@@ -97,9 +97,13 @@ public class KillCommand extends VanillaCommand {
                 }
                 String entities = joiner.toString();
                 sender.sendMessage(new TranslationContainer("commands.kill.successful", entities.isEmpty() ? "0" : entities));
-            } else if (args[0].equals("@s") && sender instanceof Player) {
+            } else if (args[0].equals("@s")) {
                 if (!sender.hasPermission("nukkit.command.kill.self")) {
                     sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.permission"));
+                    return true;
+                }
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(new TranslationContainer("%commands.generic.ingame"));
                     return true;
                 }
                 EntityDamageEvent ev = new EntityDamageEvent((Player) sender, DamageCause.SUICIDE, 1000);
