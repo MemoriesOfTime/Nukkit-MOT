@@ -5,7 +5,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 
@@ -65,7 +65,7 @@ public class BlockCarpet extends BlockFlowable {
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
 
-        return new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x + 1, this.y + 0.0625, this.z + 1);
+        return new AxisAlignedBB(this.x, this.y, this.z, this.x + 1, this.y + 0.0625, this.z + 1);
     }
 
     @Override

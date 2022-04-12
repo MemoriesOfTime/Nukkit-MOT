@@ -182,11 +182,6 @@ public class BlockSweetBerryBush extends BlockFlowable {
     }
 
     @Override
-    public AxisAlignedBB getCollisionBoundingBox() {
-        return this.getDamage() > 0? this : null;
-    }
-
-    @Override
     public Item[] getDrops(Item item) {
         int age = MathHelper.clamp(getDamage(), 0, 3);
         int amount = 1 + ThreadLocalRandom.current().nextInt(2);

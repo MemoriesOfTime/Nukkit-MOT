@@ -7,7 +7,7 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
 
@@ -90,7 +90,7 @@ public class BlockLadder extends BlockTransparentMeta implements Faceable {
         double f = 0.1875;
 
         if (this.getDamage() == 2) {
-            return new SimpleAxisAlignedBB(
+            return new AxisAlignedBB(
                     this.x,
                     this.y,
                     this.z + 1 - f,
@@ -99,7 +99,7 @@ public class BlockLadder extends BlockTransparentMeta implements Faceable {
                     this.z + 1
             );
         } else if (this.getDamage() == 3) {
-            return new SimpleAxisAlignedBB(
+            return new AxisAlignedBB(
                     this.x,
                     this.y,
                     this.z,
@@ -108,7 +108,7 @@ public class BlockLadder extends BlockTransparentMeta implements Faceable {
                     this.z + f
             );
         } else if (this.getDamage() == 4) {
-            return new SimpleAxisAlignedBB(
+            return new AxisAlignedBB(
                     this.x + 1 - f,
                     this.y,
                     this.z,
@@ -117,7 +117,7 @@ public class BlockLadder extends BlockTransparentMeta implements Faceable {
                     this.z + 1
             );
         } else if (this.getDamage() == 5) {
-            return new SimpleAxisAlignedBB(
+            return new AxisAlignedBB(
                     this.x,
                     this.y,
                     this.z,

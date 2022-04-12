@@ -672,7 +672,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.setLevel(this.server.getDefaultLevel());
         this.viewDistance = this.server.getViewDistance();
         this.chunkRadius = viewDistance;
-        this.boundingBox = new SimpleAxisAlignedBB(0, 0, 0, 0, 0, 0);
+        this.boundingBox = new AxisAlignedBB(0, 0, 0, 0, 0, 0);
     }
 
     @Override
@@ -1835,7 +1835,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.collisionBlocks = null;
                     }
                     if (this.server.getMobAiEnabled() && this.age % 20 == 0) {
-                        AxisAlignedBB aab = new SimpleAxisAlignedBB(
+                        AxisAlignedBB aab = new AxisAlignedBB(
                                 this.getX() - 0.6f,
                                 this.getY() + 1.45f,
                                 this.getZ() - 0.6f,
