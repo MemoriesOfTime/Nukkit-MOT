@@ -1,6 +1,7 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
+import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityWalking;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
@@ -79,4 +80,10 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
 
         return true;
     }
+
+    @Override
+    public boolean canTarget(Entity entity) {
+        return ((this.isInLove() || entity instanceof cn.nukkit.Player) && entity.canBeFollowed());
+    }
+
 }

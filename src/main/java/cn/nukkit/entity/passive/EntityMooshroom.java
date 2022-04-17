@@ -112,7 +112,7 @@ public class EntityMooshroom extends EntityWalkingAnimal {
             }
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_MILK);
             return false;
-        } else if (item.getId() == Item.WHEAT && !this.isBaby()) {
+        } else if (item.getId() == Item.WHEAT && !this.isBaby() && !this.isInLoveCooldown()) {
             if (!player.isCreative()) {
                 player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             }

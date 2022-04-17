@@ -84,22 +84,22 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getId() == Item.CARROT && !this.isBaby()) {
+        if (item.getId() == Item.CARROT && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(),0),Item.get(Item.CARROT)));
             this.setInLove();
             return true;
-        } else if (item.getId() == Item.POTATO && !this.isBaby()) {
+        } else if (item.getId() == Item.POTATO && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(),0),Item.get(Item.POTATO)));
             this.setInLove();
             return true;
-        } else if (item.getId() == Item.BEETROOT && !this.isBaby()) {
+        } else if (item.getId() == Item.BEETROOT && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(),0),Item.get(Item.BEETROOT)));
             this.setInLove();
             return true;
-        } else if (item.getId() == Item.SADDLE && !this.isSaddled() && !this.isBaby()) {
+        } else if (item.getId() == Item.SADDLE && !this.isSaddled() && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_SADDLE);
             this.setSaddled(true);

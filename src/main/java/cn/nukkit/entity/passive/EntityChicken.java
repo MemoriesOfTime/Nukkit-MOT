@@ -108,25 +108,25 @@ public class EntityChicken extends EntityWalkingAnimal {
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getId() == Item.SEEDS && !this.isBaby()) {
+        if (item.getId() == Item.SEEDS && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addParticle(new ItemBreakParticle(
                     this.add(Utils.rand(-0.5, 0.5), this.getMountedYOffset(), Utils.rand(-0.5, 0.5)),
                     Item.get(Item.SEEDS)));
             this.setInLove();
-        } else if (item.getId() == Item.BEETROOT_SEEDS && !this.isBaby()) {
+        } else if (item.getId() == Item.BEETROOT_SEEDS && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addParticle(new ItemBreakParticle(
                     this.add(Utils.rand(-0.5, 0.5), this.getMountedYOffset(), Utils.rand(-0.5, 0.5)),
                     Item.get(Item.BEETROOT_SEEDS)));
             this.setInLove();
-        } else if (item.getId() == Item.MELON_SEEDS && !this.isBaby()) {
+        } else if (item.getId() == Item.MELON_SEEDS && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addParticle(new ItemBreakParticle(
                     this.add(Utils.rand(-0.5, 0.5), this.getMountedYOffset(), Utils.rand(-0.5, 0.5)),
                     Item.get(Item.MELON_SEEDS)));
             this.setInLove();
-        } else if (item.getId() == Item.PUMPKIN_SEEDS && !this.isBaby()) {
+        } else if (item.getId() == Item.PUMPKIN_SEEDS && !this.isBaby() && !this.isInLoveCooldown()) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addParticle(new ItemBreakParticle(
                     this.add(Utils.rand(-0.5, 0.5), this.getMountedYOffset(), Utils.rand(-0.5, 0.5)),

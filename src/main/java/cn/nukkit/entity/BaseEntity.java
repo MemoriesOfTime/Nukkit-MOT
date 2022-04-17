@@ -36,6 +36,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     protected Entity followTarget = null;
     protected int attackDelay = 0;
     private short inLoveTicks = 0;
+    private short inLoveCooldown = 0;
 
     private boolean baby = false;
     private boolean movement = true;
@@ -128,12 +129,21 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         }
     }
 
+    @Override
     public void saveNBT() {
         super.saveNBT();
 
         this.namedTag.putBoolean("Baby", this.baby);
         this.namedTag.putBoolean("Movement", this.isMovement());
         this.namedTag.putShort("Age", this.age);
+
+        if (this.isInLove()) {
+            this.namedTag.putShort("inLoveTicks", this.inLoveTicks);
+        }
+        if (this.isInLoveCooldown()) {
+            this.namedTag.putShort("inLoveCooldown", this.inLoveCooldown);
+        }
+
     }
 
     public boolean targetOption(EntityCreature creature, double distance) {
@@ -173,13 +183,56 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                 for (int i = 0; i < 3; i++) {
                     this.level.addParticle(new HeartParticle(this.add(Utils.rand(-1.0, 1.0), this.getMountedYOffset() + Utils.rand(-1.0, 1.0), Utils.rand(-1.0, 1.0))));
                 }
+                Entity[] collidingEntities = this.level.getCollidingEntities(this.boundingBox.grow(0.5d, 0.5d, 0.5d));
+                for (Entity entity : collidingEntities) {
+                    if (this.checkSpawnBaby(entity)) {
+                        break;
+                    }
+                }
             }
+        }else if (isInLoveCooldown()) {
+            this.inLoveCooldown -= tickDiff;
         }
 
         if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.stopTiming();
 
         return hasUpdate;
     }
+
+    protected boolean checkSpawnBaby(Entity entity) {
+        if (!(entity instanceof BaseEntity) || entity.getNetworkId() != this.getNetworkId()) {
+            return false;
+        }
+        BaseEntity baseEntity = (BaseEntity) entity;
+        if (!baseEntity.isInLove() || baseEntity.isBaby() || baseEntity.age <= 0) {
+            return false;
+        }
+
+        this.setInLove(false);
+        baseEntity.setInLove(false);
+
+        this.setInLoveCooldown((short) 1200);
+        baseEntity.setInLoveCooldown((short) 1200);
+
+        this.stayTime = 60;
+        baseEntity.stayTime = 60;
+
+        int i = 0;
+        for (Entity entity2 : this.chunk.getEntities().values()) {
+            if (entity2.getNetworkId() == getNetworkId()) {
+                i++;
+                if (i > 10) {
+                    return true;
+                }
+            }
+        }
+
+        BaseEntity newEntity = (BaseEntity) Entity.createEntity(getNetworkId(), this, new Object[0]);
+        newEntity.setBaby(true);
+        newEntity.spawnToAll();
+        return true;
+    }
+
 
     @Override
     public boolean attack(EntityDamageEvent source) {
@@ -280,12 +333,29 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     public void setInLove() {
-        this.inLoveTicks = 600;
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, true);
+        this.setInLove(true);
+    }
+
+    public void setInLove(boolean inLove) {
+        if (inLove && !this.isBaby()) {
+            this.inLoveTicks = 600;
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, true);
+        }else {
+            this.inLoveTicks = 0;
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, false);
+        }
     }
 
     public boolean isInLove() {
         return inLoveTicks > 0;
+    }
+
+    public void setInLoveCooldown(short inLoveCooldown) {
+        this.inLoveCooldown = inLoveCooldown;
+    }
+
+    public boolean isInLoveCooldown() {
+        return this.inLoveCooldown > 0;
     }
 
     public Item[] getRandomArmor() {
