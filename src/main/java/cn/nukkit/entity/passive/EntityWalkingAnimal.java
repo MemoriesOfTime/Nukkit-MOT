@@ -83,7 +83,7 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
 
     @Override
     public boolean canTarget(Entity entity) {
-        return ((this.isInLove() || entity instanceof cn.nukkit.Player) && entity.canBeFollowed());
+        return ((this.isInLove() || entity instanceof Player) && entity.canBeFollowed());
     }
 
 }

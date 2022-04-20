@@ -11,7 +11,6 @@ import cn.nukkit.level.GameRule;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddPaintingPacket;
@@ -176,7 +175,7 @@ public class EntityPainting extends EntityHanging {
         DONKEY_KONG("DonkeyKong", 4, 3),
         POINTER("Pointer", 4, 4),
         PIG_SCENE("Pigscene", 4, 4),
-        FLAMING_SKULL("Flaming Skull", 4, 4);
+        BURNING_SKULL("BurningSkull", 4, 4);
 
         public final String title;
         public final int width;
