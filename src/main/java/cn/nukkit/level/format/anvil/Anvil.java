@@ -1,19 +1,16 @@
 package cn.nukkit.level.format.anvil;
 
-import cn.nukkit.blockentity.BlockEntity;
-import cn.nukkit.blockentity.BlockEntitySpawnable;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.BaseLevelProvider;
 import cn.nukkit.level.format.generic.BaseRegionLoader;
+import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.generator.Generator;
-import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.ChunkException;
 import cn.nukkit.utils.ThreadCache;
@@ -24,10 +21,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
@@ -35,9 +31,6 @@ import java.util.regex.Pattern;
  * Nukkit Project
  */
 public class Anvil extends BaseLevelProvider {
-
-    private static final byte[] PAD_256 = new byte[256];
-    public static final int EXTENDED_NEGATIVE_SUB_CHUNKS = 4;
 
     public Anvil(Level level, String path) throws IOException {
         super(level, path);
@@ -117,7 +110,7 @@ public class Anvil extends BaseLevelProvider {
 
         long timestamp = chunk.getChanges();
 
-        byte[] blockEntities = new byte[0];
+        /*byte[] blockEntities = new byte[0];
 
         if (!chunk.getBlockEntities().isEmpty()) {
             List<CompoundTag> tagList = new ArrayList<>();
@@ -211,10 +204,14 @@ public class Anvil extends BaseLevelProvider {
                 count += EXTENDED_NEGATIVE_SUB_CHUNKS;
             }
             this.getLevel().chunkRequestCallback(protocolId, timestamp, x, z, count, stream.getBuffer());
-        }
+        }*/
+
+        Consumer<NetworkChunkSerializer.NetworkChunkSerializerCallback> callback = (networkChunkSerializerCallback) ->
+                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(), timestamp, x, z, networkChunkSerializerCallback.getSubchunks(), networkChunkSerializerCallback.getStream().getBuffer());
+        NetworkChunkSerializer.serialize(protocols, chunk, callback, this.level.getDimensionData());
     }
 
-    private byte[] convert2DBiomesTo3D(int protocolId, BaseFullChunk chunk) {
+/*    private byte[] convert2DBiomesTo3D(int protocolId, BaseFullChunk chunk) {
         PalettedBlockStorage palette = PalettedBlockStorage.createWithDefaultState(Biome.getBiomeIdOrCorrect(protocolId, chunk.getBiomeId(0, 0)));
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
@@ -234,7 +231,7 @@ public class Anvil extends BaseLevelProvider {
             stream.put(bytes);
         }
         return stream.getBuffer();
-    }
+    }*/
 
     private int lastPosition = 0;
 

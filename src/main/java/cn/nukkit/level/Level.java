@@ -31,7 +31,6 @@ import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
-import cn.nukkit.level.format.anvil.Anvil;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.BaseLevelProvider;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
@@ -259,7 +258,7 @@ public class Level implements ChunkManager, Metadatable {
 
     private long levelCurrentTick;
 
-    private int dimension;
+    private DimensionData dimensionData;
 
     public GameRules gameRules;
 
@@ -399,7 +398,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public void initLevel() {
         Generator generator = generators.get();
-        this.dimension = generator.getDimension();
+        this.dimensionData = generator.getDimensionData();
         this.gameRules = this.provider.getGamerules();
     }
 
@@ -640,11 +639,11 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void addParticleEffect(Vector3 pos, ParticleEffect particleEffect) {
-        this.addParticleEffect(pos, particleEffect, -1, this.dimension, (Player[]) null);
+        this.addParticleEffect(pos, particleEffect, -1, this.getDimension(), (Player[]) null);
     }
 
     public void addParticleEffect(Vector3 pos, ParticleEffect particleEffect, long uniqueEntityId) {
-        this.addParticleEffect(pos, particleEffect, uniqueEntityId, this.dimension, (Player[]) null);
+        this.addParticleEffect(pos, particleEffect, uniqueEntityId, this.getDimension(), (Player[]) null);
     }
 
     public void addParticleEffect(Vector3 pos, ParticleEffect particleEffect, long uniqueEntityId, int dimensionId) {
@@ -848,7 +847,7 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         // Tick Weather
-        if (this.dimension != DIMENSION_NETHER && this.dimension != DIMENSION_THE_END && this.gameRules.getBoolean(GameRule.DO_WEATHER_CYCLE) && this.randomTickingEnabled()) {
+        if (this.getDimension() != DIMENSION_NETHER && this.getDimension() != DIMENSION_THE_END && this.gameRules.getBoolean(GameRule.DO_WEATHER_CYCLE) && this.randomTickingEnabled()) {
             this.rainTime--;
             if (this.rainTime <= 0) {
                 if (!this.setRaining(!this.raining)) {
@@ -2290,7 +2289,7 @@ public class Level implements ChunkManager, Metadatable {
             return null;
         }
 
-        if (block.y > 127 && this.dimension == DIMENSION_NETHER) {
+        if (block.y > 127 && this.getDimension() == DIMENSION_NETHER) {
             return null;
         }
 
@@ -4056,8 +4055,12 @@ public class Level implements ChunkManager, Metadatable {
         this.sendWeather(players.toArray(new Player[0]));
     }
 
+    public DimensionData getDimensionData() {
+        return this.dimensionData;
+    }
+
     public int getDimension() {
-        return dimension;
+        return this.dimensionData.getDimensionId();
     }
 
     public boolean canBlockSeeSky(Vector3 pos) {
@@ -4185,7 +4188,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean createPortal(Block target, boolean fireCharge) {
-        if (this.dimension == DIMENSION_THE_END) return false;
+        if (this.getDimension() == DIMENSION_THE_END) return false;
         final int maxPortalSize = 23;
         final int targX = target.getFloorX();
         final int targY = target.getFloorY();
@@ -4437,7 +4440,9 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_18_10) { //调色板修改
+        if (protocol >= ProtocolInfo.v1_18_30) { //调色板 物品运行时id 地图数据编码
+            return ProtocolInfo.v1_18_30;
+        }else if (protocol >= ProtocolInfo.v1_18_10) { //调色板修改
             return ProtocolInfo.v1_18_10;
         } else if (protocol >= ProtocolInfo.v1_18_0) { //世界高度改变
             return ProtocolInfo.v1_18_0;
@@ -4483,10 +4488,11 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_17_10)
             if (player >= ProtocolInfo.v1_17_10) if (player < ProtocolInfo.v1_17_30) return true;
         if (chunk == ProtocolInfo.v1_17_30) if (player == ProtocolInfo.v1_17_30) return true;
-        if (chunk == ProtocolInfo.v1_17_40) if (player >= ProtocolInfo.v1_17_40) return true;
-        if (chunk == ProtocolInfo.v1_18_0) if (player >= ProtocolInfo.v1_18_0) return true;
-        if (chunk == ProtocolInfo.v1_18_10) if (player >= ProtocolInfo.v1_18_10) return true;
-        return false; // Remember to update when block palette changes
+        if (chunk == ProtocolInfo.v1_17_40) if (player == ProtocolInfo.v1_17_40) return true;
+        if (chunk == ProtocolInfo.v1_18_0) if (player == ProtocolInfo.v1_18_0) return true;
+        if (chunk == ProtocolInfo.v1_18_10) if (player == ProtocolInfo.v1_18_10) return true;
+        if (chunk == ProtocolInfo.v1_18_30) if (player >= ProtocolInfo.v1_18_30) return true;
+        return false; //TODO Remember to update when block palette changes
     }
 
     private static class CharacterHashMap extends HashMap<Character, Object> {

@@ -31,5 +31,8 @@ public class SpawnParticleEffectPacket extends DataPacket {
         }
         this.putVector3f(this.position);
         this.putString(this.identifier);
+        if (protocol >= ProtocolInfo.v1_18_30) {
+            this.putBoolean(false);
+        }
     }
 }

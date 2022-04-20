@@ -95,7 +95,11 @@ public class StartGamePacket extends DataPacket {
         this.putVector3f(this.x, this.y, this.z);
         this.putLFloat(this.yaw);
         this.putLFloat(this.pitch);
-        this.putVarInt(this.seed);
+        if (protocol >= ProtocolInfo.v1_18_30) {
+            this.putLLong(this.seed);
+        }else {
+            this.putVarInt(this.seed);
+        }
         if (protocol >= 407) {
             this.putLShort(0x00); // SpawnBiomeType - Default
             this.putString(protocol >= ProtocolInfo.v1_16_100 ? "plains" : ""); // UserDefinedBiomeName

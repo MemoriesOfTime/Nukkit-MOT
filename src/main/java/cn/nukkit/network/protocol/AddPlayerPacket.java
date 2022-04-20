@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Server;
 import cn.nukkit.entity.data.EntityMetadata;
 import cn.nukkit.item.Item;
 import cn.nukkit.utils.Binary;
@@ -35,6 +36,10 @@ public class AddPlayerPacket extends DataPacket {
     public float pitch;
     public float yaw;
     public Item item;
+    /**
+     * v1.18.30 and above
+     */
+    public int gameType = Server.getInstance().getGamemode();
     public EntityMetadata metadata = new EntityMetadata();
     public String deviceId = "";
     public int buildPlatform = -1;
@@ -63,6 +68,9 @@ public class AddPlayerPacket extends DataPacket {
         this.putLFloat(this.yaw);
         this.putLFloat(this.yaw);
         this.putSlot(protocol, this.item);
+        if (protocol >= ProtocolInfo.v1_18_30) {
+            this.putVarInt(this.gameType);
+        }
         this.put(Binary.writeMetadata(protocol, this.metadata));
         if (protocol > 274) {
             this.putUnsignedVarInt(0);

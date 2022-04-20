@@ -27,6 +27,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping448;
     private static RuntimeItemMapping mapping475;
     private static RuntimeItemMapping mapping486;
+    private static RuntimeItemMapping mapping503;
 
     private static boolean initialized;
 
@@ -68,10 +69,13 @@ public class RuntimeItems {
         mapping448 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_448.json", ProtocolInfo.v1_17_10);
         mapping475 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_475.json", ProtocolInfo.v1_18_0);
         mapping486 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_486.json", ProtocolInfo.v1_18_10);
+        mapping503 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_503.json", ProtocolInfo.v1_18_30);
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_18_10) {
+        if (protocolId >= ProtocolInfo.v1_18_30) {
+            return mapping503;
+        }else if (protocolId >= ProtocolInfo.v1_18_10) {
             return mapping486;
         } else if (protocolId >= ProtocolInfo.v1_18_0) {
             return mapping475;
