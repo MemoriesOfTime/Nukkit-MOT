@@ -350,8 +350,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     private static final List<Item> creative448 = new ObjectArrayList<>();
     private static final List<Item> creative465 = new ObjectArrayList<>();
     private static final List<Item> creative471 = new ObjectArrayList<>();
+    private static final List<Item> creative475 = new ObjectArrayList<>();
     private static final List<Item> creative486 = new ObjectArrayList<>();
     private static final List<Item> creative503 = new ObjectArrayList<>();
+    private static final List<Item> creative527 = new ObjectArrayList<>();
 
     @SuppressWarnings("unchecked")
     private static void initCreativeItems() {
@@ -447,8 +449,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCreativeItemsNew(ProtocolInfo.v1_17_10, ProtocolInfo.v1_17_10, creative448);
         registerCreativeItemsNew(ProtocolInfo.v1_17_30, ProtocolInfo.v1_17_30, creative465);
         registerCreativeItemsNew(ProtocolInfo.v1_17_30, ProtocolInfo.v1_17_40, creative471);
+        registerCreativeItemsNew(ProtocolInfo.v1_18_0, ProtocolInfo.v1_18_0, creative475);
         registerCreativeItemsNew(ProtocolInfo.v1_18_10, ProtocolInfo.v1_18_10, creative486);
         registerCreativeItemsNew(ProtocolInfo.v1_18_30, ProtocolInfo.v1_18_30, creative503);
+        registerCreativeItemsNew(ProtocolInfo.v1_19_0, ProtocolInfo.v1_19_0, creative527);
     }
 
     private static void registerCreativeItemsNew(int protocol, int blockPaletteProtocol, List<Item> creativeItems) {
@@ -482,8 +486,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         Item.creative448.clear();
         Item.creative465.clear();
         Item.creative471.clear();
+        Item.creative475.clear();
         Item.creative486.clear();
         Item.creative503.clear();
+        Item.creative527.clear();
     }
 
     public static ArrayList<Item> getCreativeItems() {
@@ -546,12 +552,15 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_17_30:
                 return new ArrayList<>(Item.creative465);
             case v1_17_40:
-            case v1_18_0:
                 return new ArrayList<>(Item.creative471);
+            case v1_18_0:
+                return new ArrayList<>(Item.creative475);
             case v1_18_10:
                 return new ArrayList<>(Item.creative486);
             case v1_18_30:
                 return new ArrayList<>(Item.creative503);
+            case v1_19_0:
+                return new ArrayList<>(Item.creative527);
             default:
                 throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
         }
@@ -604,8 +613,14 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_18_10:
                 Item.creative486.add(item.clone());
                 break;
+            case v1_18_0:
+                Item.creative475.add(item.clone());
+                break;
             case v1_18_30:
                 Item.creative503.add(item.clone());
+                break;
+            case v1_19_0:
+                Item.creative527.add(item.clone());
                 break;
             default:
                 throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);

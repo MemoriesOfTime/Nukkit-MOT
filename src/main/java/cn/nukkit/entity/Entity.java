@@ -306,6 +306,7 @@ public abstract class Entity extends Location implements Metadatable {
     private static final Map<Integer, String> entityRuntimeMappingOld = new HashMap<>();
     private static final Map<Integer, String> entityRuntimeMapping407 = new HashMap<>();
     private static final Map<Integer, String> entityRuntimeMapping440 = new HashMap<>();
+    private static final Map<Integer, String> entityRuntimeMapping527 = new HashMap<>();
 
     private static final Map<Integer, CompoundTag> entityIdentifiersMap = new HashMap<>();
     private static final Map<Integer, byte[]> entityIdentifiersCache = new HashMap<>();
@@ -314,6 +315,7 @@ public abstract class Entity extends Location implements Metadatable {
         AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMappingOld, ProtocolInfo.v1_2_0);
         AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMapping407, ProtocolInfo.v1_16_0);
         AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMapping440, ProtocolInfo.v1_17_0);
+        AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMapping527, ProtocolInfo.v1_19_0);
         initEntityIdentifiers(ProtocolInfo.v1_2_0, Base64.getDecoder().decode(AvailableEntityIdentifiersPacket.NBT313));
         initEntityIdentifiers(ProtocolInfo.v1_10_0, Base64.getDecoder().decode(AvailableEntityIdentifiersPacket.NBT340));
         initEntityIdentifiers(ProtocolInfo.v1_16_100, AvailableEntityIdentifiersPacket.NBT419);
@@ -962,7 +964,9 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     protected static Map<Integer, String> getEntityRuntimeMappingInternal(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_17_0) {
+        if (protocolId >= ProtocolInfo.v1_19_0) {
+            return entityRuntimeMapping527;
+        } else if (protocolId >= ProtocolInfo.v1_17_0) {
             return entityRuntimeMapping440;
         } else if (protocolId >= ProtocolInfo.v1_16_0) {
             return entityRuntimeMapping407;

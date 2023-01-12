@@ -3,8 +3,13 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
 import lombok.ToString;
+
+import java.io.IOException;
+import java.util.UUID;
 
 @ToString
 public class StartGamePacket extends DataPacket {
@@ -225,7 +230,17 @@ public class StartGamePacket extends DataPacket {
                 if (protocol >= ProtocolInfo.v1_16_230_50) {
                     this.putString(""); // serverEngine
                     if (protocol >= ProtocolInfo.v1_18_0) {
+                        if (protocol >= ProtocolInfo.v1_19_0) {
+                            try {
+                                this.put(NBTIO.writeNetwork(new CompoundTag(""))); // playerPropertyData
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
                         this.putLLong(0L); // BlockRegistryChecksum
+                        if (protocol >= ProtocolInfo.v1_19_0) {
+                            this.putUUID(new UUID(0, 0)); // worldTemplateId
+                        }
                     }
                 }
             }

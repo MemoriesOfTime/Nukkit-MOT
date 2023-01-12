@@ -164,6 +164,12 @@ public class AddEntityPacket extends DataPacket {
             mapping.put(EntityGlowSquid.NETWORK_ID, "minecraft:glow_squid");
             mapping.put(EntityAxolotl.NETWORK_ID, "minecraft:axolotl");
         }
+
+        if (protocolId < ProtocolInfo.v1_19_0) {
+            mapping.put(EntityAllay.NETWORK_ID, mapping.get(EntityParrot.NETWORK_ID));
+        }else {
+            mapping.put(EntityAllay.NETWORK_ID, "minecraft:allay");
+        }
     }
 
     @Override

@@ -8,14 +8,8 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.plugin.PluginDescription;
 import cn.nukkit.utils.TextFormat;
-import com.google.gson.JsonParser;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URL;
-import java.net.URLConnection;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Created on 2015/11/12 by xtypr.
@@ -41,7 +35,7 @@ public class VersionCommand extends VanillaCommand {
         if (args.length == 0 || !sender.hasPermission("nukkit.command.version.plugins")) {
             sender.sendMessage("§e###############################################\n§cNukkit §aPetteriM1 Edition\n§6Build: §b" + Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4) + "\n§6Multiversion: §bUp to version " + ProtocolInfo.MINECRAFT_VERSION_NETWORK + "\n§dhttps://github.com/PetteriM1/NukkitPetteriM1Edition\n§e###############################################");
 
-            if (sender.isOp()) {
+            /*if (sender.isOp()) {
                 CompletableFuture.runAsync(() -> {
                     try {
                         URLConnection request = new URL(Nukkit.BRANCH).openConnection();
@@ -52,15 +46,15 @@ public class VersionCommand extends VanillaCommand {
 
                         if (Nukkit.getBranch().equals("master")) {
                             if (!sender.getServer().getNukkitVersion().equals(latest) && !sender.getServer().getNukkitVersion().equals("git-null")) {
-                                sender.sendMessage("\u00A7c[Nukkit-PM1E-MOT][Update] \u00A7eThere is a new build of Nukkit PetteriM1 Edition available! Current: " + sender.getServer().getNukkitVersion() + " Latest: " + latest);
+                                sender.sendMessage("\u00A7c[Nukkit-PM1E][Update] \u00A7eThere is a new build of Nukkit PetteriM1 Edition available! Current: " + sender.getServer().getNukkitVersion() + " Latest: " + latest);
                             } else {
-                                sender.sendMessage("\u00A7c[Nukkit-PM1E-MOT] \u00A7aYou are running the latest version.");
+                                sender.sendMessage("\u00A7c[Nukkit-PM1E] \u00A7aYou are running the latest version.");
                             }
                         }
                     } catch (Exception ignore) {
                     }
                 });
-            }
+            }*/
         } else {
             StringBuilder pluginName = new StringBuilder();
             for (String arg : args) pluginName.append(arg).append(' ');

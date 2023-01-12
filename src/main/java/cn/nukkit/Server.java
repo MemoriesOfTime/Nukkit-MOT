@@ -73,14 +73,11 @@ import cn.nukkit.resourcepacks.ResourcePackManager;
 import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.scheduler.Task;
 import cn.nukkit.utils.*;
-import cn.nukkit.utils.bugreport.ExceptionHandler;
 import co.aikar.timings.Timings;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.gson.JsonParser;
 import io.netty.buffer.ByteBuf;
 import io.sentry.SentryClient;
-import io.sentry.SentryClientFactory;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -91,13 +88,17 @@ import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.impl.Iq80DBFactory;
 
-import java.io.*;
-import java.net.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -709,7 +710,7 @@ public class Server {
         }
 
         // Check for updates
-        CompletableFuture.runAsync(() -> {
+        /*CompletableFuture.runAsync(() -> {
             try {
                 URLConnection request = new URL(Nukkit.BRANCH).openConnection();
                 request.connect();
@@ -719,17 +720,17 @@ public class Server {
 
                 boolean isMaster = Nukkit.getBranch().equals("master");
                 if (!this.getNukkitVersion().equals(latest) && !this.getNukkitVersion().equals("git-null") && isMaster) {
-                    this.getLogger().info("\u00A7c[Nukkit-PM1E-MOT][Update] \u00A7eThere is a new build of Nukkit PetteriM1 Edition available! Current: " + this.getNukkitVersion() + " Latest: " + latest);
-                    this.getLogger().info("\u00A7c[Nukkit-PM1E-MOT][Update] \u00A7eYou can download the latest build from https://github.com/MemoriesOfTime/NukkitPetteriM1Edition/wiki/download");
+                    this.getLogger().info("\u00A7c[Nukkit-PM1E][Update] \u00A7eThere is a new build of Nukkit PetteriM1 Edition available! Current: " + this.getNukkitVersion() + " Latest: " + latest);
+                    this.getLogger().info("\u00A7c[Nukkit-PM1E][Update] \u00A7eYou can download the latest build from https://github.com/MemoriesOfTime/NukkitPetteriM1Edition/wiki/download");
                 } else if (!isMaster) {
-                    this.getLogger().warning("\u00A7c[Nukkit-PM1E-MOT] \u00A7eYou are running a dev build! Do not use in production! Branch: " + Nukkit.getBranch());
+                    this.getLogger().warning("\u00A7c[Nukkit-PM1E] \u00A7eYou are running a dev build! Do not use in production! Branch: " + Nukkit.getBranch());
                 }
 
                 this.getLogger().debug("Update check done");
             } catch (Exception ignore) {
                 this.getLogger().debug("Update check failed");
             }
-        });
+        });*/
 
         this.start();
     }
@@ -2790,6 +2791,7 @@ public class Server {
         Entity.registerEntity("Goat", EntityGoat.class);
         Entity.registerEntity("Axolotl", EntityAxolotl.class);
         Entity.registerEntity("GlowSquid", EntityGlowSquid.class);
+        Entity.registerEntity("Allay", EntityAllay.class);
         //Vehicles
         Entity.registerEntity("MinecartRideable", EntityMinecartEmpty.class);
         Entity.registerEntity("MinecartChest", EntityMinecartChest.class);

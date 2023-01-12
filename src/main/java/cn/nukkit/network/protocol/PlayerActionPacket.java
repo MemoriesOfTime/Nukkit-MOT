@@ -42,6 +42,7 @@ public class PlayerActionPacket extends DataPacket {
     public int x;
     public int y;
     public int z;
+    public BlockVector3 resultPosition; //1.19.0开始
     public int face;
 
     @Override
@@ -61,6 +62,9 @@ public class PlayerActionPacket extends DataPacket {
         this.putEntityRuntimeId(this.entityId);
         this.putVarInt(this.action);
         this.putBlockVector3(this.x, this.y, this.z);
+        if (protocol >= ProtocolInfo.v1_19_0) {
+            this.putBlockVector3(this.resultPosition);
+        }
         this.putVarInt(this.face);
     }
 

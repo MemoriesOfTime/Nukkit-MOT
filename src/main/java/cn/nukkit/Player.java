@@ -82,7 +82,6 @@ import co.aikar.timings.Timings;
 import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.gson.JsonParser;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
@@ -97,18 +96,13 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
-import java.net.URL;
-import java.net.URLConnection;
 import java.nio.ByteOrder;
 import java.util.List;
 import java.util.*;
 import java.util.Queue;
 import java.util.Map.Entry;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1046,7 +1040,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        if (server.updateChecks && this.isOp()) {
+        /*if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
                 try {
                     URLConnection request = new URL(Nukkit.BRANCH).openConnection();
@@ -1057,12 +1051,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     if (Nukkit.getBranch().equals("master")) {
                         if (!server.getNukkitVersion().equals(latest) && !server.getNukkitVersion().equals("git-null")) {
-                            this.sendMessage("\u00A7c[Nukkit-PM1E-MOT][Update] \u00A7eThere is a new build of Nukkit PetteriM1 Edition available! Current: " + server.getNukkitVersion() + " Latest: " + latest);
+                            this.sendMessage("\u00A7c[Nukkit-PM1E][Update] \u00A7eThere is a new build of Nukkit PetteriM1 Edition available! Current: " + server.getNukkitVersion() + " Latest: " + latest);
                         }
                     }
                 } catch (Exception ignore) {}
             });
-        }
+        }*/
     }
 
     protected boolean orderChunks() {

@@ -25,7 +25,7 @@ public abstract class Biome implements BlockID {
 
     public static final Biome[] biomes = new Biome[256];
     public static final List<Biome> unorderedBiomes = new ObjectArrayList<>();
-    private static final Int2ObjectMap<String> runtimeId2Identifier475 = new Int2ObjectOpenHashMap<>();
+    private static final Int2ObjectMap<String> runtimeId2Identifier = new Int2ObjectOpenHashMap<>();
 
     private final ArrayList<Populator> populators = new ArrayList<>();
     private int id;
@@ -33,23 +33,23 @@ public abstract class Biome implements BlockID {
     private float heightVariation = 0.3f;
 
     static {
-        try (InputStream stream = Biome.class.getClassLoader().getResourceAsStream("biome_id_map_475.json")) {
+        try (InputStream stream = Biome.class.getClassLoader().getResourceAsStream("biome_id_map.json")) {
             JsonObject json = JsonParser.parseReader(new InputStreamReader(stream)).getAsJsonObject();
             for (String identifier : json.keySet()) {
                 int biomeId = json.get(identifier).getAsInt();
-                runtimeId2Identifier475.put(biomeId, identifier);
+                runtimeId2Identifier.put(biomeId, identifier);
             }
         } catch (NullPointerException | IOException e) {
-            throw new AssertionError("Unable to load biome mapping from biome_id_map_475.json", e);
+            throw new AssertionError("Unable to load biome mapping from biome_id_map.json", e);
         }
     }
 
     public static String getBiomeNameFromId(int protocol, int biomeId) {
-        return runtimeId2Identifier475.get(biomeId);
+        return runtimeId2Identifier.get(biomeId);
     }
 
     public static int getBiomeIdOrCorrect(int protocol, int biomeId) {
-        if (runtimeId2Identifier475.get(biomeId) == null) {
+        if (runtimeId2Identifier.get(biomeId) == null) {
             return EnumBiome.OCEAN.id;
         }
         return biomeId;

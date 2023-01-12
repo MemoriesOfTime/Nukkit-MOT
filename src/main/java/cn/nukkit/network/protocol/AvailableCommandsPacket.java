@@ -318,6 +318,18 @@ public class AvailableCommandsPacket extends DataPacket {
                                         id = 44;
                                         break;
                                 }
+                            } else if (protocol >= ProtocolInfo.v1_19_0) {
+                                if (id == ARG_TYPE_TARGET) {
+                                    id = 8;
+                                }else if (id == ARG_TYPE_WILDCARD_TARGET) {
+                                    id = 10;
+                                }else if (id == ARG_TYPE_FILE_PATH) {
+                                    id = 17;
+                                }else if (id >= ARG_TYPE_STRING && id <= ARG_TYPE_JSON) {
+                                    id = id + 10;
+                                }else if (id == ARG_TYPE_COMMAND) {
+                                    id = 70;
+                                }
                             } else if (protocol >= ProtocolInfo.v1_18_30) {
                                 if (id == ARG_TYPE_WILDCARD_TARGET ) {
                                     id = 9;
@@ -336,7 +348,6 @@ public class AvailableCommandsPacket extends DataPacket {
                                 } else if (id == ARG_TYPE_COMMAND) {
                                     id = 69;
                                 }
-
                             } else if (protocol >= ProtocolInfo.v1_16_210) { //TODO: proper implementation for 1.16.210 command params
                                 if (id == ARG_TYPE_COMMAND) {
                                     id = 63;

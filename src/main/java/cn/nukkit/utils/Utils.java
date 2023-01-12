@@ -445,6 +445,8 @@ public class Utils {
                 return "1.18.10";
             case ProtocolInfo.v1_18_30:
                 return "1.18.30";
+            case ProtocolInfo.v1_19_0:
+                return "1.19.0";
             //TODO 添加新版本支持时修改这里
             default:
                 throw new IllegalStateException("Invalid protocol: " + protocol);
