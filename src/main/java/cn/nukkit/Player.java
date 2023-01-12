@@ -4849,11 +4849,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setExperience(int exp, int level) {
-        this.exp = exp;
-        this.expLevel = level;
+        PlayerExperienceChangeEvent ev = new PlayerExperienceChangeEvent(this, this.exp, this.expLevel, exp, level);
+        this.server.getPluginManager().callEvent(ev);
 
-        this.sendExperienceLevel(level);
-        this.sendExperience(exp);
+        if (ev.isCancelled()) {
+            return;
+        }
+
+        this.exp = ev.getNewExperience();
+        this.expLevel = ev.getNewExperienceLevel();
+
+        this.sendExperienceLevel(this.expLevel);
+        this.sendExperience(this.exp);
     }
 
     public void sendExperience() {
