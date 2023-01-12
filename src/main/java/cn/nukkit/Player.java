@@ -23,7 +23,10 @@ import cn.nukkit.event.block.WaterFrostEvent;
 import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageModifier;
-import cn.nukkit.event.inventory.*;
+import cn.nukkit.event.inventory.InventoryCloseEvent;
+import cn.nukkit.event.inventory.InventoryPickupArrowEvent;
+import cn.nukkit.event.inventory.InventoryPickupItemEvent;
+import cn.nukkit.event.inventory.InventoryPickupTridentEvent;
 import cn.nukkit.event.player.*;
 import cn.nukkit.event.player.PlayerAsyncPreLoginEvent.LoginResult;
 import cn.nukkit.event.player.PlayerInteractEvent.Action;
@@ -1874,20 +1877,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (!revert && this.isFoodEnabled() && this.getServer().getDifficulty() > 0) {
+            //UpdateFoodExpLevel
             if (distance >= 0.05) {
                 double jump = 0;
                 double swimming = this.isInsideOfWater() ? 0.015 * distance : 0;
                 if (swimming != 0) distance = 0;
                 if (this.isSprinting()) {
                     if (this.inAirTicks == 3 && swimming == 0) {
-                        jump = 0.7;
-                    }
-                    this.foodData.updateFoodExpLevel(0.06 * distance + jump + swimming);
-                } else {
-                    if (this.inAirTicks == 3 && swimming == 0) {
                         jump = 0.2;
                     }
-                    this.foodData.updateFoodExpLevel(0.01 * distance + jump + swimming);
+                    this.foodData.updateFoodExpLevel(0.1 * distance + jump + swimming);
+                } else {
+                    if (this.inAirTicks == 3 && swimming == 0) {
+                        jump = 0.05;
+                    }
+                    this.foodData.updateFoodExpLevel(jump + swimming);
                 }
             }
         }
@@ -3700,7 +3704,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                                     if (this.canInteract(blockVector.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7) && (i = this.level.useBreakOn(blockVector.asVector3(), face, i, this, true)) != null) {
                                         if (this.isSurvival() || this.isAdventure()) {
-                                            this.foodData.updateFoodExpLevel(0.025);
+                                            this.foodData.updateFoodExpLevel(0.005);
                                             if (!i.equals(oldItem) || i.getCount() != oldItem.getCount()) {
                                                 if (oldItem.getId() == i.getId() || i.getId() == 0) {
                                                     inventory.setItemInHand(i);
@@ -4928,7 +4932,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (source instanceof EntityDamageByEntityEvent) {
                     Entity damager = ((EntityDamageByEntityEvent) source).getDamager();
                     if (damager instanceof Player) {
-                        ((Player) damager).foodData.updateFoodExpLevel(0.3);
+                        ((Player) damager).foodData.updateFoodExpLevel(0.1);
                     }
                 }
                 EntityEventPacket pk = new EntityEventPacket();

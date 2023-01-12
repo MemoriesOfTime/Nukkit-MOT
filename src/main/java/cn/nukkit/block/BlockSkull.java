@@ -6,15 +6,17 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemSkull;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
+import cn.nukkit.utils.Faceable;
 
 /**
  * @author Justin
  */
-public class BlockSkull extends BlockTransparentMeta {
+public class BlockSkull extends BlockTransparentMeta implements Faceable {
 
     public BlockSkull() {
         this(0);
@@ -141,5 +143,26 @@ public class BlockSkull extends BlockTransparentMeta {
     @Override
     public BlockColor getColor() {
         return BlockColor.AIR_BLOCK_COLOR;
+    }
+
+    @Override
+    public BlockFace getBlockFace() {
+        return BlockFace.fromIndex(this.getDamage() & 0x7);
+    }
+
+    @Override
+    protected AxisAlignedBB recalculateBoundingBox() {
+        AxisAlignedBB bb = new AxisAlignedBB(this.x + 0.25, this.y, this.z + 0.25, this.x + 1 - 0.25, this.y + 0.5, this.z + 1 - 0.25);
+        switch (this.getBlockFace()) {
+            case NORTH:
+                return bb.offset(0, 0.25, 0.25);
+            case SOUTH:
+                return bb.offset(0, 0.25, -0.25);
+            case WEST:
+                return bb.offset(0.25, 0.25, 0);
+            case EAST:
+                return bb.offset(-0.25, 0.25, 0);
+        }
+        return bb;
     }
 }

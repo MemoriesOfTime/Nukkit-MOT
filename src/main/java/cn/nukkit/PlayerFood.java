@@ -165,7 +165,7 @@ public class PlayerFood {
                 }
             }
             if (this.player.hasEffect(Effect.HUNGER)) {
-                this.updateFoodExpLevel(0.025);
+                this.updateFoodExpLevel(0.1 * (this.getPlayer().getEffect(Effect.HUNGER).getAmplifier() + 1));
             }
         }
     }

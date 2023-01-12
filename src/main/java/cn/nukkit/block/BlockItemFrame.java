@@ -13,13 +13,14 @@ import cn.nukkit.level.sound.ItemFrameRemovedSound;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.utils.Faceable;
 
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Created by Pub4Game on 03.07.2016.
  */
-public class BlockItemFrame extends BlockTransparentMeta {
+public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
 
     private final static int[] FACING = new int[]{4, 5, 3, 2, 1, 0}; // TODO when 1.13 support arrives, add UP/DOWN facings
 
@@ -186,6 +187,11 @@ public class BlockItemFrame extends BlockTransparentMeta {
     @Override
     public double getHardness() {
         return 0.25;
+    }
+
+    @Override
+    public BlockFace getBlockFace() {
+        return this.getFacing().getOpposite();
     }
 
     @Override

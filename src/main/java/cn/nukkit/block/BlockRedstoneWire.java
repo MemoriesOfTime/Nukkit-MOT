@@ -41,7 +41,7 @@ public class BlockRedstoneWire extends BlockFlowable {
 
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        if (face != BlockFace.UP || !canBePlacedOn(target)) {
+        if (!canBePlacedOn(block.down())) {
             return false;
         }
 
@@ -196,7 +196,7 @@ public class BlockRedstoneWire extends BlockFlowable {
             return 0;
         }
 
-        if (type == Level.BLOCK_UPDATE_NORMAL && !this.canBePlacedOn(this.getLocation().down())) {
+        if (type == Level.BLOCK_UPDATE_NORMAL && !this.canBePlacedOn(this.down())) {
             this.getLevel().useBreakOn(this);
             return Level.BLOCK_UPDATE_NORMAL;
         }
@@ -214,8 +214,10 @@ public class BlockRedstoneWire extends BlockFlowable {
     }
 
     public boolean canBePlacedOn(Vector3 v) {
-        Block b = this.level.getBlock(v);
+        return this.canBePlacedOn(this.level.getBlock(v));
+    }
 
+    private boolean canBePlacedOn(Block b) {
         return (b.isSolid() && !b.isTransparent() && b.getId() != GLOWSTONE) || b.getId() == HOPPER_BLOCK;
     }
 

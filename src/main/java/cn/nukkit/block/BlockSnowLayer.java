@@ -9,7 +9,6 @@ import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
 
 /**
@@ -152,16 +151,16 @@ public class BlockSnowLayer extends BlockFallableMeta {
 
     @Override
     public boolean onActivate(Item item, Player player) {
-        if (item.isShovel()) {
+        if (item.isShovel() && (player.gamemode & 0x2) == 0) {
             item.useOn(this);
             this.level.useBreakOn(this, item.clone().clearNamedTag(), null, true);
             return true;
-        } else if (item.getId() == SNOW_LAYER) {
+        } else if (item.getId() == SNOW_LAYER && (player.gamemode & 0x2) == 0) {
             if ((this.getDamage() & 0x7) != 0x7) {
                 this.setDamage(this.getDamage() + 1);
                 this.level.setBlock(this ,this, true);
 
-                if (player != null && (player.gamemode & 0x1) == 0) {
+                if ((player.gamemode & 0x1) == 0) {
                     item.count--;
                 }
                 return true;

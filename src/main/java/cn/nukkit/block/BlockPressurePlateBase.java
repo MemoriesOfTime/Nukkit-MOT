@@ -13,7 +13,6 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.sound.ClickSound;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.AxisAlignedBB;
 
 /**
  * Created by Snake1999 on 2016/1/11.
@@ -60,7 +59,7 @@ public abstract class BlockPressurePlateBase extends BlockFlowable {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
             Block down = this.down();
             if (down.isTransparent() && !(down instanceof BlockFence)) {
-                this.level.useBreakOn(this);
+                this.level.useBreakOn(this, Item.get(Item.WOODEN_PICKAXE));
             }
         } else if (type == Level.BLOCK_UPDATE_SCHEDULED) {
             int power = this.getRedstonePower();
