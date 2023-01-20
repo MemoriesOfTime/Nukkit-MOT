@@ -334,6 +334,7 @@ public abstract class Entity extends Location implements Metadatable {
         initEntityIdentifiers(ProtocolInfo.v1_10_0, Base64.getDecoder().decode(AvailableEntityIdentifiersPacket.NBT340));
         initEntityIdentifiers(ProtocolInfo.v1_16_100, AvailableEntityIdentifiersPacket.NBT419);
         initEntityIdentifiers(ProtocolInfo.v1_17_0, AvailableEntityIdentifiersPacket.NBT440);
+        initEntityIdentifiers(ProtocolInfo.v1_19_0, AvailableEntityIdentifiersPacket.NBT527);
     }
 
     public final Map<Integer, Player> hasSpawned = new ConcurrentHashMap<>();
@@ -999,7 +1000,9 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     private static int correctEntityIdentifiersProtocol(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_17_0) {
+        if (protocolId >= ProtocolInfo.v1_19_0) {
+            return ProtocolInfo.v1_19_0;
+        }if (protocolId >= ProtocolInfo.v1_17_0) {
             return ProtocolInfo.v1_17_0;
         } else if (protocolId >= ProtocolInfo.v1_16_100) {
             return ProtocolInfo.v1_16_100;

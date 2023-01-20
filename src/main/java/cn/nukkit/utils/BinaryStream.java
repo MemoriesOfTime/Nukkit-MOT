@@ -458,7 +458,7 @@ public class BinaryStream {
 
         int runtimeId = this.getVarInt();
         if (runtimeId == 0) {
-            return Item.get(0, 0, 0);
+            return Item.get(Item.AIR, 0, 0);
         }
 
         int auxValue = this.getVarInt();
@@ -590,7 +590,7 @@ public class BinaryStream {
     private Item getSlotNew(int protocolId) {
         int runtimeId = this.getVarInt();
         if (runtimeId == 0) {
-            return Item.get(0, 0, 0);
+            return Item.get(Item.AIR, 0, 0);
         }
 
         int count = this.getLShort();
@@ -609,7 +609,13 @@ public class BinaryStream {
             this.getVarInt(); // netId
         }
 
-        this.getVarInt(); // blockRuntimeId
+        int blockRuntimeId = this.getVarInt();// blockRuntimeId
+        if (id < 256 && id != 166) { // ItemBlock
+            int fullId = GlobalBlockPalette.getLegacyFullId(blockRuntimeId);
+            if (fullId != -1) {
+                damage = fullId & 0x3f;
+            }
+        }
 
         byte[] bytes = this.getByteArray();
         ByteBuf buf = AbstractByteBufAllocator.DEFAULT.ioBuffer(bytes.length);
@@ -708,7 +714,7 @@ public class BinaryStream {
             return;
         }
 
-        if (item == null || item.getId() == 0) {
+        if (item == null || item.getId() == Item.AIR) {
             this.putVarInt(0);
             return;
         }
@@ -886,19 +892,23 @@ public class BinaryStream {
     }
 
     private void putSlotNew(int protocolId, Item item, boolean instanceItem) {
-        if (item == null || item.getId() == 0) {
+        if (item == null || item.getId() == Item.AIR) {
             this.putByte((byte) 0);
             return;
         }
 
+        int id = item.getId();
+        int meta = item.getDamage();
+        boolean isBlock = item instanceof ItemBlock;
+        boolean isDurable = item instanceof ItemDurable;
+
         RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
-        RuntimeEntry runtimeEntry = mapping.toRuntime(item.getId(), item.getDamage());
+        RuntimeEntry runtimeEntry = mapping.toRuntime(id, meta);
         int runtimeId = runtimeEntry.getRuntimeId();
-        int damage = runtimeEntry.isHasDamage() ? 0 : item.getDamage();
+        int damage = isBlock || isDurable || runtimeEntry.isHasDamage() ? 0 : meta;
 
         this.putVarInt(runtimeId);
         this.putLShort(item.getCount());
-
         this.putUnsignedVarInt(damage);
 
         if (!instanceItem) {
@@ -906,13 +916,13 @@ public class BinaryStream {
             this.putVarInt(1);
         }
 
-        Block block = item.getBlockUnsafe();
+        Block block = isBlock ? item.getBlockUnsafe() : null;
         int blockRuntimeId = block == null ? 0 : GlobalBlockPalette.getOrCreateRuntimeId(protocolId, block.getId(), block.getDamage());
         this.putVarInt(blockRuntimeId);
 
         ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
-            if (((item instanceof ItemDurable && item.getDamage() > 0) || block != null && block.getDamage() > 0) && !runtimeEntry.isHasDamage()) {
+            if (!instanceItem && isDurable && !runtimeEntry.isHasDamage()) {
                 byte[] nbt = item.getCompoundTag();
                 CompoundTag tag;
                 if (nbt == null || nbt.length == 0) {
@@ -923,7 +933,7 @@ public class BinaryStream {
                 if (tag.contains("Damage")) {
                     tag.put("__DamageConflict__", tag.removeAndGet("Damage"));
                 }
-                tag.putInt("Damage", item.getDamage());
+                tag.putInt("Damage", meta);
                 stream.writeShort(-1);
                 stream.writeByte(1); // Hardcoded in current version
                 stream.write(NBTIO.write(tag, ByteOrder.LITTLE_ENDIAN));
@@ -947,7 +957,7 @@ public class BinaryStream {
                 stream.writeUTF(string);
             }
 
-            if (item.getId() == ItemID.SHIELD) {
+            if (id == ItemID.SHIELD) {
                 stream.writeLong(0);
             }
 
