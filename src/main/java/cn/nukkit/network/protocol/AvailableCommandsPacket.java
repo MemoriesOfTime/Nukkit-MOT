@@ -7,6 +7,8 @@ import lombok.ToString;
 import java.util.*;
 import java.util.function.ObjIntConsumer;
 
+import static cn.nukkit.utils.Utils.dynamic;
+
 /**
  * @author MagicDroidX
  * Nukkit Project
@@ -29,22 +31,25 @@ public class AvailableCommandsPacket extends DataPacket {
     public static final int ARG_FLAG_SOFT_ENUM = 0x4000000;
 
     /* From < 1.16.100 */
-    public static final int ARG_TYPE_INT = 1;
-    public static final int ARG_TYPE_FLOAT = 2;
-    public static final int ARG_TYPE_VALUE = 3;
-    public static final int ARG_TYPE_WILDCARD_INT = 4;
-    public static final int ARG_TYPE_OPERATOR = 5;
-    public static final int ARG_TYPE_TARGET = 6;
-    public static final int ARG_TYPE_WILDCARD_TARGET = 7;
-    public static final int ARG_TYPE_FILE_PATH = 14;
-    public static final int ARG_TYPE_EQUIPMENT_SLOT = 37; //1.18.30
-    public static final int ARG_TYPE_STRING = 29;
-    public static final int ARG_TYPE_BLOCK_POSITION = 37;
-    public static final int ARG_TYPE_POSITION = 38;
-    public static final int ARG_TYPE_MESSAGE = 41;
-    public static final int ARG_TYPE_RAWTEXT = 43;
-    public static final int ARG_TYPE_JSON = 47;
-    public static final int ARG_TYPE_COMMAND = 54;
+    public static final int ARG_TYPE_INT = dynamic(1);
+    public static final int ARG_TYPE_FLOAT = dynamic(2);
+    public static final int ARG_TYPE_VALUE = dynamic(3);
+    public static final int ARG_TYPE_WILDCARD_INT = dynamic(4);
+    public static final int ARG_TYPE_OPERATOR = dynamic(5);
+    public static final int ARG_TYPE_COMPARE_OPERATOR = dynamic(107); //1.19.0 实际为7，防止和ARG_TYPE_WILDCARD_TARGET冲突，下面要替换回7
+    public static final int ARG_TYPE_TARGET = dynamic(6);
+    public static final int ARG_TYPE_WILDCARD_TARGET = dynamic(7);
+    public static final int ARG_TYPE_FILE_PATH = dynamic(14);
+    public static final int ARG_TYPE_FULL_INTEGER_RANGE = dynamic(23);
+    public static final int ARG_TYPE_EQUIPMENT_SLOT = dynamic(1037); //1.18.30 实际为37，防止和ARG_TYPE_BLOCK_POSITION冲突，下面要替换回37
+    public static final int ARG_TYPE_STRING = dynamic(29);
+    public static final int ARG_TYPE_BLOCK_POSITION = dynamic(37);
+    public static final int ARG_TYPE_POSITION = dynamic(38);
+    public static final int ARG_TYPE_MESSAGE = dynamic(41);
+    public static final int ARG_TYPE_RAWTEXT = dynamic(43);
+    public static final int ARG_TYPE_BLOCK_STATES = dynamic(67);
+    public static final int ARG_TYPE_JSON = dynamic(47);
+    public static final int ARG_TYPE_COMMAND = dynamic(54);
 
     public Map<String, CommandDataVersions> commands;
     public final Map<String, List<String>> softEnums = new HashMap<>();
@@ -325,10 +330,14 @@ public class AvailableCommandsPacket extends DataPacket {
                                     id = 10;
                                 }else if (id == ARG_TYPE_FILE_PATH) {
                                     id = 17;
-                                }else if (id >= ARG_TYPE_STRING && id <= ARG_TYPE_JSON) {
+                                }else if (id == ARG_TYPE_EQUIPMENT_SLOT) {
+                                    id = 38;
+                                }else if (id >= ARG_TYPE_STRING && id <= ARG_TYPE_JSON) { //29-47
                                     id = id + 10;
                                 }else if (id == ARG_TYPE_COMMAND) {
                                     id = 70;
+                                }else if (id == ARG_TYPE_COMPARE_OPERATOR) {
+                                    id = 7;
                                 }
                             } else if (protocol >= ProtocolInfo.v1_18_30) {
                                 if (id == ARG_TYPE_WILDCARD_TARGET ) {
@@ -347,6 +356,8 @@ public class AvailableCommandsPacket extends DataPacket {
                                     id = 56;
                                 } else if (id == ARG_TYPE_COMMAND) {
                                     id = 69;
+                                }else if (id == ARG_TYPE_EQUIPMENT_SLOT) {
+                                    id = 37;
                                 }
                             } else if (protocol >= ProtocolInfo.v1_16_210) { //TODO: proper implementation for 1.16.210 command params
                                 if (id == ARG_TYPE_COMMAND) {

@@ -359,6 +359,10 @@ public class Utils {
         return random.nextBoolean();
     }
 
+    public static int dynamic(int value) {
+        return value;
+    }
+
     /**
      * Get game version string by protocol version.
      * For internal usage!

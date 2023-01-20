@@ -11,9 +11,10 @@ public class BiomeDefinitionListPacket extends DataPacket {
 
     private static final byte[] TAG_361;
     private static final byte[] TAG_419;
+    private static final byte[] TAG_486; // 486
 
     // Call the latest version "TAG"
-    private static final byte[] TAG; // 486
+    private static final byte[] TAG; // 527
 
     static {
         try {
@@ -27,9 +28,14 @@ public class BiomeDefinitionListPacket extends DataPacket {
             throw new AssertionError("Error whilst loading biome definitions 419", e);
         }
         try {
-            TAG = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_486.dat"));
+            TAG_486 = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_486.dat"));
         } catch (Exception e) {
             throw new AssertionError("Error whilst loading biome definitions 486", e);
+        }
+        try {
+            TAG = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_527.dat"));
+        } catch (Exception e) {
+            throw new AssertionError("Error whilst loading biome definitions 527", e);
         }
     }
 
@@ -45,8 +51,10 @@ public class BiomeDefinitionListPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (this.protocol >= ProtocolInfo.v1_18_10) {
+        if (this.protocol >= ProtocolInfo.v1_19_0) {
             this.put(TAG);
+        }else if (this.protocol >= ProtocolInfo.v1_18_10) {
+            this.put(TAG_486);
         }else if (this.protocol >= ProtocolInfo.v1_16_100) {
             this.put(TAG_419);
         }else {

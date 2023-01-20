@@ -17,7 +17,10 @@ import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.enchantment.Enchantment;
-import cn.nukkit.level.*;
+import cn.nukkit.level.GameRule;
+import cn.nukkit.level.Level;
+import cn.nukkit.level.Location;
+import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
@@ -192,6 +195,12 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_BUOYANCY_DATA = 122;
     public static final int DATA_GOAT_HORN_COUNT = 123;
     public static final int DATA_UPDATE_PROPERTIES = 124;
+    public static final int DATA_MOVEMENT_SOUND_DISTANCE_OFFSET = 125;
+    public static final int DATA_HEARTBEAT_INTERVAL_TICKS = 126;
+    public static final int DATA_HEARTBEAT_SOUND_EVENT = 127;
+    public static final int DATA_PLAYER_LAST_DEATH_POS = 128;
+    public static final int DATA_PLAYER_LAST_DEATH_DIMENSION = 129;
+    public static final int DATA_PLAYER_HAS_DIED = 130;
 
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
@@ -295,6 +304,11 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FLAG_OVER_DESCENDABLE_BLOCK = 99;
     public static final int DATA_FLAG_CROAKING = 100;
     public static final int DATA_FLAG_EAT_MOB = 101;
+    public static final int DATA_FLAG_JUMP_GOAL_JUMP = 102;
+    public static final int DATA_FLAG_EMERGING = 103;
+    public static final int DATA_FLAG_SNIFFING = 104;
+    public static final int DATA_FLAG_DIGGING = 105;
+    public static final int DATA_FLAG_SONIC_BOOM = 106;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
 
@@ -1307,7 +1321,6 @@ public abstract class Entity extends Location implements Metadatable {
                 }
                 if (totem) {
                     this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_TOTEM);
-                    this.getLevel().addParticleEffect(this, ParticleEffect.TOTEM);
 
                     this.extinguish();
                     this.removeAllEffects();
