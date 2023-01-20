@@ -38,7 +38,7 @@ public class ItemBlock extends Item {
     }
 
     public Block getBlock() {
-        return this.block;
+        return this.block.clone();
     }
     
     @Override

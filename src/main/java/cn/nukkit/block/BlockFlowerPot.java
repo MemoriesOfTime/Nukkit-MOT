@@ -8,7 +8,6 @@ import cn.nukkit.item.ItemFlowerPot;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 
@@ -109,6 +108,7 @@ public class BlockFlowerPot extends BlockFlowable {
     public boolean onActivate(Item item, Player player) {
         BlockEntity blockEntity = getLevel().getBlockEntity(this);
         if (!(blockEntity instanceof BlockEntityFlowerPot)) return false;
+
         if (blockEntity.namedTag.getShort("item") != AIR || blockEntity.namedTag.getInt("mData") != AIR) {
             if (!canPlaceIntoFlowerPot(item.getId(), item.getDamage())) {
                 int id = blockEntity.namedTag.getShort("item");
@@ -128,8 +128,8 @@ public class BlockFlowerPot extends BlockFlowable {
         }
         int itemID;
         if (!canPlaceIntoFlowerPot(item.getId(), item.getDamage())) {
-            Block b = item.getBlock();
-            if (!canPlaceIntoFlowerPot(b.getId(), b.getDamage())) {
+            Block b = item.getBlockUnsafe();
+            if (b == null || !canPlaceIntoFlowerPot(b.getId(), b.getDamage())) {
                 return true;
             }
             itemID = b.getId();
