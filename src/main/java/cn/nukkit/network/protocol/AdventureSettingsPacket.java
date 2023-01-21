@@ -25,20 +25,24 @@ public class AdventureSettingsPacket extends DataPacket {
     public static final int BITFLAG_SECOND_SET = 65536;
 
     public static final int WORLD_IMMUTABLE = 0x01;
-    public static final int NO_PVP = 0x02;
+    public static final int NO_PVM = 0x02;
+    public static final int NO_MVP = 0x04;
+    public static final int SHOW_NAME_TAGS = 0x10;
     public static final int AUTO_JUMP = 0x20;
     public static final int ALLOW_FLIGHT = 0x40;
     public static final int NO_CLIP = 0x80;
     public static final int WORLD_BUILDER = 0x100;
     public static final int FLYING = 0x200;
     public static final int MUTED = 0x400;
-    public static final int BUILD_AND_MINE = 65537;
+    public static final int MINE = 0x01 | BITFLAG_SECOND_SET;
     public static final int DOORS_AND_SWITCHES = 65538;
     public static final int OPEN_CONTAINERS = 65540;
     public static final int ATTACK_PLAYERS = 65544;
     public static final int ATTACK_MOBS = 65552;
     public static final int OPERATOR = 65568;
     public static final int TELEPORT = 65664;
+    public static final int BUILD = 0x100 | BITFLAG_SECOND_SET;
+    public static final int DEFAULT_LEVEL_PERMISSIONS = 0x200 | BITFLAG_SECOND_SET;
 
     public long flags = 0;
 

@@ -428,8 +428,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void setAllowModifyWorld(boolean value) {
         this.adventureSettings.set(Type.WORLD_IMMUTABLE, !value);
-        this.adventureSettings.set(Type.BUILD_AND_MINE, value);
-        this.adventureSettings.set(Type.WORLD_BUILDER, value);
+        this.adventureSettings.set(Type.MINE, value);
+        this.adventureSettings.set(Type.BUILD, value);
         this.adventureSettings.update();
     }
 
@@ -1429,8 +1429,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (newSettings == null) {
             newSettings = this.adventureSettings.clone(this);
             newSettings.set(Type.WORLD_IMMUTABLE, (gamemode & 0x02) > 0);
-            newSettings.set(Type.BUILD_AND_MINE, (gamemode & 0x02) <= 0);
-            newSettings.set(Type.WORLD_BUILDER, (gamemode & 0x02) <= 0);
+            newSettings.set(Type.MINE, (gamemode & 0x02) <= 0);
+            newSettings.set(Type.BUILD, (gamemode & 0x02) <= 0);
+            newSettings.set(Type.NO_PVM, gamemode == SPECTATOR);
             newSettings.set(Type.ALLOW_FLIGHT, (gamemode & 0x01) > 0);
             newSettings.set(Type.NO_CLIP, gamemode == 0x03);
             newSettings.set(Type.FLYING, gamemode == 0x03);
@@ -2313,7 +2314,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.adventureSettings = new AdventureSettings(this)
                 .set(Type.WORLD_IMMUTABLE, isAdventure() || isSpectator())
-                .set(Type.WORLD_BUILDER, !isAdventure() && !isSpectator())
+                .set(Type.MINE, !isAdventure() && !isSpectator())
+                .set(Type.BUILD, !isAdventure() && !isSpectator())
+                .set(Type.NO_PVM, this.isSpectator())
                 .set(Type.AUTO_JUMP, true)
                 .set(Type.ALLOW_FLIGHT, isCreative())
                 .set(Type.NO_CLIP, isSpectator());
@@ -2805,11 +2808,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 case ProtocolInfo.ADVENTURE_SETTINGS_PACKET:
                     AdventureSettingsPacket adventureSettingsPacket = (AdventureSettingsPacket) packet;
-                    if (!server.getAllowFlight() && (adventureSettingsPacket.getFlag(AdventureSettingsPacket.ALLOW_FLIGHT) || adventureSettingsPacket.getFlag(AdventureSettingsPacket.FLYING)) && !this.adventureSettings.get(Type.ALLOW_FLIGHT)) {
+                    if (adventureSettingsPacket.entityUniqueId != this.getId()) {
+                        break;
+                    }
+                    if (!server.getAllowFlight() && adventureSettingsPacket.getFlag(AdventureSettingsPacket.FLYING) && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)
+                            || adventureSettingsPacket.getFlag(AdventureSettingsPacket.NO_CLIP) && !this.getAdventureSettings().get(Type.NO_CLIP)) {
                         this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server", true, "type=AdventureSettingsPacket, flags=ALLOW_FLIGHT: " + adventureSettingsPacket.getFlag(AdventureSettingsPacket.ALLOW_FLIGHT) + ", FLYING: " + adventureSettingsPacket.getFlag(AdventureSettingsPacket.ALLOW_FLIGHT));
                         break;
                     }
                     PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, adventureSettingsPacket.getFlag(AdventureSettingsPacket.FLYING));
+                    if (this.isSpectator()) {
+                        playerToggleFlightEvent.setCancelled();
+                    }
                     this.server.getPluginManager().callEvent(playerToggleFlightEvent);
                     if (playerToggleFlightEvent.isCancelled()) {
                         this.adventureSettings.update();
