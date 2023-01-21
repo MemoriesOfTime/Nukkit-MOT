@@ -2741,6 +2741,7 @@ public class Server {
         Entity.registerEntity("Spider", EntitySpider.class);
         Entity.registerEntity("Stray", EntityStray.class);
         Entity.registerEntity("Vindicator", EntityVindicator.class);
+        Entity.registerEntity("Warden", EntityWarden.class);
         Entity.registerEntity("Vex", EntityVex.class);
         Entity.registerEntity("WitherSkeleton", EntityWitherSkeleton.class);
         Entity.registerEntity("Wither", EntityWither.class);
@@ -2786,8 +2787,11 @@ public class Server {
         Entity.registerEntity("WanderingTrader", EntityWanderingTrader.class);
         Entity.registerEntity("VillagerV2", EntityVillagerV2.class);
         Entity.registerEntity("Fox", EntityFox.class);
+        Entity.registerEntity("Frog", EntityFrog.class);
+        Entity.registerEntity("Goat", EntityGoat.class);
         Entity.registerEntity("Bee", EntityBee.class);
         Entity.registerEntity("Strider", EntityStrider.class);
+        Entity.registerEntity("Tadpole", EntityTadpole.class);
         Entity.registerEntity("Goat", EntityGoat.class);
         Entity.registerEntity("Axolotl", EntityAxolotl.class);
         Entity.registerEntity("GlowSquid", EntityGlowSquid.class);

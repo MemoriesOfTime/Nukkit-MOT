@@ -167,7 +167,13 @@ public class AddEntityPacket extends DataPacket {
 
         if (protocolId < ProtocolInfo.v1_19_0) {
             mapping.put(EntityAllay.NETWORK_ID, mapping.get(EntityParrot.NETWORK_ID));
+            mapping.put(EntityWarden.NETWORK_ID, mapping.get(EntityWither.NETWORK_ID));
+            mapping.put(EntityFrog.NETWORK_ID, mapping.get(EntityRabbit.NETWORK_ID));
+            mapping.put(EntityCat.NETWORK_ID, mapping.get(EntityTropicalFish.NETWORK_ID));
         }else {
+            mapping.put(EntityWarden.NETWORK_ID, "minecraft:warden");
+            mapping.put(EntityFrog.NETWORK_ID, "minecraft:frog");
+            mapping.put(EntityCat.NETWORK_ID, "minecraft:tadpole");
             mapping.put(EntityAllay.NETWORK_ID, "minecraft:allay");
         }
     }

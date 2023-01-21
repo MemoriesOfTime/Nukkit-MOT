@@ -16,8 +16,11 @@ import cn.nukkit.level.particle.HeartParticle;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.utils.Utils;
 import co.aikar.timings.Timings;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.apache.commons.math3.util.FastMath;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -43,6 +46,36 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     private boolean friendly = false;
 
     public Item[] armor;
+
+    private static final Int2ObjectMap<Float> ARMOR_POINTS = new Int2ObjectOpenHashMap<Float>() {
+        {
+            put(Item.LEATHER_CAP, new Float(1));
+            put(Item.LEATHER_TUNIC, new Float(3));
+            put(Item.LEATHER_PANTS, new Float(2));
+            put(Item.LEATHER_BOOTS, new Float(1));
+            put(Item.CHAIN_HELMET, new Float(2));
+            put(Item.CHAIN_CHESTPLATE, new Float(5));
+            put(Item.CHAIN_LEGGINGS, new Float(4));
+            put(Item.CHAIN_BOOTS, new Float(1));
+            put(Item.GOLD_HELMET, new Float(2));
+            put(Item.GOLD_CHESTPLATE, new Float(5));
+            put(Item.GOLD_LEGGINGS, new Float(3));
+            put(Item.GOLD_BOOTS, new Float(1));
+            put(Item.IRON_HELMET, new Float(2));
+            put(Item.IRON_CHESTPLATE, new Float(6));
+            put(Item.IRON_LEGGINGS, new Float(5));
+            put(Item.IRON_BOOTS, new Float(2));
+            put(Item.DIAMOND_HELMET, new Float(3));
+            put(Item.DIAMOND_CHESTPLATE, new Float(8));
+            put(Item.DIAMOND_LEGGINGS, new Float(6));
+            put(Item.DIAMOND_BOOTS, new Float(3));
+            put(Item.NETHERITE_HELMET, new Float(3));
+            put(Item.NETHERITE_CHESTPLATE, new Float(8));
+            put(Item.NETHERITE_LEGGINGS, new Float(6));
+            put(Item.NETHERITE_BOOTS, new Float(3));
+            put(Item.TURTLE_SHELL, new Float(2));
+        }
+    };
 
     public BaseEntity(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -607,5 +640,26 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         }
 
         // TODO: portals
+    }
+
+    /**
+     * Get armor defense points for item
+     * @param item item id
+     * @return defense points
+     */
+    protected float getArmorPoints(int item) {
+        Float points = ARMOR_POINTS.get(item);
+        if (points == null) return 0;
+        return points;
+    }
+
+    /**
+     * Play attack animation to viewers
+     */
+    protected void playAttack() {
+        EntityEventPacket pk = new EntityEventPacket();
+        pk.eid = this.getId();
+        pk.event = EntityEventPacket.ARM_SWING;
+        Server.broadcastPacket(this.getViewers().values(), pk);
     }
 }
