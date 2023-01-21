@@ -255,7 +255,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private int hash;
 
-    private String buttonText = "Button";
+    private String buttonText = "";
 
     protected boolean enableClientCommand = true;
 
@@ -2194,7 +2194,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (canInteract(this, interactDistance)) {
             EntityInteractable e = getEntityPlayerLookingAt(interactDistance);
             if (e != null) {
-                setButtonText(e.getInteractButtonText());
+                String buttonText = e.getInteractButtonText(this);
+                if (buttonText == null) {
+                    buttonText = "";
+                }
+                setButtonText(buttonText);
             } else {
                 setButtonText("");
             }
@@ -3164,11 +3168,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     }
 
-                    this.craftingType = CRAFTING_SMALL;
+                    //this.craftingType = CRAFTING_SMALL;
 
                     InteractPacket interactPacket = (InteractPacket) packet;
 
-                    Entity targetEntity = this.level.getEntity(interactPacket.target);
+                    if (interactPacket.target == 0 && interactPacket.action == InteractPacket.ACTION_MOUSEOVER) {
+                        this.setButtonText("");
+                        break;
+                    }
+
+                    Entity targetEntity = interactPacket.target == this.getId() ? this : this.level.getEntity(interactPacket.target);
 
                     if (interactPacket.action != InteractPacket.ACTION_OPEN_INVENTORY && (targetEntity == null || !this.isAlive() || !targetEntity.isAlive())) {
                         break;
@@ -3182,6 +3191,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     switch (interactPacket.action) {
                         case InteractPacket.ACTION_OPEN_INVENTORY:
+                            if (targetEntity != this) {
+                                break;
+                            }
                             if (this.protocol >= 407) {
                                 if (!this.inventoryOpen) {
                                     this.inventoryOpen = this.inventory.open(this);
@@ -3192,10 +3204,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             if (interactPacket.target == 0 && this.protocol >= 313) {
                                 break packetswitch;
                             }
+                            String buttonText = "";
+                            if (targetEntity instanceof EntityInteractable) {
+                                buttonText = ((EntityInteractable) targetEntity).getInteractButtonText(this);
+                                if (buttonText == null) {
+                                    buttonText = "";
+                                }
+                            }
+                            this.setButtonText(buttonText);
+
                             this.getServer().getPluginManager().callEvent(new PlayerMouseOverEntityEvent(this, targetEntity));
                             break;
                         case InteractPacket.ACTION_VEHICLE_EXIT:
-                            if (!(targetEntity instanceof EntityRideable) || this.riding == null) {
+                            if (!(targetEntity instanceof EntityRideable) || this.riding != targetEntity) {
                                 break;
                             }
 

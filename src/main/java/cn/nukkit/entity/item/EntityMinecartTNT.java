@@ -40,6 +40,11 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     }
 
     @Override
+    public String getInteractButtonText() {
+        return "";
+    }
+
+    @Override
     public void initEntity() {
         super.initEntity();
 

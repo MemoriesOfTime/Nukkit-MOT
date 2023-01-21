@@ -201,8 +201,7 @@ public class EntityBoat extends EntityVehicle {
             this.updateMovement();
 
             if (this.age % 5 == 0) {
-                int passengersCount = this.passengers.size();
-                if (passengersCount > 0) {
+                if (this.passengers.size() > 0) {
                     Block[] blocks = this.level.getCollisionBlocks(this.getBoundingBox().grow(0.1, 0.3, 0.1));
                     for (Block b : blocks) {
                         if (b.getId() == Block.LILY_PAD) {
@@ -212,7 +211,7 @@ public class EntityBoat extends EntityVehicle {
                     }
                 }
 
-                if (passengersCount < 2) {
+                if (!this.isFull()) {
                     Entity[] e = this.level.getCollidingEntities(this.boundingBox.grow(0.20000000298023224, 0.0D, 0.20000000298023224), this);
                     for (Entity entity : e) {
                         if (entity.isPlayer && !isPassenger(entity)) {
@@ -225,7 +224,7 @@ public class EntityBoat extends EntityVehicle {
 
                         this.mountEntity(entity);
 
-                        if (this.passengers.size() >= 2) {
+                        if (this.isFull()) {
                             break;
                         }
                     }
@@ -380,7 +379,7 @@ public class EntityBoat extends EntityVehicle {
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (this.passengers.size() >= 2 || getWaterLevel() < -SINKING_DEPTH) {
+        if (this.isFull() || getWaterLevel() < -SINKING_DEPTH) {
             return false;
         }
 
@@ -471,5 +470,14 @@ public class EntityBoat extends EntityVehicle {
 
     public void onInput(double x, double y, double z, double yaw) {
         this.setPositionAndRotation(this.temporalVector.setComponents(x, y - this.getBaseOffset(), z), yaw % 360, 0);
+    }
+
+    public boolean isFull() {
+        return this.passengers.size() >= 2;
+    }
+
+    @Override
+    public String getInteractButtonText() {
+        return !this.isFull() ? "action.interact.ride.boat" : "";
     }
 }
