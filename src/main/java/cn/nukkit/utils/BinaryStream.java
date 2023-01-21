@@ -611,7 +611,7 @@ public class BinaryStream {
 
         int blockRuntimeId = this.getVarInt();// blockRuntimeId
         if (id < 256 && id != 166) { // ItemBlock
-            int fullId = GlobalBlockPalette.getLegacyFullId(blockRuntimeId);
+            int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, blockRuntimeId);
             if (fullId != -1) {
                 damage = fullId & 0x3f;
             }

@@ -57,7 +57,9 @@ public class AddPlayerPacket extends DataPacket {
             this.putString("");
             this.putVarInt(0);
         }
-        this.putEntityUniqueId(this.entityUniqueId);
+        if (protocol < ProtocolInfo.v1_19_10) {
+            this.putEntityUniqueId(this.entityUniqueId);
+        }
         this.putEntityRuntimeId(this.entityRuntimeId);
         if (protocol >= 223) {
             this.putString(this.platformChatId);
@@ -73,12 +75,24 @@ public class AddPlayerPacket extends DataPacket {
         }
         this.put(Binary.writeMetadata(protocol, this.metadata));
         if (protocol > 274) {
-            this.putUnsignedVarInt(0);
-            this.putUnsignedVarInt(0);
-            this.putUnsignedVarInt(0);
-            this.putUnsignedVarInt(0);
-            this.putUnsignedVarInt(0);
+            if (protocol < ProtocolInfo.v1_19_10) {
+                this.putUnsignedVarInt(0);
+                this.putUnsignedVarInt(0);
+                this.putUnsignedVarInt(0);
+                this.putUnsignedVarInt(0);
+                this.putUnsignedVarInt(0);
+            }
             this.putLLong(entityUniqueId);
+            if (protocol >= ProtocolInfo.v1_19_10) {
+                this.putUnsignedVarInt(0); // playerPermission
+                this.putUnsignedVarInt(0); // commandPermission
+                this.putUnsignedVarInt(1); // abilitiesLayer size
+                this.putLShort(1); // BASE layer type
+                this.putLInt(262143); // abilitiesSet - all abilities
+                this.putLInt(63); // abilityValues - survival abilities
+                this.putLFloat(0.1f); // flySpeed
+                this.putLFloat(0.05f); // walkSpeed
+            }
             this.putUnsignedVarInt(0);
             this.putString(deviceId);
             if (protocol >= 388) {

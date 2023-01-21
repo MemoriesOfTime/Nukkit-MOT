@@ -197,6 +197,7 @@ public class AddEntityPacket extends DataPacket {
     public float yaw;
     public float pitch;
     public float headYaw;
+    public float bodyYaw = -1;
     public EntityMetadata metadata = new EntityMetadata();
     public Attribute[] attributes = new Attribute[0];
     public EntityLink[] links = new EntityLink[0];
@@ -215,8 +216,11 @@ public class AddEntityPacket extends DataPacket {
         this.putVector3f(this.speedX, this.speedY, this.speedZ);
         this.putLFloat(this.pitch);
         this.putLFloat(this.yaw);
-        if (protocol >= 274) {
+        if (protocol >= ProtocolInfo.v1_5_0) {
             this.putLFloat(this.headYaw);
+            if (protocol >= ProtocolInfo.v1_19_10) {
+                this.putLFloat(this.bodyYaw == -1 ? this.yaw : this.bodyYaw);
+            }
         }
         this.putAttributeList(this.attributes);
         this.put(Binary.writeMetadata(protocol, this.metadata));

@@ -521,6 +521,7 @@ public class GlobalBlockPalette {
                 }
                 return runtimeId;
             case ProtocolInfo.v1_19_0:
+            case ProtocolInfo.v1_19_10:
                 runtimeId = legacyToRuntimeId527.get(legacyId);
                 if (runtimeId == -1) {
                     runtimeId = legacyToRuntimeId527.get(id << 6);
