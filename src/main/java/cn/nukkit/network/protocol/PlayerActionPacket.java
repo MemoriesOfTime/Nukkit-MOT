@@ -58,6 +58,9 @@ public class PlayerActionPacket extends DataPacket {
         this.x = v.x;
         this.y = v.y;
         this.z = v.z;
+        if (protocol >= ProtocolInfo.v1_19_0) {
+            this.resultPosition = this.getBlockVector3();
+        }
         this.face = this.getVarInt();
     }
 

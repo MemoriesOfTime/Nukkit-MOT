@@ -6354,7 +6354,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean isMovementServerAuthoritative() {
-        return this.protocol >= ProtocolInfo.v1_17_0;
+        return this.protocol >= ProtocolInfo.v1_19_10;
     }
 
     public boolean isServerAuthoritativeBlockBreaking() {
