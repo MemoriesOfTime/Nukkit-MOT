@@ -2789,6 +2789,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                         this.setRotation(movePlayerPacket.yaw, movePlayerPacket.pitch);
                         this.newPosition = newPos;
+                        this.clientMovements.offer(newPos);
                         this.forceMovement = null;
                     }
                     break;
@@ -4736,6 +4737,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.server.removeOnlinePlayer(this);
             this.loggedIn = false;
         }
+        this.clientMovements.clear();
     }
 
     /**
