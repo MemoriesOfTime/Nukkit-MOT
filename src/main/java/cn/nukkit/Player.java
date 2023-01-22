@@ -11,12 +11,10 @@ import cn.nukkit.command.data.CommandDataVersions;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.item.*;
-import cn.nukkit.entity.mob.EntityEnderman;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
-import cn.nukkit.event.block.WaterFrostEvent;
 import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageModifier;
@@ -52,7 +50,6 @@ import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.*;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.PunchBlockParticle;
 import cn.nukkit.level.sound.ExperienceOrbSound;
@@ -62,9 +59,7 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.protocol.*;
-import cn.nukkit.network.protocol.types.AuthInputAction;
-import cn.nukkit.network.protocol.types.ContainerIds;
-import cn.nukkit.network.protocol.types.NetworkInventoryAction;
+import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.permission.Permission;
 import cn.nukkit.permission.PermissionAttachment;
@@ -80,12 +75,14 @@ import co.aikar.timings.Timings;
 import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import io.netty.util.internal.PlatformDependent;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math3.util.FastMath;
@@ -163,6 +160,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public Vector3 speed = null;
 
+    private final Queue<Vector3> clientMovements = PlatformDependent.newMpscQueue(4);
     public final HashSet<String> achievements = new HashSet<>();
 
     public int craftingType = CRAFTING_SMALL;
@@ -262,6 +260,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private LoginChainData loginChainData;
 
     public Block breakingBlock = null;
+    private PlayerBlockActionData lastBlockAction;
 
     public int pickedXPOrb = 0;
     private boolean canPickupXP = true;
@@ -1564,7 +1563,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         AxisAlignedBB newBB = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
 
-        if (this.isSpectator() || server.getAllowFlight() || !this.level.hasCollision(this, newBB, false)) {
+        if (this.isSpectator() || server.getAllowFlight() || !this.level.hasCollision(this, newBB.shrink(0, this.getStepHeight(), 0), false)) {
             this.boundingBox = newBB;
         }
 
@@ -1768,240 +1767,166 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
-    /**
-     * Internal: Process player movement
-     *
-     * @param tickDiff tick diff
-     */
-    protected void processMovement(int tickDiff) {
-        if (!this.isAlive() || !this.spawned || this.newPosition == null || this.teleportPosition != null || this.isSleeping()) {
+    protected void handleMovement(Vector3 clientPos) {
+        if (!this.isAlive() || !this.spawned || this.teleportPosition != null || this.isSleeping()) {
             return;
         }
-        Vector3 newPos = this.newPosition;
-        double distanceSquared = newPos.distanceSquared(this);
-        boolean revert = false;
-        if ((distanceSquared / ((double) (tickDiff * tickDiff))) > 100 && (newPos.y - this.y) > -5) {
-            revert = true;
-        } else if (this.chunk == null || !this.chunk.isGenerated()) {
-            BaseFullChunk chunk = this.level.getChunk((int) newPos.x >> 4, (int) newPos.z >> 4, false);
-            if (chunk == null || !chunk.isGenerated()) {
-                revert = true;
-                this.nextChunkOrderRun = 0;
-            } else {
-                if (this.chunk != null) {
-                    this.chunk.removeEntity(this);
+
+        boolean invalidMotion = false;
+        double distance = clientPos.distanceSquared(this);
+        if (distance > 128) {
+            invalidMotion = true;
+        } else if (!this.level.isChunkGenerated(clientPos.getChunkX(), clientPos.getChunkZ())) {
+            invalidMotion = true;
+            this.nextChunkOrderRun = 0;
+        }
+
+        if (invalidMotion) {
+            this.revertClientMotion(this.getLocation());
+            return;
+        }
+
+        double diffX = clientPos.getX() - this.x;
+        double diffY = clientPos.getY() - this.y;
+        double diffZ = clientPos.getZ() - this.z;
+
+        // Client likes to clip into few blocks like stairs or slabs
+        // This should help reduce the server mis-prediction at least a bit
+        diffY += this.ySize * (1 - 0.4D);
+
+        this.fastMove(diffX, diffY, diffZ);
+
+        double corrX = this.x - clientPos.getX();
+        double corrY = this.y - clientPos.getY();
+        double corrZ = this.z - clientPos.getZ();
+
+        double yS = this.getStepHeight() + this.ySize;
+        if (corrY >= -yS || corrY <= yS) {
+            corrY = 0;
+        }
+
+        if (this.checkMovement && (Math.abs(corrX) > 0.5 || Math.abs(corrY) > 0.5 || Math.abs(corrZ) > 0.5) &&
+                this.riding == null && !this.hasEffect(Effect.LEVITATION) && !this.hasEffect(Effect.SLOW_FALLING)) {
+            double diff = corrX * corrX + corrZ * corrZ;
+            if (diff > 0.5) {
+                PlayerInvalidMoveEvent event = new PlayerInvalidMoveEvent(this, true);
+                this.getServer().getPluginManager().callEvent(event);
+                if (!event.isCancelled() && (invalidMotion = event.isRevert())) {
+                    this.server.getLogger().warning(this.getServer().getLanguage().translateString("nukkit.player.invalidMove", this.getName()));
                 }
-                this.chunk = chunk;
+            }
+
+            if (!invalidMotion) {
+                this.x = clientPos.getX();
+                this.y = clientPos.getY();
+                this.z = clientPos.getZ();
+                double radius = this.getWidth() / 2;
+                this.boundingBox.setBounds(this.x - radius, this.y, this.z - radius, this.x + radius, this.y + this.getHeight(), this.z + radius);
             }
         }
 
-        double tdx = newPos.x - this.x;
-        double tdz = newPos.z - this.z;
-        double distance = Math.sqrt(tdx * tdx + tdz * tdz);
-
-        if (!revert && distanceSquared != 0) {
-            double dx = newPos.x - this.x;
-            double dy = newPos.y - this.y;
-            double dz = newPos.z - this.z;
-
-            //the client likes to clip into blocks like stairs, but we do full server-side prediction of that without
-            //help from the client's position changes, so we deduct the expected clip height from the moved distance.
-            double expectedClipDistance = this.ySize * (1 - STEP_CLIP_MULTIPLIER);
-            dy -= expectedClipDistance;
-
-            this.fastMove(dx, dy, dz);
-            if (this.newPosition == null) {
-                return;
-            }
-
-            double diffX = this.x - newPos.x;
-            double diffY = this.y - newPos.y;
-            double diffZ = this.z - newPos.z;
-
-            double yS = 0.5 + this.ySize;
-            if (diffY >= -yS || diffY <= yS) {
-                diffY = 0;
-            }
-
-            if (diffX != 0 || diffY != 0 || diffZ != 0) {
-                if (this.checkMovement && !server.getAllowFlight() && (this.isSurvival() || this.isAdventure())) {
-                    if (!this.isSleeping() && this.riding == null && !this.hasEffect(Effect.LEVITATION) && !this.hasEffect(Effect.SLOW_FALLING)) {
-                        if ((diffX * diffX + diffZ * diffZ) / ((double) (tickDiff * tickDiff)) > 0.5 ) {
-                            PlayerInvalidMoveEvent ev;
-                            this.getServer().getPluginManager().callEvent(ev = new PlayerInvalidMoveEvent(this, true));
-                            if (!ev.isCancelled()) {
-                                revert = ev.isRevert();
-                            }
-                        }
-                    }
-                }
-
-                if (!revert) {
-                    this.x = newPos.x;
-                    this.y = newPos.y;
-                    this.z = newPos.z;
-                    double radius = this.getWidth() / 2;
-                    this.boundingBox.setBounds(this.x - radius, this.y, this.z - radius, this.x + radius, this.y + this.getHeight(), this.z + radius);
-                }
-            }
+        if (invalidMotion) {
+            this.revertClientMotion(this.getLocation());
+            return;
         }
 
-        Location from = new Location(
-                this.lastX,
-                this.lastY,
-                this.lastZ,
-                this.lastYaw,
-                this.lastPitch,
-                this.level);
-        Location to = this.getLocation();
+        Location source = new Location(this.lastX, this.lastY, this.lastZ, this.lastYaw, this.lastPitch, this.level);
+        Location target = this.getLocation();
+        double delta = Math.pow(this.lastX - target.getX(), 2) + Math.pow(this.lastY - target.getY(), 2) + Math.pow(this.z - target.getZ(), 2);
+        double deltaAngle = Math.abs(this.lastYaw - target.getYaw()) + Math.abs(this.lastPitch - target.getPitch());
 
-        double delta = Math.pow(this.lastX - to.x, 2) + Math.pow(this.lastY - to.y, 2) + Math.pow(this.z - to.z, 2);
-        double deltaAngle = Math.abs(this.lastYaw - to.yaw) + Math.abs(this.lastPitch - to.pitch);
-
-        if (!revert && (delta > 0.0001d || deltaAngle > 1d)) {
+        if (delta > 0.0005 || deltaAngle > 1) {
             boolean isFirst = this.firstMove;
-
             this.firstMove = false;
-            this.lastX = to.x;
-            this.lastY = to.y;
-            this.lastZ = to.z;
 
-            this.lastYaw = to.yaw;
-            this.lastPitch = to.pitch;
+            this.lastX = target.x;
+            this.lastY = target.y;
+            this.lastZ = target.z;
+            this.lastYaw = target.yaw;
+            this.lastPitch = target.pitch;
 
             if (!isFirst) {
                 List<Block> blocksAround = null;
-                List<Block> collisionBlocks = null;
-                if (!this.server.suomiCraftPEMode()) {
-                    blocksAround = new ArrayList<>(this.blocksAround);
-                    collisionBlocks = new ArrayList<>(this.collisionBlocks);
-                    this.blocksAround = null;
-                    this.collisionBlocks = null;
+                if (this.blocksAround != null) {
+                    blocksAround = new ObjectArrayList<>(this.blocksAround);
+                }
+                List<Block> collidingBlocks = null;
+                if (this.collisionBlocks != null) {
+                    collidingBlocks = new ObjectArrayList<>(this.collisionBlocks);
                 }
 
-                PlayerMoveEvent ev = new PlayerMoveEvent(this, from, to);
-                this.server.getPluginManager().callEvent(ev);
+                PlayerMoveEvent event = new PlayerMoveEvent(this, source, target);
+                this.blocksAround = null;
+                this.collisionBlocks = null;
+                this.server.getPluginManager().callEvent(event);
 
-                if (!(revert = ev.isCancelled())) {
-                    if (this.server.suomiCraftPEMode()) {
-                        this.blocksAround = null;
-                        this.collisionBlocks = null;
-                    }
-                    if (this.server.getMobAiEnabled() && this.age % 20 == 0) {
-                        AxisAlignedBB aab = new AxisAlignedBB(
-                                this.getX() - 0.6f,
-                                this.getY() + 1.45f,
-                                this.getZ() - 0.6f,
-                                this.getX() + 0.6f,
-                                this.getY() + 2.9f,
-                                this.getZ() + 0.6f
-                        );
-                        for (int i = 0; i < 8; i++) {
-                            Entity[] entities = this.level.getCollidingEntities(aab.offset(-Math.sin(this.getYaw() * Math.PI / 180) * i, i * (Math.tan(this.getPitch() * -1 * Math.PI / 180)), Math.cos(this.getYaw() * Math.PI / 180) * i));
-                            if (entities.length > 0) {
-                                for (Entity e : entities) {
-                                    if (e instanceof EntityEnderman) {
-                                        ((EntityEnderman) e).stareToAngry();
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (!to.equals(ev.getTo())) {
-                        this.teleport(ev.getTo(), null);
+                if (!(invalidMotion = event.isCancelled())) {
+                    if (!target.equals(event.getTo())) {
+                        this.teleport(event.getTo(), null);
                     } else {
-                        this.addMovement(this.x, this.y + this.getEyeHeight(), this.z, this.yaw, this.pitch, this.yaw);
+                        this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.yaw);
                     }
-                } else if (!this.server.suomiCraftPEMode()) {
+                } else {
                     this.blocksAround = blocksAround;
-                    this.collisionBlocks = collisionBlocks;
+                    this.collisionBlocks = collidingBlocks;
                 }
             }
 
-            if (this.speed == null) speed = new Vector3(from.x - to.x, from.y - to.y, from.z - to.z);
-            else this.speed.setComponents(from.x - to.x, from.y - to.y, from.z - to.z);
+            if (this.speed == null) {
+                this.speed = new Vector3(source.x - target.x, source.y - target.y, source.z - target.z);
+            } else {
+                this.speed.setComponents(source.x - target.x, source.y - target.y, source.z - target.z);
+            }
         } else {
             if (this.speed == null) speed = new Vector3(0, 0, 0);
             else this.speed.setComponents(0, 0, 0);
         }
 
-        if (!revert && this.isFoodEnabled() && this.getServer().getDifficulty() > 0) {
-            //UpdateFoodExpLevel
-            if (distance >= 0.05) {
-                double jump = 0;
-                double swimming = this.isInsideOfWater() ? 0.015 * distance : 0;
-                if (swimming != 0) distance = 0;
-                if (this.isSprinting()) {
-                    if (this.inAirTicks == 3 && swimming == 0) {
-                        jump = 0.2;
-                    }
-                    this.foodData.updateFoodExpLevel(0.1 * distance + jump + swimming);
-                } else {
-                    if (this.inAirTicks == 3 && swimming == 0) {
-                        jump = 0.05;
-                    }
-                    this.foodData.updateFoodExpLevel(jump + swimming);
+        if ((this.isFoodEnabled() || this.getServer().getDifficulty() == 0) && distance >= 0.05) {
+            double jump = 0;
+            double swimming = this.isInsideOfWater() ? 0.015 * distance : 0;
+            double distance2 = distance;
+            if (swimming != 0) distance2 = 0;
+            if (this.isSprinting()) {
+                if (this.inAirTicks == 3 && swimming == 0) {
+                    jump = 0.2;
                 }
+                this.getFoodData().updateFoodExpLevel(0.1 * distance2 + jump + swimming);
+            } else {
+                if (this.inAirTicks == 3 && swimming == 0) {
+                    jump = 0.05;
+                }
+                this.getFoodData().updateFoodExpLevel(jump + swimming);
             }
         }
 
-        // Frost Walker
-        if (!revert && delta > 0.0001d) {
-            Item boots = inventory.getBootsFast();
-
-            Enchantment frostWalker = boots.getEnchantment(Enchantment.ID_FROST_WALKER);
-            if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= 1 && this.y <= 255) {
-                int radius = 2 + frostWalker.getLevel();
-                for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
-                    for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
-                        Block block = level.getBlock(coordX, this.getFloorY() - 1, coordZ);
-                        if ((block.getId() == Block.STILL_WATER || block.getId() == Block.WATER && block.getDamage() == 0) && block.up().getId() == Block.AIR) {
-                            WaterFrostEvent ev = new WaterFrostEvent(block);
-                            server.getPluginManager().callEvent(ev);
-                            if (!ev.isCancelled()) {
-                                level.setBlock(block, Block.get(Block.ICE_FROSTED), true, false);
-                                level.scheduleUpdate(level.getBlock(block), Utils.random.nextInt(20, 40));
-                            }
-                        }
-                    }
-                }
-            }
-
-            Enchantment soulSpeedEnchantment = boots.getEnchantment(Enchantment.ID_SOUL_SPEED);
-            if (soulSpeedEnchantment != null && soulSpeedEnchantment.getLevel() > 0) {
-                int down = this.getLevel().getBlockIdAt(chunk, getFloorX(), getFloorY() - 1, getFloorZ());
-                if (this.inSoulSand && down != BlockID.SOUL_SAND) {
-                    this.inSoulSand = false;
-                    this.setMovementSpeed(DEFAULT_SPEED, true);
-                } else if (!this.inSoulSand && down == BlockID.SOUL_SAND) {
-                    this.inSoulSand = true;
-                    float soulSpeed = (soulSpeedEnchantment.getLevel() * 0.105f) + 1.3f;
-                    this.setMovementSpeed(DEFAULT_SPEED * soulSpeed, true);
-                }
-            }
+        this.forceMovement = null;
+        if (distance != 0 && this.nextChunkOrderRun > 20) {
+            this.nextChunkOrderRun = 20;
         }
+        this.resetClientMovement();
+    }
 
-        if (revert) {
-            this.lastX = from.x;
-            this.lastY = from.y;
-            this.lastZ = from.z;
-
-            this.lastYaw = from.yaw;
-            this.lastPitch = from.pitch;
-
-            // We have to send slightly above otherwise the player will fall into the ground
-            Vector3 vec = new Vector3(from.x, from.y + 0.00001, from.z);
-            this.sendPosition(vec, from.yaw, from.pitch, MovePlayerPacket.MODE_RESET);
-            this.forceMovement = vec;
-        } else {
-            this.forceMovement = null;
-            if (distanceSquared != 0 && this.nextChunkOrderRun > 20) {
-                this.nextChunkOrderRun = 20;
-            }
-        }
-
+    protected void resetClientMovement() {
         this.newPosition = null;
+    }
+
+    protected void revertClientMotion(Location originalPos) {
+        this.lastX = originalPos.getX();
+        this.lastY = originalPos.getY();
+        this.lastZ = originalPos.getZ();
+        this.lastYaw = originalPos.getYaw();
+        this.lastPitch = originalPos.getPitch();
+
+        Vector3 syncPos = originalPos.add(0, 0.00001, 0);
+        this.sendPosition(syncPos, originalPos.getYaw(), originalPos.getPitch(), MovePlayerPacket.MODE_RESET);
+        this.forceMovement = syncPos;
+
+        if (this.speed == null) {
+            this.speed = new Vector3(0, 0, 0);
+        } else {
+            this.speed.setComponents(0, 0, 0);
+        }
     }
 
     @Override
@@ -2079,7 +2004,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (this.spawned) {
-            this.processMovement(tickDiff);
+            while (!this.clientMovements.isEmpty()) {
+                this.handleMovement(this.clientMovements.poll());
+            }
             this.motionX = this.motionY = this.motionZ = 0; // HACK: fix player knockback being messed up
 
             if (!this.isSpectator() && this.isAlive()) {
@@ -2501,7 +2428,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 startGamePacket.lightningLevel = this.getLevel().getThunderTime();
             }
         }
-        this.quickBatch(startGamePacket);
+        startGamePacket.isMovementServerAuthoritative = this.isMovementServerAuthoritative();
+        startGamePacket.isServerAuthoritativeBlockBreaking = this.isServerAuthoritativeBlockBreaking();
+        this.directDataPacket(startGamePacket);
 
         this.loggedIn = true;
         this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logIn",
@@ -2815,7 +2744,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     break;
                 case ProtocolInfo.PLAYER_INPUT_PACKET:
-                    if (!this.isAlive() || !this.spawned) {
+                    if (!this.isAlive() || !this.spawned || this.isMovementServerAuthoritative()) {
                         break;
                     }
                     if (riding instanceof EntityControllable) {
@@ -2864,20 +2793,56 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     break;
                 case ProtocolInfo.PLAYER_AUTH_INPUT_PACKET:
+                    if (!this.isMovementServerAuthoritative()) {
+                        return;
+                    }
+                    PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;
+
+                    if (!authPacket.getBlockActionData().isEmpty()) {
+                        for (PlayerBlockActionData action : authPacket.getBlockActionData().values()) {
+                            BlockVector3 blockPos = action.getPosition();
+                            BlockFace blockFace = BlockFace.fromIndex(action.getFacing());
+                            if (this.lastBlockAction != null && this.lastBlockAction.getAction() == PlayerActionType.PREDICT_DESTROY_BLOCK &&
+                                    action.getAction() == PlayerActionType.CONTINUE_DESTROY_BLOCK) {
+                                this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                            }
+
+                            BlockVector3 lastBreakPos = this.lastBlockAction == null ? null : this.lastBlockAction.getPosition();
+                            if (lastBreakPos != null && (lastBreakPos.getX() != blockPos.getX() ||
+                                    lastBreakPos.getY() != blockPos.getY() || lastBreakPos.getZ() != blockPos.getZ())) {
+                                this.onBlockBreakAbort(lastBreakPos.asVector3(), BlockFace.DOWN);
+                                this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                            }
+
+                            switch (action.getAction()) {
+                                case START_DESTROY_BLOCK:
+                                    this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                                    break;
+                                case ABORT_DESTROY_BLOCK:
+                                case STOP_DESTROY_BLOCK:
+                                    this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
+                                    break;
+                                case CONTINUE_DESTROY_BLOCK:
+                                    this.onBlockBreakContinue(blockPos.asVector3(), blockFace);
+                                    break;
+                                case PREDICT_DESTROY_BLOCK:
+                                    this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
+                                    this.onBlockBreakComplete(blockPos, blockFace);
+                                    break;
+                            }
+                            this.lastBlockAction = action;
+                        }
+                    }
+
                     if (this.teleportPosition != null) {
                         break;
                     }
-
-                    PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;
 
                     // Proper player.isPassenger() check may be needed
                     if (this.riding instanceof EntityMinecartAbstract) {
                         ((EntityMinecartAbstract) riding).setCurrentSpeed(authPacket.getMotion().getY());
                         break;
                     }
-
-                    if (!authPacket.getBlockActionData().isEmpty())
-                        System.out.println("handled PlayerAuthInputPacket " + authPacket.getBlockActionData());
 
                     if (authPacket.getInputData().contains(AuthInputAction.START_SPRINTING)) {
                         PlayerToggleSprintEvent event = new PlayerToggleSprintEvent(this, true);
@@ -2888,6 +2853,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.setSprinting(true);
                         }
                     }
+
                     if (authPacket.getInputData().contains(AuthInputAction.STOP_SPRINTING)) {
                         PlayerToggleSprintEvent event = new PlayerToggleSprintEvent(this, false);
                         this.server.getPluginManager().callEvent(event);
@@ -2897,6 +2863,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.setSprinting(false);
                         }
                     }
+
                     if (authPacket.getInputData().contains(AuthInputAction.START_SNEAKING)) {
                         PlayerToggleSneakEvent event = new PlayerToggleSneakEvent(this, true);
                         this.server.getPluginManager().callEvent(event);
@@ -2906,6 +2873,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.setSneaking(true);
                         }
                     }
+
                     if (authPacket.getInputData().contains(AuthInputAction.STOP_SNEAKING)) {
                         PlayerToggleSneakEvent event = new PlayerToggleSneakEvent(this, false);
                         this.server.getPluginManager().callEvent(event);
@@ -2913,6 +2881,51 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.sendData(this);
                         } else {
                             this.setSneaking(false);
+                        }
+                    }
+
+                    if (authPacket.getInputData().contains(AuthInputAction.START_JUMPING)) {
+                        PlayerJumpEvent playerJumpEvent = new PlayerJumpEvent(this);
+                        this.server.getPluginManager().callEvent(playerJumpEvent);
+                    }
+
+                    if (authPacket.getInputData().contains(AuthInputAction.START_GLIDING)) {
+                        PlayerToggleGlideEvent playerToggleGlideEvent = new PlayerToggleGlideEvent(this, true);
+                        this.server.getPluginManager().callEvent(playerToggleGlideEvent);
+                        if (playerToggleGlideEvent.isCancelled()) {
+                            this.sendData(this);
+                        } else {
+                            this.setGliding(true);
+                        }
+                    }
+
+                    if (authPacket.getInputData().contains(AuthInputAction.STOP_GLIDING)) {
+                        PlayerToggleGlideEvent playerToggleGlideEvent = new PlayerToggleGlideEvent(this, false);
+                        this.server.getPluginManager().callEvent(playerToggleGlideEvent);
+                        if (playerToggleGlideEvent.isCancelled()) {
+                            this.sendData(this);
+                        } else {
+                            this.setGliding(false);
+                        }
+                    }
+
+                    if (authPacket.getInputData().contains(AuthInputAction.START_SWIMMING)) {
+                        PlayerToggleSwimEvent ptse = new PlayerToggleSwimEvent(this, true);
+                        this.server.getPluginManager().callEvent(ptse);
+                        if (ptse.isCancelled()) {
+                            this.sendData(this);
+                        } else {
+                            this.setSwimming(true);
+                        }
+                    }
+
+                    if (authPacket.getInputData().contains(AuthInputAction.STOP_SWIMMING)) {
+                        PlayerToggleSwimEvent ptse = new PlayerToggleSwimEvent(this, false);
+                        this.server.getPluginManager().callEvent(ptse);
+                        if (ptse.isCancelled()) {
+                            this.sendData(this);
+                        } else {
+                            this.setSwimming(false);
                         }
                     }
 
@@ -2940,13 +2953,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     } else {
                         float yaw = authPacket.getYaw() % 360;
                         float pitch = authPacket.getPitch() % 360;
-
                         if (yaw < 0) {
                             yaw += 360;
                         }
 
-                        this.setRotation(authPacket.getYaw(), authPacket.getPitch());
+                        this.setRotation(yaw, pitch);
                         this.newPosition = clientPosition;
+                        this.clientMovements.offer(clientPosition);
                         this.forceMovement = null;
                     }
                     break;
@@ -3024,70 +3037,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     actionswitch:
                     switch (playerActionPacket.action) {
                         case PlayerActionPacket.ACTION_START_BREAK:
-                            long currentBreak = System.currentTimeMillis();
-                            BlockVector3 currentBreakPosition = new BlockVector3(playerActionPacket.x, playerActionPacket.y, playerActionPacket.z);
-                            // HACK: Client spams multiple left clicks so we need to skip them.
-                            if ((lastBreakPosition.equals(currentBreakPosition) && (currentBreak - this.lastBreak) < 10) || pos.distanceSquared(this) > 100) {
-                                break;
-                            }
-                            Block target = this.level.getBlock(pos);
-                            PlayerInteractEvent playerInteractEvent = new PlayerInteractEvent(this, this.inventory.getItemInHand(), target, face, target.getId() == 0 ? Action.LEFT_CLICK_AIR : Action.LEFT_CLICK_BLOCK);
-                            this.getServer().getPluginManager().callEvent(playerInteractEvent);
-                            if (playerInteractEvent.isCancelled()) {
-                                this.inventory.sendHeldItem(this);
-                                break;
-                            }
-                            switch (target.getId()) {
-                                case Block.NOTEBLOCK:
-                                    ((BlockNoteblock) target).emitSound();
-                                    break actionswitch;
-                                case Block.DRAGON_EGG:
-                                    if (!this.isCreative()) {
-                                        ((BlockDragonEgg) target).teleport();
-                                        break actionswitch;
-                                    }
-                                case Block.ITEM_FRAME_BLOCK:
-                                    BlockEntity itemFrame = this.level.getBlockEntityIfLoaded(pos);
-                                    if (itemFrame instanceof BlockEntityItemFrame && ((BlockEntityItemFrame) itemFrame).dropItem(this)) {
-                                        break actionswitch;
-                                    }
-                            }
-                            Block block = target.getSide(face);
-                            if (block.getId() == Block.FIRE) {
-                                this.level.setBlock(block, Block.get(BlockID.AIR), true);
-                                this.level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_EXTINGUISH_FIRE);
-                                break;
-                            }
-                            if (!this.isCreative()) {
-                                double breakTime = Math.ceil(target.calculateBreakTime(this.inventory.getItemInHandFast(), this) * 20);
-                                if (breakTime > 0) {
-                                    LevelEventPacket pk = new LevelEventPacket();
-                                    pk.evid = LevelEventPacket.EVENT_BLOCK_START_BREAK;
-                                    pk.x = (float) pos.x;
-                                    pk.y = (float) pos.y;
-                                    pk.z = (float) pos.z;
-                                    pk.data = (int) (65535 / breakTime);
-                                    this.getLevel().addChunkPacket(pos.getFloorX() >> 4, pos.getFloorZ() >> 4, pk);
-                                }
-                            }
-
-                            this.breakingBlock = target;
-                            this.lastBreak = currentBreak;
-                            this.lastBreakPosition = currentBreakPosition;
+                            if (this.isServerAuthoritativeBlockBreaking()) break;
+                            this.onBlockBreakStart(pos, face);
                             break;
-
                         case PlayerActionPacket.ACTION_ABORT_BREAK:
                         case PlayerActionPacket.ACTION_STOP_BREAK:
-                            if (pos.distanceSquared(this) < 100) { // same as with ACTION_START_BREAK
-                                LevelEventPacket pk = new LevelEventPacket();
-                                pk.evid = LevelEventPacket.EVENT_BLOCK_STOP_BREAK;
-                                pk.x = (float) pos.x;
-                                pk.y = (float) pos.y;
-                                pk.z = (float) pos.z;
-                                pk.data = 0;
-                                this.getLevel().addChunkPacket(pos.getFloorX() >> 4, pos.getFloorZ() >> 4, pk);
-                                this.breakingBlock = null;
-                            }
+                            if (this.isServerAuthoritativeBlockBreaking()) break;
+                            this.onBlockBreakAbort(pos, face);
                             break;
                         case PlayerActionPacket.ACTION_GET_UPDATED_BLOCK:
                         case PlayerActionPacket.ACTION_DROP_ITEM:
@@ -3103,6 +3059,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.respawn();
                             break;
                         case PlayerActionPacket.ACTION_JUMP:
+                            if (this.isMovementServerAuthoritative()) break;
                             if (this.inAirTicks > 40 && this.checkMovement && !server.getAllowFlight() && !this.isCreative() && !this.isSwimming() && !this.isGliding()) {
                                 /*if (this.inAirTicks < 150) {
                                     PlayerInvalidMoveEvent playerInvalidMoveEvent = new PlayerInvalidMoveEvent(this, true);
@@ -3118,6 +3075,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.server.getPluginManager().callEvent(new PlayerJumpEvent(this));
                             break packetswitch;
                         case PlayerActionPacket.ACTION_START_SPRINT:
+                            if (this.isMovementServerAuthoritative()) break;
                             PlayerToggleSprintEvent playerToggleSprintEvent = new PlayerToggleSprintEvent(this, true);
                             this.server.getPluginManager().callEvent(playerToggleSprintEvent);
                             if (playerToggleSprintEvent.isCancelled()) {
@@ -3127,6 +3085,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             break packetswitch;
                         case PlayerActionPacket.ACTION_STOP_SPRINT:
+                            if (this.isMovementServerAuthoritative()) break;
                             playerToggleSprintEvent = new PlayerToggleSprintEvent(this, false);
                             this.server.getPluginManager().callEvent(playerToggleSprintEvent);
                             if (playerToggleSprintEvent.isCancelled()) {
@@ -3136,6 +3095,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             break packetswitch;
                         case PlayerActionPacket.ACTION_START_SNEAK:
+                            if (this.isMovementServerAuthoritative()) break;
                             PlayerToggleSneakEvent playerToggleSneakEvent = new PlayerToggleSneakEvent(this, true);
                             this.server.getPluginManager().callEvent(playerToggleSneakEvent);
                             if (playerToggleSneakEvent.isCancelled()) {
@@ -3145,6 +3105,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             break packetswitch;
                         case PlayerActionPacket.ACTION_STOP_SNEAK:
+                            if (this.isMovementServerAuthoritative()) break;
                             playerToggleSneakEvent = new PlayerToggleSneakEvent(this, false);
                             this.server.getPluginManager().callEvent(playerToggleSneakEvent);
                             if (playerToggleSneakEvent.isCancelled()) {
@@ -3158,6 +3119,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.dummyBossBars.values().forEach(DummyBossBar::reshow);
                             break;
                         case PlayerActionPacket.ACTION_START_GLIDE:
+                            if (this.isMovementServerAuthoritative()) break;
                             if (!server.getAllowFlight() && this.checkMovement) {
                                 Item chestplate = this.getInventory().getChestplateFast();
                                 if ((chestplate == null || chestplate.getId() != ItemID.ELYTRA) && !server.getAllowFlight()) {
@@ -3174,6 +3136,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             break packetswitch;
                         case PlayerActionPacket.ACTION_STOP_GLIDE:
+                            if (this.isMovementServerAuthoritative()) break;
                             playerToggleGlideEvent = new PlayerToggleGlideEvent(this, false);
                             this.server.getPluginManager().callEvent(playerToggleGlideEvent);
                             if (playerToggleGlideEvent.isCancelled()) {
@@ -3183,11 +3146,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             break packetswitch;
                         case PlayerActionPacket.ACTION_CONTINUE_BREAK:
-                            if (this.isBreakingBlock()) {
-                                this.level.addParticle(new PunchBlockParticle(pos, this.breakingBlock, face));
-                            }
+                            if (this.isMovementServerAuthoritative()) break;
+                            this.onBlockBreakContinue(pos, face);
                             break;
                         case PlayerActionPacket.ACTION_START_SWIMMING:
+                            if (this.isMovementServerAuthoritative()) break;
                             PlayerToggleSwimEvent ptse = new PlayerToggleSwimEvent(this, true);
                             if (!this.isInsideOfWater()) {
                                 ptse.setCancelled(true);
@@ -3200,6 +3163,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                             break;
                         case PlayerActionPacket.ACTION_STOP_SWIMMING:
+                            if (this.isMovementServerAuthoritative()) break;
                             ptse = new PlayerToggleSwimEvent(this, false);
                             this.server.getPluginManager().callEvent(ptse);
                             if (ptse.isCancelled()) {
@@ -4297,6 +4261,129 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    private void onBlockBreakContinue(Vector3 pos, BlockFace face) {
+        if (this.isBreakingBlock()) {
+            Block block = this.level.getBlock(pos, false);
+            this.level.addParticle(new PunchBlockParticle(pos, block, face));
+        }
+    }
+
+    private void onBlockBreakStart(Vector3 pos, BlockFace face) {
+        BlockVector3 blockPos = pos.asBlockVector3();
+        long currentBreak = System.currentTimeMillis();
+        // HACK: Client spams multiple left clicks so we need to skip them.
+        if ((this.lastBreakPosition.equals(blockPos) && (currentBreak - this.lastBreak) < 10) || pos.distanceSquared(this) > 100) {
+            return;
+        }
+
+        Block target = this.level.getBlock(pos);
+        PlayerInteractEvent playerInteractEvent = new PlayerInteractEvent(this, this.inventory.getItemInHand(), target, face,
+                target.getId() == 0 ? Action.LEFT_CLICK_AIR : Action.LEFT_CLICK_BLOCK);
+        this.getServer().getPluginManager().callEvent(playerInteractEvent);
+        if (playerInteractEvent.isCancelled()) {
+            this.inventory.sendHeldItem(this);
+            return;
+        }
+
+        switch (target.getId()) {
+            case Block.NOTEBLOCK:
+                ((BlockNoteblock) target).emitSound();
+                return;
+            case Block.DRAGON_EGG:
+                if (!this.isCreative()) {
+                    ((BlockDragonEgg) target).teleport();
+                    return;
+                }
+                break;
+            case Block.ITEM_FRAME_BLOCK:
+                BlockEntity itemFrame = this.level.getBlockEntity(pos);
+                if (itemFrame instanceof BlockEntityItemFrame && ((BlockEntityItemFrame) itemFrame).dropItem(this)) {
+                    return;
+                }
+                break;
+        }
+
+        Block block = target.getSide(face);
+        if (block.getId() == Block.FIRE) {
+            this.level.setBlock(block, Block.get(BlockID.AIR), true);
+            this.level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_EXTINGUISH_FIRE);
+            return;
+        }
+
+        if (!this.isCreative()) {
+            double breakTime = Math.ceil(target.getBreakTime(this.inventory.getItemInHand(), this) * 20);
+            if (breakTime > 0) {
+                LevelEventPacket pk = new LevelEventPacket();
+                pk.evid = LevelEventPacket.EVENT_BLOCK_START_BREAK;
+                pk.x = (float) pos.x;
+                pk.y = (float) pos.y;
+                pk.z = (float) pos.z;
+                pk.data = (int) (65535 / breakTime);
+                this.getLevel().addChunkPacket(pos.getFloorX() >> 4, pos.getFloorZ() >> 4, pk);
+            }
+        }
+
+        this.breakingBlock = target;
+        this.lastBreak = currentBreak;
+        this.lastBreakPosition = blockPos;
+    }
+
+    private void onBlockBreakAbort(Vector3 pos, BlockFace face) {
+        if (pos.distanceSquared(this) < 100) {
+            LevelEventPacket pk = new LevelEventPacket();
+            pk.evid = LevelEventPacket.EVENT_BLOCK_STOP_BREAK;
+            pk.x = (float) pos.x;
+            pk.y = (float) pos.y;
+            pk.z = (float) pos.z;
+            pk.data = 0;
+            this.getLevel().addChunkPacket(pos.getFloorX() >> 4, pos.getFloorZ() >> 4, pk);
+        }
+        this.breakingBlock = null;
+    }
+
+    private void onBlockBreakComplete(BlockVector3 blockPos, BlockFace face) {
+        if (!this.spawned || !this.isAlive()) {
+            return;
+        }
+
+        this.resetCraftingGridType();
+
+        Item handItem = this.getInventory().getItemInHand();
+        Item clone = handItem.clone();
+
+        boolean canInteract = this.canInteract(blockPos.add(0.5, 0.5, 0.5), this.isCreative() ? 13 : 7);
+        if (canInteract) {
+            handItem = this.level.useBreakOn(blockPos.asVector3(), face, handItem, this, true);
+            if (handItem != null && this.isSurvival()) {
+                this.getFoodData().updateFoodExpLevel(0.005);
+                if (handItem.equals(clone) && handItem.getCount() == clone.getCount()) {
+                    return;
+                }
+
+                if (clone.getId() == handItem.getId() || handItem.getId() == 0) {
+                    inventory.setItemInHand(handItem);
+                } else {
+                    server.getLogger().debug("Tried to set item " + handItem.getId() + " but " + this.username + " had item " + clone.getId() + " in their hand slot");
+                }
+                inventory.sendHeldItem(this.getViewers().values());
+            }
+            return;
+        }
+
+        inventory.sendContents(this);
+        inventory.sendHeldItem(this);
+
+        if (blockPos.distanceSquared(this) < 100) {
+            Block target = this.level.getBlock(blockPos.asVector3());
+            this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
+
+            BlockEntity blockEntity = this.level.getBlockEntity(blockPos.asVector3());
+            if (blockEntity instanceof BlockEntitySpawnable) {
+                ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+            }
+        }
+    }
+
     /**
      * Sends a chat message as this player
      *
@@ -5361,7 +5448,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.resetFallDistance();
             this.nextChunkOrderRun = 0;
-            this.newPosition = null;
+            this.resetClientMovement();
 
             this.stopFishing(false);
             return true;
@@ -5416,7 +5503,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.resetFallDistance();
             this.orderChunks();
             this.nextChunkOrderRun = 0;
-            this.newPosition = null;
+            this.resetClientMovement();
 
             // Weather
             this.getLevel().sendWeather(this);
@@ -6264,5 +6351,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.setDataPropertyAndSendOnlyToSelf(new ShortEntityData(DATA_AIR, ticks));
             }
         }
+    }
+
+    public boolean isMovementServerAuthoritative() {
+        return this.protocol >= ProtocolInfo.v1_17_0;
+    }
+
+    public boolean isServerAuthoritativeBlockBreaking() {
+        return this.isMovementServerAuthoritative();
     }
 }

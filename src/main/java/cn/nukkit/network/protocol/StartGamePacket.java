@@ -84,6 +84,7 @@ public class StartGamePacket extends DataPacket {
     public String premiumWorldTemplateId = "";
     public boolean isTrial = false;
     public boolean isMovementServerAuthoritative;
+    public boolean isServerAuthoritativeBlockBreaking;
     public long currentTick;
     public int enchantmentSeed;
     public String multiplayerCorrelationId = "";
@@ -207,7 +208,7 @@ public class StartGamePacket extends DataPacket {
                 if (protocol >= ProtocolInfo.v1_16_210) {
                     this.putUnsignedVarInt(this.isMovementServerAuthoritative ? 1 : 0); // 2 - rewind
                     this.putVarInt(0); // RewindHistorySize
-                    this.putBoolean(false); // isServerAuthoritativeBlockBreaking
+                    this.putBoolean(this.isServerAuthoritativeBlockBreaking); // isServerAuthoritativeBlockBreaking
                 } else {
                     this.putVarInt(this.isMovementServerAuthoritative ? 1 : 0); // 2 - rewind
                 }
