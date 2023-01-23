@@ -1,6 +1,5 @@
 package cn.nukkit.item.enchantment;
 
-import cn.nukkit.block.BlockPumpkin;
 import cn.nukkit.item.*;
 
 /**
@@ -31,7 +30,7 @@ public enum EnchantmentType {
             return true;
 
         } else if (item instanceof ItemArmor) {
-            if (this == ARMOR || this == WEARABLE) {
+            if (this == WEARABLE || (this == ARMOR && item.isArmor())) {
                 return true;
             }
 
@@ -44,8 +43,6 @@ public enum EnchantmentType {
                     return item.isLeggings();
                 case ARMOR_FEET:
                     return item.isBoots();
-                case WEARABLE:
-                    return item instanceof ItemArmor || item instanceof ItemSkull || item.getBlock() instanceof BlockPumpkin;
                 default:
                     return false;
             }
