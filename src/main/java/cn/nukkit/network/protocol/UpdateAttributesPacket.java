@@ -38,6 +38,9 @@ public class UpdateAttributesPacket extends DataPacket {
                 this.putLFloat(entry.getValue());
                 this.putLFloat(entry.getDefaultValue());
                 this.putString(entry.getName());
+                if (protocol >= ProtocolInfo.v1_19_20) {
+                    this.putUnsignedVarInt(0); // Modifiers
+                }
             }
         }
 

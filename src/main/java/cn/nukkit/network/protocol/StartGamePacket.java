@@ -88,6 +88,11 @@ public class StartGamePacket extends DataPacket {
     public long currentTick;
     public int enchantmentSeed;
     public String multiplayerCorrelationId = "";
+    public boolean isDisablingPersonas;
+    public boolean isDisablingCustomSkins;
+    public boolean clientSideGenerationEnabled;
+    public byte chatRestrictionLevel;
+    public boolean disablePlayerInteractions;
 
     @Override
     public void decode() {
@@ -102,6 +107,8 @@ public class StartGamePacket extends DataPacket {
         this.putVector3f(this.x, this.y, this.z);
         this.putLFloat(this.yaw);
         this.putLFloat(this.pitch);
+
+        /* Level settings start */
         if (protocol >= ProtocolInfo.v1_18_30) {
             this.putLLong(this.seed);
         }else {
@@ -183,12 +190,16 @@ public class StartGamePacket extends DataPacket {
                 this.putBoolean(this.isWorldTemplateOptionLocked);
                 if (protocol >= 361) {
                     this.putBoolean(this.isOnlySpawningV1Villagers);
-                    if (protocol >= 388) {
+                    if (protocol >= ProtocolInfo.v1_13_0) {
+                        if (protocol >= ProtocolInfo.v1_19_20) {
+                            this.putBoolean(this.isDisablingPersonas);
+                            this.putBoolean(this.isDisablingCustomSkins);
+                        }
                         this.putString(this.vanillaVersion);
                     }
                 }
             }
-            if (protocol >= 407) {
+            if (protocol >= ProtocolInfo.v1_16_0) {
                 this.putLInt(protocol >= ProtocolInfo.v1_16_100 ? 16 : 0); // Limited world width
                 this.putLInt(protocol >= ProtocolInfo.v1_16_100 ? 16 : 0); // Limited world height
                 this.putBoolean(false); // Nether type
@@ -197,13 +208,19 @@ public class StartGamePacket extends DataPacket {
                     this.putString(""); // linkUri
                 }
                 this.putBoolean(false); // Experimental Gameplay
+                if (protocol >= ProtocolInfo.v1_19_20) {
+                    this.putByte(this.chatRestrictionLevel);
+                    this.putBoolean(this.disablePlayerInteractions);
+                }
             }
         }
+        /* Level settings end */
+
         this.putString(this.levelId);
         this.putString(this.worldName);
         this.putString(this.premiumWorldTemplateId);
         this.putBoolean(this.isTrial);
-        if (protocol >= 388) {
+        if (protocol >= ProtocolInfo.v1_13_0) {
             if (protocol >= ProtocolInfo.v1_16_100) {
                 if (protocol >= ProtocolInfo.v1_16_210) {
                     this.putUnsignedVarInt(this.isMovementServerAuthoritative ? 1 : 0); // 2 - rewind
@@ -218,19 +235,19 @@ public class StartGamePacket extends DataPacket {
         }
         this.putLLong(this.currentTick);
         this.putVarInt(this.enchantmentSeed);
-        if (protocol > 274) {
+        if (protocol > ProtocolInfo.v1_5_0) {
             if (protocol >= ProtocolInfo.v1_16_100) {
                 this.putUnsignedVarInt(0); // Custom blocks
             } else {
                 this.put(GlobalBlockPalette.getCompiledTable(this.protocol));
             }
-            if (protocol >= 361) {
+            if (protocol >= ProtocolInfo.v1_12_0) {
                 this.put(RuntimeItems.getMapping(protocol).getItemPalette());
             }
             this.putString(this.multiplayerCorrelationId);
             if (protocol == 354 && version != null && version.startsWith("1.11.4")) {
                 this.putBoolean(this.isOnlySpawningV1Villagers);
-            } else if (protocol >= 407) {
+            } else if (protocol >= ProtocolInfo.v1_16_0) {
                 this.putBoolean(false); // isInventoryServerAuthoritative
                 if (protocol >= ProtocolInfo.v1_16_230_50) {
                     this.putString(""); // serverEngine
@@ -245,6 +262,9 @@ public class StartGamePacket extends DataPacket {
                         this.putLLong(0L); // BlockRegistryChecksum
                         if (protocol >= ProtocolInfo.v1_19_0) {
                             this.putUUID(new UUID(0, 0)); // worldTemplateId
+                            if (protocol >= ProtocolInfo.v1_19_20) {
+                                this.putBoolean(this.clientSideGenerationEnabled);
+                            }
                         }
                     }
                 }

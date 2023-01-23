@@ -6,7 +6,6 @@ import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.ChunkSection;
-import cn.nukkit.level.format.anvil.Anvil;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.util.PalettedBlockStorage;
@@ -23,7 +22,6 @@ import lombok.Data;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.List;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 public class NetworkChunkSerializer {

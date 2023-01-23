@@ -335,6 +335,7 @@ public abstract class Entity extends Location implements Metadatable {
         initEntityIdentifiers(ProtocolInfo.v1_16_100, AvailableEntityIdentifiersPacket.NBT419);
         initEntityIdentifiers(ProtocolInfo.v1_17_0, AvailableEntityIdentifiersPacket.NBT440);
         initEntityIdentifiers(ProtocolInfo.v1_19_0, AvailableEntityIdentifiersPacket.NBT527);
+        initEntityIdentifiers(ProtocolInfo.v1_19_20, AvailableEntityIdentifiersPacket.NBT544);
     }
 
     public final Map<Integer, Player> hasSpawned = new ConcurrentHashMap<>();
@@ -1000,9 +1001,11 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     private static int correctEntityIdentifiersProtocol(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_19_0) {
+        if (protocolId >= ProtocolInfo.v1_19_20) {
+            return ProtocolInfo.v1_19_20;
+        }else if (protocolId >= ProtocolInfo.v1_19_0) {
             return ProtocolInfo.v1_19_0;
-        }if (protocolId >= ProtocolInfo.v1_17_0) {
+        }else if (protocolId >= ProtocolInfo.v1_17_0) {
             return ProtocolInfo.v1_17_0;
         } else if (protocolId >= ProtocolInfo.v1_16_100) {
             return ProtocolInfo.v1_16_100;
