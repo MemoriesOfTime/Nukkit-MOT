@@ -11,7 +11,6 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
@@ -58,7 +57,7 @@ public class BlockEnderChest extends BlockTransparentMeta implements Faceable {
 
     @Override
     public String getName() {
-        return "Chest";
+        return "Ender Chest";
     }
 
     @Override
