@@ -148,7 +148,7 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             return false;
         }
 
-        if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.CUSTOM && source.getCause() != DamageCause.MAGIC) {
+        if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.CUSTOM && source.getCause() != DamageCause.MAGIC && source.getCause() != DamageCause.HUNGER) {
             int armorPoints = 0;
             int epf = 0;
 
@@ -170,9 +170,9 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
 
             source.setDamage(-source.getFinalDamage() * Math.min(NukkitMath.ceilFloat(Math.min(epf, 25) * ((float) Utils.random.nextInt(50, 100) / 100)), 20) * 0.04f,
                     EntityDamageEvent.DamageModifier.ARMOR_ENCHANTMENTS);
-
-            source.setDamage(-Math.min(this.getAbsorption(), source.getFinalDamage()), EntityDamageEvent.DamageModifier.ABSORPTION);
         }
+
+        source.setDamage(-Math.min(this.getAbsorption(), source.getFinalDamage()), EntityDamageEvent.DamageModifier.ABSORPTION);
 
         if (super.attack(source)) {
             Entity damager = null;
@@ -209,18 +209,28 @@ public abstract class EntityHumanType extends EntityCreature implements Inventor
             }
         }
 
-        if (armor.isUnbreakable() || armor instanceof ItemSkull) {
-            return armor;
-        }
+        if (cause != DamageCause.VOID &&
+                cause != DamageCause.MAGIC &&
+                cause != DamageCause.HUNGER &&
+                cause != DamageCause.DROWNING &&
+                cause != DamageCause.SUFFOCATION &&
+                cause != DamageCause.SUICIDE &&
+                cause != DamageCause.FIRE_TICK &&
+                cause != DamageCause.FALL) { // No armor damage
 
-        if (shield) {
-            armor.setDamage(armor.getDamage() + (damage >= 4.0f ? ((int) damage) : 1));
-        } else {
-            armor.setDamage(armor.getDamage() + Math.max((int) (damage / 4), 1));
-        }
+            if (armor.isUnbreakable() || armor instanceof ItemSkull) {
+                return armor;
+            }
 
-        if (armor.getDamage() >= armor.getMaxDurability()) {
-            return Item.get(BlockID.AIR, 0, 0);
+            if (shield) {
+                armor.setDamage(armor.getDamage() + (damage >= 4.0f ? ((int) damage) : 1));
+            } else {
+                armor.setDamage(armor.getDamage() + Math.max((int) (damage / 4), 1));
+            }
+
+            if (armor.getDamage() >= armor.getMaxDurability()) {
+                return Item.get(BlockID.AIR, 0, 0);
+            }
         }
 
         return armor;
