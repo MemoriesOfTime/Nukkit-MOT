@@ -7,7 +7,6 @@ import cn.nukkit.item.food.Food;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
 
 /**
@@ -110,7 +109,7 @@ public class BlockCake extends BlockTransparentMeta {
 
     @Override
     public boolean onActivate(Item item, Player player) {
-        if (player != null && player.getFoodData().getLevel() < player.getFoodData().getMaxLevel()) {
+        if (player != null && (player.getFoodData().getLevel() < player.getFoodData().getMaxLevel() || player.isCreative() || player.getServer().getDifficulty() == 0)) {
             if (getDamage() <= 0x06) setDamage(getDamage() + 1);
             if (getDamage() >= 0x06) {
                 getLevel().setBlock(this, Block.get(BlockID.AIR), true);
