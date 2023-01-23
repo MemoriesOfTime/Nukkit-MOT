@@ -570,6 +570,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_19_10:
                 return new ArrayList<>(Item.creative534);
             case v1_19_20:
+            case v1_19_21:
                 return new ArrayList<>(Item.creative544);
             default:
                 throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
@@ -578,7 +579,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static void addCreativeItem(Item item) {
         Server.mvw("Item#addCreativeItem(Item)");
-        addCreativeItem(v1_17_10, item);
+        addCreativeItem(v1_19_20, item);
     }
 
     public static void addCreativeItem(int protocol, Item item) {
