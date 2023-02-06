@@ -7,15 +7,17 @@ import cn.nukkit.network.protocol.*;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
 import cn.nukkit.utils.VarInt;
-import cn.nukkit.utils.Zlib;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
+import java.net.ProtocolException;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -143,50 +145,81 @@ public class Network {
     }
 
     public void processBatch(BatchPacket packet, Player player) {
+        ObjectArrayList<DataPacket> packets = new ObjectArrayList<>();
+        try {
+            this.processBatch(packet.payload, packets, player.getNetworkSession().getCompression(), player.protocol, player.raknetProtocol);
+            this.processPackets(player, packets);
+        } catch (Exception e) {
+            log.error("Error whilst decoding batch packet from " + player.getName(), e);
+            player.close("", "Error whilst decoding batch packet");
+        }
+    }
+
+    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int protocol, int raknetProtocol) throws ProtocolException {
         byte[] data;
         try {
-            if (player.raknetProtocol >= 10) {
-                data = Zlib.inflateRaw(packet.payload, 2097152); // 2 * 1024 * 1024
-            } else {
-                data = Zlib.inflate(packet.payload, 2097152);
-            }
+            data = compression.decompress(payload);
         } catch (Exception e) {
+            log.debug("Exception while inflating batch packet", e);
             return;
         }
 
-        int len = data.length;
         BinaryStream stream = new BinaryStream(data);
         try {
-            List<DataPacket> packets = new ArrayList<>();
             int count = 0;
-            while (stream.offset < len) {
+            while (!stream.feof()) {
                 count++;
-                if (count > 780) {
-                    player.close("", "Illegal Batch Packet");
-                    return;
+                if (count >= 1000) {
+                    throw new ProtocolException("Illegal batch with " + count + " packets");
                 }
                 byte[] buf = stream.getByteArray();
 
-                DataPacket pk = this.getPacketFromBuffer(player.protocol, buf);
+                ByteArrayInputStream bais = new ByteArrayInputStream(buf);
+
+                int packetId;
+                switch (raknetProtocol) {
+                    case 7:
+                        packetId = bais.read();
+                        break;
+                    case 8:
+                        packetId = bais.read();
+                        bais.skip(2L);
+                        break;
+                    default:
+                        int header = (int) VarInt.readUnsignedVarInt(bais);
+                        // | Client ID | Sender ID | Packet ID |
+                        // |   2 bits  |   2 bits  |  10 bits  |
+                        packetId = header & 0x3FF;
+                        break;
+                }
+
+                DataPacket pk = this.getPacket(packetId);
 
                 if (pk != null) {
-                    pk.protocol = player.protocol;
-
-                    if (player.raknetProtocol > 8) {
-                        pk.decode();
-                    } else { // version < 1.6
-                        pk.setBuffer(buf, 3);
-                        pk.decode();
+                    pk.protocol = protocol;
+                    pk.setBuffer(buf, buf.length - bais.available());
+                    try {
+                        if (protocol > 8) {
+                            pk.decode();
+                        }else { // version < 1.6
+                            pk.setBuffer(buf, 3);
+                            pk.decode();
+                        }
+                    } catch (Exception e) {
+                        if (log.isTraceEnabled()) {
+                            log.trace("Dumping Packet\n{}", ByteBufUtil.prettyHexDump(Unpooled.wrappedBuffer(buf)));
+                        }
+                        log.error("Unable to decode packet", e);
+                        throw new IllegalStateException("Unable to decode " + pk.getClass().getSimpleName());
                     }
 
                     packets.add(pk);
+                } else {
+                    log.debug("Received unknown packet with ID: {}", Integer.toHexString(packetId));
                 }
             }
-
-            processPackets(player, packets);
-
         } catch (Exception e) {
-            if (Nukkit.DEBUG > 1) {
+            if (log.isDebugEnabled()) {
                 log.debug("Error whilst decoding batch packet", e);
             }
         }
@@ -201,19 +234,6 @@ public class Network {
     public void processPackets(Player player, List<DataPacket> packets) {
         if (packets.isEmpty()) return;
         packets.forEach(player::handleDataPacket);
-    }
-
-    private DataPacket getPacketFromBuffer(int protocol, byte[] buffer) throws IOException {
-        ByteArrayInputStream stream = new ByteArrayInputStream(buffer);
-        DataPacket pk = this.getPacket((byte) VarInt.readUnsignedVarInt(stream));
-        if (pk != null) {
-            if (protocol >= 388) {
-                pk.setBuffer(buffer, buffer.length - stream.available());
-            } else {
-                pk.setBuffer(buffer, protocol <= 274 ? 3 : 1);
-            }
-        }
-        return pk;
     }
 
     public DataPacket getPacket(byte id) {
@@ -367,6 +387,7 @@ public class Network {
         this.registerPacket(ProtocolInfo.MAP_CREATE_LOCKED_COPY_PACKET, MapCreateLockedCopyPacket.class);
         this.registerPacket(ProtocolInfo.ON_SCREEN_TEXTURE_ANIMATION_PACKET, OnScreenTextureAnimationPacket.class);
         this.registerPacket(ProtocolInfo.COMPLETED_USING_ITEM_PACKET, CompletedUsingItemPacket.class);
+        this.registerPacket(ProtocolInfo.NETWORK_SETTINGS_PACKET, NetworkSettingsPacket.class);
         this.registerPacket(ProtocolInfo.CODE_BUILDER_PACKET, CodeBuilderPacket.class);
         this.registerPacket(ProtocolInfo.PLAYER_AUTH_INPUT_PACKET, PlayerAuthInputPacket.class);
         this.registerPacket(ProtocolInfo.CREATIVE_CONTENT_PACKET, CreativeContentPacket.class);
@@ -376,10 +397,14 @@ public class Network {
         this.registerPacket(ProtocolInfo.PLAYER_ARMOR_DAMAGE_PACKET, PlayerArmorDamagePacket.class);
         this.registerPacket(ProtocolInfo.PLAYER_ENCHANT_OPTIONS_PACKET, PlayerEnchantOptionsPacket.class);
         this.registerPacket(ProtocolInfo.UPDATE_PLAYER_GAME_TYPE_PACKET, UpdatePlayerGameTypePacket.class);
+        this.registerPacket(ProtocolInfo.UPDATE_ABILITIES_PACKET, UpdateAbilitiesPacket.class);
+        this.registerPacket(ProtocolInfo.REQUEST_ABILITY_PACKET, RequestAbilityPacket.class);
+        this.registerPacket(ProtocolInfo.UPDATE_ADVENTURE_SETTINGS_PACKET, UpdateAdventureSettingsPacket.class);
         this.registerPacket(ProtocolInfo.EMOTE_PACKET, EmotePacket.class);
         this.registerPacket(ProtocolInfo.ANIMATE_ENTITY_PACKET, AnimateEntityPacket.class);
         this.registerPacket(ProtocolInfo.ITEM_COMPONENT_PACKET, ItemComponentPacket.class);
         this.registerPacket(ProtocolInfo.FILTER_TEXT_PACKET, FilterTextPacket.class);
         this.registerPacket(ProtocolInfo.TOAST_REQUEST_PACKET, ToastRequestPacket.class);
+        this.registerPacket(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET, RequestNetworkSettingsPacket.class);
     }
 }

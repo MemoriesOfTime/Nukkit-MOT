@@ -2,6 +2,9 @@ package cn.nukkit.network;
 
 import cn.nukkit.Player;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.session.NetworkPlayerSession;
+
+import java.net.InetSocketAddress;
 
 
 /**
@@ -10,11 +13,25 @@ import cn.nukkit.network.protocol.DataPacket;
  */
 public interface SourceInterface {
 
-    Integer putPacket(Player player, DataPacket packet);
+    @Deprecated
+    default Integer putPacket(Player player, DataPacket packet) {
+        player.getNetworkSession().sendPacket(packet);
+        return null;
+    }
 
-    Integer putPacket(Player player, DataPacket packet, boolean needACK);
+    @Deprecated
+    default Integer putPacket(Player player, DataPacket packet, boolean needACK) {
+        player.getNetworkSession().sendPacket(packet);
+        return null;
+    }
 
-    Integer putPacket(Player player, DataPacket packet, boolean needACK, boolean immediate);
+    @Deprecated
+    default Integer putPacket(Player player, DataPacket packet, boolean needACK, boolean immediate) {
+        player.getNetworkSession().sendPacket(packet);
+        return null;
+    }
+
+    NetworkPlayerSession getSession(InetSocketAddress address);
 
     int getNetworkLatency(Player player);
 

@@ -7,6 +7,7 @@ import cn.nukkit.item.ItemID;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.CraftingDataPacket;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.MainLogger;
@@ -39,6 +40,11 @@ public class CraftingManager {
     public static DataPacket packet448;
     public static DataPacket packet465;
     public static DataPacket packet471;
+    public static DataPacket packet486;
+    public static DataPacket packet503;
+    public static DataPacket packet527;
+    public static DataPacket packet544;
+    public static DataPacket packet554;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -330,131 +336,48 @@ public class CraftingManager {
             }
         }
         // Torch with charcoal recipe fix for 1.16.100+
-        pk.addShapedRecipe(charcoalTorchRecipe419);
-        for (FurnaceRecipe recipe : this.furnaceRecipes.values()) {
+        //TODO 检查
+        if (protocol >= ProtocolInfo.v1_16_100) {
+            pk.addShapedRecipe(charcoalTorchRecipe419);
+        }
+        for (FurnaceRecipe recipe : this.getFurnaceRecipes(protocol).values()) {
             pk.addFurnaceRecipe(recipe);
         }
-        for (MultiRecipe recipe : this.multiRecipes.values()) {
-            pk.addMultiRecipe(recipe);
-        }
-        for (BrewingRecipe recipe : brewingRecipes.values()) {
-            pk.addBrewingRecipe(recipe);
-        }
-        for (ContainerRecipe recipe : containerRecipes.values()) {
-            pk.addContainerRecipe(recipe);
+        if (protocol >= ProtocolInfo.v1_13_0) {
+            for (BrewingRecipe recipe : this.getBrewingRecipes(protocol).values()) {
+                pk.addBrewingRecipe(recipe);
+            }
+            for (ContainerRecipe recipe : this.getContainerRecipes(protocol).values()) {
+                pk.addContainerRecipe(recipe);
+            }
+            if (protocol >= ProtocolInfo.v1_16_0) {
+                for (MultiRecipe recipe : this.getMultiRecipes(protocol).values()) {
+                    pk.addMultiRecipe(recipe);
+                }
+            }
         }
         pk.tryEncode();
         return pk;
     }
 
     public void rebuildPacket() {
+        packet554 = packetFor(554);
+        packet544 = packetFor(544);
+        packet527 = packetFor(527);
+        packet503 = packetFor(503);
+        packet486 = packetFor(486);
         packet471 = packetFor(471);
         packet465 = packetFor(465);
         packet448 = packetFor(448);
         packet440 = packetFor(440);
         packet431 = packetFor(431);
         packet419 = packetFor(419);
-        CraftingDataPacket pk407 = new CraftingDataPacket();
-        pk407.protocol = 407;
-        for (Recipe recipe : this.recipes) {
-            if (recipe instanceof ShapedRecipe) {
-                pk407.addShapedRecipe((ShapedRecipe) recipe);
-            } else if (recipe instanceof ShapelessRecipe) {
-                pk407.addShapelessRecipe((ShapelessRecipe) recipe);
-            }
-        }
-        for (FurnaceRecipe recipe : this.furnaceRecipes.values()) {
-            pk407.addFurnaceRecipe(recipe);
-        }
-        for (BrewingRecipe recipe : brewingRecipes.values()) {
-            pk407.addBrewingRecipe(recipe);
-        }
-        for (ContainerRecipe recipe : containerRecipes.values()) {
-            pk407.addContainerRecipe(recipe);
-        }
-        pk407.tryEncode();
-        packet407 = pk407;// .compress(Deflater.BEST_COMPRESSION);
-        // 388
-        CraftingDataPacket pk388 = new CraftingDataPacket();
-        pk388.protocol = 388;
-        for (Recipe recipe : this.recipes) {
-            if (recipe instanceof ShapedRecipe) {
-                pk388.addShapedRecipe((ShapedRecipe) recipe);
-            } else if (recipe instanceof ShapelessRecipe) {
-                pk388.addShapelessRecipe((ShapelessRecipe) recipe);
-            }
-        }
-        for (FurnaceRecipe recipe : this.furnaceRecipes.values()) {
-            pk388.addFurnaceRecipe(recipe);
-        }
-        for (BrewingRecipe recipe : brewingRecipesOld.values()) {
-            pk388.addBrewingRecipe(recipe);
-        }
-        for (ContainerRecipe recipe : containerRecipesOld.values()) {
-            pk388.addContainerRecipe(recipe);
-        }
-        pk388.tryEncode();
-        packet388 = pk388.compress(Deflater.BEST_COMPRESSION);
-        // 361
-        CraftingDataPacket pk361 = new CraftingDataPacket();
-        pk361.protocol = 361;
-        for (Recipe recipe : this.recipes) {
-            if (recipe instanceof ShapedRecipe) {
-                pk361.addShapedRecipe((ShapedRecipe) recipe);
-            } else if (recipe instanceof ShapelessRecipe) {
-                pk361.addShapelessRecipe((ShapelessRecipe) recipe);
-            }
-        }
-        for (FurnaceRecipe recipe : this.furnaceRecipes.values()) {
-            pk361.addFurnaceRecipe(recipe);
-        }
-        pk361.tryEncode();
-        packet361 = pk361.compress(Deflater.BEST_COMPRESSION);
-        // 354
-        CraftingDataPacket pk354 = new CraftingDataPacket();
-        pk354.protocol = 354;
-        for (Recipe recipe : this.recipes) {
-            if (recipe instanceof ShapedRecipe) {
-                pk354.addShapedRecipe((ShapedRecipe) recipe);
-            } else if (recipe instanceof ShapelessRecipe) {
-                pk354.addShapelessRecipe((ShapelessRecipe) recipe);
-            }
-        }
-        for (FurnaceRecipe recipe : this.furnaceRecipes.values()) {
-            pk354.addFurnaceRecipe(recipe);
-        }
-        pk354.tryEncode();
-        packet354 = pk354.compress(Deflater.BEST_COMPRESSION);
-        // 340
-        CraftingDataPacket pk340 = new CraftingDataPacket();
-        pk340.protocol = 340;
-        for (Recipe recipe : this.recipes332) {
-            if (recipe instanceof ShapedRecipe) {
-                pk340.addShapedRecipe((ShapedRecipe) recipe);
-            } else if (recipe instanceof ShapelessRecipe) {
-                pk340.addShapelessRecipe((ShapelessRecipe) recipe);
-            }
-        }
-        for (FurnaceRecipe recipe : this.furnaceRecipes.values()) {
-            pk340.addFurnaceRecipe(recipe);
-        }
-        pk340.tryEncode();
-        packet340 = pk340.compress(Deflater.BEST_COMPRESSION);
-        // 313
-        CraftingDataPacket pk313 = new CraftingDataPacket();
-        pk313.protocol = 313;
-        for (Recipe recipe : this.recipes313) {
-            if (recipe instanceof ShapedRecipe) {
-                pk313.addShapedRecipe((ShapedRecipe) recipe);
-            } else if (recipe instanceof ShapelessRecipe) {
-                pk313.addShapelessRecipe((ShapelessRecipe) recipe);
-            }
-        }
-        for (FurnaceRecipe recipe : this.furnaceRecipesOld.values()) {
-            pk313.addFurnaceRecipe(recipe);
-        }
-        pk313.tryEncode();
-        packet313 = pk313.compress(Deflater.BEST_COMPRESSION);
+        packet407 = packetFor(407).compress(Deflater.BEST_COMPRESSION);
+        packet388 = packetFor(388).compress(Deflater.BEST_COMPRESSION);
+        packet361 = packetFor(361).compress(Deflater.BEST_COMPRESSION);
+        packet354 = packetFor(354).compress(Deflater.BEST_COMPRESSION);
+        packet340 = packetFor(340).compress(Deflater.BEST_COMPRESSION);
+        packet313 = packetFor(313).compress(Deflater.BEST_COMPRESSION);
     }
 
     public Collection<Recipe> getRecipes() {
@@ -462,7 +385,36 @@ public class CraftingManager {
     }
 
     public Map<Integer, FurnaceRecipe> getFurnaceRecipes() {
-        return furnaceRecipes;
+        Server.mvw("CraftingManager#getFurnaceRecipes()");
+        return this.getFurnaceRecipes(ProtocolInfo.CURRENT_PROTOCOL);
+    }
+
+    public Map<Integer, FurnaceRecipe> getFurnaceRecipes(int protocol) {
+        if (protocol >= ProtocolInfo.v1_10_0) {
+            return this.furnaceRecipes;
+        }
+        return this.furnaceRecipesOld;
+    }
+
+    public Map<Integer, ContainerRecipe> getContainerRecipes(int protocol) {
+        if (protocol >= ProtocolInfo.v1_16_0) {
+            return this.containerRecipes;
+        }
+        return this.containerRecipesOld;
+    }
+
+    public Map<Integer, BrewingRecipe> getBrewingRecipes(int protocol) {
+        if (protocol >= ProtocolInfo.v1_16_0) {
+            return this.brewingRecipes;
+        }
+        return this.brewingRecipesOld;
+    }
+
+    public Map<UUID, MultiRecipe> getMultiRecipes(int protocol) {
+        if (protocol >= ProtocolInfo.v1_16_0) {
+            return this.multiRecipes;
+        }
+        throw new IllegalArgumentException("Multi recipes are not supported for protocol " + protocol + " (< 407)");
     }
 
     public FurnaceRecipe matchFurnaceRecipe(Item input) {

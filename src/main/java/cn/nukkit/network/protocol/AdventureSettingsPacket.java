@@ -1,12 +1,17 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.Player;
+import cn.nukkit.api.API;
 import lombok.ToString;
+
+import static cn.nukkit.api.API.Definition.UNIVERSAL;
+import static cn.nukkit.api.API.Usage.DEPRECATED;
 
 /**
  * @author Nukkit Project Team
  */
 @ToString
+@API(usage = DEPRECATED, definition = UNIVERSAL) //在1.19.30弃用
 public class AdventureSettingsPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.ADVENTURE_SETTINGS_PACKET;

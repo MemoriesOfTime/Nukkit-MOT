@@ -57,7 +57,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (this.protocol >= ProtocolInfo.v1_19_20) {
+        if (this.protocol >= ProtocolInfo.v1_19_30_23) {
             this.put(TAG);
         }else if (this.protocol >= ProtocolInfo.v1_19_0) {
             this.put(TAG_527);

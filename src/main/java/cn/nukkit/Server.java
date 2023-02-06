@@ -805,39 +805,23 @@ public class Server {
 
 
     public static void broadcastPacket(Collection<Player> players, DataPacket packet) {
-        if (packet.pid() == ProtocolInfo.BATCH_PACKET) {
-            for (Player player : players) {
-                player.directDataPacket(packet);
-            }
-            return;
-        }
         for (Player player : players) {
-            if (player.protocol >= ProtocolInfo.v1_16_100) {
-                player.batchDataPacket(packet);
-            } else {
-                player.dataPacket(packet);
-            }
+            player.dataPacket(packet);
         }
     }
 
     public static void broadcastPacket(Player[] players, DataPacket packet) {
-        if (packet.pid() == ProtocolInfo.BATCH_PACKET) {
-            for (Player player : players) {
-                player.directDataPacket(packet);
-            }
-            return;
-        }
         for (Player player : players) {
-            if (player.protocol >= ProtocolInfo.v1_16_100) {
-                player.batchDataPacket(packet);
-            } else {
-                player.dataPacket(packet);
-            }
+            player.dataPacket(packet);
         }
     }
 
     public static void broadcastPackets(Player[] players, DataPacket[] packets) {
-        instance.batchPackets(players, packets, false);
+        for (Player player : players) {
+            for (DataPacket packet : packets) {
+                player.dataPacket(packet);
+            }
+        }
     }
 
     public void batchPackets(Player[] players, DataPacket[] packets) {
@@ -1188,7 +1172,17 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_17_40) {
+        if (player.protocol >= ProtocolInfo.v1_19_30_23) {
+            player.dataPacket(CraftingManager.packet554);
+        } else if (player.protocol >= ProtocolInfo.v1_19_20) {
+            player.dataPacket(CraftingManager.packet544);
+        } else if (player.protocol >= ProtocolInfo.v1_19_0) {
+            player.dataPacket(CraftingManager.packet527);
+        } else if (player.protocol >= ProtocolInfo.v1_18_30) {
+            player.dataPacket(CraftingManager.packet503);
+        } else if (player.protocol >= ProtocolInfo.v1_18_10) {
+            player.dataPacket(CraftingManager.packet486);
+        } else if (player.protocol >= ProtocolInfo.v1_17_40) {
             player.dataPacket(CraftingManager.packet471);
         } if (player.protocol >= ProtocolInfo.v1_17_30) {
             player.dataPacket(CraftingManager.packet465);

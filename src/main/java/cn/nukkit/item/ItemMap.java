@@ -1,12 +1,14 @@
 package cn.nukkit.item;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ClientboundMapItemDataPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.MainLogger;
 
 import javax.imageio.ImageIO;
-import java.awt.Graphics2D;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -96,21 +98,16 @@ public class ItemMap extends Item {
         pk.image = image;
 
         p.dataPacket(pk);
+
+        if (p.protocol >= ProtocolInfo.v1_19_20) {
+            Server.getInstance().getScheduler().scheduleDelayedTask(null, () -> p.dataPacket(pk), 20);
+        }
     }
 
     public boolean trySendImage(Player p) {
         BufferedImage image = this.image != null ? this.image : loadImageFromNBT();
         if (image == null) return false;
-        ClientboundMapItemDataPacket pk = new ClientboundMapItemDataPacket();
-        pk.mapId = getMapId();
-        pk.update = 2;
-        pk.scale = 0;
-        pk.width = 128;
-        pk.height = 128;
-        pk.offsetX = 0;
-        pk.offsetZ = 0;
-        pk.image = image;
-        p.dataPacket(pk);
+        this.sendImage(p);
         return true;
     }
 

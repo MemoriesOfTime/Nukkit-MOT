@@ -27,9 +27,12 @@ import io.netty.buffer.ByteBufAllocator;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 /**
  * BinaryStream
@@ -1000,8 +1003,17 @@ public class BinaryStream {
 
     public void putRecipeIngredient(int protocolId, Item item) {
         if (item == null || item.getId() == 0) {
-            this.putVarInt(0);
+            if (protocolId >= ProtocolInfo.v1_19_30_23) {
+                this.putBoolean(false); // isValid? - false
+                this.putVarInt(0); // item == null ? 0 : item.getCount()
+            }else {
+                this.putVarInt(0);
+            }
             return;
+        }
+
+        if (protocolId >= ProtocolInfo.v1_19_30_23) {
+            this.putBoolean(true); // isValid? - true
         }
 
         int runtimeId = item.getId();
@@ -1020,8 +1032,13 @@ public class BinaryStream {
             }
         }
 
-        this.putVarInt(runtimeId);
-        this.putVarInt(damage);
+        if (protocolId >= ProtocolInfo.v1_19_30_23) {
+            this.putLShort(runtimeId);
+            this.putLShort(damage);
+        }else {
+            this.putVarInt(runtimeId);
+            this.putVarInt(damage);
+        }
         this.putVarInt(item.getCount());
     }
 
@@ -1226,6 +1243,23 @@ public class BinaryStream {
                 getBoolean(),
                 getBoolean() //1.16+
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T[] getArray(Class<T> clazz, Function<BinaryStream, T> function) {
+        ArrayDeque<T> deque = new ArrayDeque<>();
+        int count = (int) getUnsignedVarInt();
+        for (int i = 0; i < count; i++) {
+            deque.add(function.apply(this));
+        }
+        return deque.toArray((T[]) Array.newInstance(clazz, 0));
+    }
+
+    public <T> void putArray(Collection<T> array, BiConsumer<BinaryStream, T> biConsumer) {
+        this.putUnsignedVarInt(array.size());
+        for (T val : array) {
+            biConsumer.accept(this, val);
+        }
     }
 
     public boolean feof() {

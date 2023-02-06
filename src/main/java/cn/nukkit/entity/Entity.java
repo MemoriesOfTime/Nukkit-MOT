@@ -1224,8 +1224,7 @@ public abstract class Entity extends Location implements Metadatable {
         pk.eid = this.id;
         pk.metadata = data == null ? this.dataProperties.clone() : data;
 
-        //player.dataPacket(pk);
-        player.batchDataPacket(pk);
+        player.dataPacket(pk);
     }
 
     public void sendData(Player[] players) {
@@ -1242,13 +1241,11 @@ public abstract class Entity extends Location implements Metadatable {
                 continue;
             }
             pk.metadata = data == null ? this.dataProperties.clone() : data;
-            //player.dataPacket(pk/*.clone()*/);
-            player.batchDataPacket(pk.clone());
+            player.dataPacket(pk/*.clone()*/);
         }
         if (this.isPlayer) {
             pk.metadata = data == null ? this.dataProperties.clone() : data;
-            //((Player) this).dataPacket(pk);
-            ((Player) this).batchDataPacket(pk);
+            ((Player) this).dataPacket(pk);
         }
     }
 
@@ -1655,7 +1652,7 @@ public abstract class Entity extends Location implements Metadatable {
         pk.motionY = (float) motionY;
         pk.motionZ = (float) motionZ;
         for (Player p : this.hasSpawned.values()) {
-            p.batchDataPacket(pk); // Server.broadcastPacket would only use batching for >= 1.16.100
+            p.dataPacket(pk); // Server.broadcastPacket would only use batching for >= 1.16.100
         }
     }
 
@@ -2638,8 +2635,7 @@ public abstract class Entity extends Location implements Metadatable {
                 SetEntityDataPacket pk = new SetEntityDataPacket();
                 pk.eid = this.id;
                 pk.metadata = d == null ? this.dataProperties.clone() : d;
-                //((Player) this).dataPacket(pk);
-                ((Player) this).batchDataPacket(pk);
+                ((Player) this).dataPacket(pk);
             }
             return true;
         }
