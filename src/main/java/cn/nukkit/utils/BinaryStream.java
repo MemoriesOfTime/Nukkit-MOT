@@ -44,7 +44,7 @@ public class BinaryStream {
 
     public int offset;
     private byte[] buffer;
-    private int count;
+    protected int count;
 
     private static final int MAX_ARRAY_SIZE = 2147483639;
 
