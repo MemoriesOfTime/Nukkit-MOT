@@ -460,6 +460,8 @@ public class Utils {
             case ProtocolInfo.v1_19_30_23:
             case ProtocolInfo.v1_19_30:
                 return "1.19.30";
+            case ProtocolInfo.v1_19_40:
+                return "1.19.40";
             //TODO 添加新版本支持时修改这里
             default:
                 throw new IllegalStateException("Invalid protocol: " + protocol);

@@ -32,6 +32,10 @@ public class SetEntityDataPacket extends DataPacket {
         this.putEntityRuntimeId(this.eid);
         this.put(Binary.writeMetadata(protocol, this.metadata));
         if (protocol >= ProtocolInfo.v1_16_100) {
+            if (protocol >= ProtocolInfo.v1_19_40) {
+                this.putUnsignedVarInt(0); // Entity properties int
+                this.putUnsignedVarInt(0); // Entity properties float
+            }
             this.putUnsignedVarLong(this.frame);
         }
     }

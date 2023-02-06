@@ -224,6 +224,10 @@ public class AddEntityPacket extends DataPacket {
         }
         this.putAttributeList(this.attributes);
         this.put(Binary.writeMetadata(protocol, this.metadata));
+        if (protocol >= ProtocolInfo.v1_19_40) {
+            this.putUnsignedVarInt(0); // Entity properties int
+            this.putUnsignedVarInt(0); // Entity properties float
+        }
         this.putUnsignedVarInt(this.links.length);
         for (EntityLink link : links) {
             putEntityLink(protocol, link);

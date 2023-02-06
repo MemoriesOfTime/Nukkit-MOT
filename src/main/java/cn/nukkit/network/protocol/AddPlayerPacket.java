@@ -81,6 +81,9 @@ public class AddPlayerPacket extends DataPacket {
                 this.putUnsignedVarInt(0);
                 this.putUnsignedVarInt(0);
                 this.putUnsignedVarInt(0);
+            }else if (protocol >= ProtocolInfo.v1_19_40) {
+                this.putUnsignedVarInt(0); // Entity properties int
+                this.putUnsignedVarInt(0); // Entity properties float
             }
             this.putLLong(entityUniqueId);
             if (protocol >= ProtocolInfo.v1_19_10) {
