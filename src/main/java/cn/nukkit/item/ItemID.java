@@ -109,6 +109,7 @@ public interface ItemID {
     int PAPER = 339;
     int BOOK = 340;
     int SLIMEBALL = 341;
+    int CHEST_MINECART = 342;
     int MINECART_WITH_CHEST = 342;
     // 343 not yet in Minecraft
     int EGG = 344;
@@ -187,7 +188,9 @@ public interface ItemID {
     int NETHER_BRICK = 405;
     int QUARTZ = 406;
     int NETHER_QUARTZ = 406;
+    int TNT_MINECART = 407;
     int MINECART_WITH_TNT = 407;
+    int HOPPER_MINECART = 408;
     int MINECART_WITH_HOPPER = 408;
     int PRISMARINE_SHARD = 409;
     int HOPPER = 410;
