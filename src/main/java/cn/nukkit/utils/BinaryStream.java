@@ -1005,10 +1005,8 @@ public class BinaryStream {
         if (item == null || item.getId() == 0) {
             if (protocolId >= ProtocolInfo.v1_19_30_23) {
                 this.putBoolean(false); // isValid? - false
-                this.putVarInt(0); // item == null ? 0 : item.getCount()
-            }else {
-                this.putVarInt(0);
             }
+            this.putVarInt(0); // item == null ? 0 : item.getCount()
             return;
         }
 

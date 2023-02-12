@@ -86,7 +86,7 @@ public class CraftingTransaction extends InventoryTransaction {
     }
 
     public boolean canExecute() {
-        recipe = source.getServer().getCraftingManager().matchRecipe(inputs, this.primaryOutput, this.secondaryOutputs);
+        recipe = source.getServer().getCraftingManager().matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs);
         return this.recipe != null && super.canExecute();
     }
 

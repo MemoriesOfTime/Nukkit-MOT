@@ -430,7 +430,7 @@ public class Chunk extends BaseChunk {
         chunk.putCompound("Level", nbt);
 
         try {
-            return Zlib.deflate(NBTIO.write(chunk, ByteOrder.BIG_ENDIAN), RegionLoader.COMPRESSION_LEVEL);
+            return Zlib.deflate(NBTIO.write(chunk, ByteOrder.BIG_ENDIAN), Server.getInstance().chunkCompressionLevel);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

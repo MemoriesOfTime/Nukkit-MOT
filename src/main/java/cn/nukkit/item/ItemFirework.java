@@ -7,10 +7,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
-import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.nbt.tag.DoubleTag;
-import cn.nukkit.nbt.tag.FloatTag;
-import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.*;
 import cn.nukkit.utils.DyeColor;
 import org.apache.commons.math3.util.FastMath;
 
@@ -144,6 +141,21 @@ public class ItemFirework extends Item {
 
         EntityFirework entity = new EntityFirework(level.getChunk(pos.getFloorX() >> 4, pos.getFloorZ() >> 4), nbt);
         entity.spawnToAll();
+    }
+
+    public int getFlight() {
+        int flight = 0;
+        Tag tag = this.getNamedTag();
+        if (tag != null && (tag = ((CompoundTag)tag).get("Fireworks")) instanceof CompoundTag) {
+            flight = ((CompoundTag)tag).getByte("Flight");
+        }
+        return flight;
+    }
+
+    public void setFlight(int flight) {
+        CompoundTag compoundTag = this.getNamedTag();
+        compoundTag.putCompound("Fireworks", compoundTag.getCompound("Fireworks").putByte("Flight", flight));
+        this.setNamedTag(compoundTag);
     }
 
     public static class FireworkExplosion {

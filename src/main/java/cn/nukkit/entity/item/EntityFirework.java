@@ -7,6 +7,7 @@ import cn.nukkit.entity.data.Vector3fEntityData;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemFirework;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.NBTIO;
@@ -43,10 +44,17 @@ public class EntityFirework extends Entity {
         this.motionY = 0.05D;
 
         if (namedTag.contains("FireworkItem")) {
-            firework = NBTIO.getItemHelper(namedTag.getCompound("FireworkItem"));
-            this.setDataProperty(new NBTEntityData(Entity.DATA_DISPLAY_ITEM, firework));
+            this.setFirework(NBTIO.getItemHelper(this.namedTag.getCompound("FireworkItem")));
             this.setDataProperty(new Vector3fEntityData(Entity.DATA_DISPLAY_OFFSET, new Vector3f(0, 1, 0)));
             this.setDataProperty(new LongEntityData(Entity.DATA_HAS_DISPLAY, -1));
+        }
+    }
+
+    @Override
+    public void saveNBT() {
+        super.saveNBT();
+        if (this.firework != null) {
+            this.namedTag.putCompound("FireworkItem", NBTIO.putItemHelper(this.firework));
         }
     }
 
@@ -123,6 +131,9 @@ public class EntityFirework extends Entity {
     public void setFirework(Item item) {
         this.firework = item;
         this.setDataProperty(new NBTEntityData(Entity.DATA_DISPLAY_ITEM, firework));
+        int flight = Math.max(1, this.firework instanceof ItemFirework ? ((ItemFirework) this.firework).getFlight() : 1);
+        ThreadLocalRandom threadLocalRandom = ThreadLocalRandom.current();
+        this.lifetime = 10 * (flight + 1) + threadLocalRandom.nextInt(5) + threadLocalRandom.nextInt(6);
     }
 
     @Override

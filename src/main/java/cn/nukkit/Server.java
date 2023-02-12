@@ -348,6 +348,10 @@ public class Server {
      */
     public int networkCompressionLevel;
     /**
+     * Zlib compression level for chuck packets
+     */
+    public int chunkCompressionLevel;
+    /**
      * Maximum view distance.
      */
     public int viewDistance;
@@ -1184,7 +1188,7 @@ public class Server {
             player.dataPacket(CraftingManager.packet486);
         } else if (player.protocol >= ProtocolInfo.v1_17_40) {
             player.dataPacket(CraftingManager.packet471);
-        } if (player.protocol >= ProtocolInfo.v1_17_30) {
+        } else if (player.protocol >= ProtocolInfo.v1_17_30) {
             player.dataPacket(CraftingManager.packet465);
         } else if (player.protocol >= ProtocolInfo.v1_17_10) {
             player.dataPacket(CraftingManager.packet448);
@@ -2893,6 +2897,7 @@ public class Server {
     private void loadSettings() {
         this.forceLanguage = this.getPropertyBoolean("force-language", false);
         this.networkCompressionLevel = Math.max(Math.min(this.getPropertyInt("compression-level", 4), 9), 0);
+        this.chunkCompressionLevel = Math.max(Math.min(this.getPropertyInt("chunk-compression-level", 7), 9), 1);
         this.autoTickRate = this.getPropertyBoolean("auto-tick-rate", true);
         this.autoTickRateLimit = this.getPropertyInt("auto-tick-rate-limit", 20);
         this.alwaysTickPlayers = this.getPropertyBoolean("always-tick-players", false);

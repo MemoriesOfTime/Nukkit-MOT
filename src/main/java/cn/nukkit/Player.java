@@ -2508,7 +2508,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     settingsPacket.compressionAlgorithm = PacketCompressionAlgorithm.ZLIB;
                     settingsPacket.compressionThreshold = 1; // compress everything
                     this.forceDataPacket(settingsPacket, () -> {
-                        this.networkSession.setCompression(CompressionProvider.ZLIB_RAW);
+                        this.networkSession.setCompression(CompressionProvider.from(PacketCompressionAlgorithm.ZLIB, this.raknetProtocol));
                     });
                     break;
                 case ProtocolInfo.LOGIN_PACKET:
@@ -2602,24 +2602,36 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     }
 
+                    Player playerInstance = this;
                     this.verified = true;
 
-                    Consumer<PlayerAsyncPreLoginEvent> callback = event -> {
-                        if (this.closed) {
-                            return;
+                    this.preLoginEventTask = new AsyncTask() {
+                        private PlayerAsyncPreLoginEvent event;
+
+                        @Override
+                        public void onRun() {
+                            this.event = new PlayerAsyncPreLoginEvent(username, uuid, loginChainData, playerInstance.getSkin(), playerInstance.getAddress(), playerInstance.getPort());
+                            server.getPluginManager().callEvent(this.event);
                         }
 
-                        if (event.getLoginResult() == LoginResult.KICK) {
-                            this.close(event.getKickMessage(), event.getKickMessage());
-                        } else if (this.shouldLogin) {
-                            this.completeLoginSequence();
-                            for (Consumer<Server> action : event.getScheduledActions()) {
-                                action.accept(server);
+                        @Override
+                        public void onCompletion(Server server) {
+                            if (playerInstance.closed) {
+                                return;
+                            }
+
+                            if (this.event.getLoginResult() == LoginResult.KICK) {
+                                playerInstance.close(this.event.getKickMessage(), this.event.getKickMessage());
+                            } else if (playerInstance.shouldLogin) {
+                                playerInstance.setSkin(this.event.getSkin());
+                                playerInstance.completeLoginSequence();
+                                for (Consumer<Server> action : this.event.getScheduledActions()) {
+                                    action.accept(server);
+                                }
                             }
                         }
                     };
 
-                    this.preLoginEventTask = new PreLoginTask(new PlayerAsyncPreLoginEvent(this), this, callback);
                     this.server.getScheduler().scheduleAsyncTask(this.preLoginEventTask);
                     this.processLogin();
                     break;
@@ -5398,7 +5410,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.status = status;
 
         if (immediate) {
-            this.directDataPacket(pk);
+            this.forceDataPacket(pk, null);
         } else {
             this.dataPacket(pk);
         }
@@ -5869,7 +5881,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         batchPayload[0] = Binary.writeUnsignedVarInt(buf.length);
         batchPayload[1] = buf;
         try {
-            if (protocol >= 407) {
+            if (protocol >= ProtocolInfo.v1_16_0) {
                 batch.payload = Zlib.deflateRaw(Binary.appendBytes(batchPayload), Server.getInstance().networkCompressionLevel);
             } else {
                 batch.payload = Zlib.deflate(Binary.appendBytes(batchPayload), Server.getInstance().networkCompressionLevel);
