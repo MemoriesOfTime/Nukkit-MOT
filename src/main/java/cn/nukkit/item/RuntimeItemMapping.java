@@ -2,7 +2,6 @@ package cn.nukkit.item;
 
 import cn.nukkit.Server;
 import cn.nukkit.item.RuntimeItems.MappingEntry;
-
 import cn.nukkit.item.customitem.ItemCustom;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -91,7 +90,7 @@ public class RuntimeItemMapping {
     }
 
     synchronized boolean registerCustomItem(ItemCustom itemCustom) {
-        if (!Server.getInstance().enableCustomItems || this.customItems.contains(itemCustom.getId())) {
+        if (!Server.getInstance().enableExperimentMode || this.customItems.contains(itemCustom.getId())) {
             return false;
         }
         this.customItems.add(itemCustom.getId());
@@ -110,7 +109,7 @@ public class RuntimeItemMapping {
     }
 
     synchronized boolean deleteCustomItem(ItemCustom itemCustom) {
-        if (!Server.getInstance().enableCustomItems && !this.customItems.contains(itemCustom.getId())) {
+        if (!Server.getInstance().enableExperimentMode && !this.customItems.contains(itemCustom.getId())) {
             return false;
         }
 
@@ -140,7 +139,7 @@ public class RuntimeItemMapping {
         BinaryStream paletteBuffer = new BinaryStream();
         int size = 0;
         for (RuntimeEntry entry : this.legacy2Runtime.values()) {
-            if (entry.isCustomItem() && (!Server.getInstance().enableCustomItems || protocolId < ProtocolInfo.v1_16_100)) {
+            if (entry.isCustomItem() && (!Server.getInstance().enableExperimentMode || protocolId < ProtocolInfo.v1_16_100)) {
                 break;
             }
             size++;
@@ -148,7 +147,7 @@ public class RuntimeItemMapping {
         paletteBuffer.putUnsignedVarInt(size);
         for (RuntimeEntry entry : this.legacy2Runtime.values()) {
             if (entry.isCustomItem()) {
-                if (Server.getInstance().enableCustomItems && protocolId >= ProtocolInfo.v1_16_100) {
+                if (Server.getInstance().enableExperimentMode && protocolId >= ProtocolInfo.v1_16_100) {
                     paletteBuffer.putString(("customitem:" + entry.getIdentifier()).toLowerCase());
                     paletteBuffer.putLShort(entry.getRuntimeId());
                     paletteBuffer.putBoolean(true); // Component item

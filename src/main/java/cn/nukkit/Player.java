@@ -1003,33 +1003,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.spawnToAll();
         }
 
-        if (this.server.enableCustomItems) {
-            ArrayList<Integer> customItems = RuntimeItems.getMapping(this.protocol).getCustomItems();
-
-            if (!customItems.isEmpty()) {
-                ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
-                itemComponentPacket.entries = new ItemComponentPacket.Entry[customItems.size()];
-
-                int i = 0;
-                for (Integer id : customItems) {
-                    Item item = Item.get(id);
-                    if (!(item instanceof ItemCustom)) {
-                        continue;
-                    }
-
-                    ItemCustom itemCustom = (ItemCustom) item;
-                    CompoundTag data = itemCustom.getComponentsData(this.protocol);
-                    data.putShort("minecraft:identifier", i);
-
-                    itemComponentPacket.entries[i] = new ItemComponentPacket.Entry(("customitem:" + item.getName()).toLowerCase(), data);
-
-                    i++;
-                }
-
-                this.dataPacket(itemComponentPacket);
-            }
-        }
-
         /*if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
                 try {
@@ -2376,7 +2349,33 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.protocol >= ProtocolInfo.v1_8_0) {
                 if (this.protocol >= ProtocolInfo.v1_12_0) {
                     if (this.protocol >= ProtocolInfo.v1_16_100) {
-                        this.dataPacket(new ItemComponentPacket());
+                        ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
+                        if (this.server.enableExperimentMode) {
+                            ArrayList<Integer> customItems = RuntimeItems.getMapping(this.protocol).getCustomItems();
+
+                            if (!customItems.isEmpty()) {
+                                itemComponentPacket.entries = new ItemComponentPacket.Entry[customItems.size()];
+
+                                int i = 0;
+                                for (Integer id : customItems) {
+                                    Item item = Item.get(id);
+                                    if (!(item instanceof ItemCustom)) {
+                                        continue;
+                                    }
+
+                                    ItemCustom itemCustom = (ItemCustom) item;
+                                    CompoundTag data = itemCustom.getComponentsData(this.protocol);
+                                    data.putShort("minecraft:identifier", i);
+
+                                    itemComponentPacket.entries[i] = new ItemComponentPacket.Entry(("customitem:" + item.getName()).toLowerCase(), data);
+
+                                    i++;
+                                }
+
+                                this.dataPacket(itemComponentPacket);
+                            }
+                        }
+                        this.dataPacket(itemComponentPacket);
                     }
                     this.dataPacket(new BiomeDefinitionListPacket());
                 }
@@ -2662,12 +2661,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             ResourcePackStackPacket stackPacket = new ResourcePackStackPacket();
                             stackPacket.mustAccept = this.server.getForceResources();
                             stackPacket.resourcePackStack = this.server.getResourcePackManager().getResourceStack();
-                            if (this.server.enableCustomItems) {
+                            if (this.server.enableExperimentMode) {
                                 stackPacket.experiments.add(
                                         new ResourcePackStackPacket.ExperimentData("data_driven_items", true)
                                 );
                                 stackPacket.experiments.add(
                                         new ResourcePackStackPacket.ExperimentData("experimental_custom_ui", true)
+                                );
+                                stackPacket.experiments.add(
+                                        new ResourcePackStackPacket.ExperimentData("upcoming_creator_features", true)
+                                );
+                                stackPacket.experiments.add(
+                                        new ResourcePackStackPacket.ExperimentData("experimental_molang_features", true)
                                 );
                             }
 

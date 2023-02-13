@@ -452,9 +452,9 @@ public class Server {
      */
     public boolean updateChecks;
     /**
-     * Allow adding custom items
+     * Enable experimental mode
      */
-    public boolean enableCustomItems;
+    public boolean enableExperimentMode;
     /**
      * Asynchronous chunk sending (Experiment)
      */
@@ -2966,7 +2966,7 @@ public class Server {
         this.updateChecks = this.getPropertyBoolean("update-notifications", false);
         this.minimumProtocol = this.getPropertyInt("multiversion-min-protocol", 0);
         this.whitelistReason = this.getPropertyString("whitelist-reason", "§cServer is white-listed").replace("§n", "\n");
-        this.enableCustomItems = this.getPropertyBoolean("enable_custom_items", true);
+        this.enableExperimentMode = this.getPropertyBoolean("enable-experiment-mode", true);
         this.asyncChunks = this.getPropertyBoolean("async-chunks", false);
         this.deprecatedVerbose = this.getPropertyBoolean("deprecated-verbose", true);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
@@ -3108,7 +3108,7 @@ public class Server {
             put("bstats-metrics", true);
             put("min-mtu", 576);
             put("max-mtu", 1492);
-            put("enable_custom_items", false);
+            put("enable-experiment-mode", false);
             put("async-chunks", false);
             put("deprecated-verbose", true);
         }

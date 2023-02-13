@@ -692,11 +692,12 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return -1;
     }
 
-    private static final HashMap<Integer, Class<? extends Item>> customItems = new HashMap<>();
+    private static final HashMap<Integer, Class<? extends Item>> CUSTOM_ITEMS = new HashMap<>();
 
-    public static boolean registeredCustomItem(int id, Class<? extends ItemCustom> c) {
-        if (!Server.getInstance().enableCustomItems) {
-            throw new RuntimeException("Try to register a custom item, but the server did not enable this feature!");
+    public static boolean registerCustomItem(int id, Class<? extends ItemCustom> c) {
+        if (!Server.getInstance().enableExperimentMode) {
+            Server.getInstance().getLogger().warning("The server is not enabled for experimental play and cannot register custom items!");
+            return false;
         }
 
         if (id < 10000 || id > 65535) {
@@ -704,7 +705,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             throw new IllegalArgumentException("Custom item id cannot be less than 10000 or greater than 65535");
         }
 
-        customItems.put(id, c);
+        CUSTOM_ITEMS.put(id, c);
         list[id] = c;
 
         ItemCustom item = (ItemCustom) get(id);
@@ -726,13 +727,26 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         if (RuntimeItems.getMapping(v1_18_30).registerCustomItem(item)) {
             addCreativeItem(v1_18_30, item);
         }
+        if (RuntimeItems.getMapping(v1_19_0).registerCustomItem(item)) {
+            addCreativeItem(v1_19_0, item);
+        }
+        if (RuntimeItems.getMapping(v1_19_10).registerCustomItem(item)) {
+            addCreativeItem(v1_19_10, item);
+            addCreativeItem(v1_19_20, item);
+        }
+        if (RuntimeItems.getMapping(v1_19_50).registerCustomItem(item)) {
+            addCreativeItem(v1_19_50, item);
+        }
+        if (RuntimeItems.getMapping(v1_19_60).registerCustomItem(item)) {
+            addCreativeItem(v1_19_60, item);
+        }
         return true;
     }
 
     public static boolean deleteCustomItem(int id) {
-        if (customItems.containsKey(id)) {
+        if (CUSTOM_ITEMS.containsKey(id)) {
             removeCreativeItem(get(id));
-            customItems.remove(id);
+            CUSTOM_ITEMS.remove(id);
             list[id] = null;
 
             ItemCustom item = (ItemCustom) get(id);
@@ -741,14 +755,18 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                     RuntimeItems.getMapping(v1_17_10).deleteCustomItem(item) &&
                     RuntimeItems.getMapping(v1_18_0).deleteCustomItem(item) &&
                     RuntimeItems.getMapping(v1_18_10).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_18_30).deleteCustomItem(item);
+                    RuntimeItems.getMapping(v1_18_30).deleteCustomItem(item) &&
+                    RuntimeItems.getMapping(v1_19_0).deleteCustomItem(item) &&
+                    RuntimeItems.getMapping(v1_19_10).deleteCustomItem(item) &&
+                    RuntimeItems.getMapping(v1_19_50).deleteCustomItem(item) &&
+                    RuntimeItems.getMapping(v1_19_60).deleteCustomItem(item);
         }else {
             return false;
         }
     }
 
     public static HashMap<Integer, Class<? extends Item>> getCustomItems() {
-        return customItems;
+        return CUSTOM_ITEMS;
     }
 
     public static Item get(int id) {
