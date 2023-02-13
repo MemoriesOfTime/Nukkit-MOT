@@ -2,10 +2,7 @@ package cn.nukkit.entity.data;
 
 import cn.nukkit.Server;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
-import cn.nukkit.utils.PersonaPiece;
-import cn.nukkit.utils.PersonaPieceTint;
-import cn.nukkit.utils.SerializedImage;
-import cn.nukkit.utils.SkinAnimation;
+import cn.nukkit.utils.*;
 import com.google.common.base.Preconditions;
 import com.nimbusds.jose.shaded.json.JSONObject;
 import com.nimbusds.jose.shaded.json.JSONValue;
@@ -13,6 +10,7 @@ import lombok.ToString;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.*;
 
@@ -20,7 +18,7 @@ import java.util.*;
  * @author MagicDroidX
  * Nukkit Project
  */
-@ToString
+@ToString(exclude = {"geometryData", "animationData"})
 public class Skin {
 
     public static final int SINGLE_SKIN_SIZE = 8192;
@@ -103,6 +101,9 @@ public class Skin {
     }
 
     public String getSkinId() {
+        if (this.skinId == null) {
+            this.generateSkinId("Custom");
+        }
         return skinId;
     }
 
@@ -111,6 +112,11 @@ public class Skin {
             return;
         }
         this.skinId = skinId;
+    }
+
+    public void generateSkinId(String name) {
+        byte[] data = Binary.appendBytes(getSkinData().data, getSkinResourcePatch().getBytes(StandardCharsets.UTF_8));
+        this.skinId = UUID.nameUUIDFromBytes(data) + "." + name;
     }
 
     public void setSkinData(byte[] skinData) {
