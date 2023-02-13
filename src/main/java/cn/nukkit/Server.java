@@ -459,6 +459,10 @@ public class Server {
      * Asynchronous chunk sending (Experiment)
      */
     public boolean asyncChunks;
+    /**
+     * Show a console message when a plugin uses deprecated API methods
+     */
+    public boolean deprecatedVerbose;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -2962,6 +2966,7 @@ public class Server {
         this.whitelistReason = this.getPropertyString("whitelist-reason", "§cServer is white-listed").replace("§n", "\n");
         this.enableCustomItems = this.getPropertyBoolean("enable_custom_items", true);
         this.asyncChunks = this.getPropertyBoolean("async-chunks", false);
+        this.deprecatedVerbose = this.getPropertyBoolean("deprecated-verbose", true);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
@@ -3103,6 +3108,7 @@ public class Server {
             put("max-mtu", 1492);
             put("enable_custom_items", false);
             put("async-chunks", false);
+            put("deprecated-verbose", true);
         }
     }
 
