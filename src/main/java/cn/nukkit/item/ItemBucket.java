@@ -52,6 +52,10 @@ public class ItemBucket extends Item {
                 return "Water Bucket";
             case 10:
                 return "Lava Bucket";
+            case 12:
+                return "Bucket of Axolotl";
+            case 13:
+                return "Bucket of Tadpoles";
             default:
                 return "Bucket";
         }
@@ -65,6 +69,8 @@ public class ItemBucket extends Item {
             case 5:
             case 8:
             case 9:
+            case 12:
+            case 13:
                 return 8;
             case 10:
             case 11:
@@ -162,7 +168,7 @@ public class ItemBucket extends Item {
                 placementBlock = block;
             }
 
-            PlayerBucketEmptyEvent ev = new PlayerBucketEmptyEvent(player, block, face, this, result);
+            PlayerBucketEmptyEvent ev = new PlayerBucketEmptyEvent(player, block, face, this, result, true);
             boolean canBeFlowedInto = placementBlock.canBeFlowedInto() || placementBlock.getId() == BlockID.BAMBOO;
             if (usesWaterlogging) {
                 ev.setCancelled(placementBlock.getWaterloggingLevel() <= 0 && !canBeFlowedInto);
@@ -205,7 +211,7 @@ public class ItemBucket extends Item {
                     level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_BUCKET_EMPTY_WATER);
                 }
 
-                if (Server.getInstance().mobsFromBlocks) {
+                if (Server.getInstance().mobsFromBlocks && ev.isMobSpawningAllowed()) {
                     switch (this.getDamage()) {
                         case 2:
                             Entity e2 = Entity.createEntity("Cod", block);
@@ -222,6 +228,14 @@ public class ItemBucket extends Item {
                         case 5:
                             Entity e5 = Entity.createEntity("Pufferfish", block);
                             if (e5 != null) e5.spawnToAll();
+                            break;
+                        case 12:
+                            Entity e12 = Entity.createEntity("Axolotl", block);
+                            if (e12 != null) e12.spawnToAll();
+                            break;
+                        case 13:
+                            Entity e13 = Entity.createEntity("Tadpole", block);
+                            if (e13 != null) e13.spawnToAll();
                             break;
                     }
                 }
@@ -263,7 +277,7 @@ public class ItemBucket extends Item {
         }
 
         if (!player.isCreative()) {
-            player.getInventory().setItemInHand(new ItemBucket());
+            player.getInventory().setItemInHand(Item.get(Item.BUCKET));
         }
 
         player.removeAllEffects();
