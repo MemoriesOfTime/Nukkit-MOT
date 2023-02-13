@@ -91,7 +91,7 @@ public class RuntimeItems {
             return mapping527;
         }else if (protocolId >= ProtocolInfo.v1_18_30) {
             return mapping503;
-        }else if (protocolId >= ProtocolInfo.v1_18_10) {
+        }else if (protocolId >= ProtocolInfo.v1_18_10_26) {
             return mapping486;
         } else if (protocolId >= ProtocolInfo.v1_18_0) {
             return mapping475;

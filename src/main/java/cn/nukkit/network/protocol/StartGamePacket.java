@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Server;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -160,8 +161,19 @@ public class StartGamePacket extends DataPacket {
         this.putBoolean(this.isTexturePacksRequired);
         this.putGameRules(protocol, gameRules);
         if (protocol >= ProtocolInfo.v1_16_100) {
-            this.putLInt(0); // Experiment count
-            this.putBoolean(false); // Were experiments previously toggled
+            if (Server.getInstance().enableExperimentMode) {
+                this.putLInt(3); // Experiment count
+                this.putString("data_driven_items");
+                this.putBoolean(true);
+                this.putString("upcoming_creator_features");
+                this.putBoolean(true);
+                this.putString("experimental_molang_features");
+                this.putBoolean(true);
+                this.putBoolean(true); // Were experiments previously toggled
+            } else {
+                this.putLInt(0);
+                this.putBoolean(false); // Were experiments previously toggled
+            }
         }
         this.putBoolean(this.bonusChest);
         if (protocol > 201) {
@@ -214,7 +226,7 @@ public class StartGamePacket extends DataPacket {
                     this.putString(""); // buttonName
                     this.putString(""); // linkUri
                 }
-                this.putBoolean(false); // Experimental Gameplay
+                this.putBoolean(Server.getInstance().enableExperimentMode); // Experimental Gameplay
                 if (protocol >= ProtocolInfo.v1_19_20) {
                     this.putByte(this.chatRestrictionLevel);
                     this.putBoolean(this.disablePlayerInteractions);

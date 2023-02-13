@@ -1192,7 +1192,7 @@ public class Server {
             player.dataPacket(CraftingManager.packet527);
         } else if (player.protocol >= ProtocolInfo.v1_18_30) {
             player.dataPacket(CraftingManager.packet503);
-        } else if (player.protocol >= ProtocolInfo.v1_18_10) {
+        } else if (player.protocol >= ProtocolInfo.v1_18_10_26) {
             player.dataPacket(CraftingManager.packet486);
         } else if (player.protocol >= ProtocolInfo.v1_17_40) {
             player.dataPacket(CraftingManager.packet471);

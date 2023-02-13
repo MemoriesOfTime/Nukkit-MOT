@@ -516,6 +516,7 @@ public class GlobalBlockPalette {
                     }
                 }
                 return runtimeId;
+            case ProtocolInfo.v1_18_10_26:
             case ProtocolInfo.v1_18_10:
                 runtimeId = legacyToRuntimeId486.get(legacyId);
                 if (runtimeId == -1) {
@@ -687,7 +688,7 @@ public class GlobalBlockPalette {
             return runtimeIdToLegacy527.get(runtimeId);
         }else if (protocolId >= ProtocolInfo.v1_18_30) {
             return runtimeIdToLegacy503.get(runtimeId);
-        }else if (protocolId >= ProtocolInfo.v1_18_10) {
+        }else if (protocolId >= ProtocolInfo.v1_18_10_26) {
             return runtimeIdToLegacy486.get(runtimeId);
         } else if (protocolId >= ProtocolInfo.v1_17_40) {
             return runtimeIdToLegacy471.get(runtimeId);
