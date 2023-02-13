@@ -338,7 +338,7 @@ public abstract class Entity extends Location implements Metadatable {
         initEntityIdentifiers(ProtocolInfo.v1_16_100, AvailableEntityIdentifiersPacket.NBT419);
         initEntityIdentifiers(ProtocolInfo.v1_17_0, AvailableEntityIdentifiersPacket.NBT440);
         initEntityIdentifiers(ProtocolInfo.v1_19_0, AvailableEntityIdentifiersPacket.NBT527);
-        initEntityIdentifiers(ProtocolInfo.v1_19_20, AvailableEntityIdentifiersPacket.NBT544);
+        initEntityIdentifiers(ProtocolInfo.v1_19_20, AvailableEntityIdentifiersPacket.TAG);
     }
 
     public final Map<Integer, Player> hasSpawned = new ConcurrentHashMap<>();

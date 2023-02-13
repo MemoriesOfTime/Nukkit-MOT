@@ -696,7 +696,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static boolean registerCustomItem(int id, Class<? extends ItemCustom> c) {
         if (!Server.getInstance().enableExperimentMode) {
-            Server.getInstance().getLogger().warning("The server is not enabled for experimental play and cannot register custom items!");
+            Server.getInstance().getLogger().warning("The server does not have the custom item feature enabled. Unable to register the custom item!");
             return false;
         }
 

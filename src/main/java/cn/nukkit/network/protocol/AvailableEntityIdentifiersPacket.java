@@ -1,7 +1,9 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.Nukkit;
+import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.custom.EntityManager;
 import com.google.common.io.ByteStreams;
 
 import java.io.InputStream;
@@ -15,7 +17,7 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
     public static final byte[] NBT419;
     public static final byte[] NBT440;
     public static final byte[] NBT527;
-    public static final byte[] NBT544;
+    public static final byte[] TAG; //544
 
     static {
         try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_419.dat")) {
@@ -37,7 +39,7 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
         }
 
         try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_544.dat")) {
-            NBT544 = ByteStreams.toByteArray(stream);
+            TAG = ByteStreams.toByteArray(stream);
         } catch (Exception e) {
             throw new AssertionError("Error whilst loading entity identifiers 544", e);
         }
@@ -57,9 +59,17 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (this.identifiers == null) {
-            this.identifiers = Entity.getEntityIdentifiersCache(this.protocol);
+        if (Server.getInstance().enableExperimentMode) { //自定义实体
+            if (this.protocol <= ProtocolInfo.v1_16_0) {
+                this.put(EntityManager.get().getNetworkTagCachedOld());
+            } else {
+                this.put(EntityManager.get().getNetworkTagCached());
+            }
+        }else {
+            if (this.identifiers == null) {
+                this.identifiers = Entity.getEntityIdentifiersCache(this.protocol);
+            }
+            this.put(this.identifiers);
         }
-        this.put(this.identifiers);
     }
 }
