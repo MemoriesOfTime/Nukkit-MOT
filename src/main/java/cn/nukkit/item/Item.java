@@ -357,6 +357,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     private static final List<Item> creative534 = new ObjectArrayList<>();
     private static final List<Item> creative544 = new ObjectArrayList<>();
     private static final List<Item> creative560 = new ObjectArrayList<>();
+    private static final List<Item> creative567 = new ObjectArrayList<>();
 
     @SuppressWarnings("unchecked")
     private static void initCreativeItems() {
@@ -459,6 +460,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCreativeItemsNew(ProtocolInfo.v1_19_0, ProtocolInfo.v1_19_10, creative534);
         registerCreativeItemsNew(ProtocolInfo.v1_19_20, ProtocolInfo.v1_19_20, creative544);
         registerCreativeItemsNew(ProtocolInfo.v1_19_50, ProtocolInfo.v1_19_50, creative560);
+        registerCreativeItemsNew(ProtocolInfo.v1_19_60, ProtocolInfo.v1_19_60, creative567);
     }
 
     private static void registerCreativeItemsNew(int protocol, int blockPaletteProtocol, List<Item> creativeItems) {
@@ -499,6 +501,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         Item.creative534.clear();
         Item.creative544.clear();
         Item.creative560.clear();
+        Item.creative567.clear();
     }
 
     public static ArrayList<Item> getCreativeItems() {
@@ -580,6 +583,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 return new ArrayList<>(Item.creative544);
             case v1_19_50:
                 return new ArrayList<>(Item.creative560);
+            case v1_19_60:
+                return new ArrayList<>(Item.creative567);
             default:
                 throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
         }
@@ -587,7 +592,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static void addCreativeItem(Item item) {
         Server.mvw("Item#addCreativeItem(Item)");
-        addCreativeItem(v1_19_50, item);
+        addCreativeItem(v1_19_60, item);
     }
 
     public static void addCreativeItem(int protocol, Item item) {
@@ -649,6 +654,9 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 break;
             case v1_19_50:
                 Item.creative560.add(item.clone());
+                break;
+            case v1_19_60:
+                Item.creative567.add(item.clone());
                 break;
             default:
                 throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);

@@ -93,6 +93,10 @@ public class StartGamePacket extends DataPacket {
     public boolean clientSideGenerationEnabled;
     public byte chatRestrictionLevel;
     public boolean disablePlayerInteractions;
+    /**
+     * @since v567
+     */
+    public boolean emoteChatMuted;
 
     @Override
     public void decode() {
@@ -194,6 +198,9 @@ public class StartGamePacket extends DataPacket {
                         if (protocol >= ProtocolInfo.v1_19_20) {
                             this.putBoolean(this.isDisablingPersonas);
                             this.putBoolean(this.isDisablingCustomSkins);
+                            if (protocol >= ProtocolInfo.v1_19_60) {
+                                this.putBoolean(this.emoteChatMuted);
+                            }
                         }
                         this.putString(this.vanillaVersion);
                     }

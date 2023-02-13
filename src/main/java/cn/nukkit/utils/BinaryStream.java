@@ -411,7 +411,7 @@ public class BinaryStream {
             skin.setCapeOnClassic(this.getBoolean());
         }
         skin.setCapeId(this.getString());
-        this.getString(); // TODO: Full skin id
+        skin.setFullSkinId(this.getString());
         if (protocol >= ProtocolInfo.v1_14_60) {
             skin.setArmSize(this.getString());
             skin.setSkinColor(this.getString());

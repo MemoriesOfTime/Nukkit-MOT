@@ -45,7 +45,7 @@ public class Skin {
         NO_PERSONA_SKIN = skin;
     }
 
-    private final String fullSkinId = UUID.randomUUID().toString();
+    private String fullSkinId = UUID.randomUUID().toString();
     private String skinId;
     private String playFabId = "";
     private String skinResourcePatch = GEOMETRY_CUSTOM;
@@ -298,6 +298,10 @@ public class Skin {
 
     public void setArmSize(String armSize) {
         this.armSize = armSize;
+    }
+
+    public void setFullSkinId(String fullSkinId) {
+        this.fullSkinId = fullSkinId;
     }
 
     public String getFullSkinId() {
