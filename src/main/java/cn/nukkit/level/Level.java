@@ -4438,7 +4438,9 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_19_20) { //调色板 物品运行时id
+        if (protocol >= ProtocolInfo.v1_19_50) {
+            return ProtocolInfo.v1_19_50;
+        }else if (protocol >= ProtocolInfo.v1_19_20) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_20;
         }else if (protocol >= ProtocolInfo.v1_19_0) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_0;
@@ -4496,8 +4498,10 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_18_30) if (player == ProtocolInfo.v1_18_30) return true;
         if (chunk == ProtocolInfo.v1_19_0)
             if (player >= ProtocolInfo.v1_19_0) if (player < ProtocolInfo.v1_19_20) return true;
-        if (chunk == ProtocolInfo.v1_19_20) if (player >= ProtocolInfo.v1_19_20) return true;
-        return false; //TODO Remember to update when block palette changes
+        if (chunk == ProtocolInfo.v1_19_20)
+            if (player >= ProtocolInfo.v1_19_20) if (player < ProtocolInfo.v1_19_50) return true;
+        if (chunk == ProtocolInfo.v1_19_50) if (player >= ProtocolInfo.v1_19_50) return true;
+        return false; //TODO Multiversion  Remember to update when block palette changes
     }
 
     private static class CharacterHashMap extends HashMap<Character, Object> {

@@ -279,6 +279,9 @@ public interface ItemID {
     int RECORD_WAIT = 511;
     // 512 not yet in Minecraft
     int SHIELD = 513;
+
+    int RECORD_5 = 636;
+
     int CAMPFIRE = 720;
 
     // 514 - 733 not yet in Minecraft

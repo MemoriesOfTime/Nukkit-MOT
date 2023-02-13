@@ -44,6 +44,7 @@ public class CraftingManager {
     public static DataPacket packet527;
     public static DataPacket packet544;
     public static DataPacket packet554;
+    public static DataPacket packet560;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -470,6 +471,7 @@ public class CraftingManager {
     }
 
     public void rebuildPacket() {
+        packet560 = packetFor(560);
         packet554 = packetFor(554);
         packet544 = packetFor(544);
         packet527 = packetFor(527);
@@ -663,6 +665,11 @@ public class CraftingManager {
             UUID id = Utils.dataToUUID(String.valueOf(++RECIPE_COUNT), String.valueOf(recipe.getResult().getId()), String.valueOf(recipe.getResult().getDamage()), String.valueOf(recipe.getResult().getCount()), Arrays.toString(recipe.getResult().getCompoundTag()));
             ((CraftingRecipe) recipe).setId(id);
             this.getRegisterRecipes(protocol).add(recipe);
+            if (recipe instanceof ShapedRecipe) {
+                this.registerShapedRecipe(protocol, (ShapedRecipe) recipe);
+            }else if (recipe instanceof ShapelessRecipe) {
+                this.registerShapelessRecipe(protocol, (ShapelessRecipe) recipe);
+            }
         }
         recipe.registerToCraftingManager(this);
     }

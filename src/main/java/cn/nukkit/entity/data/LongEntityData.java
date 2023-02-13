@@ -9,6 +9,7 @@ import cn.nukkit.entity.Entity;
 public class LongEntityData extends EntityData<Long> {
 
     public long data;
+    public long[] dataVersions;
 
     public LongEntityData(int id, long data) {
         super(id);

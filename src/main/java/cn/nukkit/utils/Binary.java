@@ -190,6 +190,36 @@ public class Binary {
                     stream.putVarInt(pos.z);
                     break;
                 case Entity.DATA_TYPE_LONG:
+                    if (protocol < ProtocolInfo.v1_19_50) {
+                        long[] dataVersions;
+                        if (id == Entity.DATA_FLAGS) {
+                            dataVersions = ((LongEntityData) d).dataVersions;
+                            if (dataVersions != null && dataVersions.length == 3) {
+                                if (protocol < ProtocolInfo.v1_7_0) {
+                                    if (protocol < ProtocolInfo.v1_2_13) {
+                                        stream.putVarLong(dataVersions[2]);
+                                        break;
+                                    }
+                                    stream.putVarLong(dataVersions[1]);
+                                    break;
+                                }
+                                stream.putVarLong(dataVersions[0]);
+                                break;
+                            }
+                            if (Server.getInstance().minimumProtocol != ProtocolInfo.CURRENT_PROTOCOL) {
+                                Server.getInstance().getLogger().debug("Invalid LongEntityData dataVersions for DATA_FLAGS, reverting to non-multiversion compatible flags: expected 3, got " + (dataVersions == null ? 0 : dataVersions.length));
+                            }
+                        } else if (id == Entity.DATA_FLAGS_EXTENDED) {
+                            dataVersions = ((LongEntityData) d).dataVersions;
+                            if (dataVersions != null && dataVersions.length == 1) {
+                                stream.putVarLong(dataVersions[0]);
+                                break;
+                            }
+                            if (Server.getInstance().minimumProtocol != ProtocolInfo.CURRENT_PROTOCOL) {
+                                Server.getInstance().getLogger().debug("Invalid LongEntityData dataVersions for DATA_FLAGS_EXTENDED, reverting to non-multiversion compatible flags: expected 1, got " + (dataVersions == null ? 0 : dataVersions.length));
+                            }
+                        }
+                    }
                     stream.putVarLong(((LongEntityData) d).getData());
                     break;
                 case Entity.DATA_TYPE_VECTOR3F:

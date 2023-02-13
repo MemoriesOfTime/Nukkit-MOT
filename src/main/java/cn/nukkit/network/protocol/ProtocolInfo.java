@@ -62,18 +62,19 @@ public interface ProtocolInfo {
     int v1_19_30_23 = 553; //TODO
     int v1_19_30 = 554;
     int v1_19_40 = 557;
+    int v1_19_50 = 560;
 
-    int CURRENT_PROTOCOL = Utils.dynamic(v1_19_40);
+    int CURRENT_PROTOCOL = Utils.dynamic(v1_19_50);
 
     List<Integer> SUPPORTED_PROTOCOLS = Ints.asList(
             v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
             v1_8_0, v1_9_0, v1_10_0, v1_11_0, v1_12_0, v1_13_0, v1_14_0, v1_14_60, v1_16_0, v1_16_20, v1_16_100_0, v1_16_100_51,
             v1_16_100_52, v1_16_100, v1_16_200_51, v1_16_200, v1_16_210_50, v1_16_210_53, v1_16_210, v1_16_220, v1_16_230_50, v1_16_230,
             v1_16_230_54, v1_17_0, v1_17_10, v1_17_20_20, v1_17_30, v1_17_40, v1_18_0, v1_18_10, v1_18_30, v1_19_0, v1_19_10, v1_19_20,
-            v1_19_21, v1_19_30, v1_19_40
+            v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50
     );
 
-    String MINECRAFT_VERSION_NETWORK = "1.19.40";
+    String MINECRAFT_VERSION_NETWORK = "1.19.50";
     String MINECRAFT_VERSION = 'v' + MINECRAFT_VERSION_NETWORK;
 
     byte BATCH_PACKET = (byte) 0xff;
@@ -262,4 +263,6 @@ public interface ProtocolInfo {
     byte UPDATE_ABILITIES_PACKET = (byte) 0xbb;
     byte UPDATE_ADVENTURE_SETTINGS_PACKET = (byte) 0xbc;
     byte REQUEST_NETWORK_SETTINGS_PACKET = (byte) 0xc1;
+    byte GAME_TEST_RESULTS_PACKET = (byte) 0xc3;
+    byte UPDATE_CLIENT_INPUT_LOCKS = (byte) 0xc4;
 }
