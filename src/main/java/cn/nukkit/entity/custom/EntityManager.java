@@ -47,6 +47,9 @@ public class EntityManager {
         if (entityDefinition.getAlternateName() != null && !entityDefinition.getAlternateName().trim().isEmpty()) {
             this.alternateNameToDefinition.put(entityDefinition.getAlternateName(), entityDefinition);
         }
+
+        this.networkTagCachedOld = null;
+        this.networkTagCached = null;
     }
 
     public EntityDefinition getDefinition(String string) {

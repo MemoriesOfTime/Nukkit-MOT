@@ -19,7 +19,7 @@ import cn.nukkit.network.protocol.LevelSoundEventPacket;
 /**
  * Created by PetteriM1
  */
-public class EntityThrownTrident extends EntityProjectile {
+public class EntityThrownTrident extends EntitySlenderProjectile {
 
     public static final int NETWORK_ID = 73;
 

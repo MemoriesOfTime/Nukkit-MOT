@@ -5,7 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.LongEntityData;
-import cn.nukkit.entity.projectile.EntityProjectile;
+import cn.nukkit.entity.projectile.EntitySlenderProjectile;
 import cn.nukkit.event.entity.EntityDamageByChildEntityEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
@@ -35,7 +35,7 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Created by PetteriM1
  */
-public class EntityFishingHook extends EntityProjectile {
+public class EntityFishingHook extends EntitySlenderProjectile {
 
 	public static final int NETWORK_ID = 77;
 

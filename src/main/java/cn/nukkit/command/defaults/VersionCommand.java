@@ -33,7 +33,7 @@ public class VersionCommand extends VanillaCommand {
             return true;
         }*/
         if (args.length == 0 || !sender.hasPermission("nukkit.command.version.plugins")) {
-            sender.sendMessage("§e###############################################\n§cNukkit-§aPM1E-§dMOT\n§6Build: §b" + Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4) + "\n§6Multiversion: §bUp to version " + ProtocolInfo.MINECRAFT_VERSION_NETWORK + "\n§e###############################################");
+            sender.sendMessage("§e###############################################\n§cNukkit§3-§aPM1E§3-§dMOT\n§6Build: §b" + Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4) + "\n§6Multiversion: §bUp to version " + ProtocolInfo.MINECRAFT_VERSION_NETWORK + "\n§e###############################################");
 
             /*if (sender.isOp()) {
                 CompletableFuture.runAsync(() -> {

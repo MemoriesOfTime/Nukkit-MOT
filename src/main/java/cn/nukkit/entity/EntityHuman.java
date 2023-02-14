@@ -4,7 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.entity.data.IntPositionEntityData;
 import cn.nukkit.entity.data.Skin;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemID;
+import cn.nukkit.item.ItemShield;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -356,11 +356,11 @@ public class EntityHuman extends EntityHumanType {
     protected void onBlock(Entity entity, boolean animate, float damage) {
         super.onBlock(entity, animate, damage);
         Item shieldOffhand = getOffhandInventory().getItem(0);
-        if (shieldOffhand.getId() == ItemID.SHIELD) {
+        if (shieldOffhand instanceof ItemShield) {
             getOffhandInventory().setItem(0, damageArmor(shieldOffhand, entity, damage, true, null));
         } else {
             Item shield = getInventory().getItemInHand();
-            if (shield.getId() == ItemID.SHIELD) {
+            if (shield instanceof ItemShield) {
                 getInventory().setItemInHand(damageArmor(shield, entity, damage, true, null));
             }
         }

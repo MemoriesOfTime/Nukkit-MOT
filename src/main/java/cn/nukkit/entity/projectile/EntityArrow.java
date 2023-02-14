@@ -11,7 +11,7 @@ import cn.nukkit.utils.Utils;
  * @author MagicDroidX
  * Nukkit Project
  */
-public class EntityArrow extends EntityProjectile {
+public class EntityArrow extends EntitySlenderProjectile {
 
     public static final int NETWORK_ID = 80;
 
