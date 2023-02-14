@@ -100,7 +100,7 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 
 	@Override
 	public boolean onUpdate(int currentTick) {
-		boolean hasUpdate = super.onUpdate(currentTick);
+		if (this.timing != null) this.timing.startTiming();
 
 		if (this.target != 0) {
 			Entity ent = this.level.getEntity(this.target);
@@ -109,14 +109,10 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 			} else {
 				this.setPosition(new Vector3(ent.x, ent.y + (getHeight() * 0.75f), ent.z));
 			}
-			hasUpdate = true;
-		}
-
-		if (hasUpdate) {
 			return false;
 		}
 
-		if (this.timing != null) this.timing.startTiming();
+		boolean hasUpdate = super.onUpdate(currentTick);
 
 		boolean inWater = this.isInsideOfWater();
 		if (inWater) {
@@ -173,6 +169,21 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 		if (this.timing != null) this.timing.stopTiming();
 
 		return hasUpdate;
+	}
+
+	protected void updateMotion() {
+		//正确的浮力
+		if (this.isInsideOfWater() && this.getY() < this.getWaterHeight() - 2) {
+			this.motionX = 0;
+			this.motionY += getGravity();
+			this.motionZ = 0;
+		} else if (this.isInsideOfWater() && this.getY() >= this.getWaterHeight() - 2) {//防止鱼钩上浮超出水面
+			this.motionX = 0;
+			this.motionZ = 0;
+			this.motionY = 0;
+		} else {//处理不在水中的情况
+			super.updateMotion();
+		}
 	}
 
 	public int getWaterHeight() {
@@ -243,8 +254,9 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 				}
 			}
 			int experience = Utils.random.nextInt(3) + 1;
-			Vector3 motion = player.subtract(this).multiply(0.1);
-			motion.y += Math.sqrt(player.distance(this)) * 0.08;
+			Vector3 pos = new Vector3(this.x, this.getWaterHeight(), this.z); //实体生成在水面上
+			Vector3 motion = player.subtract(pos).multiply(0.1);
+			motion.y += Math.sqrt(player.distance(pos)) * 0.08;
 
 			PlayerFishEvent event = new PlayerFishEvent(player, this, item, experience, motion);
 			this.getServer().getPluginManager().callEvent(event);
@@ -252,7 +264,7 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 			if (!event.isCancelled()) {
 				EntityItem itemEntity = new EntityItem(
 						this.level.getChunk((int) this.x >> 4, (int) this.z >> 4, true),
-						Entity.getDefaultNBT(new Vector3(this.x, this.getWaterHeight(), this.z), event.getMotion(), ThreadLocalRandom.current().nextFloat() * 360, 0).putShort("Health", 5).putCompound("Item", NBTIO.putItemHelper(event.getLoot())).putShort("PickupDelay", 1));
+						Entity.getDefaultNBT(pos, event.getMotion(), ThreadLocalRandom.current().nextFloat() * 360, 0).putShort("Health", 5).putCompound("Item", NBTIO.putItemHelper(event.getLoot())).putShort("PickupDelay", 1));
 
 				itemEntity.setOwner(player.getName());
 				itemEntity.spawnToAll();

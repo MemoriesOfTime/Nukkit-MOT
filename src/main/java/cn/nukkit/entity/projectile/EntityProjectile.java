@@ -133,13 +133,7 @@ public abstract class EntityProjectile extends Entity {
             MovingObjectPosition movingObjectPosition = null;
 
             if (!this.isCollided) {
-                if (this.isInsideOfWater()) {
-                    this.motionY -= this.getGravity() - (this.getGravity() / 2);
-                } else {
-                    this.motionY -= this.getGravity();
-                }
-                this.motionX *= 1 - this.getDrag();
-                this.motionZ *= 1 - this.getDrag();
+                this.updateMotion();
             }
 
             Vector3 moveVector = new Vector3(this.x + this.motionX, this.y + this.motionY, this.z + this.motionZ);
@@ -205,6 +199,16 @@ public abstract class EntityProjectile extends Entity {
         }
 
         return hasUpdate;
+    }
+
+    protected void updateMotion() {
+        if (this.isInsideOfWater()) {
+            this.motionY -= this.getGravity() - (this.getGravity() / 2);
+        } else {
+            this.motionY -= this.getGravity();
+        }
+        this.motionX *= 1 - this.getDrag();
+        this.motionZ *= 1 - this.getDrag();
     }
 
     public void updateRotation() {
