@@ -104,6 +104,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -1780,7 +1781,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (!target.equals(event.getTo())) {
                         this.teleport(event.getTo(), null);
                     } else {
-                        this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.yaw);
+                        //this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.yaw);
+                        this.sendPosition(x, y, z, yaw, pitch, MovePlayerPacket.MODE_NORMAL,
+                                this.getViewers().values().stream().filter(p -> p.protocol < ProtocolInfo.v1_19_0).collect(Collectors.toList())); //1.19.0-
+                        this.broadcastMovement(); //1.19.0+
                     }
                 } else {
                     this.blocksAround = blocksAround;

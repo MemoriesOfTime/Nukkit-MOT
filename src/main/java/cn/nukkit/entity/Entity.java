@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
 
@@ -1657,6 +1658,22 @@ public abstract class Entity extends Location implements Metadatable {
         for (Player p : this.hasSpawned.values()) {
             p.dataPacket(pk); // Server.broadcastPacket would only use batching for >= 1.16.100
         }
+    }
+
+    protected void broadcastMovement() {
+        MoveEntityAbsolutePacket pk = new MoveEntityAbsolutePacket();
+        pk.eid = this.getId();
+        pk.x = this.x;
+        //因为以前处理MOVE_PLAYER_PACKET的时候是y - this.getBaseOffset()
+        //现在统一 MOVE_PLAYER_PACKET和PLAYER_AUTH_INPUT_PACKET 均为this.y - this.getEyeHeight()，所以这里不再需要对两种移动方式分别处理
+        pk.y = this.y + this.getBaseOffset();
+        pk.z = this.z;
+        pk.headYaw = yaw;
+        pk.pitch = pitch;
+        pk.yaw = yaw;
+        pk.teleport = false;
+        pk.onGround = this.onGround;
+        Server.broadcastPacket(hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_19_0).collect(Collectors.toList()), pk);
     }
 
     public Vector3 getDirectionVector() {

@@ -12,6 +12,10 @@ public class MoveEntityAbsolutePacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.MOVE_ENTITY_ABSOLUTE_PACKET;
 
+    public static final byte FLAG_GROUND = 0x01;
+    public static final byte FLAG_TELEPORT = 0x02;
+    public static final byte FLAG_FORCE_MOVE_LOCAL_ENTITY = 0x04;
+
     public long eid;
     public double x;
     public double y;
@@ -33,15 +37,15 @@ public class MoveEntityAbsolutePacket extends DataPacket {
         this.eid = this.getEntityRuntimeId();
         if (protocol >= 274) {
             int flags = this.getByte();
-            onGround = (flags & 0x01) != 0;
-            teleport = (flags & 0x02) != 0;
-            forceMoveLocalEntity = (flags & 0x04) != 0;
+            onGround = (flags & FLAG_GROUND) != 0;
+            teleport = (flags & FLAG_TELEPORT) != 0;
+            forceMoveLocalEntity = (flags & FLAG_FORCE_MOVE_LOCAL_ENTITY) != 0;
         }
         Vector3f v = this.getVector3f();
         this.x = v.x;
         this.y = v.y;
         this.z = v.z;
-        this.pitch = this.getByte() * 1.40625;
+        this.pitch = this.getByte() * 1.40625; // (360d / 256d)
         this.headYaw = this.getByte() * 1.40625;
         this.yaw = this.getByte() * 1.40625;
     }
@@ -64,7 +68,7 @@ public class MoveEntityAbsolutePacket extends DataPacket {
             this.putByte(flags);
         }
         this.putVector3f((float) this.x, (float) this.y, (float) this.z);
-        this.putByte((byte) (this.pitch / 1.40625));
+        this.putByte((byte) (this.pitch / 1.40625)); // (360d / 256d)
         this.putByte((byte) (this.headYaw / 1.40625));
         this.putByte((byte) (this.yaw / 1.40625));
         if (protocol <= 261) {
