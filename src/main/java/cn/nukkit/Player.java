@@ -2741,7 +2741,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
 
                     MovePlayerPacket movePlayerPacket = (MovePlayerPacket) packet;
-                    Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getEyeHeight(), movePlayerPacket.z);
+                    Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getBaseOffset(), movePlayerPacket.z);
                     double dis = newPos.distanceSquared(this);
 
                     if (dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
@@ -2914,7 +2914,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
 
                     Vector3 clientPosition = authPacket.getPosition().asVector3()
-                            .subtract(0, this.getEyeHeight(), 0);
+                            .subtract(0, this.getBaseOffset(), 0);
 
                     double distSqrt = clientPosition.distanceSquared(this);
                     if (distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
