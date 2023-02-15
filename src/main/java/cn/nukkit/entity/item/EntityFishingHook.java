@@ -46,6 +46,7 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 	public boolean caught = false;
 	public int caughtTimer = 0;
 	public boolean canCollide = true;
+	public Entity caughtEntity = null;
 	private long target = 0;
 
 	public Vector3 fish = null;
@@ -105,6 +106,7 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 		if (this.target != 0) {
 			Entity ent = this.level.getEntity(this.target);
 			if (ent == null || !ent.isAlive()) {
+				this.caughtEntity = null;
 				this.setTarget(0);
 			} else {
 				this.setPosition(new Vector3(ent.x, ent.y + (getHeight() * 0.75f), ent.z));
@@ -244,32 +246,38 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 	}
 
 	public void reelLine() {
-		if (this.shootingEntity instanceof Player && this.caught) {
+		if (this.shootingEntity instanceof Player) {
 			Player player = (Player) this.shootingEntity;
-			Item item = Fishing.getFishingResult(this.rod);
-			if (item instanceof ItemBookEnchanted) {
-				if (!item.hasEnchantments()) {
-					item = item.clone();
-					item.addEnchantment(Enchantment.getEnchantment(Utils.rand(0, 36)));
+			if (this.caught) {
+				Item item = Fishing.getFishingResult(this.rod);
+				if (item instanceof ItemBookEnchanted) {
+					if (!item.hasEnchantments()) {
+						item = item.clone();
+						item.addEnchantment(Enchantment.getEnchantment(Utils.rand(0, 36)));
+					}
 				}
-			}
-			int experience = Utils.random.nextInt(3) + 1;
-			Vector3 pos = new Vector3(this.x, this.getWaterHeight(), this.z); //实体生成在水面上
-			Vector3 motion = player.subtract(pos).multiply(0.1);
-			motion.y += Math.sqrt(player.distance(pos)) * 0.08;
+				int experience = Utils.random.nextInt(3) + 1;
+				Vector3 pos = new Vector3(this.x, this.getWaterHeight(), this.z); //实体生成在水面上
+				Vector3 motion = player.subtract(pos).multiply(0.1);
+				motion.y += Math.sqrt(player.distance(pos)) * 0.08;
 
-			PlayerFishEvent event = new PlayerFishEvent(player, this, item, experience, motion);
-			this.getServer().getPluginManager().callEvent(event);
+				PlayerFishEvent event = new PlayerFishEvent(player, this, item, experience, motion);
+				this.getServer().getPluginManager().callEvent(event);
 
-			if (!event.isCancelled()) {
-				EntityItem itemEntity = new EntityItem(
-						this.level.getChunk((int) this.x >> 4, (int) this.z >> 4, true),
-						Entity.getDefaultNBT(pos, event.getMotion(), ThreadLocalRandom.current().nextFloat() * 360, 0).putShort("Health", 5).putCompound("Item", NBTIO.putItemHelper(event.getLoot())).putShort("PickupDelay", 1));
+				if (!event.isCancelled()) {
+					EntityItem itemEntity = new EntityItem(
+							this.level.getChunk((int) this.x >> 4, (int) this.z >> 4, true),
+							Entity.getDefaultNBT(pos, event.getMotion(), ThreadLocalRandom.current().nextFloat() * 360, 0).putShort("Health", 5).putCompound("Item", NBTIO.putItemHelper(event.getLoot())).putShort("PickupDelay", 1));
 
-				itemEntity.setOwner(player.getName());
-				itemEntity.spawnToAll();
+					itemEntity.setOwner(player.getName());
+					itemEntity.spawnToAll();
 
-				player.getLevel().dropExpOrb(player, event.getExperience());
+					player.getLevel().dropExpOrb(player, event.getExperience());
+				}
+			}else if (this.caughtEntity != null) {
+				Vector3 motion = this.shootingEntity.subtract(this).multiply(0.1);
+				motion.y += Math.sqrt(this.shootingEntity.distance(this)) * 0.08;
+				this.caughtEntity.setMotion(motion);
 			}
 		}
 		this.close();
@@ -316,6 +324,7 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 		}
 
 		if (entity.attack(ev)) {
+			this.caughtEntity = entity;
 			this.setTarget(entity.getId());
 		}
 	}
