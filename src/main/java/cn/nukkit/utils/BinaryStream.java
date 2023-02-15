@@ -727,7 +727,8 @@ public class BinaryStream {
         // Multiversion: Replace unsupported items
         boolean saveOriginalID = false;
         if (!crafting) {
-            if (runtimeId == Item.SPYGLASS) { // Protocol always < v1_16_220
+            if (runtimeId == Item.SPYGLASS || // Protocol always < v1_16_220
+                    (protocolId < ProtocolInfo.v1_16_100 && runtimeId >= 10000)) { // Custom Item
                 saveOriginalID = true;
                 runtimeId = Item.INFO_UPDATE;
             } else if (protocolId < ProtocolInfo.v1_16_0) {
