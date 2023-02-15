@@ -3,7 +3,9 @@ package cn.nukkit.entity.mob;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntitySmite;
+import cn.nukkit.entity.data.LongEntityData;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.EntityShootBowEvent;
@@ -14,6 +16,7 @@ import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.MobArmorEquipmentPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
@@ -25,6 +28,9 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
 
     public static final int NETWORK_ID = 34;
 
+    private boolean angryFlagSet;
+    private boolean hasPumpkin;
+
     public EntitySkeleton(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
     }
@@ -32,6 +38,10 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
     @Override
     public void initEntity() {
         super.initEntity();
+
+        if (java.time.LocalDate.now().toString().contains("-10-31") && Utils.rand(0, 10) < 2) {
+            this.hasPumpkin = true;
+        }
 
         this.setMaxHealth(20);
     }
@@ -103,12 +113,12 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
         pk.hotbarSlot = 0;
         player.dataPacket(pk);
 
-        /*if (java.time.LocalDate.now().toString().contains("-10-31")) {
+        if (this.hasPumpkin) {
             MobArmorEquipmentPacket pk2 = new MobArmorEquipmentPacket();
             pk2.eid = this.getId();
-            pk2.slots[0] = new ItemBlock(Block.get(Block.PUMPKIN));
+            pk2.slots[0] = Item.get(Item.PUMPKIN);
             player.dataPacket(pk2);
-        }*/
+        }
     }
 
     @Override
@@ -152,5 +162,23 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
     @Override
     public int nearbyDistanceMultiplier() {
         return 10;
+    }
+
+    @Override
+    public boolean targetOption(EntityCreature creature, double distance) {
+        boolean hasTarget = super.targetOption(creature, distance);
+        if (hasTarget) {
+            if (!this.angryFlagSet && creature != null) {
+                this.setDataProperty(new LongEntityData(DATA_TARGET_EID, creature.getId()));
+                this.angryFlagSet = true;
+            }
+        } else {
+            if (this.angryFlagSet) {
+                this.setDataProperty(new LongEntityData(DATA_TARGET_EID, 0));
+                this.angryFlagSet = false;
+                this.stayTime = 100;
+            }
+        }
+        return hasTarget;
     }
 }

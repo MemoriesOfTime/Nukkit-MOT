@@ -3,7 +3,9 @@ package cn.nukkit.entity.mob;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntitySmite;
+import cn.nukkit.entity.data.LongEntityData;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.EntityShootBowEvent;
@@ -24,6 +26,8 @@ import java.util.List;
 public class EntityStray extends EntityWalkingMob implements EntitySmite {
 
     public static final int NETWORK_ID = 46;
+
+    private boolean angryFlagSet;
 
     public EntityStray(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -143,5 +147,23 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
     @Override
     public int nearbyDistanceMultiplier() {
         return 10;
+    }
+
+    @Override
+    public boolean targetOption(EntityCreature creature, double distance) {
+        boolean hasTarget = super.targetOption(creature, distance);
+        if (hasTarget) {
+            if (!this.angryFlagSet && creature != null) {
+                this.setDataProperty(new LongEntityData(DATA_TARGET_EID, creature.getId()));
+                this.angryFlagSet = true;
+            }
+        } else {
+            if (this.angryFlagSet) {
+                this.setDataProperty(new LongEntityData(DATA_TARGET_EID, 0));
+                this.angryFlagSet = false;
+                this.stayTime = 100;
+            }
+        }
+        return hasTarget;
     }
 }
