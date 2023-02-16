@@ -78,6 +78,7 @@ import co.aikar.timings.Timings;
 import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import com.google.gson.JsonParser;
 import io.netty.util.internal.PlatformDependent;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -94,13 +95,18 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.net.URLConnection;
 import java.nio.ByteOrder;
 import java.util.List;
 import java.util.*;
 import java.util.Queue;
 import java.util.Map.Entry;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -1004,23 +1010,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.spawnToAll();
         }
 
-        /*if (server.updateChecks && this.isOp()) {
+        if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
                 try {
                     URLConnection request = new URL(Nukkit.BRANCH).openConnection();
                     request.connect();
                     InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
-                    String latest = "git-" + new JsonParser().parse(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
+                    String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
                     content.close();
 
                     if (Nukkit.getBranch().equals("master")) {
                         if (!server.getNukkitVersion().equals(latest) && !server.getNukkitVersion().equals("git-null")) {
-                            this.sendMessage("\u00A7c[Nukkit-PM1E][Update] \u00A7eThere is a new build of Nukkit PetteriM1 Edition available! Current: " + server.getNukkitVersion() + " Latest: " + latest);
+                            this.sendMessage("§c[Nukkit-PM1E-MOT][Update] §eThere is a new build of Nukkit PetteriM1 Edition available! Current: " + server.getNukkitVersion() + " Latest: " + latest);
                         }
                     }
                 } catch (Exception ignore) {}
             });
-        }*/
+        }
     }
 
     protected boolean orderChunks() {

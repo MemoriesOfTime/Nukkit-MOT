@@ -8,8 +8,14 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.plugin.PluginDescription;
 import cn.nukkit.utils.TextFormat;
+import com.google.gson.JsonParser;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.net.URLConnection;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Created on 2015/11/12 by xtypr.
@@ -35,7 +41,7 @@ public class VersionCommand extends VanillaCommand {
         if (args.length == 0 || !sender.hasPermission("nukkit.command.version.plugins")) {
             sender.sendMessage("§e###############################################\n§cNukkit§3-§aPM1E§3-§dMOT\n§6Build: §b" + Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4) + "\n§6Multiversion: §bUp to version " + ProtocolInfo.MINECRAFT_VERSION_NETWORK + "\n§e###############################################");
 
-            /*if (sender.isOp()) {
+            if (sender.isOp()) {
                 CompletableFuture.runAsync(() -> {
                     try {
                         URLConnection request = new URL(Nukkit.BRANCH).openConnection();
@@ -54,7 +60,7 @@ public class VersionCommand extends VanillaCommand {
                     } catch (Exception ignore) {
                     }
                 });
-            }*/
+            }
         } else {
             StringBuilder pluginName = new StringBuilder();
             for (String arg : args) pluginName.append(arg).append(' ');
