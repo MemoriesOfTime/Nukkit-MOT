@@ -527,7 +527,8 @@ public abstract class Entity extends Location implements Metadatable {
             }
         }
 
-        this.dataProperties.put(new LongEntityData(DATA_FLAGS, this.getDataPropertyLong(DATA_FLAGS) ^ 1L << DATA_FLAG_HAS_COLLISION));
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_HAS_COLLISION, true, false);
+        //this.dataProperties.put(new LongEntityData(DATA_FLAGS, this.getDataPropertyLong(DATA_FLAGS) ^ 1L << DATA_FLAG_HAS_COLLISION));
         this.dataProperties.putFloat(DATA_BOUNDING_BOX_HEIGHT, this.getHeight());
         this.dataProperties.putFloat(DATA_BOUNDING_BOX_WIDTH, this.getWidth());
         this.dataProperties.putInt(DATA_HEALTH, (int) this.health);
@@ -2739,22 +2740,22 @@ public abstract class Entity extends Location implements Metadatable {
 
                     int id291 = id > 46 ? id - 1 : id;
                     int id223 = id291 > 30 ? id291 - 1 : id291;
-                    int id137 = id223 >= 23 && id223 < 43 || id223 >= 46 ? id223 - 1 : id223;
+                    int id137 = (id223 >= 23 && id223 < 43) || (id223 >= 46) ? id223 - 1 : id223;
 
                     if (longEntityData.dataVersions != null && longEntityData.dataVersions.length == 3) {
-                        data291 = longEntityData.dataVersions[0];
+                        data291 = longEntityData.dataVersions[2];
                         data223 = longEntityData.dataVersions[1];
-                        data137 = longEntityData.dataVersions[2];
+                        data137 = longEntityData.dataVersions[0];
                     } else {
                         data291 = 0L;
                         data223 = 0L;
                         data137 = 0L;
                     }
 
-                    newLongEntityData.dataVersions = new long[]{
-                            data291 ^ 1L << id291,
+                    newLongEntityData.dataVersions = new long[] {
+                            data137 ^ 1L << id137,
                             data223 ^ 1L << id223,
-                            data137 ^ 1L << id137
+                            data291 ^ 1L << id291
                     };
                 } else if (propertyId == DATA_FLAGS_EXTENDED) {
                     int id2 = id > 46 ? id - 1 : id;
@@ -2786,19 +2787,19 @@ public abstract class Entity extends Location implements Metadatable {
                     int id137 = id223 >= 23 && id223 < 43 || id223 >= 46 ? id223 - 1 : id223;
 
                     if (longEntityData.dataVersions != null && longEntityData.dataVersions.length == 3) {
-                        data291 = longEntityData.dataVersions[0];
+                        data291 = longEntityData.dataVersions[2];
                         data223 = longEntityData.dataVersions[1];
-                        data137 = longEntityData.dataVersions[2];
+                        data137 = longEntityData.dataVersions[0];
                     } else {
                         data291 = 0L;
                         data223 = 0L;
                         data137 = 0L;
                     }
 
-                    newLongEntityData.dataVersions = new long[]{
-                            data291 ^ 1L << id291,
+                    newLongEntityData.dataVersions = new long[] {
+                            data137 ^ 1L << id137,
                             data223 ^ 1L << id223,
-                            data137 ^ 1L << id137
+                            data291 ^ 1L << id291
                     };
                 } else if (propertyId == DATA_FLAGS_EXTENDED) {
                     int id2 = id > 46 ? id - 1 : id;
