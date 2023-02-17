@@ -967,6 +967,19 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return false;
     }
 
+    /**
+     * 通过附魔id来查找对应附魔的等级
+     * <p>
+     * Find the enchantment level by the enchantment id.
+     *
+     * @param id The enchantment ID from {@link Enchantment} constants.
+     * @return {@code 0} if the item don't have that enchantment or the current level of the given enchantment.
+     */
+    public int getEnchantmentLevel(int id) {
+        Enchantment enchantment = this.getEnchantment(id);
+        return enchantment == null ? 0 : enchantment.getLevel();
+    }
+
     public Enchantment getEnchantment(int id) {
         return getEnchantment((short) (id & 0xffff));
     }
