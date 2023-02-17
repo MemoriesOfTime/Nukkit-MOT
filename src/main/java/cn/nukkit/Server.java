@@ -73,11 +73,12 @@ import cn.nukkit.resourcepacks.ResourcePackManager;
 import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.scheduler.Task;
 import cn.nukkit.utils.*;
+import cn.nukkit.utils.bugreport.ExceptionHandler;
 import co.aikar.timings.Timings;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import io.netty.buffer.ByteBuf;
-import io.sentry.SentryClient;
+import io.sentry.Sentry;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -216,7 +217,6 @@ public class Server {
         }
     };
 
-    public SentryClient sentry;
     private Level[] levelArray = new Level[0];
     private final ServiceManager serviceManager = new NKServiceManager();
     private Level defaultLevel;
@@ -463,6 +463,10 @@ public class Server {
      * Show a console message when a plugin uses deprecated API methods
      */
     public boolean deprecatedVerbose;
+    /**
+     * Enable automatic bug reporting
+     */
+    public boolean automaticBugReport;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -501,11 +505,17 @@ public class Server {
 
         this.loadSettings();
 
-        //Useless for MOT branches
-        /*if (this.getPropertyBoolean("automatic-bug-report", false)) {
+        this.automaticBugReport = this.getPropertyBoolean("automatic-bug-report", false);
+        if (this.automaticBugReport) {
             ExceptionHandler.registerExceptionHandler();
-            this.sentry = SentryClientFactory.sentryClient("https://0e094ce5464f4663a0b521d61f4bfe54@o381665.ingest.sentry.io/5209314");
-        }*/
+            Sentry.init(options -> {
+                options.setDsn("https://b61b4bfc0057480e9644111aa4e78844@o4504694990700544.ingest.sentry.io/4504694992535552");
+                options.setTracesSampleRate(1.0); //错误报告率 0.0-1.0
+                options.setDebug(false);
+                options.setTag("nukkit_version", Nukkit.VERSION);
+                options.setTag("branch", Nukkit.getBranch());
+            });
+        }
 
         if (!new File(dataPath + "players/").exists() && this.shouldSavePlayerData) {
             new File(dataPath + "players/").mkdirs();

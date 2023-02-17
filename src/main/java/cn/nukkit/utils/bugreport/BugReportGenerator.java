@@ -7,6 +7,8 @@ import cn.nukkit.math.NukkitMath;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.TextFormat;
 import com.sun.management.OperatingSystemMXBean;
+import io.sentry.ScopeCallback;
+import io.sentry.Sentry;
 
 import java.lang.management.ManagementFactory;
 
@@ -42,7 +44,7 @@ public class BugReportGenerator extends Thread {
             }
         }
         try {
-            if (Server.getInstance().sentry != null) {
+            if (Server.getInstance().automaticBugReport) {
                 sentry();
             }
         } catch (Exception ex) {
@@ -56,10 +58,8 @@ public class BugReportGenerator extends Thread {
     private void sentry() {
         Server.getInstance().getLogger().info("[BugReport] Sending a bug report ...");
 
-        Server.getInstance().sentry.getContext().clear();
-
+        boolean pluginError;
         if (throwable != null) {
-            boolean pluginError = false;
             StackTraceElement[] stackTrace = throwable.getStackTrace();
             if (stackTrace.length > 0) {
                 String className = throwable.getStackTrace()[0].getClassName();
@@ -68,11 +68,15 @@ public class BugReportGenerator extends Thread {
                     if (className.startsWith("org.hibernate")) {
                         return;
                     }
+                } else {
+                    pluginError = false;
                 }
             } else {
+                pluginError = false;
                 return; // Don't send empty stack traces
             }
-            Server.getInstance().sentry.getContext().addTag("plugin_error", String.valueOf(pluginError));
+        } else {
+            pluginError = false;
         }
 
         StringBuilder plugins = new StringBuilder();
@@ -92,31 +96,68 @@ public class BugReportGenerator extends Thread {
 
         String cpuType = System.getenv("PROCESSOR_IDENTIFIER");
         OperatingSystemMXBean osMXBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
-        Server.getInstance().sentry.getContext().addExtra("Nukkit Version", Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4));
-        Server.getInstance().sentry.getContext().addExtra("Java Version", System.getProperty("java.vm.name") + " (" + System.getProperty("java.runtime.version") + ')');
-        Server.getInstance().sentry.getContext().addExtra("Host OS", osMXBean.getName() + '-' + osMXBean.getArch() + " [" + osMXBean.getVersion() + ']');
         Runtime runtime = Runtime.getRuntime();
         double usedMB = NukkitMath.round((double) (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024, 2);
         double maxMB = NukkitMath.round(((double) runtime.maxMemory()) / 1024 / 1024, 2);
         double usage = usedMB / maxMB * 100;
-        Server.getInstance().sentry.getContext().addExtra("Memory", usedMB + " MB (" + NukkitMath.round(usage, 2) + "%) of " + maxMB + " MB");
-        Server.getInstance().sentry.getContext().addExtra("CPU Type", cpuType == null ? "UNKNOWN" : cpuType);
-        Server.getInstance().sentry.getContext().addExtra("Available Cores", String.valueOf(osMXBean.getAvailableProcessors()));
-        Server.getInstance().sentry.getContext().addExtra("Uptime", TextFormat.clean(StatusCommand.formatUptime(System.currentTimeMillis() - Nukkit.START_TIME)));
-        Server.getInstance().sentry.getContext().addExtra("Players", Server.getInstance().getOnlinePlayersCount() + "/" + Server.getInstance().getMaxPlayers());
-        Server.getInstance().sentry.getContext().addExtra("Plugins", plugins.toString());
-        Server.getInstance().sentry.getContext().addTag("nukkit_version", Nukkit.VERSION);
-        Server.getInstance().sentry.getContext().addTag("branch", Nukkit.getBranch());
+
+        ScopeCallback scopeCallback = scope -> {
+            scope.setContexts("Nukkit Version", Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4));
+            scope.setContexts("Java Version", System.getProperty("java.vm.name") + " (" + System.getProperty("java.runtime.version") + ')');
+            scope.setContexts("Host OS", osMXBean.getName() + '-' + osMXBean.getArch() + " [" + osMXBean.getVersion() + ']');
+            scope.setContexts("Memory", usedMB + " MB (" + NukkitMath.round(usage, 2) + "%) of " + maxMB + " MB");
+            scope.setContexts("CPU Type", cpuType == null ? "UNKNOWN" : cpuType);
+            scope.setContexts("Available Cores", String.valueOf(osMXBean.getAvailableProcessors()));
+            scope.setContexts("Uptime", TextFormat.clean(StatusCommand.formatUptime(System.currentTimeMillis() - Nukkit.START_TIME)));
+            scope.setContexts("Players", Server.getInstance().getOnlinePlayersCount() + "/" + Server.getInstance().getMaxPlayers());
+            scope.setContexts("plugin_error", pluginError);
+            scope.setContexts("Plugins", plugins.toString());
+        };
 
         if (throwable != null) {
-            Server.getInstance().sentry.getContext().addTag("watchdog", String.valueOf(false));
-            Server.getInstance().sentry.sendException(throwable);
+            Sentry.captureException(throwable, scopeCallback);
         } else if (message != null) {
-            Server.getInstance().sentry.getContext().addTag("watchdog", String.valueOf(true));
-            Server.getInstance().sentry.sendMessage(message);
+            Sentry.captureMessage(message, scopeCallback);
+
         } else {
             Server.getInstance().getLogger().error("[BugReport] Failed to send a bug report: content cannot be null");
         }
+    }
+
+    public static ScopeCallback getScopeCallback() {
+        StringBuilder plugins = new StringBuilder();
+        try {
+            for (Plugin plugin : Server.getInstance().getPluginManager().getPlugins().values()) {
+                if (plugins.length() > 0) {
+                    plugins.append(", ");
+                }
+                if (!plugin.isEnabled()) {
+                    plugins.append('*');
+                }
+                plugins.append(plugin.getDescription().getFullName());
+            }
+        } catch (Exception ex) {
+            Server.getInstance().getLogger().logException(ex);
+        }
+
+        String cpuType = System.getenv("PROCESSOR_IDENTIFIER");
+        OperatingSystemMXBean osMXBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+        Runtime runtime = Runtime.getRuntime();
+        double usedMB = NukkitMath.round((double) (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024, 2);
+        double maxMB = NukkitMath.round(((double) runtime.maxMemory()) / 1024 / 1024, 2);
+        double usage = usedMB / maxMB * 100;
+
+        return scope -> {
+            scope.setContexts("Nukkit Version", Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4));
+            scope.setContexts("Java Version", System.getProperty("java.vm.name") + " (" + System.getProperty("java.runtime.version") + ')');
+            scope.setContexts("Host OS", osMXBean.getName() + '-' + osMXBean.getArch() + " [" + osMXBean.getVersion() + ']');
+            scope.setContexts("Memory", usedMB + " MB (" + NukkitMath.round(usage, 2) + "%) of " + maxMB + " MB");
+            scope.setContexts("CPU Type", cpuType == null ? "UNKNOWN" : cpuType);
+            scope.setContexts("Available Cores", String.valueOf(osMXBean.getAvailableProcessors()));
+            scope.setContexts("Uptime", TextFormat.clean(StatusCommand.formatUptime(System.currentTimeMillis() - Nukkit.START_TIME)));
+            scope.setContexts("Players", Server.getInstance().getOnlinePlayersCount() + "/" + Server.getInstance().getMaxPlayers());
+            scope.setContexts("Plugins", plugins.toString());
+        };
     }
 
     public static String getCount(long bytes, boolean si) {
