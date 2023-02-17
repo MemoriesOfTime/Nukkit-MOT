@@ -170,7 +170,10 @@ public abstract class EntityProjectile extends Entity {
             if (movingObjectPosition != null) {
                 if (movingObjectPosition.entityHit != null) {
                     onCollideWithEntity(movingObjectPosition.entityHit);
-                    return true;
+                    hasUpdate = true;
+                    if (this.hadCollision) {
+                        return true;
+                    }
                 }
             }
 

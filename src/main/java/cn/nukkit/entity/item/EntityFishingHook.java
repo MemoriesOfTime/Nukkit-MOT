@@ -327,6 +327,8 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 		}
 
 		if (entity.attack(ev)) {
+			this.hadCollision = true;
+
 			this.caughtEntity = entity;
 			this.setTarget(entity.getId());
 		}
