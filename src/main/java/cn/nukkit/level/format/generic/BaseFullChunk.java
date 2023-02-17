@@ -68,7 +68,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected boolean isInit;
 
-    protected BatchPacket chunkPacket;
+    protected Map<Integer, BatchPacket> chunkPackets;
 
     @Override
     public BaseFullChunk clone() {
@@ -107,16 +107,22 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     public void setChunkPacket(int protocol, BatchPacket packet) {
         if (packet != null) {
             packet.trim();
+            if (this.chunkPackets == null) {
+                this.chunkPackets = new Int2ObjectOpenHashMap<>();
+            }
+            this.chunkPackets.put(protocol, packet);
         }
-        this.chunkPacket = packet;
     }
 
     public BatchPacket getChunkPacket(int protocol) {
-        BatchPacket pk = chunkPacket;
+        if (this.chunkPackets == null) {
+            return null;
+        }
+        BatchPacket pk = this.chunkPackets.get(protocol);
         if (pk != null) {
             pk.trim();
         }
-        return chunkPacket;
+        return pk;
     }
 
     public void backwardCompatibilityUpdate(Level level) {
@@ -556,7 +562,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void setChanged() {
         this.changes++;
-        chunkPacket = null;
+        chunkPackets = null;
     }
 
     @Override
@@ -697,11 +703,14 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     public boolean compress() {
-        BatchPacket pk = chunkPacket;
-        if (pk != null) {
-            pk.trim();
-            return true;
+        if (this.chunkPackets == null) {
+            return false;
         }
-        return false;
+        for (BatchPacket pk : this.chunkPackets.values()) {
+            if (pk != null) {
+                pk.trim();
+            }
+        }
+        return !this.chunkPackets.isEmpty();
     }
 }
