@@ -92,6 +92,11 @@ public class Watchdog extends Thread {
      * @param log bug report generator input
      */
     private static void dumpThread(ThreadInfo thread, Logger logger, StringBuilder log) {
+        if (thread == null) {
+            print("Attempted to dump a null thread!", logger, log);
+            return;
+        }
+
         print("Current Thread: " + thread.getThreadName(), logger, log);
         print("\tPID: " + thread.getThreadId() + " | Suspended: " + thread.isSuspended() + " | Native: " + thread.isInNative() + " | State: " + thread.getThreadState(), logger, log);
 
