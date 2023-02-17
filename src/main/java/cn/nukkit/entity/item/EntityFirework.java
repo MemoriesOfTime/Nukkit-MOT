@@ -14,6 +14,8 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.math3.util.FastMath;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -24,8 +26,10 @@ import java.util.concurrent.ThreadLocalRandom;
 public class EntityFirework extends Entity {
 
     public static final int NETWORK_ID = 72;
-
+    @Getter
+    @Setter
     private int lifetime;
+
     private Item firework;
 
     public EntityFirework(FullChunk chunk, CompoundTag nbt) {
@@ -37,7 +41,18 @@ public class EntityFirework extends Entity {
         super.initEntity();
 
         ThreadLocalRandom rand = ThreadLocalRandom.current();
-        this.lifetime = 30 + rand.nextInt(12);
+
+        int lifetime;
+        boolean contains = namedTag.contains("FireworkLifeTime");
+        if (contains) {
+            lifetime = namedTag.getInt("FireworkLifeTime");
+        } else {
+            lifetime = 30 + rand.nextInt(12);
+        }
+        if (lifetime > 0) {
+            this.setLifetime(lifetime);
+        }
+
 
         this.motionX = rand.nextGaussian() * 0.001D;
         this.motionZ = rand.nextGaussian() * 0.001D;
@@ -55,6 +70,7 @@ public class EntityFirework extends Entity {
         super.saveNBT();
         if (this.firework != null) {
             this.namedTag.putCompound("FireworkItem", NBTIO.putItemHelper(this.firework));
+            this.namedTag.putInt("FireworkLifeTime", this.lifetime);
         }
     }
 
@@ -77,7 +93,9 @@ public class EntityFirework extends Entity {
 
         this.lastUpdate = currentTick;
 
-        if (this.timing != null) this.timing.startTiming();
+        if (this.timing != null) {
+            this.timing.startTiming();
+        }
 
         boolean hasUpdate = this.entityBaseTick(tickDiff);
 
@@ -114,7 +132,9 @@ public class EntityFirework extends Entity {
             }
         }
 
-        if (this.timing != null) this.timing.stopTiming();
+        if (this.timing != null) {
+            this.timing.stopTiming();
+        }
 
         return hasUpdate || !this.onGround || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001;
     }
