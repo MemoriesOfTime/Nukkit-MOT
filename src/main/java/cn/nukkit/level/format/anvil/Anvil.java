@@ -1,19 +1,16 @@
 package cn.nukkit.level.format.anvil;
 
 import cn.nukkit.level.Level;
-import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.BaseLevelProvider;
 import cn.nukkit.level.format.generic.BaseRegionLoader;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.generator.Generator;
-import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.utils.ChunkException;
-import cn.nukkit.utils.ThreadCache;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 
@@ -23,7 +20,6 @@ import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
@@ -206,9 +202,33 @@ public class Anvil extends BaseLevelProvider {
             this.getLevel().chunkRequestCallback(protocolId, timestamp, x, z, count, stream.getBuffer());
         }*/
 
-        Consumer<NetworkChunkSerializer.NetworkChunkSerializerCallback> callback = (networkChunkSerializerCallback) ->
-                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(), timestamp, x, z, networkChunkSerializerCallback.getSubchunks(), networkChunkSerializerCallback.getStream().getBuffer());
-        NetworkChunkSerializer.serialize(protocols, chunk, callback, this.level.getDimensionData());
+        if (this.getServer().asyncChunkSending) {
+            //TODO 优化
+            this.getServer().getScheduler().scheduleAsyncTask(new AsyncTask() {
+                @Override
+                public void onRun() {
+                    NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
+                        getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                                timestamp,
+                                x,
+                                z,
+                                networkChunkSerializerCallback.getSubchunks(),
+                                networkChunkSerializerCallback.getStream().getBuffer()
+                        );
+                    }, getLevel().getDimensionData());
+                }
+            });
+        }else {
+            NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
+                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                        timestamp,
+                        x,
+                        z,
+                        networkChunkSerializerCallback.getSubchunks(),
+                        networkChunkSerializerCallback.getStream().getBuffer()
+                );
+            }, this.level.getDimensionData());
+        }
     }
 
 /*    private byte[] convert2DBiomesTo3D(int protocolId, BaseFullChunk chunk) {

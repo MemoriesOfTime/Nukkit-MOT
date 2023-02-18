@@ -458,7 +458,7 @@ public class Server {
     /**
      * Asynchronous chunk sending (Experiment)
      */
-    public boolean asyncChunks;
+    public boolean asyncChunkSending;
     /**
      * Show a console message when a plugin uses deprecated API methods
      */
@@ -2977,7 +2977,7 @@ public class Server {
         this.minimumProtocol = this.getPropertyInt("multiversion-min-protocol", 0);
         this.whitelistReason = this.getPropertyString("whitelist-reason", "§cServer is white-listed").replace("§n", "\n");
         this.enableExperimentMode = this.getPropertyBoolean("enable-experiment-mode", true);
-        this.asyncChunks = this.getPropertyBoolean("async-chunks", false);
+        this.asyncChunkSending = this.getPropertyBoolean("async-chunks", false);
         this.deprecatedVerbose = this.getPropertyBoolean("deprecated-verbose", true);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {

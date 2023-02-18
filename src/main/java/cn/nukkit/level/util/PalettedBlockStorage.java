@@ -19,6 +19,10 @@ public class PalettedBlockStorage {
         return createFromBlockPalette(BitArrayVersion.V2, 0);
     }
 
+    public static PalettedBlockStorage createFromBlockPalette(int protocol) {
+        return PalettedBlockStorage.createFromBlockPalette(BitArrayVersion.V2, protocol);
+    }
+
     public static PalettedBlockStorage createFromBlockPalette(BitArrayVersion version, int protocol) {
         int runtimeId;
         if (protocol >= ProtocolInfo.v1_16_100) {
