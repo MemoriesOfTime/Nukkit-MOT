@@ -2904,7 +2904,7 @@ public class Server {
     /**
      * 低配服务器模式
      *
-     * @return 默认关闭
+     * @return 是否开启低配服务器模式
      */
     public boolean lowProfileServer() {
         return lowProfileServer;
@@ -3108,7 +3108,7 @@ public class Server {
             put("thread-watchdog-tick", 60000);
             put("nether", true);
             put("end", false);
-            put("suomicraft-mode", false);
+            put("low-profile-server-mode", false);
             put("do-not-tick-worlds", "");
             put("load-all-worlds", true);
             // 用ide软件时后台会频繁显示 : (
