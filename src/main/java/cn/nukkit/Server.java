@@ -467,6 +467,14 @@ public class Server {
      * Enable automatic bug reporting
      */
     public boolean automaticBugReport;
+    /**
+     * Player movement processing mode
+     */
+    public int serverAuthoritativeMovementMode;
+    /**
+     * Server authority block destruction
+     */
+    public boolean serverAuthoritativeBlockBreaking;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -2979,6 +2987,19 @@ public class Server {
         this.enableExperimentMode = this.getPropertyBoolean("enable-experiment-mode", true);
         this.asyncChunkSending = this.getPropertyBoolean("async-chunks", false);
         this.deprecatedVerbose = this.getPropertyBoolean("deprecated-verbose", true);
+        switch (this.getPropertyString("server-authoritative-movement")) {
+            case "client-auth":
+                this.serverAuthoritativeMovementMode = 0;
+                break;
+            case "server-auth-with-rewind":
+                this.serverAuthoritativeMovementMode = 2;
+                break;
+            case "server-auth":
+            default:
+                this.serverAuthoritativeMovementMode = 1;
+                break;
+        }
+        this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
@@ -3121,6 +3142,8 @@ public class Server {
             put("enable-experiment-mode", false);
             put("async-chunks", false);
             put("deprecated-verbose", true);
+            put("server-authoritative-movement", "server-auth");
+            put("server-authoritative-block-breaking", true);
         }
     }
 

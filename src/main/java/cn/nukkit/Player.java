@@ -1787,8 +1787,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (!target.equals(event.getTo())) {
                         this.teleport(event.getTo(), null);
                     } else {
-                        //this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.yaw);
-                        this.sendPosition(x, y, z, yaw, pitch, MovePlayerPacket.MODE_NORMAL,
+                        this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.yaw,
                                 this.getViewers().values().stream().filter(p -> p.protocol < ProtocolInfo.v1_19_0).collect(Collectors.toList())); //1.19.0-
                         this.broadcastMovement(); //1.19.0+
                     }
@@ -1857,7 +1856,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void addMovement(double x, double y, double z, double yaw, double pitch, double headYaw) {
-        this.sendPosition(x, y, z, yaw, pitch, MovePlayerPacket.MODE_NORMAL, this.getViewers().values());
+        //this.sendPosition(x, y, z, yaw, pitch, MovePlayerPacket.MODE_NORMAL, this.getViewers().values());
+        this.addMovement(x, y, z, yaw, pitch, headYaw, this.getViewers().values());
+    }
+
+    public void addMovement(double x, double y, double z, double yaw, double pitch, double headYaw, Collection<Player> viewers) {
+        this.sendPosition(x, y, z, yaw, pitch, MovePlayerPacket.MODE_NORMAL, viewers);
     }
 
     @Override
@@ -6344,10 +6348,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean isMovementServerAuthoritative() {
-        return this.protocol >= ProtocolInfo.v1_19_10;
+        return this.server.serverAuthoritativeMovementMode == 1 && this.protocol >= ProtocolInfo.v1_17_0;
     }
 
     public boolean isServerAuthoritativeBlockBreaking() {
-        return this.isMovementServerAuthoritative();
+        return this.server.serverAuthoritativeBlockBreaking && this.isMovementServerAuthoritative();
     }
 }
