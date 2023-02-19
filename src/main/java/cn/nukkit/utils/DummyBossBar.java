@@ -144,6 +144,24 @@ public class DummyBossBar {
         }
     }
 
+    @Deprecated
+    public void setColor(BlockColor blockColor) {
+        try {
+            throw new RuntimeException();
+        }catch (Exception e) {
+            Server.getInstance().getLogger().warning("Unsupported API usage: DummyBossBar.setColor(BlockColor)", e);
+        }
+    }
+
+    @Deprecated
+    public void setColor(int red, int green, int blue) {
+        try {
+            throw new RuntimeException();
+        }catch (Exception e) {
+            Server.getInstance().getLogger().warning("Unsupported API usage: DummyBossBar.setColor(int,int,int)", e);
+        }
+    }
+
     public BossBarColor getColor() {
         return this.color;
     }
