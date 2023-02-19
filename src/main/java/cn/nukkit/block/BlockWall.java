@@ -3,7 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
-import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 
 /**
  * @author MagicDroidX
@@ -77,7 +77,7 @@ public class BlockWall extends BlockTransparentMeta {
             s = 0.6875;
         }
 
-        return new AxisAlignedBB(
+        return new SimpleAxisAlignedBB(
                 this.x + w,
                 this.y,
                 this.z + n,

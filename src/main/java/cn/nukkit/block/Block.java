@@ -31,7 +31,7 @@ import java.util.function.Predicate;
  * @author MagicDroidX
  * Nukkit Project
  */
-public abstract class Block extends Position implements Metadatable, Cloneable, BlockID {
+public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
 
     public static final int MAX_BLOCK_ID = 600;
     public static final int DATA_BITS = 6;
@@ -56,7 +56,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     protected Block() {}
 
-    @SuppressWarnings("unchecked")
     public static void init() {
         if (list == null) {
             list = new Class[MAX_BLOCK_ID];
@@ -1069,7 +1068,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     protected AxisAlignedBB recalculateBoundingBox() {
-        return new AxisAlignedBB(this.x, this.y, this.z, this.x + 1.0D, this.y + 1.0D, this.z + 1.0D);
+        return this;
+        //return new AxisAlignedBB(this.x, this.y, this.z, this.x + 1.0D, this.y + 1.0D, this.z + 1.0D);
     }
 
     public double getMinX() {

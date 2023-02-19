@@ -1,36 +1,10 @@
 package cn.nukkit.math;
 
-import cn.nukkit.Server;
 import cn.nukkit.level.MovingObjectPosition;
 
-public class AxisAlignedBB implements Cloneable {
+public interface AxisAlignedBB extends Cloneable {
 
-    public double minX;
-    public double minY;
-    public double minZ;
-    public double maxX;
-    public double maxY;
-    public double maxZ;
-
-    public AxisAlignedBB(double paramDouble1, double paramDouble2, double paramDouble3, double paramDouble4, double paramDouble5, double paramDouble6) {
-        this.minX = paramDouble1;
-        this.minY = paramDouble2;
-        this.minZ = paramDouble3;
-        this.maxX = paramDouble4;
-        this.maxY = paramDouble5;
-        this.maxZ = paramDouble6;
-    }
-
-    public AxisAlignedBB(Vector3 paramVector31, Vector3 paramVector32) {
-        this.minX = Math.min(paramVector31.x, paramVector32.x);
-        this.minY = Math.min(paramVector31.y, paramVector32.y);
-        this.minZ = Math.min(paramVector31.z, paramVector32.z);
-        this.maxX = Math.max(paramVector31.x, paramVector32.x);
-        this.maxY = Math.max(paramVector31.y, paramVector32.y);
-        this.maxZ = Math.max(paramVector31.z, paramVector32.z);
-    }
-
-    public AxisAlignedBB setBounds(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+    default AxisAlignedBB setBounds(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
         this.setMinX(minX);
         this.setMinY(minY);
         this.setMinZ(minZ);
@@ -40,7 +14,7 @@ public class AxisAlignedBB implements Cloneable {
         return this;
     }
 
-    public AxisAlignedBB addCoord(double x, double y, double z) {
+    default AxisAlignedBB addCoord(double x, double y, double z) {
         double minX = this.getMinX();
         double minY = this.getMinY();
         double minZ = this.getMinZ();
@@ -57,18 +31,20 @@ public class AxisAlignedBB implements Cloneable {
         if (z < 0) minZ += z;
         if (z > 0) maxZ += z;
 
-        return new AxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);
+        return new SimpleAxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
-    public AxisAlignedBB grow(double x, double y, double z) {
-        return new AxisAlignedBB(this.getMinX() - x, this.getMinY() - y, this.getMinZ() - z, this.getMaxX() + x, this.getMaxY() + y, this.getMaxZ() + z);
+    default AxisAlignedBB grow(double x, double y, double z) {
+        return new SimpleAxisAlignedBB(this.getMinX() - x, this.getMinY() - y, this.getMinZ() - z, this.getMaxX() + x, this.getMaxY() + y, this.getMaxZ() + z);
     }
 
-    public AxisAlignedBB growNoUp(double x, double y, double z) {
-        return new AxisAlignedBB(this.getMinX() - x, this.getMinY() - y, this.getMinZ() - z, this.getMaxX() + x, this.getMaxY(), this.getMaxZ() + z);
+    default AxisAlignedBB growNoUp(double x, double y, double z) {
+        return new SimpleAxisAlignedBB(this.getMinX() - x, this.getMinY() - y, this.getMinZ() - z, this.getMaxX() + x, this.getMaxY(), this.getMaxZ() + z);
     }
 
-    public AxisAlignedBB expand(double x, double y, double z)  {
+    default AxisAlignedBB expand(double x, double y, double z)
+
+    {
         this.setMinX(this.getMinX() - x);
         this.setMinY(this.getMinY() - y);
         this.setMinZ(this.getMinZ() - z);
@@ -79,7 +55,7 @@ public class AxisAlignedBB implements Cloneable {
         return this;
     }
 
-    public AxisAlignedBB offset(double x, double y, double z) {
+    default AxisAlignedBB offset(double x, double y, double z) {
         this.setMinX(this.getMinX() + x);
         this.setMinY(this.getMinY() + y);
         this.setMinZ(this.getMinZ() + z);
@@ -90,11 +66,11 @@ public class AxisAlignedBB implements Cloneable {
         return this;
     }
 
-    public AxisAlignedBB shrink(double x, double y, double z) {
-        return new AxisAlignedBB(this.getMinX() + x, this.getMinY() + y, this.getMinZ() + z, this.getMaxX() - x, this.getMaxY() - y, this.getMaxZ() - z);
+    default AxisAlignedBB shrink(double x, double y, double z) {
+        return new SimpleAxisAlignedBB(this.getMinX() + x, this.getMinY() + y, this.getMinZ() + z, this.getMaxX() - x, this.getMaxY() - y, this.getMaxZ() - z);
     }
 
-    public AxisAlignedBB contract(double x, double y, double z) {
+    default AxisAlignedBB contract(double x, double y, double z) {
         this.setMinX(this.getMinX() + x);
         this.setMinY(this.getMinY() + y);
         this.setMinZ(this.getMinZ() + z);
@@ -105,7 +81,7 @@ public class AxisAlignedBB implements Cloneable {
         return this;
     }
 
-    public AxisAlignedBB setBB(AxisAlignedBB bb) {
+    default AxisAlignedBB setBB(AxisAlignedBB bb) {
         this.setMinX(bb.getMinX());
         this.setMinY(bb.getMinY());
         this.setMinZ(bb.getMinZ());
@@ -115,15 +91,11 @@ public class AxisAlignedBB implements Cloneable {
         return this;
     }
 
-    public AxisAlignedBB getOffsetBoundingBox(BlockFace face, double x, double y, double z) {
-        return getOffsetBoundingBox(face.getXOffset() * x, face.getYOffset() * y, face.getZOffset() * z);
+    default AxisAlignedBB getOffsetBoundingBox(double x, double y, double z) {
+        return new SimpleAxisAlignedBB(this.getMinX() + x, this.getMinY() + y, this.getMinZ() + z, this.getMaxX() + x, this.getMaxY() + y, this.getMaxZ() + z);
     }
 
-    public AxisAlignedBB getOffsetBoundingBox(double x, double y, double z) {
-        return new AxisAlignedBB(this.getMinX() + x, this.getMinY() + y, this.getMinZ() + z, this.getMaxX() + x, this.getMaxY() + y, this.getMaxZ() + z);
-    }
-
-    public double calculateXOffset(AxisAlignedBB bb, double x) {
+    default double calculateXOffset(AxisAlignedBB bb, double x) {
         if (bb.getMaxY() <= this.getMinY() || bb.getMinY() >= this.getMaxY()) {
             return x;
         }
@@ -146,7 +118,7 @@ public class AxisAlignedBB implements Cloneable {
         return x;
     }
 
-    public double calculateYOffset(AxisAlignedBB bb, double y) {
+    default double calculateYOffset(AxisAlignedBB bb, double y) {
         if (bb.getMaxX() <= this.getMinX() || bb.getMinX() >= this.getMaxX()) {
             return y;
         }
@@ -169,7 +141,7 @@ public class AxisAlignedBB implements Cloneable {
         return y;
     }
 
-    public double calculateZOffset(AxisAlignedBB bb, double z) {
+    default double calculateZOffset(AxisAlignedBB bb, double z) {
         if (bb.getMaxX() <= this.getMinX() || bb.getMinX() >= this.getMaxX()) {
             return z;
         }
@@ -192,7 +164,7 @@ public class AxisAlignedBB implements Cloneable {
         return z;
     }
 
-    public boolean intersectsWith(AxisAlignedBB bb) {
+    default boolean intersectsWith(AxisAlignedBB bb) {
         if (bb.getMaxY() > this.getMinY() && bb.getMinY() < this.getMaxY()) {
             if (bb.getMaxX() > this.getMinX() && bb.getMinX() < this.getMaxX()) {
                 return bb.getMaxZ() > this.getMinZ() && bb.getMinZ() < this.getMaxZ();
@@ -202,28 +174,28 @@ public class AxisAlignedBB implements Cloneable {
         return false;
     }
 
-    public boolean isVectorInside(Vector3 vector) {
+    default boolean isVectorInside(Vector3 vector) {
         return vector.x >= this.getMinX() && vector.x <= this.getMaxX() && vector.y >= this.getMinY() && vector.y <= this.getMaxY() && vector.z >= this.getMinZ() && vector.z <= this.getMaxZ();
 
     }
 
-    public double getAverageEdgeLength() {
+    default double getAverageEdgeLength() {
         return (this.getMaxX() - this.getMinX() + this.getMaxY() - this.getMinY() + this.getMaxZ() - this.getMinZ()) / 3;
     }
 
-    public boolean isVectorInYZ(Vector3 vector) {
+    default boolean isVectorInYZ(Vector3 vector) {
         return vector.y >= this.getMinY() && vector.y <= this.getMaxY() && vector.z >= this.getMinZ() && vector.z <= this.getMaxZ();
     }
 
-    public boolean isVectorInXZ(Vector3 vector) {
+    default boolean isVectorInXZ(Vector3 vector) {
         return vector.x >= this.getMinX() && vector.x <= this.getMaxX() && vector.z >= this.getMinZ() && vector.z <= this.getMaxZ();
     }
 
-    public boolean isVectorInXY(Vector3 vector) {
+    default boolean isVectorInXY(Vector3 vector) {
         return vector.x >= this.getMinX() && vector.x <= this.getMaxX() && vector.y >= this.getMinY() && vector.y <= this.getMaxY();
     }
 
-    public MovingObjectPosition calculateIntercept(Vector3 pos1, Vector3 pos2) {
+    default MovingObjectPosition calculateIntercept(Vector3 pos1, Vector3 pos2) {
         Vector3 v1 = pos1.getIntermediateWithXValue(pos2, this.getMinX());
         Vector3 v2 = pos1.getIntermediateWithXValue(pos2, this.getMaxX());
         Vector3 v3 = pos1.getIntermediateWithYValue(pos2, this.getMinY());
@@ -305,65 +277,41 @@ public class AxisAlignedBB implements Cloneable {
         return MovingObjectPosition.fromBlock(0, 0, 0, face, vector);
     }
 
-    public void setMinX(double minX) {
-        this.minX = minX;
+    default void setMinX(double minX) {
+        throw new UnsupportedOperationException("Not mutable");
     }
 
-    public void setMinY(double minY) {
-        this.minY = minY;
+    default void setMinY(double minY) {
+        throw new UnsupportedOperationException("Not mutable");
     }
 
-    public void setMinZ(double minZ) {
-        this.minZ = minZ;
+    default void setMinZ(double minZ) {
+        throw new UnsupportedOperationException("Not mutable");
     }
 
-    public void setMaxX(double maxX) {
-        this.maxX = maxX;
+    default void setMaxX(double maxX) {
+        throw new UnsupportedOperationException("Not mutable");
     }
 
-    public void setMaxY(double maxY) {
-        this.maxY = maxY;
+    default void setMaxY(double maxY) {
+        throw new UnsupportedOperationException("Not mutable");
     }
 
-    public void setMaxZ(double maxZ) {
-        this.maxZ = maxZ;
+    default void setMaxZ(double maxZ) {
+        throw new UnsupportedOperationException("Not mutable");
     }
 
 
-    public double getMinX() {
-        return this.minX;
-    }
+    double getMinX();
+    double getMinY();
+    double getMinZ();
+    double getMaxX();
+    double getMaxY();
+    double getMaxZ();
 
-    public double getMinY() {
-        return this.minY;
-    }
+    AxisAlignedBB clone();
 
-    public double getMinZ() {
-        return this.minZ;
-    }
-
-    public double getMaxX() {
-        return this.maxX;
-    }
-
-    public double getMaxY() {
-        return this.maxY;
-    }
-
-    public double getMaxZ() {
-        return this.maxZ;
-    }
-
-    public AxisAlignedBB clone() {
-        try {
-            return (AxisAlignedBB) super.clone();
-        } catch (CloneNotSupportedException cloneNotSupportedException) {
-            Server.getInstance().getLogger().logException(cloneNotSupportedException);
-            return null;
-        }
-    }
-
-    public void forEach(BBConsumer action) {
+    default void forEach(BBConsumer action) {
         int minX = NukkitMath.floorDouble(this.getMinX());
         int minY = NukkitMath.floorDouble(this.getMinY());
         int minZ = NukkitMath.floorDouble(this.getMinZ());
@@ -382,7 +330,7 @@ public class AxisAlignedBB implements Cloneable {
     }
 
 
-    public interface BBConsumer<T> {
+    interface BBConsumer<T> {
 
         void accept(int x, int y, int z);
 

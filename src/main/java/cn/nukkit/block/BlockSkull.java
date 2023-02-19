@@ -8,6 +8,7 @@ import cn.nukkit.item.ItemSkull;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
@@ -152,7 +153,7 @@ public class BlockSkull extends BlockTransparentMeta implements Faceable {
 
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
-        AxisAlignedBB bb = new AxisAlignedBB(this.x + 0.25, this.y, this.z + 0.25, this.x + 1 - 0.25, this.y + 0.5, this.z + 1 - 0.25);
+        AxisAlignedBB bb = new SimpleAxisAlignedBB(this.x + 0.25, this.y, this.z + 0.25, this.x + 1 - 0.25, this.y + 0.5, this.z + 1 - 0.25);
         switch (this.getBlockFace()) {
             case NORTH:
                 return bb.offset(0, 0.25, 0.25);
