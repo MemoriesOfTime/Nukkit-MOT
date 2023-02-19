@@ -16,8 +16,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 /**
  * 主要处理服务器广播数据包
@@ -31,6 +30,11 @@ public class BatchingHelper {
         ThreadFactoryBuilder builder = new ThreadFactoryBuilder();
         builder.setNameFormat("Batching Executor");
         this.threadedExecutor = Executors.newSingleThreadExecutor(builder.build());
+        //this.threadedExecutor = new ThreadPoolExecutor(
+        //        1, 100, 100L, TimeUnit.MILLISECONDS,
+        //        new LinkedBlockingDeque<>(),
+        //        builder.build(),
+        //        new ThreadPoolExecutor.DiscardOldestPolicy());
     }
 
     public void batchPackets(Player[] players, DataPacket[] packets) {
@@ -41,13 +45,13 @@ public class BatchingHelper {
 
     private void batchAndSendPackets(Player[] players, DataPacket[] packets) {
         //只有一个玩家时直接发送
-        if (players.length == 1) {
-            for (DataPacket packet : packets) {
-                packet.protocol = players[0].protocol;
-                players[0].getNetworkSession().sendPacket(packet);
-            }
-            return;
-        }
+        //if (players.length == 1) {
+        //    for (DataPacket packet : packets) {
+        //        packet.protocol = players[0].protocol;
+        //        players[0].getNetworkSession().sendPacket(packet);
+        //    }
+        //    return;
+        //}
 
         Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
         for (Player player : players) {
