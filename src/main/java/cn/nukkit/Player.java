@@ -2552,6 +2552,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     this.loginChainData = ClientChainData.read(loginPacket);
 
+                    // 修复1.19.62皮肤修改问题
+                    if (this.protocol == ProtocolInfo.v1_19_60 && !"1.19.60".equals(this.loginChainData.getGameVersion())) {
+                        this.protocol = ProtocolInfo.v1_19_62;
+                    }
+
                     if (!loginChainData.isXboxAuthed() && server.xboxAuth) {
                         this.close("", "disconnectionScreen.notAuthenticated");
                         if (server.banXBAuthFailed) {

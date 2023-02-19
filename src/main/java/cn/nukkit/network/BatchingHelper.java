@@ -16,7 +16,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * 主要处理服务器广播数据包
@@ -45,13 +46,14 @@ public class BatchingHelper {
 
     private void batchAndSendPackets(Player[] players, DataPacket[] packets) {
         //只有一个玩家时直接发送
-        //if (players.length == 1) {
-        //    for (DataPacket packet : packets) {
-        //        packet.protocol = players[0].protocol;
-        //        players[0].getNetworkSession().sendPacket(packet);
-        //    }
-        //    return;
-        //}
+        //未知原因 注释掉会导致客户端容易闪退
+        if (players.length == 1) {
+            for (DataPacket packet : packets) {
+                packet.protocol = players[0].protocol;
+                players[0].getNetworkSession().sendPacket(packet);
+           }
+           return;
+        }
 
         Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
         for (Player player : players) {
@@ -108,15 +110,15 @@ public class BatchingHelper {
                 } else {
                     pk.payload = Zlib.deflate(bytes, Server.getInstance().networkCompressionLevel);
                 }
-                for (Player pl : finalTargets) {
-                    CompressionProvider compressionProvider = pl.getNetworkSession().getCompression();
+                for (Player player : finalTargets) {
+                    CompressionProvider compressionProvider = player.getNetworkSession().getCompression();
                     if (compressionProvider == CompressionProvider.NONE) {
                         BatchPacket batchPacket = new BatchPacket();
                         batchPacket.payload = bytes;
-                        pl.dataPacket(batchPacket);
-                        continue;
+                        player.dataPacket(batchPacket);
+                    }else {
+                        player.dataPacket(pk);
                     }
-                    pl.dataPacket(pk);
                 }
             } catch (Exception e) {
                 throw new RuntimeException(e);

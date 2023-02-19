@@ -62,7 +62,7 @@ public class ResourcePackStackPacket extends DataPacket {
                     this.putString(experimentData.getName());
                     this.putBoolean(experimentData.isEnabled());
                 }
-                this.putBoolean(false); // Were experiments previously toggled
+                this.putBoolean(!this.experiments.isEmpty()); // Were experiments previously toggled
             }
         }
     }

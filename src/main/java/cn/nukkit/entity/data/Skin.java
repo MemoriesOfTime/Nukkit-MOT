@@ -64,6 +64,7 @@ public class Skin {
     private String armSize = "wide";
     private boolean trusted = true;
     private String geometryDataEngineVersion = "";
+    private boolean overridingPlayerAppearance = true;
 
     public boolean isValid() {
         return isValidSkin() && isValidResourcePatch();
@@ -323,6 +324,14 @@ public class Skin {
             this.playFabId = this.fullSkinId.replace("-", "").substring(16);
         }
         return this.playFabId;
+    }
+
+    public void setOverridingPlayerAppearance(boolean override) {
+        this.overridingPlayerAppearance = override;
+    }
+
+    public boolean isOverridingPlayerAppearance() {
+        return this.overridingPlayerAppearance;
     }
 
     private static SerializedImage parseBufferedImage(BufferedImage image) {
