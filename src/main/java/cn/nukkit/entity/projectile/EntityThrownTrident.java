@@ -140,7 +140,7 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
             }
         }
         EntityThrownTrident newTrident = (EntityThrownTrident) Entity.createEntity("ThrownTrident", this);
-        if (this.getServer().suomiCraftPEMode()) {
+        if (this.getServer().lowProfileServer()) {
             newTrident.namedTag = this.namedTag.clone();
         }
         newTrident.alreadyCollided = true;

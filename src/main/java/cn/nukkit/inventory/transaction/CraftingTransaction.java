@@ -53,7 +53,7 @@ public class CraftingTransaction extends InventoryTransaction {
             }
             inputs.add(item.clone());
         } else {
-            if (!Server.getInstance().suomiCraftPEMode()) throw new RuntimeException("Input list is full can't add " + item);
+            if (!Server.getInstance().lowProfileServer()) throw new RuntimeException("Input list is full can't add " + item);
         }
     }
 
@@ -65,7 +65,7 @@ public class CraftingTransaction extends InventoryTransaction {
         if (secondaryOutputs.size() < gridSize * gridSize) {
             secondaryOutputs.add(item.clone());
         } else {
-            if (!Server.getInstance().suomiCraftPEMode()) throw new RuntimeException("Output list is full can't add " + item);
+            if (!Server.getInstance().lowProfileServer()) throw new RuntimeException("Output list is full can't add " + item);
         }
     }
 
@@ -77,7 +77,7 @@ public class CraftingTransaction extends InventoryTransaction {
         if (primaryOutput == null) {
             primaryOutput = item.clone();
         } else if (!primaryOutput.equals(item)) {
-            if (!Server.getInstance().suomiCraftPEMode()) throw new RuntimeException("Primary result item has already been set and does not match the current item (expected " + primaryOutput + ", got " + item + ')');
+            if (!Server.getInstance().lowProfileServer()) throw new RuntimeException("Primary result item has already been set and does not match the current item (expected " + primaryOutput + ", got " + item + ')');
         }
     }
 

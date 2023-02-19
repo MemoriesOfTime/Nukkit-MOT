@@ -236,9 +236,9 @@ public class Server {
      */
     public String whitelistReason;
     /**
-     * SuomiCraft PE optimizations enabled.
+     * optimizations server enabled.
      */
-    public boolean suomicraftMode;
+    public boolean lowProfileServer;
     /**
      * Mob AI enabled.
      */
@@ -503,7 +503,9 @@ public class Server {
         log.info("Loading server properties...");
         this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ServerProperties());
 
-        if (!this.getPropertyBoolean("ansi-title", true)) Nukkit.TITLE = false;
+        if (!this.getPropertyBoolean("ansi-title", true)) {
+            Nukkit.TITLE = false;
+        }
 
         int debugLvl = NukkitMath.clamp(this.getPropertyInt("debug-level", 1), 1, 3);
         if (debug && debugLvl < 2) {
@@ -892,7 +894,7 @@ public class Server {
 
     public boolean dispatchCommand(CommandSender sender, String commandLine) throws ServerException {
         // First we need to check if this command is on the main thread or not, if not, warn the user
-        if (!this.isPrimaryThread() && !this.suomiCraftPEMode()) {
+        if (!this.isPrimaryThread()) {
             getLogger().warning("Command Dispatched Async: " + commandLine);
         }
         if (sender == null) {
@@ -2900,12 +2902,12 @@ public class Server {
     }
 
     /**
-     * SuomiCraft PE mode tweaks some stuff to work better on SuomiCraft PE server.
+     * 低配服务器模式
      *
-     * @return SuomiCraft PE mode enabled
+     * @return 默认关闭
      */
-    public boolean suomiCraftPEMode() {
-        return suomicraftMode;
+    public boolean lowProfileServer() {
+        return lowProfileServer;
     }
 
     /**
@@ -2928,7 +2930,8 @@ public class Server {
         this.autoTickRateLimit = this.getPropertyInt("auto-tick-rate-limit", 20);
         this.alwaysTickPlayers = this.getPropertyBoolean("always-tick-players", false);
         this.baseTickRate = this.getPropertyInt("base-tick-rate", 1);
-        this.suomicraftMode = this.getPropertyBoolean("suomicraft-mode", false);
+        // 低配服务器模式（会减少多场景下如：下雪，火焰等等...）
+        this.lowProfileServer = this.getPropertyBoolean("low-profile-server-mode", false);
         this.callDataPkSendEv = this.getPropertyBoolean("call-data-pk-send-event", true);
         this.callBatchPkEv = this.getPropertyBoolean("call-batch-pk-send-event", true);
         this.doLevelGC = this.getPropertyBoolean("do-level-gc", true);
@@ -3108,7 +3111,8 @@ public class Server {
             put("suomicraft-mode", false);
             put("do-not-tick-worlds", "");
             put("load-all-worlds", true);
-            put("ansi-title", true);
+            // 用ide软件时后台会频繁显示 : (
+            put("ansi-title", false);
             put("worlds-entity-spawning-disabled", "");
             put("block-listener", true);
             put("allow-flight", false);

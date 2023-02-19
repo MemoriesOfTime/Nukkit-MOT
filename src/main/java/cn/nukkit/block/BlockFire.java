@@ -98,7 +98,7 @@ public class BlockFire extends BlockFlowable {
         if (type == Level.BLOCK_UPDATE_NORMAL || type == Level.BLOCK_UPDATE_RANDOM) {
             if (!this.isBlockTopFacingSurfaceSolid(this.down()) && !this.canNeighborBurn()) {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
-            } else if (!Server.getInstance().suomiCraftPEMode() && this.level.gameRules.getBoolean(GameRule.DO_FIRE_TICK) && !level.isUpdateScheduled(this, this)) {
+            } else if (!Server.getInstance().lowProfileServer() && this.level.gameRules.getBoolean(GameRule.DO_FIRE_TICK) && !level.isUpdateScheduled(this, this)) {
                 level.scheduleUpdate(this, tickRate());
             }
 
@@ -107,19 +107,20 @@ public class BlockFire extends BlockFlowable {
             Block down = this.down();
             boolean forever = down.getId() == NETHERRACK || down.getId() == MAGMA || (down.getId() == BEDROCK && level.getDimension() == Level.DIMENSION_THE_END);
 
-            if (!forever && this.getLevel().isRaining() &&
-                    (this.getLevel().canBlockSeeSky(this) ||
-                            this.getLevel().canBlockSeeSky(this.east()) ||
-                            this.getLevel().canBlockSeeSky(this.west()) ||
-                            this.getLevel().canBlockSeeSky(this.south()) ||
-                            this.getLevel().canBlockSeeSky(this.north()))
-                    ) {
+            boolean canBlockSeeSky = this.getLevel().canBlockSeeSky(this) ||
+                    this.getLevel().canBlockSeeSky(this.east()) ||
+                    this.getLevel().canBlockSeeSky(this.west()) ||
+                    this.getLevel().canBlockSeeSky(this.south()) ||
+                    this.getLevel().canBlockSeeSky(this.north());
 
+            if (!forever && this.getLevel().isRaining() && canBlockSeeSky) {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
             }
 
-            if (Server.getInstance().suomiCraftPEMode()) {
-                if (forever) return 0;
+            if (Server.getInstance().lowProfileServer()) {
+                if (forever) {
+                    return 0;
+                }
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
                 return 0;
             }
@@ -133,7 +134,9 @@ public class BlockFire extends BlockFlowable {
 
             if (meta < 15) {
                 int newMeta = meta + Utils.random.nextInt(3);
-                if (newMeta > 15) newMeta = 15;
+                if (newMeta > 15) {
+                    newMeta = 15;
+                }
                 this.setDamage(newMeta);
                 this.getLevel().setBlock(this, this, true);
             }
@@ -268,7 +271,9 @@ public class BlockFire extends BlockFlowable {
                     return true;
                 } else if (block instanceof BlockSlab && (block.getDamage() & 8) == 8) {
                     return true;
-                } else return block instanceof BlockSnowLayer && (block.getDamage() & 7) == 7;
+                } else {
+                    return block instanceof BlockSnowLayer && (block.getDamage() & 7) == 7;
+                }
             }
         }
 

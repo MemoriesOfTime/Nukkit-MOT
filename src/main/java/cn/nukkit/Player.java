@@ -2445,7 +2445,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.setCheckMovement(false);
             }
 
-            if (this.isOp() || this.hasPermission("nukkit.textcolor") || this.server.suomiCraftPEMode()) {
+            if (this.isOp() || this.hasPermission("nukkit.textcolor") || this.server.lowProfileServer()) {
                 this.setRemoveFormat(false);
             }
 

@@ -45,7 +45,7 @@ public class DummyBossBar {
 
         public Builder(Player player) {
             this.player = player;
-            if (Server.getInstance().suomiCraftPEMode()) {
+            if (Server.getInstance().lowProfileServer()) {
                 this.bossBarId = 1095216660480L; // This is hack to get one thing work
             } else {
                 this.bossBarId = 1095216660480L + Utils.random.nextLong(0, 0x7fffffffL);

@@ -27,7 +27,7 @@ public class WorldCommand extends Command {
             return true;
         }
         
-        if (args.length == 0 && !Server.getInstance().suomiCraftPEMode()) {
+        if (args.length == 0 && !Server.getInstance().lowProfileServer()) {
             sender.sendMessage("Available worlds:");
             for (Level level : Server.getInstance().getLevels().values()) {
                 sender.sendMessage(level.getName());

@@ -113,7 +113,7 @@ public abstract class DefaultPermissions {
         registerPermission(new Permission("nukkit.command.xp", "Allows the user to give experience", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.transferserver", "Allows the user to transfer to other server", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.summon", "Allows the user to summon entities", Permission.DEFAULT_OP), commands);
-        registerPermission(new Permission("nukkit.command.world", "Allows the user to switch world", Server.getInstance().suomiCraftPEMode() ? Permission.DEFAULT_TRUE : Permission.DEFAULT_OP), commands);
+        registerPermission(new Permission("nukkit.command.world", "Allows the user to switch world", Server.getInstance().lowProfileServer() ? Permission.DEFAULT_TRUE : Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.world.others", "Allows the user to switch world for other players", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.generateworld", "Allows the user to generate new world", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.seed", "Allows the user to see world's seed", Permission.DEFAULT_OP), commands);

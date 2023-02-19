@@ -114,8 +114,8 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.LEAVES2] = true;
         randomTickBlocks[Block.SNOW_LAYER] = true;
         randomTickBlocks[Block.ICE] = true;
-        if (!Server.getInstance().suomiCraftPEMode()) randomTickBlocks[Block.LAVA] = true;
-        if (!Server.getInstance().suomiCraftPEMode()) randomTickBlocks[Block.STILL_LAVA] = true;
+        if (!Server.getInstance().lowProfileServer()) randomTickBlocks[Block.LAVA] = true;
+        if (!Server.getInstance().lowProfileServer()) randomTickBlocks[Block.STILL_LAVA] = true;
         randomTickBlocks[Block.CACTUS] = true;
         randomTickBlocks[Block.BEETROOT_BLOCK] = true;
         randomTickBlocks[Block.CARROT_BLOCK] = true;
@@ -125,7 +125,7 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.WHEAT_BLOCK] = true;
         randomTickBlocks[Block.SUGARCANE_BLOCK] = true;
         randomTickBlocks[Block.NETHER_WART_BLOCK] = true;
-        if (!Server.getInstance().suomiCraftPEMode()) randomTickBlocks[Block.FIRE] = true;
+        if (!Server.getInstance().lowProfileServer()) randomTickBlocks[Block.FIRE] = true;
         randomTickBlocks[Block.GLOWING_REDSTONE_ORE] = true;
         randomTickBlocks[Block.COCOA_BLOCK] = true;
         randomTickBlocks[Block.ICE_FROSTED] = true;
@@ -2235,7 +2235,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public void dropExpOrb(Vector3 source, int exp, Vector3 motion, int delay) {
         Random rand = ThreadLocalRandom.current();
-        if (server.suomiCraftPEMode()) {
+        if (server.lowProfileServer()) {
             CompoundTag nbt = Entity.getDefaultNBT(source, motion == null ? new Vector3(
                             (rand.nextDouble() * 0.2 - 0.1) * 2,
                             rand.nextDouble() * 0.4,
@@ -3544,7 +3544,7 @@ public class Level implements ChunkManager, Metadatable {
     public boolean isSpawnChunk(int X, int Z) {
         Vector3 spawn = this.getSpawnLocation();
 
-        if (this.server.suomiCraftPEMode() && !this.randomTickingEnabled()) {
+        if (this.server.lowProfileServer() && !this.randomTickingEnabled()) {
             if (this.equals(this.getServer().getDefaultLevel())) {
                 return Math.abs(X - (spawn.getFloorX() >> 4)) <= 9 && Math.abs(Z - (spawn.getFloorZ() >> 4)) <= 9;
             }
