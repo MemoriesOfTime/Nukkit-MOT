@@ -58,7 +58,7 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
 
         // fix look at
         Optional.ofNullable(this.updateMove(tickDiff))
-                .ifPresent(super::lookAt);
+                .ifPresent(this::lookAt);
         return true;
     }
 
