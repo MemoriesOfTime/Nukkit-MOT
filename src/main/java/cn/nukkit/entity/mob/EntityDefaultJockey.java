@@ -41,12 +41,12 @@ public class EntityDefaultJockey extends EntityWalkingMob {
 
     @Override
     public float getHeight() {
-        return 0.95F;
+        return 0.8F;
     }
 
     @Override
     public float getWidth() {
-        return 0.3F;
+        return 0.6F;
     }
 
     @Override
