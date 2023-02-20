@@ -8,6 +8,9 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 
+import java.util.Objects;
+import java.util.Optional;
+
 public abstract class EntityJumpingMob extends EntityJumping implements EntityMob {
 
     protected int[] minDamage;
@@ -150,11 +153,13 @@ public abstract class EntityJumpingMob extends EntityJumping implements EntityMo
         this.entityBaseTick(tickDiff);
 
         Vector3 target = this.updateMove(tickDiff);
-        if (this.getServer().getMobAiEnabled() && target instanceof Entity) {
-            Entity entity = (Entity) target;
-            if (!entity.closed && (target != this.followTarget || this.canAttack)) {
-                this.attackEntity(entity);
-            }
+        if (Objects.nonNull(target)) {
+            Optional.ofNullable(getAttackTarget(target))
+                    .ifPresent(entity -> {
+                        if (this.canAttack) {
+                            this.attackEntity(entity);
+                        }
+                    });
         }
         return true;
     }

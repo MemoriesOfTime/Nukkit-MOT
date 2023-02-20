@@ -150,7 +150,7 @@ public abstract class EntityFlyingMob extends EntityFlying implements EntityMob 
         this.entityBaseTick(tickDiff);
 
         Vector3 target = this.updateMove(tickDiff);
-        if (this.getServer().getMobAiEnabled() && target instanceof Entity) {
+        if (target instanceof Entity && this.isMovement()) {
             Entity entity = (Entity) target;
             if (!entity.closed && (target != this.followTarget || this.canAttack)) {
                 this.attackEntity(entity);

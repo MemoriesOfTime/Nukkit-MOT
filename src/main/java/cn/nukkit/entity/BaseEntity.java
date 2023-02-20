@@ -192,11 +192,15 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.startTiming();
+        if (Timings.entityBaseTickTimer != null) {
+            Timings.entityBaseTickTimer.startTiming();
+        }
 
         if (this.canDespawn() && this.age > Server.getInstance().mobDespawnTicks && !this.hasCustomName() && !(this instanceof EntityBoss)) {
             this.close();
-            if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.stopTiming();
+            if (Timings.entityBaseTickTimer != null) {
+                Timings.entityBaseTickTimer.stopTiming();
+            }
             return true;
         }
 
@@ -223,11 +227,13 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                     }
                 }
             }
-        }else if (isInLoveCooldown()) {
+        } else if (isInLoveCooldown()) {
             this.inLoveCooldown -= tickDiff;
         }
 
-        if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.stopTiming();
+        if (Timings.entityBaseTickTimer != null) {
+            Timings.entityBaseTickTimer.stopTiming();
+        }
 
         return hasUpdate;
     }
@@ -296,14 +302,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     @Override
-    public boolean setMotion(Vector3 motion) {
-        if (this.getServer().getMobAiEnabled()) {
-            super.setMotion(motion);
-        }
-        return false;
-    }
-
-    @Override
     public boolean move(double dx, double dy, double dz) {
         if (dy < -10 || dy > 10) {
             if (!(this instanceof EntityFlyingMob)) {
@@ -316,7 +314,9 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             return false;
         }
 
-        if (Timings.entityMoveTimer != null) Timings.entityMoveTimer.startTiming();
+        if (Timings.entityMoveTimer != null) {
+            Timings.entityMoveTimer.startTiming();
+        }
 
         this.blocksAround = null;
 
@@ -347,7 +347,9 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.checkGroundState(movX, movY, movZ, dx, dy, dz);
         this.updateFallState(this.onGround);
 
-        if (Timings.entityMoveTimer != null) Timings.entityMoveTimer.stopTiming();
+        if (Timings.entityMoveTimer != null) {
+            Timings.entityMoveTimer.stopTiming();
+        }
         return true;
     }
 
@@ -373,7 +375,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         if (inLove && !this.isBaby()) {
             this.inLoveTicks = 600;
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, true);
-        }else {
+        } else {
             this.inLoveTicks = 0;
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, false);
         }
@@ -439,6 +441,8 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                     }
                 }
                 break;
+            default:
+                break;
         }
 
         slots[0] = helmet;
@@ -484,6 +488,8 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                             this.addHealth(3);
                         }
                     }
+                    break;
+                default:
                     break;
             }
         }
@@ -532,6 +538,8 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                         }
                     }
                     break;
+                default:
+                    break;
             }
         }
 
@@ -578,6 +586,8 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                             this.addHealth(2);
                         }
                     }
+                    break;
+                default:
                     break;
             }
         }
@@ -644,12 +654,15 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     /**
      * Get armor defense points for item
+     *
      * @param item item id
      * @return defense points
      */
     protected float getArmorPoints(int item) {
         Float points = ARMOR_POINTS.get(item);
-        if (points == null) return 0;
+        if (points == null) {
+            return 0;
+        }
         return points;
     }
 
@@ -662,4 +675,55 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         pk.event = EntityEventPacket.ARM_SWING;
         Server.broadcastPacket(this.getViewers().values(), pk);
     }
+
+    /**
+     * 满足攻击目标条件
+     *
+     * @return 是否满足
+     */
+    public boolean isMeetAttackConditions(Vector3 target) {
+        return this.getServer().getMobAiEnabled() && target instanceof Entity;
+    }
+
+    /**
+     * 获取攻击目标
+     *
+     * @param target 目标
+     * @return 有可能为空指针
+     */
+    protected Entity getAttackTarget(Vector3 target) {
+        if (isMeetAttackConditions(target)) {
+            Entity entity = (Entity) target;
+            if (!entity.isClosed() && target != this.followTarget) {
+                return entity;
+            }
+        }
+        return null;
+    }
+
+    protected void lookAt(Vector3 target) {
+        double dx = this.x - target.x;
+        double dy = this.y - target.y;
+        double dz = this.z - target.z;
+        double yaw = Math.asin(dx / Math.sqrt(dx * dx + dz * dz)) / Math.PI * 180.0d;
+        double asin = Math.asin(dy / Math.sqrt(dx * dx + dz * dz + dy * dy)) / Math.PI * 180.0d;
+        long pitch = Math.round(asin);
+        if (dz > 0.0d) {
+            yaw = -yaw + 180.0d;
+        }
+        this.setRotation(yaw, pitch);
+    }
+
+    protected EntityHuman getNearbyHuman() {
+        AxisAlignedBB bb = this.boundingBox.clone().expand(2.5, 2.5, 2.5);
+        EntityHuman human = null;
+        for (Entity collidingEntity : this.level.getCollidingEntities(bb)) {
+            if (collidingEntity instanceof EntityHuman) {
+                human = (EntityHuman) collidingEntity;
+                break;
+            }
+        }
+        return human;
+    }
+
 }

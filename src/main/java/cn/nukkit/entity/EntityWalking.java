@@ -105,7 +105,8 @@ public abstract class EntityWalking extends BaseEntity {
         Block block = that.getSide(this.getHorizontalFacing());
         Block down = block.down();
         if (!down.isSolid() && !block.isSolid() && !down.down().isSolid()) {
-            this.stayTime = 10; // "hack": try to make mobs not to be so suicidal
+            // "hack": try to make mobs not to be so suicidal
+            this.stayTime = 10;
         } else if (!block.canPassThrough() && block.up().canPassThrough() && that.up(2).canPassThrough()) {
             if (block instanceof BlockFence || block instanceof BlockFenceGate) {
                 this.motionY = this.getGravity();
@@ -135,8 +136,12 @@ public abstract class EntityWalking extends BaseEntity {
             Block levelBlock = getLevelBlock();
             boolean inWater = levelBlock.getId() == 8 || levelBlock.getId() == 9;
             int downId = level.getBlockIdAt(chunk, getFloorX(), getFloorY() - 1, getFloorZ());
-            if (inWater && (downId == 0 || downId == 8 || downId == 9 || downId == BlockID.LAVA || downId == BlockID.STILL_LAVA || downId == BlockID.SIGN_POST || downId == BlockID.WALL_SIGN)) onGround = false;
-            if (downId == 0 || downId == BlockID.SIGN_POST || downId == BlockID.WALL_SIGN) onGround = false;
+            if (inWater && (downId == 0 || downId == 8 || downId == 9 || downId == BlockID.LAVA || downId == BlockID.STILL_LAVA || downId == BlockID.SIGN_POST || downId == BlockID.WALL_SIGN)) {
+                onGround = false;
+            }
+            if (downId == 0 || downId == BlockID.SIGN_POST || downId == BlockID.WALL_SIGN) {
+                onGround = false;
+            }
             if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed()) {
                 double x = this.followTarget.x - this.x;
                 double z = this.followTarget.z - this.z;
@@ -160,7 +165,9 @@ public abstract class EntityWalking extends BaseEntity {
                         this.motionZ = this.getSpeed() * moveMultiplier * 0.1 * (z / diff);
                     }
                 }
-                if ((this.passengers.isEmpty() || this instanceof EntityLlama) && (this.stayTime <= 0 || Utils.rand())) this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                if ((this.passengers.isEmpty() || this instanceof EntityLlama) && (this.stayTime <= 0 || Utils.rand())) {
+                    this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                }
                 return this.followTarget;
             }
 
@@ -183,13 +190,17 @@ public abstract class EntityWalking extends BaseEntity {
                     } else if (levelBlock.getId() == BlockID.STILL_WATER) {
                         this.motionX = this.getSpeed() * moveMultiplier * 0.05 * (x / diff);
                         this.motionZ = this.getSpeed() * moveMultiplier * 0.05 * (z / diff);
-                        if (!this.isDrowned) this.level.addParticle(new BubbleParticle(this.add(Utils.rand(-2.0, 2.0), Utils.rand(-0.5, 0), Utils.rand(-2.0, 2.0))));
+                        if (!this.isDrowned) {
+                            this.level.addParticle(new BubbleParticle(this.add(Utils.rand(-2.0, 2.0), Utils.rand(-0.5, 0), Utils.rand(-2.0, 2.0))));
+                        }
                     } else {
                         this.motionX = this.getSpeed() * moveMultiplier * 0.15 * (x / diff);
                         this.motionZ = this.getSpeed() * moveMultiplier * 0.15 * (z / diff);
                     }
                 }
-                if ((this.passengers.isEmpty() || this instanceof EntityLlama) && (this.stayTime <= 0 || Utils.rand())) this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                if ((this.passengers.isEmpty() || this instanceof EntityLlama) && (this.stayTime <= 0 || Utils.rand())) {
+                    this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                }
             }
 
             double dx = this.motionX;

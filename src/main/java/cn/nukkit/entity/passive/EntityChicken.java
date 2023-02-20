@@ -19,7 +19,7 @@ public class EntityChicken extends EntityWalkingAnimal {
     public static final int NETWORK_ID = 10;
 
     private int eggLayTime = getRandomEggLayTime();
-    private boolean isChickenJockey = false;
+    //private boolean isChickenJockey = false;
 
     public EntityChicken(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -53,7 +53,8 @@ public class EntityChicken extends EntityWalkingAnimal {
 
     @Override
     public float getGravity() {
-        return 0.08f; //Should be lower but that breaks jumping
+        //Should be lower but that breaks jumping
+        return 0.08f;
     }
 
     @Override
@@ -65,11 +66,11 @@ public class EntityChicken extends EntityWalkingAnimal {
         } else {
             this.eggLayTime = getRandomEggLayTime();
         }
-        if (this.namedTag.contains("IsChickenJockey")) {
-            this.isChickenJockey = this.namedTag.getBoolean("IsChickenJockey");
-        } else {
-            this.isChickenJockey = false;
-        }
+        //if (this.namedTag.contains("IsChickenJockey")) {
+        //    this.isChickenJockey = this.namedTag.getBoolean("IsChickenJockey");
+        //} else {
+        //    this.isChickenJockey = false;
+        //}
 
         this.setMaxHealth(4);
     }
@@ -140,7 +141,7 @@ public class EntityChicken extends EntityWalkingAnimal {
         super.saveNBT();
 
         this.namedTag.putInt("EggLayTime", this.eggLayTime);
-        this.namedTag.putBoolean("IsChickenJockey", this.isChickenJockey);
+        //this.namedTag.putBoolean("IsChickenJockey", this.isChickenJockey);
     }
 
     @Override
@@ -169,14 +170,6 @@ public class EntityChicken extends EntityWalkingAnimal {
 
     private static  int getRandomEggLayTime() {
         return Utils.rand(6000, 12000);
-    }
-
-    public boolean isChickenJockey() {
-        return isChickenJockey;
-    }
-
-    public void setChickenJockey(boolean chickenJockey) {
-        isChickenJockey = chickenJockey;
     }
 
     @Override

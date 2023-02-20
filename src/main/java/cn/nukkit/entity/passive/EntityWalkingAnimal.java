@@ -6,9 +6,12 @@ import cn.nukkit.entity.EntityWalking;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.Optional;
 
 public abstract class EntityWalkingAnimal extends EntityWalking implements EntityAnimal {
 
@@ -17,6 +20,16 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
     }
 
     private int panicTicks = 0;
+
+    /**
+     * todo 当玩家靠近友好生物时，看向玩家
+     */
+    @Getter
+    @Setter
+    private int stayLookAt = 0;
+    @Getter
+    @Setter
+    private int startLookAt = 0;
 
     @Override
     public boolean onUpdate(int currentTick) {
@@ -43,16 +56,9 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
         this.lastUpdate = currentTick;
         this.entityBaseTick(tickDiff);
 
-        Vector3 target = this.updateMove(tickDiff);
-        /*if (target instanceof Player) {
-            if (this.distanceSquared(target) <= 2) {
-                //this.pitch = 22;
-                this.x = this.lastX;
-                this.y = this.lastY;
-                this.z = this.lastZ;
-            }
-        }*/
-
+        // fix look at
+        Optional.ofNullable(this.updateMove(tickDiff))
+                .ifPresent(super::lookAt);
         return true;
     }
 

@@ -16,14 +16,11 @@ import java.util.Optional;
  */
 public class EntityDefaultJockey extends EntityWalkingMob {
     /**
-     * todo 支持其他的敌对型生物
+     * 支持其他的敌对型生物
      */
     @Getter
     @Setter
     private EntityWalkingMob mob;
-    @Getter
-    @Setter
-    private boolean isJockey = false;
 
     public EntityDefaultJockey(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -36,6 +33,11 @@ public class EntityDefaultJockey extends EntityWalkingMob {
 
     @Override
     public int getNetworkId() {
+        // 支持其他坐骑但不局限于小鸡
+        boolean jockey = namedTag.contains("JockeyId");
+        if (jockey) {
+            return namedTag.getInt("JockeyId");
+        }
         return EntityChicken.NETWORK_ID;
     }
 
@@ -57,6 +59,11 @@ public class EntityDefaultJockey extends EntityWalkingMob {
     @Override
     public double getSpeed() {
         return 1.5D;
+    }
+
+    @Override
+    public String getName() {
+        return "DefaultJockey";
     }
 
     @Override
@@ -107,9 +114,7 @@ public class EntityDefaultJockey extends EntityWalkingMob {
         if (b) {
             Optional.ofNullable(getMob())
                     .ifPresent(mob -> {
-                        if (mob.isAlive()) {
-                            this.setRotation(mob.getYaw(), 0);
-                        } else {
+                        if (!mob.isAlive()) {
                             setMob(null);
                             followTarget = null;
                         }

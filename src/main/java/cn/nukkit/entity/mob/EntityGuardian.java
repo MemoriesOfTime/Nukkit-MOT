@@ -44,7 +44,7 @@ public class EntityGuardian extends EntitySwimmingMob {
         super.initEntity();
 
         this.setMaxHealth(30);
-        this.setDamage(new int[] { 0, 4, 6, 9 });
+        this.setDamage(new int[]{0, 4, 6, 9});
     }
 
     @Override
@@ -87,9 +87,11 @@ public class EntityGuardian extends EntitySwimmingMob {
                 this.setDataProperty(new LongEntityData(Entity.DATA_TARGET_EID, laserTargetEid = followTarget.getId()));
                 laserChargeTick = 60;
             }
-            if (targetOption((EntityCreature) followTarget,this.distanceSquared(followTarget))) {
+            if (targetOption((EntityCreature) followTarget, this.distanceSquared(followTarget))) {
                 if (--laserChargeTick < 0) {
-                    if (this.getServer().getMobAiEnabled()) attackEntity(followTarget);
+                    if (this.getServer().getMobAiEnabled()) {
+                        attackEntity(followTarget);
+                    }
                     this.setDataProperty(new LongEntityData(Entity.DATA_TARGET_EID, laserTargetEid = -1));
                     laserChargeTick = 60;
                 }

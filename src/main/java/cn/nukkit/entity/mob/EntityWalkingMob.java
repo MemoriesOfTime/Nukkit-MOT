@@ -9,6 +9,9 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 
+import java.util.Objects;
+import java.util.Optional;
+
 public abstract class EntityWalkingMob extends EntityWalking implements EntityMob {
 
     private int[] minDamage;
@@ -135,6 +138,7 @@ public abstract class EntityWalkingMob extends EntityWalking implements EntityMo
         }
     }
 
+    @Override
     public boolean onUpdate(int currentTick) {
         if (this.closed) {
             return false;
@@ -158,12 +162,21 @@ public abstract class EntityWalkingMob extends EntityWalking implements EntityMo
         this.entityBaseTick(tickDiff);
 
         Vector3 target = this.updateMove(tickDiff);
-        if (this.getServer().getMobAiEnabled() && target instanceof Entity && (!this.isFriendly() || !(target instanceof Player) || ((Entity) target).getId() == this.isAngryTo)) {
-            Entity entity = (Entity) target;
-            if (!entity.closed && (target != this.followTarget || this.canAttack)) {
-                this.attackEntity(entity);
-            }
+        if (Objects.nonNull(target)) {
+            Optional.ofNullable(getAttackTarget(target))
+                    .ifPresent(entity -> {
+                        if (this.canAttack) {
+                            this.attackEntity(entity);
+                        }
+                    });
         }
         return true;
+    }
+
+    @Override
+    public boolean isMeetAttackConditions(Vector3 target) {
+        return this.getServer().getMobAiEnabled() &&
+                target instanceof Entity &&
+                (!this.isFriendly() || !(target instanceof Player) || ((Entity) target).getId() == this.isAngryTo);
     }
 }
