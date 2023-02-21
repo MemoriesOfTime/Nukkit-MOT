@@ -4643,7 +4643,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void sendActionBar(String title, int fadein, int duration, int fadeout) {
         SetTitlePacket pk = new SetTitlePacket();
         pk.type = SetTitlePacket.TYPE_ACTION_BAR;
-        pk.text = title;
+        pk.text = Strings.isNullOrEmpty(title) ? " " : title;
         pk.fadeInTime = fadein;
         pk.stayTime = duration;
         pk.fadeOutTime = fadeout;
