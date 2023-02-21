@@ -103,14 +103,14 @@ public class BlockCactus extends BlockTransparentMeta {
                             if (!event.isCancelled()) {
                                 this.getLevel().setBlock(b, event.getNewState(), true, true);
                             }
+                            break;
                         }
                     }
                     this.setDamage(0);
-                    this.getLevel().setBlock(this, this);
                 } else {
                     this.setDamage(this.getDamage() + 1);
-                    this.getLevel().setBlock(this, this);
                 }
+                this.getLevel().setBlock(this, this);
             }
         }
 
