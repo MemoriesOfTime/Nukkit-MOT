@@ -164,4 +164,15 @@ public class NetworkChunkSerializer {
         private BinaryStream stream;
         private Integer subchunks;
     }
+
+    @AllArgsConstructor
+    @Data
+    public static class NetworkChunkSerializerCallbackData {
+        private int protocol;
+        private long timestamp;
+        private int x;
+        private int z;
+        private int subChunkCount;
+        private byte[] payload;
+    }
 }

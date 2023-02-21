@@ -104,6 +104,39 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return chunk;
     }
 
+    protected BaseFullChunk fullClone() {
+        BaseFullChunk chunk;
+        try {
+            chunk = (BaseFullChunk)super.clone();
+        } catch (CloneNotSupportedException e) {
+            return null;
+        }
+        if (this.biomes != null) {
+            chunk.biomes = this.biomes.clone();
+        }
+
+        if (this.blocks != null) {
+            chunk.blocks = this.blocks.clone();
+        }
+
+        if (this.heightMap != null) {
+            chunk.heightMap = this.heightMap.clone();
+        }
+
+        if (this.entities != null) {
+            chunk.entities = new Long2ObjectOpenHashMap<>(this.entities);
+        }
+
+        if (this.tiles != null) {
+            chunk.tiles = new Long2ObjectOpenHashMap<>(this.tiles);
+        }
+
+        chunk.tileList = null;
+        chunk.NBTentities = null;
+        chunk.NBTtiles = null;
+        return chunk;
+    }
+
     public void setChunkPacket(int protocol, BatchPacket packet) {
         if (packet != null) {
             packet.trim();

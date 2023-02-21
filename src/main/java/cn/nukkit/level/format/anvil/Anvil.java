@@ -203,12 +203,12 @@ public class Anvil extends BaseLevelProvider {
         }*/
 
         if (this.getServer().asyncChunkSending) {
-            //TODO 优化
+            final Chunk chunkClone = chunk.fullClone();
             this.getServer().getScheduler().scheduleAsyncTask(new AsyncTask() {
                 @Override
                 public void onRun() {
-                    NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                        getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                    NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
+                        getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
                                 timestamp,
                                 x,
                                 z,

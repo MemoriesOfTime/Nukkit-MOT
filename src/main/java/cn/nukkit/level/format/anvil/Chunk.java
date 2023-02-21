@@ -43,6 +43,11 @@ public class Chunk extends BaseChunk {
         return (Chunk) super.clone();
     }
 
+    @Override
+    public Chunk fullClone() {
+        return (Chunk) super.fullClone();
+    }
+
     public Chunk(LevelProvider level) {
         this(level, null);
     }

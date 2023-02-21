@@ -41,6 +41,20 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         return chunk;
     }
 
+    @Override
+    public BaseChunk fullClone() {
+        BaseChunk chunk = (BaseChunk) super.fullClone();
+        if (this.biomes != null) chunk.biomes = this.biomes.clone();
+        chunk.heightMap = this.getHeightMapArray().clone();
+        if (sections != null && sections[0] != null) {
+            chunk.sections = new ChunkSection[sections.length];
+            for (int i = 0; i < sections.length; i++) {
+                chunk.sections[i] = sections[i].copy();
+            }
+        }
+        return chunk;
+    }
+
     private void removeInvalidTile(int x, int y, int z) {
         BlockEntity entity = getTile(x, y, z);
         if (entity != null && !entity.isBlockEntityValid()) {

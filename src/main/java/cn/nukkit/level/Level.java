@@ -34,6 +34,7 @@ import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.BaseLevelProvider;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
+import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.level.generator.PopChunkManager;
 import cn.nukkit.level.generator.task.GenerationTask;
@@ -262,6 +263,8 @@ public class Level implements ChunkManager, Metadatable {
     public GameRules gameRules;
 
     private final boolean randomTickingEnabled;
+
+    private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
         this.levelId = levelIdCounter++;
@@ -957,6 +960,14 @@ public class Level implements ChunkManager, Metadatable {
                     }
                 }
                 this.changedBlocks.clear();
+            }
+        }
+
+        if (this.server.asyncChunkSending) {
+            NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
+            int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
+            for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
+                this.chunkRequestCallback(data.getProtocol(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload());
             }
         }
 
@@ -3308,6 +3319,10 @@ public class Level implements ChunkManager, Metadatable {
                 this.timings.syncChunkSendPrepareTimer.stopTiming();
             }
         }
+    }
+
+    public void asyncChunkRequestCallback(int protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
+        this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(protocol, timestamp, x, z, subChunkCount, payload));
     }
 
     public void chunkRequestCallback(int protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
