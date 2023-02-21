@@ -11,16 +11,17 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.extern.log4j.Log4j2;
+import oshi.SystemInfo;
+import oshi.hardware.NetworkIF;
 
 import java.io.ByteArrayInputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ProtocolException;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * @author MagicDroidX
@@ -54,27 +55,54 @@ public class Network {
     private String name;
     private String subName;
 
+    private final List<NetworkIF> hardWareNetworkInterfaces;
+    private final LinkedList<NetWorkStatisticData> netWorkStatisticDataList = new LinkedList<>();
+
     public Network(Server server) {
         this.registerPackets();
         this.server = server;
+        List<NetworkIF> tmpIfs = null;
+        try {
+            tmpIfs = new SystemInfo().getHardware().getNetworkIFs();
+        } catch (Throwable t) {
+            log.warn(Server.getInstance().getLanguage().get("nukkit.start.hardwareMonitorDisabled"));
+        } finally {
+            this.hardWareNetworkInterfaces = tmpIfs;
+        }
     }
 
+    @Deprecated
     public void addStatistics(double upload, double download) {
         this.upload += upload;
         this.download += download;
     }
 
     public double getUpload() {
-        return upload;
+        //return upload;
+        return netWorkStatisticDataList.get(1).upload - netWorkStatisticDataList.get(0).upload;
     }
 
     public double getDownload() {
-        return download;
+        //return download;
+        return netWorkStatisticDataList.get(1).download - netWorkStatisticDataList.get(0).download;
     }
 
     public void resetStatistics() {
-        this.upload = 0;
-        this.download = 0;
+        /*this.upload = 0;
+        this.download = 0;*/
+        long upload = 0;
+        long download = 0;
+        if (netWorkStatisticDataList.size() > 1) {
+            netWorkStatisticDataList.removeFirst();
+        }
+        if (this.hardWareNetworkInterfaces != null) {
+            for (NetworkIF networkIF : this.hardWareNetworkInterfaces) {
+                networkIF.updateAttributes();
+                upload += networkIF.getBytesSent();
+                download += networkIF.getBytesRecv();
+            }
+        }
+        netWorkStatisticDataList.add(new NetWorkStatisticData(upload, download));
     }
 
     public Set<SourceInterface> getInterfaces() {
@@ -142,6 +170,10 @@ public class Network {
 
     public Server getServer() {
         return server;
+    }
+
+    public List<NetworkIF> getHardWareNetworkInterfaces() {
+        return hardWareNetworkInterfaces;
     }
 
     public void processBatch(BatchPacket packet, Player player) {
@@ -407,5 +439,12 @@ public class Network {
         this.registerPacket(ProtocolInfo.TOAST_REQUEST_PACKET, ToastRequestPacket.class);
         this.registerPacket(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET, RequestNetworkSettingsPacket.class);
         this.registerPacket(ProtocolInfo.UPDATE_CLIENT_INPUT_LOCKS, UpdateClientInputLocksPacket.class);
+    }
+
+    @AllArgsConstructor
+    @Data
+    public static class NetWorkStatisticData {
+        private long upload;
+        private long download;
     }
 }
