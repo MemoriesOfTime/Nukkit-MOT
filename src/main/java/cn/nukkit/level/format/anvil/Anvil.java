@@ -9,7 +9,6 @@ import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.utils.ChunkException;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
@@ -204,19 +203,16 @@ public class Anvil extends BaseLevelProvider {
 
         if (this.getServer().asyncChunkSending) {
             final Chunk chunkClone = chunk.fullClone();
-            this.getServer().getScheduler().scheduleAsyncTask(new AsyncTask() {
-                @Override
-                public void onRun() {
-                    NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
-                        getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
-                                timestamp,
-                                x,
-                                z,
-                                networkChunkSerializerCallback.getSubchunks(),
-                                networkChunkSerializerCallback.getStream().getBuffer()
-                        );
-                    }, getLevel().getDimensionData());
-                }
+            this.level.getAsyncChuckExecutor().execute(() -> {
+                NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
+                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                            timestamp,
+                            x,
+                            z,
+                            networkChunkSerializerCallback.getSubchunks(),
+                            networkChunkSerializerCallback.getStream().getBuffer()
+                    );
+                }, getLevel().getDimensionData());
             });
         }else {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {

@@ -59,11 +59,13 @@ import cn.nukkit.utils.*;
 import co.aikar.timings.Timings;
 import co.aikar.timings.TimingsHistory;
 import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import lombok.Getter;
 
 import java.lang.ref.SoftReference;
 import java.util.*;
@@ -264,6 +266,8 @@ public class Level implements ChunkManager, Metadatable {
 
     private final boolean randomTickingEnabled;
 
+    @Getter
+    private ExecutorService asyncChuckExecutor;
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
@@ -326,6 +330,10 @@ public class Level implements ChunkManager, Metadatable {
         this.isEnd = name.equals("the_end");
 
         this.randomTickingEnabled = !Server.noTickingWorlds.contains(name);
+
+        if (this.server.asyncChunkSending) {
+            this.asyncChuckExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("AsyncChunkThread for " + name).build());
+        }
     }
 
     public static long chunkHash(int x, int z) {
