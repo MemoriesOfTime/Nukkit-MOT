@@ -52,7 +52,9 @@ public class BlockWaterLily extends BlockFlowable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            if (!(this.down() instanceof BlockWater)) {
+            Block down = this.down();
+            if (!(down instanceof BlockWater) && !(down.getLevelBlockAtLayer(1) instanceof BlockWater)
+                    && !(down instanceof BlockIceFrosted) && !(down.getLevelBlockAtLayer(1) instanceof BlockIceFrosted)) {
                 this.getLevel().useBreakOn(this);
                 return Level.BLOCK_UPDATE_NORMAL;
             }
@@ -67,6 +69,11 @@ public class BlockWaterLily extends BlockFlowable {
 
     @Override
     public boolean canPassThrough() {
+        return false;
+    }
+
+    @Override
+    public boolean canBeFlowedInto() {
         return false;
     }
 
