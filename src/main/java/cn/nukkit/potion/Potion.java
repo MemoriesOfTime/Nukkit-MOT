@@ -481,7 +481,7 @@ public class Potion implements Cloneable {
                 case SPEED_LONG:
                     return 480;
                 case SPEED_II:
-                    return 480;
+                    return 90;
                 case SLOWNESS:
                     return 90;
                 case SLOWNESS_LONG:
