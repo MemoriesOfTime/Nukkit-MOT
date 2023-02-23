@@ -1021,7 +1021,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     if (Nukkit.getBranch().equals("master")) {
                         if (!server.getNukkitVersion().equals(latest) && !server.getNukkitVersion().equals("git-null")) {
-                            this.sendMessage("§c[Nukkit-PM1E-MOT][Update] §eThere is a new build of Nukkit PetteriM1 Edition available! Current: " + server.getNukkitVersion() + " Latest: " + latest);
+                            this.sendMessage("§c[Nukkit-PM1E-MOT][Update] §eThere is a new build of §cNukkit§3-§aPM1E§3-§dMOT §eavailable! Current: " + server.getNukkitVersion() + " Latest: " + latest);
                         }
                     }
                 } catch (Exception ignore) {}

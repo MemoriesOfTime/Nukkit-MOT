@@ -52,7 +52,7 @@ public class VersionCommand extends VanillaCommand {
 
                         if (Nukkit.getBranch().equals("master")) {
                             if (!sender.getServer().getNukkitVersion().equals(latest) && !sender.getServer().getNukkitVersion().equals("git-null")) {
-                                sender.sendMessage("§c[Nukkit-PM1E-MOT][Update] §eThere is a new build of Nukkit PetteriM1 Edition available! Current: " + sender.getServer().getNukkitVersion() + " Latest: " + latest);
+                                sender.sendMessage("§c[Nukkit-PM1E-MOT][Update] §eThere is a new build of §cNukkit§3-§aPM1E§3-§dMOT §eavailable! Current: " + sender.getServer().getNukkitVersion() + " Latest: " + latest);
                             } else {
                                 sender.sendMessage("§c[Nukkit-PM1E-MOT] §aYou are running the latest version.");
                             }
