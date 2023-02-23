@@ -666,14 +666,24 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public static void removeCreativeItem(Item item) {
-        int index = getCreativeItemIndex(item);
+        Server.mvw("Item#removeCreativeItem(Item)");
+        removeCreativeItem(ProtocolInfo.CURRENT_PROTOCOL, item);
+    }
+
+    public static void removeCreativeItem(int protocol, Item item) {
+        int index = getCreativeItemIndex(protocol, item);
         if (index != -1) {
-            Item.creative407.remove(index);
+            Item.getCreativeItems(protocol).remove(index);
         }
     }
 
     public static boolean isCreativeItem(Item item) {
-        for (Item aCreative : Item.creative407) {
+        Server.mvw("Item#isCreativeItem(Item)");
+        return isCreativeItem(ProtocolInfo.CURRENT_PROTOCOL, item);
+    }
+
+    public static boolean isCreativeItem(int protocol, Item item) {
+        for (Item aCreative : Item.getCreativeItems(protocol)) {
             if (item.equals(aCreative, !item.isTool())) {
                 return true;
             }
@@ -682,12 +692,22 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public static Item getCreativeItem(int index) {
-        return (index >= 0 && index < Item.creative407.size()) ? Item.creative407.get(index) : null;
+        Server.mvw("Item#getCreativeItemIndex(int)");
+        return Item.getCreativeItem(ProtocolInfo.CURRENT_PROTOCOL, index);
+    }
+
+    public static Item getCreativeItem(int protocol, int index) {
+        return (index >= 0 && index < Item.getCreativeItems(protocol).size()) ? Item.getCreativeItems(protocol).get(index) : null;
     }
 
     public static int getCreativeItemIndex(Item item) {
-        for (int i = 0; i < Item.creative407.size(); i++) {
-            if (item.equals(Item.creative407.get(i), !item.isTool())) {
+        Server.mvw("Item#getCreativeItemIndex(Item)");
+        return getCreativeItemIndex(ProtocolInfo.CURRENT_PROTOCOL, item);
+    }
+
+    public static int getCreativeItemIndex(int protocol, Item item) {
+        for (int i = 0; i < Item.getCreativeItems(protocol).size(); i++) {
+            if (item.equals(Item.getCreativeItems(protocol).get(i), !item.isTool())) {
                 return i;
             }
         }

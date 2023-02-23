@@ -60,7 +60,7 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
 
     @Override
     public boolean canHarvestWithHand() {
-        return false;
+        return true;
     }
 
     @Override
@@ -259,5 +259,10 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
         }
 
         return super.getComparatorInputOverride();
+    }
+
+    @Override
+    public boolean canBePushed() {
+        return true;
     }
 }

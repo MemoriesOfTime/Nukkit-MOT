@@ -518,12 +518,12 @@ public class PlayerInventory extends BaseInventory {
             InventoryContentPacket pk = new InventoryContentPacket();
             pk.inventoryId = ContainerIds.CREATIVE;
             if (!p.isSpectator()) { //fill it for all gamemodes except spectator
-                pk.slots = Item.getCreativeItems(p.protocol).toArray(new Item[0]);
+                pk.slots = Item.getCreativeItems(p.protocol).toArray(Item.EMPTY_ARRAY);
             }
             p.dataPacket(pk);
         } else {
             CreativeContentPacket pk = new CreativeContentPacket();
-            pk.entries = p.isSpectator() ? new Item[0] : Item.getCreativeItems(p.protocol).toArray(new Item[0]);
+            pk.entries = p.isSpectator() ? Item.EMPTY_ARRAY : Item.getCreativeItems(p.protocol).toArray(Item.EMPTY_ARRAY);
             p.dataPacket(pk);
         }
     }
