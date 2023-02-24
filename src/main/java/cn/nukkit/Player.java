@@ -2746,7 +2746,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     break;
                 case ProtocolInfo.MOVE_PLAYER_PACKET:
-                    if (this.teleportPosition != null || !this.locallyInitialized) {
+                    if (this.teleportPosition != null || !this.spawned) {
                         break;
                     }
 
@@ -2754,11 +2754,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getBaseOffset(), movePlayerPacket.z);
                     double dis = newPos.distanceSquared(this);
 
-                    if (dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
+                    /*if (dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
                         break;
-                    }
+                    }*/
 
-                    if (dis > 81) {
+                    if (dis > 100) {
                         this.sendPosition(this, movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
                         break;
                     }
