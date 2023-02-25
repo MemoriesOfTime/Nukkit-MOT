@@ -7,7 +7,6 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.Sound;
 import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
@@ -261,8 +260,7 @@ public class BlockBamboo extends BlockTransparentMeta {
 
     @Override
     public boolean onActivate(Item item, Player player) {
-        boolean itemIsBoneMeal = item.getId() == ItemID.DYE && item.getDamage() == 0x0F; //Bonemeal
-        if (itemIsBoneMeal || item.getBlock() != null && item.getBlock().getId() == BlockID.BAMBOO) {
+        if (item.getId() == ItemID.DYE && item.getDamage() == 0x0F) { //Bonemeal
             int top = (int) y;
             int count = 1;
 
@@ -285,7 +283,8 @@ public class BlockBamboo extends BlockTransparentMeta {
                 }
             }
 
-            if (itemIsBoneMeal && count >= 15) {
+            //15格以上需要嫁接（放置竹子）
+            if (count >= 15) {
                 return false;
             }
 
@@ -300,11 +299,8 @@ public class BlockBamboo extends BlockTransparentMeta {
                 if (player != null && player.isSurvival()) {
                     item.count--;
                 }
-                if (itemIsBoneMeal) {
-                    level.addParticle(new BoneMealParticle(this));
-                } else {
-                    level.addSound(block, Sound.BLOCK_BAMBOO_PLACE, 0.8F, 1.0F);
-                }
+
+                level.addParticle(new BoneMealParticle(this));
             }
 
             return true;
