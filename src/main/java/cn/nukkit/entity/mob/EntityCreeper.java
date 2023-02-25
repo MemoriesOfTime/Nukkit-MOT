@@ -116,42 +116,45 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
             return true;
         }
 
-        Vector3 before = this.target;
-        this.checkTarget();
+        if (this.getServer().getMobAiEnabled()) {
+            Vector3 before = this.target;
+            this.checkTarget();
 
-        if (this.target instanceof EntityCreature || before != this.target) {
-            double x = this.target.x - this.x;
-            double z = this.target.z - this.z;
+            if (this.target instanceof EntityCreature || before != this.target) {
+                double x = this.target.x - this.x;
+                double z = this.target.z - this.z;
 
-            double diff = Math.abs(x) + Math.abs(z);
-            double distance = target.distance(this);
-            if (distance <= 4) {
-                if (target instanceof EntityCreature) {
+                double diff = Math.abs(x) + Math.abs(z);
+                double distance = target.distance(this);
+                if (distance <= 4) {
+                    if (target instanceof EntityCreature) {
+                        if (!exploding) {
+                            if (bombTime == 0) {
+                                this.level.addSound(new TNTPrimeSound(this.add(0, getEyeHeight())));
+                                this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, true);
+                            }
+                            this.bombTime += tickDiff;
+                            if (this.bombTime >= 30) {
+                                this.explode();
+                                return false;
+                            }
+                        }
+                        if (distance <= 1) {
+                            this.stayTime = 10;
+                        }
+                    }
+                } else {
                     if (!exploding) {
-                        if (bombTime == 0) {
-                            this.level.addSound(new TNTPrimeSound(this.add(0, getEyeHeight())));
-                            this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, true);
-                        }
-                        this.bombTime += tickDiff;
-                        if (this.bombTime >= 30) {
-                            this.explode();
-                            return false;
-                        }
+                        this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, false);
+                        this.bombTime = 0;
                     }
-                    if (distance <= 1) {
-                        this.stayTime = 10;
-                    }
-                }
-            } else {
-                if (!exploding) {
-                    this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, false);
-                    this.bombTime = 0;
-                }
 
-                this.motionX = this.getSpeed() * 0.15 * (x / diff);
-                this.motionZ = this.getSpeed() * 0.15 * (z / diff);
+                    this.motionX = this.getSpeed() * 0.15 * (x / diff);
+                    this.motionZ = this.getSpeed() * 0.15 * (z / diff);
+                }
+                if (this.stayTime <= 0 || Utils.rand())
+                    this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
             }
-            if (this.stayTime <= 0 || Utils.rand()) this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
         }
 
         double dx = this.motionX;
@@ -210,7 +213,7 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
             }
         }
 
-        return drops.toArray(new Item[0]);
+        return drops.toArray(Item.EMPTY_ARRAY);
     }
 
     @Override

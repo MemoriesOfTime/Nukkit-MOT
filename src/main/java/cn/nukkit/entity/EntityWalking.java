@@ -142,64 +142,68 @@ public abstract class EntityWalking extends BaseEntity {
             if (downId == 0 || downId == BlockID.SIGN_POST || downId == BlockID.WALL_SIGN) {
                 onGround = false;
             }
-            if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed()) {
-                double x = this.followTarget.x - this.x;
-                double z = this.followTarget.z - this.z;
 
-                double diff = Math.abs(x) + Math.abs(z);
-                if (!inWater && (this.stayTime > 0 || this.distance(this.followTarget) <= (this.getWidth() / 2 + 0.05))) {
-                    this.motionX = 0;
-                    this.motionZ = 0;
-                } else {
-                    if (levelBlock.getId() == BlockID.WATER) {
-                        BlockWater blockWater = (BlockWater) levelBlock;
-                        Vector3 flowVector = blockWater.getFlowVector();
-                        motionX = flowVector.getX() * .05;
-                        motionZ = flowVector.getZ() * .05;
-                    } else if (levelBlock.getId() == BlockID.STILL_WATER) {
-                        this.motionX = this.getSpeed() * moveMultiplier * 0.05 * (x / diff);
-                        this.motionZ = this.getSpeed() * moveMultiplier * 0.05 * (z / diff);
-                        if (!this.isDrowned) this.level.addParticle(new BubbleParticle(this.add(Utils.rand(-2.0, 2.0), Utils.rand(-0.5, 0), Utils.rand(-2.0, 2.0))));
+            if (this.getServer().getMobAiEnabled()) {
+                if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed()) {
+                    double x = this.followTarget.x - this.x;
+                    double z = this.followTarget.z - this.z;
+
+                    double diff = Math.abs(x) + Math.abs(z);
+                    if (!inWater && (this.stayTime > 0 || this.distance(this.followTarget) <= (this.getWidth() / 2 + 0.05))) {
+                        this.motionX = 0;
+                        this.motionZ = 0;
                     } else {
-                        this.motionX = this.getSpeed() * moveMultiplier * 0.1 * (x / diff);
-                        this.motionZ = this.getSpeed() * moveMultiplier * 0.1 * (z / diff);
-                    }
-                }
-                if ((this.passengers.isEmpty() || this instanceof EntityLlama) && (this.stayTime <= 0 || Utils.rand())) {
-                    this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
-                }
-                return this.followTarget;
-            }
-
-            Vector3 before = this.target;
-            this.checkTarget();
-            if (this.target instanceof EntityCreature || before != this.target) {
-                double x = this.target.x - this.x;
-                double z = this.target.z - this.z;
-
-                double diff = Math.abs(x) + Math.abs(z);
-                if (!inWater && (this.stayTime > 0 || (this.distance(this.target) <= (this.getWidth() / 2 + 0.05) * nearbyDistanceMultiplier()))) {
-                    this.motionX = 0;
-                    this.motionZ = 0;
-                } else {
-                    if (levelBlock.getId() == BlockID.WATER) {
-                        BlockWater blockWater = (BlockWater) levelBlock;
-                        Vector3 flowVector = blockWater.getFlowVector();
-                        motionX = flowVector.getX() * .05;
-                        motionZ = flowVector.getZ() * .05;
-                    } else if (levelBlock.getId() == BlockID.STILL_WATER) {
-                        this.motionX = this.getSpeed() * moveMultiplier * 0.05 * (x / diff);
-                        this.motionZ = this.getSpeed() * moveMultiplier * 0.05 * (z / diff);
-                        if (!this.isDrowned) {
-                            this.level.addParticle(new BubbleParticle(this.add(Utils.rand(-2.0, 2.0), Utils.rand(-0.5, 0), Utils.rand(-2.0, 2.0))));
+                        if (levelBlock.getId() == BlockID.WATER) {
+                            BlockWater blockWater = (BlockWater) levelBlock;
+                            Vector3 flowVector = blockWater.getFlowVector();
+                            motionX = flowVector.getX() * .05;
+                            motionZ = flowVector.getZ() * .05;
+                        } else if (levelBlock.getId() == BlockID.STILL_WATER) {
+                            this.motionX = this.getSpeed() * moveMultiplier * 0.05 * (x / diff);
+                            this.motionZ = this.getSpeed() * moveMultiplier * 0.05 * (z / diff);
+                            if (!this.isDrowned)
+                                this.level.addParticle(new BubbleParticle(this.add(Utils.rand(-2.0, 2.0), Utils.rand(-0.5, 0), Utils.rand(-2.0, 2.0))));
+                        } else {
+                            this.motionX = this.getSpeed() * moveMultiplier * 0.1 * (x / diff);
+                            this.motionZ = this.getSpeed() * moveMultiplier * 0.1 * (z / diff);
                         }
-                    } else {
-                        this.motionX = this.getSpeed() * moveMultiplier * 0.15 * (x / diff);
-                        this.motionZ = this.getSpeed() * moveMultiplier * 0.15 * (z / diff);
                     }
+                    if ((this.passengers.isEmpty() || this instanceof EntityLlama) && (this.stayTime <= 0 || Utils.rand())) {
+                        this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                    }
+                    return this.followTarget;
                 }
-                if ((this.passengers.isEmpty() || this instanceof EntityLlama) && (this.stayTime <= 0 || Utils.rand())) {
-                    this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+
+                Vector3 before = this.target;
+                this.checkTarget();
+                if (this.target instanceof EntityCreature || before != this.target) {
+                    double x = this.target.x - this.x;
+                    double z = this.target.z - this.z;
+
+                    double diff = Math.abs(x) + Math.abs(z);
+                    if (!inWater && (this.stayTime > 0 || (this.distance(this.target) <= (this.getWidth() / 2 + 0.05) * nearbyDistanceMultiplier()))) {
+                        this.motionX = 0;
+                        this.motionZ = 0;
+                    } else {
+                        if (levelBlock.getId() == BlockID.WATER) {
+                            BlockWater blockWater = (BlockWater) levelBlock;
+                            Vector3 flowVector = blockWater.getFlowVector();
+                            motionX = flowVector.getX() * .05;
+                            motionZ = flowVector.getZ() * .05;
+                        } else if (levelBlock.getId() == BlockID.STILL_WATER) {
+                            this.motionX = this.getSpeed() * moveMultiplier * 0.05 * (x / diff);
+                            this.motionZ = this.getSpeed() * moveMultiplier * 0.05 * (z / diff);
+                            if (!this.isDrowned) {
+                                this.level.addParticle(new BubbleParticle(this.add(Utils.rand(-2.0, 2.0), Utils.rand(-0.5, 0), Utils.rand(-2.0, 2.0))));
+                            }
+                        } else {
+                            this.motionX = this.getSpeed() * moveMultiplier * 0.15 * (x / diff);
+                            this.motionZ = this.getSpeed() * moveMultiplier * 0.15 * (z / diff);
+                        }
+                    }
+                    if ((this.passengers.isEmpty() || this instanceof EntityLlama) && (this.stayTime <= 0 || Utils.rand())) {
+                        this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                    }
                 }
             }
 

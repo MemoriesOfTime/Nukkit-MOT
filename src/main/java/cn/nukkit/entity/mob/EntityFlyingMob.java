@@ -3,10 +3,10 @@ package cn.nukkit.entity.mob;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityFlying;
-import cn.nukkit.utils.Utils;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.Utils;
 
 public abstract class EntityFlyingMob extends EntityFlying implements EntityMob {
 
@@ -150,7 +150,7 @@ public abstract class EntityFlyingMob extends EntityFlying implements EntityMob 
         this.entityBaseTick(tickDiff);
 
         Vector3 target = this.updateMove(tickDiff);
-        if (target instanceof Entity && this.isMovement()) {
+        if (target instanceof Entity && this.isMovement() && this.getServer().getMobAiEnabled()) {
             Entity entity = (Entity) target;
             if (!entity.closed && (target != this.followTarget || this.canAttack)) {
                 this.attackEntity(entity);
