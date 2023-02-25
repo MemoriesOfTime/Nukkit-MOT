@@ -91,8 +91,7 @@ public class BlockBambooSapling extends BlockFlowable {
 
     @Override
     public boolean onActivate(Item item, Player player) {
-        boolean isBoneMeal = item.getId() == ItemID.DYE && item.getDamage() == 0x0F; //Bonemeal
-        if (isBoneMeal || item.getBlock() != null && item.getBlock().getId() == BlockID.BAMBOO) {
+        if (item.getId() == ItemID.DYE && item.getDamage() == 0x0F) { //Bonemeal
 
             boolean success = false;
             Block block = this.up();
