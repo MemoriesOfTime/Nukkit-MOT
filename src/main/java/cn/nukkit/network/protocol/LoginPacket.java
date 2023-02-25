@@ -86,10 +86,10 @@ public class LoginPacket extends DataPacket {
 
         if (skinToken == null) return;
 
-        // 修复1.19.62皮肤修改问题
+        // 将1.19.62按1.19.63版本处理 修复1.19.62皮肤修改问题
         if (this.protocol_ == ProtocolInfo.v1_19_60 &&
                 skinToken.has("GameVersion") && !skinToken.get("GameVersion").getAsString().startsWith("1.19.60")) {
-            this.protocol_ = ProtocolInfo.v1_19_62;
+            this.protocol_ = ProtocolInfo.v1_19_63;
         }
 
         if (skinToken.has("ClientRandomId")) {

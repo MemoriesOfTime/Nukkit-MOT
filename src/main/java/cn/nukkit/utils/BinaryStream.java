@@ -358,7 +358,7 @@ public class BinaryStream {
                     this.putBoolean(skin.isPersona());
                     this.putBoolean(skin.isCapeOnClassic());
                     this.putBoolean(skin.isPrimaryUser());
-                    if (protocol >= ProtocolInfo.v1_19_62) {
+                    if (protocol >= ProtocolInfo.v1_19_63) {
                         this.putBoolean(skin.isOverridingPlayerAppearance());
                     }
                 }
@@ -445,7 +445,7 @@ public class BinaryStream {
                 skin.setPersona(this.getBoolean());
                 skin.setCapeOnClassic(this.getBoolean());
                 skin.setPrimaryUser(this.getBoolean());
-                if (protocol >= ProtocolInfo.v1_19_62) {
+                if (protocol >= ProtocolInfo.v1_19_63) {
                     skin.setOverridingPlayerAppearance(this.getBoolean());
                 }
             }
