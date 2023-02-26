@@ -77,7 +77,7 @@ public class Nukkit {
 
         try {
             if (TITLE) {
-                System.out.print("\u001B]0;Nukkit PetteriM1 Edition\u0007");
+                System.out.print("\u001B]0;Nukkit PM1E MOT\u0007");
             }
             new Server(PATH, DATA_PATH, PLUGIN_PATH, loadPlugins, debug);
         } catch (Throwable t) {
