@@ -248,6 +248,11 @@ public class AddEntityPacket extends DataPacket {
         if (this.mapping == null) {
             this.mapping = Entity.getEntityRuntimeMapping(this.protocol);
         }
-        this.putString(this.mapping.get(type));
+
+        String identifier = this.mapping.get(type);
+        if (identifier == null) {
+            throw new IllegalStateException("Unknown entity with network id " + this.type);
+        }
+        this.putString(identifier);
     }
 }
