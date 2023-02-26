@@ -405,7 +405,7 @@ public class PluginManager {
             } catch (Throwable e) {
                 MainLogger logger = this.server.getLogger();
                 if (logger != null) {
-                    logger.logException(new RuntimeException(e));
+                    logger.logException(new RuntimeException("plugin: " + plugin.getName() + " load failed!", e));
                 }
                 this.disablePlugin(plugin);
             }
