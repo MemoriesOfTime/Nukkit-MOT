@@ -2,8 +2,8 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockLava;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockLava;
 import cn.nukkit.block.BlockLiquid;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityLiving;
@@ -22,7 +22,6 @@ import cn.nukkit.level.sound.AnvilFallSound;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
-import sun.security.krb5.internal.crypto.Des;
 
 /**
  * @author MagicDroidX
