@@ -454,6 +454,9 @@ public class BinaryStream {
     }
 
     private static final String NukkitPetteriM1EditionTag = "NukkitPetteriM1Edition";
+    private static final String MV_ORIGIN_NBT = "mv_origin_nbt";
+    private static final String MV_ORIGIN_ID = "mv_origin_id";
+    private static final String MV_ORIGIN_META = "mv_origin_meta";
 
     public Item getSlot() {
         Server.mvw("BinaryStream#getSlot()");
@@ -671,6 +674,14 @@ public class BinaryStream {
 
             if (id == ItemID.SHIELD) {
                 stream.readLong();
+            }
+
+            if (id == Item.INFO_UPDATE && compoundTag != null && compoundTag.contains(MV_ORIGIN_ID) && compoundTag.contains(MV_ORIGIN_META)) {
+                Item item = Item.get(compoundTag.getInt(MV_ORIGIN_ID), compoundTag.getInt(MV_ORIGIN_META), count);
+                if (compoundTag.contains(MV_ORIGIN_NBT)) {
+                    item.setNamedTag(compoundTag.getCompound(MV_ORIGIN_NBT));
+                }
+                return item;
             }
         } catch (IOException e) {
             throw new IllegalStateException("Unable to read item user data", e);
@@ -905,6 +916,17 @@ public class BinaryStream {
         if (item == null || item.getId() == Item.AIR) {
             this.putByte((byte) 0);
             return;
+        }
+
+        if (!item.isSupportedOn(protocolId)) {
+            Item originItem = item;
+            item = Item.get(Item.INFO_UPDATE, 0, originItem.getCount());
+            CompoundTag compoundTag = originItem.getNamedTag();
+            if (compoundTag != null) {
+                item.setNamedTag(new CompoundTag().putCompound(MV_ORIGIN_NBT, compoundTag));
+            }
+            item.setCustomName(originItem.getName());
+            item.setNamedTag(item.getNamedTag().putInt(MV_ORIGIN_ID, originItem.getId()).putInt(MV_ORIGIN_META, originItem.getDamage()));
         }
 
         int id = item.getId();

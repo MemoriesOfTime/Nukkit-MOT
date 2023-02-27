@@ -1558,4 +1558,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         }
         return this.getRuntimeEntry(protocolId).getRuntimeId();
     }
+
+    public boolean isSupportedOn(int protocolId) {
+        return true;
+    }
 }
