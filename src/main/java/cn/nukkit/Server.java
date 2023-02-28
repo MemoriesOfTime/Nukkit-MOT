@@ -2822,6 +2822,7 @@ public class Server {
         Entity.registerEntity("MinecartHopper", EntityMinecartHopper.class);
         Entity.registerEntity("MinecartTnt", EntityMinecartTNT.class);
         Entity.registerEntity("Boat", EntityBoat.class);
+        Entity.registerEntity("ChestBoat", EntityChestBoat.class);
         //Others
         Entity.registerEntity("Human", EntityHuman.class, true);
         Entity.registerEntity("Lightning", EntityLightning.class);

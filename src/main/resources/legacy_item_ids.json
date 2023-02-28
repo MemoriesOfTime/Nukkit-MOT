@@ -994,8 +994,6 @@
   "minecraft:amethyst_shard": 771,
   "minecraft:spyglass": 772,
   "minecraft:music_disc_otherside": 773,
-  "minecraft:music_disc_5": 776,
-  "minecraft:disc_fragment_5": 777,
   "minecraft:recovery_compass": 778,
   "minecraft:echo_shard": 779,
   "minecraft:glow_frame": 850,
@@ -1014,5 +1012,15 @@
   "minecraft:stone_block_slab": 44,
   "minecraft:stone_block_slab2": 182,
   "minecraft:stone_block_slab3": -162,
-  "minecraft:stone_block_slab4": -166
+  "minecraft:stone_block_slab4": -166,
+  "minecraft:oak_chest_boat": 638,
+  "minecraft:birch_chest_boat": 639,
+  "minecraft:jungle_chest_boat": 640,
+  "minecraft:spruce_chest_boat": 641,
+  "minecraft:acacia_chest_boat": 642,
+  "minecraft:dark_oak_chest_boat": 643,
+  "minecraft:mangrove_chest_boat": 644,
+  "minecraft:chest_boat": 645,
+  "minecraft:music_disc_5": 636,
+  "minecraft:disc_fragment_5": 637
 }

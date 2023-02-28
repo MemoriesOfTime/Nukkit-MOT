@@ -1,5 +1,7 @@
 package cn.nukkit.item;
 
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 public class ItemRecord5 extends ItemRecord {
 
     public ItemRecord5() {
@@ -18,5 +20,10 @@ public class ItemRecord5 extends ItemRecord {
     @Override
     public String getSoundId() {
         return "record.5";
+    }
+
+    @Override
+    public boolean isSupportedOn(int protocolId) {
+        return protocolId >= ProtocolInfo.v1_19_0;
     }
 }

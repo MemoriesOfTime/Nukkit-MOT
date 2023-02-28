@@ -282,6 +282,15 @@ public interface ItemID {
 
     int RECORD_5 = 636;
 
+    int OAK_CHEST_BOAT = 638;
+    int BIRCH_CHEST_BOAT = 639;
+    int JUNGLE_CHEST_BOAT = 640;
+    int SPRUCE_CHEST_BOAT = 641;
+    int ACACIA_CHEST_BOAT = 642;
+    int DARK_OAK_CHEST_BOAT = 643;
+    int MANGROVE_CHEST_BOAT = 644;
+    int CHEST_BOAT = 645;
+
     int CAMPFIRE = 720;
 
     // 514 - 733 not yet in Minecraft

@@ -1696,6 +1696,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         boolean invalidMotion = false;
+        Location revertPos = this.getLocation().clone();
         double distance = clientPos.distanceSquared(this);
         if (distance > 128) {
             invalidMotion = true;
@@ -1749,7 +1750,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (invalidMotion) {
-            this.revertClientMotion(this.getLocation());
+            this.revertClientMotion(revertPos);
             return;
         }
 
@@ -3265,7 +3266,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     switch (interactPacket.action) {
                         case InteractPacket.ACTION_OPEN_INVENTORY:
-                            if (targetEntity != this) {
+                            if(targetEntity instanceof EntityChestBoat chestBoat){
+                                this.addWindow(chestBoat.getInventory());
+                                break;
+                            } else if (targetEntity != this) {
                                 break;
                             }
                             if (this.protocol >= 407) {
