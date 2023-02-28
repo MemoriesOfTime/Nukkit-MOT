@@ -918,7 +918,16 @@ public class BinaryStream {
             return;
         }
 
-        if (!item.isSupportedOn(protocolId)) {
+        RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
+        boolean isErrorItem = false;
+        try {
+            mapping.toRuntime(item.getId(), item.getDamage());
+        }catch (Exception e) {
+            Server.getInstance().getLogger().logException(e);
+            isErrorItem = true;
+        }
+
+        if (!item.isSupportedOn(protocolId) || isErrorItem) {
             Item originItem = item;
             item = Item.get(Item.INFO_UPDATE, 0, originItem.getCount());
             CompoundTag compoundTag = originItem.getNamedTag();
@@ -934,7 +943,6 @@ public class BinaryStream {
         boolean isBlock = item instanceof ItemBlock;
         boolean isDurable = item instanceof ItemDurable;
 
-        RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
         RuntimeEntry runtimeEntry = mapping.toRuntime(id, meta);
         int runtimeId = runtimeEntry.getRuntimeId();
         int damage = isBlock || isDurable || runtimeEntry.isHasDamage() ? 0 : meta;
