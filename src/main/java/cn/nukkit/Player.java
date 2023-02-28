@@ -3266,8 +3266,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     switch (interactPacket.action) {
                         case InteractPacket.ACTION_OPEN_INVENTORY:
-                            if(targetEntity instanceof EntityChestBoat chestBoat) {
+                            if(targetEntity instanceof EntityChestBoat) {
                                 if (this.protocol >= ProtocolInfo.v1_19_0) {
+                                    EntityChestBoat chestBoat = (EntityChestBoat) targetEntity;
                                     this.addWindow(chestBoat.getInventory());
                                 }
                                 break;

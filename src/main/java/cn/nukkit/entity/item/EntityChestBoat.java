@@ -127,14 +127,30 @@ public class EntityChestBoat extends EntityBoat implements InventoryHolder {
     @Override
     protected void dropItem() {
         switch (this.getVariant()) {
-            case 0 -> this.level.dropItem(this, Item.get(ItemID.OAK_CHEST_BOAT));
-            case 1 -> this.level.dropItem(this, Item.get(ItemID.SPRUCE_CHEST_BOAT));
-            case 2 -> this.level.dropItem(this, Item.get(ItemID.BIRCH_CHEST_BOAT));
-            case 3 -> this.level.dropItem(this, Item.get(ItemID.JUNGLE_CHEST_BOAT));
-            case 4 -> this.level.dropItem(this, Item.get(ItemID.ACACIA_CHEST_BOAT));
-            case 5 -> this.level.dropItem(this, Item.get(ItemID.DARK_OAK_CHEST_BOAT));
-            case 6 -> this.level.dropItem(this, Item.get(ItemID.MANGROVE_CHEST_BOAT));
-            default -> this.level.dropItem(this, Item.get(ItemID.CHEST_BOAT));
+            case 0:
+                this.level.dropItem(this, Item.get(ItemID.OAK_CHEST_BOAT));
+                break;
+            case 1:
+                this.level.dropItem(this, Item.get(ItemID.SPRUCE_CHEST_BOAT));
+                break;
+            case 2:
+                this.level.dropItem(this, Item.get(ItemID.BIRCH_CHEST_BOAT));
+                break;
+            case 3:
+                this.level.dropItem(this, Item.get(ItemID.JUNGLE_CHEST_BOAT));
+                break;
+            case 4:
+                this.level.dropItem(this, Item.get(ItemID.ACACIA_CHEST_BOAT));
+                break;
+            case 5:
+                this.level.dropItem(this, Item.get(ItemID.DARK_OAK_CHEST_BOAT));
+                break;
+            case 6:
+                this.level.dropItem(this, Item.get(ItemID.MANGROVE_CHEST_BOAT));
+                break;
+            default:
+                this.level.dropItem(this, Item.get(ItemID.CHEST_BOAT));
+                break;
         }
 
         for (Item item : this.inventory.getContents().values()) {
