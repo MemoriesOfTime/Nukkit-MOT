@@ -517,7 +517,7 @@ public class Server {
             ExceptionHandler.registerExceptionHandler();
             Sentry.init(options -> {
                 options.setDsn("https://b61b4bfc0057480e9644111aa4e78844@o4504694990700544.ingest.sentry.io/4504694992535552");
-                options.setTracesSampleRate(1.0); //错误报告率 0.0-1.0
+                options.setTracesSampleRate(0.5); //错误报告率 0.0-1.0
                 options.setDebug(false);
                 options.setTag("nukkit_version", Nukkit.VERSION);
                 options.setTag("branch", Nukkit.getBranch());

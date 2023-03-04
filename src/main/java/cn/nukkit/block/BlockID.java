@@ -277,7 +277,7 @@ public interface BlockID {
     int END_GATEWAY = 209;
     // 210 Allow in Education Edition
     // 211 Deny in Education Edition
-    // 212 Border in Education Edition
+    int BORDER_BLOCK = 212;
     int MAGMA = 213;
     int MAGMA_BLOCK = 213;
     int BLOCK_NETHER_WART_BLOCK = 214;
