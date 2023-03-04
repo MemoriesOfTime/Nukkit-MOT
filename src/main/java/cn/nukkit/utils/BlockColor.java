@@ -79,6 +79,8 @@ public class BlockColor  {
     public static final BlockColor WARPED_HYPHAE_BLOCK_COLOR = new BlockColor(0x56, 0x2C, 0x3E);
     public static final BlockColor WARPED_WART_BLOCK_COLOR = new BlockColor(0x14, 0xB4, 0x85);
 
+    public static final BlockColor FIRE_BLOCK_COLOR = TNT_BLOCK_COLOR;
+
     private final int red;
     private final int green;
     private final int blue;

@@ -15,7 +15,6 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.metadata.Metadatable;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
@@ -97,9 +96,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[BED_BLOCK] = BlockBed.class; //26
             list[POWERED_RAIL] = BlockRailPowered.class; //27
             list[DETECTOR_RAIL] = BlockRailDetector.class; //28
+            list[STICKY_PISTON] = BlockPistonSticky.class; //29
             list[COBWEB] = BlockCobweb.class; //30
             list[TALL_GRASS] = BlockTallGrass.class; //31
             list[DEAD_BUSH] = BlockDeadBush.class; //32
+            list[PISTON] = BlockPiston.class; //33
+            list[PISTON_HEAD] = BlockPistonHead.class; //34
             list[WOOL] = BlockWool.class; //35
             list[DANDELION] = BlockDandelion.class; //37
             list[FLOWER] = BlockFlower.class; //38
@@ -276,7 +278,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[END_GATEWAY] = BlockEndGateway.class; //209
             // 210 Allow in Education Edition
             // 211 Deny in Education Edition
-            // 212 Border in Education Edition
+            list[BORDER_BLOCK] = BlockBorder.class; //212
             list[MAGMA] = BlockMagma.class; //213
             list[BLOCK_NETHER_WART_BLOCK] = BlockNetherWartBlock.class; //214
             list[RED_NETHER_BRICK] = BlockBricksRedNether.class; //215
@@ -314,96 +316,87 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[NETHER_REACTOR] = BlockNetherReactor.class; //247
             list[INFO_UPDATE] = BlockInfoUpdate.class; //248
             list[INFO_UPDATE2] = BlockInfoUpdate2.class; //249
+            list[PISTON_EXTENSION] = BlockPistonExtension.class; //250
             list[OBSERVER] = BlockObserver.class; //251
             list[STRUCTURE_BLOCK] = BlockStructureBlock.class; //252
             list[HARD_GLASS] = BlockHardGlass.class; //253
             list[HARD_STAINED_GLASS] = BlockHardGlassStained.class; //254
             list[RESERVED6] = BlockReserved6.class; //255
 
-            if (Server.getInstance().minimumProtocol >= ProtocolInfo.v1_13_0){
-                list[PRISMARINE_STAIRS] = BlockStairsPrismarine.class; //257
-                list[DARK_PRISMARINE_STAIRS] = BlockStairsDarkPrismarine.class; //258
-                list[PRISMARINE_BRICKS_STAIRS] = BlockStairsPrismarineBrick.class; //259
-                list[STRIPPED_SPRUCE_LOG] = BlockWoodStrippedSpruce.class; //260
-                list[STRIPPED_BIRCH_LOG] = BlockWoodStrippedBirch.class; //261
-                list[STRIPPED_JUNGLE_LOG] = BlockWoodStrippedJungle.class; //262
-                list[STRIPPED_ACACIA_LOG] = BlockWoodStrippedAcacia.class; //263
-                list[STRIPPED_DARK_OAK_LOG] = BlockWoodStrippedDarkOak.class; //264
-                list[STRIPPED_OAK_LOG] = BlockWoodStrippedOak.class; //265
-                list[BLUE_ICE] = BlockBlueIce.class; //266
+            list[PRISMARINE_STAIRS] = BlockStairsPrismarine.class; //257
+            list[DARK_PRISMARINE_STAIRS] = BlockStairsDarkPrismarine.class; //258
+            list[PRISMARINE_BRICKS_STAIRS] = BlockStairsPrismarineBrick.class; //259
+            list[STRIPPED_SPRUCE_LOG] = BlockWoodStrippedSpruce.class; //260
+            list[STRIPPED_BIRCH_LOG] = BlockWoodStrippedBirch.class; //261
+            list[STRIPPED_JUNGLE_LOG] = BlockWoodStrippedJungle.class; //262
+            list[STRIPPED_ACACIA_LOG] = BlockWoodStrippedAcacia.class; //263
+            list[STRIPPED_DARK_OAK_LOG] = BlockWoodStrippedDarkOak.class; //264
+            list[STRIPPED_OAK_LOG] = BlockWoodStrippedOak.class; //265
+            list[BLUE_ICE] = BlockBlueIce.class; //266
 
-                list[SEAGRASS] = BlockSeagrass.class; //385
-                list[CORAL] = BlockCoral.class; //386
-                list[CORAL_BLOCK] = BlockCoralBlock.class; //387
-                list[CORAL_FAN] = BlockCoralFan.class; //388
-                list[CORAL_FAN_DEAD] = BlockCoralFanDead.class; //389
-                list[CORAL_FAN_HANG] = BlockCoralFanHang.class; //390
-                list[CORAL_FAN_HANG2] = BlockCoralFanHang2.class; //391
-                list[CORAL_FAN_HANG3] = BlockCoralFanHang3.class; //392
-                list[DRIED_KELP_BLOCK] = BlockDriedKelpBlock.class; //394
-                list[BLOCK_KELP] = BlockKelp.class; //393
+            list[SEAGRASS] = BlockSeagrass.class; //385
+            list[CORAL] = BlockCoral.class; //386
+            list[CORAL_BLOCK] = BlockCoralBlock.class; //387
+            list[CORAL_FAN] = BlockCoralFan.class; //388
+            list[CORAL_FAN_DEAD] = BlockCoralFanDead.class; //389
+            list[CORAL_FAN_HANG] = BlockCoralFanHang.class; //390
+            list[CORAL_FAN_HANG2] = BlockCoralFanHang2.class; //391
+            list[CORAL_FAN_HANG3] = BlockCoralFanHang3.class; //392
+            list[BLOCK_KELP] = BlockKelp.class; //393
+            list[DRIED_KELP_BLOCK] = BlockDriedKelpBlock.class; //394
 
-                list[CARVED_PUMPKIN] = BlockCarvedPumpkin.class; //410
-                list[SEA_PICKLE] = BlockSeaPickle.class; //411
-                list[BARRIER] = BlockBarrier.class; //416
-                list[STONE_SLAB3] = BlockSlabStone3.class ; //417
-                list[BAMBOO] = BlockBamboo.class; //418
-                list[BAMBOO_SAPLING] = BlockBambooSapling.class; //419
-                list[STONE_SLAB4] = BlockSlabStone4.class ; //421
+            list[CARVED_PUMPKIN] = BlockCarvedPumpkin.class; //410
+            list[SEA_PICKLE] = BlockSeaPickle.class; //411
 
-                list[SCAFFOLDING] = BlockScaffolding.class; //420
-                list[DOUBLE_STONE_SLAB3] = BlockDoubleSlabStone3.class; //422
-                list[DOUBLE_STONE_SLAB4] = BlockDoubleSlabStone4.class; //423
+            list[BARRIER] = BlockBarrier.class; //416
+            list[STONE_SLAB3] = BlockSlabStone3.class ; //417
+            list[BAMBOO] = BlockBamboo.class; //418
+            list[BAMBOO_SAPLING] = BlockBambooSapling.class; //419
+            list[SCAFFOLDING] = BlockScaffolding.class; //420
+            list[STONE_SLAB4] = BlockSlabStone4.class ; //421
+            list[DOUBLE_STONE_SLAB3] = BlockDoubleSlabStone3.class; //422
+            list[DOUBLE_STONE_SLAB4] = BlockDoubleSlabStone4.class; //423
+            list[GRANITE_STAIRS] = BlockStairsGranite.class; //424
+            list[DIORITE_STAIRS] = BlockStairsDiorite.class; //425
+            list[ANDESITE_STAIRS] = BlockStairsAndesite.class; //426
+            list[POLISHED_GRANITE_STAIRS] = BlockStairsGranitePolished.class; //427
+            list[POLISHED_DIORITE_STAIRS] = BlockStairsDioritePolished.class; //428
+            list[POLISHED_ANDESITE_STAIRS] = BlockStairsAndesitePolished.class; //429
+            list[MOSSY_STONE_BRICK_STAIRS] = BlockStairsMossyStoneBrick.class; //430
+            list[SMOOTH_RED_SANDSTONE_STAIRS] = BlockStairsSmoothRedSandstone.class; //431
+            list[SMOOTH_SANDSTONE_STAIRS] = BlockStairsSmoothSandstone.class; //432
+            list[END_BRICK_STAIRS] = BlockStairsEndBrick.class; //433
+            list[MOSSY_COBBLESTONE_STAIRS] = BlockStairsMossyCobblestone.class; //434
+            list[NORMAL_STONE_STAIRS] = BlockStairsStone.class; //435
 
-                list[GRANITE_STAIRS] = BlockStairsGranite.class; //424
-                list[DIORITE_STAIRS] = BlockStairsDiorite.class; //425
-                list[ANDESITE_STAIRS] = BlockStairsAndesite.class; //426
-                list[POLISHED_GRANITE_STAIRS] = BlockStairsGranitePolished.class; //427
-                list[POLISHED_DIORITE_STAIRS] = BlockStairsDioritePolished.class; //428
-                list[POLISHED_ANDESITE_STAIRS] = BlockStairsAndesitePolished.class; //429
-                list[MOSSY_STONE_BRICK_STAIRS] = BlockStairsMossyStoneBrick.class; //430
-                list[SMOOTH_RED_SANDSTONE_STAIRS] = BlockStairsSmoothRedSandstone.class; //431
-                list[SMOOTH_SANDSTONE_STAIRS] = BlockStairsSmoothSandstone.class; //432
-                list[END_BRICK_STAIRS] = BlockStairsEndBrick.class; //433
-                list[MOSSY_COBBLESTONE_STAIRS] = BlockStairsMossyCobblestone.class; //434
-                list[NORMAL_STONE_STAIRS] = BlockStairsStone.class; //435
+            list[SMOOTH_STONE] = BlockSmoothStone.class; //438
+            list[RED_NETHER_BRICK_STAIRS] = BlockStairsRedNetherBrick.class; //439
+            list[SMOOTH_QUARTZ_STAIRS] = BlockStairsSmoothQuartz.class; //440
 
-                list[SMOOTH_STONE] = BlockSmoothStone.class; //438
-                list[RED_NETHER_BRICK_STAIRS] = BlockStairsRedNetherBrick.class; //439
-                list[SMOOTH_QUARTZ_STAIRS] = BlockStairsSmoothQuartz.class; //440
-                list[BARREL] = BlockBarrel.class; //458
+            list[BARREL] = BlockBarrel.class; //458
 
-                list[BELL] = BlockBell.class; //461
-                list[SWEET_BERRY_BUSH] = BlockSweetBerryBush.class; //462
-                list[LANTERN] = BlockLantern.class; //463
-                list[CAMPFIRE_BLOCK] = BlockCampfire.class; //464
-                list[WOOD_BARK] = BlockWoodBark.class; //467
-                list[COMPOSTER] = BlockComposter.class; //468
+            list[BELL] = BlockBell.class; //461
+            list[SWEET_BERRY_BUSH] = BlockSweetBerryBush.class; //462
+            list[LANTERN] = BlockLantern.class; //463
+            list[CAMPFIRE_BLOCK] = BlockCampfire.class; //464
+            list[WOOD_BARK] = BlockWoodBark.class; //467
+            list[COMPOSTER] = BlockComposter.class; //468
 
-                //PISTON_HEAD_STICKY will work with more-blocks only
-                //For this reason register piston blocks with more-block support only
-                list[STICKY_PISTON] = BlockPistonSticky.class; //29
-                list[PISTON] = BlockPiston.class; //33
-                list[PISTON_HEAD] = BlockPistonHead.class; //34
-                list[PISTON_EXTENSION] = BlockPistonExtension.class; //250
-                list[PISTON_HEAD_STICKY] = BlockPistonHeadSticky.class; //472
-            }
+            list[PISTON_HEAD_STICKY] = BlockPistonHeadSticky.class; //472
 
-            if (Server.getInstance().minimumProtocol >= ProtocolInfo.v1_16_0){
-                list[CRIMSON_STEM] = BlockStemCrimson.class; //480
-                list[WARPED_STEM] = BlockStemWarped.class; //481
-                list[WARPED_WART_BLOCK] = BlockWarpedWartBlock.class; //482
-                list[CRIMSON_FUNGUS] = BlockFungusCrimson.class; //483
-                list[WARPED_FUNGUS] = BlockFungusWarped.class; //484
-                list[SHROOMLIGHT] = BlockShroomlight.class; //485
+            list[CRIMSON_STEM] = BlockStemCrimson.class; //480
+            list[WARPED_STEM] = BlockStemWarped.class; //481
+            list[WARPED_WART_BLOCK] = BlockWarpedWartBlock.class; //482
+            list[CRIMSON_FUNGUS] = BlockFungusCrimson.class; //483
+            list[WARPED_FUNGUS] = BlockFungusWarped.class; //484
+            list[SHROOMLIGHT] = BlockShroomlight.class; //485
 
-                list[CRIMSON_NYLIUM] = BlockNyliumCrimson.class; //487
-                list[WARPED_NYLIUM] = BlockNyliumWarped.class; //488
-                list[STRIPPED_CRIMSON_STEM] = BlockStemStrippedCrimson.class; //495
-                list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
-                list[CRIMSON_PLANKS] = BlockPlanksCrimson.class; //497
-                list[WARPED_PLANKS] = BlockPlanksWarped.class; //498
-            }
+            list[CRIMSON_NYLIUM] = BlockNyliumCrimson.class; //487
+            list[WARPED_NYLIUM] = BlockNyliumWarped.class; //488
+            list[STRIPPED_CRIMSON_STEM] = BlockStemStrippedCrimson.class; //495
+            list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
+            list[CRIMSON_PLANKS] = BlockPlanksCrimson.class; //497
+            list[WARPED_PLANKS] = BlockPlanksWarped.class; //498
 
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];
