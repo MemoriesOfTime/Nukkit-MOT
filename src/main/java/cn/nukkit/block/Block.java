@@ -308,7 +308,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[UNDERWATER_TORCH] = BlockUnderwaterTorch.class; //239
             list[CHORUS_PLANT] = BlockChorusPlant.class; //240
             list[STAINED_GLASS] = BlockGlassStained.class; //241
-            // 242 Camera in Education Edition
+            list[CAMERA_BLOCK] = BlockCamera.class; //242
             list[PODZOL] = BlockPodzol.class; //243
             list[BEETROOT_BLOCK] = BlockBeetroot.class; //244
             list[STONECUTTER] = BlockStonecutter.class; //244
@@ -397,6 +397,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
             list[CRIMSON_PLANKS] = BlockPlanksCrimson.class; //497
             list[WARPED_PLANKS] = BlockPlanksWarped.class; //498
+            list[CRIMSON_DOOR_BLOCK] = BlockDoorCrimson.class; //499
+            list[WARPED_DOOR_BLOCK] = BlockDoorWarped.class; //500
+
+            //TODO
+            //list[CRIMSON_TRAPDOOR] = BlockTrapdoorCrimson.class; //501
+            //list[WARPED_TRAPDOOR] = BlockTrapdoorWarped.class; //502
 
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];
