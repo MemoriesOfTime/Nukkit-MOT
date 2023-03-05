@@ -2,6 +2,8 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.custom.EntityDefinition;
+import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.data.EntityMetadata;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.*;
@@ -293,6 +295,10 @@ public class AddEntityPacket extends DataPacket {
 
         String identifier = this.mapping.get(type);
         if (identifier == null) {
+            EntityDefinition entityDefinition = EntityManager.get().getDefinition(this.type);
+            if (entityDefinition != null) {
+                return entityDefinition.getIdentifier();
+            }
             throw new IllegalStateException("Unknown entity with network id " + this.type + " protocol " + this.protocol);
         }
         return identifier;
