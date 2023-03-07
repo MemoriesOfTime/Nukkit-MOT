@@ -153,7 +153,7 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
                     this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                 }
                 if (this.stayTime <= 0 || Utils.rand())
-                    this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                    this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
             }
         }
 

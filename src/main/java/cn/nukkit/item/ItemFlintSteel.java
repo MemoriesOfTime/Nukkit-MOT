@@ -57,7 +57,7 @@ public class ItemFlintSteel extends ItemTool {
 
                 if (!e.isCancelled()) {
                     level.setBlock(fire, fire, true);
-                    level.scheduleUpdate(fire, Server.getInstance().lowProfileServer() ? Utils.rand(200, 400) : (fire.tickRate() + Utils.random.nextInt(10)));
+                    level.scheduleUpdate(fire, Server.getInstance().isLowProfileServer() ? Utils.rand(200, 400) : (fire.tickRate() + Utils.random.nextInt(10)));
                     level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_IGNITE);
 
                     if (!player.isCreative()) {

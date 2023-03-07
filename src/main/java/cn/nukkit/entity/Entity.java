@@ -1623,6 +1623,8 @@ public abstract class Entity extends Location implements Metadatable {
         double diffMotion = (this.motionX - this.lastMotionX) * (this.motionX - this.lastMotionX) + (this.motionY - this.lastMotionY) * (this.motionY - this.lastMotionY) + (this.motionZ - this.lastMotionZ) * (this.motionZ - this.lastMotionZ);
 
         if (diffPosition > 0.0001 || diffRotation > 1.0) { //0.2 ** 2, 1.5 ** 2
+            this.addMovement(this.x, this.isPlayer ? this.y : this.y + this.getBaseOffset(), this.z, this.yaw, this.pitch, this.headYaw == 0.0 || this.isPlayer ? this.yaw : this.headYaw);
+
             this.lastX = this.x;
             this.lastY = this.y;
             this.lastZ = this.z;
@@ -1631,7 +1633,6 @@ public abstract class Entity extends Location implements Metadatable {
             this.lastPitch = this.pitch;
             this.lastHeadYaw = this.headYaw;
 
-            this.addMovement(this.x, this.isPlayer ? this.y : this.y + this.getBaseOffset(), this.z, this.yaw, this.pitch, this.yaw);
             this.positionChanged = true;
         }else {
             this.positionChanged = false;

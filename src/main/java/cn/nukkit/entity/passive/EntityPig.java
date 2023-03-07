@@ -197,7 +197,7 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
         if (player.getInventory().getItemInHandFast().getId() == Item.CARROT_ON_A_STICK) {
             this.stayTime = 0;
             this.moveTime = 10;
-            this.yaw = player.yaw;
+            this.setBothYaw(player.yaw);
 
             strafe *= 0.4;
 
