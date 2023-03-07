@@ -169,7 +169,7 @@ public abstract class EntityWalking extends BaseEntity {
                         }
                     }
                     if ((this.passengers.isEmpty() || this instanceof EntityLlama) && (this.stayTime <= 0 || Utils.rand())) {
-                        this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                     return this.followTarget;
                 }
@@ -202,7 +202,7 @@ public abstract class EntityWalking extends BaseEntity {
                         }
                     }
                     if ((this.passengers.isEmpty() || this instanceof EntityLlama) && (this.stayTime <= 0 || Utils.rand())) {
-                        this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                 }
             }

@@ -16,8 +16,14 @@ public class EntityPiglinBrute extends EntityWalkingMob {
 
     public EntityPiglinBrute(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+    }
 
+    @Override
+    public void initEntity() {
         this.setMaxHealth(50);
+
+        super.initEntity();
+
         this.setDamage(new int[]{0, 3, 7, 10}); // no weapon
         //this.setDamage(new int[]{0, 6, 10, 15}); // with weapon
     }

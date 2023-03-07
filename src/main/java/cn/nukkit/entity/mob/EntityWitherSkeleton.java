@@ -32,10 +32,11 @@ public class EntityWitherSkeleton extends EntityWalkingMob implements EntitySmit
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(20);
+
         super.initEntity();
 
         this.fireProof = true;
-        this.setMaxHealth(20);
         this.setDamage(new int[] { 0, 5, 8, 12 });
     }
 

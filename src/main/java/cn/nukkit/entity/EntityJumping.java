@@ -134,7 +134,7 @@ public abstract class EntityJumping extends BaseEntity {
                         }
                     }
                     if (this.stayTime <= 0 || Utils.rand()) {
-                        this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                     return this.followTarget;
                 }
@@ -160,7 +160,7 @@ public abstract class EntityJumping extends BaseEntity {
                         }
                     }
                     if (this.stayTime <= 0 || Utils.rand()) {
-                        this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                 }
             }

@@ -45,9 +45,9 @@ public class EntityWitch extends EntityWalkingMob {
 
     @Override
     protected void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(26);
+
+        super.initEntity();
     }
 
     @Override

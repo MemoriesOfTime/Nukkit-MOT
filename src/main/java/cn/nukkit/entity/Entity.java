@@ -404,6 +404,7 @@ public abstract class Entity extends Location implements Metadatable {
     protected float ySize = 0;
     public boolean keepMovement = false;
 
+    protected boolean noFallDamage;
     public float fallDistance = 0;
     public int lastUpdate;
     public int fireTicks = 0;
@@ -1623,6 +1624,8 @@ public abstract class Entity extends Location implements Metadatable {
         double diffMotion = (this.motionX - this.lastMotionX) * (this.motionX - this.lastMotionX) + (this.motionY - this.lastMotionY) * (this.motionY - this.lastMotionY) + (this.motionZ - this.lastMotionZ) * (this.motionZ - this.lastMotionZ);
 
         if (diffPosition > 0.0001 || diffRotation > 1.0) { //0.2 ** 2, 1.5 ** 2
+            this.addMovement(this.x, this.isPlayer ? this.y : this.y + this.getBaseOffset(), this.z, this.yaw, this.pitch, this.headYaw == 0.0 || this.isPlayer ? this.yaw : this.headYaw);
+
             this.lastX = this.x;
             this.lastY = this.y;
             this.lastZ = this.z;
@@ -1631,7 +1634,6 @@ public abstract class Entity extends Location implements Metadatable {
             this.lastPitch = this.pitch;
             this.lastHeadYaw = this.headYaw;
 
-            this.addMovement(this.x, this.isPlayer ? this.y : this.y + this.getBaseOffset(), this.z, this.yaw, this.pitch, this.yaw);
             this.positionChanged = true;
         }else {
             this.positionChanged = false;
@@ -1927,16 +1929,17 @@ public abstract class Entity extends Location implements Metadatable {
     public void fall(float fallDistance) {
         if (fallDistance > 0.75) {
             if (!this.hasEffect(Effect.SLOW_FALLING)) {
-                float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));
-
                 Block down = this.level.getBlock(this.floor().down());
-                if (down.getId() == BlockID.HAY_BALE) {
-                    damage -= (damage * 0.8f);
-                }
+                if (!this.noFallDamage) {
+                    float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));
+                    if (down.getId() == BlockID.HAY_BALE) {
+                        damage -= (damage * 0.8f);
+                    }
 
-                if (damage > 0) {
-                    if (!this.isPlayer || level.getGameRules().getBoolean(GameRule.FALL_DAMAGE)) {
-                        this.attack(new EntityDamageEvent(this, DamageCause.FALL, damage));
+                    if (damage > 0) {
+                        if (!this.isPlayer || level.getGameRules().getBoolean(GameRule.FALL_DAMAGE)) {
+                            this.attack(new EntityDamageEvent(this, DamageCause.FALL, damage));
+                        }
                     }
                 }
 

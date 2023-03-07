@@ -11,6 +11,7 @@ public abstract class EntityFlying extends BaseEntity {
 
     public EntityFlying(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+        this.noFallDamage = true;
     }
 
     protected void checkTarget() {
@@ -110,7 +111,7 @@ public abstract class EntityFlying extends BaseEntity {
                         this.motionY = this.getSpeed() * 0.27 * (y / diff);
                     }
                     if (this.stayTime <= 0 || Utils.rand()) {
-                        this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                 }
 
@@ -131,7 +132,7 @@ public abstract class EntityFlying extends BaseEntity {
                         this.motionY = this.getSpeed() * 0.27 * (y / diff);
                     }
                     if (this.stayTime <= 0 || Utils.rand()) {
-                        this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                        this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                 }
             }

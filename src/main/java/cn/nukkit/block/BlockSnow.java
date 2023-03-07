@@ -67,7 +67,7 @@ public class BlockSnow extends BlockSolid {
 
     @Override
     public boolean onActivate(Item item, Player player) {
-        if (item.isShovel() && !Server.getInstance().lowProfileServer()) {
+        if (item.isShovel() && !Server.getInstance().isLowProfileServer()) {
             item.useOn(this);
             this.level.useBreakOn(this, item.clone().clearNamedTag(), null, true);
             return true;

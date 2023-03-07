@@ -57,10 +57,11 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(witherMaxHealth());
+
         super.initEntity();
 
         this.fireProof = true;
-        this.setMaxHealth(witherMaxHealth());
         this.setDamage(new int[]{0, 2, 4, 6});
         if (this.age == 0) {
             this.setDataProperty(new IntEntityData(DATA_WITHER_INVULNERABLE_TICKS, 200));

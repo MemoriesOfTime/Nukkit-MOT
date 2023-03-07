@@ -2,8 +2,8 @@ package cn.nukkit.entity.mob;
 
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
+import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemSwordIron;
 import cn.nukkit.level.format.FullChunk;
@@ -37,9 +37,10 @@ public class EntityVex extends EntityFlyingMob {
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(14);
+
         super.initEntity();
 
-        this.setMaxHealth(14);
         this.setDamage(new int[] { 0, 5, 9, 13 });
     }
 

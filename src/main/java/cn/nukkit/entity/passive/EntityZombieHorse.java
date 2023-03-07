@@ -40,9 +40,9 @@ public class EntityZombieHorse extends EntityHorseBase implements EntitySmite {
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(15);
+
+        super.initEntity();
     }
 
     @Override

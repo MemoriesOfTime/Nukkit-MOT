@@ -45,9 +45,10 @@ public class EntityPillager extends EntityWalkingMob {
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(24);
+
         super.initEntity();
 
-        this.setMaxHealth(24);
         this.setDamage(new int[] { 0, 4, 4, 5 });
     }
 

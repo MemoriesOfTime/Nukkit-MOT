@@ -53,9 +53,10 @@ public class EntityPolarBear extends EntityWalkingMob {
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(30);
+
         super.initEntity();
 
-        this.setMaxHealth(30);
         this.setDamage(new int[] { 0, 4, 6, 9 });
 
         if (this.namedTag.contains("Angry")) {

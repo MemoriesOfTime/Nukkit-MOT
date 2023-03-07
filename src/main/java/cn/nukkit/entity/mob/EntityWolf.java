@@ -73,6 +73,8 @@ public class EntityWolf extends EntityTameableMob {
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(8);
+
         super.initEntity();
 
         this.setFriendly(true);
@@ -90,7 +92,6 @@ public class EntityWolf extends EntityTameableMob {
             }
         }
 
-        this.setMaxHealth(8);
         this.setDamage(new int[] { 0, 3, 4, 6 });
     }
 

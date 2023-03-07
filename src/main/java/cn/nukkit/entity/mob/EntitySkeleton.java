@@ -37,13 +37,13 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(20);
+
         super.initEntity();
 
         if (java.time.LocalDate.now().toString().contains("-10-31") && Utils.rand(0, 10) < 2) {
             this.hasPumpkin = true;
         }
-
-        this.setMaxHealth(20);
     }
 
     @Override

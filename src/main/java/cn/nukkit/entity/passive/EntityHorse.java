@@ -47,9 +47,9 @@ public class EntityHorse extends EntityHorseBase {
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(Utils.rand(15, 30));
+
+        super.initEntity();
 
         if (this.namedTag.contains("Variant")) {
             this.variant = this.namedTag.getInt("Variant");

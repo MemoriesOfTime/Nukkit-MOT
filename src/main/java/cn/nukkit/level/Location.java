@@ -96,6 +96,12 @@ public class Location extends Position {
         return this;
     }
 
+    public Location setBothYaw(double yaw) {
+        this.yaw = yaw;
+        this.headYaw = yaw;
+        return this;
+    }
+
     public Location setPitch(double pitch) {
         this.pitch = pitch;
         return this;

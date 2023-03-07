@@ -5,7 +5,7 @@ import cn.nukkit.entity.EntityLiving;
 import cn.nukkit.entity.EntitySmite;
 import cn.nukkit.entity.mob.EntityBlaze;
 import cn.nukkit.entity.mob.EntityEnderman;
-import cn.nukkit.entity.passive.EntitySnowGolem;
+import cn.nukkit.entity.mob.EntitySnowGolem;
 import cn.nukkit.entity.passive.EntityStrider;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;

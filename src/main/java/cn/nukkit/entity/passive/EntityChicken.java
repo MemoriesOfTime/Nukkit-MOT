@@ -59,6 +59,8 @@ public class EntityChicken extends EntityWalkingAnimal {
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(4);
+
         super.initEntity();
 
         if (this.namedTag.contains("EggLayTime")) {
@@ -72,7 +74,7 @@ public class EntityChicken extends EntityWalkingAnimal {
         //    this.isChickenJockey = false;
         //}
 
-        this.setMaxHealth(4);
+        this.noFallDamage = true;
     }
 
     @Override

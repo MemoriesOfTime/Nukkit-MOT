@@ -2901,7 +2901,7 @@ public class Server {
      *
      * @return 是否开启低配服务器模式
      */
-    public boolean lowProfileServer() {
+    public boolean isLowProfileServer() {
         return lowProfileServer;
     }
 

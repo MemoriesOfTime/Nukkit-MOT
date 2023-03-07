@@ -64,9 +64,9 @@ public class EntityVillager extends EntityWalkingAnimal implements InventoryHold
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(10);
+
+        super.initEntity();
 
         this.inventory = new TradeInventory(this);
         this.recipes = new ArrayList<>();

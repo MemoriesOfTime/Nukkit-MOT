@@ -47,9 +47,10 @@ public class EntityStrider extends EntityWalkingAnimal implements EntityRideable
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(20);
+
         super.initEntity();
         this.fireProof = true;
-        this.setMaxHealth(20);
 
         if (this.namedTag.contains("Saddle")) {
             this.setSaddled(this.namedTag.getBoolean("Saddle"));
@@ -131,7 +132,7 @@ public class EntityStrider extends EntityWalkingAnimal implements EntityRideable
         if (player.getInventory().getItemInHandFast().getId() == Item.WARPED_FUNGUS_ON_A_STICK) {
             this.stayTime = 0;
             this.moveTime = 10;
-            this.yaw = player.yaw;
+            this.setBothYaw(player.yaw);
 
             strafe *= 0.4;
 

@@ -58,9 +58,9 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(10);
+
+        super.initEntity();
 
         if (this.namedTag.contains("Saddle")) {
             this.setSaddled(this.namedTag.getBoolean("Saddle"));
@@ -197,7 +197,7 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
         if (player.getInventory().getItemInHandFast().getId() == Item.CARROT_ON_A_STICK) {
             this.stayTime = 0;
             this.moveTime = 10;
-            this.yaw = player.yaw;
+            this.setBothYaw(player.yaw);
 
             strafe *= 0.4;
 

@@ -58,9 +58,9 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(20);
+
+        super.initEntity();
 
         if (this.namedTag.contains("powered")) {
             this.setPowered(this.namedTag.getBoolean("powered"));
@@ -153,7 +153,7 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
                     this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                 }
                 if (this.stayTime <= 0 || Utils.rand())
-                    this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                    this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
             }
         }
 

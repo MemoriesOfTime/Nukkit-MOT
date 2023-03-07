@@ -44,8 +44,9 @@ public class EntityDonkey extends EntityHorseBase {
 
     @Override
     public void initEntity() {
-        super.initEntity();
         this.setMaxHealth(15);
+
+        super.initEntity();
 
         if (this.namedTag.contains("ChestedHorse")) {
             this.setChested(this.namedTag.getBoolean("ChestedHorse"));

@@ -149,7 +149,7 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
     public void onPlayerInput(Player player, double strafe, double forward) {
         this.stayTime = 0;
         this.moveTime = 10;
-        this.yaw = player.yaw;
+        this.setBothYaw(player.yaw);
 
         strafe *= 0.4;
 

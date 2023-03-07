@@ -63,23 +63,22 @@ public class SimpleCommandMap implements CommandMap {
         this.register("nukkit", new WhitelistCommand("whitelist"));
         this.register("nukkit", new GameruleCommand("gamerule"));
         this.register("nukkit", new SpawnCommand("spawn"));
-        if (!Server.getInstance().lowProfileServer()) {
-            this.register("nukkit", new DefaultGamemodeCommand("defaultgamemode"));
-            this.register("nukkit", new SayCommand("say"));
-            this.register("nukkit", new MeCommand("me"));
-            this.register("nukkit", new SaveOnCommand("save-on"));
-            this.register("nukkit", new SaveOffCommand("save-off"));
-            this.register("nukkit", new DifficultyCommand("difficulty"));
-            this.register("nukkit", new ParticleCommand("particle"));
-            this.register("nukkit", new SpawnpointCommand("spawnpoint"));
-            this.register("nukkit", new TitleCommand("title"));
-            this.register("nukkit", new TransferServerCommand("transfer"));
-            this.register("nukkit", new SeedCommand("seed"));
-            this.register("nukkit", new PlaySoundCommand("playsound"));
-            this.register("nukkit", new DebugPasteCommand("debugpaste"));
-            this.register("nukkit", new GarbageCollectorCommand("gc"));
-            this.register("nukkit", new TimingsCommand("timings"));
-        }
+        this.register("nukkit", new DefaultGamemodeCommand("defaultgamemode"));
+        this.register("nukkit", new SayCommand("say"));
+        this.register("nukkit", new MeCommand("me"));
+        this.register("nukkit", new SaveOnCommand("save-on"));
+        this.register("nukkit", new SaveOffCommand("save-off"));
+        this.register("nukkit", new DifficultyCommand("difficulty"));
+        this.register("nukkit", new ParticleCommand("particle"));
+        this.register("nukkit", new SpawnpointCommand("spawnpoint"));
+        this.register("nukkit", new TitleCommand("title"));
+        this.register("nukkit", new TransferServerCommand("transfer"));
+        this.register("nukkit", new SeedCommand("seed"));
+        this.register("nukkit", new PlaySoundCommand("playsound"));
+        this.register("nukkit", new DebugPasteCommand("debugpaste"));
+        this.register("nukkit", new GarbageCollectorCommand("gc"));
+        this.register("nukkit", new TimingsCommand("timings"));
+        this.register("nukkit", new ClearCommand("clear"));
     }
 
     @Override

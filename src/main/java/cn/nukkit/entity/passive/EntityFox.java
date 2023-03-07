@@ -35,9 +35,9 @@ public class EntityFox extends EntityWalkingAnimal {
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(20);
+
+        super.initEntity();
     }
 
     @Override

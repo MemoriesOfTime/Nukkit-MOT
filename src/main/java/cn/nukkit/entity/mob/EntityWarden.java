@@ -40,9 +40,10 @@ public class EntityWarden extends EntityWalkingMob {
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(500);
+
         super.initEntity();
 
-        this.setMaxHealth(500);
         this.setDamage(new int[] { 0, 16, 30, 45 });
     }
 

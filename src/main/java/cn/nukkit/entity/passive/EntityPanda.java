@@ -1,8 +1,8 @@
 package cn.nukkit.entity.passive;
 
-import cn.nukkit.utils.Utils;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.Utils;
 
 public class EntityPanda extends EntityWalkingAnimal {
 
@@ -34,9 +34,9 @@ public class EntityPanda extends EntityWalkingAnimal {
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(20);
+
+        super.initEntity();
     }
 
     @Override

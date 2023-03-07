@@ -8,9 +8,9 @@ import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
+import cn.nukkit.entity.mob.EntitySnowGolem;
 import cn.nukkit.entity.mob.EntityWither;
 import cn.nukkit.entity.passive.EntityIronGolem;
-import cn.nukkit.entity.passive.EntitySnowGolem;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.weather.EntityLightning;
 import cn.nukkit.event.block.BlockBreakEvent;
@@ -117,8 +117,8 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.LEAVES2] = true;
         randomTickBlocks[Block.SNOW_LAYER] = true;
         randomTickBlocks[Block.ICE] = true;
-        if (!Server.getInstance().lowProfileServer()) randomTickBlocks[Block.LAVA] = true;
-        if (!Server.getInstance().lowProfileServer()) randomTickBlocks[Block.STILL_LAVA] = true;
+        if (!Server.getInstance().isLowProfileServer()) randomTickBlocks[Block.LAVA] = true;
+        if (!Server.getInstance().isLowProfileServer()) randomTickBlocks[Block.STILL_LAVA] = true;
         randomTickBlocks[Block.CACTUS] = true;
         randomTickBlocks[Block.BEETROOT_BLOCK] = true;
         randomTickBlocks[Block.CARROT_BLOCK] = true;
@@ -128,7 +128,7 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.WHEAT_BLOCK] = true;
         randomTickBlocks[Block.SUGARCANE_BLOCK] = true;
         randomTickBlocks[Block.NETHER_WART_BLOCK] = true;
-        if (!Server.getInstance().lowProfileServer()) randomTickBlocks[Block.FIRE] = true;
+        if (!Server.getInstance().isLowProfileServer()) randomTickBlocks[Block.FIRE] = true;
         randomTickBlocks[Block.GLOWING_REDSTONE_ORE] = true;
         randomTickBlocks[Block.COCOA_BLOCK] = true;
         randomTickBlocks[Block.ICE_FROSTED] = true;
@@ -2254,7 +2254,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public void dropExpOrb(Vector3 source, int exp, Vector3 motion, int delay) {
         Random rand = ThreadLocalRandom.current();
-        if (server.lowProfileServer()) {
+        if (server.isLowProfileServer()) {
             CompoundTag nbt = Entity.getDefaultNBT(source, motion == null ? new Vector3(
                             (rand.nextDouble() * 0.2 - 0.1) * 2,
                             rand.nextDouble() * 0.4,
@@ -3572,7 +3572,7 @@ public class Level implements ChunkManager, Metadatable {
     public boolean isSpawnChunk(int X, int Z) {
         Vector3 spawn = this.getSpawnLocation();
 
-        if (this.server.lowProfileServer() && !this.randomTickingEnabled()) {
+        if (this.server.isLowProfileServer() && !this.randomTickingEnabled()) {
             if (this.equals(this.getServer().getDefaultLevel())) {
                 return Math.abs(X - (spawn.getFloorX() >> 4)) <= 9 && Math.abs(Z - (spawn.getFloorZ() >> 4)) <= 9;
             }
@@ -3950,9 +3950,45 @@ public class Level implements ChunkManager, Metadatable {
         pk.pitch = (float) pitch;
         pk.onGround = entity.onGround;
 
-        for (Player p : entity.getViewers().values()) {
-            p.dataPacket(pk); // Server.broadcastPacket would only use batching for >= 1.16.100
+        if (this.server.isLowProfileServer()) {
+            for (Player p : entity.getViewers().values()) {
+                p.dataPacket(pk);
+            }
+            return;
         }
+        entity.getViewers().values().stream().filter(p -> p.protocol < ProtocolInfo.v1_16_100).forEach(p -> p.dataPacket(pk));
+
+        MoveEntityDeltaPacket pk2 = new MoveEntityDeltaPacket();
+        pk2.eid = entity.getId();
+        if (entity.lastX != x) {
+            pk2.x = (float) x;
+            pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_X;
+        }
+        if (entity.lastY != y) {
+            pk2.y = (float) y;
+            pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_Y;
+        }
+        if (entity.lastZ != z) {
+            pk2.z = (float) z;
+            pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_Z;
+        }
+        if (entity.lastPitch != pitch) {
+            pk2.pitchDelta = (float) pitch;
+            pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_PITCH;
+        }
+        if (entity.lastYaw != yaw) {
+            pk2.yawDelta = (float) yaw;
+            pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_YAW;
+        }
+        if (entity.lastHeadYaw != headYaw) {
+            pk2.headYawDelta = (float) headYaw;
+            pk2.flags |= MoveEntityDeltaPacket.FLAG_HAS_HEAD_YAW;
+        }
+        if (entity.onGround) {
+            pk2.flags |= MoveEntityDeltaPacket.FLAG_ON_GROUND;
+        }
+
+        entity.getViewers().values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_16_100).forEach(p -> p.dataPacket(pk2));
     }
 
     public boolean isRaining() {

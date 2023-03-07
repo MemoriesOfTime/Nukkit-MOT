@@ -313,6 +313,9 @@ public interface ItemID {
     int NETHERITE_BOOTS = 751;
     int NETHERITE_SCRAP = 752;
     //
+    int CRIMSON_DOOR = 755;
+    int WARPED_DOOR = 756;
+    //
     int WARPED_FUNGUS_ON_A_STICK = 757;
     //
     int RECORD_PIGSTEP = 759;

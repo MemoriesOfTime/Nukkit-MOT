@@ -2,8 +2,6 @@ package cn.nukkit.level.format.anvil.util;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GlobalBlockPalette;
-import cn.nukkit.level.util.PalettedBlockStorage;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -444,7 +442,14 @@ public class BlockStorage {
     }
 
     public BlockStorage copy() {
-        return new BlockStorage(blockIds.clone(), blockIdsExtra.clone(), blockData.copy(), blockDataExtra.copy(), blockDataHyperA.clone(), blockDataHyperB.clone());
+        return new BlockStorage(
+                blockIds.clone(),
+                blockIdsExtra.clone(),
+                blockData.copy(),
+                blockDataExtra.copy(),
+                blockDataHyperA.clone(),
+                blockDataHyperB.clone()
+        );
     }
 
     public boolean hasBlockIds() {
