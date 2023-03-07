@@ -49,6 +49,8 @@ public class EntityZombiePigman extends EntityWalkingMob implements EntitySmite 
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(20);
+
         super.initEntity();
 
         if (this.namedTag.contains("Angry")) {
@@ -56,7 +58,6 @@ public class EntityZombiePigman extends EntityWalkingMob implements EntitySmite 
         }
 
         this.fireProof = true;
-        this.setMaxHealth(20);
         this.setDamage(new int[] { 0, 5, 9, 13 });
     }
 

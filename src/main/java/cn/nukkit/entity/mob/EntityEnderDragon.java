@@ -47,10 +47,11 @@ public class EntityEnderDragon extends EntityFlyingMob implements EntityBoss {
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(200);
+
         super.initEntity();
 
         this.fireProof = true;
-        this.setMaxHealth(200);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_FIRE_IMMUNE, true);
     }
 

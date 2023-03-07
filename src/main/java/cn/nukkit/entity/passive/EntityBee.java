@@ -52,9 +52,9 @@ public class EntityBee extends EntityFlyingMob { // A mob because it needs to ha
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(10);
+
+        super.initEntity();
         this.setDamage(new int[]{0, 2, 2, 3});
     }
 

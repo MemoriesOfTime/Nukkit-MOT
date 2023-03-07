@@ -54,9 +54,10 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(20);
+
         super.initEntity();
 
-        this.setMaxHealth(20);
         this.setDamage(new int[] { 0, 2, 3, 4 });
 
         if (this.namedTag.contains("Item")) {

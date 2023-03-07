@@ -48,9 +48,10 @@ public class EntityEnderman extends EntityWalkingMob {
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(40);
+
         super.initEntity();
 
-        this.setMaxHealth(40);
         this.setDamage(new int[]{0, 4, 7, 10});
     }
 

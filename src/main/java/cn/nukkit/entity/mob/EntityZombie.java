@@ -55,10 +55,11 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(20);
+        
         super.initEntity();
 
         this.setDamage(new int[] { 0, 2, 3, 4 });
-        this.setMaxHealth(20);
 
         this.armor = getRandomArmor();
 

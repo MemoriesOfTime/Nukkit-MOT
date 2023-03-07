@@ -35,9 +35,9 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(20);
+
+        super.initEntity();
     }
 
     @Override

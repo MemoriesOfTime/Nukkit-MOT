@@ -33,8 +33,9 @@ public class EntityTadpole extends EntityWaterAnimal {
 
     @Override
     protected void initEntity() {
-        super.initEntity();
         this.setMaxHealth(6);
+
+        super.initEntity();
     }
 
     @Override

@@ -1,8 +1,8 @@
 package cn.nukkit.entity.passive;
 
-import cn.nukkit.utils.Utils;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.Utils;
 
 public class EntityTurtle extends EntityWaterAnimal {
 
@@ -29,9 +29,9 @@ public class EntityTurtle extends EntityWaterAnimal {
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(30);
+
+        super.initEntity();
     }
 
     @Override

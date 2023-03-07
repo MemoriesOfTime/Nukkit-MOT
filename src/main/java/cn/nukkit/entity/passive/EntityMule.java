@@ -1,11 +1,11 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
-import cn.nukkit.utils.Utils;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,9 +41,9 @@ public class EntityMule extends EntityHorseBase {
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(15);
+
+        super.initEntity();
     }
 
     @Override

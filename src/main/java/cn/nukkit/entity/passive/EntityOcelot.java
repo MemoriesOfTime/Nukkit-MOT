@@ -2,10 +2,10 @@ package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
 import cn.nukkit.entity.EntityCreature;
-import cn.nukkit.utils.Utils;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.Utils;
 
 public class EntityOcelot extends EntityTameableAnimal {
 
@@ -43,9 +43,11 @@ public class EntityOcelot extends EntityTameableAnimal {
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(10);
+
         super.initEntity();
 
-        this.setMaxHealth(10);
+        this.noFallDamage = true;
     }
 
     @Override

@@ -41,9 +41,11 @@ public class EntityCat extends EntityWalkingAnimal {
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(10);
+
         super.initEntity();
 
-        this.setMaxHealth(10);
+        this.noFallDamage = true;
     }
 
     @Override

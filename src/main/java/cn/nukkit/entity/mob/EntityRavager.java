@@ -25,9 +25,10 @@ public class EntityRavager extends EntityWalkingMob {
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(100);
+
         super.initEntity();
 
-        this.setMaxHealth(100);
         this.setDamage(new int[] { 0, 7, 12, 18 });
     }
 

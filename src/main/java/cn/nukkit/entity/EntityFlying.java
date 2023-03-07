@@ -11,6 +11,7 @@ public abstract class EntityFlying extends BaseEntity {
 
     public EntityFlying(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+        this.noFallDamage = true;
     }
 
     protected void checkTarget() {

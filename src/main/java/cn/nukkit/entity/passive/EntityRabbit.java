@@ -2,10 +2,10 @@ package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
 import cn.nukkit.entity.EntityCreature;
-import cn.nukkit.utils.Utils;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,9 +46,9 @@ public class EntityRabbit extends EntityJumpingAnimal {
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(3);
+
+        super.initEntity();
     }
 
     @Override

@@ -43,9 +43,10 @@ public class EntityPhantom extends EntityFlyingMob implements EntitySmite {
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(20);
+
         super.initEntity();
 
-        this.setMaxHealth(20);
         this.setDamage(new int[] { 0, 4, 6, 9 });
     }
 

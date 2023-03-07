@@ -45,9 +45,10 @@ public class EntityVindicator extends EntityWalkingMob {
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(24);
+
         super.initEntity();
 
-        this.setMaxHealth(24);
         this.setDamage(new int[] { 0, 2, 3, 4 });
     }
 

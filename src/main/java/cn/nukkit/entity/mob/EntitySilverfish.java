@@ -41,9 +41,10 @@ public class EntitySilverfish extends EntityWalkingMob implements EntityArthropo
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(8);
+
         super.initEntity();
 
-        this.setMaxHealth(8);
         this.setDamage(new int[] { 0, 1, 1, 1 });
     }
 

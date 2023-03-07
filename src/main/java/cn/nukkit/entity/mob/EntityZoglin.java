@@ -35,8 +35,9 @@ public class EntityZoglin extends EntityWalkingMob implements EntitySmite {
 
     @Override
     protected void initEntity() {
-        super.initEntity();
         this.setMaxHealth(40);
+
+        super.initEntity();
         this.setDamage(new int[]{0, 2, 3, 4});
     }
 

@@ -61,9 +61,9 @@ public class EntityLlama extends EntityHorseBase {
 
     @Override
     public void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(15);
+
+        super.initEntity();
 
         if (this.namedTag.contains("Variant")) {
             this.variant = this.namedTag.getInt("Variant");

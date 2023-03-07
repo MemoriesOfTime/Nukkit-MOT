@@ -45,10 +45,12 @@ public class EntityShulker extends EntityWalkingMob {
 
     @Override
     protected void initEntity() {
+        this.setMaxHealth(15);
+
         super.initEntity();
 
         this.fireProof = true;
-        this.setMaxHealth(15);
+        this.noFallDamage = true;
         this.setDamage(Utils.emptyDamageArray);
     }
 

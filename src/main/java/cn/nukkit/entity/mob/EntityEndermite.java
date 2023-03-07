@@ -41,9 +41,10 @@ public class EntityEndermite extends EntityWalkingMob implements EntityArthropod
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(8);
+
         super.initEntity();
 
-        this.setMaxHealth(8);
         this.setDamage(new int[] { 0, 2, 2, 3 });
     }
 
