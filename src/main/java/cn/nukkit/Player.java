@@ -2780,7 +2780,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     break;
                 case ProtocolInfo.MOVE_PLAYER_PACKET:
-                    if (this.teleportPosition != null || !this.spawned) {
+                    if (this.teleportPosition != null || !this.spawned || this.isMovementServerAuthoritative()) {
                         break;
                     }
 
@@ -2788,9 +2788,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getBaseOffset(), movePlayerPacket.z);
                     double dis = newPos.distanceSquared(this);
 
-                    /*if (dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
+                    if (dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
                         break;
-                    }*/
+                    }
 
                     if (dis > 100) {
                         this.sendPosition(this, movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
@@ -2798,12 +2798,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
 
                     Block block;
-                    if (!(this.getAdventureSettings().get(AdventureSettings.Type.NO_CLIP) ||
-                            !(block = this.level.getBlock(newPos.getFloorX(), NukkitMath.floorDouble(newPos.getY() + 0.2), newPos.getFloorZ(), false)).isSolid() ||
-                            (block.isTransparent() && !Player.canGoThrough(block)) ||
-                            block instanceof BlockFallable && !this.isInsideOfSolid())) {
-                        this.sendPosition(this.onGround && newPos.y < this.y ? this.add(0.0, 0.1, 0.0) : this, movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
-                        return;
+                    if (movePlayerPacket.y < this.y) {
+                        if (!(this.getAdventureSettings().get(AdventureSettings.Type.NO_CLIP) ||
+                                !(block = this.level.getBlock(newPos.getFloorX(), NukkitMath.floorDouble(newPos.getY() + 0.2), newPos.getFloorZ(), false)).isSolid() ||
+                                (block.isTransparent() && !Player.canGoThrough(block)) ||
+                                block instanceof BlockFallable && !this.isInsideOfSolid())) {
+                            this.sendPosition(this.add(0.0, 0.1, 0.0), movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
+                            return;
+                        }
                     }
 
                     boolean revert = false;
@@ -2979,12 +2981,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     }
 
-                    if (!(this.getAdventureSettings().get(AdventureSettings.Type.NO_CLIP) ||
-                            !(block = this.level.getBlock(clientPosition.getFloorX(), NukkitMath.floorDouble(clientPosition.getY() + 0.2), clientPosition.getFloorZ(), false)).isSolid() ||
-                            (block.isTransparent() && !Player.canGoThrough(block)) ||
-                            block instanceof BlockFallable && !this.isInsideOfSolid())) {
-                        this.sendPosition(this.onGround && clientPosition.y < this.y ? this.add(0.0, 0.1, 0.0) : this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
-                        return;
+                    if (clientPosition.y < this.y) {
+                        if (!(this.getAdventureSettings().get(AdventureSettings.Type.NO_CLIP) ||
+                                !(block = this.level.getBlock(clientPosition.getFloorX(), NukkitMath.floorDouble(clientPosition.getY() + 0.2), clientPosition.getFloorZ(), false)).isSolid() ||
+                                (block.isTransparent() && !Player.canGoThrough(block)) ||
+                                block instanceof BlockFallable && !this.isInsideOfSolid())) {
+                            this.sendPosition(this.add(0.0, 0.1, 0.0), authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
+                            return;
+                        }
                     }
 
                     boolean revertMotion = false;
