@@ -53,9 +53,15 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public int layer = 0;
 
+    private static final boolean[] usesFakeWater = new boolean[512];
+
     protected Block() {}
 
     public static void init() {
+        Block.usesFakeWater[SEAGRASS] = true;
+        Block.usesFakeWater[BLOCK_KELP] = true;
+        Block.usesFakeWater[415] = true;
+
         if (list == null) {
             list = new Class[MAX_BLOCK_ID];
             fullList = new Block[MAX_BLOCK_ID * (1 << DATA_BITS)];
@@ -1276,5 +1282,13 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         return Optional.empty();
+    }
+
+    public static boolean hasWater(int id) {
+        return id == WATER || id == STILL_WATER || usesFakeWater[id];
+    }
+
+    public static boolean usesFakeWater(int id) {
+        return usesFakeWater[id];
     }
 }
