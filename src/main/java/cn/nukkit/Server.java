@@ -257,6 +257,10 @@ public class Server {
      */
     public boolean forceResources;
     /**
+     * Allow clients to use their own resource packs when enabling mandatory resource packs
+     */
+    public boolean forceResourcesAllowOwnPacks;
+    /**
      * Force player gamemode to default on every join.
      */
     public boolean forceGamemode;
@@ -2954,6 +2958,7 @@ public class Server {
         this.isHardcore = this.getPropertyBoolean("hardcore", false);
         this.despawnMobs = this.getPropertyBoolean("entity-despawn-task", true);
         this.forceResources = this.getPropertyBoolean("force-resources", false);
+        this.forceResourcesAllowOwnPacks = this.getPropertyBoolean("force-resources-allow-client-packs", false);
         this.whitelistEnabled = this.getPropertyBoolean("white-list", false);
         this.checkOpMovement = this.getPropertyBoolean("check-op-movement", false);
         this.forceGamemode = this.getPropertyBoolean("force-gamemode", true);
@@ -3058,6 +3063,7 @@ public class Server {
             put("rcon.password", Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13));
             put("auto-save", true);
             put("force-resources", false);
+            put("force-resources-allow-client-packs", false);
             put("xbox-auth", true);
             put("bed-spawnpoints", true);
             put("explosion-break-blocks", true);
