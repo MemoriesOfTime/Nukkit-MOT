@@ -49,10 +49,7 @@ public class EntityFirework extends Entity {
         } else {
             lifetime = 30 + rand.nextInt(12);
         }
-        if (lifetime > 0) {
-            this.setLifetime(lifetime);
-        }
-
+        this.setLifetime(lifetime);
 
         this.motionX = rand.nextGaussian() * 0.001D;
         this.motionZ = rand.nextGaussian() * 0.001D;

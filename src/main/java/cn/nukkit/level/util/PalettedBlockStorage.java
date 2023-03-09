@@ -73,7 +73,7 @@ public class PalettedBlockStorage {
         }
     }
 
-    public void writeTo(int protocol, BinaryStream stream) {
+    public void writeTo(BinaryStream stream) {
         stream.putByte((byte) getPaletteHeader(bitArray.getVersion()));
 
         for (int word : bitArray.getWords()) {

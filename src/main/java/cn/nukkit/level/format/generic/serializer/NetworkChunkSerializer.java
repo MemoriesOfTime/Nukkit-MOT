@@ -147,7 +147,7 @@ public class NetworkChunkSerializer {
         }
 
         BinaryStream stream = ThreadCache.binaryStream.get().reset();
-        palette.writeTo(protocolId, stream);
+        palette.writeTo(stream);
         byte[] bytes = stream.getBuffer();
         stream.reset();
 

@@ -4,6 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.nbt.tag.ByteTag;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.Utils;
 
@@ -76,7 +77,7 @@ public abstract class ItemTool extends Item implements ItemDurable {
                 block.getToolType() == ItemTool.TYPE_HOE && this.isHoe() ||
                 block.getToolType() == ItemTool.TYPE_SWORD && this.isSword() ||
                 block.getToolType() == ItemTool.TYPE_SHEARS && this.isShears()
-                ) {
+        ) {
             this.meta++;
         } else if (!this.isShears() && block.calculateBreakTime(this) > 0) {
             this.meta += 2;
@@ -120,6 +121,16 @@ public abstract class ItemTool extends Item implements ItemDurable {
         return tag instanceof ByteTag && ((ByteTag) tag).data > 0;
     }
 
+    public ItemTool setUnbreakable(boolean unbreakable) {
+        var tag = this.getNamedTag();
+        if (tag == null) {
+            tag = new CompoundTag();
+        }
+        tag.putByte("Unbreakable", (byte) (unbreakable ? 1 : 0));
+        this.setNamedTag(tag);
+        return this;
+    }
+
     @Override
     public boolean isTool() {
         return true;
@@ -138,15 +149,17 @@ public abstract class ItemTool extends Item implements ItemDurable {
                 return 22;
             case TIER_IRON:
                 return 14;
+            //TODO
             case TIER_NETHERITE:
-                return 10; //TODO
+                return 10;
+            default:
+                return 0;
         }
-
-        return 0;
     }
 
     /**
      * No damage to item when it's used to attack entities
+     *
      * @return whether the item should take damage when used to attack entities
      */
     public boolean noDamageOnAttack() {
@@ -155,6 +168,7 @@ public abstract class ItemTool extends Item implements ItemDurable {
 
     /**
      * No damage to item when it's used to break blocks
+     *
      * @return whether the item should take damage when used to break blocks
      */
     public boolean noDamageOnBreak() {
