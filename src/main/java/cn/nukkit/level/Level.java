@@ -54,8 +54,10 @@ import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
+import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.scheduler.BlockUpdateScheduler;
 import cn.nukkit.utils.*;
+import co.aikar.timings.Timing;
 import co.aikar.timings.Timings;
 import co.aikar.timings.TimingsHistory;
 import com.google.common.base.Preconditions;
@@ -3272,33 +3274,26 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void processChunkRequest() {
-        if (this.timings.syncChunkSendTimer != null) {
-            this.timings.syncChunkSendTimer.startTiming();
-        }
+        Optional.ofNullable(this.timings.syncChunkSendTimer)
+                .ifPresent(Timing::startTiming);
 
         // Map shorted by index => requested protocols
         Long2ObjectMap<IntSet> chunkRequests = new Long2ObjectOpenHashMap<>();
         for (int protocolId : this.chunkSendQueues.keySet()) {
-            Set<Long> indexes = this.getChunkSendQueue(protocolId).keySet();
-            LongSet tasks = this.getChunkSendTasks(protocolId);
-            for (long index : indexes) {
-                //if (!tasks.contains(index)) {
-                //    IntSet absent = chunkRequests.computeIfAbsent(index, l -> new IntOpenHashSet());
-                //    absent.add(protocolId);
-                //    tasks.add(index);
-                //}
-
-                IntSet absent = chunkRequests.computeIfAbsent(index, l -> new IntOpenHashSet());
-                absent.add(protocolId);
+            for (long index : this.getChunkSendQueue(protocolId).keySet()) {
+                LongSet tasks = this.getChunkSendTasks(protocolId);
+                if (tasks.contains(index)) {
+                    continue;
+                }
+                chunkRequests.computeIfAbsent(index, l -> new IntOpenHashSet()).add(protocolId);
                 tasks.add(index);
             }
         }
 
         this.chunkRequestInternal(chunkRequests);
 
-        if (this.timings.syncChunkSendTimer != null) {
-            this.timings.syncChunkSendTimer.stopTiming();
-        }
+        Optional.ofNullable(this.timings.syncChunkSendTimer)
+                .ifPresent(Timing::stopTiming);
     }
 
     private void chunkRequestInternal(Long2ObjectMap<IntSet> chunkRequests) {
@@ -3356,10 +3351,13 @@ public class Level implements ChunkManager, Metadatable {
         LongSet tasks = this.getChunkSendTasks(protocol);
         if (tasks.contains(index)) {
             ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocol);
-            for (Player player : queue.get(index).values()) {
-                if (player.isConnected() && player.usedChunks.containsKey(index)) {
-                    if (matchMVChunkProtocol(protocol, player.protocol)) {
-                        player.sendChunk(x, z, subChunkCount, payload);
+
+            if (queue.containsKey(index)) {
+                for (Player player : queue.get(index).values()) {
+                    if (player.isConnected() && player.usedChunks.containsKey(index)) {
+                        if (matchMVChunkProtocol(protocol, player.protocol)) {
+                            player.sendChunk(x, z, subChunkCount, payload);
+                        }
                     }
                 }
             }
