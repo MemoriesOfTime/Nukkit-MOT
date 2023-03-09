@@ -122,7 +122,7 @@ public abstract class ItemTool extends Item implements ItemDurable {
     }
 
     public ItemTool setUnbreakable(boolean unbreakable) {
-        var tag = this.getNamedTag();
+        CompoundTag tag = this.getNamedTag();
         if (tag == null) {
             tag = new CompoundTag();
         }
