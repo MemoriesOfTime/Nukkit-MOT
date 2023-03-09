@@ -89,7 +89,6 @@ import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import lombok.extern.log4j.Log4j2;
-import lombok.var;
 import org.apache.commons.math3.util.FastMath;
 
 import java.awt.*;
@@ -1709,9 +1708,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        var invalidMoveEvent = new PlayerInvalidMoveEvent(this, false);
-        this.getServer().getPluginManager().callEvent(invalidMoveEvent);
-
         boolean invalidMotion = false;
         Location revertPos = this.getLocation().clone();
         double distance = clientPos.distanceSquared(this);
@@ -1720,7 +1716,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             invalidMotion = true;
             this.nextChunkOrderRun = 0;
         } else if (distance > 128) {
-            invalidMotion = invalidMoveEvent.isRevert();
+            invalidMotion = true;
             getServer().getLogger().warning(String.format("%s moved too far (%.2f)", this.getName(), distance));
         }
 
@@ -1752,6 +1748,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.riding == null && !this.hasEffect(Effect.LEVITATION) && !this.hasEffect(Effect.SLOW_FALLING)) {
             double diff = corrX * corrX + corrZ * corrZ;
             if (diff > 0.5) {
+                PlayerInvalidMoveEvent invalidMoveEvent = new PlayerInvalidMoveEvent(this, true);
+                this.getServer().getPluginManager().callEvent(invalidMoveEvent);
                 if (!invalidMoveEvent.isCancelled() && (invalidMotion = invalidMoveEvent.isRevert())) {
                     this.server.getLogger().warning(this.getServer().getLanguage().translateString("nukkit.player.invalidMove", this.getName()));
                 }
@@ -1799,7 +1797,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.server.getPluginManager().callEvent(event);
 
                 if (!(invalidMotion = event.isCancelled())) {
-                    if (!target.equals(event.getTo()) && invalidMoveEvent.isRevert()) {
+                    if (!target.equals(event.getTo())) {
                         this.teleport(event.getTo(), null);
                     } else {
                         //1.19.0-
@@ -1850,9 +1848,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        this.forceMovement = null;
-        if (distance != 0 && this.nextChunkOrderRun > 20) {
-            this.nextChunkOrderRun = 20;
+        if (invalidMotion) {
+            this.positionChanged = false;
+            this.setPositionAndRotation(revertPos.asVector3f().asVector3(), revertPos.getYaw(), revertPos.getPitch(), revertPos.getHeadYaw());
+            this.revertClientMotion(revertPos);
+        } else {
+            this.forceMovement = null;
+            if (distance != 0 && this.nextChunkOrderRun > 20) {
+                this.nextChunkOrderRun = 20;
+            }
         }
         this.resetClientMovement();
     }
