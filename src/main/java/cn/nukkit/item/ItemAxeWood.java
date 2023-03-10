@@ -37,4 +37,9 @@ public class ItemAxeWood extends ItemTool {
     public int getAttackDamage() {
         return 3;
     }
+
+    @Override
+    public boolean canBreakShield() {
+        return true;
+    }
 }

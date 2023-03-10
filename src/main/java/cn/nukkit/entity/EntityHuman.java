@@ -3,6 +3,7 @@ package cn.nukkit.entity;
 import cn.nukkit.Player;
 import cn.nukkit.entity.data.IntPositionEntityData;
 import cn.nukkit.entity.data.Skin;
+import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemShield;
 import cn.nukkit.level.format.FullChunk;
@@ -353,15 +354,15 @@ public class EntityHuman extends EntityHumanType {
     }
 
     @Override
-    protected void onBlock(Entity entity, boolean animate, float damage) {
-        super.onBlock(entity, animate, damage);
+    protected void onBlock(Entity entity, EntityDamageEvent event, boolean animate) {
+        super.onBlock(entity, event, animate);
         Item shieldOffhand = getOffhandInventory().getItem(0);
         if (shieldOffhand instanceof ItemShield) {
-            getOffhandInventory().setItem(0, damageArmor(shieldOffhand, entity, damage, true, null));
+            getOffhandInventory().setItem(0, damageArmor(shieldOffhand, entity, event.getDamage(), true, event.getCause()));
         } else {
             Item shield = getInventory().getItemInHand();
             if (shield instanceof ItemShield) {
-                getInventory().setItemInHand(damageArmor(shield, entity, damage, true, null));
+                getInventory().setItemInHand(damageArmor(shield, entity, event.getDamage(), true, event.getCause()));
             }
         }
     }

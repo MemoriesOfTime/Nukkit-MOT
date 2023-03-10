@@ -194,13 +194,13 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             ((EntityLiving) damager).knockBack(this, 0, deltaX, deltaZ);
         }
 
-        onBlock(damager, event.getAnimation(), source.getDamage());
+        onBlock(damager, source, event.getAnimation());
         return true;
     }
 
-    protected void onBlock(Entity entity, boolean animate, float damage) {
+    protected void onBlock(Entity entity, EntityDamageEvent event, boolean animate) {
         if (animate) {
-            getLevel().addSoundToViewers(this, Sound.ITEM_SHIELD_BLOCK);
+            this.getLevel().addSoundToViewers(this, Sound.ITEM_SHIELD_BLOCK);
         }
     }
 
