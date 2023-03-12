@@ -15,4 +15,8 @@ public interface ResourcePack {
     byte[] getSha256();
 
     byte[] getPackChunk(int off, int len);
+
+    default String getEncryptionKey() {
+        return "";
+    }
 }

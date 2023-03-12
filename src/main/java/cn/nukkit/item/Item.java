@@ -1427,6 +1427,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return false;
     }
 
+    public boolean canBreakShield() {
+        return false;
+    }
+
     public boolean onUse(Player player, int ticksUsed) {
         return false;
     }

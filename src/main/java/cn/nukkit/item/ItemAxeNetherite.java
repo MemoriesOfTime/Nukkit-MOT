@@ -33,4 +33,9 @@ public class ItemAxeNetherite extends ItemTool {
     public int getMaxDurability() {
         return ItemTool.DURABILITY_NETHERITE;
     }
+
+    @Override
+    public boolean canBreakShield() {
+        return true;
+    }
 }

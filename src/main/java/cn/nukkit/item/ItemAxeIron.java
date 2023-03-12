@@ -37,4 +37,9 @@ public class ItemAxeIron extends ItemTool {
     public int getAttackDamage() {
         return 5;
     }
+
+    @Override
+    public boolean canBreakShield() {
+        return true;
+    }
 }

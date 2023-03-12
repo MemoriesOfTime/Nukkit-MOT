@@ -29,6 +29,9 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
     private final Map<DamageModifier, Float> modifiers;
     private final Map<DamageModifier, Float> originals;
 
+    private boolean breakShield = false;
+    private int ShieldBreakCoolDown = 100;
+
     public EntityDamageEvent(Entity entity, DamageCause cause, float damage) {
         this(entity, cause, new DamageModifierFloatEnumMap(damage));
     }
@@ -120,6 +123,22 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
                 return false;
         }
         return true;
+    }
+
+    public boolean isBreakShield() {
+        return this.breakShield;
+    }
+
+    public void setBreakShield(boolean breakShield) {
+        this.breakShield = breakShield;
+    }
+
+    public int getShieldBreakCoolDown() {
+        return this.ShieldBreakCoolDown;
+    }
+
+    public void setShieldBreakCoolDown(int shieldBreakCoolDown) {
+        this.ShieldBreakCoolDown = shieldBreakCoolDown;
     }
 
     public enum DamageModifier {

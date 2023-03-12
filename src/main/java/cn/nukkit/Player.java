@@ -271,6 +271,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public Block breakingBlock = null;
     private PlayerBlockActionData lastBlockAction;
 
+    private static final int NO_SHIELD_DELAY = 10;
+    private int noShieldTicks;
+
     public int pickedXPOrb = 0;
     private boolean canPickupXP = true;
 
@@ -2029,8 +2032,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.highestPosition = this.y;
                     }
 
-                    if (this.isGliding() || this.isSwimming()) {
+                    // Wiki: 使用鞘翅滑翔时在垂直高度下降率低于每刻 0.5 格的情况下，摔落高度被重置为 1 格。
+                    // Wiki: 玩家在较小的角度和足够低的速度上着陆不会受到坠落伤害。着陆时临界伤害角度为50°，伤害值等同于玩家从滑行的最高点直接摔落到着陆点受到的伤害。
+                    if (this.isSwimming() || this.isGliding() && Math.abs(this.speed.y) < 0.5 && this.getPitch() <= 40) {
                         this.resetFallDistance();
+                    } else if (this.isGliding()) {
+                        this.resetInAirTicks();
                     } else {
                         ++this.inAirTicks;
                     }
@@ -2066,7 +2073,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private void updateBlockingFlag() {
-        boolean shieldInHand = this.getInventory().getItemInHandFast() instanceof ItemShield;
+        boolean shouldBlock = getNoShieldTicks() == 0
+                && (this.isSneaking() || getRiding() != null)
+                && (this.getInventory().getItemInHand() instanceof ItemShield || this.getOffhandInventory().getItem(0) instanceof ItemShield);
+
+        if (isBlocking() != shouldBlock) {
+            this.setBlocking(shouldBlock);
+        }
+
+        /*boolean shieldInHand = this.getInventory().getItemInHandFast() instanceof ItemShield;
         boolean shieldInOffhand = this.getOffhandInventory().getItemFast(0) instanceof ItemShield;
         if (isBlocking()) {
             if (!isSneaking() || (!shieldInHand && !shieldInOffhand)) {
@@ -2074,7 +2089,28 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         } else if (isSneaking() && (shieldInHand || shieldInOffhand)) {
             this.setBlocking(true);
+        }*/
+    }
+
+    @Override
+    public boolean entityBaseTick(int tickDiff) {
+        boolean hasUpdated = false;
+        if (isUsingItem()) {
+            if (noShieldTicks < NO_SHIELD_DELAY) {
+                noShieldTicks = NO_SHIELD_DELAY;
+                hasUpdated = true;
+            }
+        } else {
+            if (noShieldTicks > 0) {
+                noShieldTicks -= tickDiff;
+                hasUpdated = true;
+            }
+            if (noShieldTicks < 0) {
+                noShieldTicks = 0;
+                hasUpdated = true;
+            }
         }
+        return super.entityBaseTick(tickDiff) || hasUpdated;
     }
 
     public void checkInteractNearby() {
@@ -3465,6 +3501,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             break;
                     }
 
+                    if (animationEvent.getAnimationType() == AnimatePacket.Action.SWING_ARM) {
+                        this.setNoShieldTicks(NO_SHIELD_DELAY);
+                    }
+
                     animatePacket.eid = this.getId();
                     animatePacket.action = animationEvent.getAnimationType();
                     Server.broadcastPacket(this.getViewers().values(), animatePacket);
@@ -4099,6 +4139,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     }
 
                                     EntityDamageByEntityEvent entityDamageByEntityEvent = new EntityDamageByEntityEvent(this, target, DamageCause.ENTITY_ATTACK, damage, knockBack, enchantments);
+                                    entityDamageByEntityEvent.setBreakShield(item.canBreakShield());
                                     if (this.isSpectator()) entityDamageByEntityEvent.setCancelled();
                                     if ((target instanceof Player) && !this.level.getGameRules().getBoolean(GameRule.PVP)) {
                                         entityDamageByEntityEvent.setCancelled();
@@ -4711,6 +4752,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.fadeInTime = fadein;
         pk.stayTime = duration;
         pk.fadeOutTime = fadeout;
+        this.dataPacket(pk);
+    }
+
+    /**
+     * 设置指定itemCategory物品的冷却显示效果，注意该方法仅为客户端显示效果，冷却逻辑实现仍需自己实现
+     * <p>
+     * Set the cooling display effect of the specified itemCategory items, note that this method is only for client-side display effect, cooling logic implementation still needs to be implemented by itself
+     *
+     * @param coolDown     the cool down
+     * @param itemCategory the item category
+     */
+    public void setItemCoolDown(int coolDown, String itemCategory) {
+        PlayerStartItemCoolDownPacket pk = new PlayerStartItemCoolDownPacket();
+        pk.setCoolDownDuration(coolDown);
+        pk.setItemCategory(itemCategory);
         this.dataPacket(pk);
     }
 
@@ -6375,18 +6431,30 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.gamemode != SPECTATOR;
     }
 
-    /*@Override
-    protected void onBlock(Entity entity, boolean animate, float damage) {
-        super.onBlock(entity, animate, damage);
+    public int getNoShieldTicks() {
+        return this.noShieldTicks;
+    }
+
+    public void setNoShieldTicks(int noShieldTicks) {
+        this.noShieldTicks = noShieldTicks;
+    }
+
+    @Override
+    protected void onBlock(Entity entity, EntityDamageEvent event, boolean animate) {
+        super.onBlock(entity, event, animate);
+        if (event.isBreakShield()) {
+            this.setNoShieldTicks(event.getShieldBreakCoolDown());
+            this.setItemCoolDown(event.getShieldBreakCoolDown(), "shield");
+        }
         if (animate) {
-            this.setDataFlag(DATA_FLAGS, DATA_FLAG_SHIELD_SHAKING, true);
-            this.getServer().getScheduler().scheduleTask(null, ()-> {
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_BLOCKED_USING_DAMAGED_SHIELD, true);
+            this.getServer().getScheduler().scheduleTask(null, () -> {
                 if (this.isOnline()) {
-                    this.setDataFlag(DATA_FLAGS, DATA_FLAG_SHIELD_SHAKING, false);
+                    this.setDataFlag(DATA_FLAGS, DATA_FLAG_BLOCKED_USING_DAMAGED_SHIELD, false);
                 }
             });
         }
-    }*/
+    }
 
     /**
      * Get ticks since sleeping in the current world last time

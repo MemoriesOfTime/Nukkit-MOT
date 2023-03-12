@@ -14,8 +14,22 @@ public class ItemShield extends ItemTool {
         super(SHIELD, meta, count, "Shield");
     }
 
+    /**
+     * 为自定义盾牌提供的构造函数
+     * <p>
+     * Constructor for custom shield
+     *
+     * @param id    the id
+     * @param meta  the meta
+     * @param count the count
+     * @param name  the name
+     */
+    public ItemShield(int id, Integer meta, int count, String name) {
+        super(id, meta, count, name);
+    }
+
     @Override
     public int getMaxDurability() {
-        return 337;
+        return DURABILITY_SHIELD;
     }
 }
