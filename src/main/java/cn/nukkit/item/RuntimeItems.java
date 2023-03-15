@@ -32,6 +32,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping534;
     private static RuntimeItemMapping mapping560;
     private static RuntimeItemMapping mapping567;
+    private static RuntimeItemMapping mapping575;
 
     private static boolean initialized;
 
@@ -78,20 +79,23 @@ public class RuntimeItems {
         mapping534 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_534.json", ProtocolInfo.v1_19_10);
         mapping560 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_560.json", ProtocolInfo.v1_19_50);
         mapping567 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_567.json", ProtocolInfo.v1_19_60);
+        mapping575 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_575.json", ProtocolInfo.v1_19_70);
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_19_60) {
+        if (protocolId >= ProtocolInfo.v1_19_70_24) {
+            return mapping575;
+        } else if (protocolId >= ProtocolInfo.v1_19_60) {
             return mapping567;
-        }else if (protocolId >= ProtocolInfo.v1_19_50) {
+        } else if (protocolId >= ProtocolInfo.v1_19_50) {
             return mapping560;
-        }else if (protocolId >= ProtocolInfo.v1_19_10) {
+        } else if (protocolId >= ProtocolInfo.v1_19_10) {
             return mapping534;
-        }else if (protocolId >= ProtocolInfo.v1_19_0) {
+        } else if (protocolId >= ProtocolInfo.v1_19_0) {
             return mapping527;
-        }else if (protocolId >= ProtocolInfo.v1_18_30) {
+        } else if (protocolId >= ProtocolInfo.v1_18_30) {
             return mapping503;
-        }else if (protocolId >= ProtocolInfo.v1_18_10_26) {
+        } else if (protocolId >= ProtocolInfo.v1_18_10_26) {
             return mapping486;
         } else if (protocolId >= ProtocolInfo.v1_18_0) {
             return mapping475;

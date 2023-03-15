@@ -173,13 +173,20 @@ public class AddEntityPacket extends DataPacket {
             mapping.put(EntityFrog.NETWORK_ID, mapping.get(EntityRabbit.NETWORK_ID));
             mapping.put(EntityCat.NETWORK_ID, mapping.get(EntityTropicalFish.NETWORK_ID));
             mapping.put(EntityChestBoat.NETWORK_ID, mapping.get(EntityBoat.NETWORK_ID));
-        }else {
+        } else {
             mapping.put(EntityWarden.NETWORK_ID, "minecraft:warden");
             mapping.put(EntityFrog.NETWORK_ID, "minecraft:frog");
             mapping.put(EntityCat.NETWORK_ID, "minecraft:tadpole");
             mapping.put(EntityAllay.NETWORK_ID, "minecraft:allay");
             mapping.put(EntityChestBoat.NETWORK_ID, "minecraft:chest_boat");
         }
+
+        //TODO 骆驼正式加入时取消注释此段代码
+        /*if (protocolId < ProtocolInfo.???) {
+            mapping.put(EntityCamel.NETWORK_ID, mapping.get(EntityHorse.NETWORK_ID));
+        } else {
+            mapping.put(EntityCamel.NETWORK_ID, "minecraft:camel");
+        }*/
     }
 
     @Override
