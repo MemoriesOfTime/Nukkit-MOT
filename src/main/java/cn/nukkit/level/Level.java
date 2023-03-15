@@ -4503,7 +4503,9 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_19_60) { //调色板 物品运行时id
+        if (protocol >= ProtocolInfo.v1_19_70_24) { //调色板 物品运行时id
+            return ProtocolInfo.v1_19_70;
+        } else if (protocol >= ProtocolInfo.v1_19_60) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_60;
         } else if (protocol >= ProtocolInfo.v1_19_50) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_50;
@@ -4569,7 +4571,9 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_19_20)
             if (player >= ProtocolInfo.v1_19_20) if (player < ProtocolInfo.v1_19_50) return true;
         if (chunk == ProtocolInfo.v1_19_50) if (player == ProtocolInfo.v1_19_50) return true;
-        if (chunk == ProtocolInfo.v1_19_60) if (player >= ProtocolInfo.v1_19_60) return true;
+        if (chunk == ProtocolInfo.v1_19_60)
+            if (player >= ProtocolInfo.v1_19_60) if (player < ProtocolInfo.v1_19_70) return true;
+        if (chunk == ProtocolInfo.v1_19_70) if (player >= ProtocolInfo.v1_19_70) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

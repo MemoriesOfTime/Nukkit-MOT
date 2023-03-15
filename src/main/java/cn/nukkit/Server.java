@@ -1198,9 +1198,11 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_19_60) {
+        if (player.protocol >= ProtocolInfo.v1_19_70_24) {
+            player.dataPacket(CraftingManager.packet575);
+        } else if (player.protocol >= ProtocolInfo.v1_19_60) {
             player.dataPacket(CraftingManager.packet567);
-        }else if (player.protocol >= ProtocolInfo.v1_19_50) {
+        } else if (player.protocol >= ProtocolInfo.v1_19_50) {
             player.dataPacket(CraftingManager.packet560);
         } else if (player.protocol >= ProtocolInfo.v1_19_30_23) {
             player.dataPacket(CraftingManager.packet554);
@@ -2820,6 +2822,8 @@ public class Server {
         Entity.registerEntity("Axolotl", EntityAxolotl.class);
         Entity.registerEntity("GlowSquid", EntityGlowSquid.class);
         Entity.registerEntity("Allay", EntityAllay.class);
+        //TODO 骆驼正式加入时取消注释
+        //Entity.registerEntity("Camel", EntityCamel.class);
         //Vehicles
         Entity.registerEntity("MinecartRideable", EntityMinecartEmpty.class);
         Entity.registerEntity("MinecartChest", EntityMinecartChest.class);

@@ -88,6 +88,10 @@ public class AdventureSettingsPacket extends DataPacket {
     }
 
     public void setFlag(int flag, boolean value) {
+        // 有些参数是在AdventureSettingsPacket弃用后添加的，这里跳过这些参数
+        if (flag == -1) {
+            return;
+        }
         boolean flags = (flag & BITFLAG_SECOND_SET) != 0;
 
         if (value) {

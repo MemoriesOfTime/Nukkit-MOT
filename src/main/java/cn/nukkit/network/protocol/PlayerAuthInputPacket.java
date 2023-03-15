@@ -31,6 +31,7 @@ public class PlayerAuthInputPacket extends DataPacket {
     private Vector3f delta;
     // private ItemStackRequest itemStackRequest;
     private Map<PlayerActionType, PlayerBlockActionData> blockActionData = new EnumMap<>(PlayerActionType.class);
+    private Vector2 analogMoveVector;
 
     @Override
     public byte pid() {
@@ -86,6 +87,10 @@ public class PlayerAuthInputPacket extends DataPacket {
                         this.blockActionData.put(type, new PlayerBlockActionData(type, null, -1));
                 }
             }
+        }
+
+        if (protocol >= ProtocolInfo.v1_19_70_24) {
+            this.analogMoveVector = new Vector2(this.getLFloat(), this.getLFloat());
         }
     }
 
