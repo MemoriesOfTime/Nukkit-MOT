@@ -10,6 +10,8 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
+import java.lang.reflect.Field;
+import java.math.BigDecimal;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -462,4 +464,34 @@ public class Utils {
                 return "Unknown";
         }
     }
+
+    public static <T> T sumObjectsAndGet(Class<? extends T> clazz1, Class<? extends T> clazz2) {
+        try {
+            for (Field field : clazz1.getDeclaredFields()) {
+                field.setAccessible(true);
+                Object value1 = field.get(clazz1);
+                Object value2 = field.get(clazz2);
+                if (value1 instanceof Integer v1 && value2 instanceof Integer v2) {
+                    var sum = v1 + v2;
+                    field.set(clazz1, sum);
+                }
+                if (value1 instanceof Long v1 && value2 instanceof Long v2) {
+                    var sum = v1 + v2;
+                    field.set(clazz1, sum);
+                }
+                if (value1 instanceof Double v1 && value2 instanceof Double v2) {
+                    var sum = BigDecimal.valueOf(v1).add(BigDecimal.valueOf(v2));
+                    field.set(clazz1, sum.doubleValue());
+                }
+                if (value1 instanceof Float v1 && value2 instanceof Float v2) {
+                    var sum = BigDecimal.valueOf(v1).add(BigDecimal.valueOf(v2));
+                    field.set(clazz1, sum.floatValue());
+                }
+            }
+        } catch (IllegalAccessException e) {
+            e.printStackTrace();
+        }
+        return (T) clazz1;
+    }
+
 }
