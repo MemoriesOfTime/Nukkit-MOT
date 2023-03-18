@@ -2,7 +2,6 @@ package cn.nukkit.entity.mob;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityArthropod;
 import cn.nukkit.entity.EntityCreature;
@@ -62,11 +61,9 @@ public class EntitySpider extends EntityWalkingMob implements EntityArthropod {
     @Override
     protected boolean checkJump(double dx, double dz) {
         if (this.motionY == this.getGravity() * 2) {
-            int b = level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) this.y, NukkitMath.floorDouble(this.z));
-            return b == BlockID.WATER || b == BlockID.STILL_WATER;
+            return this.canSwimIn(level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) this.y, NukkitMath.floorDouble(this.z)));
         } else {
-            int b = level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) (this.y + 0.8), NukkitMath.floorDouble(this.z));
-            if (b == BlockID.WATER || b == BlockID.STILL_WATER) {
+            if (this.canSwimIn(level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) (this.y + 0.8), NukkitMath.floorDouble(this.z)))) {
                 this.motionY = this.getGravity() * 2;
                 return true;
             }
@@ -94,11 +91,9 @@ public class EntitySpider extends EntityWalkingMob implements EntityArthropod {
                     damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
                     if (player instanceof Player) {
-                        HashMap<Integer, Float> armorValues = new ArmorPoints();
-
                         float points = 0;
                         for (Item i : ((Player) player).getInventory().getArmorContents()) {
-                            points += armorValues.getOrDefault(i.getId(), 0f);
+                            points += this.getArmorPoints(i.getId());
                         }
                         damage.put(EntityDamageEvent.DamageModifier.ARMOR,
                                 (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));
@@ -126,13 +121,8 @@ public class EntitySpider extends EntityWalkingMob implements EntityArthropod {
     public Item[] getDrops() {
         List<Item> drops = new ArrayList<>();
 
-        for (int i = 0; i < Utils.rand(0, 2); i++) {
-            drops.add(Item.get(Item.STRING, 0, 1));
-        }
-
-        for (int i = 0; i < (Utils.rand(0, 2) == 0 ? 1 : 0); i++) {
-            drops.add(Item.get(Item.SPIDER_EYE, 0, 1));
-        }
+        drops.add(Item.get(Item.STRING, 0, Utils.rand(0, 2)));
+        drops.add(Item.get(Item.SPIDER_EYE, 0, Utils.rand(0, 2) == 0 ? 1 : 0));
 
         return drops.toArray(Item.EMPTY_ARRAY);
     }

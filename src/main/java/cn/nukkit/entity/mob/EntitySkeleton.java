@@ -73,13 +73,12 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
             double pitchR = FastMath.toRadians(pitch);
             Location pos = new Location(this.x - Math.sin(yawR) * Math.cos(pitchR) * 0.5, this.y + this.getHeight() - 0.18,
                     this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
-            if (this.getLevel().getBlockIdAt((int) pos.getX(), (int) pos.getY(), (int) pos.getZ()) == Block.AIR) {
+            if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) == Block.AIR) {
                 Entity k = Entity.createEntity("Arrow", pos, this);
-                if (!(k instanceof EntityArrow)) {
+                if (!(k instanceof EntityArrow arrow)) {
                     return;
                 }
 
-                EntityArrow arrow = (EntityArrow) k;
                 setProjectileMotion(arrow, pitch, yawR, pitchR, f);
 
                 EntityShootBowEvent ev = new EntityShootBowEvent(this, Item.get(Item.ARROW, 0, 1), arrow, f);
@@ -132,7 +131,7 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
 
         hasUpdate = super.entityBaseTick(tickDiff);
 
-        if (level.shouldMobBurn(this)) {
+        if (!this.closed && level.shouldMobBurn(this)) {
             this.setOnFire(100);
         }
 
@@ -143,13 +142,8 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
     public Item[] getDrops() {
         List<Item> drops = new ArrayList<>();
 
-        for (int i = 0; i < Utils.rand(0, 2); i++) {
-            drops.add(Item.get(Item.BONE, 0, 1));
-        }
-
-        for (int i = 0; i < Utils.rand(0, 2); i++) {
-            drops.add(Item.get(Item.ARROW, 0, 1));
-        }
+        drops.add(Item.get(Item.BONE, 0, Utils.rand(0, 2)));
+        drops.add(Item.get(Item.ARROW, 0, Utils.rand(0, 2)));
 
         return drops.toArray(Item.EMPTY_ARRAY);
     }

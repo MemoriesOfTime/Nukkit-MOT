@@ -5,7 +5,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
-import cn.nukkit.event.entity.ExplosionPrimeEvent;
+import cn.nukkit.event.entity.EntityExplosionPrimeEvent;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.WeakExplosion;
 import cn.nukkit.level.format.FullChunk;
@@ -26,17 +26,17 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
 
     @Override
     public float getWidth() {
-        return 0.45f;
+        return 0.31f;
     }
 
     @Override
     public float getHeight() {
-        return 0.45f;
+        return 0.31f;
     }
 
     @Override
     public float getGravity() {
-        return 0.01f;
+        return 0.005f;
     }
 
     @Override
@@ -45,8 +45,8 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
     }
 
     @Override
-    public double getDamage() {
-        return 5;
+    public double getBaseDamage() {
+        return 6;
     }
 
     public EntityGhastFireBall(FullChunk chunk, CompoundTag nbt) {
@@ -71,14 +71,17 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
             return false;
         }
 
-        if (this.age > 1200 || this.isCollided) {
+        if (this.age > 1200 || this.isCollided || this.hadCollision) {
             if (this.isCollided && this.canExplode) {
                 this.explode();
+            } else {
+                this.close();
             }
-            this.close();
+            return false;
         }
 
-        return super.onUpdate(currentTick);
+        super.onUpdate(currentTick);
+        return !this.closed;
     }
     
     @Override
@@ -88,9 +91,9 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
 
     @Override
     public boolean attack(EntityDamageEvent source) {
-        if (!directionChanged && source instanceof EntityDamageByEntityEvent) {
+        if (!this.directionChanged && source instanceof EntityDamageByEntityEvent) {
             if (((EntityDamageByEntityEvent) source).getDamager() instanceof Player) {
-                directionChanged = true;
+                this.directionChanged = true;
                 this.setMotion(((EntityDamageByEntityEvent) source).getDamager().getLocation().getDirectionVector());
             }
         }
@@ -100,7 +103,12 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
 
     @Override
     public void explode() {
-        ExplosionPrimeEvent ev = new ExplosionPrimeEvent(this, 1.2);
+        if (this.closed) {
+            return;
+        }
+        this.close();
+
+        EntityExplosionPrimeEvent ev = new EntityExplosionPrimeEvent(this, 1.2);
         this.server.getPluginManager().callEvent(ev);
         if (!ev.isCancelled()) {
             WeakExplosion explosion = new WeakExplosion(this, (float) ev.getForce(), this.shootingEntity);

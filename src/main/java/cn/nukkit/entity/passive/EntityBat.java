@@ -37,9 +37,4 @@ public class EntityBat extends EntityFlyingAnimal {
     public int getKillExperience() {
         return 0;
     }
-
-    @Override
-    public boolean doesTriggerPressurePlate() {
-        return false;
-    }
 }

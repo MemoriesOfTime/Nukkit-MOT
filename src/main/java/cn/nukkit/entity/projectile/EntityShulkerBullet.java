@@ -42,7 +42,7 @@ public class EntityShulkerBullet extends EntityProjectile {
     }
 
     @Override
-    protected double getDamage() {
+    protected double getBaseDamage() {
         return 4;
     }
 
@@ -60,11 +60,13 @@ public class EntityShulkerBullet extends EntityProjectile {
             return false;
         }
 
-        if (this.age > 1200 || this.isCollided) {
+        if (this.age > 1200 || this.isCollided || this.hadCollision) {
             this.close();
+            return false;
         }
 
-        return super.onUpdate(currentTick);
+        super.onUpdate(currentTick);
+        return !this.closed;
     }
 
     @Override

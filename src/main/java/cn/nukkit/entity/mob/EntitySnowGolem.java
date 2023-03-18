@@ -77,8 +77,8 @@ public class EntitySnowGolem extends EntityWalkingMob {
             this.attackDelay = 0;
 
             double f = 1.2;
-            double yaw = this.yaw + Utils.rand(-12.0, 12.0);
-            double pitch = this.pitch + Utils.rand(-7.0, 7.0);
+            double yaw = this.yaw + Utils.rand(-4.0, 4.0);
+            double pitch = this.pitch + Utils.rand(-4.0, 4.0);
             Location location = new Location(this.x + (-Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5), this.y + this.getEyeHeight(),
                     this.z + (Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5), yaw, pitch, this.level);
             Entity k = Entity.createEntity("Snowball", location, this);

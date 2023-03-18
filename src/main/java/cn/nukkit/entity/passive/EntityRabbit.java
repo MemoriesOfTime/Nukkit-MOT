@@ -4,7 +4,10 @@ import cn.nukkit.Player;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.particle.ItemBreakParticle;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
@@ -56,9 +59,9 @@ public class EntityRabbit extends EntityJumpingAnimal {
         if (creature instanceof Player) {
             Player player = (Player) creature;
             int id = player.getInventory().getItemInHandFast().getId();
-            return player.spawned && player.isAlive() && !player.closed && (id == Item.CARROT || id == Item.GOLDEN_CARROT) && distance <= 40;
+            return player.spawned && player.isAlive() && !player.closed && (id == Item.DANDELION || id == Item.CARROT || id == Item.GOLDEN_CARROT) && distance <= 49;
         }
-        return false;
+        return super.targetOption(creature, distance);
     }
 
     @Override
@@ -68,10 +71,7 @@ public class EntityRabbit extends EntityJumpingAnimal {
         if (!this.isBaby()) {
             drops.add(Item.get(Item.RABBIT_HIDE, 0, Utils.rand(0, 1)));
             drops.add(Item.get(this.isOnFire() ? Item.COOKED_RABBIT : Item.RAW_RABBIT, 0, Utils.rand(0, 1)));
-
-            for (int i = 0; i < (Utils.rand(0, 101) <= 9 ? 1 : 0); i++) {
-                drops.add(Item.get(Item.RABBIT_FOOT, 0, 1));
-            }
+            drops.add(Item.get(Item.RABBIT_FOOT, 0, Utils.rand(0, 101) <= 9 ? 1 : 0));
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);
@@ -80,5 +80,17 @@ public class EntityRabbit extends EntityJumpingAnimal {
     @Override
     public int getKillExperience() {
         return this.isBaby() ? 0 : Utils.rand(1, 3);
+    }
+
+    @Override
+    public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
+        if (item.getId() == Item.DANDELION || item.getId() == Item.CARROT || item.getId() == Item.GOLDEN_CARROT) {
+            player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
+            this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EAT);
+            this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(),0), item));
+            this.setInLove();
+            return true;
+        }
+        return super.onInteract(player, item, clickedPos);
     }
 }

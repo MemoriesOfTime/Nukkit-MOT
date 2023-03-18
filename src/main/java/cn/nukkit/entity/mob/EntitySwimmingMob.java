@@ -3,11 +3,11 @@ package cn.nukkit.entity.mob;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.utils.Utils;
 import cn.nukkit.entity.EntitySwimming;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.Utils;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -76,7 +76,7 @@ public abstract class EntitySwimmingMob extends EntitySwimming implements Entity
     }
 
     public void setDamage(int[] damage) {
-        if (damage.length < 4) {
+        if (damage.length != 4) {
             throw new IllegalArgumentException("Invalid damage array length");
         }
 
@@ -95,12 +95,12 @@ public abstract class EntitySwimmingMob extends EntitySwimming implements Entity
     }
 
     public void setMinDamage(int[] damage) {
-        if (damage.length < 4) {
-            return;
+        if (damage.length != 4) {
+            throw new IllegalArgumentException("Invalid damage array length");
         }
 
         for (int i = 0; i < 4; i++) {
-            this.setMinDamage(Math.min(damage[i], this.getMaxDamage(i)), i);
+            this.setMinDamage(damage[i], i);
         }
     }
 
@@ -115,16 +115,17 @@ public abstract class EntitySwimmingMob extends EntitySwimming implements Entity
     }
 
     public void setMaxDamage(int[] damage) {
-        if (damage.length < 4)
-            return;
+        if (damage.length != 4) {
+            throw new IllegalArgumentException("Invalid damage array length");
+        }
 
         for (int i = 0; i < 4; i++) {
-            this.setMaxDamage(Math.max(damage[i], this.getMinDamage(i)), i);
+            this.setMaxDamage(damage[i], i);
         }
     }
 
     public void setMaxDamage(int damage) {
-        setMinDamage(damage, Server.getInstance().getDifficulty());
+        this.setMaxDamage(damage, Server.getInstance().getDifficulty());
     }
 
     public void setMaxDamage(int damage, int difficulty) {

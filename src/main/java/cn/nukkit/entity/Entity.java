@@ -2406,7 +2406,6 @@ public abstract class Entity extends Location implements Metadatable {
 
     /**
      * Whether the entity can active pressure plates.
-     * Used for {@link cn.nukkit.entity.passive.EntityBat}s only.
      *
      * @return triggers pressure plate
      */

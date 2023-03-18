@@ -59,11 +59,6 @@ public class EntityBee extends EntityFlyingMob { // A mob because it needs to ha
     }
 
     @Override
-    public boolean doesTriggerPressurePlate() {
-        return false;
-    }
-
-    @Override
     public double getSpeed() {
         return 1.2;
     }
@@ -75,10 +70,9 @@ public class EntityBee extends EntityFlyingMob { // A mob because it needs to ha
             HashMap<EntityDamageEvent.DamageModifier, Float> damage = new HashMap<>();
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
             if (player instanceof Player) {
-                HashMap<Integer, Float> armorValues = new ArmorPoints();
                 float points = 0;
                 for (Item i : ((Player) player).getInventory().getArmorContents()) {
-                    points += armorValues.getOrDefault(i.getId(), 0f);
+                    points += this.getArmorPoints(i.getId());
                 }
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR,
                         (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(

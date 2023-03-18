@@ -1,16 +1,20 @@
 package cn.nukkit.entity.mob;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.Location;
+import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.sound.EndermanTeleportSound;
 import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
 
@@ -21,6 +25,8 @@ public class EntityEnderman extends EntityWalkingMob {
     public static final int NETWORK_ID = 38;
 
     private int angry = 0;
+
+    private boolean teleported;
 
     public EntityEnderman(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -63,11 +69,9 @@ public class EntityEnderman extends EntityWalkingMob {
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
             if (player instanceof Player) {
-                HashMap<Integer, Float> armorValues = new ArmorPoints();
-
                 float points = 0;
                 for (Item i : ((Player) player).getInventory().getArmorContents()) {
-                    points += armorValues.getOrDefault(i.getId(), 0f);
+                    points += this.getArmorPoints(i.getId());
                 }
 
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR,
@@ -93,10 +97,10 @@ public class EntityEnderman extends EntityWalkingMob {
                     setAngry(2400);
                 }
                 ev.setCancelled(true);
-                tp();
+                this.teleport();
                 return false;
-            } else if (Utils.rand(1, 10) == 1) {
-                tp();
+            } else if (!this.teleported && Utils.rand(1, 10) == 1) {
+                this.teleport();
             }
         }
         return true;
@@ -114,41 +118,70 @@ public class EntityEnderman extends EntityWalkingMob {
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        if (getServer().getDifficulty() == 0) {
+        if (this.closed) {
+            return false;
+        }
+
+        if (this.getServer().getDifficulty() == 0) {
             this.close();
             return true;
         }
 
-        int b = level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) this.y, NukkitMath.floorDouble(this.z));
-        if (b == BlockID.WATER || b == BlockID.STILL_WATER) {
-            this.attack(new EntityDamageEvent(this, EntityDamageEvent.DamageCause.DROWNING, 2));
-            if (isAngry()) {
-                setAngry(0);
-            }
-            tp();
-        } else if (Utils.rand(0, 500) == 20) {
-            tp();
-        }
-
-        if (this.level.isRaining() && Utils.rand(1, 5) == 1 && this.canSeeSky()) {
-            this.attack(new EntityDamageEvent(this, EntityDamageEvent.DamageCause.DROWNING, 1f));
-            if (isAngry()) {
-                setAngry(0);
-            }
-            tp();
-        }
+        this.teleported = false;
 
         if (this.angry > 0) {
-            this.angry--;
+            if (this.angry == 1) {
+                this.setAngry(0);
+            } else {
+                this.angry--;
+            }
+        }
+
+        int b = level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) this.y, NukkitMath.floorDouble(this.z));
+        if (b == BlockID.WATER || b == BlockID.STILL_WATER || (this.level.isRaining() && Utils.rand() && this.level.canBlockSeeSky(this))) {
+            this.attack(new EntityDamageEvent(this, EntityDamageEvent.DamageCause.DROWNING, 1));
+            this.setAngry(0);
+            this.teleport();
+        } else if (Utils.rand(0, 500) == 20) {
+            this.setAngry(0);
+            this.teleport();
         }
 
         return super.entityBaseTick(tickDiff);
     }
 
-    private void tp() {
-        this.level.addSound(new EndermanTeleportSound(this));
-        this.move(Utils.rand(-10, 10), 0, Utils.rand(-10, 10));
-        this.level.addSound(new EndermanTeleportSound(this));
+    public void teleport() {
+        Location to = this.getSafeTpLocation();
+        if (to != null) {
+            this.level.addSound(this, Sound.MOB_ENDERMEN_PORTAL);
+            if (this.teleport(to, PlayerTeleportEvent.TeleportCause.UNKNOWN)) {
+                this.level.addSound(this, Sound.MOB_ENDERMEN_PORTAL);
+                this.teleported = true;
+            }
+        }
+    }
+
+    private Location getSafeTpLocation() {
+        double dx = this.x + Utils.rand(-16, 16);
+        double dz = this.z + Utils.rand(-16, 16);
+        Vector3 pos = new Vector3(Math.floor(dx), (int) Math.floor(this.y + 0.1) + 16, Math.floor(dz));
+        FullChunk chunk = this.level.getChunk((int) pos.x >> 4, (int) pos.z >> 4, false);
+        int x = (int) pos.x & 0x0f;
+        int z = (int) pos.z & 0x0f;
+        int previousY1 = -1;
+        int previousY2 = -1;
+        if (chunk != null && chunk.isGenerated()) {
+            for (int y = Math.min(255, (int) pos.y); y >= 0; y--) {
+                if (previousY1 > -1 && previousY2 > -1) {
+                    if (Block.solid[chunk.getBlockId(x, y, z)] && chunk.getBlockId(x, previousY1, z) == 0 && chunk.getBlockId(x, previousY2, z) == 0) {
+                        return new Location(pos.x + 0.5, previousY1 + 0.1, pos.z + 0.5, this.level);
+                    }
+                }
+                previousY2 = previousY1;
+                previousY1 = y;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -165,18 +198,19 @@ public class EntityEnderman extends EntityWalkingMob {
     }
 
     public void setAngry(int val) {
-        this.angry = val;
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ANGRY, val > 0);
+        if (this.angry != val) {
+            this.angry = val;
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_ANGRY, val > 0);
+        }
     }
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
         if (!isAngry()) return false;
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
-            return !player.closed && player.spawned && player.isAlive() && (player.isSurvival() || player.isAdventure()) && distance <= 256;
+        if (creature instanceof Player player) {
+            return !player.closed && player.spawned && player.isAlive() && (player.isSurvival() || player.isAdventure()) && distance <= 1024;
         }
-        return creature.isAlive() && !creature.closed && distance <= 256;
+        return creature.isAlive() && !creature.closed && distance <= 1024;
     }
 
     public void stareToAngry() {

@@ -57,14 +57,14 @@ public class EntityWitherSkeleton extends EntityWalkingMob implements EntitySmit
             HashMap<EntityDamageEvent.DamageModifier, Float> damage = new HashMap<>();
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
             if (player instanceof Player) {
-                HashMap<Integer, Float> armorValues = new ArmorPoints();
                 float points = 0;
                 for (Item i : ((Player) player).getInventory().getArmorContents()) {
-                    points += armorValues.getOrDefault(i.getId(), 0f);
+                    points += this.getArmorPoints(i.getId());
                 }
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR, (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));
             }
             if (player.attack(new EntityDamageByEntityEvent(this, player, EntityDamageEvent.DamageCause.ENTITY_ATTACK, damage))) {
+                this.playAttack();
                 player.addEffect(Effect.getEffect(Effect.WITHER).setDuration(200));
             }
         }
@@ -85,9 +85,7 @@ public class EntityWitherSkeleton extends EntityWalkingMob implements EntitySmit
     public Item[] getDrops() {
         List<Item> drops = new ArrayList<>();
 
-        for (int i = 0; i < Utils.rand(0, 2); i++) {
-            drops.add(Item.get(Item.BONE, 0, 1));
-        }
+        drops.add(Item.get(Item.BONE, 0, Utils.rand(0, 2)));
 
         if (Utils.rand(1, 3) == 1) {
             drops.add(Item.get(Item.COAL, 0, 1));
@@ -101,7 +99,7 @@ public class EntityWitherSkeleton extends EntityWalkingMob implements EntitySmit
             drops.add(Item.get(Item.STONE_SWORD, Utils.rand(0, 131), 1));
         }
 
-        return drops.toArray(new Item[0]);
+        return drops.toArray(Item.EMPTY_ARRAY);
     }
 
     @Override

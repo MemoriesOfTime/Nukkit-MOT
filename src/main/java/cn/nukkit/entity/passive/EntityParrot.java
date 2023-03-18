@@ -12,7 +12,7 @@ public class EntityParrot extends EntityFlyingAnimal {
 
     public static final int NETWORK_ID = 30;
 
-    public int variant;
+    private int variant;
 
     private static final int[] VARIANTS = {0, 1, 2, 3, 4};
 
@@ -68,15 +68,14 @@ public class EntityParrot extends EntityFlyingAnimal {
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
+        if (creature instanceof Player player) {
             int id = player.getInventory().getItemInHandFast().getId();
             return player.spawned && player.isAlive() && !player.closed
                     && (id == Item.SEEDS
                     || id == Item.BEETROOT_SEEDS
                     || id == Item.PUMPKIN_SEEDS
                     || id == Item.MELON_SEEDS)
-                    && distance <= 40;
+                    && distance <= 49;
         }
         return false;
     }

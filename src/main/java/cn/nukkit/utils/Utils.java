@@ -352,6 +352,13 @@ public class Utils {
         return min + random.nextDouble() * (max-min);
     }
 
+    public static float rand(float min, float max) {
+        if (min == max) {
+            return max;
+        }
+        return min + (float) Math.random() * (max-min);
+    }
+
     /**
      * Get a random boolean
      *

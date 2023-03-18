@@ -25,12 +25,12 @@ public class EntityAxolotl extends EntityFish {
 
     @Override
     public float getWidth() {
-        return 1.3f;
+        return 0.75f;
     }
 
     @Override
     public float getHeight() {
-        return 0.6f;
+        return 0.42f;
     }
 
     @Override

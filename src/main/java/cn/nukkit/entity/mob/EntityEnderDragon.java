@@ -13,6 +13,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
+import cn.nukkit.network.protocol.BossEventPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
@@ -78,8 +79,8 @@ public class EntityEnderDragon extends EntityFlyingMob implements EntityBoss {
     if (this.attackDelay > 60 && Utils.rand(1, 5) < 3 && this.distanceSquared(player) <= 90000) {
             this.attackDelay = 0;
             double f = 1.1;
-            double yaw = this.yaw + Utils.rand(-12.0, 12.0);
-            double pitch = this.pitch + Utils.rand(-7.0, 7.0);
+            double yaw = this.yaw + Utils.rand(-4.0, 4.0);
+            double pitch = this.pitch + Utils.rand(-4.0, 4.0);
 
             EntityEnderCharge charge = (EntityEnderCharge) Entity.createEntity("EnderCharge", new Location(this.x + this.getLocation().getDirectionVector().multiply(5.0).x, this.y, this.z + this.getDirectionVector().multiply(5.0).z, this.level), this);
             charge.setMotion(new Vector3(-Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f, -Math.sin(FastMath.toRadians(pitch)) * f * f,
@@ -136,5 +137,21 @@ public class EntityEnderDragon extends EntityFlyingMob implements EntityBoss {
         addEntity.metadata = this.dataProperties.clone();
         addEntity.attributes = new Attribute[]{Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(200).setValue(200)};
         return addEntity;
+    }
+
+    @Override
+    public void spawnTo(Player player) {
+        super.spawnTo(player);
+        BossEventPacket pkBoss = new BossEventPacket();
+        pkBoss.bossEid = this.id;
+        pkBoss.type = BossEventPacket.TYPE_SHOW;
+        pkBoss.title = this.getName();
+        pkBoss.healthPercent = this.health / 100;
+        player.dataPacket(pkBoss);
+    }
+
+    @Override
+    protected boolean isInTickingRange() {
+        return true;
     }
 }

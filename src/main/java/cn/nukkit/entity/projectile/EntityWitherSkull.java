@@ -37,7 +37,7 @@ public class EntityWitherSkull extends EntityProjectile {
 
     @Override
     public float getGravity() {
-        return 0.01f;
+        return 0.005f;
     }
 
     @Override
@@ -46,8 +46,12 @@ public class EntityWitherSkull extends EntityProjectile {
     }
 
     @Override
-    protected double getDamage() {
-        return 5;
+    protected double getBaseDamage() {
+        return switch (server.getDifficulty()) {
+            case 2 -> 8; // normal
+            case 3 -> 12; // hard
+            default -> 5;
+        };
     }
 
     public EntityWitherSkull(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
@@ -66,15 +70,16 @@ public class EntityWitherSkull extends EntityProjectile {
 
         if (this.timing != null) this.timing.startTiming();
 
-        if (this.age > 1200 || this.isCollided) {
+        if (this.age > 1200 || this.isCollided || this.hadCollision) {
             this.close();
-        } else {
+        } else if (this.age % 4 == 0) {
             this.level.addParticle(new SmokeParticle(this.add(this.getWidth() / 2 + Utils.rand(-100.0, 100.0) / 500, this.getHeight() / 2 + Utils.rand(-100.0, 100.0) / 500, this.getWidth() / 2 + Utils.rand(-100.0, 100.0) / 500)));
         }
 
         if (this.timing != null) this.timing.stopTiming();
 
-        return super.onUpdate(currentTick);
+        super.onUpdate(currentTick);
+        return !this.closed;
     }
 
     @Override

@@ -20,9 +20,7 @@ public class BlazeSpawner extends AbstractEntitySpawner {
             return;
         }
 
-        if (!(pos.y > 127) && !(pos.y < 1)) {
-            this.spawnTask.createEntity("Blaze", pos);
-        }
+        this.spawnTask.createEntity("Blaze", pos);
     }
 
     @Override

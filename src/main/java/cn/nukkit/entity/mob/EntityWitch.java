@@ -66,11 +66,13 @@ public class EntityWitch extends EntityWalkingMob {
             if (player.isAlive() && !player.closed) {
 
                 double f = 1;
-                double yaw = this.yaw + Utils.rand(-5.0, 5.0);
-                Location pos = new Location(this.x - Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, this.y + this.getEyeHeight(),
-                        this.z + Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, yaw, pitch, this.level);
+                double yaw = this.yaw + Utils.rand(-4.0, 4.0);
+                double yawR = FastMath.toRadians(yaw);
+                double pitchR = FastMath.toRadians(pitch);
+                Location pos = new Location(this.x - Math.sin(yawR) * Math.cos(pitchR) * 0.5, this.y + this.getEyeHeight(),
+                        this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
 
-                if (this.getLevel().getBlockIdAt((int) pos.getX(), (int) pos.getY(), (int) pos.getZ()) != Block.AIR) {
+                if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) != Block.AIR) {
                     return;
                 }
 
@@ -88,8 +90,8 @@ public class EntityWitch extends EntityWalkingMob {
                     thrownPotion.potionId = Potion.HARMING;
                 }
 
-                thrownPotion.setMotion(new Vector3(-Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f, -Math.sin(FastMath.toRadians(pitch)) * f * f,
-                        Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f));
+                thrownPotion.setMotion(new Vector3(-Math.sin(yawR) * Math.cos(pitchR) * f * f, -Math.sin(pitchR) * f * f,
+                        Math.cos(yawR) * Math.cos(pitchR) * f * f));
                 ProjectileLaunchEvent launch = new ProjectileLaunchEvent(thrownPotion);
                 this.server.getPluginManager().callEvent(launch);
                 if (launch.isCancelled()) {

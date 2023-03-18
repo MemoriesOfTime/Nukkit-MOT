@@ -34,12 +34,17 @@ public class EntityRavager extends EntityWalkingMob {
 
     @Override
     public float getHeight() {
-        return 1.9f;
+        return 2.2f;
     }
 
     @Override
     public float getWidth() {
-        return 1.2f;
+        return 1.95f;
+    }
+
+    @Override
+    public double getSpeed() {
+        return 1.1;
     }
 
     @Override
@@ -55,11 +60,9 @@ public class EntityRavager extends EntityWalkingMob {
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
             if (player instanceof Player) {
-                HashMap<Integer, Float> armorValues = new ArmorPoints();
-
                 float points = 0;
                 for (Item i : ((Player) player).getInventory().getArmorContents()) {
-                    points += armorValues.getOrDefault(i.getId(), 0f);
+                    points += this.getArmorPoints(i.getId());
                 }
 
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR, (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));

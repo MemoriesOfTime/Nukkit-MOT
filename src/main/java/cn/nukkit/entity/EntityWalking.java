@@ -23,7 +23,7 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
-        if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed()) {
+        if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && targetOption((EntityCreature) this.followTarget, this.distanceSquared(this.followTarget)) && this.target != null) {
             return;
         }
 
@@ -32,11 +32,10 @@ public abstract class EntityWalking extends BaseEntity {
             double near = Integer.MAX_VALUE;
 
             for (Entity entity : this.getLevel().getEntities()) {
-                if (entity == this || !(entity instanceof EntityCreature) || entity.closed || !this.canTarget(entity)) {
+                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }
 
-                EntityCreature creature = (EntityCreature) entity;
                 if (creature instanceof BaseEntity && ((BaseEntity) creature).isFriendly() == this.isFriendly()) {
                     continue;
                 }
@@ -49,11 +48,11 @@ public abstract class EntityWalking extends BaseEntity {
 
                 this.stayTime = 0;
                 this.moveTime = 0;
-                this.target = creature;
+                this.followTarget = creature;
             }
         }
 
-        if (this.target instanceof EntityCreature && !((EntityCreature) this.target).closed && ((EntityCreature) this.target).isAlive() && this.targetOption((EntityCreature) this.target, this.distanceSquared(this.target))) {
+        if (this.followTarget != null) {
             return;
         }
 
@@ -81,11 +80,9 @@ public abstract class EntityWalking extends BaseEntity {
 
     protected boolean checkJump(double dx, double dz) {
         if (this.motionY == this.getGravity() * 2) {
-            int b = level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) this.y, NukkitMath.floorDouble(this.z));
-            return b == BlockID.WATER || b == BlockID.STILL_WATER;
+            return this.canSwimIn(level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) this.y, NukkitMath.floorDouble(this.z)));
         } else if (!(this instanceof EntitySkeletonHorse)) {
-            int b = level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) (this.y + 0.8), NukkitMath.floorDouble(this.z));
-            if (b == BlockID.WATER || b == BlockID.STILL_WATER) {
+            if (this.canSwimIn(level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) (this.y + 0.8), NukkitMath.floorDouble(this.z)))) {
                 if (!this.isDrowned || this.target == null) {
                     this.motionY = this.getGravity() * 2;
                 }
@@ -103,8 +100,8 @@ public abstract class EntityWalking extends BaseEntity {
         }*/
 
         Block block = that.getSide(this.getHorizontalFacing());
-        Block down = block.down();
-        if (!down.isSolid() && !block.isSolid() && !down.down().isSolid()) {
+        Block down;
+        if (this.followTarget == null && this.passengers.isEmpty() && !(down = block.down()).isSolid() && !block.isSolid() && !down.down().isSolid()) {
             // "hack": try to make mobs not to be so suicidal
             this.stayTime = 10;
         } else if (!block.canPassThrough() && block.up().canPassThrough() && that.up(2).canPassThrough()) {
@@ -125,9 +122,18 @@ public abstract class EntityWalking extends BaseEntity {
     }
 
     public Vector3 updateMove(int tickDiff) {
+        if (!this.isInTickingRange()) {
+            return null;
+        }
+
         if (this.isMovement() && !isImmobile()) {
             if (this.isKnockback()) {
                 this.move(this.motionX, this.motionY, this.motionZ);
+                if (this.isDrowned && this.isInsideOfWater()) {
+                    this.motionY -= this.getGravity() * 0.3;
+                } else {
+                    this.motionY -= this.getGravity();
+                }
                 this.motionY -= this.getGravity();
                 this.updateMovement();
                 return null;
@@ -144,7 +150,7 @@ public abstract class EntityWalking extends BaseEntity {
             }
 
             if (this.getServer().getMobAiEnabled()) {
-                if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed()) {
+                if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed() && this.target != null) {
                     double x = this.followTarget.x - this.x;
                     double z = this.followTarget.z - this.z;
 
@@ -174,9 +180,8 @@ public abstract class EntityWalking extends BaseEntity {
                     return this.followTarget;
                 }
 
-                Vector3 before = this.target;
                 this.checkTarget();
-                if (this.target instanceof EntityCreature || before != this.target) {
+                if (this.target != null) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;
 
@@ -195,6 +200,9 @@ public abstract class EntityWalking extends BaseEntity {
                             this.motionZ = this.getSpeed() * moveMultiplier * 0.05 * (z / diff);
                             if (!this.isDrowned) {
                                 this.level.addParticle(new BubbleParticle(this.add(Utils.rand(-2.0, 2.0), Utils.rand(-0.5, 0), Utils.rand(-2.0, 2.0))));
+                            } else if (this.followTarget != null) {
+                                double y = this.followTarget.y - this.y;
+                                this.motionY = this.getSpeed() * moveMultiplier * 0.05 * (y / (diff + Math.abs(y)));
                             }
                         } else {
                             this.motionX = this.getSpeed() * moveMultiplier * 0.15 * (x / diff);
@@ -227,16 +235,21 @@ public abstract class EntityWalking extends BaseEntity {
                 if (this.onGround && !inWater) {
                     this.motionY = 0;
                 } else if (this.motionY > -this.getGravity() * 4) {
-                    int b = this.level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) (this.y + 0.8), NukkitMath.floorDouble(this.z));
-                    if (b != Block.WATER && b != Block.STILL_WATER && b != Block.LAVA && b != Block.STILL_LAVA) {
+                    if (!(this.level.getBlock(NukkitMath.floorDouble(this.x), (int) (this.y + 0.8), NukkitMath.floorDouble(this.z)) instanceof BlockLiquid)) {
                         this.motionY -= this.getGravity();
                     }
                 } else {
-                    this.motionY -= this.getGravity();
+                    if (this.isDrowned && this.isInsideOfWater() && this.motionY < 0) {
+                        this.motionY = this.getGravity() * -0.3;
+                        this.stayTime = 40;
+                    } else {
+                        this.motionY -= this.getGravity();
+                    }
                 }
             }
+
             this.updateMovement();
-            return this.target;
+            return this.followTarget != null ? this.followTarget : this.target;
         }
         return null;
     }

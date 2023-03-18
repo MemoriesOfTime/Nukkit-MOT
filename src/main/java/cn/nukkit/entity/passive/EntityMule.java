@@ -50,10 +50,9 @@ public class EntityMule extends EntityHorseBase {
     public boolean targetOption(EntityCreature creature, double distance) {
         boolean canTarget = super.targetOption(creature, distance);
 
-        if (canTarget && (creature instanceof Player)) {
-            Player player = (Player) creature;
+        if (canTarget && (creature instanceof Player player)) {
             return player.spawned && player.isAlive() && !player.closed &&
-                    this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 40;
+                    this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 49;
         }
         return false;
     }
@@ -63,9 +62,11 @@ public class EntityMule extends EntityHorseBase {
         List<Item> drops = new ArrayList<>();
 
         if (!this.isBaby()) {
-            for (int i = 0; i < Utils.rand(0, 2); i++) {
-                drops.add(Item.get(Item.LEATHER, 0, 1));
-            }
+            drops.add(Item.get(Item.LEATHER, 0, Utils.rand(0, 2)));
+        }
+
+        if (this.isSaddled()) {
+            drops.add(Item.get(Item.SADDLE, 0, 1));
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);

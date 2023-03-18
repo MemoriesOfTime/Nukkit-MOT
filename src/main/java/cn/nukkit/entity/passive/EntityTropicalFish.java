@@ -9,8 +9,51 @@ public class EntityTropicalFish extends EntityFish {
 
     public static final int NETWORK_ID = 111;
 
+    private int variantA;
+    private int variantB;
+    private int color;
+
     public EntityTropicalFish(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+    }
+
+    @Override
+    public void initEntity() {
+        this.setMaxHealth(3);
+
+        super.initEntity();
+
+        if (this.namedTag.contains("VariantA")) {
+            this.variantA = this.namedTag.getInt("VariantA");
+        } else {
+            this.variantA = Utils.rand(0, 5);
+
+        }
+        this.dataProperties.putInt(DATA_VARIANT, this.variantA);
+
+        if (this.namedTag.contains("VariantB")) {
+            this.variantB = this.namedTag.getInt("VariantB");
+        } else {
+            this.variantB = Utils.rand(0, 5);
+
+        }
+        this.dataProperties.putInt(DATA_MARK_VARIANT, this.variantB);
+
+        if (this.namedTag.contains("Color")) {
+            this.color = this.namedTag.getInt("Color");
+        } else {
+            this.color = Utils.rand(0, 15);
+
+        }
+        this.dataProperties.putByte(DATA_COLOR, this.color);
+    }
+
+    @Override
+    public void saveNBT() {
+        super.saveNBT();
+        this.namedTag.putInt("VariantA", this.variantA);
+        this.namedTag.putInt("VariantB", this.variantB);
+        this.namedTag.putInt("Color", this.color);
     }
 
     @Override
@@ -31,13 +74,6 @@ public class EntityTropicalFish extends EntityFish {
     @Override
     public float getHeight() {
         return 0.4f;
-    }
-
-    @Override
-    public void initEntity() {
-        this.setMaxHealth(3);
-
-        super.initEntity();
     }
 
     @Override

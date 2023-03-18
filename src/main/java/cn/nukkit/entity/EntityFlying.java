@@ -1,5 +1,6 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.block.Block;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
@@ -19,15 +20,18 @@ public abstract class EntityFlying extends BaseEntity {
             return;
         }
 
+        if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive()) {
+            return;
+        }
+
         Vector3 target = this.target;
         if (!(target instanceof EntityCreature) || (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) || !((Entity) target).canBeFollowed()) {
             double near = Integer.MAX_VALUE;
             for (Entity entity : this.getLevel().getEntities()) {
-                if (entity == this || !(entity instanceof EntityCreature) || entity.closed || !this.canTarget(entity)) {
+                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }
 
-                EntityCreature creature = (EntityCreature) entity;
                 if (creature instanceof BaseEntity && ((BaseEntity) creature).isFriendly() == this.isFriendly()) {
                     continue;
                 }
@@ -38,17 +42,17 @@ public abstract class EntityFlying extends BaseEntity {
                 }
                 near = distance;
 
+                this.stayTime = 0;
                 this.moveTime = 0;
                 this.target = creature;
             }
         }
 
-        if (this.target instanceof EntityCreature && ((EntityCreature) this.target).isAlive()) {
+        if (this.target instanceof EntityCreature && !((EntityCreature) this.target).closed && ((EntityCreature) this.target).isAlive() && this.targetOption((EntityCreature) this.target, this.distanceSquared(this.target))) {
             return;
         }
 
-        int x, y, z;
-        int maxY = Math.max(this.getLevel().getHighestBlockAt((int) this.x, (int) this.z) + 15, 120);
+        int x, z;
         if (this.stayTime > 0) {
             if (Utils.rand(1, 100) > 5) {
                 return;
@@ -56,38 +60,27 @@ public abstract class EntityFlying extends BaseEntity {
 
             x = Utils.rand(10, 30);
             z = Utils.rand(10, 30);
-            if (this.y > maxY) {
-                y = Utils.rand(-12, -4);
-            } else {
-                y = Utils.rand(-10, 10);
-            }
-            this.target = this.add(Utils.rand() ? x : -x, y, Utils.rand() ? z : -z);
+            this.target = this.add(Utils.rand() ? x : -x, 0, Utils.rand() ? z : -z);
         } else if (Utils.rand(1, 100) == 1) {
             x = Utils.rand(10, 30);
             z = Utils.rand(10, 30);
-            if (this.y > maxY) {
-                y = Utils.rand(-12, -4);
-            } else {
-                y = Utils.rand(-10, 10);
-            }
             this.stayTime = Utils.rand(100, 200);
-            this.target = this.add(Utils.rand() ? x : -x, y, Utils.rand() ? z : -z);
+            this.target = this.add(Utils.rand() ? x : -x, 0, Utils.rand() ? z : -z);
         } else if (this.moveTime <= 0 || this.target == null) {
             x = Utils.rand(20, 100);
             z = Utils.rand(20, 100);
-            if (this.y > maxY) {
-                y = Utils.rand(-12, -4);
-            } else {
-                y = Utils.rand(-10, 10);
-            }
             this.stayTime = 0;
             this.moveTime = Utils.rand(100, 200);
-            this.target = this.add(Utils.rand() ? x : -x, y, Utils.rand() ? z : -z);
+            this.target = this.add(Utils.rand() ? x : -x, 0, Utils.rand() ? z : -z);
         }
     }
 
     @Override
     public Vector3 updateMove(int tickDiff) {
+        if (!this.isInTickingRange()) {
+            return null;
+        }
+
         if (this.isMovement() && !isImmobile()) {
             if (this.isKnockback()) {
                 this.move(this.motionX, this.motionY, this.motionZ);
@@ -104,15 +97,17 @@ public abstract class EntityFlying extends BaseEntity {
                     double diff = Math.abs(x) + Math.abs(z);
                     if (this.stayTime > 0 || this.distance(this.followTarget) <= (this.getWidth() / 2 + 0.05)) {
                         this.motionX = 0;
+                        this.motionY = this.getSpeed() * 0.01 * y;
                         this.motionZ = 0;
                     } else {
                         this.motionX = this.getSpeed() * 0.15 * (x / diff);
-                        this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                         this.motionY = this.getSpeed() * 0.27 * (y / diff);
+                        this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                     }
                     if (this.stayTime <= 0 || Utils.rand()) {
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
+                    return this.followTarget;
                 }
 
                 Vector3 before = this.target;
@@ -125,11 +120,12 @@ public abstract class EntityFlying extends BaseEntity {
                     double diff = Math.abs(x) + Math.abs(z);
                     if (this.stayTime > 0 || this.distance(this.target) <= (this.getWidth() / 2 + 0.05) * nearbyDistanceMultiplier()) {
                         this.motionX = 0;
+                        this.motionY = this.getSpeed() * 0.01 * y;
                         this.motionZ = 0;
                     } else {
                         this.motionX = this.getSpeed() * 0.15 * (x / diff);
-                        this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                         this.motionY = this.getSpeed() * 0.27 * (y / diff);
+                        this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                     }
                     if (this.stayTime <= 0 || Utils.rand()) {
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
@@ -137,10 +133,15 @@ public abstract class EntityFlying extends BaseEntity {
                 }
             }
 
+            int block;
+            if (this.stayTime <= 0 && this.motionY == 0 && (Math.abs(motionX) > 0 || Math.abs(motionZ) > 0) &&
+                    (Block.solid[(block = this.level.getBlockIdAt(this.getFloorX(), this.getFloorY() - 1, this.getFloorZ()))] || block == Block.WATER || block == Block.STILL_WATER || block == Block.LAVA || block == Block.STILL_LAVA)) {
+                this.motionY = 0.05;
+            }
+
             double dx = this.motionX;
             double dy = this.motionY;
             double dz = this.motionZ;
-            Vector3 target = this.target;
             if (this.stayTime > 0) {
                 this.stayTime -= tickDiff;
                 this.move(0, dy, 0);
@@ -161,7 +162,7 @@ public abstract class EntityFlying extends BaseEntity {
             }
 
             this.updateMovement();
-            return target;
+            return this.target;
         }
         return null;
     }

@@ -1,7 +1,6 @@
 package cn.nukkit.entity;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockID;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.BubbleParticle;
 import cn.nukkit.math.NukkitMath;
@@ -31,11 +30,10 @@ public abstract class EntityJumping extends BaseEntity {
             double near = Integer.MAX_VALUE;
 
             for (Entity entity : this.getLevel().getEntities()) {
-                if (entity == this || !(entity instanceof EntityCreature) || entity.closed || !this.canTarget(entity)) {
+                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }
 
-                EntityCreature creature = (EntityCreature) entity;
                 if (creature instanceof BaseEntity && ((BaseEntity) creature).isFriendly() == this.isFriendly()) {
                     continue;
                 }
@@ -80,11 +78,9 @@ public abstract class EntityJumping extends BaseEntity {
 
     protected boolean checkJump() {
         if (this.motionY == this.getGravity() * 2) {
-            int b = level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) this.y, NukkitMath.floorDouble(this.z));
-            return b == BlockID.WATER || b == BlockID.STILL_WATER;
+            return this.canSwimIn(level.getBlockIdAt(NukkitMath.floorDouble(this.x), (int) this.y, NukkitMath.floorDouble(this.z)));
         } else {
-            int b = level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) (this.y + 0.8), NukkitMath.floorDouble(this.z));
-            if (b == BlockID.WATER || b == BlockID.STILL_WATER) {
+            if (this.canSwimIn(level.getBlockIdAt(NukkitMath.floorDouble(this.x), (int) (this.y + 0.8), NukkitMath.floorDouble(this.z)))) {
                 this.motionY = this.getGravity() * 2;
                 return true;
             }
@@ -106,6 +102,10 @@ public abstract class EntityJumping extends BaseEntity {
     }
 
     public Vector3 updateMove(int tickDiff) {
+        if (!this.isInTickingRange()) {
+            return null;
+        }
+
         if (this.isMovement() && !isImmobile()) {
             if (this.isKnockback()) {
                 this.move(this.motionX, this.motionY, this.motionZ);
