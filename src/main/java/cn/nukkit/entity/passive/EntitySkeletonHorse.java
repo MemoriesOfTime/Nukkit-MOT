@@ -61,11 +61,12 @@ public class EntitySkeletonHorse extends EntityHorseBase implements EntitySmite 
         List<Item> drops = new ArrayList<>();
 
         if (!this.isBaby()) {
-            for (int i = 0; i < Utils.rand(0, 2); i++) {
-                drops.add(Item.get(Item.LEATHER, 0, 1));
-            }
-
+            drops.add(Item.get(Item.LEATHER, 0, Utils.rand(0, 2)));
             drops.add(Item.get(Item.BONE, 0, Utils.rand(0, 1)));
+        }
+
+        if (this.isSaddled()) {
+            drops.add(Item.get(Item.SADDLE, 0, 1));
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);

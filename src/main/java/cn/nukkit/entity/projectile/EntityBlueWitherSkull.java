@@ -2,14 +2,13 @@ package cn.nukkit.entity.projectile;
 
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
-import cn.nukkit.event.entity.ExplosionPrimeEvent;
-import cn.nukkit.level.StrongExplosion;
+import cn.nukkit.event.entity.EntityExplosionPrimeEvent;
 import cn.nukkit.level.Explosion;
 import cn.nukkit.level.GameRule;
+import cn.nukkit.level.StrongExplosion;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.SmokeParticle;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 
 public class EntityBlueWitherSkull extends EntityWitherSkull implements EntityExplosive {
@@ -47,30 +46,30 @@ public class EntityBlueWitherSkull extends EntityWitherSkull implements EntityEx
 
         if (this.timing != null) this.timing.startTiming();
 
-        if (this.age > 1200 || this.hadCollision) {
+        if (this.age > 1200 || this.isCollided || this.hadCollision) {
             if (this.canExplode) {
                 this.explode();
+            }else {
+                this.close();
             }
-
-            this.close();
         } else if (this.age % 4 == 0) {
             this.level.addParticle(new SmokeParticle(this.add(this.getWidth() / 2 + Utils.rand(-100.0, 100.0) / 500, this.getHeight() / 2 + Utils.rand(-100.0, 100.0) / 500, this.getWidth() / 2 + Utils.rand(-100.0, 100.0) / 500)));
         }
 
         if (this.timing != null) this.timing.stopTiming();
 
-        return super.onUpdate(currentTick);
-    }
-
-    @Override
-    public void onCollideWithEntity(Entity entity) {
-        super.onCollideWithEntity(entity);
-        entity.addEffect(Effect.getEffect(Effect.WITHER).setDuration(200));
+        super.onUpdate(currentTick);
+        return !this.closed;
     }
 
     @Override
     public void explode() {
-        ExplosionPrimeEvent ev = new ExplosionPrimeEvent(this, 1.2);
+        if (this.closed) {
+            return;
+        }
+        this.close();
+
+        EntityExplosionPrimeEvent ev = new EntityExplosionPrimeEvent(this, 1.2);
         this.server.getPluginManager().callEvent(ev);
 
         if (!ev.isCancelled()) {

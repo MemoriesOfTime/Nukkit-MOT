@@ -3,7 +3,7 @@ package cn.nukkit.entity.passive;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 
-public class EntityTadpole extends EntityWaterAnimal {
+public class EntityTadpole extends EntityFish {
 
     public static final int NETWORK_ID = 133;
 
@@ -14,6 +14,11 @@ public class EntityTadpole extends EntityWaterAnimal {
     @Override
     public int getKillExperience() {
         return 0;
+    }
+
+    @Override
+    int getBucketMeta() {
+        return 13;
     }
 
     @Override

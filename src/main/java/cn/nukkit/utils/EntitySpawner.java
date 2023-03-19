@@ -29,4 +29,8 @@ public interface EntitySpawner {
      * @return entity network id
      */
     int getEntityNetworkId();
+
+    default boolean isWaterMob() {
+        return false;
+    }
 }

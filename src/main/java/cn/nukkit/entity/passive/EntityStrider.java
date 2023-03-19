@@ -1,6 +1,7 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityControllable;
 import cn.nukkit.entity.EntityCreature;
@@ -197,16 +198,14 @@ public class EntityStrider extends EntityWalkingAnimal implements EntityRideable
         List<Item> drops = new ArrayList<>();
 
         if (!this.isBaby()) {
-            for (int i = 0; i < Utils.rand(2, 5); i++) {
-                drops.add(Item.get(Item.STRING, 0, 1));
-            }
-
-            if (this.isSaddled()) {
-                drops.add(Item.get(Item.SADDLE));
-            }
+            drops.add(Item.get(Item.STRING, 0, Utils.rand(2, 5)));
         }
 
-        return drops.toArray(new Item[0]);
+        if (this.isSaddled()) {
+            drops.add(Item.get(Item.SADDLE, 0, 1));
+        }
+
+        return drops.toArray(Item.EMPTY_ARRAY);
     }
 
     @Override
@@ -225,11 +224,15 @@ public class EntityStrider extends EntityWalkingAnimal implements EntityRideable
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
-            return player.spawned && player.isAlive() && !player.closed && distance <= 40
+        if (creature instanceof Player player) {
+            return player.spawned && player.isAlive() && !player.closed && distance <= 49
                     && player.getInventory().getItemInHandFast().getId() == Item.WARPED_FUNGUS_ON_A_STICK;
         }
-        return false;
+        return super.targetOption(creature, distance);
+    }
+
+    @Override
+    protected boolean canSwimIn(int block) {
+        return block == BlockID.WATER || block == BlockID.STILL_WATER || block == BlockID.LAVA || block == BlockID.STILL_LAVA;
     }
 }

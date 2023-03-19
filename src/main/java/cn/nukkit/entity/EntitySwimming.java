@@ -1,6 +1,8 @@
 package cn.nukkit.entity;
 
+import cn.nukkit.block.Block;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -26,11 +28,10 @@ public abstract class EntitySwimming extends BaseEntity {
         if (!(target instanceof EntityCreature) || (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) || !((Entity) target).canBeFollowed()) {
             double near = Integer.MAX_VALUE;
             for (Entity entity : this.getLevel().getEntities()) {
-                if (entity == this || !(entity instanceof EntityCreature) || entity.closed || !this.canTarget(entity)) {
+                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }
 
-                EntityCreature creature = (EntityCreature) entity;
                 if (creature instanceof BaseEntity && ((BaseEntity) creature).isFriendly() == this.isFriendly()) {
                     continue;
                 }
@@ -74,10 +75,14 @@ public abstract class EntitySwimming extends BaseEntity {
     }
 
     public Vector3 updateMove(int tickDiff) {
+        if (!this.isInTickingRange()) {
+            return null;
+        }
+
         if (this.isMovement() && !isImmobile()) {
             if (this.isKnockback()) {
                 this.move(this.motionX, this.motionY, this.motionZ);
-                this.motionY -= this.getGravity();
+                this.motionY -= this.getGravity() * (this.isInsideOfWater() ? 0.5 : 1);
                 this.updateMovement();
                 return null;
             }
@@ -95,8 +100,9 @@ public abstract class EntitySwimming extends BaseEntity {
                         this.motionX = this.getSpeed() * 0.1 * (x / diff);
                         this.motionZ = this.getSpeed() * 0.1 * (z / diff);
                     }
-                    if (this.stayTime <= 0 || Utils.rand())
+                    if (this.stayTime <= 0 || Utils.rand()) {
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
+                    }
                     return this.followTarget;
                 }
 
@@ -114,20 +120,27 @@ public abstract class EntitySwimming extends BaseEntity {
                         this.motionX = this.getSpeed() * 0.15 * (x / diff);
                         this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                     }
-                    if (this.stayTime <= 0 || Utils.rand()) if (this.stayTime <= 0 || Utils.rand())
+                    if (this.stayTime <= 0 || Utils.rand()) {
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
+                    }
                 }
             }
 
             double dx = this.motionX;
             double dz = this.motionZ;
 
-            if (this.isInsideOfWater() && (this.motionX > 0 || this.motionZ > 0)) {
+            boolean inWater = this.isInsideOfWater();
+            if (inWater && (this.motionX > 0 || this.motionZ > 0)) {
                 this.motionY = Utils.rand(-0.12, 0.12);
-            } else if (!this.isOnGround() && !isInsideOfWater()) {
+            } else if (!this.isOnGround() && !inWater) {
                 this.motionY -= this.getGravity();
             } else {
-                this.motionY = 0;
+                this.motionY *= 0.1;
+            }
+
+            int block;
+            if (this.stayTime <= 0 && this.motionY >= 0 && (Math.abs(motionX) > 0 || Math.abs(motionZ) > 0) && (block = this.level.getBlockIdAt(this.getFloorX(), NukkitMath.floorDouble(this.getY() + this.getHeight()), this.getFloorZ())) != Block.WATER && block != Block.STILL_WATER) {
+                this.motionY = -0.05;
             }
 
             if (this.stayTime > 0) {

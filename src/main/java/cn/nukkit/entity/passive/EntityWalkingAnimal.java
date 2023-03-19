@@ -3,7 +3,6 @@ package cn.nukkit.entity.passive;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityWalking;
-import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -14,10 +13,6 @@ import lombok.Setter;
 import java.util.Optional;
 
 public abstract class EntityWalkingAnimal extends EntityWalking implements EntityAnimal {
-
-    public EntityWalkingAnimal(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
-    }
 
     private int panicTicks = 0;
 
@@ -30,6 +25,10 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
     @Getter
     @Setter
     private int startLookAt = 0;
+
+    public EntityWalkingAnimal(FullChunk chunk, CompoundTag nbt) {
+        super(chunk, nbt);
+    }
 
     @Override
     public boolean onUpdate(int currentTick) {
@@ -48,7 +47,7 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
         if (this.panicTicks > 0) {
             this.panicTicks--;
             if (panicTicks == 0) {
-                doPanic(false);
+                this.doPanic(false);
             }
         }
 
@@ -62,6 +61,10 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
         return true;
     }
 
+    public int getPanicTicks() {
+        return this.panicTicks;
+    }
+
     public void doPanic(boolean panic) {
         if (panic) {
             int time = Utils.rand(60, 100);
@@ -70,21 +73,20 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
             this.moveTime = time;
             this.moveMultiplier = 1.8f;
         } else {
+            this.panicTicks = 0;
             this.moveMultiplier = 1.0f;
         }
     }
 
     @Override
     public boolean attack(EntityDamageEvent ev) {
-        super.attack(ev);
+        boolean result = super.attack(ev);
 
-        if (!ev.isCancelled() && ev instanceof EntityDamageByEntityEvent) {
-            if (((EntityDamageByEntityEvent) ev).getDamager() instanceof Player) {
-                this.doPanic(true);
-            }
+        if (result && !ev.isCancelled()) {
+            this.doPanic(true);
         }
 
-        return true;
+        return result;
     }
 
     @Override

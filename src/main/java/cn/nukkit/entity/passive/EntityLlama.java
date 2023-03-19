@@ -17,17 +17,16 @@ import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 public class EntityLlama extends EntityHorseBase {
 
     public static final int NETWORK_ID = 29;
 
-    public int variant;
+    private int variant;
 
     private static final int[] VARIANTS = {0, 1, 2, 3};
 
-    private final AtomicBoolean delay = new AtomicBoolean();
+    private int attackTicks;
+    private Entity damagedBy;
 
     public EntityLlama(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -86,44 +85,55 @@ public class EntityLlama extends EntityHorseBase {
 
         if (ev instanceof EntityDamageByEntityEvent) {
             Entity damager = ((EntityDamageByEntityEvent) ev).getDamager();
-            if (damager instanceof Player) {
-                if (this.delay.get()) return true;
-                this.delay.set(true);
-                this.server.getScheduler().scheduleDelayedTask(() -> this.delay.compareAndSet(true, false), 40);
+            if (damager instanceof Player && (((Player) damager).isSurvival() || ((Player) damager).isAdventure())) {
+                if (this.attackTicks <= 0) {
+                    this.attackTicks = 60;
+                    this.damagedBy = damager;
+                }
+            }
+        }
 
-                this.getServer().getScheduler().scheduleDelayedTask(null, () -> {
-                    if (this.isAlive()) {
-                        if (this.distanceSquared(damager) < 100) {
-                            this.moveTime = 0;
-                            this.stayTime = 100;
+        return true;
+    }
 
+    @Override
+    public boolean onUpdate(int currentTick) {
+        if (!this.closed) {
+            if (this.attackTicks > 0) {
+                this.attackTicks--;
+                this.moveTime = 0;
+                this.stayTime = 60;
+                if (this.damagedBy != null) {
+                    double x = this.damagedBy.x - this.x;
+                    double z = this.damagedBy.z - this.z;
+                    double diff = Math.abs(x) + Math.abs(z);
+                    this.yaw = FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff));
+                    if (this.attackTicks == 0) {
+                        if (this.distanceSquared(this.damagedBy) < 100) {
                             double f = 2;
                             double yaw = this.yaw;
                             double pitch = this.pitch;
                             Location pos = new Location(this.x - Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, this.y + this.getEyeHeight(),
                                     this.z + Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, yaw, pitch, this.level);
                             Entity k = Entity.createEntity("LlamaSpit", pos, this);
-                            if (!(k instanceof EntityLlamaSpit)) return;
-                            
-                            EntityLlamaSpit spit = (EntityLlamaSpit) k;
-                            spit.setMotion(new Vector3(-Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f, -Math.sin(FastMath.toRadians(pitch)) * f * f,
-                                    Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f));
-
-                            ProjectileLaunchEvent launch = new ProjectileLaunchEvent(spit);
-                            this.server.getPluginManager().callEvent(launch);
-                            if (launch.isCancelled()) {
-                                spit.close();
-                            } else {
-                                spit.spawnToAll();
-                                this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_SHOOT, -1, "minecraft:llama", false, false);
+                            if (k instanceof EntityLlamaSpit spit) {
+                                spit.setMotion(new Vector3(-Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f, -Math.sin(FastMath.toRadians(pitch)) * f * f,
+                                        Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f));
+                                ProjectileLaunchEvent launch = new ProjectileLaunchEvent(spit);
+                                this.server.getPluginManager().callEvent(launch);
+                                if (launch.isCancelled()) {
+                                    spit.close();
+                                } else {
+                                    spit.spawnToAll();
+                                    this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_SHOOT, -1, "minecraft:llama", false, false);
+                                }
                             }
                         }
                     }
-                }, 30);
+                }
             }
         }
-
-        return true;
+        return super.onUpdate(currentTick);
     }
 
     @Override
@@ -135,9 +145,8 @@ public class EntityLlama extends EntityHorseBase {
     public boolean targetOption(EntityCreature creature, double distance) {
         boolean canTarget = super.targetOption(creature, distance);
 
-        if (canTarget && (creature instanceof Player)) {
-            Player player = (Player) creature;
-            return player.isAlive() && !player.closed && this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 40;
+        if (canTarget && (creature instanceof Player player)) {
+            return player.isAlive() && !player.closed && this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 49;
         }
 
         return false;

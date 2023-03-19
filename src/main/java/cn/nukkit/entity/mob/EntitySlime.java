@@ -10,9 +10,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 
 public class EntitySlime extends EntityJumpingMob {
 
@@ -92,11 +90,9 @@ public class EntitySlime extends EntityJumpingMob {
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
             if (player instanceof Player) {
-                HashMap<Integer, Float> armorValues = new ArmorPoints();
-
                 float points = 0;
                 for (Item i : ((Player) player).getInventory().getArmorContents()) {
-                    points += armorValues.getOrDefault(i.getId(), 0f);
+                    points += this.getArmorPoints(i.getId());
                 }
 
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR,
@@ -114,7 +110,7 @@ public class EntitySlime extends EntityJumpingMob {
             level.getServer().getPluginManager().callEvent(ev);
 
             if (ev.isCancelled()) {
-                return new Item[0];
+                return Item.EMPTY_ARRAY;
             }
 
             EntitySlime entity = (EntitySlime) Entity.createEntity("Slime", this);
@@ -125,13 +121,13 @@ public class EntitySlime extends EntityJumpingMob {
                 entity.spawnToAll();
             }
 
-            return new Item[0];
+            return Item.EMPTY_ARRAY;
         } else if (this.size == SIZE_MEDIUM) {
             CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
             level.getServer().getPluginManager().callEvent(ev);
 
             if (ev.isCancelled()) {
-                return new Item[0];
+                return Item.EMPTY_ARRAY;
             }
 
             EntitySlime entity = (EntitySlime) Entity.createEntity("Slime", this);
@@ -142,15 +138,9 @@ public class EntitySlime extends EntityJumpingMob {
                 entity.spawnToAll();
             }
 
-            return new Item[0];
+            return Item.EMPTY_ARRAY;
         } else {
-            List<Item> drops = new ArrayList<>();
-
-            for (int i = 0; i < Utils.rand(0, 2); i++) {
-                drops.add(Item.get(Item.SLIMEBALL, 0, 1));
-            }
-
-            return drops.toArray(new Item[0]);
+            return new Item[]{Item.get(Item.SLIMEBALL, 0, Utils.rand(0, 2))};
         }
     }
 
@@ -160,5 +150,9 @@ public class EntitySlime extends EntityJumpingMob {
         if (this.size == SIZE_MEDIUM) return 2;
         if (this.size == SIZE_SMALL) return 1;
         return 0;
+    }
+
+    public int getSlimeSize() {
+        return this.size;
     }
 }

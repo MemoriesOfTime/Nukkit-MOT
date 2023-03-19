@@ -51,11 +51,10 @@ public class EntityPhantom extends EntityFlyingMob implements EntitySmite {
     }
 
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
-            return player.spawned && player.isAlive() && !player.closed && (player.isSurvival() || player.isAdventure()) && distance <= 256;
+        if (creature instanceof Player player) {
+            return player.spawned && player.isAlive() && !player.closed && (player.isSurvival() || player.isAdventure()) && distance <= 1024;
         }
-        return creature.isAlive() && !creature.closed && distance <= 256;
+        return creature.isAlive() && !creature.closed && distance <= 1024;
     }
 
     @Override
@@ -66,11 +65,9 @@ public class EntityPhantom extends EntityFlyingMob implements EntitySmite {
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
             if (player instanceof Player) {
-                HashMap<Integer, Float> armorValues = new ArmorPoints();
-
                 float points = 0;
                 for (Item i : ((Player) player).getInventory().getArmorContents()) {
-                    points += armorValues.getOrDefault(i.getId(), 0f);
+                    points += this.getArmorPoints(i.getId());
                 }
 
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR,

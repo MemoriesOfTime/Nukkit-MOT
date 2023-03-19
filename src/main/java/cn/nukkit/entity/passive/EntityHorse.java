@@ -15,7 +15,7 @@ public class EntityHorse extends EntityHorseBase {
 
     public static final int NETWORK_ID = 23;
 
-    public int variant;
+    private int variant;
 
     private static final int[] VARIANTS = {0, 1, 2, 3, 4, 5, 6, 256, 257, 258, 259, 260, 261, 262, 512, 513, 514, 515, 516, 517, 518,
             768, 769, 770, 771, 772, 773, 774, 1024, 1025, 1026, 1027, 1028, 1029, 1030};
@@ -87,6 +87,10 @@ public class EntityHorse extends EntityHorseBase {
             for (int i = 0; i < Utils.rand(0, 2); i++) {
                 drops.add(Item.get(Item.LEATHER, 0, 1));
             }
+        }
+
+        if (this.isSaddled()) {
+            drops.add(Item.get(Item.SADDLE, 0, 1));
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);

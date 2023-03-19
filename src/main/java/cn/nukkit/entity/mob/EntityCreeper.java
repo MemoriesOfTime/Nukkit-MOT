@@ -125,8 +125,8 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
                 double z = this.target.z - this.z;
 
                 double diff = Math.abs(x) + Math.abs(z);
-                double distance = target.distance(this);
-                if (distance <= 4) {
+                double distance = target.distanceSquared(this);
+                if (distance <= 16) { // 4 blocks
                     if (target instanceof EntityCreature) {
                         if (!exploding) {
                             if (bombTime == 0) {
@@ -195,9 +195,7 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
     public Item[] getDrops() {
         List<Item> drops = new ArrayList<>();
 
-        for (int i = 0; i < Utils.rand(0, 2); i++) {
-            drops.add(Item.get(Item.GUNPOWDER, 0, 1));
-        }
+        drops.add(Item.get(Item.GUNPOWDER, 0, Utils.rand(0, 2)));
 
         if (this.lastDamageCause instanceof EntityDamageByEntityEvent) {
             Entity killer = ((EntityDamageByEntityEvent) this.lastDamageCause).getDamager();

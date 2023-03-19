@@ -7,9 +7,6 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class EntityCat extends EntityWalkingAnimal {
 
     public static final int NETWORK_ID = 75;
@@ -50,15 +47,12 @@ public class EntityCat extends EntityWalkingAnimal {
 
     @Override
     public Item[] getDrops() {
-        List<Item> drops = new ArrayList<>();
-
         if (!this.isBaby()) {
-            for (int i = 0; i < Utils.rand(0, 2); i++) {
-                drops.add(Item.get(Item.STRING, 0, 1));
-            }
+            int c = Utils.rand(0, 2);
+            if (c > 0) return new Item[]{Item.get(Item.STRING, 0, c)};
         }
 
-        return drops.toArray(Item.EMPTY_ARRAY);
+        return Item.EMPTY_ARRAY;
     }
 
     @Override
@@ -71,7 +65,7 @@ public class EntityCat extends EntityWalkingAnimal {
         if (creature instanceof Player) {
             Player player = (Player) creature;
             int id = player.getInventory().getItemInHandFast().getId();
-            return player.spawned && player.isAlive() && !player.closed && (id == Item.RAW_FISH || id == Item.RAW_SALMON) && distance <= 40;
+            return player.spawned && player.isAlive() && !player.closed && (id == Item.RAW_FISH || id == Item.RAW_SALMON) && distance <= 49;
         }
         return false;
     }

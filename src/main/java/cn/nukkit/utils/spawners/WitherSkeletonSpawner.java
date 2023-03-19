@@ -20,11 +20,8 @@ public class WitherSkeletonSpawner extends AbstractEntitySpawner {
         if (Utils.rand(1, 3) == 1) {
             return;
         }
-
-        if (pos.y > 127 || pos.y < 1) {
-        } else if (level.getBlockIdAt((int) pos.x, (int) pos.y, (int) pos.z) != Block.NETHERRACK) {
-        } else {
-            this.spawnTask.createEntity("WitherSkeleton", pos.add(0, 1, 0));
+        if (level.getBlockIdAt((int) pos.x, (int) pos.y, (int) pos.z) == Block.NETHER_BRICKS) {
+            this.spawnTask.createEntity("WitherSkeleton", pos.add(0.5, 1, 0.5));
         }
     }
 

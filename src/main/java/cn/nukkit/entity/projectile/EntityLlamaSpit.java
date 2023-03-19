@@ -25,7 +25,7 @@ public class EntityLlamaSpit extends EntityProjectile {
 
     @Override
     public float getGravity() {
-        return 0.01f;
+        return 0.005f;
     }
 
     @Override
@@ -34,7 +34,7 @@ public class EntityLlamaSpit extends EntityProjectile {
     }
 
     @Override
-    protected double getDamage() {
+    protected double getBaseDamage() {
         return 1;
     }
 
@@ -56,10 +56,12 @@ public class EntityLlamaSpit extends EntityProjectile {
             return false;
         }
 
-        if (this.age > 100 || this.isCollided) {
+        if (this.age > 100 || this.isCollided || this.hadCollision) {
             this.close();
+            return false;
         }
 
-        return super.onUpdate(currentTick);
+        super.onUpdate(currentTick);
+        return !this.closed;
     }
 }

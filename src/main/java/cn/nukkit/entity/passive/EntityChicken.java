@@ -96,45 +96,29 @@ public class EntityChicken extends EntityWalkingAnimal {
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
+        if (creature instanceof Player player) {
             int id = player.getInventory().getItemInHandFast().getId();
             return player.isAlive() && !player.closed
                     && (id == Item.SEEDS
                             || id == Item.BEETROOT_SEEDS
                             || id == Item.MELON_SEEDS
                             || id == Item.PUMPKIN_SEEDS)
-                    && distance <= 40;
+                    && distance <= 49;
         }
-        return false;
+        return super.targetOption(creature, distance);
     }
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getId() == Item.SEEDS && !this.isBaby() && !this.isInLoveCooldown()) {
-            player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-            this.level.addParticle(new ItemBreakParticle(
-                    this.add(Utils.rand(-0.5, 0.5), this.getMountedYOffset(), Utils.rand(-0.5, 0.5)),
-                    Item.get(Item.SEEDS)));
-            this.setInLove();
-        } else if (item.getId() == Item.BEETROOT_SEEDS && !this.isBaby() && !this.isInLoveCooldown()) {
-            player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-            this.level.addParticle(new ItemBreakParticle(
-                    this.add(Utils.rand(-0.5, 0.5), this.getMountedYOffset(), Utils.rand(-0.5, 0.5)),
-                    Item.get(Item.BEETROOT_SEEDS)));
-            this.setInLove();
-        } else if (item.getId() == Item.MELON_SEEDS && !this.isBaby() && !this.isInLoveCooldown()) {
-            player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-            this.level.addParticle(new ItemBreakParticle(
-                    this.add(Utils.rand(-0.5, 0.5), this.getMountedYOffset(), Utils.rand(-0.5, 0.5)),
-                    Item.get(Item.MELON_SEEDS)));
-            this.setInLove();
-        } else if (item.getId() == Item.PUMPKIN_SEEDS && !this.isBaby() && !this.isInLoveCooldown()) {
-            player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-            this.level.addParticle(new ItemBreakParticle(
-                    this.add(Utils.rand(-0.5, 0.5), this.getMountedYOffset(), Utils.rand(-0.5, 0.5)),
-                    Item.get(Item.PUMPKIN_SEEDS)));
-            this.setInLove();
+        if (item.getId() == Item.SEEDS || item.getId() == Item.BEETROOT_SEEDS ||
+                item.getId() == Item.MELON_SEEDS || item.getId() == Item.PUMPKIN_SEEDS) {
+            if (!this.isBaby() && !this.isInLoveCooldown()) {
+                player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
+                this.level.addParticle(new ItemBreakParticle(
+                        this.add(Utils.rand(-0.5, 0.5), this.getMountedYOffset(), Utils.rand(-0.5, 0.5)),
+                        item));
+                this.setInLove();
+            }
         }
         return super.onInteract(player, item, clickedPos);
     }
@@ -151,10 +135,7 @@ public class EntityChicken extends EntityWalkingAnimal {
         List<Item> drops = new ArrayList<>();
 
         if (!this.isBaby()) {
-            for (int i = 0; i < Utils.rand(0, 2); i++) {
-                drops.add(Item.get(Item.FEATHER, 0, 1));
-            }
-
+            drops.add(Item.get(Item.FEATHER, 0, Utils.rand(0, 2)));
             drops.add(Item.get(this.isOnFire() ? Item.COOKED_CHICKEN : Item.RAW_CHICKEN, 0, 1));
         }
 

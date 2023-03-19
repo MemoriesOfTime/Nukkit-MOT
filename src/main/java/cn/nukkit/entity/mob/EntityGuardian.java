@@ -63,11 +63,10 @@ public class EntityGuardian extends EntitySwimmingMob {
     public void attackEntity(Entity player) {
         HashMap<EntityDamageEvent.DamageModifier, Float> damage = new HashMap<>();
         damage.put(EntityDamageEvent.DamageModifier.BASE, 1F);
-        HashMap<Integer, Float> armorValues = new ArmorPoints();
 
         float points = 0;
         for (Item i : ((Player) player).getInventory().getArmorContents()) {
-            points += armorValues.getOrDefault(i.getId(), 0f);
+            points += this.getArmorPoints(i.getId());
         }
 
         damage.put(EntityDamageEvent.DamageModifier.ARMOR,
@@ -83,7 +82,7 @@ public class EntityGuardian extends EntitySwimmingMob {
         }
 
         boolean hasUpdate = super.entityBaseTick(tickDiff);
-        if (followTarget != null) {
+        if (!this.closed && followTarget != null) {
             if (laserTargetEid != followTarget.getId()) {
                 this.setDataProperty(new LongEntityData(Entity.DATA_TARGET_EID, laserTargetEid = followTarget.getId()));
                 laserChargeTick = 60;

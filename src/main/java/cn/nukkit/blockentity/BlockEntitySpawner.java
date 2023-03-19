@@ -110,7 +110,7 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
             int nearbyEntities = 0;
             boolean playerInRange = false;
             for (Entity entity : this.level.getEntities()) {
-                if (!playerInRange && entity instanceof Player) {
+                if (!playerInRange && entity instanceof Player && !((Player) entity).isSpectator()) {
                     if (entity.distanceSquared(this) <= this.requiredPlayerRange2) {
                         playerInRange = true;
                     }
@@ -191,7 +191,7 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
 
     @Override
     public boolean isBlockEntityValid() {
-        return this.getBlock().getId() == Block.MONSTER_SPAWNER;
+        return level.getBlockIdAt((int) x, (int) y, (int) z) == Block.MONSTER_SPAWNER;
     }
 
     public void setSpawnEntityType(int entityId) {

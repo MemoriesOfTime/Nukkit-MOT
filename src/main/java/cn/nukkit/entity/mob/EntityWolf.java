@@ -24,7 +24,6 @@ import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.Utils;
 
-import java.rmi.server.Skeleton;
 import java.util.HashMap;
 
 public class EntityWolf extends EntityTameableMob {
@@ -130,7 +129,7 @@ public class EntityWolf extends EntityTameableMob {
         }
 
         if (!this.hasOwner() && distance <= 256 && (
-                (creature instanceof Skeleton && !creature.isInsideOfWater()) ||
+                (creature instanceof EntitySkeleton && !creature.isInsideOfWater()) ||
                         creature instanceof EntitySheep ||
                         creature instanceof EntityRabbit ||
                         creature instanceof EntityFox ||
@@ -139,7 +138,7 @@ public class EntityWolf extends EntityTameableMob {
             this.isAngryTo = creature.getId();
             this.setAngry(true);
             return true;
-        } else if (this.hasOwner() && distance <= 256 && creature instanceof Skeleton) {
+        } else if (this.hasOwner() && distance <= 256 && creature instanceof EntitySkeleton) {
             this.isAngryTo = creature.getId();
             this.setAngry(true);
             return true;
@@ -176,7 +175,6 @@ public class EntityWolf extends EntityTameableMob {
                     this.setHealth(20);
                     this.setOwner(player);
                     this.setCollarColor(DyeColor.RED);
-                    this.saveNBT();
 
                     this.getLevel().dropExpOrb(this, Utils.rand(1, 7));
 
@@ -215,8 +213,7 @@ public class EntityWolf extends EntityTameableMob {
         if (super.attack(ev)) {
             this.setSitting(false);
             if (ev instanceof EntityDamageByEntityEvent) {
-                if (((EntityDamageByEntityEvent) ev).getDamager() instanceof Player) {
-                    Player player = (Player) ((EntityDamageByEntityEvent) ev).getDamager();
+                if (((EntityDamageByEntityEvent) ev).getDamager() instanceof Player player) {
                     if (!(player.isSurvival() || player.isAdventure()) || (this.hasOwner() && player.equals(this.getOwner()))) {
                         return true;
                     }
@@ -243,11 +240,9 @@ public class EntityWolf extends EntityTameableMob {
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
             if (entity instanceof Player) {
-                HashMap<Integer, Float> armorValues = new ArmorPoints();
-
                 float points = 0;
                 for (Item i : ((Player) entity).getInventory().getArmorContents()) {
-                    points += armorValues.getOrDefault(i.getId(), 0f);
+                    points += this.getArmorPoints(i.getId());
                 }
 
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR,

@@ -83,17 +83,16 @@ public class EntityZombiePigman extends EntityWalkingMob implements EntitySmite 
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
             if (player instanceof Player) {
-                HashMap<Integer, Float> armorValues = new ArmorPoints();
-
                 float points = 0;
                 for (Item i : ((Player) player).getInventory().getArmorContents()) {
-                    points += armorValues.getOrDefault(i.getId(), 0f);
+                    points += this.getArmorPoints(i.getId());
                 }
 
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR,
                         (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));
             }
             player.attack(new EntityDamageByEntityEvent(this, player, EntityDamageEvent.DamageCause.ENTITY_ATTACK, damage));
+            this.playAttack();
         }
     }
 
@@ -136,10 +135,7 @@ public class EntityZombiePigman extends EntityWalkingMob implements EntitySmite 
         if (!this.isBaby()) {
             drops.add(Item.get(Item.ROTTEN_FLESH, 0, Utils.rand(0, 1)));
             drops.add(Item.get(Item.GOLD_NUGGET, 0, Utils.rand(0, 1)));
-
-            for (int i = 0; i < (Utils.rand(0, 101) <= 9 ? 1 : 0); i++) {
-                drops.add(Item.get(Item.GOLD_SWORD, Utils.rand(20, 30), 1));
-            }
+            drops.add(Item.get(Item.GOLD_SWORD, Utils.rand(20, 30), Utils.rand(0, 101) <= 9 ? 1 : 0));
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);

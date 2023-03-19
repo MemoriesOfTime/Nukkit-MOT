@@ -3,10 +3,12 @@ package cn.nukkit.entity;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.mob.EntityEnderDragon;
 import cn.nukkit.entity.mob.EntityFlyingMob;
 import cn.nukkit.entity.mob.EntityMob;
 import cn.nukkit.entity.mob.EntityRavager;
+import cn.nukkit.entity.passive.EntityAnimal;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
@@ -47,33 +49,33 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     public Item[] armor;
 
-    private static final Int2ObjectMap<Float> ARMOR_POINTS = new Int2ObjectOpenHashMap<Float>() {
+    private static final Int2ObjectMap<Float> ARMOR_POINTS = new Int2ObjectOpenHashMap<>() {
         {
-            put(Item.LEATHER_CAP, new Float(1));
-            put(Item.LEATHER_TUNIC, new Float(3));
-            put(Item.LEATHER_PANTS, new Float(2));
-            put(Item.LEATHER_BOOTS, new Float(1));
-            put(Item.CHAIN_HELMET, new Float(2));
-            put(Item.CHAIN_CHESTPLATE, new Float(5));
-            put(Item.CHAIN_LEGGINGS, new Float(4));
-            put(Item.CHAIN_BOOTS, new Float(1));
-            put(Item.GOLD_HELMET, new Float(2));
-            put(Item.GOLD_CHESTPLATE, new Float(5));
-            put(Item.GOLD_LEGGINGS, new Float(3));
-            put(Item.GOLD_BOOTS, new Float(1));
-            put(Item.IRON_HELMET, new Float(2));
-            put(Item.IRON_CHESTPLATE, new Float(6));
-            put(Item.IRON_LEGGINGS, new Float(5));
-            put(Item.IRON_BOOTS, new Float(2));
-            put(Item.DIAMOND_HELMET, new Float(3));
-            put(Item.DIAMOND_CHESTPLATE, new Float(8));
-            put(Item.DIAMOND_LEGGINGS, new Float(6));
-            put(Item.DIAMOND_BOOTS, new Float(3));
-            put(Item.NETHERITE_HELMET, new Float(3));
-            put(Item.NETHERITE_CHESTPLATE, new Float(8));
-            put(Item.NETHERITE_LEGGINGS, new Float(6));
-            put(Item.NETHERITE_BOOTS, new Float(3));
-            put(Item.TURTLE_SHELL, new Float(2));
+            put(Item.LEATHER_CAP, Float.valueOf(1));
+            put(Item.LEATHER_TUNIC, Float.valueOf(3));
+            put(Item.LEATHER_PANTS, Float.valueOf(2));
+            put(Item.LEATHER_BOOTS, Float.valueOf(1));
+            put(Item.CHAIN_HELMET, Float.valueOf(2));
+            put(Item.CHAIN_CHESTPLATE, Float.valueOf(5));
+            put(Item.CHAIN_LEGGINGS, Float.valueOf(4));
+            put(Item.CHAIN_BOOTS, Float.valueOf(1));
+            put(Item.GOLD_HELMET, Float.valueOf(2));
+            put(Item.GOLD_CHESTPLATE, Float.valueOf(5));
+            put(Item.GOLD_LEGGINGS, Float.valueOf(3));
+            put(Item.GOLD_BOOTS, Float.valueOf(1));
+            put(Item.IRON_HELMET, Float.valueOf(2));
+            put(Item.IRON_CHESTPLATE, Float.valueOf(6));
+            put(Item.IRON_LEGGINGS, Float.valueOf(5));
+            put(Item.IRON_BOOTS, Float.valueOf(2));
+            put(Item.DIAMOND_HELMET, Float.valueOf(3));
+            put(Item.DIAMOND_CHESTPLATE, Float.valueOf(8));
+            put(Item.DIAMOND_LEGGINGS, Float.valueOf(6));
+            put(Item.DIAMOND_BOOTS, Float.valueOf(3));
+            put(Item.NETHERITE_HELMET, Float.valueOf(3));
+            put(Item.NETHERITE_CHESTPLATE, Float.valueOf(8));
+            put(Item.NETHERITE_LEGGINGS, Float.valueOf(6));
+            put(Item.NETHERITE_BOOTS, Float.valueOf(3));
+            put(Item.TURTLE_SHELL, Float.valueOf(2));
         }
     };
 
@@ -140,6 +142,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_BABY, baby);
         if (baby) {
             this.setScale(0.5f);
+            this.age = Utils.rand(-2400, -1800);
         } else {
             this.setScale(1.0f);
         }
@@ -160,6 +163,14 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         if (this.namedTag.getBoolean("Baby")) {
             this.setBaby(true);
         }
+
+        if (this.namedTag.contains("InLoveTicks")) {
+            this.inLoveTicks = (short) this.namedTag.getShort("InLoveTicks");
+        }
+
+        if (this.namedTag.contains("InLoveCooldown")) {
+            this.inLoveCooldown = (short) this.namedTag.getShort("InLoveCooldown");
+        }
     }
 
     @Override
@@ -169,23 +180,18 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.namedTag.putBoolean("Baby", this.baby);
         this.namedTag.putBoolean("Movement", this.isMovement());
         this.namedTag.putShort("Age", this.age);
-
-        if (this.isInLove()) {
-            this.namedTag.putShort("inLoveTicks", this.inLoveTicks);
-        }
-        if (this.isInLoveCooldown()) {
-            this.namedTag.putShort("inLoveCooldown", this.inLoveCooldown);
-        }
-
+        this.namedTag.putShort("InLoveTicks", this.inLoveTicks);
+        this.namedTag.putShort("InLoveCooldown", this.inLoveCooldown);
     }
 
     public boolean targetOption(EntityCreature creature, double distance) {
         if (this instanceof EntityMob) {
-            if (creature instanceof Player) {
-                Player player = (Player) creature;
+            if (creature instanceof Player player) {
                 return !player.closed && player.spawned && player.isAlive() && (player.isSurvival() || player.isAdventure()) && distance <= 100;
             }
             return creature.isAlive() && !creature.closed && distance <= 100;
+        } else if (this instanceof EntityAnimal && this.isInLove()) {
+            return creature instanceof BaseEntity && ((BaseEntity) creature).isInLove() && creature.isAlive() && !creature.closed && creature.getNetworkId() == this.getNetworkId() && distance <= 100;
         }
         return false;
     }
@@ -214,9 +220,13 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             this.moveTime -= tickDiff;
         }
 
+        if (this.isBaby() && this.age > 0) {
+            this.setBaby(false);
+        }
+
         if (this.isInLove()) {
             this.inLoveTicks -= tickDiff;
-            if (this.age % 20 == 0) {
+            if (!this.isBaby() && this.age > 0 && this.age % 20 == 0) {
                 for (int i = 0; i < 3; i++) {
                     this.level.addParticle(new HeartParticle(this.add(Utils.rand(-1.0, 1.0), this.getMountedYOffset() + Utils.rand(-1.0, 1.0), Utils.rand(-1.0, 1.0))));
                 }
@@ -227,7 +237,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                     }
                 }
             }
-        } else if (isInLoveCooldown()) {
+        } else if (this.isInLoveCooldown()) {
             this.inLoveCooldown -= tickDiff;
         }
 
@@ -239,10 +249,9 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     protected boolean checkSpawnBaby(Entity entity) {
-        if (!(entity instanceof BaseEntity) || entity.getNetworkId() != this.getNetworkId()) {
+        if (!(entity instanceof BaseEntity baseEntity) || entity.getNetworkId() != this.getNetworkId()) {
             return false;
         }
-        BaseEntity baseEntity = (BaseEntity) entity;
         if (!baseEntity.isInLove() || baseEntity.isBaby() || baseEntity.age <= 0) {
             return false;
         }
@@ -393,6 +402,19 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return this.inLoveCooldown > 0;
     }
 
+    /**
+     * Check if the entity can swim in the block
+     * @param block block id
+     * @return can swim
+     */
+    protected boolean canSwimIn(int block) {
+        return block == BlockID.WATER || block == BlockID.STILL_WATER;
+    }
+
+    /**
+     * Get a random set of armor
+     * @return armor items
+     */
     public Item[] getRandomArmor() {
         Item[] slots = new Item[4];
         Item helmet = Item.get(0);
@@ -401,211 +423,189 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         Item boots = Item.get(0);
 
         switch (Utils.rand(1, 5)) {
-            case 1:
-                if (Utils.rand(1, 100) < 39) {
-                    if (Utils.rand(0, 1) == 0) {
-                        helmet = Item.get(Item.LEATHER_HELMET, 0, 1);
-                        this.addHealth(1);
-                    }
-                }
-                break;
-            case 2:
-                if (Utils.rand(1, 100) < 50) {
-                    if (Utils.rand(0, 1) == 0) {
-                        helmet = Item.get(Item.GOLD_HELMET, 0, 1);
-                        this.addHealth(1);
-                    }
-                }
-                break;
-            case 3:
-                if (Utils.rand(1, 100) < 14) {
-                    if (Utils.rand(0, 1) == 0) {
-                        helmet = Item.get(Item.CHAIN_HELMET, 0, 1);
-                        this.addHealth(1);
-                    }
-                }
-                break;
-            case 4:
-                if (Utils.rand(1, 100) < 3) {
-                    if (Utils.rand(0, 1) == 0) {
-                        helmet = Item.get(Item.IRON_HELMET, 0, 1);
-                        this.addHealth(1);
-                    }
-                }
-                break;
-            case 5:
-                if (Utils.rand(1, 100) == 100) {
-                    if (Utils.rand(0, 1) == 0) {
-                        helmet = Item.get(Item.DIAMOND_HELMET, 0, 1);
-                        this.addHealth(2);
-                    }
-                }
-                break;
-            default:
-                break;
-        }
+			case 1 -> {
+				if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
+					helmet = Item.get(Item.LEATHER_HELMET, Utils.rand(30, 48), 1);
+				}
+			}
+			case 2 -> {
+				if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
+					helmet = Item.get(Item.GOLD_HELMET, Utils.rand(40, 70), 1);
+				}
+			}
+			case 3 -> {
+				if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
+					helmet = Item.get(Item.CHAIN_HELMET, Utils.rand(100, 160), 1);
+				}
+			}
+			case 4 -> {
+				if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
+					helmet = Item.get(Item.IRON_HELMET, Utils.rand(100, 160), 1);
+				}
+			}
+			case 5 -> {
+				if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
+					helmet = Item.get(Item.DIAMOND_HELMET, Utils.rand(190, 256), 1);
+				}
+			}
+		}
 
-        slots[0] = helmet;
+		slots[0] = helmet;
 
-        if (Utils.rand(1, 4) != 1) {
-            switch (Utils.rand(1, 5)) {
-                case 1:
-                    if (Utils.rand(1, 100) < 39) {
-                        if (Utils.rand(0, 1) == 0) {
-                            chestplate = Item.get(Item.LEATHER_CHESTPLATE, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 2:
-                    if (Utils.rand(1, 100) < 50) {
-                        if (Utils.rand(0, 1) == 0) {
-                            chestplate = Item.get(Item.GOLD_CHESTPLATE, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 3:
-                    if (Utils.rand(1, 100) < 14) {
-                        if (Utils.rand(0, 1) == 0) {
-                            chestplate = Item.get(Item.CHAIN_CHESTPLATE, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 4:
-                    if (Utils.rand(1, 100) < 3) {
-                        if (Utils.rand(0, 1) == 0) {
-                            chestplate = Item.get(Item.IRON_CHESTPLATE, 0, 1);
-                            this.addHealth(2);
-                        }
-                    }
-                    break;
-                case 5:
-                    if (Utils.rand(1, 100) == 100) {
-                        if (Utils.rand(0, 1) == 0) {
-                            chestplate = Item.get(Item.DIAMOND_CHESTPLATE, 0, 1);
-                            this.addHealth(3);
-                        }
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
+		if (Utils.rand(1, 4) != 1) {
+			switch (Utils.rand(1, 5)) {
+				case 1 -> {
+					if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
+						chestplate = Item.get(Item.LEATHER_CHESTPLATE, Utils.rand(60, 73), 1);
+					}
+				}
+				case 2 -> {
+					if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
+						chestplate = Item.get(Item.GOLD_CHESTPLATE, Utils.rand(65, 105), 1);
+					}
+				}
+				case 3 -> {
+					if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
+						chestplate = Item.get(Item.CHAIN_CHESTPLATE, Utils.rand(170, 233), 1);
+					}
+				}
+				case 4 -> {
+					if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
+						chestplate = Item.get(Item.IRON_CHESTPLATE, Utils.rand(170, 233), 1);
+					}
+				}
+				case 5 -> {
+					if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
+						chestplate = Item.get(Item.DIAMOND_CHESTPLATE, Utils.rand(421, 521), 1);
+					}
+				}
+			}
+		}
 
-        slots[1] = chestplate;
+		slots[1] = chestplate;
 
-        if (Utils.rand(1, 2) == 2) {
-            switch (Utils.rand(1, 5)) {
-                case 1:
-                    if (Utils.rand(1, 100) < 39) {
-                        if (Utils.rand(0, 1) == 0) {
-                            leggings = Item.get(Item.LEATHER_LEGGINGS, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 2:
-                    if (Utils.rand(1, 100) < 50) {
-                        if (Utils.rand(0, 1) == 0) {
-                            leggings = Item.get(Item.GOLD_LEGGINGS, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 3:
-                    if (Utils.rand(1, 100) < 14) {
-                        if (Utils.rand(0, 1) == 0) {
-                            leggings = Item.get(Item.CHAIN_LEGGINGS, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 4:
-                    if (Utils.rand(1, 100) < 3) {
-                        if (Utils.rand(0, 1) == 0) {
-                            leggings = Item.get(Item.IRON_LEGGINGS, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 5:
-                    if (Utils.rand(1, 100) == 100) {
-                        if (Utils.rand(0, 1) == 0) {
-                            leggings = Item.get(Item.DIAMOND_LEGGINGS, 0, 1);
-                            this.addHealth(2);
-                        }
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
+		if (Utils.rand(1, 2) == 2) {
+			switch (Utils.rand(1, 5)) {
+				case 1 -> {
+					if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
+						leggings = Item.get(Item.LEATHER_LEGGINGS, Utils.rand(35, 68), 1);
+					}
+				}
+				case 2 -> {
+					if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
+						leggings = Item.get(Item.GOLD_LEGGINGS, Utils.rand(50, 98), 1);
+					}
+				}
+				case 3 -> {
+					if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
+						leggings = Item.get(Item.CHAIN_LEGGINGS, Utils.rand(170, 218), 1);
+					}
+				}
+				case 4 -> {
+					if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
+						leggings = Item.get(Item.IRON_LEGGINGS, Utils.rand(170, 218), 1);
+					}
+				}
+				case 5 -> {
+					if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
+						leggings = Item.get(Item.DIAMOND_LEGGINGS, Utils.rand(388, 488), 1);
+					}
+				}
+			}
+		}
 
-        slots[2] = leggings;
+		slots[2] = leggings;
 
-        if (Utils.rand(1, 5) < 3) {
-            switch (Utils.rand(1, 5)) {
-                case 1:
-                    if (Utils.rand(1, 100) < 39) {
-                        if (Utils.rand(0, 1) == 0) {
-                            boots = Item.get(Item.LEATHER_BOOTS, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 2:
-                    if (Utils.rand(1, 100) < 50) {
-                        if (Utils.rand(0, 1) == 0) {
-                            boots = Item.get(Item.GOLD_BOOTS, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 3:
-                    if (Utils.rand(1, 100) < 14) {
-                        if (Utils.rand(0, 1) == 0) {
-                            boots = Item.get(Item.CHAIN_BOOTS, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 4:
-                    if (Utils.rand(1, 100) < 3) {
-                        if (Utils.rand(0, 1) == 0) {
-                            boots = Item.get(Item.IRON_BOOTS, 0, 1);
-                            this.addHealth(1);
-                        }
-                    }
-                    break;
-                case 5:
-                    if (Utils.rand(1, 100) == 100) {
-                        if (Utils.rand(0, 1) == 0) {
-                            boots = Item.get(Item.DIAMOND_BOOTS, 0, 1);
-                            this.addHealth(2);
-                        }
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
+		if (Utils.rand(1, 5) < 3) {
+			switch (Utils.rand(1, 5)) {
+				case 1 -> {
+					if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
+						boots = Item.get(Item.LEATHER_BOOTS, Utils.rand(35, 58), 1);
+					}
+				}
+				case 2 -> {
+					if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
+						boots = Item.get(Item.GOLD_BOOTS, Utils.rand(50, 86), 1);
+					}
+				}
+				case 3 -> {
+					if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
+						boots = Item.get(Item.CHAIN_BOOTS, Utils.rand(100, 188), 1);
+					}
+				}
+				case 4 -> {
+					if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
+						boots = Item.get(Item.IRON_BOOTS, Utils.rand(100, 188), 1);
+					}
+				}
+				case 5 -> {
+					if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
+						boots = Item.get(Item.DIAMOND_BOOTS, Utils.rand(350, 428), 1);
+					}
+				}
+			}
+		}
 
         slots[3] = boots;
 
         return slots;
     }
 
-    private void addHealth(int health) {
-        this.maxHealth = this.maxHealth + health;
-        this.setHealth(this.getHealth() + health);
+    /**
+     * Increases mob's health according to armor the mob has (temporary workaround until armor damage modifiers are implemented for mobs)
+     */
+    protected void addArmorExtraHealth() {
+        if (this.armor != null && this.armor.length == 4) {
+            switch (armor[0].getId()) {
+                case Item.LEATHER_CAP -> this.addHealth(1);
+                case Item.GOLD_HELMET, Item.CHAIN_HELMET, Item.IRON_HELMET -> this.addHealth(2);
+                case Item.DIAMOND_HELMET -> this.addHealth(3);
+            }
+            switch (armor[1].getId()) {
+                case Item.LEATHER_TUNIC -> this.addHealth(2);
+                case Item.GOLD_CHESTPLATE, Item.CHAIN_CHESTPLATE, Item.IRON_CHESTPLATE -> this.addHealth(3);
+                case Item.DIAMOND_CHESTPLATE -> this.addHealth(4);
+            }
+            switch (armor[2].getId()) {
+                case Item.LEATHER_PANTS -> this.addHealth(1);
+                case Item.GOLD_LEGGINGS, Item.CHAIN_LEGGINGS, Item.IRON_LEGGINGS -> this.addHealth(2);
+                case Item.DIAMOND_LEGGINGS -> this.addHealth(3);
+            }
+            switch (armor[3].getId()) {
+                case Item.LEATHER_BOOTS -> this.addHealth(1);
+                case Item.GOLD_BOOTS, Item.CHAIN_BOOTS, Item.IRON_BOOTS -> this.addHealth(2);
+                case Item.DIAMOND_BOOTS -> this.addHealth(3);
+            }
+        }
     }
 
+    /**
+     * Increase the maximum health and health. Used for armored mobs.
+     *
+     * @param health amount of health to add
+     */
+    private void addHealth(int health) {
+        boolean wasMaxHealth = this.getHealth() == this.getMaxHealth();
+        this.setMaxHealth(this.getMaxHealth() + health);
+        if (wasMaxHealth) {
+            this.setHealth(this.getHealth() + health);
+        }
+    }
+
+    /**
+     * Check whether a mob is allowed to despawn
+     *
+     * @return can despawn
+     */
     public boolean canDespawn() {
         return Server.getInstance().despawnMobs;
     }
 
+    /**
+     * How near a player the mob should get before it starts attacking
+     *
+     * @return distance
+     */
     public int nearbyDistanceMultiplier() {
         return 1;
     }
@@ -724,6 +724,15 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             }
         }
         return human;
+    }
+
+    protected boolean isInTickingRange() {
+        for (Player player : this.level.getPlayers().values()) {
+            if (player.distanceSquared(this) < 6400) { // 80 blocks
+                return true;
+            }
+        }
+        return false;
     }
 
 }

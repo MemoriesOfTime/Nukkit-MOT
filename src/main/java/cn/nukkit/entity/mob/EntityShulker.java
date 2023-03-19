@@ -56,27 +56,28 @@ public class EntityShulker extends EntityWalkingMob {
 
     @Override
     public void attackEntity(Entity player) {
-    if (this.attackDelay > 23 && Utils.rand(1, 32) < 4 && this.distanceSquared(player) <= 55) {
+        if (this.attackDelay > 60 && Utils.rand(1, 32) < 4 && this.distanceSquared(player) <= 256) {
             this.attackDelay = 0;
 
             double f = 0.5;
-        double yaw = this.yaw + Utils.rand(-12.0, 12.0);
-        double pitch = this.pitch + Utils.rand(-7.0, 7.0);
-            Location pos = new Location(this.x - Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, this.y + this.getHeight() - 0.18,
-                    this.z + Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, yaw, pitch, this.level);
+            double yaw = this.yaw + Utils.rand(-4.0, 4.0);
+            double pitch = this.pitch + Utils.rand(-4.0, 4.0);
+            double yawR = FastMath.toRadians(yaw);
+            double pitchR = FastMath.toRadians(pitch);
+            Location pos = new Location(this.x - Math.sin(yawR) * Math.cos(pitchR) * 0.5, this.y + this.getHeight() - 0.18,
+                        this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
 
-        if (this.getLevel().getBlockIdAt((int) pos.getX(), (int) pos.getY(), (int) pos.getZ()) != Block.AIR) {
-            return;
-        }
-
-            Entity k = Entity.createEntity("ShulkerBullet", pos, this);
-            if (!(k instanceof EntityShulkerBullet)) {
+            if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) != Block.AIR) {
                 return;
             }
 
-            EntityShulkerBullet bullet = (EntityShulkerBullet) k;
-            bullet.setMotion(new Vector3(-Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f, -Math.sin(FastMath.toRadians(pitch)) * f * f,
-                    Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f));
+            Entity k = Entity.createEntity("ShulkerBullet", pos, this);
+            if (!(k instanceof EntityShulkerBullet bullet)) {
+                return;
+            }
+
+            bullet.setMotion(new Vector3(-Math.sin(yawR) * Math.cos(pitchR) * f * f, -Math.sin(pitchR) * f * f,
+                    Math.cos(yawR) * Math.cos(pitchR) * f * f));
 
             ProjectileLaunchEvent launch = new ProjectileLaunchEvent(bullet);
             this.server.getPluginManager().callEvent(launch);

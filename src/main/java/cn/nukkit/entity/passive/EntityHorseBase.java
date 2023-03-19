@@ -84,7 +84,8 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (this.isFeedItem(item)) {
+        if (this.isFeedItem(item) && !this.isInLoveCooldown()) {
+            this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EAT);
             this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(), 0), Item.get(item.getId(), 0, 1)));
             this.setInLove();
             return true;
@@ -111,7 +112,7 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
 
     public void setSaddled(boolean saddled) {
         if (this.canBeSaddled()) {
-            this.saddled = true;
+            this.saddled = saddled;
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_SADDLED, saddled);
         }
     }
@@ -149,7 +150,10 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
     public void onPlayerInput(Player player, double strafe, double forward) {
         this.stayTime = 0;
         this.moveTime = 10;
+        this.target = null;
         this.setBothYaw(player.yaw);
+
+        if (forward < 0) forward = forward / 2;
 
         strafe *= 0.4;
 

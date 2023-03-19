@@ -3,6 +3,7 @@ package cn.nukkit.entity.mob;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.EntityShootBowEvent;
@@ -10,7 +11,6 @@ import cn.nukkit.event.entity.ProjectileLaunchEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
@@ -23,6 +23,8 @@ import java.util.List;
 public class EntityPillager extends EntityWalkingMob {
 
     public static final int NETWORK_ID = 114;
+
+    private boolean angryFlagSet;
 
     public EntityPillager(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -49,7 +51,7 @@ public class EntityPillager extends EntityWalkingMob {
 
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 4, 4, 5 });
+        //this.setDamage(new int[] { 0, 4, 4, 5 });
     }
 
     @Override
@@ -58,14 +60,15 @@ public class EntityPillager extends EntityWalkingMob {
             this.attackDelay = 0;
 
             double f = 1.5;
-            double yaw = this.yaw + Utils.rand(-12.0, 12.0);
-            double pitch = this.pitch + Utils.rand(-7.0, 7.0);
-            Location pos = new Location(this.x - Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, this.y + this.getHeight() - 0.18,
-                    this.z + Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, yaw, pitch, this.level);
-            if (this.getLevel().getBlockIdAt((int) pos.getX(), (int) pos.getY(), (int) pos.getZ()) == Block.AIR) {
+            double yaw = this.yaw;
+            double pitch = this.pitch;
+            double yawR = FastMath.toRadians(yaw);
+            double pitchR = FastMath.toRadians(pitch);
+            Location pos = new Location(this.x - Math.sin(yawR) * Math.cos(pitchR) * 0.5, this.y + this.getHeight() - 0.18,
+                    this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
+            if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) == Block.AIR) {
                 EntityArrow arrow = (EntityArrow) Entity.createEntity("Arrow", pos, this);
-                arrow.setMotion(new Vector3(-Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f, -Math.sin(FastMath.toRadians(pitch)) * f * f,
-                        Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f));
+                setProjectileMotion(arrow, pitch, yawR, pitchR, f);
 
                 EntityShootBowEvent ev = new EntityShootBowEvent(this, Item.get(Item.ARROW, 0, 1), arrow, f);
                 this.server.getPluginManager().callEvent(ev);
@@ -93,9 +96,7 @@ public class EntityPillager extends EntityWalkingMob {
     public Item[] getDrops() {
         List<Item> drops = new ArrayList<>();
 
-        for (int i = 0; i < Utils.rand(0, 2); i++) {
-            drops.add(Item.get(Item.ARROW, 0, 1));
-        }
+        drops.add(Item.get(Item.ARROW, 0, Utils.rand(0, 2)));
 
         if (Utils.rand(1, 12) == 1) {
             drops.add(Item.get(Item.CROSSBOW, Utils.rand(300, 380), Utils.rand(0, 1)));
@@ -123,5 +124,23 @@ public class EntityPillager extends EntityWalkingMob {
     @Override
     public int nearbyDistanceMultiplier() {
         return 20;
+    }
+
+    @Override
+    public boolean targetOption(EntityCreature creature, double distance) {
+        boolean hasTarget = super.targetOption(creature, distance);
+        if (hasTarget) {
+            if (!this.angryFlagSet) {
+                this.setDataFlag(DATA_FLAGS, DATA_FLAG_CHARGED, true);
+                this.angryFlagSet = true;
+            }
+        } else {
+            if (this.angryFlagSet) {
+                this.setDataFlag(DATA_FLAGS, DATA_FLAG_CHARGED, false);
+                this.angryFlagSet = false;
+                this.stayTime = 100;
+            }
+        }
+        return hasTarget;
     }
 }

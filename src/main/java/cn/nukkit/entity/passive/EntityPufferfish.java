@@ -84,4 +84,8 @@ public class EntityPufferfish extends EntityFish {
 
         return super.entityBaseTick(tickDiff);
     }
+
+    public boolean isPuffed() {
+        return this.puffed > 0;
+    }
 }

@@ -1,7 +1,6 @@
 package cn.nukkit.entity.mob;
 
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntitySmite;
@@ -16,7 +15,6 @@ import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.utils.Utils;
@@ -31,7 +29,7 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
 
     public static final int NETWORK_ID = 110;
 
-    public Item tool;
+    protected Item tool;
 
     public EntityDrowned(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -62,7 +60,7 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
 
         if (this.namedTag.contains("Item")) {
             this.tool = NBTIO.getItemHelper(this.namedTag.getCompound("Item"));
-        } else {
+        } else if (!this.namedTag.getBoolean("HandItemSet")) {
             this.setRandomTool();
         }
     }
@@ -75,21 +73,16 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
             damage.put(EntityDamageEvent.DamageModifier.BASE, (float) this.getDamage());
 
             if (player instanceof Player) {
-                HashMap<Integer, Float> armorValues = new ArmorPoints();
-
                 float points = 0;
                 for (Item i : ((Player) player).getInventory().getArmorContents()) {
-                    points += armorValues.getOrDefault(i.getId(), 0f);
+                    points += this.getArmorPoints(i.getId());
                 }
 
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR,
                         (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));
             }
             player.attack(new EntityDamageByEntityEvent(this, player, EntityDamageEvent.DamageCause.ENTITY_ATTACK, damage));
-            EntityEventPacket pk = new EntityEventPacket();
-            pk.eid = this.getId();
-            pk.event = EntityEventPacket.ARM_SWING;
-            Server.broadcastPacket(this.getViewers().values(), pk);
+            this.playAttack();
         } else if (tool != null && tool.getId() == Item.TRIDENT && this.attackDelay > 120 && Utils.rand(1, 32) < 4 && this.distanceSquared(player) <= 55) {
             this.attackDelay = 0;
 
@@ -100,13 +93,12 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
             double pitchR = FastMath.toRadians(pitch);
             Location pos = new Location(this.x - Math.sin(yawR) * Math.cos(pitchR) * 0.5, this.y + this.getHeight() - 0.18,
                     this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
-            if (this.getLevel().getBlockIdAt((int) pos.getX(), (int) pos.getY(), (int) pos.getZ()) == Block.AIR) {
+            if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) == Block.AIR) {
                 Entity k = Entity.createEntity("ThrownTrident", pos, this);
-                if (!(k instanceof EntityThrownTrident)) {
+                if (!(k instanceof EntityThrownTrident trident)) {
                     return;
                 }
 
-                EntityThrownTrident trident = (EntityThrownTrident) k;
                 setProjectileMotion(trident, pitch, yawR, pitchR, f);
 
                 EntityShootBowEvent ev = new EntityShootBowEvent(this, Item.get(Item.TRIDENT, 0, 1), trident, f);
@@ -132,7 +124,6 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
     
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        boolean hasUpdate;
         if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.startTiming();
 
         if (getServer().getDifficulty() == 0) {
@@ -140,9 +131,9 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
             return true;
         }
 
-        hasUpdate = super.entityBaseTick(tickDiff);
+        boolean hasUpdate = super.entityBaseTick(tickDiff);
 
-        if (level.shouldMobBurn(this)) {
+        if (!this.closed && level.shouldMobBurn(this)) {
             this.setOnFire(100);
         }
 
@@ -155,20 +146,20 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
         List<Item> drops = new ArrayList<>();
 
         if (!this.isBaby()) {
-            for (int i = 0; i < Utils.rand(0, 2); i++) {
-                drops.add(Item.get(Item.ROTTEN_FLESH, 0, 1));
-            }
+            drops.add(Item.get(Item.ROTTEN_FLESH, 0, Utils.rand(0, 2)));
 
             if (Utils.rand(1, 100) <= 11) {
                 drops.add(Item.get(Item.GOLD_INGOT, 0, 1));
             }
 
-            if (tool != null && Utils.rand(1, 100) == 50) {
+            if (tool != null && Utils.rand(1, 4) == 1) {
                 drops.add(tool);
+            } else if (tool == null && Utils.rand(1, 80) <= 3) {
+                drops.add(Item.get(Item.TRIDENT, Utils.rand(230, 246), 1));
             }
         }
 
-        return drops.toArray(new Item[0]);
+        return drops.toArray(Item.EMPTY_ARRAY);
     }
 
     @Override
@@ -184,7 +175,7 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
                 }
                 return;
             case 2:
-                if (Utils.rand(1, 100) == 50) {
+                if (Utils.rand(1, 100) == 1) {
                     this.tool = Item.get(Item.FISHING_ROD, Utils.rand(51, 61), 1);
                 }
                 return;
@@ -212,8 +203,13 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
     public void saveNBT() {
         super.saveNBT();
 
+        this.namedTag.putBoolean("HandItemSet", true); // Can be air but don't try to set a new tool next time
         if (tool != null) {
             this.namedTag.put("Item", NBTIO.putItemHelper(tool));
         }
+    }
+
+    public Item getTool() {
+        return this.tool;
     }
 }

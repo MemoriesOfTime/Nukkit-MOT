@@ -69,17 +69,16 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
+        if (creature instanceof Player player) {
             int id = player.getInventory().getItemInHandFast().getId();
             return player.spawned && player.isAlive() && !player.closed
                     && (id == Item.CARROT
                     || id == Item.POTATO
                     || id == Item.CARROT_ON_A_STICK
                     || id == Item.BEETROOT)
-                    && distance <= 40;
+                    && distance <= 49;
         }
-        return false;
+        return super.targetOption(creature, distance);
     }
 
     @Override
@@ -116,13 +115,11 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
         List<Item> drops = new ArrayList<>();
 
         if (!this.isBaby()) {
-            for (int i = 0; i < Utils.rand(1, 3); i++) {
-                drops.add(Item.get(this.isOnFire() ? Item.COOKED_PORKCHOP : Item.RAW_PORKCHOP, 0, 1));
-            }
+            drops.add(Item.get(this.isOnFire() ? Item.COOKED_PORKCHOP : Item.RAW_PORKCHOP, 0, Utils.rand(1, 3)));
+        }
 
-            if (this.isSaddled()) {
-                drops.add(Item.get(Item.SADDLE));
-            }
+        if (this.isSaddled()) {
+            drops.add(Item.get(Item.SADDLE));
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);

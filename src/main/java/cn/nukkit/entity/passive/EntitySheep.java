@@ -22,9 +22,9 @@ public class EntitySheep extends EntityWalkingAnimal {
 
     public static final int NETWORK_ID = 13;
 
-    public boolean sheared = false;
-    public int color;
-    public int unshearTicks = -1;
+    protected boolean sheared = false;
+    protected int color;
+    protected int unshearTicks = -1;
 
     public EntitySheep(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -112,11 +112,10 @@ public class EntitySheep extends EntityWalkingAnimal {
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
-            return player.spawned && player.isAlive() && !player.closed && player.getInventory().getItemInHandFast().getId() == Item.WHEAT && distance <= 40;
+        if (creature instanceof Player player) {
+            return player.spawned && player.isAlive() && !player.closed && player.getInventory().getItemInHandFast().getId() == Item.WHEAT && distance <= 49;
         }
-        return false;
+        return super.targetOption(creature, distance);
     }
 
     @Override
@@ -124,11 +123,10 @@ public class EntitySheep extends EntityWalkingAnimal {
         List<Item> drops = new ArrayList<>();
 
         if (!this.isBaby()) {
-            if (!sheared) drops.add(Item.get(Item.WOOL, this.getColor(), 1));
-
-            for (int i = 0; i < Utils.rand(1, 2); i++) {
-                drops.add(Item.get(this.isOnFire() ? Item.COOKED_MUTTON : Item.RAW_MUTTON, 0, 1));
+            if (!this.isSheared()) {
+                drops.add(Item.get(Item.WOOL, this.getColor(), 1));
             }
+            drops.add(Item.get(this.isOnFire() ? Item.COOKED_MUTTON : Item.RAW_MUTTON, 0, Utils.rand(1, 2)));
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);
@@ -142,7 +140,7 @@ public class EntitySheep extends EntityWalkingAnimal {
     }
 
     public int getColor() {
-        return namedTag.getByte("Color");
+        return this.color;
     }
 
     private int randomColor() {
@@ -181,5 +179,9 @@ public class EntitySheep extends EntityWalkingAnimal {
         }
 
         return super.entityBaseTick(tickDiff);
+    }
+
+    public boolean isSheared() {
+        return this.sheared;
     }
 }
