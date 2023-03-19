@@ -30,9 +30,11 @@ public abstract class EntityJumping extends BaseEntity {
             double near = Integer.MAX_VALUE;
 
             for (Entity entity : this.getLevel().getEntities()) {
-                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
+                if (entity == this || !(entity instanceof EntityCreature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }
+
+                EntityCreature creature = (EntityCreature) entity;
 
                 if (creature instanceof BaseEntity && ((BaseEntity) creature).isFriendly() == this.isFriendly()) {
                     continue;

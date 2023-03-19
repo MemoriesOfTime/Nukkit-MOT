@@ -96,7 +96,8 @@ public class EntityChicken extends EntityWalkingAnimal {
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player player) {
+        if (creature instanceof Player) {
+            Player player = (Player) creature;
             int id = player.getInventory().getItemInHandFast().getId();
             return player.isAlive() && !player.closed
                     && (id == Item.SEEDS

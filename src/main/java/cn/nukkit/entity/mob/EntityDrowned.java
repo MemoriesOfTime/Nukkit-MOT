@@ -95,9 +95,11 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
                     this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
             if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) == Block.AIR) {
                 Entity k = Entity.createEntity("ThrownTrident", pos, this);
-                if (!(k instanceof EntityThrownTrident trident)) {
+                if (!(k instanceof EntityThrownTrident)) {
                     return;
                 }
+
+                EntityThrownTrident trident = (EntityThrownTrident) k;
 
                 setProjectileMotion(trident, pitch, yawR, pitchR, f);
 

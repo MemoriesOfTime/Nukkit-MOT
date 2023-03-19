@@ -116,7 +116,8 @@ public class EntityLlama extends EntityHorseBase {
                             Location pos = new Location(this.x - Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, this.y + this.getEyeHeight(),
                                     this.z + Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, yaw, pitch, this.level);
                             Entity k = Entity.createEntity("LlamaSpit", pos, this);
-                            if (k instanceof EntityLlamaSpit spit) {
+                            if (k instanceof EntityLlamaSpit) {
+                                EntityLlamaSpit spit = (EntityLlamaSpit) k;
                                 spit.setMotion(new Vector3(-Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f, -Math.sin(FastMath.toRadians(pitch)) * f * f,
                                         Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f));
                                 ProjectileLaunchEvent launch = new ProjectileLaunchEvent(spit);
@@ -145,7 +146,8 @@ public class EntityLlama extends EntityHorseBase {
     public boolean targetOption(EntityCreature creature, double distance) {
         boolean canTarget = super.targetOption(creature, distance);
 
-        if (canTarget && (creature instanceof Player player)) {
+        if (canTarget && (creature instanceof Player)) {
+            Player player = (Player) creature;
             return player.isAlive() && !player.closed && this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 49;
         }
 

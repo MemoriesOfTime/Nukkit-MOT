@@ -58,7 +58,8 @@ public class EntityMooshroom extends EntityWalkingAnimal {
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player player) {
+        if (creature instanceof Player) {
+            Player player = (Player) creature;
             return player.spawned && player.isAlive() && !player.closed && player.getInventory().getItemInHandFast().getId() == Item.WHEAT && distance <= 49;
         }
         return super.targetOption(creature, distance);

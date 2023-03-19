@@ -207,7 +207,8 @@ public class EntityEnderman extends EntityWalkingMob {
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
         if (!isAngry()) return false;
-        if (creature instanceof Player player) {
+        if (creature instanceof Player) {
+            Player player = (Player) creature;
             return !player.closed && player.spawned && player.isAlive() && (player.isSurvival() || player.isAdventure()) && distance <= 1024;
         }
         return creature.isAlive() && !creature.closed && distance <= 1024;

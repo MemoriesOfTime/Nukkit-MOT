@@ -75,9 +75,11 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
                     this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
             if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) == Block.AIR) {
                 Entity k = Entity.createEntity("Arrow", pos, this);
-                if (!(k instanceof EntityArrow arrow)) {
+                if (!(k instanceof EntityArrow)) {
                     return;
                 }
+
+                EntityArrow arrow = (EntityArrow) k;
 
                 setProjectileMotion(arrow, pitch, yawR, pitchR, f);
 

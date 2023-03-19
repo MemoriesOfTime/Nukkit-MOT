@@ -74,7 +74,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player player) {
+        if (creature instanceof Player) {
+            Player player = (Player) creature;
             if (!player.isSurvival() && !player.isAdventure()) {
                 return false;
             }

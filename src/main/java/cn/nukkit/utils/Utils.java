@@ -535,20 +535,20 @@ public class Utils {
                 field.setAccessible(true);
                 Object value1 = field.get(clazz1);
                 Object value2 = field.get(clazz2);
-                if (value1 instanceof Integer v1 && value2 instanceof Integer v2) {
-                    var sum = v1 + v2;
+                if (value1 instanceof Integer && value2 instanceof Integer) {
+                    Integer sum = (Integer) value1 + (Integer) value2;
                     field.set(clazz1, sum);
                 }
-                if (value1 instanceof Long v1 && value2 instanceof Long v2) {
-                    var sum = v1 + v2;
+                if (value1 instanceof Long && value2 instanceof Long) {
+                    Long sum = (Long) value1 + (Long) value2;
                     field.set(clazz1, sum);
                 }
-                if (value1 instanceof Double v1 && value2 instanceof Double v2) {
-                    var sum = BigDecimal.valueOf(v1).add(BigDecimal.valueOf(v2));
+                if (value1 instanceof Double && value2 instanceof Double) {
+                    BigDecimal sum = BigDecimal.valueOf((Double) value1).add(BigDecimal.valueOf((Double) value2));
                     field.set(clazz1, sum.doubleValue());
                 }
-                if (value1 instanceof Float v1 && value2 instanceof Float v2) {
-                    var sum = BigDecimal.valueOf(v1).add(BigDecimal.valueOf(v2));
+                if (value1 instanceof Float && value2 instanceof Float) {
+                    BigDecimal sum = BigDecimal.valueOf((Float) value1).add(BigDecimal.valueOf((Float) value2));
                     field.set(clazz1, sum.floatValue());
                 }
             }

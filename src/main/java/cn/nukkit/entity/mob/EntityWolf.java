@@ -213,7 +213,8 @@ public class EntityWolf extends EntityTameableMob {
         if (super.attack(ev)) {
             this.setSitting(false);
             if (ev instanceof EntityDamageByEntityEvent) {
-                if (((EntityDamageByEntityEvent) ev).getDamager() instanceof Player player) {
+                if (((EntityDamageByEntityEvent) ev).getDamager() instanceof Player) {
+                    Player player = (Player) ((EntityDamageByEntityEvent) ev).getDamager();
                     if (!(player.isSurvival() || player.isAdventure()) || (this.hasOwner() && player.equals(this.getOwner()))) {
                         return true;
                     }

@@ -47,11 +47,14 @@ public class EntityWitherSkull extends EntityProjectile {
 
     @Override
     protected double getBaseDamage() {
-        return switch (server.getDifficulty()) {
-            case 2 -> 8; // normal
-            case 3 -> 12; // hard
-            default -> 5;
-        };
+        switch (server.getDifficulty()) {
+            case 2:
+                return 8; // normal
+            case 3:
+                return 12; // hard
+            default:
+                return 5;
+        }
     }
 
     public EntityWitherSkull(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {

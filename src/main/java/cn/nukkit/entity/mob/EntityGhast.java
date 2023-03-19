@@ -62,7 +62,8 @@ public class EntityGhast extends EntityFlyingMob {
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player player) {
+        if (creature instanceof Player) {
+            Player player = (Player) creature;
             return !player.closed && player.spawned && player.isAlive() && (player.isSurvival() || player.isAdventure()) && distance <= 4096;
         }
         return false;

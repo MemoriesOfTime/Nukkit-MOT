@@ -69,7 +69,8 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player player) {
+        if (creature instanceof Player) {
+            Player player = (Player) creature;
             int id = player.getInventory().getItemInHandFast().getId();
             return player.spawned && player.isAlive() && !player.closed
                     && (id == Item.CARROT

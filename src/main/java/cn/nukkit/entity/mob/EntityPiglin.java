@@ -76,9 +76,11 @@ public class EntityPiglin extends EntityWalkingMob {
 
             if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) == Block.AIR) {
                 Entity k = Entity.createEntity("Arrow", pos, this);
-                if (!(k instanceof EntityArrow arrow)) {
+                if (!(k instanceof EntityArrow)) {
                     return;
                 }
+
+                EntityArrow arrow = (EntityArrow) k;
 
                 setProjectileMotion(arrow, pitch, yawR, pitchR, f);
 

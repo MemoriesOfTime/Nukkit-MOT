@@ -57,7 +57,8 @@ public class EntityDonkey extends EntityHorseBase {
     public boolean targetOption(EntityCreature creature, double distance) {
         boolean canTarget = super.targetOption(creature, distance);
 
-        if (canTarget && (creature instanceof Player player)) {
+        if (canTarget && (creature instanceof Player)) {
+            Player player = (Player) creature;
             return player.spawned && player.isAlive() && !player.closed &&
                     this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 49;
         }

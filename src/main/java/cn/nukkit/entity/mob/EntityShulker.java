@@ -72,9 +72,11 @@ public class EntityShulker extends EntityWalkingMob {
             }
 
             Entity k = Entity.createEntity("ShulkerBullet", pos, this);
-            if (!(k instanceof EntityShulkerBullet bullet)) {
+            if (!(k instanceof EntityShulkerBullet)) {
                 return;
             }
+
+            EntityShulkerBullet bullet = (EntityShulkerBullet) k;
 
             bullet.setMotion(new Vector3(-Math.sin(yawR) * Math.cos(pitchR) * f * f, -Math.sin(pitchR) * f * f,
                     Math.cos(yawR) * Math.cos(pitchR) * f * f));
