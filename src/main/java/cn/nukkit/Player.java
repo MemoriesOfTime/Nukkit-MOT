@@ -5479,7 +5479,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.ySize = 0;
 
-        Server.broadcastPacket(targets, pk);
+        if (targets != null) {
+            Server.broadcastPacket(targets, pk);
+        } else {
+            this.dataPacket(pk);
+        }
     }
 
     @Override
