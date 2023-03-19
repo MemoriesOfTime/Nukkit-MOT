@@ -77,7 +77,6 @@ import cn.nukkit.utils.bugreport.ExceptionHandler;
 import co.aikar.timings.Timings;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.gson.JsonParser;
 import io.netty.buffer.ByteBuf;
 import io.sentry.Sentry;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -90,13 +89,17 @@ import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.impl.Iq80DBFactory;
 
-import java.io.*;
-import java.net.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -739,7 +742,7 @@ public class Server {
         }
 
         // Check for updates
-        CompletableFuture.runAsync(() -> {
+        /*CompletableFuture.runAsync(() -> {
             try {
                 URLConnection request = new URL(Nukkit.BRANCH).openConnection();
                 request.connect();
@@ -756,7 +759,9 @@ public class Server {
                 }
             } catch (Exception ignore) {
             }
-        });
+        });*/
+
+        this.getLogger().warning("\u00A7c[Nukkit-PM1E-MOT] \u00A7eYou are using the java8 branch, this branch may stop being maintained in the future, it is recommended that you update to java17 and switch to the master branch!");
 
         this.start();
     }

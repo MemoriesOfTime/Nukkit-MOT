@@ -8,14 +8,8 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.plugin.PluginDescription;
 import cn.nukkit.utils.TextFormat;
-import com.google.gson.JsonParser;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.URL;
-import java.net.URLConnection;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Created on 2015/11/12 by xtypr.
@@ -42,7 +36,8 @@ public class VersionCommand extends VanillaCommand {
             sender.sendMessage("§e###############################################\n§cNukkit§3-§aPM1E§3-§dMOT\n§6Build: §b" + Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4) + "\n§6Multiversion: §bUp to version " + ProtocolInfo.MINECRAFT_VERSION_NETWORK + "\n§e###############################################");
 
             if (sender.isOp()) {
-                CompletableFuture.runAsync(() -> {
+                sender.sendMessage("§c[Nukkit-PM1E-MOT] §eYou are using the java8 branch, this branch may stop being maintained in the future, it is recommended that you update to java17 and switch to the master branch!");
+                /*CompletableFuture.runAsync(() -> {
                     try {
                         URLConnection request = new URL(Nukkit.BRANCH).openConnection();
                         request.connect();
@@ -59,7 +54,7 @@ public class VersionCommand extends VanillaCommand {
                         }
                     } catch (Exception ignore) {
                     }
-                });
+                });*/
             }
         } else {
             StringBuilder pluginName = new StringBuilder();

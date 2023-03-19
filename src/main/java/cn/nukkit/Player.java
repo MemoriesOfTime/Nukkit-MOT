@@ -78,7 +78,6 @@ import co.aikar.timings.Timings;
 import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.gson.JsonParser;
 import io.netty.util.internal.PlatformDependent;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -95,18 +94,13 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
-import java.net.URL;
-import java.net.URLConnection;
 import java.nio.ByteOrder;
 import java.util.List;
 import java.util.*;
 import java.util.Queue;
 import java.util.Map.Entry;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -1017,7 +1011,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (server.updateChecks && this.isOp()) {
-            CompletableFuture.runAsync(() -> {
+            this.sendMessage("§c[Nukkit-PM1E-MOT] §eYou are using the java8 branch, this branch may stop being maintained in the future, it is recommended that you update to java17 and switch to the master branch!");
+
+            /*CompletableFuture.runAsync(() -> {
                 try {
                     URLConnection request = new URL(Nukkit.BRANCH).openConnection();
                     request.connect();
@@ -1032,7 +1028,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 } catch (Exception ignore) {
                 }
-            });
+            });*/
         }
     }
 
