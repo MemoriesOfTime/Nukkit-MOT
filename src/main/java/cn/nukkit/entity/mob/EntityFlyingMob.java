@@ -8,6 +8,9 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
 
+import java.util.Objects;
+import java.util.Optional;
+
 public abstract class EntityFlyingMob extends EntityFlying implements EntityMob {
 
     protected int[] minDamage;
@@ -150,12 +153,20 @@ public abstract class EntityFlyingMob extends EntityFlying implements EntityMob 
         this.entityBaseTick(tickDiff);
 
         Vector3 target = this.updateMove(tickDiff);
-        if (target instanceof Entity && this.isMovement() && this.getServer().getMobAiEnabled()) {
-            Entity entity = (Entity) target;
-            if (!entity.closed && (target != this.followTarget || this.canAttack)) {
-                this.attackEntity(entity);
-            }
+        if (Objects.nonNull(target)) {
+            Optional.ofNullable(getAttackTarget(target))
+                    .ifPresent(this::attackEntity);
         }
         return true;
+    }
+
+    protected Entity getAttackTarget(Vector3 target) {
+        if (isMeetAttackConditions(target)) {
+            Entity entity = (Entity) target;
+            if (!entity.isClosed() && (target != this.followTarget || this.canAttack)) {
+                return entity;
+            }
+        }
+        return null;
     }
 }

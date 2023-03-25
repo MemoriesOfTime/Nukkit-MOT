@@ -155,12 +155,18 @@ public abstract class EntityJumpingMob extends EntityJumping implements EntityMo
         Vector3 target = this.updateMove(tickDiff);
         if (Objects.nonNull(target)) {
             Optional.ofNullable(getAttackTarget(target))
-                    .ifPresent(entity -> {
-                        if (this.canAttack) {
-                            this.attackEntity(entity);
-                        }
-                    });
+                    .ifPresent(this::attackEntity);
         }
         return true;
+    }
+
+    protected Entity getAttackTarget(Vector3 target) {
+        if (isMeetAttackConditions(target)) {
+            Entity entity = (Entity) target;
+            if (!entity.isClosed() && (target != this.followTarget || this.canAttack)) {
+                return entity;
+            }
+        }
+        return null;
     }
 }

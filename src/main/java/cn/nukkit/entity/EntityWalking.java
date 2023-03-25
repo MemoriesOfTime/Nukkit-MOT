@@ -27,6 +27,8 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
+        this.followTarget = null;
+
         Vector3 target = this.target;
         if (!(target instanceof EntityCreature) || (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) || !((Entity) target).canBeFollowed()) {
             double near = Integer.MAX_VALUE;
@@ -49,6 +51,9 @@ public abstract class EntityWalking extends BaseEntity {
                 this.stayTime = 0;
                 this.moveTime = 0;
                 this.followTarget = creature;
+                if (this.target == null) {
+                    this.target = this.followTarget;
+                }
             }
         }
 
