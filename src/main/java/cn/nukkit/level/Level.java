@@ -1357,9 +1357,9 @@ public class Level implements ChunkManager, Metadatable {
         provider.saveChunks();
     }
 
-    public void updateAroundRedstone(Vector3 pos, BlockFace face) {
+    public void updateAroundRedstone(Vector3 pos, BlockFace ignoredFace) {
         for (BlockFace side : BlockFace.values()) {
-            if (face != null /*&&*/ || side == face) {
+            if (ignoredFace != null && side == ignoredFace) {
                 continue;
             }
 
