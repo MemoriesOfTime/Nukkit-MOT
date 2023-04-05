@@ -23,7 +23,7 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
-        if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && targetOption((EntityCreature) this.followTarget, this.distanceSquared(this.followTarget)) && this.target != null) {
+        if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed()) {
             return;
         }
 
@@ -50,11 +50,11 @@ public abstract class EntityWalking extends BaseEntity {
 
                 this.stayTime = 0;
                 this.moveTime = 0;
-                this.followTarget = creature;
+                this.target = creature;
             }
         }
 
-        if (this.followTarget != null) {
+        if (this.target instanceof EntityCreature && !((EntityCreature) this.target).closed && ((EntityCreature) this.target).isAlive() && this.targetOption((EntityCreature) this.target, this.distanceSquared(this.target))) {
             return;
         }
 
@@ -152,7 +152,7 @@ public abstract class EntityWalking extends BaseEntity {
             }
 
             if (this.getServer().getMobAiEnabled()) {
-                if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed() && this.target != null) {
+                if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed()) {
                     double x = this.followTarget.x - this.x;
                     double z = this.followTarget.z - this.z;
 
@@ -182,8 +182,9 @@ public abstract class EntityWalking extends BaseEntity {
                     return this.followTarget;
                 }
 
+                Vector3 before = this.target;
                 this.checkTarget();
-                if (this.target != null) {
+                if (this.target instanceof EntityCreature || before != this.target) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;
 
@@ -251,7 +252,7 @@ public abstract class EntityWalking extends BaseEntity {
             }
 
             this.updateMovement();
-            return this.followTarget != null ? this.followTarget : this.target;
+            return this.target;
         }
         return null;
     }

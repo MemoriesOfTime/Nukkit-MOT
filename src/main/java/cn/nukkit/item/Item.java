@@ -607,7 +607,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static void addCreativeItem(Item item) {
         Server.mvw("Item#addCreativeItem(Item)");
-        addCreativeItem(v1_19_60, item);
+        addCreativeItem(v1_19_70, item);
     }
 
     public static void addCreativeItem(int protocol, Item item) {
@@ -675,6 +675,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 break;
             case v1_19_70:
                 Item.creative575.add(item.clone());
+                break;
             default:
                 throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }

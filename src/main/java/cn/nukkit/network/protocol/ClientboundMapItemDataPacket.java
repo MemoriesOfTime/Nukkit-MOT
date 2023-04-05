@@ -19,6 +19,7 @@ public class ClientboundMapItemDataPacket extends DataPacket {
     public long[] eids = EMPTY_LONGS;
 
     public long mapId;
+    @Deprecated
     public int update;
     public byte scale;
     public boolean isLocked;
@@ -70,6 +71,9 @@ public class ClientboundMapItemDataPacket extends DataPacket {
         this.putByte(this.dimensionId);
         if (protocol >= 354) {
             this.putBoolean(this.isLocked);
+        }
+        if (protocol >= ProtocolInfo.v1_19_20) {
+            this.putBlockVector3(this.origin);
         }
 
         if ((update & ENTITIES_UPDATE) != 0) {
@@ -124,6 +128,7 @@ public class ClientboundMapItemDataPacket extends DataPacket {
 
                 image.flush();
             } else if (colors.length > 0) {
+                this.putUnsignedVarInt(colors.length);
                 for (int color : colors) {
                     this.putUnsignedVarInt(color);
                 }

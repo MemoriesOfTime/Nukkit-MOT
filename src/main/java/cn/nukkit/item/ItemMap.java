@@ -89,7 +89,6 @@ public class ItemMap extends Item {
 
         ClientboundMapItemDataPacket pk = new ClientboundMapItemDataPacket();
         pk.mapId = getMapId();
-        pk.update = 2;
         pk.scale = 0;
         pk.width = 128;
         pk.height = 128;
