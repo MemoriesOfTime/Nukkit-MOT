@@ -85,6 +85,8 @@ public class EntityEventPacket extends DataPacket {
     public int event;
     public int data = 0;
 
+    public int originProtocol = -1;
+
     @Override
     public void decode() {
         this.eid = this.getEntityRuntimeId();
@@ -97,6 +99,18 @@ public class EntityEventPacket extends DataPacket {
         this.reset();
         this.putEntityRuntimeId(this.eid);
         this.putByte((byte) this.event);
+        if (this.event == EATING_ITEM && this.originProtocol > 0) {
+            // 1.19.63 <=> 1.19.70 喝药水声音转换
+            if (this.originProtocol >= ProtocolInfo.v1_19_70_24 && this.protocol < ProtocolInfo.v1_19_70_24) {
+                if (this.data >= 27983872) {
+                    this.data -= 65536;
+                }
+            } else if (this.originProtocol < ProtocolInfo.v1_19_70_24 && this.protocol >= ProtocolInfo.v1_19_70_24) {
+                if (this.data >= 27918336) {
+                    this.data += 65536;
+                }
+            }
+        }
         this.putVarInt(this.data);
     }
 }

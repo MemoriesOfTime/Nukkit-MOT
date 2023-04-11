@@ -3506,6 +3506,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             entityEventPacket.eid = this.id;
                             entityEventPacket.isEncoded = false;
+                            entityEventPacket.originProtocol = this.protocol;
                             this.dataPacket(entityEventPacket);
                             Server.broadcastPacket(this.getViewers().values(), entityEventPacket);
                             break;
