@@ -49,7 +49,7 @@ public class EntityEnderman extends EntityWalkingMob {
 
     @Override
     public double getSpeed() {
-        return this.isAngry() ? 1.4 : 1.21;
+        return this.isAngry() ? 1.6 : 1.21;
     }
 
     @Override

@@ -481,6 +481,8 @@ public class Utils {
             case ProtocolInfo.v1_19_70_24:
             case ProtocolInfo.v1_19_70:
                 return "1.19.70";
+            case ProtocolInfo.v1_19_80:
+                return "1.19.80";
             //TODO Multiversion 添加新版本支持时修改这里
             default:
                 throw new IllegalStateException("Invalid protocol: " + protocol);

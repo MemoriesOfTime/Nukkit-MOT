@@ -2829,17 +2829,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     }
 
-                    Block block;
-                    if (movePlayerPacket.y < this.y) {
-                        if (!(this.getAdventureSettings().get(AdventureSettings.Type.NO_CLIP) ||
-                                !(block = this.level.getBlock(newPos.getFloorX(), NukkitMath.floorDouble(newPos.getY() + 0.2), newPos.getFloorZ(), false)).isSolid() ||
-                                (block.isTransparent() && !Player.canGoThrough(block)) ||
-                                block instanceof BlockFallable && !this.isInsideOfSolid())) {
-                            this.sendPosition(this.add(0.0, 0.1, 0.0), movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
-                            return;
-                        }
-                    }
-
                     boolean revert = false;
                     if (!this.isAlive() || !this.spawned) {
                         revert = true;
@@ -3011,16 +3000,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (distSqrt > 100) {
                         this.sendPosition(this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
                         break;
-                    }
-
-                    if (clientPosition.y < this.y) {
-                        if (!(this.getAdventureSettings().get(AdventureSettings.Type.NO_CLIP) ||
-                                !(block = this.level.getBlock(clientPosition.getFloorX(), NukkitMath.floorDouble(clientPosition.getY() + 0.2), clientPosition.getFloorZ(), false)).isSolid() ||
-                                (block.isTransparent() && !Player.canGoThrough(block)) ||
-                                block instanceof BlockFallable && !this.isInsideOfSolid())) {
-                            this.sendPosition(this.add(0.0, 0.1, 0.0), authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
-                            return;
-                        }
                     }
 
                     boolean revertMotion = false;
@@ -3393,7 +3372,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 case ProtocolInfo.BLOCK_PICK_REQUEST_PACKET:
                     BlockPickRequestPacket pickRequestPacket = (BlockPickRequestPacket) packet;
-                    block = this.level.getBlock(pickRequestPacket.x, pickRequestPacket.y, pickRequestPacket.z, false);
+                    Block block = this.level.getBlock(pickRequestPacket.x, pickRequestPacket.y, pickRequestPacket.z, false);
                     if (block.distanceSquared(this) > 1000) {
                         this.getServer().getLogger().debug(username + ": Block pick request for a block too far away");
                         return;
@@ -3524,6 +3503,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                             entityEventPacket.eid = this.id;
                             entityEventPacket.isEncoded = false;
+                            entityEventPacket.originProtocol = this.protocol;
                             this.dataPacket(entityEventPacket);
                             Server.broadcastPacket(this.getViewers().values(), entityEventPacket);
                             break;
