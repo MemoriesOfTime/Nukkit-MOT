@@ -174,7 +174,7 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable {
                 sign.setGlowing(glow);
                 sign.spawnToAll();
 
-                this.level.addLevelEvent(this, LevelEventPacket.EVENT_SOUND_INK_SAC_USED);
+                this.level.addLevelEvent(this, LevelEventPacket.EVENT_SOUND_INK_SACE_USED);
 
                 if (player != null && (player.getGamemode() & 0x01) == 0) {
                     item.count--;
