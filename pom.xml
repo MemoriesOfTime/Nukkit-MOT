@@ -61,6 +61,12 @@
         </dependency>
         <dependency>
             <groupId>com.nukkitx</groupId>
+            <artifactId>natives</artifactId>
+            <version>1.0.3</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.nukkitx</groupId>
             <artifactId>fastutil-lite</artifactId>
             <version>8.1.1</version>
         </dependency>

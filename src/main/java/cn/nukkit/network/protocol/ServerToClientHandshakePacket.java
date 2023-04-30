@@ -12,9 +12,7 @@ public class ServerToClientHandshakePacket extends DataPacket {
         return NETWORK_ID;
     }
 
-    public String publicKey;
-    public String serverToken;
-    public String privateKey;
+    public String jwt;
 
     @Override
     public void decode() {
@@ -22,5 +20,16 @@ public class ServerToClientHandshakePacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
+
+        this.putString(this.jwt);
+    }
+
+    public void setJwt(String jwt) {
+        this.jwt = jwt;
+    }
+
+    public String getJwt() {
+        return jwt;
     }
 }
