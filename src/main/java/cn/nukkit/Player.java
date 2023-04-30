@@ -2724,8 +2724,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                         }
                     };
+
                     this.server.getScheduler().scheduleAsyncTask(this.preLoginEventTask);
-                    if (this.server.encryptionEnabled && loginChainData.isXboxAuthed()) {
+
+                    if (this.isEnableNetworkEncryption()) {
                         this.server.getScheduler().scheduleAsyncTask(new PrepareEncryptionTask(this) {
                             @Override
                             public void onCompletion(Server server) {
@@ -2748,7 +2750,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     break;
                 case ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET:
-                    if (this.server.encryptionEnabled && loginChainData.isXboxAuthed()) {
+                    if (this.isEnableNetworkEncryption()) {
                         this.processLogin();
                     }
                     break;
@@ -6537,5 +6539,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public boolean isServerAuthoritativeBlockBreaking() {
         return this.server.serverAuthoritativeBlockBreaking && this.isMovementServerAuthoritative();
+    }
+
+    private boolean isEnableNetworkEncryption() {
+        return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled && loginChainData.isXboxAuthed();
     }
 }
