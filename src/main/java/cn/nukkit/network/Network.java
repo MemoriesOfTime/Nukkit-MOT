@@ -233,7 +233,7 @@ public class Network {
                     pk.protocol = protocol;
                     pk.setBuffer(buf, buf.length - bais.available());
                     try {
-                        if (protocol > 8) {
+                        if (raknetProtocol > 8) {
                             pk.decode();
                         }else { // version < 1.6
                             pk.setBuffer(buf, 3);
