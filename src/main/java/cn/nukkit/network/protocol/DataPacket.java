@@ -20,6 +20,10 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
 
     public RakNetReliability reliability = RakNetReliability.RELIABLE_ORDERED;
 
+    public int packetId() {
+        return ProtocolInfo.toNewProtocolID(this.pid());
+    }
+
     public abstract byte pid();
 
     public abstract void decode();
@@ -33,7 +37,7 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
             this.putByte(this.pid());
             this.putShort(0);
         } else {
-            this.putUnsignedVarInt(this.pid() & 0xff);
+            this.putUnsignedVarInt(this.packetId());
         }
         return this;
     }

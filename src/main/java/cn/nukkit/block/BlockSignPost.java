@@ -15,6 +15,8 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelEventPacket;
+import cn.nukkit.network.protocol.OpenSignPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.Faceable;
@@ -89,7 +91,7 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable {
             }
 
             if (player != null) {
-                nbt.putString("Creator", player.getUniqueId().toString());
+                nbt.putString("Creator", player.getUniqueId().toString()); //已不再使用，保留是防止有插件用
             }
 
             if (item.hasCustomBlockData()) {
@@ -98,7 +100,16 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable {
                 }
             }
 
-            BlockEntity.createBlockEntity(BlockEntity.SIGN, this.level.getChunk(block.getChunkX(), block.getChunkZ()), nbt);
+            BlockEntity blockEntity = BlockEntity.createBlockEntity(BlockEntity.SIGN, this.level.getChunk(block.getChunkX(), block.getChunkZ()), nbt);
+            if (player != null && blockEntity instanceof BlockEntitySign blockEntitySign) {
+                blockEntitySign.setEditorEntityRuntimeId(player.getId());
+                if (player.protocol >= ProtocolInfo.v1_19_80) {
+                    OpenSignPacket openSignPacket = new OpenSignPacket();
+                    openSignPacket.setPosition(this.asBlockVector3());
+                    openSignPacket.setFrontSide(true);
+                    player.dataPacket(openSignPacket);
+                }
+            }
             return true;
         }
 
