@@ -3,6 +3,7 @@ package cn.nukkit.network;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
@@ -60,6 +61,7 @@ public class Network {
 
     public Network(Server server) {
         this.registerPackets();
+        DataPacketManager.registerDefaultProcessors();
         this.server = server;
         List<NetworkIF> tmpIfs = null;
         try {

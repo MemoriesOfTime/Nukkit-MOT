@@ -61,6 +61,7 @@ import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
+import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.session.NetworkPlayerSession;
@@ -91,6 +92,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math3.util.FastMath;
+import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -156,7 +158,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public boolean playedBefore;
     public boolean spawned = false;
     public boolean loggedIn = false;
-    private boolean verified = false;
+    protected boolean verified = false;
     private int unverifiedPackets;
     public int gamemode;
     public long lastBreak = -1;
@@ -267,7 +269,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private BlockEnderChest viewingEnderChest = null;
 
-    private LoginChainData loginChainData;
+    protected LoginChainData loginChainData;
 
     public Block breakingBlock = null;
     private PlayerBlockActionData lastBlockAction;
@@ -284,7 +286,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected Map<Long, DummyBossBar> dummyBossBars = new Long2ObjectLinkedOpenHashMap<>();
 
-    private AsyncTask preLoginEventTask = null;
+    protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
 
     private static Stream<Field> pkIDs;
@@ -317,6 +319,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET,
             ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET,
             ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET);
+
+    private final @NotNull PlayerHandle playerHandle = new PlayerHandle(this);
 
     public int getStartActionTick() {
         return startAction;
@@ -2574,6 +2578,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 log.trace("Inbound {}: {}", this.getName(), packet);
             }
 
+            if (DataPacketManager.canProcess(packet.protocol, packet.packetId())) {
+                DataPacketManager.processPacket(this.playerHandle, packet);
+                return;
+            }
+
             packetswitch:
             switch (packet.pid()) {
                 case ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET:
@@ -2746,11 +2755,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                         });
                     } else {
-                        this.processLogin();
-                    }
-                    break;
-                case ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET:
-                    if (this.isEnableNetworkEncryption()) {
                         this.processLogin();
                     }
                     break;
@@ -6541,7 +6545,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.server.serverAuthoritativeBlockBreaking && this.isMovementServerAuthoritative();
     }
 
-    private boolean isEnableNetworkEncryption() {
+    public boolean isEnableNetworkEncryption() {
         return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled && loginChainData.isXboxAuthed();
     }
 }
