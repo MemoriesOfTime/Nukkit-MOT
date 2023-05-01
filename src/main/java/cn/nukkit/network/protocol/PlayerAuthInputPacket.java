@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.math.Vector2;
+import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.network.protocol.types.*;
 import lombok.Getter;
@@ -31,7 +32,10 @@ public class PlayerAuthInputPacket extends DataPacket {
     private Vector3f delta;
     // private ItemStackRequest itemStackRequest;
     private Map<PlayerActionType, PlayerBlockActionData> blockActionData = new EnumMap<>(PlayerActionType.class);
-    private Vector2 analogMoveVector;
+    /**
+     * @since 575
+     */
+    private Vector2f analogMoveVector;
 
     @Override
     public byte pid() {
@@ -90,7 +94,7 @@ public class PlayerAuthInputPacket extends DataPacket {
         }
 
         if (protocol >= ProtocolInfo.v1_19_70_24) {
-            this.analogMoveVector = new Vector2(this.getLFloat(), this.getLFloat());
+            this.analogMoveVector = this.getVector2f();
         }
     }
 
