@@ -2595,6 +2595,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     this.protocol = ((RequestNetworkSettingsPacket) packet).protocolVersion;
 
+                    NetworkSettingsPacket settingsPacket = new NetworkSettingsPacket();
+                    settingsPacket.compressionAlgorithm = PacketCompressionAlgorithm.ZLIB;
+                    settingsPacket.compressionThreshold = 1; // compress everything
+                    this.forceDataPacket(settingsPacket, () -> {
+                        this.networkSession.setCompression(CompressionProvider.from(PacketCompressionAlgorithm.ZLIB, this.raknetProtocol));
+                    });
+
                     if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
                         this.close("", "You are running unsupported Minecraft version");
                         this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol " + this.protocol);
@@ -2605,13 +2612,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol " + this.protocol);
                         return;
                     }
-
-                    NetworkSettingsPacket settingsPacket = new NetworkSettingsPacket();
-                    settingsPacket.compressionAlgorithm = PacketCompressionAlgorithm.ZLIB;
-                    settingsPacket.compressionThreshold = 1; // compress everything
-                    this.forceDataPacket(settingsPacket, () -> {
-                        this.networkSession.setCompression(CompressionProvider.from(PacketCompressionAlgorithm.ZLIB, this.raknetProtocol));
-                    });
                     break;
                 case ProtocolInfo.LOGIN_PACKET:
                     if (this.loggedIn) {
