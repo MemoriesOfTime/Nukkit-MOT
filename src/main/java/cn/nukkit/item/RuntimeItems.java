@@ -33,6 +33,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping560;
     private static RuntimeItemMapping mapping567;
     private static RuntimeItemMapping mapping575;
+    private static RuntimeItemMapping mapping582;
 
     private static boolean initialized;
 
@@ -68,22 +69,25 @@ public class RuntimeItems {
             }
         }
 
-        mapping361 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_361.json", ProtocolInfo.v1_12_0);
-        mapping419 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_419.json", ProtocolInfo.v1_16_100);
-        mapping440 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_440.json", ProtocolInfo.v1_17_0);
-        mapping448 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_448.json", ProtocolInfo.v1_17_10);
-        mapping475 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_475.json", ProtocolInfo.v1_18_0);
-        mapping486 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_486.json", ProtocolInfo.v1_18_10);
-        mapping503 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_503.json", ProtocolInfo.v1_18_30);
-        mapping527 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_527.json", ProtocolInfo.v1_19_0);
-        mapping534 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_534.json", ProtocolInfo.v1_19_10);
-        mapping560 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_560.json", ProtocolInfo.v1_19_50);
-        mapping567 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_567.json", ProtocolInfo.v1_19_60);
-        mapping575 = new RuntimeItemMapping(mappingEntries, "runtime_item_states_575.json", ProtocolInfo.v1_19_70);
+        mapping361 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_12_0);
+        mapping419 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_16_100);
+        mapping440 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_17_0);
+        mapping448 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_17_10);
+        mapping475 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_18_0);
+        mapping486 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_18_10);
+        mapping503 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_18_30);
+        mapping527 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_0);
+        mapping534 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_10);
+        mapping560 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_50);
+        mapping567 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_60);
+        mapping575 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_70);
+        mapping582 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_80);
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_19_70_24) {
+        if (protocolId >= ProtocolInfo.v1_19_80) {
+            return mapping582;
+        } else if (protocolId >= ProtocolInfo.v1_19_70_24) {
             return mapping575;
         } else if (protocolId >= ProtocolInfo.v1_19_60) {
             return mapping567;

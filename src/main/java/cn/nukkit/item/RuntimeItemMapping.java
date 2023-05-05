@@ -37,8 +37,9 @@ public class RuntimeItemMapping {
 
     private byte[] itemPalette;
 
-    public RuntimeItemMapping(Map<String, MappingEntry> mappings, String itemStatesFile, int protocolId) {
+    public RuntimeItemMapping(Map<String, MappingEntry> mappings, int protocolId) {
         this.protocolId = protocolId;
+        String itemStatesFile = "runtime_item_states_" + protocolId + ".json";
         InputStream stream = Server.class.getClassLoader().getResourceAsStream(itemStatesFile);
         if (stream == null) {
             throw new AssertionError("Unable to load " + itemStatesFile);
