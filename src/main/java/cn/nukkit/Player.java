@@ -3907,10 +3907,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 break packetswitch;
                             }
 
-                            if (this.isBlocking()) {
-                                this.setBlocking(false);
-                            }
-
                             if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
                                 inventory.equipItem(useItemData.hotbarSlot);
                             }
