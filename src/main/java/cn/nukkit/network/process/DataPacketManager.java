@@ -14,7 +14,7 @@ public final class DataPacketManager {
     private static final Int2ObjectOpenHashMap<DataPacketProcessor> CURRENT_PROTOCOL_PROCESSORS = new Int2ObjectOpenHashMap<>(300);
 
     public static void registerProcessor(@NotNull DataPacketProcessor... processors) {
-        for (var processor : processors) {
+        for (DataPacketProcessor processor : processors) {
             CURRENT_PROTOCOL_PROCESSORS.put(processor.getPacketId(), processor);
         }
         CURRENT_PROTOCOL_PROCESSORS.trim();
@@ -25,7 +25,7 @@ public final class DataPacketManager {
     }
 
     public static void processPacket(@NotNull PlayerHandle playerHandle, @NotNull DataPacket packet) {
-        var processor = CURRENT_PROTOCOL_PROCESSORS.get(packet.packetId());
+        DataPacketProcessor processor = CURRENT_PROTOCOL_PROCESSORS.get(packet.packetId());
         if (processor != null) {
             //noinspection unchecked
             processor.handle(playerHandle, packet);

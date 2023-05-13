@@ -101,7 +101,8 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable {
             }
 
             BlockEntity blockEntity = BlockEntity.createBlockEntity(BlockEntity.SIGN, this.level.getChunk(block.getChunkX(), block.getChunkZ()), nbt);
-            if (player != null && blockEntity instanceof BlockEntitySign blockEntitySign) {
+            if (player != null && blockEntity instanceof BlockEntitySign) {
+                BlockEntitySign blockEntitySign = (BlockEntitySign) blockEntity;
                 blockEntitySign.setEditorEntityRuntimeId(player.getId());
                 if (player.protocol >= ProtocolInfo.v1_19_80) {
                     OpenSignPacket openSignPacket = new OpenSignPacket();
