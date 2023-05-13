@@ -45,11 +45,7 @@ public class DummyBossBar {
 
         public Builder(Player player) {
             this.player = player;
-            if (Server.getInstance().isLowProfileServer()) {
-                this.bossBarId = 1095216660480L; // This is hack to get one thing work
-            } else {
-                this.bossBarId = 1095216660480L + Utils.random.nextLong(0, 0x7fffffffL);
-            }
+            this.bossBarId = 1095216660480L + Utils.random.nextLong(0, Integer.MAX_VALUE);
         }
 
         public Builder text(String text) {

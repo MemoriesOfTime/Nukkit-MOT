@@ -1721,15 +1721,20 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public synchronized Block getBlock(int x, int y, int z, int layer, boolean load) {
+        return this.getBlock(null, x, y, z, layer, load);
+    }
+
+    public synchronized Block getBlock(FullChunk chunk, int x, int y, int z, int layer, boolean load) {
         int[] fullState;
         if (y >= 0 && y < 256) {
             int cx = x >> 4;
             int cz = z >> 4;
-            BaseFullChunk chunk;
-            if (load) {
-                chunk = getChunk(cx, cz);
-            } else {
-                chunk = getChunkIfLoaded(cx, cz);
+            if (chunk == null || chunk.getX() != cx || chunk.getZ() != cz) {
+                if (load) {
+                    chunk = getChunk(cx, cz);
+                } else {
+                    chunk = getChunkIfLoaded(cx, cz);
+                }
             }
             if (chunk != null) {
                 fullState = chunk.getBlockState(x & 0xF, y, z & 0xF, layer);

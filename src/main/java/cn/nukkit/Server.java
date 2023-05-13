@@ -479,6 +479,10 @@ public class Server {
      * Server authority block destruction
      */
     public boolean serverAuthoritativeBlockBreaking;
+    /**
+     * Network encryption
+     */
+    public boolean encryptionEnabled;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -3013,6 +3017,7 @@ public class Server {
                 break;
         }
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
+        this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
@@ -3158,6 +3163,7 @@ public class Server {
             put("deprecated-verbose", true);
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
+            put("encryption", true);
         }
     }
 

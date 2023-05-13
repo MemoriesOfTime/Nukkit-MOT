@@ -272,4 +272,18 @@ public interface ProtocolInfo {
     byte GAME_TEST_RESULTS_PACKET = (byte) 0xc3;
     byte UPDATE_CLIENT_INPUT_LOCKS = (byte) 0xc4;
     byte CLIENT_CHEAT_ABILITY_PACKET = (byte) 0xc5;
+
+    int CAMERA_INSTRUCTION_PACKET = 300;
+    int COMPRESSED_BIOME_DEFINITIONS_LIST = 301;
+    int TRIM_DATA = 302;
+    int OPEN_SIGN = 303;
+
+    static int toNewProtocolID(byte oldProtocolID) {
+        return oldProtocolID & 0xff;
+    }
+
+    // 这是为了兼容nkx
+    // MC packet IDs continue from 300 (0x12c)
+    // Hack: 100 is added to the IDs below on encode
+    byte __INTERNAL__OPEN_SIGN_PACKET = (byte) 203; // 303
 }

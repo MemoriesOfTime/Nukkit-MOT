@@ -20,8 +20,8 @@ public class NukkitMetrics {
         Metrics metrics = new Metrics("Nukkit", server.getServerUniqueId().toString(), true, server.getLogger());
 
         metrics.addCustomChart(new Metrics.SingleLineChart("players", server::getOnlinePlayersCount));
-        metrics.addCustomChart(new Metrics.SimplePie("codename", () -> "PM1E"));
-        metrics.addCustomChart(new Metrics.SimplePie("nukkit_version", () -> "PM1E"));
+        metrics.addCustomChart(new Metrics.SimplePie("codename", () -> "MOT"));
+        metrics.addCustomChart(new Metrics.SimplePie("nukkit_version", () -> "MOT"));
         metrics.addCustomChart(new Metrics.SimplePie("xbox_auth", () -> server.xboxAuth ? "Required" : "Not required"));
 
         metrics.addCustomChart(new Metrics.AdvancedPie("player_platform", () -> {

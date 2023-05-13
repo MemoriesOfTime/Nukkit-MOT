@@ -15,6 +15,7 @@ import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.projectile.EntityArrow;
+import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
 import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -60,6 +61,8 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.SourceInterface;
+import cn.nukkit.network.encryption.PrepareEncryptionTask;
+import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.session.NetworkPlayerSession;
@@ -89,6 +92,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math3.util.FastMath;
+import org.jetbrains.annotations.NotNull;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -149,7 +153,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public boolean playedBefore;
     public boolean spawned = false;
     public boolean loggedIn = false;
-    private boolean verified = false;
+    protected boolean verified = false;
     private int unverifiedPackets;
     public int gamemode;
     public long lastBreak = -1;
@@ -260,7 +264,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private BlockEnderChest viewingEnderChest = null;
 
-    private LoginChainData loginChainData;
+    protected LoginChainData loginChainData;
 
     public Block breakingBlock = null;
     private PlayerBlockActionData lastBlockAction;
@@ -277,7 +281,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected Map<Long, DummyBossBar> dummyBossBars = new Long2ObjectLinkedOpenHashMap<>();
 
-    private AsyncTask preLoginEventTask = null;
+    protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
 
     private static Stream<Field> pkIDs;
@@ -300,7 +304,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     /**
      * Packets that can be received before the player has logged in
      */
-    private static final List<Byte> PRE_LOGIN_PACKETS = Arrays.asList(ProtocolInfo.BATCH_PACKET, ProtocolInfo.LOGIN_PACKET, ProtocolInfo.REQUEST_CHUNK_RADIUS_PACKET, ProtocolInfo.SET_LOCAL_PLAYER_AS_INITIALIZED_PACKET, ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET, ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET, ProtocolInfo.CLIENT_CACHE_STATUS_PACKET, ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET, ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET);
+    private static final List<Byte> PRE_LOGIN_PACKETS = Arrays.asList(
+            ProtocolInfo.BATCH_PACKET, ProtocolInfo.LOGIN_PACKET,
+            ProtocolInfo.REQUEST_CHUNK_RADIUS_PACKET,
+            ProtocolInfo.SET_LOCAL_PLAYER_AS_INITIALIZED_PACKET,
+            ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET,
+            ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET,
+            ProtocolInfo.CLIENT_CACHE_STATUS_PACKET,
+            ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET,
+            ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET,
+            ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET);
+
+    private final @NotNull PlayerHandle playerHandle = new PlayerHandle(this);
 
     public int getStartActionTick() {
         return startAction;
@@ -2560,6 +2575,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 log.trace("Inbound {}: {}", this.getName(), packet);
             }
 
+            if (DataPacketManager.canProcess(packet.protocol, packet.packetId())) {
+                DataPacketManager.processPacket(this.playerHandle, packet);
+                return;
+            }
+
             packetswitch:
             switch (packet.pid()) {
                 case ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET:
@@ -2572,6 +2592,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     this.protocol = ((RequestNetworkSettingsPacket) packet).protocolVersion;
 
+                    NetworkSettingsPacket settingsPacket = new NetworkSettingsPacket();
+                    settingsPacket.compressionAlgorithm = PacketCompressionAlgorithm.ZLIB;
+                    settingsPacket.compressionThreshold = 1; // compress everything
+                    this.forceDataPacket(settingsPacket, () -> {
+                        this.networkSession.setCompression(CompressionProvider.from(PacketCompressionAlgorithm.ZLIB, this.raknetProtocol));
+                    });
+
                     if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
                         this.close("", "You are running unsupported Minecraft version");
                         this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol " + this.protocol);
@@ -2582,13 +2609,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol " + this.protocol);
                         return;
                     }
-
-                    NetworkSettingsPacket settingsPacket = new NetworkSettingsPacket();
-                    settingsPacket.compressionAlgorithm = PacketCompressionAlgorithm.ZLIB;
-                    settingsPacket.compressionThreshold = 1; // compress everything
-                    this.forceDataPacket(settingsPacket, () -> {
-                        this.networkSession.setCompression(CompressionProvider.from(PacketCompressionAlgorithm.ZLIB, this.raknetProtocol));
-                    });
                     break;
                 case ProtocolInfo.LOGIN_PACKET:
                     if (this.loggedIn) {
@@ -2712,7 +2732,28 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     };
 
                     this.server.getScheduler().scheduleAsyncTask(this.preLoginEventTask);
-                    this.processLogin();
+
+                    if (this.isEnableNetworkEncryption()) {
+                        this.server.getScheduler().scheduleAsyncTask(new PrepareEncryptionTask(this) {
+                            @Override
+                            public void onCompletion(Server server) {
+                                if (!playerInstance.isConnected()) {
+                                    return;
+                                }
+                                if (this.getHandshakeJwt() == null || this.getEncryptionKey() == null || this.getEncryptionCipher() == null || this.getDecryptionCipher() == null) {
+                                    playerInstance.close("", "Network Encryption error");
+                                    return;
+                                }
+                                ServerToClientHandshakePacket pk = new ServerToClientHandshakePacket();
+                                pk.setJwt(this.getHandshakeJwt());
+                                playerInstance.forceDataPacket(pk, () -> {
+                                    playerInstance.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
+                                });
+                            }
+                        });
+                    } else {
+                        this.processLogin();
+                    }
                     break;
                 case ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET:
                     ResourcePackClientResponsePacket responsePacket = (ResourcePackClientResponsePacket) packet;
@@ -3862,10 +3903,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 type = useItemData.actionType;
                             } catch (Exception ignored) {
                                 break packetswitch;
-                            }
-
-                            if (this.isBlocking()) {
-                                this.setBlocking(false);
                             }
 
                             if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
@@ -6214,7 +6251,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
                 entity.close();
                 return true;
-            } else if (entity instanceof EntityThrownTrident && ((EntityThrownTrident) entity).hadCollision) {
+            } else if (entity instanceof EntityThrownTrident) {
+                // Check Trident is returning to shooter
+                if (!((EntityThrownTrident) entity).hadCollision) {
+                    if (entity.isNoClip()) {
+                        if (!((EntityProjectile) entity).shootingEntity.equals(this)) {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+
+                if (!((EntityThrownTrident) entity).isPlayer()) {
+                    return false;
+                }
+
                 Item item = ((EntityThrownTrident) entity).getItem();
                 if (!this.isCreative() && !this.inventory.canAddItem(item)) {
                     return false;
@@ -6238,8 +6290,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Server.broadcastPacket(entity.getViewers().values(), pk);
                 this.dataPacket(pk);
 
-                if (!this.isCreative()) {
-                    this.inventory.addItem(item.clone());
+                if (!((EntityThrownTrident) entity).isCreative()) {
+                    if (inventory.getItem(((EntityThrownTrident) entity).getFavoredSlot()).getId() == Item.AIR) {
+                        inventory.setItem(((EntityThrownTrident) entity).getFavoredSlot(), item.clone());
+                    } else {
+                        inventory.addItem(item.clone());
+                    }
                 }
                 entity.close();
                 return true;
@@ -6500,5 +6556,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public boolean isServerAuthoritativeBlockBreaking() {
         return this.server.serverAuthoritativeBlockBreaking && this.isMovementServerAuthoritative();
+    }
+
+    public boolean isEnableNetworkEncryption() {
+        return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled && loginChainData.isXboxAuthed();
     }
 }
