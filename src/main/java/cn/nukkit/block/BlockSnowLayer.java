@@ -38,7 +38,7 @@ public class BlockSnowLayer extends BlockFallableMeta {
 
     @Override
     public double getHardness() {
-        return 0.1;
+        return 0.2;
     }
 
     @Override
