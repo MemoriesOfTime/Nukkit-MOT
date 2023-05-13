@@ -2,6 +2,7 @@ package cn.nukkit.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
 import cn.nukkit.event.entity.EntityShootBowEvent;
 import cn.nukkit.event.entity.ProjectileLaunchEvent;
@@ -76,6 +77,12 @@ public class ItemTrident extends ItemTool {
 
         double p = (double) ticksUsed / 20;
         double f = Math.min((p * p + p * 2) / 3, 1) * 2.5;
+
+        if (player.isCreative()) {
+            trident.setPickupMode(EntityProjectile.PICKUP_CREATIVE);
+        }
+
+        trident.setFavoredSlot(player.getInventory().getHeldItemIndex());
 
         EntityShootBowEvent entityShootBowEvent = new EntityShootBowEvent(player, this, trident, f);
 

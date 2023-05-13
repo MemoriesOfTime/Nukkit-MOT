@@ -15,6 +15,7 @@ import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.projectile.EntityArrow;
+import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
 import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -6253,7 +6254,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
                 entity.close();
                 return true;
-            } else if (entity instanceof EntityThrownTrident && ((EntityThrownTrident) entity).hadCollision) {
+            } else if (entity instanceof EntityThrownTrident) {
+                // Check Trident is returning to shooter
+                if (!((EntityThrownTrident) entity).hadCollision) {
+                    if (entity.isNoClip()) {
+                        if (!((EntityProjectile) entity).shootingEntity.equals(this)) {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+
+                if (!((EntityThrownTrident) entity).isPlayer()) {
+                    return false;
+                }
+
                 Item item = ((EntityThrownTrident) entity).getItem();
                 if (!this.isCreative() && !this.inventory.canAddItem(item)) {
                     return false;
@@ -6277,8 +6293,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Server.broadcastPacket(entity.getViewers().values(), pk);
                 this.dataPacket(pk);
 
-                if (!this.isCreative()) {
-                    this.inventory.addItem(item.clone());
+                if (!((EntityThrownTrident) entity).isCreative()) {
+                    if (inventory.getItem(((EntityThrownTrident) entity).getFavoredSlot()).getId() == Item.AIR) {
+                        inventory.setItem(((EntityThrownTrident) entity).getFavoredSlot(), item.clone());
+                    } else {
+                        inventory.addItem(item.clone());
+                    }
                 }
                 entity.close();
                 return true;

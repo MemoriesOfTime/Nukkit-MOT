@@ -1,5 +1,6 @@
 package cn.nukkit.event.entity;
 
+import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.Cancellable;
 import cn.nukkit.event.HandlerList;
@@ -18,5 +19,9 @@ public class ProjectileLaunchEvent extends EntityEvent implements Cancellable {
 
     public EntityProjectile getEntity() {
         return (EntityProjectile) this.entity;
+    }
+
+    public Entity getShooter() {
+        return this.getEntity().shootingEntity;
     }
 }

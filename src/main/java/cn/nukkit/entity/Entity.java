@@ -441,6 +441,8 @@ public abstract class Entity extends Location implements Metadatable {
 
     public boolean closed = false;
 
+    public boolean noClip = false;
+
     protected Timing timing;
 
     public final boolean isPlayer;
@@ -1420,11 +1422,11 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean canCollideWith(Entity entity) {
-        return !this.justCreated && this != entity;
+        return !this.justCreated && this != entity && !this.noClip;
     }
 
     protected boolean checkObstruction(double x, double y, double z) {
-        if (this.level.getCollisionCubes(this, this.boundingBox, false).length == 0) {
+        if (this.noClip || this.level.getCollisionCubes(this, this.boundingBox, false).length == 0) {
             return false;
         }
 
@@ -2111,7 +2113,7 @@ public abstract class Entity extends Location implements Metadatable {
 
         return false;*/
         int bid = level.getBlockIdAt(chunk, this.getFloorX(), this.getFloorY(), this.getFloorZ());
-        return bid == BlockID.WATER || bid == BlockID.STILL_WATER;
+        return Block.hasWater(bid);
     }
 
     public boolean isInsideOfSolid() {
@@ -2161,7 +2163,7 @@ public abstract class Entity extends Location implements Metadatable {
 
         this.checkChunks();
 
-        if (!this.onGround || dy != 0) {
+        if ((!this.onGround || dy != 0) && !this.noClip) {
             AxisAlignedBB bb = this.boundingBox.growNoUp(0.1, 0.1, 0.1);
             bb.setMinY(bb.getMinY() - 0.75);
 
@@ -2198,7 +2200,7 @@ public abstract class Entity extends Location implements Metadatable {
 
             AxisAlignedBB axisalignedbb = this.boundingBox.clone();
 
-            AxisAlignedBB[] list = this.level.getCollisionCubes(this, this.boundingBox.addCoord(dx, dy, dz), false);
+            AxisAlignedBB[] list = this.noClip ? AxisAlignedBB.EMPTY_ARRAY : this.level.getCollisionCubes(this, this.boundingBox.addCoord(dx, dy, dz), false);
 
             for (AxisAlignedBB bb : list) {
                 dy = bb.calculateYOffset(this.boundingBox, dy);
@@ -2296,10 +2298,17 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     protected void checkGroundState(double movX, double movY, double movZ, double dx, double dy, double dz) {
-        this.isCollidedVertically = movY != dy;
-        this.isCollidedHorizontally = (movX != dx || movZ != dz);
-        this.isCollided = (this.isCollidedHorizontally || this.isCollidedVertically);
-        this.onGround = (movY != dy && movY < 0);
+        if (this.noClip) {
+            this.isCollidedVertically = false;
+            this.isCollidedHorizontally = false;
+            this.isCollided = false;
+            this.onGround = false;
+        } else {
+            this.isCollidedVertically = movY != dy;
+            this.isCollidedHorizontally = (movX != dx || movZ != dz);
+            this.isCollided = (this.isCollidedHorizontally || this.isCollidedVertically);
+            this.onGround = (movY != dy && movY < 0);
+        }
     }
 
     public List<Block> getBlocksAround() {
@@ -2351,6 +2360,10 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     protected void checkBlockCollision() {
+        if (this.noClip) {
+            return;
+        }
+
         Vector3 vector = new Vector3(0, 0, 0);
         boolean portal = false;
 
@@ -2577,7 +2590,7 @@ public abstract class Entity extends Location implements Metadatable {
 
         if (this.setPositionAndRotation(to, yaw, pitch)) {
             this.resetFallDistance();
-            this.onGround = true;
+            this.onGround = !this.isNoClip();
 
             this.updateMovement();
 
@@ -2911,5 +2924,14 @@ public abstract class Entity extends Location implements Metadatable {
             }
         }
         return true;
+    }
+
+    public boolean isNoClip() {
+        return noClip;
+    }
+
+    public void setNoClip(boolean noClip) {
+        this.noClip = noClip;
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_HAS_COLLISION, noClip);
     }
 }

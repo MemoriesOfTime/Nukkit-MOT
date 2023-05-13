@@ -1,6 +1,7 @@
 package cn.nukkit.entity.projectile;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityLiving;
 import cn.nukkit.entity.item.EntityBoat;
@@ -188,6 +189,7 @@ public abstract class EntityProjectile extends Entity {
 
                 this.server.getPluginManager().callEvent(new ProjectileHitEvent(this, MovingObjectPosition.fromBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ(), -1, this)));
                 this.onHit();
+                this.onHitGround(moveVector);
                 return false;
             } else if (!this.isCollided && this.hadCollision) {
                 this.hadCollision = false;
@@ -230,5 +232,12 @@ public abstract class EntityProjectile extends Entity {
 
     protected void onHit() {
 
+    }
+
+    protected void onHitGround(Vector3 vector3) {
+        Block block = this.level.getBlock(this.chunk, vector3.getFloorX(), vector3.getFloorY(), vector3.getFloorZ(), 0, false);
+        if (block.hasEntityCollision()) {
+            block.onEntityCollide(this);
+        }
     }
 }
