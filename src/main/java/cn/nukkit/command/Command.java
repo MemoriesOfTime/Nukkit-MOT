@@ -109,6 +109,15 @@ public abstract class Command {
         }
 
         CommandData customData = this.commandData.clone();
+
+        if (this.getAliases().length > 0) {
+            List<String> aliases = new ArrayList<>(Arrays.asList(this.getAliases()));
+            if (!aliases.contains(this.name)) {
+                aliases.add(this.name);
+            }
+            customData.aliases = new CommandEnum(this.name + "Aliases", aliases);
+        }
+
         customData.description = player.getServer().getLanguage().translateString(this.description);
         this.commandParameters.forEach((key, par) -> {
             CommandOverload overload = new CommandOverload();
