@@ -209,7 +209,7 @@ public final class BVector3 {
      * @return 结果向量
      */
     public BVector3 add(double x, double y, double z) {
-        var pos = this.vector3.multiply(this.length);
+        Vector3 pos = this.vector3.multiply(this.length);
         pos.add(x, y, z);
         this.yaw = getYawFromVector(pos);
         this.pitch = getPitchFromVector(pos);
@@ -308,11 +308,11 @@ public final class BVector3 {
      * @return Vector3方向向量
      */
     public static Vector3 getDirectionVector(double yaw, double pitch) {
-        var pitch0 = toRadians(pitch + 90);
-        var yaw0 = toRadians(yaw + 90);
-        var x = sin(pitch0) * cos(yaw0);
-        var z = sin(pitch0) * sin(yaw0);
-        var y = cos(pitch0);
+        double pitch0 = toRadians(pitch + 90);
+        double yaw0 = toRadians(yaw + 90);
+        double x = sin(pitch0) * cos(yaw0);
+        double z = sin(pitch0) * sin(yaw0);
+        double y = cos(pitch0);
         return new Vector3(x, y, z).normalize();
     }
 
@@ -348,7 +348,7 @@ public final class BVector3 {
         if (length == 0) {
             return 0;
         }
-        var pitch = toDegrees(asin(-vector.y / sqrt(length)));
+        double pitch = toDegrees(asin(-vector.y / sqrt(length)));
         return StrictMath.abs(pitch) < 1E-10 ? 0 : pitch;
     }
 }
