@@ -2,7 +2,6 @@ package cn.nukkit.level.format.anvil;
 
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
-import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.format.anvil.util.BlockStorage;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.generic.BaseChunk;
@@ -10,16 +9,13 @@ import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.nbt.tag.ByteArrayTag;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author MagicDroidX
@@ -463,17 +459,22 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
 
     @Override
     public byte[] getSkyLightArray() {
-        if (this.skyLight != null) return this.skyLight;
-        if (this.hasSkyLight) {
-            if (this.compressedLight != null) {
-                this.inflate();
-                if (this.skyLight != null) return this.skyLight;
-            }
+        if (skyLight != null) {
+            return skyLight.clone();
         }
-        return EmptyChunkSection.EMPTY_SKY_LIGHT_ARR;
+
+        if (!hasSkyLight) {
+            return new byte[EmptyChunkSection.EMPTY_LIGHT_ARR.length];
+        }
+
+        if (compressedLight != null && inflate() && skyLight != null) {
+            return skyLight.clone();
+        }
+
+        return EmptyChunkSection.EMPTY_SKY_LIGHT_ARR.clone();
     }
 
-    private void inflate() {
+    private boolean inflate() {
         try {
             if (compressedLight != null && compressedLight.length != 0) {
                 byte[] inflated = Zlib.inflate(compressedLight);
@@ -494,8 +495,10 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
                     Arrays.fill(skyLight, (byte) 0xFF);
                 }
             }
+            return true;
         } catch (IOException e) {
-            Server.getInstance().getLogger().logException(e);
+            Server.getInstance().getLogger().error("Failed to decompress a chunk section", e);
+            return false;
         }
     }
 
