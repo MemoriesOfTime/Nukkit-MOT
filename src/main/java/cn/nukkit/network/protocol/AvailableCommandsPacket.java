@@ -1,14 +1,13 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.command.data.*;
+import cn.nukkit.network.protocol.types.CommandParam;
 import cn.nukkit.utils.BinaryStream;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import cn.nukkit.utils.TypeMap;
 import lombok.ToString;
 
 import java.util.*;
 import java.util.function.ObjIntConsumer;
-
-import static cn.nukkit.utils.Utils.dynamic;
 
 /**
  * @author MagicDroidX
@@ -31,159 +30,192 @@ public class AvailableCommandsPacket extends DataPacket {
     public static final int ARG_FLAG_POSTFIX = 0x1000000;
     public static final int ARG_FLAG_SOFT_ENUM = 0x4000000;
 
-    /* From < 1.16.100 */
-    public static final int ARG_TYPE_INT = dynamic(1);
-    public static final int ARG_TYPE_FLOAT = dynamic(3);
-    public static final int ARG_TYPE_VALUE = dynamic(4);
-    public static final int ARG_TYPE_WILDCARD_INT = dynamic(5);
-    public static final int ARG_TYPE_OPERATOR = dynamic(6);
-    public static final int ARG_TYPE_COMPARE_OPERATOR = dynamic(7);
-    public static final int ARG_TYPE_TARGET = dynamic(8);
-    public static final int ARG_TYPE_WILDCARD_TARGET = dynamic(10);
-    public static final int ARG_TYPE_FILE_PATH = dynamic(17);
-    public static final int ARG_TYPE_FULL_INTEGER_RANGE = dynamic(23);
-    public static final int ARG_TYPE_EQUIPMENT_SLOT = dynamic(43);
-    public static final int ARG_TYPE_STRING = dynamic(44);
-    public static final int ARG_TYPE_BLOCK_POSITION = dynamic(52);
-    public static final int ARG_TYPE_POSITION = dynamic(53);
-    public static final int ARG_TYPE_MESSAGE = dynamic(55);
-    public static final int ARG_TYPE_RAWTEXT = dynamic(58);
-    public static final int ARG_TYPE_JSON = dynamic(62);
-    public static final int ARG_TYPE_BLOCK_STATES = dynamic(71);
-    public static final int ARG_TYPE_COMMAND = dynamic(74);
+
+    //各个版本的参数
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_291 = TypeMap.builder(CommandParam.class)
+            .insert(1, CommandParam.INT)
+            .insert(2, CommandParam.FLOAT)
+            .insert(3, CommandParam.VALUE)
+            .insert(4, CommandParam.WILDCARD_INT)
+            .insert(5, CommandParam.OPERATOR)
+            .insert(6, CommandParam.TARGET)
+            .insert(7, CommandParam.WILDCARD_TARGET)
+            .insert(24, CommandParam.STRING)
+            .insert(26, CommandParam.POSITION)
+            .insert(29, CommandParam.MESSAGE)
+            .insert(31, CommandParam.TEXT)
+            .insert(34, CommandParam.JSON)
+            .insert(41, CommandParam.COMMAND)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_313 = COMMAND_PARAMS_291.toBuilder()
+            .shift(24, 2)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_332 = COMMAND_PARAMS_313.toBuilder()
+            .insert(15, CommandParam.FILE_PATH)
+            .shift(26, 2)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_340 = COMMAND_PARAMS_332.toBuilder()
+            .shift(15, -1)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_388 = COMMAND_PARAMS_340.toBuilder()
+            .shift(27, 2)
+            .shift(31, 7)
+            .insert(37, CommandParam.BLOCK_POSITION)
+            .shift(46, 1)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_419 = COMMAND_PARAMS_388.toBuilder()
+            .shift(7, 1)
+            .shift(30, 1)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_428 = COMMAND_PARAMS_419.toBuilder()
+            .shift(2, 1)
+            .shift(57, 6)
+            .insert(60, CommandParam.BLOCK_STATES)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_503 = COMMAND_PARAMS_428.toBuilder()
+            .shift(32, 6)
+            .insert(37, CommandParam.EQUIPMENT_SLOTS)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_527 = COMMAND_PARAMS_503.toBuilder()
+            .shift(7, 1)
+            .insert(7, CommandParam.COMPARE_OPERATOR)
+            .insert(23, CommandParam.INT_RANGE)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_575 = TypeMap.builder(CommandParam.class)
+            .insert(0, CommandParam.UNKNOWN)
+            .insert(1, CommandParam.INT)
+            .insert(2, CommandParam.FLOAT)
+            .insert(3, CommandParam.VALUE)
+            .insert(4, CommandParam.R_VALUE)
+            .insert(5, CommandParam.WILDCARD_INT)
+            .insert(6, CommandParam.OPERATOR)
+            .insert(7, CommandParam.COMPARE_OPERATOR)
+            .insert(8, CommandParam.TARGET)
+            .insert(9, CommandParam.UNKNOWN_STANDALONE)
+            .insert(10, CommandParam.WILDCARD_TARGET)
+            .insert(11, CommandParam.UNKNOWN_NON_ID)
+            .insert(12, CommandParam.SCORE_ARG)
+            .insert(13, CommandParam.SCORE_ARGS)
+            .insert(14, CommandParam.SCORE_SELECT_PARAM)
+            .insert(15, CommandParam.SCORE_SELECTOR)
+            .insert(16, CommandParam.TAG_SELECTOR)
+            .insert(17, CommandParam.FILE_PATH)
+            .insert(18, CommandParam.FILE_PATH_VAL)
+            .insert(19, CommandParam.FILE_PATH_CONT)
+            .insert(20, CommandParam.INT_RANGE_VAL)
+            .insert(21, CommandParam.INT_RANGE_POST_VAL)
+            .insert(22, CommandParam.INT_RANGE)
+            .insert(23, CommandParam.INT_RANGE_FULL)
+            .insert(24, CommandParam.SEL_ARGS)
+            .insert(25, CommandParam.ARGS)
+            .insert(26, CommandParam.ARG)
+            .insert(27, CommandParam.MARG)
+            .insert(28, CommandParam.MVALUE)
+            .insert(29, CommandParam.NAME)
+            .insert(30, CommandParam.TYPE)
+            .insert(31, CommandParam.FAMILY)
+            .insert(32, CommandParam.TAG)
+            .insert(33, CommandParam.HAS_ITEM_ELEMENT)
+            .insert(34, CommandParam.HAS_ITEM_ELEMENTS)
+            .insert(35, CommandParam.HAS_ITEM)
+            .insert(36, CommandParam.HAS_ITEMS)
+            .insert(37, CommandParam.HAS_ITEM_SELECTOR)
+            .insert(38, CommandParam.EQUIPMENT_SLOTS)
+            .insert(39, CommandParam.STRING)
+            .insert(40, CommandParam.ID_CONT)
+            .insert(41, CommandParam.COORD_X_INT)
+            .insert(42, CommandParam.COORD_Y_INT)
+            .insert(43, CommandParam.COORD_Z_INT)
+            .insert(44, CommandParam.COORD_X_FLOAT)
+            .insert(45, CommandParam.COORD_Y_FLOAT)
+            .insert(46, CommandParam.COORD_Z_FLOAT)
+            .insert(47, CommandParam.BLOCK_POSITION)
+            .insert(48, CommandParam.POSITION)
+            .insert(49, CommandParam.MESSAGE_XP)
+            .insert(50, CommandParam.MESSAGE)
+            .insert(51, CommandParam.MESSAGE_ROOT)
+            .insert(52, CommandParam.POST_SELECTOR)
+            .insert(53, CommandParam.TEXT)
+            .insert(54, CommandParam.TEXT_CONT)
+            .insert(55, CommandParam.JSON_VALUE)
+            .insert(56, CommandParam.JSON_FIELD)
+            .insert(57, CommandParam.JSON)
+            .insert(58, CommandParam.JSON_OBJECT_FIELDS)
+            .insert(59, CommandParam.JSON_OBJECT_CONT)
+            .insert(60, CommandParam.JSON_ARRAY)
+            .insert(61, CommandParam.JSON_ARRAY_VALUES)
+            .insert(62, CommandParam.JSON_ARRAY_CONT)
+            .insert(63, CommandParam.BLOCK_STATE)
+            .insert(64, CommandParam.BLOCK_STATE_KEY)
+            .insert(65, CommandParam.BLOCK_STATE_VALUE)
+            .insert(66, CommandParam.BLOCK_STATE_VALUES)
+            .insert(67, CommandParam.BLOCK_STATES)
+            .insert(68, CommandParam.BLOCK_STATES_CONT)
+            .insert(69, CommandParam.COMMAND)
+            .insert(70, CommandParam.SLASH_COMMAND)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_582 = COMMAND_PARAMS_575.toBuilder()
+            .shift(32, 5)
+            .insert(32, CommandParam.PERMISSION)
+            .insert(33, CommandParam.PERMISSIONS)
+            .insert(34, CommandParam.PERMISSION_SELECTOR)
+            .insert(35, CommandParam.PERMISSION_ELEMENT)
+            .insert(36, CommandParam.PERMISSION_ELEMENTS)
+            .build();
+
+    //TODO Multiversion 保持最新版
+    private static final TypeMap<CommandParam> COMMAND_PARAMS = COMMAND_PARAMS_582.toBuilder().build();
+
+    //兼容nk插件
+    public static final int ARG_TYPE_UNKNOWN = COMMAND_PARAMS.getId(CommandParam.UNKNOWN);
+    public static final int ARG_TYPE_INT = COMMAND_PARAMS.getId(CommandParam.INT);
+    public static final int ARG_TYPE_FLOAT = COMMAND_PARAMS.getId(CommandParam.FLOAT);
+    public static final int ARG_TYPE_VALUE = COMMAND_PARAMS.getId(CommandParam.VALUE);
+    public static final int ARG_TYPE_WILDCARD_INT = COMMAND_PARAMS.getId(CommandParam.WILDCARD_INT);
+    public static final int ARG_TYPE_OPERATOR = COMMAND_PARAMS.getId(CommandParam.OPERATOR);
+    public static final int ARG_TYPE_COMPARE_OPERATOR = COMMAND_PARAMS.getId(CommandParam.COMPARE_OPERATOR);
+    public static final int ARG_TYPE_TARGET = COMMAND_PARAMS.getId(CommandParam.TARGET);
+    public static final int ARG_TYPE_WILDCARD_TARGET = COMMAND_PARAMS.getId(CommandParam.WILDCARD_TARGET);
+    public static final int ARG_TYPE_FILE_PATH = COMMAND_PARAMS.getId(CommandParam.FILE_PATH);
+    public static final int ARG_TYPE_FULL_INTEGER_RANGE = COMMAND_PARAMS.getId(CommandParam.INT_RANGE_FULL);
+    public static final int ARG_TYPE_EQUIPMENT_SLOT = COMMAND_PARAMS.getId(CommandParam.EQUIPMENT_SLOTS);
+    public static final int ARG_TYPE_STRING = COMMAND_PARAMS.getId(CommandParam.STRING);
+    public static final int ARG_TYPE_BLOCK_POSITION = COMMAND_PARAMS.getId(CommandParam.BLOCK_POSITION);
+    public static final int ARG_TYPE_POSITION = COMMAND_PARAMS.getId(CommandParam.POSITION);
+    public static final int ARG_TYPE_MESSAGE = COMMAND_PARAMS.getId(CommandParam.MESSAGE);
+    public static final int ARG_TYPE_RAWTEXT = COMMAND_PARAMS.getId(CommandParam.TEXT);
+    public static final int ARG_TYPE_JSON = COMMAND_PARAMS.getId(CommandParam.JSON);
+    public static final int ARG_TYPE_BLOCK_STATES = COMMAND_PARAMS.getId(CommandParam.BLOCK_STATES);
+    public static final int ARG_TYPE_COMMAND = COMMAND_PARAMS.getId(CommandParam.COMMAND);
 
     public Map<String, CommandDataVersions> commands;
     public final Map<String, List<String>> softEnums = new HashMap<>();
 
-    private static final Int2IntOpenHashMap COMMAND_PARAMS = new Int2IntOpenHashMap();
-    private static final Int2IntOpenHashMap COMMAND_PARAMS_582 = new Int2IntOpenHashMap();
-    private static final Int2IntOpenHashMap COMMAND_PARAMS_527 = new Int2IntOpenHashMap();
-    private static final Int2IntOpenHashMap COMMAND_PARAMS_503 = new Int2IntOpenHashMap();
-    private static final Int2IntOpenHashMap COMMAND_PARAMS_428 = new Int2IntOpenHashMap();
-    private static final Int2IntOpenHashMap COMMAND_PARAMS_419 = new Int2IntOpenHashMap();
-    private static final Int2IntOpenHashMap COMMAND_PARAMS_388 = new Int2IntOpenHashMap();
-    private static final Int2IntOpenHashMap COMMAND_PARAMS_340 = new Int2IntOpenHashMap();
-    private static final Int2IntOpenHashMap COMMAND_PARAMS_332 = new Int2IntOpenHashMap();
-    private static final Int2IntOpenHashMap COMMAND_PARAMS_313 = new Int2IntOpenHashMap();
-    private static final Int2IntOpenHashMap COMMAND_PARAMS_291 = new Int2IntOpenHashMap();
-
-    static {
-        COMMAND_PARAMS.put(ARG_TYPE_INT, ARG_TYPE_INT);
-        COMMAND_PARAMS.put(ARG_TYPE_FLOAT, ARG_TYPE_FLOAT);
-        COMMAND_PARAMS.put(ARG_TYPE_VALUE, ARG_TYPE_VALUE);
-        COMMAND_PARAMS.put(ARG_TYPE_WILDCARD_INT, ARG_TYPE_WILDCARD_INT);
-        COMMAND_PARAMS.put(ARG_TYPE_OPERATOR, ARG_TYPE_OPERATOR);
-        COMMAND_PARAMS.put(ARG_TYPE_COMPARE_OPERATOR, ARG_TYPE_COMPARE_OPERATOR);
-        COMMAND_PARAMS.put(ARG_TYPE_TARGET, ARG_TYPE_TARGET);
-        COMMAND_PARAMS.put(ARG_TYPE_WILDCARD_TARGET, ARG_TYPE_WILDCARD_TARGET);
-        COMMAND_PARAMS.put(ARG_TYPE_FILE_PATH, ARG_TYPE_FILE_PATH);
-        COMMAND_PARAMS.put(ARG_TYPE_FULL_INTEGER_RANGE, ARG_TYPE_FULL_INTEGER_RANGE);
-        COMMAND_PARAMS.put(ARG_TYPE_EQUIPMENT_SLOT, ARG_TYPE_EQUIPMENT_SLOT);
-        COMMAND_PARAMS.put(ARG_TYPE_STRING, ARG_TYPE_STRING);
-        COMMAND_PARAMS.put(ARG_TYPE_BLOCK_POSITION, ARG_TYPE_BLOCK_POSITION);
-        COMMAND_PARAMS.put(ARG_TYPE_POSITION, ARG_TYPE_POSITION);
-        COMMAND_PARAMS.put(ARG_TYPE_MESSAGE, ARG_TYPE_MESSAGE);
-        COMMAND_PARAMS.put(ARG_TYPE_RAWTEXT, ARG_TYPE_RAWTEXT);
-        COMMAND_PARAMS.put(ARG_TYPE_JSON, ARG_TYPE_JSON);
-        COMMAND_PARAMS.put(ARG_TYPE_BLOCK_STATES, ARG_TYPE_BLOCK_STATES);
-        COMMAND_PARAMS.put(ARG_TYPE_COMMAND, ARG_TYPE_COMMAND);
-
-        COMMAND_PARAMS_582.putAll(COMMAND_PARAMS);
-
-        COMMAND_PARAMS_527.putAll(COMMAND_PARAMS_582);
-        COMMAND_PARAMS_527.put(ARG_TYPE_EQUIPMENT_SLOT, 38);
-        COMMAND_PARAMS_527.put(ARG_TYPE_STRING, 39);
-        COMMAND_PARAMS_527.put(ARG_TYPE_BLOCK_POSITION, 47);
-        COMMAND_PARAMS_527.put(ARG_TYPE_POSITION, 48);
-        COMMAND_PARAMS_527.put(ARG_TYPE_MESSAGE, 51);
-        COMMAND_PARAMS_527.put(ARG_TYPE_RAWTEXT, 53);
-        COMMAND_PARAMS_527.put(ARG_TYPE_JSON, 57);
-        COMMAND_PARAMS_527.put(ARG_TYPE_BLOCK_STATES, 67);
-        COMMAND_PARAMS_527.put(ARG_TYPE_COMMAND, 70);
-
-        COMMAND_PARAMS_503.putAll(COMMAND_PARAMS_527);
-        COMMAND_PARAMS_503.put(ARG_TYPE_TARGET, 7);
-        COMMAND_PARAMS_503.put(ARG_TYPE_WILDCARD_TARGET, 9);
-        COMMAND_PARAMS_503.put(ARG_TYPE_FILE_PATH, 16);
-        COMMAND_PARAMS_503.put(ARG_TYPE_EQUIPMENT_SLOT, 37);
-        COMMAND_PARAMS_503.put(ARG_TYPE_STRING, 38);
-        COMMAND_PARAMS_503.put(ARG_TYPE_BLOCK_POSITION, 46);
-        COMMAND_PARAMS_503.put(ARG_TYPE_POSITION, 47);
-        COMMAND_PARAMS_503.put(ARG_TYPE_MESSAGE, 50);
-        COMMAND_PARAMS_503.put(ARG_TYPE_RAWTEXT, 52);
-        COMMAND_PARAMS_503.put(ARG_TYPE_JSON, 56);
-        COMMAND_PARAMS_503.put(ARG_TYPE_BLOCK_STATES, 66);
-        COMMAND_PARAMS_503.put(ARG_TYPE_COMMAND, 69);
-
-        COMMAND_PARAMS_428.putAll(COMMAND_PARAMS_503);
-        COMMAND_PARAMS_428.put(ARG_TYPE_STRING, 32);
-        COMMAND_PARAMS_428.put(ARG_TYPE_BLOCK_POSITION, 40);
-        COMMAND_PARAMS_428.put(ARG_TYPE_POSITION, 41);
-        COMMAND_PARAMS_428.put(ARG_TYPE_MESSAGE, 44);
-        COMMAND_PARAMS_428.put(ARG_TYPE_RAWTEXT, 46);
-        COMMAND_PARAMS_428.put(ARG_TYPE_JSON, 50);
-        COMMAND_PARAMS_428.put(ARG_TYPE_BLOCK_STATES, 60);
-        COMMAND_PARAMS_428.put(ARG_TYPE_COMMAND, 63);
-
-        COMMAND_PARAMS_419.putAll(COMMAND_PARAMS_428);
-        COMMAND_PARAMS_419.put(ARG_TYPE_FLOAT, 2);
-        COMMAND_PARAMS_419.put(ARG_TYPE_VALUE, 3);
-        COMMAND_PARAMS_419.put(ARG_TYPE_WILDCARD_INT, 4);
-        COMMAND_PARAMS_419.put(ARG_TYPE_OPERATOR, 5);
-        COMMAND_PARAMS_419.put(ARG_TYPE_TARGET, 6);
-        COMMAND_PARAMS_419.put(ARG_TYPE_WILDCARD_TARGET, 8);
-        COMMAND_PARAMS_419.put(ARG_TYPE_FILE_PATH, 15);
-        COMMAND_PARAMS_419.put(ARG_TYPE_STRING, 31);
-        COMMAND_PARAMS_419.put(ARG_TYPE_BLOCK_POSITION, 39);
-        COMMAND_PARAMS_419.put(ARG_TYPE_POSITION, 40);
-        COMMAND_PARAMS_419.put(ARG_TYPE_MESSAGE, 43);
-        COMMAND_PARAMS_419.put(ARG_TYPE_RAWTEXT, 45);
-        COMMAND_PARAMS_419.put(ARG_TYPE_JSON, 49);
-        COMMAND_PARAMS_419.put(ARG_TYPE_COMMAND, 56);
-
-        COMMAND_PARAMS_388.putAll(COMMAND_PARAMS_419);
-        COMMAND_PARAMS_388.put(ARG_TYPE_WILDCARD_TARGET, 7);
-        COMMAND_PARAMS_388.put(ARG_TYPE_FILE_PATH, 14);
-        COMMAND_PARAMS_388.put(ARG_TYPE_STRING, 29);
-        COMMAND_PARAMS_388.put(ARG_TYPE_BLOCK_POSITION, 37);
-        COMMAND_PARAMS_388.put(ARG_TYPE_POSITION, 38);
-        COMMAND_PARAMS_388.put(ARG_TYPE_MESSAGE, 41);
-        COMMAND_PARAMS_388.put(ARG_TYPE_RAWTEXT, 43);
-        COMMAND_PARAMS_388.put(ARG_TYPE_JSON, 47);
-        COMMAND_PARAMS_388.put(ARG_TYPE_COMMAND, 54);
-
-        COMMAND_PARAMS_340.putAll(COMMAND_PARAMS_388);
-        COMMAND_PARAMS_340.put(ARG_TYPE_STRING, 27);
-        COMMAND_PARAMS_340.put(ARG_TYPE_POSITION, 29);
-        COMMAND_PARAMS_340.put(ARG_TYPE_MESSAGE, 32);
-        COMMAND_PARAMS_340.put(ARG_TYPE_RAWTEXT, 34);
-        COMMAND_PARAMS_340.put(ARG_TYPE_JSON, 37);
-        COMMAND_PARAMS_340.put(ARG_TYPE_COMMAND, 44);
-
-        COMMAND_PARAMS_332.putAll(COMMAND_PARAMS_340);
-        COMMAND_PARAMS_332.put(ARG_TYPE_FILE_PATH, 15);
-        COMMAND_PARAMS_332.put(ARG_TYPE_STRING, 28);
-        COMMAND_PARAMS_332.put(ARG_TYPE_POSITION, 30);
-        COMMAND_PARAMS_332.put(ARG_TYPE_MESSAGE, 33);
-        COMMAND_PARAMS_332.put(ARG_TYPE_RAWTEXT, 35);
-        COMMAND_PARAMS_332.put(ARG_TYPE_JSON, 38);
-        COMMAND_PARAMS_332.put(ARG_TYPE_COMMAND, 45);
-
-        COMMAND_PARAMS_313.putAll(COMMAND_PARAMS_332);
-        COMMAND_PARAMS_313.put(ARG_TYPE_STRING, 26);
-        COMMAND_PARAMS_313.put(ARG_TYPE_POSITION, 28);
-        COMMAND_PARAMS_313.put(ARG_TYPE_MESSAGE, 31);
-        COMMAND_PARAMS_313.put(ARG_TYPE_RAWTEXT, 33);
-        COMMAND_PARAMS_313.put(ARG_TYPE_JSON, 36);
-        COMMAND_PARAMS_313.put(ARG_TYPE_COMMAND, 43);
-
-        COMMAND_PARAMS_291.putAll(COMMAND_PARAMS_313);
-        COMMAND_PARAMS_291.put(ARG_TYPE_STRING, 24);
-        COMMAND_PARAMS_291.put(ARG_TYPE_POSITION, 26);
-        COMMAND_PARAMS_291.put(ARG_TYPE_MESSAGE, 29);
-        COMMAND_PARAMS_291.put(ARG_TYPE_RAWTEXT, 31);
-        COMMAND_PARAMS_291.put(ARG_TYPE_JSON, 34);
-        COMMAND_PARAMS_291.put(ARG_TYPE_COMMAND, 41);
+    public static TypeMap<CommandParam> getCommandParams(int protocol) {
+        //TODO Multiversion
+        if (protocol >= ProtocolInfo.v1_19_80) {
+            return COMMAND_PARAMS_582;
+        } else if (protocol >= ProtocolInfo.v1_19_70_24) {
+            return COMMAND_PARAMS_575;
+        } else if (protocol >= ProtocolInfo.v1_19_0) {
+            return COMMAND_PARAMS_527;
+        } else if (protocol >= ProtocolInfo.v1_18_30) {
+            return COMMAND_PARAMS_503;
+        } else if (protocol >= ProtocolInfo.v1_16_210) {
+            return COMMAND_PARAMS_428;
+        } else if (protocol >= ProtocolInfo.v1_16_100) {
+            return COMMAND_PARAMS_419;
+        } else if (protocol >= ProtocolInfo.v1_13_0) {
+            return COMMAND_PARAMS_388;
+        } else if (protocol >= ProtocolInfo.v1_10_0) {
+            return COMMAND_PARAMS_340;
+        } else if (protocol >= ProtocolInfo.v1_9_0) {
+            return COMMAND_PARAMS_332;
+        } else if (protocol >= ProtocolInfo.v1_8_0) {
+            return COMMAND_PARAMS_313;
+        } else {
+            return COMMAND_PARAMS_291;
+        }
     }
 
     @Override
@@ -410,29 +442,8 @@ public class AvailableCommandsPacket extends DataPacket {
                         if (parameter.enumData != null) {
                             type |= ARG_FLAG_ENUM | enums.indexOf(parameter.enumData);
                         } else {
-                            int id = parameter.type.getId();
-                            //TODO Multiversion
-                            if (protocol >= ProtocolInfo.v1_19_80) {
-                                id = COMMAND_PARAMS_582.getOrDefault(id, id);
-                            } else if (protocol >= ProtocolInfo.v1_19_0) {
-                                id = COMMAND_PARAMS_527.getOrDefault(id, id);
-                            } else if (protocol >= ProtocolInfo.v1_18_30) {
-                                id = COMMAND_PARAMS_503.getOrDefault(id, id);
-                            } else if (protocol >= ProtocolInfo.v1_16_210) {
-                                id = COMMAND_PARAMS_428.getOrDefault(id, id);
-                            } else if (protocol >= ProtocolInfo.v1_16_100) {
-                                id = COMMAND_PARAMS_419.getOrDefault(id, id);
-                            } else if (protocol >= ProtocolInfo.v1_13_0) {
-                                id = COMMAND_PARAMS_388.getOrDefault(id, id);
-                            } else if (protocol >= ProtocolInfo.v1_10_0) {
-                                id = COMMAND_PARAMS_340.getOrDefault(id, id);
-                            } else if (protocol >= ProtocolInfo.v1_9_0) {
-                                id = COMMAND_PARAMS_332.getOrDefault(id, id);
-                            } else if (protocol >= ProtocolInfo.v1_8_0) {
-                                id = COMMAND_PARAMS_313.getOrDefault(id, id);
-                            } else {
-                                id = COMMAND_PARAMS_291.getOrDefault(id, id);
-                            }
+                            CommandParam commandParam = COMMAND_PARAMS.getType(parameter.type.getId()); //正常来说应该传入最新版的数字id
+                            int id = getCommandParams(protocol).getId(commandParam);
 
                             /*if (protocol < ProtocolInfo.v1_8_0) {
                                 switch (parameter.type) {
