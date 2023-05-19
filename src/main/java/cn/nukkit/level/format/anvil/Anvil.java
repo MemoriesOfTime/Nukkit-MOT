@@ -11,13 +11,13 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.ChunkException;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -105,102 +105,6 @@ public class Anvil extends BaseLevelProvider {
 
         long timestamp = chunk.getChanges();
 
-        /*byte[] blockEntities = new byte[0];
-
-        if (!chunk.getBlockEntities().isEmpty()) {
-            List<CompoundTag> tagList = new ArrayList<>();
-
-            for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
-                if (blockEntity instanceof BlockEntitySpawnable) {
-                    tagList.add(((BlockEntitySpawnable) blockEntity).getSpawnCompound());
-                }
-            }
-
-            try {
-                blockEntities = NBTIO.write(tagList, ByteOrder.LITTLE_ENDIAN, true);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        Map<Integer, Integer> extra = chunk.getBlockExtraDataArray();
-        BinaryStream extraData;
-        if (!extra.isEmpty()) {
-            extraData = new BinaryStream();
-            extraData.putVarInt(extra.size());
-            for (Map.Entry<Integer, Integer> entry : extra.entrySet()) {
-                extraData.putVarInt(entry.getKey());
-                extraData.putLShort(entry.getValue());
-            }
-        } else {
-            extraData = null;
-        }
-
-        int subChunkCount = 0;
-        cn.nukkit.level.format.ChunkSection[] sections = chunk.getSections();
-        for (int i = sections.length - 1; i >= 0; i--) {
-            if (!sections[i].isEmpty()) {
-                subChunkCount = i + 1;
-                break;
-            }
-        }
-
-        for (int protocolId : protocols) {
-            BinaryStream stream = ThreadCache.binaryStream.get().reset();
-            if (protocolId < ProtocolInfo.v1_12_0) {
-                stream.putByte((byte) subChunkCount);
-            }
-
-            //1.18.0开始主世界支持384世界高度
-            byte[] biomePalettes = null;
-            if (protocolId >= ProtocolInfo.v1_18_0) {
-                // In 1.18 3D biome palettes were introduced. However, current world format
-                // used internally doesn't support them, so we need to convert from legacy 2D
-                biomePalettes = this.convert2DBiomesTo3D(protocolId, chunk);
-
-                stream = ThreadCache.binaryStream.get().reset();
-
-                if (this.level.getDimension() == 0) {
-                    // Build up 4 SubChunks for the extended negative height
-                    for (int i = 0; i < EXTENDED_NEGATIVE_SUB_CHUNKS; i++) {
-                        stream.putByte((byte) 8); // SubChunk version
-                        stream.putByte((byte) 0); // 0 layers
-                    }
-                }
-            }
-
-            for (int i = 0; i < subChunkCount; i++) {
-                if (protocolId < ProtocolInfo.v1_13_0) {
-                    stream.putByte((byte) 0);
-                    stream.put(sections[i].getBytes(protocolId));
-                }else {
-                    sections[i].writeTo(protocolId, stream);
-                }
-            }
-            if (protocolId < ProtocolInfo.v1_12_0) {
-                for (byte height : chunk.getHeightMapArray()) {
-                    stream.putByte(height);
-                }
-                stream.put(PAD_256);
-            }
-            if (protocolId >= ProtocolInfo.v1_18_0) {
-                stream.put(biomePalettes);
-            }else {
-                stream.put(chunk.getBiomeIdArray());
-            }
-            stream.putByte((byte) 0);// Border blocks
-            if (protocolId < ProtocolInfo.v1_16_100) {
-                stream.putVarInt(0);// There is no extra data anymore but idk when it was removed
-            }
-            stream.put(blockEntities);
-
-            int count = subChunkCount;
-            if (protocolId >= ProtocolInfo.v1_18_0 && this.level.getDimension() == 0) {
-                count += EXTENDED_NEGATIVE_SUB_CHUNKS;
-            }
-            this.getLevel().chunkRequestCallback(protocolId, timestamp, x, z, count, stream.getBuffer());
-        }*/
-
         if (this.getServer().asyncChunkSending) {
             final Chunk chunkClone = chunk.fullClone();
             this.level.getAsyncChuckExecutor().execute(() -> {
@@ -227,28 +131,6 @@ public class Anvil extends BaseLevelProvider {
         }
     }
 
-/*    private byte[] convert2DBiomesTo3D(int protocolId, BaseFullChunk chunk) {
-        PalettedBlockStorage palette = PalettedBlockStorage.createWithDefaultState(Biome.getBiomeIdOrCorrect(protocolId, chunk.getBiomeId(0, 0)));
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                int biomeId = Biome.getBiomeIdOrCorrect(protocolId, chunk.getBiomeId(x, z));
-                for (int y = 0; y < 16; y++) {
-                    palette.setBlock(x, y, z, biomeId);
-                }
-            }
-        }
-
-        BinaryStream stream = ThreadCache.binaryStream.get().reset();
-        palette.writeTo(protocolId, stream);
-        byte[] bytes = stream.getBuffer();
-        stream.reset();
-
-        for (int i = 0; i < 25; i++) {
-            stream.put(bytes);
-        }
-        return stream.getBuffer();
-    }*/
-
     private int lastPosition = 0;
 
     @Override
@@ -258,8 +140,11 @@ public class Anvil extends BaseLevelProvider {
         if (lastPosition > maxIterations) lastPosition = 0;
         int i;
         synchronized (chunks) {
-            ObjectIterator<BaseFullChunk> iter = chunks.values().iterator();
-            if (lastPosition != 0) iter.skip(lastPosition);
+            Iterator<BaseFullChunk> iter = chunks.values().iterator();
+            if (lastPosition != 0) {
+                int tmpI = lastPosition;
+                while (tmpI-- != 0 && iter.hasNext()) iter.next();
+            }
             for (i = 0; i < maxIterations; i++) {
                 if (!iter.hasNext()) {
                     iter = chunks.values().iterator();

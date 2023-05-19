@@ -15,14 +15,19 @@ import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.nio.ByteOrder;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -43,9 +48,9 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     protected final Long2ObjectMap<BaseRegionLoader> regions = new Long2ObjectOpenHashMap<>();
 
-    protected final Long2ObjectMap<BaseFullChunk> chunks = new Long2ObjectOpenHashMap<>();
+    protected final ConcurrentMap<Long, BaseFullChunk> chunks = new ConcurrentHashMap<>();
 
-    private final AtomicReference<BaseFullChunk> lastChunk = new AtomicReference<>();
+    private final ThreadLocal<WeakReference<BaseFullChunk>> lastChunk = new ThreadLocal<>();
 
     public BaseLevelProvider(Level level, String path) throws IOException {
         this.level = level;
@@ -82,7 +87,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Override
     public void unloadChunks() {
-        ObjectIterator<BaseFullChunk> iter = chunks.values().iterator();
+        Iterator<BaseFullChunk> iter = chunks.values().iterator();
         while (iter.hasNext()) {
             iter.next().unload(level.getAutoSave(), false);
             iter.remove();
@@ -367,44 +372,47 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Override
     public BaseFullChunk getLoadedChunk(int chunkX, int chunkZ) {
-        BaseFullChunk tmp = lastChunk.get();
+        BaseFullChunk tmp = this.getThreadLastChunk();
         if (tmp != null && tmp.getX() == chunkX && tmp.getZ() == chunkZ) {
             return tmp;
         }
         long index = Level.chunkHash(chunkX, chunkZ);
-        synchronized (chunks) {
-            lastChunk.set(tmp = chunks.get(index));
-        }
+        lastChunk.set(new WeakReference<>(tmp = chunks.get(index)));
         return tmp;
     }
 
     @Override
     public BaseFullChunk getLoadedChunk(long hash) {
-        BaseFullChunk tmp = lastChunk.get();
+        BaseFullChunk tmp = this.getThreadLastChunk();
         if (tmp != null && tmp.getIndex() == hash) {
             return tmp;
         }
-        synchronized (chunks) {
-            lastChunk.set(tmp = chunks.get(hash));
-        }
+        lastChunk.set(new WeakReference<>(tmp = chunks.get(hash)));
         return tmp;
     }
 
     @Override
     public BaseFullChunk getChunk(int chunkX, int chunkZ, boolean create) {
-        BaseFullChunk tmp = lastChunk.get();
+        BaseFullChunk tmp = this.getThreadLastChunk();
         if (tmp != null && tmp.getX() == chunkX && tmp.getZ() == chunkZ) {
             return tmp;
         }
         long index = Level.chunkHash(chunkX, chunkZ);
-        synchronized (chunks) {
-            lastChunk.set(tmp = chunks.get(index));
-        }
+        lastChunk.set(new WeakReference<>(tmp = chunks.get(index)));
         if (tmp == null) {
             tmp = this.loadChunk(index, chunkX, chunkZ, create);
-            lastChunk.set(tmp);
+            lastChunk.set(new WeakReference<>(tmp));
         }
         return tmp;
+    }
+
+    @Nullable
+    protected final BaseFullChunk getThreadLastChunk() {
+        var ref = lastChunk.get();
+        if (ref == null) {
+            return null;
+        }
+        return ref.get();
     }
 
     @Override
