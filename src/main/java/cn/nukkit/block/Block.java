@@ -1260,6 +1260,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return b1 != null && b2 != null && b1.getId() == b2.getId() && (!checkDamage || b1.getDamage() == b2.getDamage());
     }
 
+    @Override
+    public int hashCode() {
+        return  ((int) x ^ ((int) z << 12)) ^ ((int) (y + 64)/*这里不删除+64，为以后支持384世界高度准备*/ << 23);
+    }
+
     public Item toItem() {
         return new ItemBlock(this, this.getDamage(), 1);
     }
