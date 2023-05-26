@@ -71,7 +71,7 @@ public class PlayerActionPacket extends DataPacket {
         this.putVarInt(this.action);
         this.putBlockVector3(this.x, this.y, this.z);
         if (protocol >= ProtocolInfo.v1_19_0) {
-            this.putBlockVector3(this.resultPosition);
+            this.putBlockVector3(this.resultPosition != null ? this.resultPosition : new BlockVector3());
         }
         this.putVarInt(this.face);
     }
