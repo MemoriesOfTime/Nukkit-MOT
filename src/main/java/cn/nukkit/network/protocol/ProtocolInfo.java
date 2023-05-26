@@ -56,6 +56,8 @@ public interface ProtocolInfo {
     int v1_18_10_26 = 485;
     int v1_18_10 = 486;
     int v1_18_30 = 503;
+    int v1_19_0_29 = 524; //TODO
+    int v1_19_0_31 = 526; //TODO
     int v1_19_0 = 527;
     int v1_19_10 = 534;
     int v1_19_20 = 544;
@@ -63,6 +65,7 @@ public interface ProtocolInfo {
     int v1_19_30_23 = 553;
     int v1_19_30 = 554;
     int v1_19_40 = 557;
+    int v1_19_50_20 = 558; //TODO
     int v1_19_50 = 560;
     int v1_19_60 = 567;
     int v1_19_63 = 568;
