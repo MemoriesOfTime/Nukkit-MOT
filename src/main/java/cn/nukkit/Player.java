@@ -869,7 +869,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (this.needDimensionChangeACK) {
             PlayerActionPacket playerActionPacket = new PlayerActionPacket();
-            playerActionPacket.action = PlayerActionPacket.ACTION_DIMENSION_CHANGE_ACK;
+            playerActionPacket.action = PlayerActionPacket.ACTION_DIMENSION_CHANGE_SUCCESS;
             playerActionPacket.entityId = this.getId();
             this.dataPacket(playerActionPacket);
         }
@@ -3258,7 +3258,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 this.setSneaking(false);
                             }
                             break packetswitch;
-                        case PlayerActionPacket.ACTION_DIMENSION_CHANGE_ACK:
+                        case PlayerActionPacket.ACTION_DIMENSION_CHANGE_SUCCESS:
                             this.sendPosition(this, this.yaw, this.pitch, MovePlayerPacket.MODE_RESET);
                             this.dummyBossBars.values().forEach(DummyBossBar::reshow);
                             break;
