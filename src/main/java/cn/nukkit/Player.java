@@ -868,6 +868,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (this.needDimensionChangeACK) {
+            this.needDimensionChangeACK = false;
+
             PlayerActionPacket playerActionPacket = new PlayerActionPacket();
             playerActionPacket.action = PlayerActionPacket.ACTION_DIMENSION_CHANGE_SUCCESS;
             playerActionPacket.entityId = this.getId();
