@@ -79,6 +79,46 @@ public enum TextFormat {
      */
     MINECOIN_GOLD('g', 0x16),
     /**
+     * Represents material quartz.
+     */
+    MATERIAL_QUARTZ('h', 0x17),
+    /**
+     * Represents material iron.
+     */
+    MATERIAL_IRON('i', 0x18),
+    /**
+     * Represents material netherite.
+     */
+    MATERIAL_NETHERITE('j', 0x19),
+    /**
+     * Represents material redstone.
+     */
+    MATERIAL_REDSTONE('m', 0x20),
+    /**
+     * Represents material copper.
+     */
+    MATERIAL_COPPER('n', 0x21),
+    /**
+     * Represents material gold.
+     */
+    MATERIAL_GOLD('p', 0x22),
+    /**
+     * Represents material emerald.
+     */
+    MATERIAL_EMERALD('q', 0x23),
+    /**
+     * Represents material diamond.
+     */
+    MATERIAL_DIAMOND('s', 0x24),
+    /**
+     * Represents material lapis.
+     */
+    MATERIAL_LAPIS('t', 0x25),
+    /**
+     * Represents material amethyst.
+     */
+    MATERIAL_AMETHYST('u', 0x26),
+    /**
      * Makes the text obfuscated.
      */
     OBFUSCATED('k', 0x10, true),
@@ -88,11 +128,15 @@ public enum TextFormat {
     BOLD('l', 0x11, true),
     /**
      * Makes a line appear through the text.
+     * 1.19.80+弃用
      */
+    @Deprecated
     STRIKETHROUGH('m', 0x12, true),
     /**
      * Makes the text appear underlined.
+     * 1.19.80+弃用
      */
+    @Deprecated
     UNDERLINE('n', 0x13, true),
     /**
      * Makes the text italic.

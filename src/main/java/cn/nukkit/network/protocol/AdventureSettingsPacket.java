@@ -40,12 +40,12 @@ public class AdventureSettingsPacket extends DataPacket {
     public static final int FLYING = 0x200;
     public static final int MUTED = 0x400;
     public static final int MINE = 0x01 | BITFLAG_SECOND_SET;
-    public static final int DOORS_AND_SWITCHES = 65538;
-    public static final int OPEN_CONTAINERS = 65540;
-    public static final int ATTACK_PLAYERS = 65544;
-    public static final int ATTACK_MOBS = 65552;
-    public static final int OPERATOR = 65568;
-    public static final int TELEPORT = 65664;
+    public static final int DOORS_AND_SWITCHES = 0x02 | BITFLAG_SECOND_SET;
+    public static final int OPEN_CONTAINERS = 0x04 | BITFLAG_SECOND_SET;
+    public static final int ATTACK_PLAYERS = 0x08 | BITFLAG_SECOND_SET;
+    public static final int ATTACK_MOBS = 0x10 | BITFLAG_SECOND_SET;
+    public static final int OPERATOR = 0x20 | BITFLAG_SECOND_SET;
+    public static final int TELEPORT = 0x80 | BITFLAG_SECOND_SET;
     public static final int BUILD = 0x100 | BITFLAG_SECOND_SET;
     public static final int DEFAULT_LEVEL_PERMISSIONS = 0x200 | BITFLAG_SECOND_SET;
 
@@ -53,7 +53,7 @@ public class AdventureSettingsPacket extends DataPacket {
 
     public long commandPermission = PERMISSION_NORMAL;
 
-    public long flags2 = -1; // This may be incorrect but DON'T TOUCH IT!
+    public long flags2 = 0;
 
     public long playerPermission = Player.PERMISSION_MEMBER;
 
@@ -89,20 +89,20 @@ public class AdventureSettingsPacket extends DataPacket {
 
     public void setFlag(int flag, boolean value) {
         // 有些参数是在AdventureSettingsPacket弃用后添加的，这里跳过这些参数
-        if (flag == -1) {
+        if (flag <= 0) {
             return;
         }
-        boolean flags = (flag & BITFLAG_SECOND_SET) != 0;
+        int newFlags2 = (flag & BITFLAG_SECOND_SET);
 
         if (value) {
-            if (flags) {
-                this.flags2 |= flag;
+            if (newFlags2 != 0) {
+                this.flags2 |= newFlags2;
             } else {
                 this.flags |= flag;
             }
         } else {
-            if (flags) {
-                this.flags2 &= ~flag;
+            if (newFlags2 != 0) {
+                this.flags2 &= ~newFlags2;
             } else {
                 this.flags &= ~flag;
             }

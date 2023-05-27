@@ -7,6 +7,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.Sound;
 import cn.nukkit.level.sound.DoorSound;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
@@ -142,7 +143,11 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
                 this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, isOpen() ? 15 : 0, isOpen() ? 0 : 15));
                 this.setDamage(this.getDamage() ^ TRAPDOOR_OPEN_BIT);
                 this.level.setBlock(this, this, true);
-                this.level.addSound(new DoorSound(this));
+                if (this.isOpen()) {
+                    this.level.addSound(this, Sound.RANDOM_DOOR_OPEN);
+                } else {
+                    this.level.addSound(this, Sound.RANDOM_DOOR_CLOSE);
+                }
                 return type;
             }
         }

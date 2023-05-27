@@ -300,6 +300,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int timeSinceRest;
     private boolean inSoulSand;
     private boolean dimensionChangeInProgress;
+    private boolean needDimensionChangeACK;
 
     /**
      * Packets that can be received before the player has logged in
@@ -858,6 +859,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     continue;
                 ((BlockEntitySpawnable) blockEntity).spawnTo(this);
             }
+        }
+
+        if (this.needDimensionChangeACK) {
+            this.needDimensionChangeACK = false;
+
+            PlayerActionPacket playerActionPacket = new PlayerActionPacket();
+            playerActionPacket.action = PlayerActionPacket.ACTION_DIMENSION_CHANGE_SUCCESS;
+            playerActionPacket.entityId = this.getId();
+            this.dataPacket(playerActionPacket);
         }
     }
 
@@ -3246,7 +3256,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 this.setSneaking(false);
                             }
                             break packetswitch;
-                        case PlayerActionPacket.ACTION_DIMENSION_CHANGE_ACK:
+                        case PlayerActionPacket.ACTION_DIMENSION_CHANGE_SUCCESS:
                             this.sendPosition(this, this.yaw, this.pitch, MovePlayerPacket.MODE_RESET);
                             this.dummyBossBars.values().forEach(DummyBossBar::reshow);
                             break;
@@ -6099,6 +6109,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             pk0.position = new BlockVector3((int) this.x, (int) this.y, (int) this.z);
             pk0.radius = this.chunkRadius << 4;
             this.dataPacket(pk0);
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_19_50) {
+            this.needDimensionChangeACK = true;
         }
     }
 
