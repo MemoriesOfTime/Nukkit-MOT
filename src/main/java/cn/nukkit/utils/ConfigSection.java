@@ -38,9 +38,11 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         this();
         if (map == null || map.isEmpty()) return;
         for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (entry.getValue() instanceof LinkedHashMap linkedHashMap) {
+            if (entry.getValue() instanceof LinkedHashMap) {
+                LinkedHashMap linkedHashMap = (LinkedHashMap) entry.getValue();
                 super.put(entry.getKey(), new ConfigSection(linkedHashMap));
-            } else if (entry.getValue() instanceof List list) {
+            } else if (entry.getValue() instanceof List) {
+                List list = (List) entry.getValue();
                 super.put(entry.getKey(), parseList(list));
             } else {
                 super.put(entry.getKey(), entry.getValue());
@@ -53,10 +55,11 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         this();
         if (map == null || map.isEmpty()) return;
         for (Map.Entry<String, Object> entry : map.entrySet()) {
-            if (entry.getValue() instanceof LinkedHashMap linkedHashMap) {
+            if (entry.getValue() instanceof LinkedHashMap) {
+                LinkedHashMap linkedHashMap = (LinkedHashMap) entry.getValue();
                 super.put(entry.getKey(), new ConfigSection(linkedHashMap));
-            } else if (entry.getValue() instanceof Map map1) {
-                super.put(entry.getKey(), new ConfigSection(map1));
+            } else if (entry.getValue() instanceof Map) {
+                super.put(entry.getKey(), new ConfigSection((Map) entry.getValue()));
             } else if (entry.getValue() instanceof List) {
                 super.put(entry.getKey(), parseList((List) entry.getValue()));
             } else {
@@ -117,10 +120,10 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
     public <T> T get(String key, T defaultValue) {
         if (key == null || key.isEmpty()) return defaultValue;
         if (super.containsKey(key)) {
-            var value = super.get(key);
+            Object value = super.get(key);
             if (defaultValue != null && !defaultValue.getClass().isInstance(value)) {
-                if (value instanceof Map map && defaultValue instanceof ConfigSection) {
-                    return (T) new ConfigSection(map);
+                if (value instanceof Map && defaultValue instanceof ConfigSection) {
+                    return (T) new ConfigSection((Map) value);
                 }
             }
             return (T) value;
@@ -128,9 +131,11 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         String[] keys = key.split("\\.", 2);
         if (!super.containsKey(keys[0])) return defaultValue;
         Object value = super.get(keys[0]);
-        if (value instanceof ConfigSection section) {
+        if (value instanceof ConfigSection) {
+            ConfigSection section = (ConfigSection) value;
             return section.get(keys[1], defaultValue);
-        } else if (value instanceof Map map) {
+        } else if (value instanceof Map) {
+            Map map = (Map) value;
             ConfigSection section = new ConfigSection(map);
             return section.get(keys[1], defaultValue);
         }

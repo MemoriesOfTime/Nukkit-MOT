@@ -408,7 +408,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Nullable
     protected final BaseFullChunk getThreadLastChunk() {
-        var ref = lastChunk.get();
+        WeakReference<BaseFullChunk> ref = lastChunk.get();
         if (ref == null) {
             return null;
         }
