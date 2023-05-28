@@ -95,8 +95,6 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math3.util.FastMath;
 import org.jetbrains.annotations.NotNull;
 
-import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -106,9 +104,7 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.ByteOrder;
-import java.util.List;
 import java.util.*;
-import java.util.Queue;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -3705,26 +3701,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 case ProtocolInfo.MAP_INFO_REQUEST_PACKET:
                     MapInfoRequestPacket pk = (MapInfoRequestPacket) packet;
-                    Item mapItem = null;
+                    ItemMap mapItem = null;
 
                     for (Item item1 : this.offhandInventory.getContents().values()) {
-                        if (item1 instanceof ItemMap && ((ItemMap) item1).getMapId() == pk.mapId) {
-                            mapItem = item1;
+                        if (item1 instanceof ItemMap map && map.getMapId() == pk.mapId) {
+                            mapItem = map;
                         }
                     }
 
                     if (mapItem == null) {
                         for (Item item1 : this.inventory.getContents().values()) {
-                            if (item1 instanceof ItemMap && ((ItemMap) item1).getMapId() == pk.mapId) {
-                                mapItem = item1;
+                            if (item1 instanceof ItemMap map && map.getMapId() == pk.mapId) {
+                                mapItem = map;
                             }
                         }
                     }
 
                     if (mapItem == null) {
                         for (BlockEntity be : this.level.getBlockEntities().values()) {
-                            if (be instanceof BlockEntityItemFrame) {
-                                BlockEntityItemFrame itemFrame1 = (BlockEntityItemFrame) be;
+                            if (be instanceof BlockEntityItemFrame itemFrame1) {
 
                                 if (itemFrame1.getItem() instanceof ItemMap && ((ItemMap) itemFrame1.getItem()).getMapId() == pk.mapId) {
                                     ((ItemMap) itemFrame1.getItem()).sendImage(this);
@@ -3737,31 +3732,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         getServer().getPluginManager().callEvent(event = new PlayerMapInfoRequestEvent(this, mapItem));
 
                         if (!event.isCancelled()) {
-                            ItemMap map = (ItemMap) mapItem;
-                            if (map.trySendImage(this)) {
+                            if (mapItem.trySendImage(this)) {
                                 return;
                             }
-                            try {
-                                BufferedImage image = new BufferedImage(128, 128, BufferedImage.TYPE_INT_RGB);
-                                Graphics2D graphics = image.createGraphics();
 
-                                int worldX = (this.getFloorX() / 128) << 7;
-                                int worldZ = (this.getFloorZ() / 128) << 7;
-                                for (int x = 0; x < 128; x++) {
-                                    for (int y = 0; y < 128; y++) {
-                                        graphics.setColor(new Color(this.getLevel().getMapColorAt(worldX + x, worldZ + y).getRGB()));
-                                        graphics.fillRect(x, y, x + 1, y + 1);
-                                    }
+                            ItemMap finalMapItem = mapItem;
+                            this.server.getScheduler().scheduleAsyncTask(new AsyncTask() {
+                                @Override
+                                public void onRun() {
+                                    finalMapItem.renderMap(Player.this.getLevel(), (Player.this.getFloorX() / 128) << 7, (Player.this.getFloorZ() / 128) << 7, 1);
+                                    finalMapItem.sendImage(Player.this);
                                 }
-
-                                map.setImage(image);
-                                map.sendImage(this);
-                            } catch (Exception ex) {
-                                this.getServer().getLogger().debug("There was an error while generating map image", ex);
-                            }
+                            });
                         }
                     }
-
                     break;
                 case ProtocolInfo.LEVEL_SOUND_EVENT_PACKET:
                 case ProtocolInfo.LEVEL_SOUND_EVENT_PACKET_V1:

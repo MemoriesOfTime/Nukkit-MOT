@@ -2,6 +2,7 @@ package cn.nukkit.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.level.Level;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ClientboundMapItemDataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -103,6 +104,29 @@ public class ItemMap extends Item {
 
         if (p.protocol >= ProtocolInfo.v1_19_20) {
             Server.getInstance().getScheduler().scheduleDelayedTask(null, () -> p.dataPacket(pk), 20);
+        }
+    }
+
+    public void renderMap(Level level, int centerX, int centerZ) {
+        renderMap(level, centerX, centerZ, 1);
+    }
+
+    public void renderMap(Level level, int centerX, int centerZ, int zoom) {
+        if (zoom < 1)
+            throw new IllegalArgumentException("Zoom must be greater than 0");
+        int[] pixels = new int[128 * 128];
+        try {
+            for (int x = 0; x < 128 * zoom; x += zoom) {
+                for (int z = 0; z < 128 * zoom; z += zoom) {
+                    pixels[(x * 128 + z) / zoom] = level.getMapColorAt(centerX + x, centerZ + z).getARGB();
+                }
+            }
+            BufferedImage image = new BufferedImage(128, 128, BufferedImage.TYPE_INT_ARGB);
+            image.setRGB(0, 0, 128, 128, pixels, 0, 128);
+
+            this.setImage(image);
+        } catch (Exception ex) {
+            MainLogger.getLogger().warning("There was an error while generating map image", ex);
         }
     }
 

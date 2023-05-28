@@ -3008,25 +3008,101 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public BlockColor getMapColorAt(int x, int z) {
-        int y = getHighestBlockAt(x, z, false);
+        BlockColor color = BlockColor.VOID_BLOCK_COLOR;
 
-        while (y > 1) {
-            Block block = getBlock(new Vector3(x, y, z));
-            if (block instanceof BlockGrass) {
-                return getGrassColorAt(x, z);
-                //} else if (block instanceof BlockWater) {
-                //    return getWaterColorAt(x, z);
-            } else {
-                BlockColor blockColor = block.getColor();
-                if (blockColor.getAlpha() == 0x00) {
-                    y--;
-                } else {
-                    return blockColor;
-                }
-            }
+        Block block = getMapColoredBlockAt(x, z);
+        if (block == null) {
+            return color;
+        }
+        if (block instanceof BlockGlass) {
+            color = this.getGrassColorAt(x, z);
+        } else {
+            color = new BlockColor(block.getColor().getARGB(), true);
         }
 
-        return BlockColor.VOID_BLOCK_COLOR;
+        //在z轴存在高度差的地方，颜色变深或变浅
+        Block nzy = getMapColoredBlockAt(x, z - 1);
+        if (nzy == null) {
+            return color;
+        }
+        if (nzy.getFloorY() > block.getFloorY()) {
+            color = darker(color, 0.875 - Math.min(5, nzy.getFloorY() - block.getFloorY()) * 0.05);
+        } else if (nzy.getFloorY() < block.getFloorY()) {
+            color = brighter(color, 0.875 - Math.min(5, block.getFloorY() - nzy.getFloorY()) * 0.05);
+        }
+
+        double deltaY = block.y - 128;
+        if (deltaY > 0) {
+            color = brighter(color, 1 - deltaY / (192 * 3));
+        } else if (deltaY < 0) {
+            color = darker(color, 1 - (-deltaY) / (192 * 3));
+        }
+
+        if ((block.getSide(BlockFace.UP) instanceof BlockWater || block.getSideAtLayer(1, BlockFace.UP) instanceof BlockWater)) {
+            int r1 = color.getRed();
+            int g1 = color.getGreen();
+            int b1 = color.getBlue();
+            BlockColor waterBlockColor = this.getWaterColorAt(x, z);
+            //在水下
+            if (block.y < 62) {
+                //海平面为62格。离海平面越远颜色越接近海洋颜色
+                double depth = 62 - block.y;
+                if (depth > 32) return waterBlockColor;
+                b1 = waterBlockColor.getBlue();
+                double radio = Math.max(0.5, depth / 96.0);
+                r1 += (waterBlockColor.getRed() - r1) * radio;
+                g1 += (waterBlockColor.getGreen() - g1) * radio;
+            } else {
+                //湖泊 or 河流
+                b1 = waterBlockColor.getBlue();
+                r1 += (waterBlockColor.getRed() - r1) * 0.5;
+                g1 += (waterBlockColor.getGreen() - g1) * 0.5;
+            }
+            color = new BlockColor(r1, g1, b1);
+        }
+
+        return color;
+    }
+
+    protected BlockColor brighter(BlockColor source, double factor) {
+        int r = source.getRed();
+        int g = source.getGreen();
+        int b = source.getBlue();
+        int alpha = source.getAlpha();
+
+        int i = (int) (1.0 / (1.0 - factor));
+        if (r == 0 && g == 0 && b == 0) {
+            return new BlockColor(i, i, i, alpha);
+        }
+        if (r > 0 && r < i) r = i;
+        if (g > 0 && g < i) g = i;
+        if (b > 0 && b < i) b = i;
+
+        return new BlockColor(Math.min((int) (r / factor), 255),
+                Math.min((int) (g / factor), 255),
+                Math.min((int) (b / factor), 255),
+                alpha);
+    }
+
+    protected BlockColor darker(BlockColor source, double factor) {
+        return new BlockColor(Math.max((int) (source.getRed() * factor), 0),
+                Math.max((int) (source.getGreen() * factor), 0),
+                Math.max((int) (source.getBlue() * factor), 0),
+                source.getAlpha());
+    }
+
+    protected Block getMapColoredBlockAt(int x, int z) {
+        int y = getHighestBlockAt(x, z);
+        while (y > 0) {
+            Block block = getBlock(new Vector3(x, y, z));
+            if (block.getColor() == null) return null;
+            if (block.getColor().getAlpha() == 0x00 || block instanceof BlockWater) {
+                y--;
+            } else {
+                return block;
+            }
+        }
+        return null;
     }
 
     public BlockColor getGrassColorAt(int x, int z) {
