@@ -1352,9 +1352,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * Returns a client-friendly gamemode of the specified real gamemode
      * This function takes care of handling gamemodes known to MCPE (as of 1.1.0.3, that includes Survival, Creative and Adventure)
      */
-    private static int getClientFriendlyGamemode(int gamemode) {
+    private int getClientFriendlyGamemode(int gamemode) {
         gamemode &= 0x03;
         if (gamemode == Player.SPECTATOR) {
+            //1.19.30+使用真正的旁观模式
+            if (this.protocol >= ProtocolInfo.v1_19_30) {
+                return GameType.SPECTATOR.ordinal();
+            }
             return Player.CREATIVE;
         }
         return gamemode;
