@@ -235,7 +235,7 @@ public class StatusCommand extends VanillaCommand {
 
             // 服务器信息
             {
-                sender.sendMessage(TextFormat.YELLOW + ">>> " + TextFormat.RED + "Nukkit" + TextFormat.DARK_AQUA + "-" + TextFormat.GREEN + "PM1E" + TextFormat.DARK_AQUA + "-" + TextFormat.LIGHT_PURPLE + "MOT " + TextFormat.RESET + " Server Info" + TextFormat.YELLOW + " <<<" + TextFormat.RESET);
+                sender.sendMessage(TextFormat.YELLOW + ">>> " + TextFormat.RED + "Nukkit" + TextFormat.DARK_AQUA + "-" + TextFormat.LIGHT_PURPLE + "MOT " + TextFormat.RESET + " Server Info" + TextFormat.YELLOW + " <<<" + TextFormat.RESET);
                 // 运行时间
                 long time = System.currentTimeMillis() - Nukkit.START_TIME;
                 sender.sendMessage(TextFormat.GOLD + "Uptime: " + formatUptime(time));

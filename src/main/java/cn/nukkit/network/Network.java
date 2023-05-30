@@ -50,8 +50,8 @@ public class Network {
 
     private final Set<AdvancedSourceInterface> advancedInterfaces = new HashSet<>();
 
-    private double upload = 0;
-    private double download = 0;
+    /*private double upload = 0;
+    private double download = 0;*/
 
     private String name;
     private String subName;
@@ -75,8 +75,8 @@ public class Network {
 
     @Deprecated
     public void addStatistics(double upload, double download) {
-        this.upload += upload;
-        this.download += download;
+        /*this.upload += upload;
+        this.download += download;*/
     }
 
     public double getUpload() {

@@ -591,7 +591,7 @@ public class Server {
             }
         }
 
-        log.info("\u00A7b-- \u00A7cNukkit \u00A7aPetteriM1 Edition \u00A7b--");
+        log.info("\u00A7b-- \u00A7cNukkit \u00A7dMOT \u00A7b--");
 
         this.consoleSender = new ConsoleCommandSender();
         this.commandMap = new SimpleCommandMap(this);
@@ -753,10 +753,10 @@ public class Server {
 
                 boolean isMaster = Nukkit.getBranch().equals("master");
                 if (!this.getNukkitVersion().equals(latest) && !this.getNukkitVersion().equals("git-null") && isMaster) {
-                    this.getLogger().info("\u00A7c[Nukkit-PM1E-MOT][Update] \u00A7eThere is a new build of §cNukkit§3-§aPM1E§3-§dMOT §eavailable! Current: " + this.getNukkitVersion() + " Latest: " + latest);
-                    this.getLogger().info("\u00A7c[Nukkit-PM1E-MOT][Update] \u00A7eYou can download the latest build from https://github.com/MemoriesOfTime/NukkitPetteriM1Edition/");
+                    this.getLogger().info("\u00A7c[Nukkit-MOT][Update] \u00A7eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + this.getNukkitVersion() + " Latest: " + latest);
+                    this.getLogger().info("\u00A7c[Nukkit-MOT][Update] \u00A7eYou can download the latest build from https://github.com/MemoriesOfTime/NukkitPetteriM1Edition/");
                 } else if (!isMaster) {
-                    this.getLogger().warning("\u00A7c[Nukkit-PM1E-MOT] \u00A7eYou are running a dev build! Do not use in production! Branch: " + Nukkit.getBranch());
+                    this.getLogger().warning("\u00A7c[Nukkit-MOT] \u00A7eYou are running a dev build! Do not use in production! Branch: " + Nukkit.getBranch());
                 }
             } catch (Exception ignore) {
             }
@@ -1425,7 +1425,7 @@ public class Server {
         Runtime runtime = Runtime.getRuntime();
         double used = NukkitMath.round((double) (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024, 2);
         double max = NukkitMath.round(((double) runtime.maxMemory()) / 1024 / 1024, 2);
-        System.out.print((char) 0x1b + "]0;" + /*Nukkit.NUKKIT*/ "Nukkit PM1E MOT" +
+        System.out.print((char) 0x1b + "]0;" + Nukkit.NUKKIT +
                 " | Online " + this.players.size() + '/' + this.maxPlayers +
                 " | Memory " + Math.round(used / max * 100) + '%' +
                 /*" | U " + NukkitMath.round((this.network.getUpload() / 1024 * 1000), 2) +
@@ -1451,7 +1451,7 @@ public class Server {
     }
 
     public String getCodename() {
-        return "PM1E";
+        return "MOT";
     }
 
     public String getVersion() {

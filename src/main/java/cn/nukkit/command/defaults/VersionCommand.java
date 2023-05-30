@@ -39,7 +39,7 @@ public class VersionCommand extends VanillaCommand {
             return true;
         }*/
         if (args.length == 0 || !sender.hasPermission("nukkit.command.version.plugins")) {
-            sender.sendMessage("§e###############################################\n§cNukkit§3-§aPM1E§3-§dMOT\n§6Build: §b" + Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4) + "\n§6Multiversion: §bUp to version " + ProtocolInfo.MINECRAFT_VERSION_NETWORK + "\n§e###############################################");
+            sender.sendMessage("§e###############################################\n§cNukkit§3-§dMOT\n§6Build: §b" + Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4) + "\n§6Multiversion: §bUp to version " + ProtocolInfo.MINECRAFT_VERSION_NETWORK + "\n§e###############################################");
 
             if (sender.isOp()) {
                 CompletableFuture.runAsync(() -> {
@@ -52,9 +52,9 @@ public class VersionCommand extends VanillaCommand {
 
                         if (Nukkit.getBranch().equals("master")) {
                             if (!sender.getServer().getNukkitVersion().equals(latest) && !sender.getServer().getNukkitVersion().equals("git-null")) {
-                                sender.sendMessage("§c[Nukkit-PM1E-MOT][Update] §eThere is a new build of §cNukkit§3-§aPM1E§3-§dMOT §eavailable! Current: " + sender.getServer().getNukkitVersion() + " Latest: " + latest);
+                                sender.sendMessage("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + sender.getServer().getNukkitVersion() + " Latest: " + latest);
                             } else {
-                                sender.sendMessage("§c[Nukkit-PM1E-MOT] §aYou are running the latest version.");
+                                sender.sendMessage("§c[Nukkit-MOT] §aYou are running the latest version.");
                             }
                         }
                     } catch (Exception ignore) {

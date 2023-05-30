@@ -1,4 +1,4 @@
-# Nukkit PM1E MOT
+# Nukkit MOT
 
 ### Introduction
 This is a special version of [Nukkit](https://github.com/CloudburstMC/Nukkit) Minecraft Bedrock Edition server software.  
