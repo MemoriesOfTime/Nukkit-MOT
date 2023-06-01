@@ -14,5 +14,7 @@ public interface Faceable {
      */
     BlockFace getBlockFace();
 
-    void setBlockFace(BlockFace face);
+    default void setBlockFace(BlockFace face) {
+        // Does nothing by default
+    }
 }

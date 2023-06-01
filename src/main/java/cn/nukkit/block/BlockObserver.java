@@ -66,17 +66,17 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
             if (Math.abs(player.getFloorX() - this.x) <= 1 && Math.abs(player.getFloorZ() - this.z) <= 1) {
                 double y = player.y + player.getEyeHeight();
                 if (y - this.y > 2) {
-                    this.setDamage(BlockFace.DOWN.getIndex());
+                    this.setBlockFace(BlockFace.DOWN);
                 } else if (this.y - y > 0) {
-                    this.setDamage(BlockFace.UP.getIndex());
+                    this.setBlockFace(BlockFace.UP);
                 } else {
-                    this.setDamage(player.getHorizontalFacing().getIndex());
+                    this.setBlockFace(player.getHorizontalFacing());
                 }
             } else {
-                this.setDamage(player.getHorizontalFacing().getIndex());
+                this.setBlockFace(player.getHorizontalFacing());
             }
         } else {
-            this.setDamage(0);
+            this.setBlockFace(BlockFace.DOWN);
         }
         this.getLevel().setBlock(block, this, true, true);
         return true;
@@ -85,6 +85,10 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
     @Override
     public BlockFace getBlockFace() {
         return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
+    }
+
+    public void setBlockFace(BlockFace face) {
+        this.setDamage(face.getIndex());
     }
 
     @Override
