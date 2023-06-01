@@ -4778,13 +4778,28 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param itemCategory the item category
      */
     public void setItemCoolDown(int coolDown, String itemCategory) {
+        if (this.protocol < ProtocolInfo.v1_18_10) {
+            return;
+        }
         PlayerStartItemCoolDownPacket pk = new PlayerStartItemCoolDownPacket();
         pk.setCoolDownDuration(coolDown);
         pk.setItemCategory(itemCategory);
         this.dataPacket(pk);
     }
 
+    /**
+     * 发送一个弹出式消息框给玩家
+     * <p>
+     * Send a Toast message box to the player
+     *
+     * @param title   the title
+     * @param content the content
+     */
     public void sendToast(String title, String content) {
+        if (this.protocol < ProtocolInfo.v1_19_0) {
+            this.sendTitle(title, content);
+            return;
+        }
         ToastRequestPacket pk = new ToastRequestPacket();
         pk.title = title;
         pk.content = content;
@@ -6553,6 +6568,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
         return false;
+    }
+
+    /**
+     * 将物品添加到玩家的主要库存中，并将任何多余的物品丢在地上。
+     * <p>
+     * Add items to the player's main inventory and drop any excess items on the ground.
+     *
+     * @param items The items to give to the player.
+     */
+    public void giveItem(Item... items) {
+        for (Item failed : getInventory().addItem(items)) {
+            getLevel().dropItem(this, failed);
+        }
     }
 
     public boolean isMovementServerAuthoritative() {
