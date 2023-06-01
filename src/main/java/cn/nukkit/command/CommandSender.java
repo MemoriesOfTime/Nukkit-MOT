@@ -1,8 +1,10 @@
 package cn.nukkit.command;
 
+import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.permission.Permissible;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * 能发送命令的人。<br>
@@ -66,5 +68,20 @@ public interface CommandSender extends Permissible {
      */
     String getName();
 
+    /**
+     * @return 发送者是否为玩家<br>whether the sender is an player
+     */
     boolean isPlayer();
+
+    /**
+     * 如果发送者是一个玩家，返回执行该命令的玩家.
+     * <p>
+     * return the player who execute the command if the sender is a player.
+     *
+     * @return 玩家对象<br>Player instance
+     */
+    @Nullable
+    default Player asPlayer() {
+        return null;
+    }
 }
