@@ -66,7 +66,10 @@ import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.Getter;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.ref.SoftReference;
 import java.util.*;
@@ -191,7 +194,7 @@ public class Level implements ChunkManager, Metadatable {
     private final Map<Character, Object> changeBlocksFullMap = new CharacterHashMap();
 
     private final BlockUpdateScheduler updateQueue;
-    private final Queue<Block> normalUpdateQueue = new ConcurrentLinkedDeque<>();
+    private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
     //private final TreeSet<BlockUpdateEntry> updateQueue = new TreeSet<>();
     //private final List<BlockUpdateEntry> nextTickUpdates = Lists.newArrayList();
     //private final Map<BlockVector3, Integer> updateQueueIndex = new HashMap<>();
@@ -914,9 +917,18 @@ public class Level implements ChunkManager, Metadatable {
         this.updateQueue.tick(this.levelCurrentTick);
         if (this.timings.doTickPending != null) this.timings.doTickPending.stopTiming();
 
-        Block block;
-        while ((block = this.normalUpdateQueue.poll()) != null) {
-            block.onUpdate(BLOCK_UPDATE_NORMAL);
+        QueuedUpdate queuedUpdate;
+        while ((queuedUpdate = this.normalUpdateQueue.poll()) != null) {
+            Block block = getBlock(queuedUpdate.block, queuedUpdate.block.layer);
+            BlockUpdateEvent event = new BlockUpdateEvent(block);
+            this.server.getPluginManager().callEvent(event);
+
+            if (!event.isCancelled()) {
+                block.onUpdate(BLOCK_UPDATE_NORMAL);
+                if (queuedUpdate.neighbor != null) {
+                    block.onNeighborChange(queuedUpdate.neighbor.getOpposite());
+                }
+            }
         }
 
         TimingsHistory.entityTicks += this.updateEntities.size();
@@ -1368,13 +1380,21 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void updateComparatorOutputLevel(Vector3 v) {
+        this.updateComparatorOutputLevelSelective(v, true);
+    }
+
+    public void updateComparatorOutputLevelSelective(Vector3 v, boolean observer) {
         for (BlockFace face : Plane.HORIZONTAL) {
             Vector3 pos = v.getSideVec(face);
 
             if (this.isChunkLoaded((int) pos.x >> 4, (int) pos.z >> 4)) {
                 Block block1 = this.getBlock(pos);
 
-                if (BlockRedstoneDiode.isDiode(block1)) {
+                if (block1.getId() == BlockID.OBSERVER) {
+                    if (observer) {
+                        block1.onNeighborChange(face.getOpposite());
+                    }
+                } else if (BlockRedstoneDiode.isDiode(block1)) {
                     block1.onUpdate(BLOCK_UPDATE_REDSTONE);
                 } else if (block1.isNormalBlock()) {
                     pos = pos.getSideVec(face);
@@ -1386,15 +1406,45 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
         }
+
+        if (!observer) {
+            return;
+        }
+
+        for (BlockFace face : Plane.VERTICAL) {
+            Block block1 = this.getBlock(v.getSideVec(face));
+
+            if (block1.getId() == BlockID.OBSERVER) {
+                block1.onNeighborChange(face.getOpposite());
+            }
+        }
+    }
+
+    public void updateAroundObserver(Vector3 pos) {
+        for (BlockFace face : BlockFace.values()) {
+            Block neighborBlock = getBlock(pos.getSide(face));
+            if (neighborBlock.getId() == BlockID.OBSERVER) {
+                neighborBlock.onNeighborChange(face.getOpposite());
+            }
+        }
     }
 
     public void updateAround(Vector3 pos) {
-        updateAround((int) pos.x, (int) pos.y, (int) pos.z, 0);
-        updateAround((int) pos.x, (int) pos.y, (int) pos.z, 1);
+        updateAround(pos, 0);
+        updateAround(pos, 1);
     }
 
+    public void updateAround(Vector3 pos, int layer) {
+        Block block = getBlock(pos);
+        for (BlockFace face : BlockFace.values()) {
+            normalUpdateQueue.add(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
+        }
+    }
+
+    @Deprecated
     public void updateAround(int x, int y, int z, int layer) {
-        BlockUpdateEvent ev;
+        updateAround(new Vector3(x, y, z), layer);
+        /*BlockUpdateEvent ev;
         this.server.getPluginManager().callEvent(
                 ev = new BlockUpdateEvent(this.getBlock(x, y - 1, z, layer)));
         if (!ev.isCancelled()) {
@@ -1429,7 +1479,7 @@ public class Level implements ChunkManager, Metadatable {
                 ev = new BlockUpdateEvent(this.getBlock(x, y, z + 1, layer)));
         if (!ev.isCancelled()) {
             normalUpdateQueue.add(ev.getBlock());
-        }
+        }*/
     }
 
     public void scheduleUpdate(Block pos, int delay) {
@@ -4671,5 +4721,13 @@ public class Level implements ChunkManager, Metadatable {
         public int size() {
             return Character.MAX_VALUE;
         }
+    }
+
+    @AllArgsConstructor
+    @Data
+    private static class QueuedUpdate {
+        @NotNull
+        private Block block;
+        private BlockFace neighbor;
     }
 }
