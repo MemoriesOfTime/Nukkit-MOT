@@ -14,6 +14,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -25,7 +26,7 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
     private final static int[] FACING = new int[]{4, 5, 3, 2, 1, 0}; // TODO when 1.13 support arrives, add UP/DOWN facings
 
     private final static int FACING_BITMASK = 0b0111;
-    //private final static int MAP_BIT = 0b1000;
+    private final static int HAS_MAP_BIT = 0b1000;
 
     public BlockItemFrame() {
         this(0);
@@ -100,7 +101,7 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         if (face.getIndex() > 1 && target.isSolid() && (!block.isSolid() || block.canBeReplaced())) {
-            this.setDamage(FACING[face.getIndex()]);
+            this.setBlockFace(face);
             this.getLevel().setBlock(block, this, true, true);
             CompoundTag nbt = new CompoundTag()
                     .putString("id", BlockEntity.ITEM_FRAME)
@@ -170,18 +171,20 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
     }
 
     public BlockFace getFacing() {
-        switch (this.getDamage() & FACING_BITMASK) {
-            case 0:
-                return BlockFace.WEST;
-            case 1:
-                return BlockFace.EAST;
-            case 2:
-                return BlockFace.NORTH;
-            case 3:
-                return BlockFace.SOUTH;
-        }
+        return switch (this.getDamage() & FACING_BITMASK) {
+            case 0 -> BlockFace.WEST;
+            case 1 -> BlockFace.EAST;
+            case 2 -> BlockFace.NORTH;
+            case 3 -> BlockFace.SOUTH;
+            default -> null;
+        };
+    }
 
-        return null;
+    @Override
+    public void setBlockFace(@NotNull BlockFace face) {
+        if (face.getIndex() > 1) {
+            this.setDamage(FACING[face.getIndex()]);
+        }
     }
 
     @Override

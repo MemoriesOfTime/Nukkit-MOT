@@ -150,6 +150,7 @@ public class BlockBarrel extends BlockSolidMeta implements Faceable {
         return BlockFace.fromIndex(index);
     }
 
+    @Override
     public void setBlockFace(BlockFace face) {
         this.setDamage((this.getDamage() & 0x8) | (face.getIndex() & 0x7));
     }
