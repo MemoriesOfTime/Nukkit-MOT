@@ -5,6 +5,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.LevelException;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -37,11 +38,11 @@ public class Position extends Vector3 {
         this.level = level;
     }
 
-    public static Position fromObject(Vector3 pos) {
+    public static Position fromObject(@NotNull Vector3 pos) {
         return fromObject(pos, null);
     }
 
-    public static Position fromObject(Vector3 pos, Level level) {
+    public static Position fromObject(@NotNull Vector3 pos, Level level) {
         return new Position(pos.x, pos.y, pos.z, level);
     }
 
@@ -71,10 +72,7 @@ public class Position extends Vector3 {
     }
 
     public Position getSide(BlockFace face, int step) {
-        if (!this.isValid()) {
-            throw new LevelException("Undefined Level reference");
-        }
-        return Position.fromObject(super.getSide(face, step), this.level);
+        return Position.fromObject(super.getSide(face, step), this.getValidLevel());
     }
 
     @Override
@@ -91,18 +89,30 @@ public class Position extends Vector3 {
     }
 
     public Block getLevelBlock() {
-        if (this.isValid()) return this.level.getBlock(this);
-        else throw new LevelException("Undefined Level reference");
+        return this.getValidLevel().getBlock(this);
     }
 
     public Block getLevelBlockAtLayer(int layer) {
-        if (this.isValid()) return this.level.getBlock(this, layer);
-        else throw new LevelException("Undefined Level reference");
+        return this.getValidLevel().getBlock(this, layer);
     }
 
+    @NotNull
     public Location getLocation() {
-        if (this.isValid()) return new Location(this.x, this.y, this.z, 0, 0, this.level);
-        else throw new LevelException("Undefined Level reference");
+        return new Location(this.x, this.y, this.z, 0, 0, this.getValidLevel());
+    }
+
+    @NotNull
+    public String getLevelName() {
+        return getValidLevel().getName();
+    }
+
+    @NotNull
+    public final Level getValidLevel() {
+        Level level = this.level;
+        if (level == null) {
+            throw new LevelException("Undefined Level reference");
+        }
+        return level;
     }
 
     @Override
