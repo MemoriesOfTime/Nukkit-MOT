@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemItemFrame;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.sound.ItemFrameItemAddedSound;
@@ -25,8 +26,10 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
 
     private final static int[] FACING = new int[]{4, 5, 3, 2, 1, 0}; // TODO when 1.13 support arrives, add UP/DOWN facings
 
-    private final static int FACING_BITMASK = 0b0111;
-    private final static int HAS_MAP_BIT = 0b1000;
+    //TODO fix runtime_block_states
+    private final static int FACING_BITMASK = 0x3; //11
+    private final static int HAS_MAP_BIT = 0x4; //100
+    //private final static int HAS_PHOTO_BIT = 0x10; //10000
 
     public BlockItemFrame() {
         this(0);
@@ -90,9 +93,17 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
             }
             itemToFrame.setCount(1);
             itemFrame.setItem(itemToFrame);
+            if (itemToFrame.getId() == ItemID.MAP) {
+                setStoringMap(true);
+                this.getLevel().setBlock(this, this, true);
+            }
             this.getLevel().addSound(new ItemFrameItemAddedSound(this));
         } else {
             itemFrame.setItemRotation((itemFrame.getItemRotation() + 1) % 8);
+            if (isStoringMap()) {
+                setStoringMap(false);
+                this.getLevel().setBlock(this, this, true);
+            }
             this.getLevel().addSound(new ItemFrameItemRotated(this));
         }
         return true;
@@ -185,6 +196,14 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
         if (face.getIndex() > 1) {
             this.setDamage(FACING[face.getIndex()]);
         }
+    }
+
+    public boolean isStoringMap() {
+        return (this.getDamage() & HAS_MAP_BIT) != 0;
+    }
+
+    public void setStoringMap(boolean map) {
+        this.setDamage((this.getDamage() & FACING_BITMASK) | (map ? HAS_MAP_BIT : 0x0));
     }
 
     @Override
