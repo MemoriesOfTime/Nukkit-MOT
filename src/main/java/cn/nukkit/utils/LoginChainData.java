@@ -1,6 +1,7 @@
 package cn.nukkit.utils;
 
 import com.google.gson.JsonObject;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -44,6 +45,18 @@ public interface LoginChainData {
     String getCapeData();
 
     int getUIProfile();
+
+    /**
+     * @return the XUID of the player, or null if the server is not using Waterdog
+     */
+    @Nullable
+    String getWaterdogXUID();
+
+    /**
+     * @return the IP of the player, or null if the server is not using Waterdog
+     */
+    @Nullable
+    String getWaterdogIP();
 
     JsonObject getRawData();
 }

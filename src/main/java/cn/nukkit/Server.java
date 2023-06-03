@@ -480,6 +480,10 @@ public class Server {
      * Network encryption
      */
     public boolean encryptionEnabled;
+    /**
+     * Using WaterdogPE Proxy
+     */
+    public boolean useWaterdog;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -2056,7 +2060,7 @@ public class Server {
      * @param player player
      */
     public void removePlayer(Player player) {
-        if (this.players.remove(player.getSocketAddress()) != null) {
+        if (this.players.remove(player.getRawSocketAddress()) != null) {
             return;
         }
 
@@ -2882,6 +2886,10 @@ public class Server {
         return this.netherEnabled;
     }
 
+    public boolean isWaterdogCapable() {
+        return this.useWaterdog;
+    }
+
     /**
      * Get player data serializer that is used to save player data
      *
@@ -3013,6 +3021,7 @@ public class Server {
         }
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
         this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
+        this.useWaterdog = this.getPropertyBoolean("use-waterdog", false);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
@@ -3159,6 +3168,7 @@ public class Server {
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
             put("encryption", true);
+            put("use-waterdog", false);
         }
     }
 
