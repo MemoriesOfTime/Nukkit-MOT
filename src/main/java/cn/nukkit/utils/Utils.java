@@ -292,6 +292,8 @@ public class Utils {
     public static int toInt(Object number) {
         if (number instanceof Integer) {
             return (Integer) number;
+        } else if (number instanceof String) {
+            return new BigDecimal(number.toString()).intValue();
         }
 
         return (int) Math.round((double) number);
