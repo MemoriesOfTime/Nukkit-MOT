@@ -11,7 +11,7 @@ public class PlayerUIComponent extends BaseInventory {
 
     public static final int CREATED_ITEM_OUTPUT_UI_SLOT = 50;
 
-    private  final PlayerUIInventory playerUI;
+    private final PlayerUIInventory playerUI;
     private final int offset;
     private final int size;
 
@@ -50,7 +50,23 @@ public class PlayerUIComponent extends BaseInventory {
 
     @Override
     public boolean setItem(int index, Item item, boolean send) {
-        return this.playerUI.setItem(index + this.offset, item, send);
+        //return this.playerUI.setItem(index + this.offset, item, send);
+        Item before = this.playerUI.getItem(index + this.offset);
+        if (this.playerUI.setItem(index + this.offset, item, send)) {
+            onSlotChange(index, before, false);
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean clear(int index, boolean send) {
+        Item before = playerUI.getItem(index + this.offset);
+        if (this.playerUI.clear(index + this.offset, send)) {
+            onSlotChange(index, before, false);
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -73,7 +89,7 @@ public class PlayerUIComponent extends BaseInventory {
 
     @Override
     public Set<Player> getViewers() {
-        return playerUI.viewers;
+        return playerUI.getViewers();
     }
 
     @Override
@@ -103,6 +119,10 @@ public class PlayerUIComponent extends BaseInventory {
 
     @Override
     public void onSlotChange(int index, Item before, boolean send) {
-        this.playerUI.onSlotChange(index + this.offset, before, send);
+        //this.playerUI.onSlotChange(index + this.offset, before, send);
+        if (send) {
+            this.playerUI.onSlotChange(index + this.offset, before, true);
+        }
+        super.onSlotChange(index, before, false);
     }
 }

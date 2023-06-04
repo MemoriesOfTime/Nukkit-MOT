@@ -30,6 +30,7 @@ import java.io.InputStreamReader;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -38,7 +39,23 @@ import java.util.regex.Pattern;
  */
 public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
+    public static final Item AIR_ITEM = new Item(0);
+
     public static final Item[] EMPTY_ARRAY = new Item[0];
+
+    /**
+     * Groups:
+     * <ol>
+     *     <li>namespace (optional)</li>
+     *     <li>item name (choice)</li>
+     *     <li>damage (optional, for item name)</li>
+     *     <li>numeric id (choice)</li>
+     *     <li>damage (optional, for numeric id)</li>
+     * </ol>
+     */
+    private static final Pattern ITEM_STRING_PATTERN = Pattern.compile(
+            //       1:namespace    2:name           3:damage   4:num-id    5:damage
+            "^(?:(?:([a-z_]\\w*):)?([a-z._]\\w*)(?::(-?\\d+))?|(-?\\d+)(?::(-?\\d+))?)$");
 
     protected static final String UNKNOWN_STR = "Unknown";
     public static Class<?>[] list = null;
@@ -868,32 +885,66 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public static Item fromString(String str) {
-        String[] b = str.trim().replace(' ', '_').replace("minecraft:", "").split(":");
-
-        int id = 0;
-        int meta = 0;
-
-        Pattern integerPattern = Pattern.compile("^[-1-9]\\d*$");
-        if (integerPattern.matcher(b[0]).matches()) {
-            id = Integer.parseInt(b[0]);
-        } else {
-            try {
-                id = BlockID.class.getField(b[0].toUpperCase()).getInt(null);
-                if (id > 255) {
-                    id = 255 - id;
-                }
-            }catch (Exception ignore) {
-                try {
-                    id = ItemID.class.getField(b[0].toUpperCase()).getInt(null);
-                } catch (Exception ignore1) {
-                }
-            }
+        String normalized = str.trim().replace(' ', '_').toLowerCase();
+        Matcher matcher = ITEM_STRING_PATTERN.matcher(normalized);
+        if (!matcher.matches()) {
+            return AIR_ITEM;
         }
 
-        //id = id & 0xFFFF;
-        if (b.length != 1) meta = Integer.parseInt(b[1]) & 0xFFFF;
+        String name = matcher.group(2);
+        OptionalInt meta = OptionalInt.empty();
+        String metaGroup;
+        if (name != null) {
+            metaGroup = matcher.group(3);
+        } else {
+            metaGroup = matcher.group(5);
+        }
+        if (metaGroup != null) {
+            meta = OptionalInt.of(Short.parseShort(metaGroup));
+        }
 
-        return get(id, meta);
+        String numericIdGroup = matcher.group(4);
+        if (name != null) {
+            String namespaceGroup = matcher.group(1);
+            String namespacedId;
+            if (namespaceGroup != null) {
+                namespacedId = namespaceGroup + ":" + name;
+            } else {
+                namespacedId = "minecraft:" + name;
+            }
+            if (namespacedId.equals("minecraft:air")) {
+                return Item.AIR_ITEM;
+            }
+
+            //common item
+            int id = RuntimeItems.getLegacyIdFromLegacyString(namespacedId);
+            if (id > 0) {
+                return get(id, meta.orElse(0));
+            } else if (namespaceGroup != null && !namespaceGroup.equals("minecraft:")) {
+                return Item.AIR_ITEM;
+            }
+        } else if (numericIdGroup != null) {
+            int id = Integer.parseInt(numericIdGroup);
+            return get(id, meta.orElse(0));
+        }
+
+        if (name == null) {
+            return Item.AIR_ITEM;
+        }
+
+        int id = 0;
+        try {
+            id = BlockID.class.getField(name.toUpperCase()).getInt(null);
+            if (id > 255) {
+                id = 255 - id;
+            }
+        } catch (Exception ignore) {
+            try {
+                id = ItemID.class.getField(name.toUpperCase()).getInt(null);
+            } catch (Exception ignore1) {
+            }
+        }
+        return get(id, meta.orElse(0));
     }
 
     public static Item fromJson(Map<String, Object> data) {
@@ -910,7 +961,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             }
         }
 
-        return get(Utils.toInt(data.get("id")), Utils.toInt(data.getOrDefault("damage", 0)), Utils.toInt(data.getOrDefault("count", 1)), nbtBytes);
+        Item item = fromString(data.get("id") + ":" + data.getOrDefault("damage", 0));
+        item.setCount(Utils.toInt(data.getOrDefault("count", 1)));
+        item.setCompoundTag(nbtBytes);
+        return item;
     }
 
     public static Item fromJsonOld(Map<String, Object> data) {
@@ -1482,6 +1536,19 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
      */
     public boolean onClickAir(Player player, Vector3 directionVector) {
         return false;
+    }
+
+    public final Item decrement(int amount) {
+        return increment(-amount);
+    }
+
+    public final Item increment(int amount) {
+        if (count + amount <= 0) {
+            return get(0);
+        }
+        Item cloned = clone();
+        cloned.count += amount;
+        return cloned;
     }
 
     @Override

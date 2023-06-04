@@ -3,9 +3,7 @@ package cn.nukkit.inventory.transaction;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
-import cn.nukkit.inventory.BigCraftingGrid;
-import cn.nukkit.inventory.CraftingRecipe;
-import cn.nukkit.inventory.InventoryType;
+import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -31,8 +29,14 @@ public class CraftingTransaction extends InventoryTransaction {
 
     protected CraftingRecipe recipe;
 
+    private Recipe transactionRecipe;
+
+    protected int craftingType;
+
     public CraftingTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions, false);
+
+        this.craftingType = source.craftingType;
 
         this.gridSize = (source.getCraftingGrid() instanceof BigCraftingGrid) ? 3 : 2;
 
@@ -85,9 +89,34 @@ public class CraftingTransaction extends InventoryTransaction {
         return recipe;
     }
 
+    public Recipe getTransactionRecipe() {
+        return this.transactionRecipe;
+    }
+
+    protected void setTransactionRecipe(Recipe recipe) {
+        this.transactionRecipe = recipe;
+        this.recipe = (recipe instanceof CraftingRecipe)? (CraftingRecipe) recipe: null;
+    }
+
     public boolean canExecute() {
-        recipe = source.getServer().getCraftingManager().matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs);
-        return this.recipe != null && super.canExecute();
+        CraftingManager craftingManager = source.getServer().getCraftingManager();
+        Inventory inventory;
+        switch (craftingType) {
+            case Player.CRAFTING_SMITHING:
+                inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
+                if (inventory instanceof SmithingInventory smithingInventory) {
+                    addInventory(inventory);
+                    SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
+                    if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment()), true, true)) {
+                        setTransactionRecipe(smithingRecipe);
+                    }
+                }
+                break;
+            default:
+                setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
+                break;
+        }
+        return this.getTransactionRecipe() != null && super.canExecute();
     }
 
     protected boolean callExecuteEvent() {

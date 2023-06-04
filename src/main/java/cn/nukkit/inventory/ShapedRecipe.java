@@ -241,7 +241,7 @@ public class ShapedRecipe implements CraftingRecipe {
             }
         }
 
-        if (!matchItemList(haveInputs, needInputs)) {
+        if (!Recipe.matchItemList(haveInputs, needInputs)) {
             return false;
         }
 
@@ -270,7 +270,7 @@ public class ShapedRecipe implements CraftingRecipe {
         }
         needOutputs.sort(CraftingManager.recipeComparator);
 
-        return matchItemList(haveOutputs, needOutputs);
+        return Recipe.matchItemList(haveOutputs, needOutputs);
     }
 
     /**
@@ -284,26 +284,6 @@ public class ShapedRecipe implements CraftingRecipe {
     @Override
     public boolean matchItems(List<Item> inputList, List<Item> extraOutputList) {
         return matchItems(inputList, extraOutputList, 1);
-    }
-
-    private static boolean matchItemList(List<Item> haveItems, List<Item> needItems) {
-        for (Item needItem : new ArrayList<>(needItems)) {
-            for (Item haveItem : new ArrayList<>(haveItems)) {
-                if (needItem.equals(haveItem, needItem.hasMeta(), needItem.hasCompoundTag())) {
-                    int amount = Math.min(haveItem.getCount(), needItem.getCount());
-                    needItem.setCount(needItem.getCount() - amount);
-                    haveItem.setCount(haveItem.getCount() - amount);
-                    if (haveItem.getCount() == 0) {
-                        haveItems.remove(haveItem);
-                    }
-                    if (needItem.getCount() == 0) {
-                        needItems.remove(needItem);
-                        break;
-                    }
-                }
-            }
-        }
-        return haveItems.isEmpty() && needItems.isEmpty();
     }
 
     @Override

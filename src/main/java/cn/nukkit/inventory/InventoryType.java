@@ -30,7 +30,8 @@ public enum InventoryType {
     MINECART_HOPPER(5, "Minecart with Hopper", 8), //5 CONTAINER
     OFFHAND(1, "Offhand", -1), //1 CONTAINER
     TRADING(3, "Villager Trade", 15), //3 CONTAINER
-    BARREL(27, "Barrel", 0);
+    BARREL(27, "Barrel", 0),
+    SMITHING_TABLE(2, "Smithing Table", 33);
 
     private final int size;
     private final String title;

@@ -34,10 +34,7 @@ import cn.nukkit.form.handler.FormResponseHandler;
 import cn.nukkit.form.window.FormWindow;
 import cn.nukkit.form.window.FormWindowCustom;
 import cn.nukkit.inventory.*;
-import cn.nukkit.inventory.transaction.CraftingTransaction;
-import cn.nukkit.inventory.transaction.EnchantTransaction;
-import cn.nukkit.inventory.transaction.InventoryTransaction;
-import cn.nukkit.inventory.transaction.RepairItemTransaction;
+import cn.nukkit.inventory.transaction.*;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
@@ -134,6 +131,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int CRAFTING_ENCHANT = 3;
     public static final int CRAFTING_BEACON = 4;
 
+    public static final int CRAFTING_SMITHING = 1003;
+
+    public static final int TRADE_WINDOW_ID = 500;
+
     public static final float DEFAULT_SPEED = 0.1f;
     public static final float MAXIMUM_SPEED = 0.5f;
     public static final float DEFAULT_FLY_SPEED = 0.05f;
@@ -146,6 +147,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int ANVIL_WINDOW_ID = 2;
     public static final int ENCHANT_WINDOW_ID = 3;
     public static final int BEACON_WINDOW_ID = 4;
+    public static final int GRINDSTONE_WINDOW_ID = 5;
+    public static final int SMITHING_WINDOW_ID = 6;
 
     protected static final int RESOURCE_PACK_CHUNK_SIZE = 8 * 1024; // 8KB
 
@@ -181,6 +184,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected CraftingTransaction craftingTransaction;
     protected EnchantTransaction enchantTransaction;
     protected RepairItemTransaction repairItemTransaction;
+    protected SmithingTransaction smithingTransaction;
 
     protected long randomClientId;
 
@@ -3793,6 +3797,86 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     InventoryTransactionPacket transactionPacket = (InventoryTransactionPacket) packet;
 
+                    // Nasty hack because the client won't change the right packet in survival when creating netherite stuff
+                    // so we are emulating what Mojang should be sending
+                    if (transactionPacket.transactionType == InventoryTransactionPacket.TYPE_MISMATCH
+                            && !isCreative()
+                            && (inv = getWindowById(SMITHING_WINDOW_ID)) instanceof SmithingInventory smithingInventory) {
+                        if (!smithingInventory.getResult().isNull()) {
+                            InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
+                            fixedPacket.isRepairItemPart = true;
+                            fixedPacket.actions = new NetworkInventoryAction[6];
+
+                            Item fromIngredient = smithingInventory.getIngredient().clone();
+                            Item toIngredient = fromIngredient.decrement(1);
+
+                            Item fromEquipment = smithingInventory.getEquipment().clone();
+                            Item toEquipment = fromEquipment.decrement(1);
+
+                            Item fromResult = Item.get(Item.AIR);
+                            Item toResult = smithingInventory.getResult().clone();
+
+                            NetworkInventoryAction action = new NetworkInventoryAction();
+                            action.windowId = ContainerIds.UI;
+                            action.inventorySlot = SmithingInventory.SMITHING_INGREDIENT_UI_SLOT;
+                            action.oldItem = fromIngredient.clone();
+                            action.newItem = toIngredient.clone();
+                            fixedPacket.actions[0] = action;
+
+                            action = new NetworkInventoryAction();
+                            action.windowId = ContainerIds.UI;
+                            action.inventorySlot = SmithingInventory.SMITHING_EQUIPMENT_UI_SLOT;
+                            action.oldItem = fromEquipment.clone();
+                            action.newItem = toEquipment.clone();
+                            fixedPacket.actions[1] = action;
+
+                            int emptyPlayerSlot = -1;
+                            for (int slot = 0; slot < inventory.getSize(); slot++) {
+                                if (inventory.getItem(slot).isNull()) {
+                                    emptyPlayerSlot = slot;
+                                    break;
+                                }
+                            }
+                            if (emptyPlayerSlot == -1) {
+                                sendAllInventories();
+                                getCursorInventory().sendContents(this);
+                            } else {
+                                action = new NetworkInventoryAction();
+                                action.windowId = ContainerIds.INVENTORY;
+                                action.inventorySlot = emptyPlayerSlot; // Cursor
+                                action.oldItem = Item.get(Item.AIR);
+                                action.newItem = toResult.clone();
+                                fixedPacket.actions[2] = action;
+
+                                action = new NetworkInventoryAction();
+                                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT;
+                                action.inventorySlot = 2; // result
+                                action.oldItem = toResult.clone();
+                                action.newItem = fromResult.clone();
+                                fixedPacket.actions[3] = action;
+
+                                action = new NetworkInventoryAction();
+                                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_INPUT;
+                                action.inventorySlot = 0; // equipment
+                                action.oldItem = toEquipment.clone();
+                                action.newItem = fromEquipment.clone();
+                                fixedPacket.actions[4] = action;
+
+                                action = new NetworkInventoryAction();
+                                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL;
+                                action.inventorySlot = 1; // material
+                                action.oldItem = toIngredient.clone();
+                                action.newItem = fromIngredient.clone();
+                                fixedPacket.actions[5] = action;
+
+                                transactionPacket = fixedPacket;
+                            }
+                        }
+                    }
+
                     List<InventoryAction> actions = new ArrayList<>();
                     for (NetworkInventoryAction networkInventoryAction : transactionPacket.actions) {
                         InventoryAction a = networkInventoryAction.createInventoryAction(this);
@@ -3839,16 +3923,44 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         return;
                     } else if (this.protocol >= ProtocolInfo.v1_16_0 && transactionPacket.isRepairItemPart) {
-                        if (this.repairItemTransaction == null) {
-                            this.repairItemTransaction = new RepairItemTransaction(this, actions);
+                        Sound sound = null;
+                        if (SmithingTransaction.checkForItemPart(actions)) {
+                            if (this.smithingTransaction == null) {
+                                this.smithingTransaction = new SmithingTransaction(this, actions);
+                            } else {
+                                for (InventoryAction action : actions) {
+                                    this.smithingTransaction.addAction(action);
+                                }
+                            }
+                            if (this.smithingTransaction.canExecute()) {
+                                try {
+                                    if (this.smithingTransaction.execute()) {
+                                        sound = Sound.SMITHING_TABLE_USE;
+                                    }
+                                } finally {
+                                    this.smithingTransaction = null;
+                                }
+                            }
                         } else {
-                            for (InventoryAction action : actions) {
-                                this.repairItemTransaction.addAction(action);
+                            if (this.repairItemTransaction == null) {
+                                this.repairItemTransaction = new RepairItemTransaction(this, actions);
+                            } else {
+                                for (InventoryAction action : actions) {
+                                    this.repairItemTransaction.addAction(action);
+                                }
+                            }
+                            if (this.repairItemTransaction.canExecute()) {
+                                this.repairItemTransaction.execute();
+                                this.repairItemTransaction = null;
                             }
                         }
-                        if (this.repairItemTransaction.canExecute()) {
-                            this.repairItemTransaction.execute();
-                            this.repairItemTransaction = null;
+
+                        if (sound != null) {
+                            Collection<Player> players = level.getChunkPlayers(getChunkX(), getChunkZ()).values();
+                            players.remove(this);
+                            if (!players.isEmpty()) {
+                                level.addSound(this, sound, 1f, 1f, players);
+                            }
                         }
                         return;
                     } else if (this.craftingTransaction != null) {
@@ -3891,6 +4003,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.getCursorInventory().sendContents(this);
                             this.sendAllInventories();
                             this.repairItemTransaction = null;
+                        }
+                    } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.smithingTransaction != null) {
+                        if (SmithingTransaction.checkForItemPart(actions)) {
+                            for (InventoryAction action : actions) {
+                                this.smithingTransaction.addAction(action);
+                            }
+                            return;
+                        } else {
+                            log.debug("Got unexpected normal inventory action with incomplete smithing table transaction from {}, refusing to execute use the smithing table {}", this.getName(), transactionPacket.toString());
+                            this.removeAllWindows(false);
+                            this.sendAllInventories();
+                            this.smithingTransaction = null;
                         }
                     }
 

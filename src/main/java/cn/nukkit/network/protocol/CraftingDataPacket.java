@@ -24,6 +24,7 @@ public class CraftingDataPacket extends DataPacket {
     public static final String CRAFTING_TAG_CAMPFIRE = "campfire";
     public static final String CRAFTING_TAG_BLAST_FURNACE = "blast_furnace";
     public static final String CRAFTING_TAG_SMOKER = "smoker";
+    public static final String CRAFTING_TAG_SMITHING_TABLE = "smithing_table";
 
     private List<Recipe> entries = new ArrayList<>();
     private final List<BrewingRecipe> brewingEntries = new ArrayList<>();
@@ -83,7 +84,7 @@ public class CraftingDataPacket extends DataPacket {
             }
         } else {
             for (Recipe recipe : entries) {
-                this.putVarInt(recipe.getType().ordinal());
+                this.putVarInt(recipe.getType().getNetworkType(protocol));
                 switch (recipe.getType()) {
                     case SHAPELESS:
                         ShapelessRecipe shapeless = (ShapelessRecipe) recipe;
@@ -111,6 +112,18 @@ public class CraftingDataPacket extends DataPacket {
                                 }
                             }
                         }
+                        break;
+                    case SMITHING_TRANSFORM:
+                        SmithingRecipe smithing = (SmithingRecipe) recipe;
+                        this.putString(smithing.getRecipeId());
+                        if (protocol >= ProtocolInfo.v1_19_80) {
+                            this.putRecipeIngredient(protocol, Item.get(Item.AIR)); //template
+                        }
+                        this.putRecipeIngredient(protocol, smithing.getEquipment());
+                        this.putRecipeIngredient(protocol, smithing.getIngredient());
+                        this.putSlot(protocol, smithing.getResult(), true);
+                        this.putString(CRAFTING_TAG_SMITHING_TABLE);
+                        this.putUnsignedVarInt(smithing.getNetworkId());
                         break;
                     case SHAPED:
                         ShapedRecipe shaped = (ShapedRecipe) recipe;
