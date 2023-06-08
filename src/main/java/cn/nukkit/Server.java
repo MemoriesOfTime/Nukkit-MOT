@@ -1206,7 +1206,9 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_19_80) {
+        if (player.protocol >= ProtocolInfo.v1_20_0_23) {
+            player.dataPacket(CraftingManager.packet589);
+        } else if (player.protocol >= ProtocolInfo.v1_19_80) {
             player.dataPacket(CraftingManager.packet582);
         } else if (player.protocol >= ProtocolInfo.v1_19_70_24) {
             player.dataPacket(CraftingManager.packet575);
@@ -1238,7 +1240,7 @@ public class Server {
             player.dataPacket(CraftingManager.packet419);
         } else if (player.protocol >= ProtocolInfo.v1_16_0) {
             player.dataPacket(CraftingManager.packet407);
-        } else if (player.protocol > ProtocolInfo.v1_12_0) {
+        } else if (player.protocol >= ProtocolInfo.v1_13_0) {
             player.dataPacket(CraftingManager.packet388);
         } else if (player.protocol == ProtocolInfo.v1_12_0) {
             player.dataPacket(CraftingManager.packet361);
