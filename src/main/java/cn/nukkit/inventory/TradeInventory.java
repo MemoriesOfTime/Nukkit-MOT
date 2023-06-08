@@ -11,13 +11,8 @@ import java.nio.ByteOrder;
 
 public class TradeInventory extends BaseInventory {
     
-    public static final int TRADE_INPUT_A = 4;
-    public static final int TRADE_INPUT_B = 5;
-    public static final int TRADE_OUTPUT = 51;
-    
-    // mojang, what the heck??
-    public static final int FAKE_TRADE_INPUT = -30; // moves from fake ui (villager inventory) to player inventory
-    public static final int FAKE_TRADE_OUTPUT = -31; // item is sent from player inventory to villager fake inv
+    public static final int TRADE_INPUT1_UI_SLOT = 4;
+    public static final int TRADE_INPUT2_UI_SLOT = 5;
     
     public TradeInventory(InventoryHolder holder) {
         super(holder, InventoryType.TRADING);

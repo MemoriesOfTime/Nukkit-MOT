@@ -292,6 +292,8 @@ public class Utils {
     public static int toInt(Object number) {
         if (number instanceof Integer) {
             return (Integer) number;
+        } else if (number instanceof String) {
+            return new BigDecimal(number.toString()).intValue();
         }
 
         return (int) Math.round((double) number);
@@ -483,6 +485,9 @@ public class Utils {
                 return "1.19.70";
             case ProtocolInfo.v1_19_80:
                 return "1.19.80";
+            case ProtocolInfo.v1_20_0_23:
+            case ProtocolInfo.v1_20_0:
+                return "1.20.0";
             //TODO Multiversion 添加新版本支持时修改这里
             default:
                 throw new IllegalStateException("Invalid protocol: " + protocol);

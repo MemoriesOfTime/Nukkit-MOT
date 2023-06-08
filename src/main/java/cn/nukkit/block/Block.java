@@ -18,6 +18,7 @@ import cn.nukkit.metadata.Metadatable;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
 import java.lang.reflect.Constructor;
@@ -379,6 +380,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[RED_NETHER_BRICK_STAIRS] = BlockStairsRedNetherBrick.class; //439
             list[SMOOTH_QUARTZ_STAIRS] = BlockStairsSmoothQuartz.class; //440
 
+            list[SMITHING_TABLE] = BlockSmithingTable.class; //457
             list[BARREL] = BlockBarrel.class; //458
 
             list[BELL] = BlockBell.class; //461
@@ -607,6 +609,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public int onUpdate(int type) {
         return 0;
+    }
+
+    public void onNeighborChange(@NotNull BlockFace side) {
+
     }
 
     public boolean onActivate(Item item) {

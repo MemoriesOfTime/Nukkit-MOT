@@ -2,7 +2,10 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.item.Item;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * @author MagicDroidX
@@ -155,7 +158,7 @@ public class ShapelessRecipe implements CraftingRecipe {
             }
         }
 
-        if (!matchItemList(haveInputs, needInputs)) {
+        if (!Recipe.matchItemList(haveInputs, needInputs)) {
             return false;
         }
 
@@ -184,7 +187,7 @@ public class ShapelessRecipe implements CraftingRecipe {
         }
         needOutputs.sort(CraftingManager.recipeComparator);
 
-        return matchItemList(haveOutputs, needOutputs);
+        return Recipe.matchItemList(haveOutputs, needOutputs);
     }
 
     /**
@@ -200,7 +203,7 @@ public class ShapelessRecipe implements CraftingRecipe {
         return matchItems(inputList, extraOutputList, 1);
     }
 
-    private static boolean matchItemList(List<Item> haveItems, List<Item> needItems) {
+    /*private static boolean matchItemList(List<Item> haveItems, List<Item> needItems) {
         for (Item needItem : new ArrayList<>(needItems)) {
             for (Item haveItem : new ArrayList<>(haveItems)) {
                 if (needItem.equals(haveItem, needItem.hasMeta(), needItem.hasCompoundTag())) {
@@ -218,7 +221,7 @@ public class ShapelessRecipe implements CraftingRecipe {
             }
         }
         return haveItems.isEmpty() && needItems.isEmpty();
-    }
+    }*/
 
     @Override
     public List<Item> getIngredientsAggregate() {

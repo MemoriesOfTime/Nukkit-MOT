@@ -6,6 +6,7 @@ import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.types.NetworkPermissions;
 import cn.nukkit.utils.Utils;
 import lombok.ToString;
 
@@ -104,15 +105,19 @@ public class StartGamePacket extends DataPacket {
      *
      * @since v582
      */
-    private boolean blockNetworkIdsHashed;
+    public boolean blockNetworkIdsHashed;
     /**
      * @since v582
      */
-    private boolean createdInEditor;
+    public boolean createdInEditor;
     /**
      * @since v582
      */
-    private boolean exportedFromEditor;
+    public boolean exportedFromEditor;
+    /**
+     * @since v588
+     */
+    public NetworkPermissions networkPermissions = NetworkPermissions.DEFAULT;
 
     @Override
     public void decode() {
@@ -306,6 +311,9 @@ public class StartGamePacket extends DataPacket {
                                 this.putBoolean(this.clientSideGenerationEnabled);
                                 if (protocol >= ProtocolInfo.v1_19_80) {
                                     this.putBoolean(this.blockNetworkIdsHashed);
+                                    if (protocol >= ProtocolInfo.v1_20_0_23) {
+                                        this.putBoolean(this.networkPermissions.isServerAuthSounds());
+                                    }
                                 }
                             }
                         }

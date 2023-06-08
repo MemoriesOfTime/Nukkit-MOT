@@ -18,12 +18,13 @@ public class PlayerUIInventory extends BaseInventory {
     private final BigCraftingGrid bigCraftingGrid;
 
     public PlayerUIInventory(Player player) {
-        super(player, InventoryType.UI, new HashMap<>(), 51);
+        super(player, InventoryType.UI, new HashMap<>(), 54);
         this.player = player;
 
         this.cursorInventory = new PlayerCursorInventory(this);
         this.craftingGrid = new CraftingGrid(this);
         this.bigCraftingGrid = new BigCraftingGrid(this);
+        this.viewers.add(player);
     }
 
     public PlayerCursorInventory getCursorInventory() {
@@ -36,6 +37,16 @@ public class PlayerUIInventory extends BaseInventory {
 
     public BigCraftingGrid getBigCraftingGrid() {
         return bigCraftingGrid;
+    }
+
+    @Override
+    public void onOpen(Player who) {
+
+    }
+
+    @Override
+    public void onClose(Player who) {
+
     }
 
     @Override

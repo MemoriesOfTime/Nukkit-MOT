@@ -47,12 +47,12 @@ public class NetworkInventoryAction {
     public static final int SOURCE_TYPE_ENCHANT_MATERIAL = -16;
     public static final int SOURCE_TYPE_ENCHANT_OUTPUT = -17;
 
-    public static final int SOURCE_TYPE_TRADING_INPUT_1 = -20;
-    public static final int SOURCE_TYPE_TRADING_INPUT_2 = -21;
-    public static final int SOURCE_TYPE_TRADING_USE_INPUTS = -22;
-    public static final int SOURCE_TYPE_TRADING_OUTPUT = -23;
-
     public static final int SOURCE_TYPE_BEACON = -24;
+
+    public static final int SOURCE_TYPE_TRADING_OUTPUT = -30;
+    public static final int SOURCE_TYPE_TRADING_INPUT_1 = -31;
+    public static final int SOURCE_TYPE_TRADING_INPUT_2 = -32;
+    public static final int SOURCE_TYPE_TRADING_USE_INPUTS = -33;
 
     /**
      * Any client-side window dropping its contents when the player closes it
@@ -98,6 +98,12 @@ public class NetworkInventoryAction {
                     case SOURCE_TYPE_ANVIL_MATERIAL:
                     case SOURCE_TYPE_ANVIL_RESULT:
                         packet.isRepairItemPart = true;
+                        break;
+                    case SOURCE_TYPE_TRADING_INPUT_1:
+                    case SOURCE_TYPE_TRADING_INPUT_2:
+                    case SOURCE_TYPE_TRADING_USE_INPUTS:
+                    case SOURCE_TYPE_TRADING_OUTPUT:
+                        packet.isTradeItemPart = true;
                         break;
                 }
                 break;
@@ -199,30 +205,42 @@ public class NetworkInventoryAction {
                             this.windowId = Player.ANVIL_WINDOW_ID;
                             this.inventorySlot = 1;
                             break;
-                        case TradeInventory.TRADE_INPUT_A:
-                            if(player.getTradeInventory() == null) {
-                                player.getServer().getLogger().error("Player " + player.getName() + " does not have trade window open");
+                        //124:51 -> 6:0
+                        case SmithingInventory.SMITHING_EQUIPMENT_UI_SLOT:
+                            if (player.getWindowById(Player.SMITHING_WINDOW_ID) == null) {
+                                player.getServer().getLogger().error("Player " + player.getName() + " does not have smithing table window open");
                                 return null;
                             }
-                            this.windowId = player.getWindowId(player.getTradeInventory());
+                            this.windowId = Player.SMITHING_WINDOW_ID;
                             this.inventorySlot = 0;
                             break;
-                        case TradeInventory.TRADE_INPUT_B:
-                            if(player.getTradeInventory() == null) {
-                                player.getServer().getLogger().error("Player " + player.getName() + " does not have trade window open");
+                        //124:52 -> 6:1
+                        case SmithingInventory.SMITHING_INGREDIENT_UI_SLOT:
+                            if (player.getWindowById(Player.SMITHING_WINDOW_ID) == null) {
+                                player.getServer().getLogger().error("Player " + player.getName() + " does not have smithing table window open");
                                 return null;
                             }
-                            this.windowId = player.getWindowId(player.getTradeInventory());
+                            this.windowId = Player.SMITHING_WINDOW_ID;
                             this.inventorySlot = 1;
-                        	break;
-                        case TradeInventory.TRADE_OUTPUT:
-                            if(player.getTradeInventory() == null) {
+                            break;
+                        //124:4 -> 500:0
+                        case TradeInventory.TRADE_INPUT1_UI_SLOT:
+                            if (player.getWindowById(Player.TRADE_WINDOW_ID) == null) {
                                 player.getServer().getLogger().error("Player " + player.getName() + " does not have trade window open");
                                 return null;
                             }
-                            this.windowId = player.getWindowId(player.getTradeInventory());
-                            this.inventorySlot = 2;
-                        	break;
+                            this.windowId = Player.TRADE_WINDOW_ID;
+                            this.inventorySlot = 0;
+                            break;
+                        //124:5 -> 500:1
+                        case TradeInventory.TRADE_INPUT2_UI_SLOT:
+                            if (player.getTradeInventory() == null) {
+                                player.getServer().getLogger().error("Player " + player.getName() + " does not have trade window open");
+                                return null;
+                            }
+                            this.windowId = Player.TRADE_WINDOW_ID;
+                            this.inventorySlot = 1;
+                            break;
                     }
                 }
 
@@ -279,31 +297,33 @@ public class NetworkInventoryAction {
                         return new CraftingTakeResultAction(this.oldItem, this.newItem);
                     case SOURCE_TYPE_CRAFTING_USE_INGREDIENT:
                         return new CraftingTransferMaterialAction(this.oldItem, this.newItem, this.inventorySlot);
-                    case TradeInventory.FAKE_TRADE_INPUT:
-                    case TradeInventory.FAKE_TRADE_OUTPUT:
-                        return new TradeAction(this.oldItem, this.newItem);
                 }
 
+                //-13 -10 anvil actions
                 if (this.windowId >= SOURCE_TYPE_ANVIL_OUTPUT && this.windowId <= SOURCE_TYPE_ANVIL_INPUT) {
-                    Inventory inv = player.getWindowById(Player.ANVIL_WINDOW_ID);
-
-                    if (!(inv instanceof AnvilInventory)) {
-                        player.getServer().getLogger().debug("Player " + player.getName() + " has no open anvil inventory");
+                    Inventory inv;
+                    if ((inv = player.getWindowById(Player.ANVIL_WINDOW_ID)) instanceof AnvilInventory) {
+                        AnvilInventory anvil = (AnvilInventory) inv;
+                        switch (this.windowId) {
+                            case SOURCE_TYPE_ANVIL_INPUT:
+                            case SOURCE_TYPE_ANVIL_MATERIAL:
+                            case SOURCE_TYPE_ANVIL_RESULT:
+                                return new RepairItemAction(this.oldItem, this.newItem, this.windowId);
+                        }
+                        return new SlotChangeAction(anvil, this.inventorySlot, this.oldItem, this.newItem);
+                    } else if (player.getWindowById(Player.SMITHING_WINDOW_ID) instanceof SmithingInventory) {
+                        switch (this.windowId) {
+                            case SOURCE_TYPE_ANVIL_INPUT:
+                            case SOURCE_TYPE_ANVIL_MATERIAL:
+                            case SOURCE_TYPE_ANVIL_OUTPUT:
+                            case SOURCE_TYPE_ANVIL_RESULT:
+                                return new SmithingItemAction(this.oldItem, this.newItem, this.inventorySlot);
+                        }
+                    } else {
+                        player.getServer().getLogger().debug("Player " + player.getName() + " has no open anvil or smithing inventory");
                         return null;
                     }
-                    AnvilInventory anvil = (AnvilInventory) inv;
-
-                    switch (this.windowId) {
-                        case SOURCE_TYPE_ANVIL_INPUT:
-                        case SOURCE_TYPE_ANVIL_MATERIAL:
-                        case SOURCE_TYPE_ANVIL_RESULT:
-                            return new RepairItemAction(this.oldItem, this.newItem, this.windowId);
-                    }
-
-                    return new SlotChangeAction(anvil, this.inventorySlot, this.oldItem, this.newItem);
-                }
-
-                if (this.windowId >= SOURCE_TYPE_ENCHANT_OUTPUT && this.windowId <= SOURCE_TYPE_ENCHANT_INPUT) {
+                } else if (this.windowId >= SOURCE_TYPE_ENCHANT_OUTPUT && this.windowId <= SOURCE_TYPE_ENCHANT_INPUT) { //-17 -15
                     Inventory inv = player.getWindowById(Player.ENCHANT_WINDOW_ID);
 
                     if (!(inv instanceof EnchantInventory)) {
@@ -372,9 +392,7 @@ public class NetworkInventoryAction {
                     }
 
                     return new SlotChangeAction(enchant, this.inventorySlot, this.oldItem, this.newItem);
-                }
-
-                if (this.windowId == SOURCE_TYPE_BEACON) {
+                } else if (this.windowId == SOURCE_TYPE_BEACON) {
                     Inventory inv = player.getWindowById(Player.BEACON_WINDOW_ID);
 
                     if (!(inv instanceof BeaconInventory)) {
@@ -385,6 +403,14 @@ public class NetworkInventoryAction {
 
                     this.inventorySlot = 0;
                     return new SlotChangeAction(beacon, this.inventorySlot, this.oldItem, this.newItem);
+                } else if (this.windowId >= SOURCE_TYPE_TRADING_USE_INPUTS && this.windowId <= SOURCE_TYPE_TRADING_OUTPUT) {
+                    Inventory inv = player.getWindowById(Player.TRADE_WINDOW_ID);
+                    //verify
+                    if (!(inv instanceof TradeInventory trade)) {
+                        player.getServer().getLogger().debug("Player " + player.getName() + " has no open trade inventory");
+                        return null;
+                    }
+                    return new TradeAction(this.oldItem, this.newItem, this.windowId, trade.getHolder());
                 }
 
                 player.getServer().getLogger().debug("Player " + player.getName() + " has no open container with window ID " + this.windowId);

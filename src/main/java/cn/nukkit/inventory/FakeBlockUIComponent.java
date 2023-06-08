@@ -71,4 +71,11 @@ public class FakeBlockUIComponent extends PlayerUIComponent {
         who.getServer().getPluginManager().callEvent(ev);
         this.onClose(who);
     }
+
+    @Override
+    public void sendContents(Player... players) {
+        for (int slot = 0; slot < getSize(); slot++) {
+            sendSlot(slot, players);
+        }
+    }
 }

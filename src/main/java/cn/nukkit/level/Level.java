@@ -66,7 +66,10 @@ import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import lombok.Getter;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.ref.SoftReference;
 import java.util.*;
@@ -191,7 +194,7 @@ public class Level implements ChunkManager, Metadatable {
     private final Map<Character, Object> changeBlocksFullMap = new CharacterHashMap();
 
     private final BlockUpdateScheduler updateQueue;
-    private final Queue<Block> normalUpdateQueue = new ConcurrentLinkedDeque<>();
+    private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
     //private final TreeSet<BlockUpdateEntry> updateQueue = new TreeSet<>();
     //private final List<BlockUpdateEntry> nextTickUpdates = Lists.newArrayList();
     //private final Map<BlockVector3, Integer> updateQueueIndex = new HashMap<>();
@@ -914,9 +917,18 @@ public class Level implements ChunkManager, Metadatable {
         this.updateQueue.tick(this.levelCurrentTick);
         if (this.timings.doTickPending != null) this.timings.doTickPending.stopTiming();
 
-        Block block;
-        while ((block = this.normalUpdateQueue.poll()) != null) {
-            block.onUpdate(BLOCK_UPDATE_NORMAL);
+        QueuedUpdate queuedUpdate;
+        while ((queuedUpdate = this.normalUpdateQueue.poll()) != null) {
+            Block block = getBlock(queuedUpdate.block, queuedUpdate.block.layer);
+            BlockUpdateEvent event = new BlockUpdateEvent(block);
+            this.server.getPluginManager().callEvent(event);
+
+            if (!event.isCancelled()) {
+                block.onUpdate(BLOCK_UPDATE_NORMAL);
+                if (queuedUpdate.neighbor != null) {
+                    block.onNeighborChange(queuedUpdate.neighbor.getOpposite());
+                }
+            }
         }
 
         TimingsHistory.entityTicks += this.updateEntities.size();
@@ -1368,13 +1380,21 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void updateComparatorOutputLevel(Vector3 v) {
+        this.updateComparatorOutputLevelSelective(v, true);
+    }
+
+    public void updateComparatorOutputLevelSelective(Vector3 v, boolean observer) {
         for (BlockFace face : Plane.HORIZONTAL) {
             Vector3 pos = v.getSideVec(face);
 
             if (this.isChunkLoaded((int) pos.x >> 4, (int) pos.z >> 4)) {
                 Block block1 = this.getBlock(pos);
 
-                if (BlockRedstoneDiode.isDiode(block1)) {
+                if (block1.getId() == BlockID.OBSERVER) {
+                    if (observer) {
+                        block1.onNeighborChange(face.getOpposite());
+                    }
+                } else if (BlockRedstoneDiode.isDiode(block1)) {
                     block1.onUpdate(BLOCK_UPDATE_REDSTONE);
                 } else if (block1.isNormalBlock()) {
                     pos = pos.getSideVec(face);
@@ -1386,15 +1406,45 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
         }
+
+        if (!observer) {
+            return;
+        }
+
+        for (BlockFace face : Plane.VERTICAL) {
+            Block block1 = this.getBlock(v.getSideVec(face));
+
+            if (block1.getId() == BlockID.OBSERVER) {
+                block1.onNeighborChange(face.getOpposite());
+            }
+        }
+    }
+
+    public void updateAroundObserver(Vector3 pos) {
+        for (BlockFace face : BlockFace.values()) {
+            Block neighborBlock = getBlock(pos.getSide(face));
+            if (neighborBlock.getId() == BlockID.OBSERVER) {
+                neighborBlock.onNeighborChange(face.getOpposite());
+            }
+        }
     }
 
     public void updateAround(Vector3 pos) {
-        updateAround((int) pos.x, (int) pos.y, (int) pos.z, 0);
-        updateAround((int) pos.x, (int) pos.y, (int) pos.z, 1);
+        updateAround(pos, 0);
+        updateAround(pos, 1);
     }
 
+    public void updateAround(Vector3 pos, int layer) {
+        Block block = getBlock(pos);
+        for (BlockFace face : BlockFace.values()) {
+            normalUpdateQueue.add(new QueuedUpdate(block.getSideAtLayer(layer, face), face));
+        }
+    }
+
+    @Deprecated
     public void updateAround(int x, int y, int z, int layer) {
-        BlockUpdateEvent ev;
+        updateAround(new Vector3(x, y, z), layer);
+        /*BlockUpdateEvent ev;
         this.server.getPluginManager().callEvent(
                 ev = new BlockUpdateEvent(this.getBlock(x, y - 1, z, layer)));
         if (!ev.isCancelled()) {
@@ -1429,7 +1479,7 @@ public class Level implements ChunkManager, Metadatable {
                 ev = new BlockUpdateEvent(this.getBlock(x, y, z + 1, layer)));
         if (!ev.isCancelled()) {
             normalUpdateQueue.add(ev.getBlock());
-        }
+        }*/
     }
 
     public void scheduleUpdate(Block pos, int delay) {
@@ -3008,25 +3058,101 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public BlockColor getMapColorAt(int x, int z) {
-        int y = getHighestBlockAt(x, z, false);
+        BlockColor color = BlockColor.VOID_BLOCK_COLOR;
 
-        while (y > 1) {
-            Block block = getBlock(new Vector3(x, y, z));
-            if (block instanceof BlockGrass) {
-                return getGrassColorAt(x, z);
-                //} else if (block instanceof BlockWater) {
-                //    return getWaterColorAt(x, z);
-            } else {
-                BlockColor blockColor = block.getColor();
-                if (blockColor.getAlpha() == 0x00) {
-                    y--;
-                } else {
-                    return blockColor;
-                }
-            }
+        Block block = getMapColoredBlockAt(x, z);
+        if (block == null) {
+            return color;
+        }
+        if (block instanceof BlockGlass) {
+            color = this.getGrassColorAt(x, z);
+        } else {
+            color = new BlockColor(block.getColor().getARGB(), true);
         }
 
-        return BlockColor.VOID_BLOCK_COLOR;
+        //在z轴存在高度差的地方，颜色变深或变浅
+        Block nzy = getMapColoredBlockAt(x, z - 1);
+        if (nzy == null) {
+            return color;
+        }
+        if (nzy.getFloorY() > block.getFloorY()) {
+            color = darker(color, 0.875 - Math.min(5, nzy.getFloorY() - block.getFloorY()) * 0.05);
+        } else if (nzy.getFloorY() < block.getFloorY()) {
+            color = brighter(color, 0.875 - Math.min(5, block.getFloorY() - nzy.getFloorY()) * 0.05);
+        }
+
+        double deltaY = block.y - 128;
+        if (deltaY > 0) {
+            color = brighter(color, 1 - deltaY / (192 * 3));
+        } else if (deltaY < 0) {
+            color = darker(color, 1 - (-deltaY) / (192 * 3));
+        }
+
+        if ((block.getSide(BlockFace.UP) instanceof BlockWater || block.getSideAtLayer(1, BlockFace.UP) instanceof BlockWater)) {
+            int r1 = color.getRed();
+            int g1 = color.getGreen();
+            int b1 = color.getBlue();
+            BlockColor waterBlockColor = this.getWaterColorAt(x, z);
+            //在水下
+            if (block.y < 62) {
+                //海平面为62格。离海平面越远颜色越接近海洋颜色
+                double depth = 62 - block.y;
+                if (depth > 32) return waterBlockColor;
+                b1 = waterBlockColor.getBlue();
+                double radio = Math.max(0.5, depth / 96.0);
+                r1 += (waterBlockColor.getRed() - r1) * radio;
+                g1 += (waterBlockColor.getGreen() - g1) * radio;
+            } else {
+                //湖泊 or 河流
+                b1 = waterBlockColor.getBlue();
+                r1 += (waterBlockColor.getRed() - r1) * 0.5;
+                g1 += (waterBlockColor.getGreen() - g1) * 0.5;
+            }
+            color = new BlockColor(r1, g1, b1);
+        }
+
+        return color;
+    }
+
+    protected BlockColor brighter(BlockColor source, double factor) {
+        int r = source.getRed();
+        int g = source.getGreen();
+        int b = source.getBlue();
+        int alpha = source.getAlpha();
+
+        int i = (int) (1.0 / (1.0 - factor));
+        if (r == 0 && g == 0 && b == 0) {
+            return new BlockColor(i, i, i, alpha);
+        }
+        if (r > 0 && r < i) r = i;
+        if (g > 0 && g < i) g = i;
+        if (b > 0 && b < i) b = i;
+
+        return new BlockColor(Math.min((int) (r / factor), 255),
+                Math.min((int) (g / factor), 255),
+                Math.min((int) (b / factor), 255),
+                alpha);
+    }
+
+    protected BlockColor darker(BlockColor source, double factor) {
+        return new BlockColor(Math.max((int) (source.getRed() * factor), 0),
+                Math.max((int) (source.getGreen() * factor), 0),
+                Math.max((int) (source.getBlue() * factor), 0),
+                source.getAlpha());
+    }
+
+    protected Block getMapColoredBlockAt(int x, int z) {
+        int y = getHighestBlockAt(x, z);
+        while (y > 0) {
+            Block block = getBlock(new Vector3(x, y, z));
+            if (block.getColor() == null) return null;
+            if (block.getColor().getAlpha() == 0x00 || block instanceof BlockWater) {
+                y--;
+            } else {
+                return block;
+            }
+        }
+        return null;
     }
 
     public BlockColor getGrassColorAt(int x, int z) {
@@ -4511,7 +4637,9 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_19_80) { //调色板 物品运行时id
+        if (protocol >= ProtocolInfo.v1_20_0_23) {
+            return ProtocolInfo.v1_20_0;
+        } else if (protocol >= ProtocolInfo.v1_19_80) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_80;
         } else if (protocol >= ProtocolInfo.v1_19_70_24) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_70;
@@ -4585,7 +4713,8 @@ public class Level implements ChunkManager, Metadatable {
             if (player >= ProtocolInfo.v1_19_60) if (player < ProtocolInfo.v1_19_70) return true;
         if (chunk == ProtocolInfo.v1_19_70)
             if (player >= ProtocolInfo.v1_19_70_24) if (player < ProtocolInfo.v1_19_80) return true;
-        if (chunk == ProtocolInfo.v1_19_80) if (player >= ProtocolInfo.v1_19_80) return true;
+        if (chunk == ProtocolInfo.v1_19_80) if (player == ProtocolInfo.v1_19_80) return true;
+        if (chunk == ProtocolInfo.v1_20_0) if (player >= ProtocolInfo.v1_20_0_23) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 
@@ -4595,5 +4724,13 @@ public class Level implements ChunkManager, Metadatable {
         public int size() {
             return Character.MAX_VALUE;
         }
+    }
+
+    @AllArgsConstructor
+    @Data
+    private static class QueuedUpdate {
+        @NotNull
+        private Block block;
+        private BlockFace neighbor;
     }
 }

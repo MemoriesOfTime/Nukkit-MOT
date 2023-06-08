@@ -89,6 +89,7 @@ public class BlockPumpkin extends BlockSolidMeta implements Faceable {
         return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
     }
 
+    @Override
     public void setBlockFace(BlockFace blockFace) {
         this.setDamage(blockFace.getHorizontalIndex());
     }

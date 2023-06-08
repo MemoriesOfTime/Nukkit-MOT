@@ -34,7 +34,7 @@ import java.util.Scanner;
 @Log4j2
 public class Nukkit {
 
-    public static final String NUKKIT = "Nukkit PetteriM1 Edition";
+    public static final String NUKKIT = "Nukkit MOT";
     public static final String BRANCH = "https://api.github.com/repos/MemoriesOfTime/NukkitPetteriM1Edition/commits/master";
     public final static Properties GIT_INFO = getGitInfo();
     public final static String VERSION = getVersion();
@@ -77,7 +77,7 @@ public class Nukkit {
 
         try {
             if (TITLE) {
-                System.out.print("\u001B]0;Nukkit PM1E MOT\u0007");
+                System.out.print("\u001B]0;Nukkit MOT\u0007");
             }
             new Server(PATH, DATA_PATH, PLUGIN_PATH, loadPlugins, debug);
         } catch (Throwable t) {

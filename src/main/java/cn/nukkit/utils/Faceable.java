@@ -13,4 +13,8 @@ public interface Faceable {
      * @return BlockFace of the direction the block is facing
      */
     BlockFace getBlockFace();
+
+    default void setBlockFace(BlockFace face) {
+        // Does nothing by default
+    }
 }

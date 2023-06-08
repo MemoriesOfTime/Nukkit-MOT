@@ -1933,37 +1933,41 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void fall(float fallDistance) {
-        if (fallDistance > 0.75) {
-            if (!this.hasEffect(Effect.SLOW_FALLING)) {
-                Block down = this.level.getBlock(this.floor().down());
-                if (!this.noFallDamage) {
-                    float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));
-                    if (down.getId() == BlockID.HAY_BALE) {
-                        damage -= (damage * 0.8f);
-                    }
+        if (fallDistance > 0.75 && !this.hasEffect(Effect.SLOW_FALLING)) {
+            Block down = this.level.getBlock(this.floor().down());
+            if (!this.noFallDamage) {
+                float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));
 
-                    if (damage > 0) {
-                        if (!this.isPlayer || level.getGameRules().getBoolean(GameRule.FALL_DAMAGE)) {
-                            this.attack(new EntityDamageEvent(this, DamageCause.FALL, damage));
-                        }
+                if (down.getId() == BlockID.HAY_BALE) {
+                    damage -= damage * 0.8f;
+                }
+
+                if (isPlayer) {
+                    final int level = ((Player) this).getInventory().getBootsFast().getEnchantmentLevel(Enchantment.ID_PROTECTION_FALL);
+                    if (level != 0) {
+                        damage -= damage / 100 * (level * 12);
                     }
                 }
 
-                if (down.getId() == BlockID.FARMLAND) {
-                    Event ev;
-
-                    if (this.isPlayer) {
-                        ev = new PlayerInteractEvent((Player) this, null, down, null, Action.PHYSICAL);
-                    } else {
-                        ev = new EntityInteractEvent(this, down);
-                    }
-
-                    this.server.getPluginManager().callEvent(ev);
-                    if (ev.isCancelled()) {
-                        return;
-                    }
-                    this.level.setBlock(down, Block.get(BlockID.DIRT), true, true);
+                if (damage > 0 && (!this.isPlayer || level.getGameRules().getBoolean(GameRule.FALL_DAMAGE))) {
+                    this.attack(new EntityDamageEvent(this, DamageCause.FALL, damage));
                 }
+            }
+
+            if (down.getId() == BlockID.FARMLAND) {
+                Event ev;
+
+                if (this.isPlayer) {
+                    ev = new PlayerInteractEvent((Player) this, null, down, null, Action.PHYSICAL);
+                } else {
+                    ev = new EntityInteractEvent(this, down);
+                }
+
+                this.server.getPluginManager().callEvent(ev);
+                if (ev.isCancelled()) {
+                    return;
+                }
+                this.level.setBlock(down, Block.get(BlockID.DIRT), true, true);
             }
         }
     }
