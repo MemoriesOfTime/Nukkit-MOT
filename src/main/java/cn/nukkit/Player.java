@@ -3732,22 +3732,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     ItemMap mapItem = null;
 
                     for (Item item1 : this.offhandInventory.getContents().values()) {
-                        if (item1 instanceof ItemMap map && map.getMapId() == pk.mapId) {
-                            mapItem = map;
+                        if (item1 instanceof ItemMap && ((ItemMap) item1).getMapId() == pk.mapId) {
+                            mapItem = (ItemMap) item1;
                         }
                     }
 
                     if (mapItem == null) {
                         for (Item item1 : this.inventory.getContents().values()) {
-                            if (item1 instanceof ItemMap map && map.getMapId() == pk.mapId) {
-                                mapItem = map;
+                            if (item1 instanceof ItemMap && ((ItemMap) item1).getMapId() == pk.mapId) {
+                                mapItem = (ItemMap) item1;
                             }
                         }
                     }
 
                     if (mapItem == null) {
                         for (BlockEntity be : this.level.getBlockEntities().values()) {
-                            if (be instanceof BlockEntityItemFrame itemFrame1) {
+                            if (be instanceof BlockEntityItemFrame) {
+                                BlockEntityItemFrame itemFrame1 = (BlockEntityItemFrame) be;
 
                                 if (itemFrame1.getItem() instanceof ItemMap && ((ItemMap) itemFrame1.getItem()).getMapId() == pk.mapId) {
                                     ((ItemMap) itemFrame1.getItem()).sendImage(this);
@@ -3798,7 +3799,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     // so we are emulating what Mojang should be sending
                     if (transactionPacket.transactionType == InventoryTransactionPacket.TYPE_MISMATCH
                             && !isCreative()
-                            && (inv = getWindowById(SMITHING_WINDOW_ID)) instanceof SmithingInventory smithingInventory) {
+                            && (inv = getWindowById(SMITHING_WINDOW_ID)) instanceof SmithingInventory) {
+                        SmithingInventory smithingInventory = (SmithingInventory) inv;
                         if (!smithingInventory.getResult().isNull()) {
                             InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
                             fixedPacket.isRepairItemPart = true;

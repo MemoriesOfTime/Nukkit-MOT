@@ -59,7 +59,8 @@ public class SmithingTransaction extends InventoryTransaction {
                     this.ingredientItem = action.getTargetItem();
                     break;
             }
-        } else if (action instanceof CreativeInventoryAction creativeAction) {
+        } else if (action instanceof CreativeInventoryAction) {
+            CreativeInventoryAction creativeAction = (CreativeInventoryAction) action;
             if (creativeAction.getActionType() == 0
                     && creativeAction.getSourceItem().isNull()
                     && !creativeAction.getTargetItem().isNull() && creativeAction.getTargetItem().getId() == ItemID.NETHERITE_INGOT) {

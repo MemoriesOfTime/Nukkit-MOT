@@ -182,13 +182,18 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
     }
 
     public BlockFace getFacing() {
-        return switch (this.getDamage() & FACING_BITMASK) {
-            case 0 -> BlockFace.WEST;
-            case 1 -> BlockFace.EAST;
-            case 2 -> BlockFace.NORTH;
-            case 3 -> BlockFace.SOUTH;
-            default -> null;
-        };
+        switch (this.getDamage() & FACING_BITMASK) {
+            case 0:
+                return BlockFace.WEST;
+            case 1:
+                return BlockFace.EAST;
+            case 2:
+                return BlockFace.NORTH;
+            case 3:
+                return BlockFace.SOUTH;
+            default:
+                return null;
+        }
     }
 
     @Override

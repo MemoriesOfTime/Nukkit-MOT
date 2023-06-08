@@ -406,10 +406,11 @@ public class NetworkInventoryAction {
                 } else if (this.windowId >= SOURCE_TYPE_TRADING_USE_INPUTS && this.windowId <= SOURCE_TYPE_TRADING_OUTPUT) {
                     Inventory inv = player.getWindowById(Player.TRADE_WINDOW_ID);
                     //verify
-                    if (!(inv instanceof TradeInventory trade)) {
+                    if (!(inv instanceof TradeInventory)) {
                         player.getServer().getLogger().debug("Player " + player.getName() + " has no open trade inventory");
                         return null;
                     }
+                    TradeInventory trade = (TradeInventory) inv;
                     return new TradeAction(this.oldItem, this.newItem, this.windowId, trade.getHolder());
                 }
 

@@ -104,7 +104,8 @@ public class CraftingTransaction extends InventoryTransaction {
         switch (craftingType) {
             case Player.CRAFTING_SMITHING:
                 inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
-                if (inventory instanceof SmithingInventory smithingInventory) {
+                if (inventory instanceof SmithingInventory) {
+                    SmithingInventory smithingInventory = (SmithingInventory) inventory;
                     addInventory(inventory);
                     SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
                     if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment()), true, true)) {
