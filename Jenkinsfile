@@ -14,12 +14,12 @@ pipeline {
             }
             post {
                 success {
-                    archiveArtifacts artifacts: 'target/nukkit.jar', fingerprint: true
+                    archiveArtifacts artifacts: 'target/Nukkit-MOT-SNAPSHOT.jar', fingerprint: true
                 }
             }
         }
 
-        stage ('Deploy') {
+        /* stage ('Deploy') {
             when {
                 branch "master"
             }
@@ -29,7 +29,7 @@ pipeline {
                         javadocDir: 'target/site/apidocs',
                         keepAll: false])
             }
-        }
+        } */
     }
 
     post {
