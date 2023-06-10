@@ -992,7 +992,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     protected static Map<Integer, String> getEntityRuntimeMappingInternal(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_19_0) {
+        if (protocolId >= ProtocolInfo.v1_19_0_29) {
             return entityRuntimeMapping527;
         } else if (protocolId >= ProtocolInfo.v1_17_0) {
             return entityRuntimeMapping440;
@@ -1015,7 +1015,7 @@ public abstract class Entity extends Location implements Metadatable {
     private static int correctEntityIdentifiersProtocol(int protocolId) {
         if (protocolId >= ProtocolInfo.v1_19_20) {
             return ProtocolInfo.v1_19_20;
-        }else if (protocolId >= ProtocolInfo.v1_19_0) {
+        }else if (protocolId >= ProtocolInfo.v1_19_0_29) {
             return ProtocolInfo.v1_19_0;
         }else if (protocolId >= ProtocolInfo.v1_17_0) {
             return ProtocolInfo.v1_17_0;

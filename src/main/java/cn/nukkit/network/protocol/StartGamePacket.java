@@ -297,7 +297,7 @@ public class StartGamePacket extends DataPacket {
                 if (protocol >= ProtocolInfo.v1_16_230_50) {
                     this.putString(""); // serverEngine
                     if (protocol >= ProtocolInfo.v1_18_0) {
-                        if (protocol >= ProtocolInfo.v1_19_0) {
+                        if (protocol >= ProtocolInfo.v1_19_0_29) {
                             try {
                                 this.put(NBTIO.writeNetwork(new CompoundTag(""))); // playerPropertyData
                             } catch (IOException e) {
@@ -305,7 +305,7 @@ public class StartGamePacket extends DataPacket {
                             }
                         }
                         this.putLLong(0L); // BlockRegistryChecksum
-                        if (protocol >= ProtocolInfo.v1_19_0) {
+                        if (protocol >= ProtocolInfo.v1_19_0_29) {
                             this.putUUID(new UUID(0, 0)); // worldTemplateId
                             if (protocol >= ProtocolInfo.v1_19_20) {
                                 this.putBoolean(this.clientSideGenerationEnabled);
