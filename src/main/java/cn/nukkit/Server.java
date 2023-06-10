@@ -484,6 +484,12 @@ public class Server {
      * Using WaterdogPE Proxy
      */
     public boolean useWaterdog;
+    /**
+     * 1.19.30+ Using Client Spectator Mode
+     * Because some servers may require the use of the inventory in spectator mode
+     * so we have prepared this option for server owners to choose for themselves
+     */
+    public boolean useClientSpectator;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -3024,6 +3030,7 @@ public class Server {
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
         this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
         this.useWaterdog = this.getPropertyBoolean("use-waterdog", false);
+        this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
@@ -3171,6 +3178,7 @@ public class Server {
             put("server-authoritative-block-breaking", true);
             put("encryption", true);
             put("use-waterdog", false);
+            put("use-client-spectator", true);
         }
     }
 

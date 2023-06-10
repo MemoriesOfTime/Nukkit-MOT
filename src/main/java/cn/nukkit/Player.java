@@ -1378,11 +1378,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int getClientFriendlyGamemode(int gamemode) {
         gamemode &= 0x03;
         if (gamemode == Player.SPECTATOR) {
-            //暂时不要启用这个，会破坏很多插件功能
             //1.19.30+使用真正的旁观模式
-            /*if (this.protocol >= ProtocolInfo.v1_19_30) {
+            if (this.server.useClientSpectator && this.protocol >= ProtocolInfo.v1_19_30) {
                 return GameType.SPECTATOR.ordinal();
-            }*/
+            }
             return Player.CREATIVE;
         }
         return gamemode;
