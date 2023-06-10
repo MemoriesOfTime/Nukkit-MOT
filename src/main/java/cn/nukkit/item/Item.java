@@ -330,6 +330,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[DARK_OAK_CHEST_BOAT] = ItemChestBoatDarkOak.class; //643
             list[MANGROVE_CHEST_BOAT] = ItemChestBoatMangrove.class; //644
             list[GLOW_BERRIES] = ItemGlowBerries.class; //654
+            list[RECORD_RELIC] = ItemRecordRelic.class; //701
             list[CAMPFIRE] = ItemCampfire.class; //720
             list[SUSPICIOUS_STEW] = ItemSuspiciousStew.class; //734
             list[HONEYCOMB] = ItemHoneycomb.class; //736

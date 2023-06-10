@@ -293,6 +293,8 @@ public interface ItemID {
 
     int GLOW_BERRIES = 654;
 
+    int RECORD_RELIC = 701;
+
     int CAMPFIRE = 720;
 
     // 514 - 733 not yet in Minecraft

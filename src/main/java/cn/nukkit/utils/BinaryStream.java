@@ -1053,14 +1053,14 @@ public class BinaryStream {
         }
 
         int runtimeId = item.getId();
-        int damage = item.hasMeta() ? item.getDamage() : 0x7fff;
+        int damage = item.hasMeta() ? item.getDamage() : Short.MAX_VALUE;
 
         if (protocolId >= ProtocolInfo.v1_16_100) {
             RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
             if (!item.hasMeta()) {
                 RuntimeEntry runtimeEntry = mapping.toRuntime(item.getId(), 0);
                 runtimeId = runtimeEntry.getRuntimeId();
-                damage = 0x7fff;
+                damage = Short.MAX_VALUE;
             } else {
                 RuntimeEntry runtimeEntry = mapping.toRuntime(item.getId(), item.getDamage());
                 runtimeId = runtimeEntry.getRuntimeId();
