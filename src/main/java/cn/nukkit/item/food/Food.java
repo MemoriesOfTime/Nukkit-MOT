@@ -99,6 +99,7 @@ public abstract class Food {
     public static final Food suspicious_stew_wither = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
             .addEffect(Effect.getEffect(Effect.WITHER).setAmplifier(1).setDuration(120)).addRelative(Item.SUSPICIOUS_STEW, 9));
     public static final Food honey_bottle = registerDefaultFood(new FoodNormal(6, 1.2F).addRelative(Item.HONEY_BOTTLE));
+    public static final Food glow_berries = registerDefaultFood(new FoodNormal(2, 0.4F).addRelative(Item.GLOW_BERRIES));
 
     public static Food registerFood(Food food, Plugin plugin) {
         Objects.requireNonNull(food);
