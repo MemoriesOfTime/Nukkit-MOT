@@ -9,6 +9,7 @@ import cn.nukkit.blockentity.BlockEntitySpawnable;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandDataVersions;
+import cn.nukkit.command.defaults.HelpCommand;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.item.*;
@@ -668,6 +669,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         Map<String, CommandDataVersions> data = new HashMap<>();
 
         for (Command command : this.server.getCommandMap().getCommands().values()) {
+            //1.20.0+客户端自带help命令
+            if (this.protocol >= ProtocolInfo.v1_20_0_23) {
+                if (command instanceof HelpCommand || "help".equalsIgnoreCase(command.getName())) {
+                    continue;
+                }
+            }
             if (!command.testPermissionSilent(this) || !command.isRegistered()) {
                 continue;
             }
