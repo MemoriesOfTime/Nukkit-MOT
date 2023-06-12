@@ -1202,6 +1202,14 @@ public class BinaryStream {
         this.putLFloat(y);
     }
 
+    public double getRotationByte() {
+        return this.getByte() * (360d / 256d);
+    }
+
+    public void putRotationByte(double rotation) {
+        this.putByte((byte) (rotation / (360d / 256d)));
+    }
+
     public void putGameRules(GameRules gameRules) {
         Server.mvw("BinaryStream#putGameRules(GameRules)");
         this.putGameRules(ProtocolInfo.CURRENT_PROTOCOL, gameRules);

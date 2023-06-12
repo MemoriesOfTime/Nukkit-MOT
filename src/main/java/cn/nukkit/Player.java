@@ -1910,17 +1910,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.positionChanged = false;
             this.setPositionAndRotation(revertPos.asVector3f().asVector3(), revertPos.getYaw(), revertPos.getPitch(), revertPos.getHeadYaw());
             this.revertClientMotion(revertPos);
+            this.resetClientMovement();
         } else {
             this.forceMovement = null;
             if (distance != 0 && this.nextChunkOrderRun > 20) {
                 this.nextChunkOrderRun = 20;
             }
         }
-        this.resetClientMovement();
     }
 
     protected void resetClientMovement() {
         this.newPosition = null;
+        this.positionChanged = false;
     }
 
     protected void revertClientMotion(Location originalPos) {
