@@ -309,6 +309,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private boolean inSoulSand;
     private boolean dimensionChangeInProgress;
     private boolean needDimensionChangeACK;
+    /**
+     * 用于修复1.20.0连续执行despawnFromAll和spawnToAll导致玩家移动不显示问题
+     */
+    private int lastDespawnFromAllTick;
+    /**
+     * 用于修复1.20.0连续执行despawnFromAll和spawnToAll导致玩家移动不显示问题
+     */
+    private boolean needSpawnToAll;
 
     /**
      * Packets that can be received before the player has logged in
@@ -2026,6 +2034,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (this.spawned) {
+            if (this.needSpawnToAll) {
+                this.needSpawnToAll = false;
+                this.spawnToAll();
+            }
+
             while (!this.clientMovements.isEmpty()) {
                 this.handleMovement(this.clientMovements.poll());
             }
@@ -4959,6 +4972,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.title = title;
         pk.content = content;
         this.dataPacket(pk);
+    }
+
+    @Override
+    public void spawnToAll() {
+        // 在1.20.0中同一tick连续执行despawnFromAll和spawnToAll会导致玩家移动不可见
+        if (this.server.getTick() == this.lastDespawnFromAllTick) {
+            this.needSpawnToAll = true;
+            return;
+        }
+        super.spawnToAll();
+    }
+
+    @Override
+    public void despawnFromAll() {
+        super.despawnFromAll();
+        this.lastDespawnFromAllTick = this.server.getTick();
     }
 
     @Override
