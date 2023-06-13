@@ -491,7 +491,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public void spawnTo(Player player) {
-        if (this.spawned && player.spawned && this.isAlive() && player.isAlive() && player.getLevel() == this.level && player.canSee(this) && !this.isSpectator() && this.showToOthers) {
+        if (this.spawned && player.spawned &&
+                this.isAlive() && player.isAlive()
+                && player.getLevel() == this.level && player.canSee(this) &&
+                (!this.isSpectator() || (this.server.useClientSpectator && player.protocol >= ProtocolInfo.v1_19_30)) &&
+                this.showToOthers) {
             super.spawnTo(player);
         }
     }
@@ -1071,7 +1075,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         // Prevent PlayerTeleportEvent during player spawn
         //this.teleport(pos, null);
 
-        if (!this.isSpectator()) {
+        if (!this.isSpectator() || this.server.useClientSpectator) {
             this.spawnToAll();
         }
 
@@ -1445,14 +1449,45 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.gamemode = gamemode;
 
-        if (this.isSpectator()) {
+        if (this.server.useClientSpectator) {
+            List<Player> updatePlayers = this.hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_19_30).filter(p -> p != this).toList();
+            ArrayList<Player> spawnPlayers = new ArrayList<>(this.hasSpawned.values());
+            spawnPlayers.removeAll(updatePlayers);
+
+            if (this.isSpectator()) {
+                this.keepMovement = true;
+                this.onGround = false;
+                spawnPlayers.forEach(this::despawnFrom);
+            } else {
+                this.keepMovement = false;
+                spawnPlayers.forEach(this::spawnTo);
+            }
+
+            if (!clientSide) {
+                UpdatePlayerGameTypePacket pk = new UpdatePlayerGameTypePacket();
+                pk.gameType = GameType.from(getClientFriendlyGamemode(gamemode));
+                pk.entityId = this.getId();
+                Server.broadcastPacket(updatePlayers, pk);
+            }
+        } else {
+            if (this.isSpectator()) {
+                this.keepMovement = true;
+                this.onGround = false;
+                this.despawnFromAll();
+            } else {
+                this.keepMovement = false;
+                this.spawnToAll();
+            }
+        }
+
+        /*if (this.isSpectator()) {
             this.keepMovement = true;
             this.onGround = false;
             this.despawnFromAll();
         } else {
             this.keepMovement = false;
             this.spawnToAll();
-        }
+        }*/
 
         this.namedTag.putInt("playerGameType", this.gamemode);
 
