@@ -8,11 +8,11 @@ public class EmotePacket extends DataPacket {
     /**
      * @since v588
      */
-    public String xuid;
+    public String xuid = "";
     /**
      * @since 588
      */
-    public String platformId;
+    public String platformId = "";
     public String emoteID;
     public byte flags;
 
