@@ -8,11 +8,11 @@ public class EmotePacket extends DataPacket {
     /**
      * @since v588
      */
-    public String xuid = "";
+    public String xuid;
     /**
      * @since 588
      */
-    public String platformId = "";
+    public String platformId;
     public String emoteID;
     public byte flags;
 
@@ -38,8 +38,8 @@ public class EmotePacket extends DataPacket {
         this.putEntityRuntimeId(this.runtimeId);
         this.putString(this.emoteID);
         if (this.protocol >= ProtocolInfo.v1_20_0_23) {
-            this.putString(this.xuid);
-            this.putString(this.platformId);
+            this.putString(this.xuid != null ? this.xuid : "");
+            this.putString(this.platformId != null ? this.platformId : "");
         }
         this.putByte(flags);
     }
