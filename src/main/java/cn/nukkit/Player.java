@@ -1929,7 +1929,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        if ((this.isFoodEnabled() || this.getServer().getDifficulty() == 0) && distance >= 0.05) {
+        if (!invalidMotion && this.isFoodEnabled() && this.getServer().getDifficulty() > 0 && distance >= 0.05) {
             double jump = 0;
             double swimming = this.isInsideOfWater() ? 0.015 * distance : 0;
             double distance2 = distance;
@@ -1949,6 +1949,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
+        //if plugin cancel move
         if (invalidMotion) {
             this.positionChanged = false;
             this.setPositionAndRotation(revertPos.asVector3f().asVector3(), revertPos.getYaw(), revertPos.getPitch(), revertPos.getHeadYaw());
@@ -3638,7 +3639,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 break;
                             }
 
-                            entityEventPacket.eid = this.id;
                             entityEventPacket.isEncoded = false;
                             entityEventPacket.originProtocol = this.protocol;
                             this.dataPacket(entityEventPacket);
