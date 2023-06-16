@@ -92,6 +92,7 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math3.util.FastMath;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -236,6 +237,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected int viewDistance;
 
     protected Position spawnPosition;
+    protected Position spawnBlockPosition;
 
     protected int inAirTicks = 0;
     protected int startAirTicks = 10;
@@ -871,11 +873,36 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public Position getSpawn() {
-        if (this.spawnPosition != null && this.spawnPosition.getLevel() != null) {
+        if (this.spawnBlockPosition != null && this.spawnBlockPosition.isValid()) {
+            return this.spawnBlockPosition;
+        } else if (this.spawnPosition != null && this.spawnPosition.isValid()) {
             return this.spawnPosition;
         } else {
             return this.server.getDefaultLevel().getSafeSpawn();
         }
+    }
+
+    public void checkSpawnBlockPosition() {
+        if (this.spawnBlockPosition != null && this.spawnBlockPosition.isValid()) {
+            Block spawnBlock = spawnBlockPosition.getLevelBlock();
+            if (spawnBlock == null || !isValidRespawnBlock(spawnBlock)) {
+                this.spawnBlockPosition = null;
+                this.sendMessage(new TranslationContainer(TextFormat.GRAY + "%tile." + (this.getLevel().getDimension() == Level.DIMENSION_OVERWORLD ? "bed" : "respawn_anchor") + ".notValid"));
+            }
+        }
+    }
+
+    protected boolean isValidRespawnBlock(Block block) {
+        /*if (block.getId() == BlockID.RESPAWN_ANCHOR && block.getLevel().getDimension() == Level.DIMENSION_NETHER) {
+            BlockRespawnAnchor anchor = (BlockRespawnAnchor) block;
+            return anchor.getCharge() > 0;
+        }*/
+        if (block.getId() == BlockID.BED_BLOCK && block.getLevel().getDimension() == Level.DIMENSION_OVERWORLD) {
+            BlockBed bed = (BlockBed) block;
+            return bed.isBedValid();
+        }
+
+        return false;
     }
 
     public void sendChunk(int x, int z, DataPacket packet) {
@@ -1012,6 +1039,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         boolean dead = this.getHealth() < 1;
+        this.checkSpawnBlockPosition();
         PlayerRespawnEvent respawnEvent = new PlayerRespawnEvent(this, this.level.getSafeSpawn(dead ? this.getSpawn() : this), true);
         this.server.getPluginManager().callEvent(respawnEvent);
 
@@ -1291,10 +1319,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.setDataFlag(DATA_PLAYER_FLAGS, DATA_PLAYER_FLAG_SLEEP, true);
 
         if (this.getServer().bedSpawnpoints) {
-            if (!this.getSpawn().equals(pos)) {
-                this.setSpawn(pos);
+            //if (!this.getSpawn().equals(pos)) {
+            //    this.setSpawn(pos);
+                this.setSpawnBlock(pos);
                 this.sendTranslation("§7%tile.bed.respawnSet");
-            }
+            //}
         }
 
         this.level.sleepTicks = 60;
@@ -1312,6 +1341,36 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         this.spawnPosition = new Position(pos.x, pos.y, pos.z, level);
         this.sendSpawnPos((int) pos.x, (int) pos.y, (int) pos.z, level.getDimension());
+    }
+
+    /**
+     * 设置保存玩家重生位置的方块的位置。当未知时可能为空。
+     * <p>
+     * Sets the position of the block that holds the player respawn position. May be null when unknown.
+     * <p>
+     * 设置保存着玩家重生位置的方块的位置。可以设置为空。
+     *
+     * @param spawnBlock 床位或重生锚的位置<br>The position of a bed or respawn anchor
+     */
+    public void setSpawnBlock(@Nullable Vector3 spawnBlock) {
+        if (spawnBlock == null) {
+            this.spawnBlockPosition = null;
+        } else {
+            Level level;
+            if (spawnBlock instanceof Position position && position.isValid()) {
+                level = position.level;
+            } else {
+                level = this.level;
+            }
+            this.spawnBlockPosition = new Position(spawnBlock.x, spawnBlock.y, spawnBlock.z, level);
+            SetSpawnPositionPacket pk = new SetSpawnPositionPacket();
+            pk.spawnType = SetSpawnPositionPacket.TYPE_PLAYER_SPAWN;
+            pk.x = this.spawnBlockPosition.getFloorX();
+            pk.y = this.spawnBlockPosition.getFloorY();
+            pk.z = this.spawnBlockPosition.getFloorZ();
+            pk.dimension = this.spawnBlockPosition.level.getDimension();
+            this.dataPacket(pk);
+        }
     }
 
     /**
@@ -2421,6 +2480,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         nbt.getInt("SpawnZ"),
                         level
                 );
+            }
+        }
+
+        if (nbt.contains("SpawnBlockLevel")) {
+            Level spawnBlockLevel = server.getLevelByName(nbt.getString("SpawnBlockLevel"));
+            if (nbt.contains("SpawnBlockPositionX") && nbt.contains("SpawnBlockPositionY") && nbt.contains("SpawnBlockPositionZ")) {
+                this.spawnBlockPosition = new Position(nbt.getInt("SpawnBlockPositionX"), nbt.getInt("SpawnBlockPositionY"), nbt.getInt("SpawnBlockPositionZ"), spawnBlockLevel);
             }
         }
 
@@ -5165,6 +5231,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.namedTag.putInt("SpawnZ", (int) this.spawnPosition.z);
             }
 
+            if (spawnBlockPosition == null) {
+                namedTag.remove("SpawnBlockPositionX").remove("SpawnBlockPositionY").remove("SpawnBlockPositionZ").remove("SpawnBlockLevel");
+            } else {
+                namedTag.putInt("SpawnBlockPositionX", spawnBlockPosition.getFloorX())
+                        .putInt("SpawnBlockPositionY", spawnBlockPosition.getFloorY())
+                        .putInt("SpawnBlockPositionZ", spawnBlockPosition.getFloorZ())
+                        .putString("SpawnBlockLevel", this.spawnBlockPosition.getLevel().getFolderName());
+            }
+
             CompoundTag achievements = new CompoundTag();
             for (String achievement : this.achievements) {
                 achievements.putByte(achievement, 1);
@@ -5412,6 +5487,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.craftingType = CRAFTING_SMALL;
         this.resetCraftingGridType();
 
+        this.checkSpawnBlockPosition();
         PlayerRespawnEvent playerRespawnEvent = new PlayerRespawnEvent(this, this.getSpawn());
         this.server.getPluginManager().callEvent(playerRespawnEvent);
 
