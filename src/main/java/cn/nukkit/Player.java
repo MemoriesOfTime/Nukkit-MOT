@@ -2753,10 +2753,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.protocol = ((RequestNetworkSettingsPacket) packet).protocolVersion;
 
                     NetworkSettingsPacket settingsPacket = new NetworkSettingsPacket();
-                    settingsPacket.compressionAlgorithm = PacketCompressionAlgorithm.ZLIB;
+                    PacketCompressionAlgorithm algorithm;
+                    if (this.server.useSnappy && protocol >= ProtocolInfo.v1_19_30_23) {
+                        algorithm = PacketCompressionAlgorithm.SNAPPY;
+                    } else {
+                        algorithm = PacketCompressionAlgorithm.ZLIB;
+                    }
+                    settingsPacket.compressionAlgorithm = algorithm;
                     settingsPacket.compressionThreshold = 1; // compress everything
                     this.forceDataPacket(settingsPacket, () -> {
-                        this.networkSession.setCompression(CompressionProvider.from(PacketCompressionAlgorithm.ZLIB, this.raknetProtocol));
+                        this.networkSession.setCompression(CompressionProvider.from(algorithm, this.raknetProtocol));
                     });
 
                     if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
@@ -6356,7 +6362,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         batchPayload[0] = Binary.writeUnsignedVarInt(buf.length);
         batchPayload[1] = buf;
         try {
-            if (protocol >= ProtocolInfo.v1_16_0) {
+            if (Server.getInstance().useSnappy && protocol >= ProtocolInfo.v1_19_30_23) {
+                batch.payload = SnappyCompression.compress(Binary.appendBytes(batchPayload));
+            } else if (protocol >= ProtocolInfo.v1_16_0) {
                 batch.payload = Zlib.deflateRaw(Binary.appendBytes(batchPayload), Server.getInstance().networkCompressionLevel);
             } else {
                 batch.payload = Zlib.deflatePre16Packet(Binary.appendBytes(batchPayload), Server.getInstance().networkCompressionLevel);

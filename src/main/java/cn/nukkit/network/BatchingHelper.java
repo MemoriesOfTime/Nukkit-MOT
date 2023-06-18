@@ -7,6 +7,7 @@ import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.SnappyCompression;
 import cn.nukkit.utils.Zlib;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
@@ -105,7 +106,9 @@ public class BatchingHelper {
             try {
                 byte[] bytes = Binary.appendBytes(batched.getBuffer());
                 BatchPacket pk = new BatchPacket();
-                if (protocolId >= ProtocolInfo.v1_16_0) {
+                if (Server.getInstance().useSnappy && protocolId >= ProtocolInfo.v1_19_30_23) {
+                    pk.payload = SnappyCompression.compress(bytes);
+                } else if (protocolId >= ProtocolInfo.v1_16_0) {
                     pk.payload = Zlib.deflateRaw(bytes, Server.getInstance().networkCompressionLevel);
                 } else {
                     pk.payload = Zlib.deflatePre16Packet(bytes, Server.getInstance().networkCompressionLevel);

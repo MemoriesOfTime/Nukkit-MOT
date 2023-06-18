@@ -4,6 +4,7 @@ import cn.nukkit.Server;
 import cn.nukkit.network.Network;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.SnappyCompression;
 import cn.nukkit.utils.Zlib;
 import com.nukkitx.network.raknet.RakNetReliability;
 
@@ -83,7 +84,9 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
         batchPayload[1] = buf;
         byte[] data = Binary.appendBytes(batchPayload);
         try {
-            if (protocol >= ProtocolInfo.v1_16_0) {
+            if (Server.getInstance().useSnappy && protocol >= ProtocolInfo.v1_19_30_23) {
+                batch.payload = SnappyCompression.compress(data);
+            } else if (protocol >= ProtocolInfo.v1_16_0) {
                 batch.payload = Zlib.deflateRaw(data, level);
             } else {
                 batch.payload = Zlib.deflatePre16Packet(data, level);

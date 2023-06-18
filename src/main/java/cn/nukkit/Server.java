@@ -485,6 +485,10 @@ public class Server {
      */
     public boolean useWaterdog;
     /**
+     * Using Snappy compression
+     */
+    public boolean useSnappy;
+    /**
      * 1.19.30+ Using Client Spectator Mode
      * Because some servers may require the use of the inventory in spectator mode
      * so we have prepared this option for server owners to choose for themselves
@@ -3034,6 +3038,7 @@ public class Server {
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
         this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
         this.useWaterdog = this.getPropertyBoolean("use-waterdog", false);
+        this.useSnappy = this.getPropertyBoolean("use-snappy-compression", false);
         this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);
         this.networkCompressionThreshold = this.getPropertyInt("compression-threshold", 256);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
@@ -3183,6 +3188,7 @@ public class Server {
             put("server-authoritative-block-breaking", true);
             put("encryption", true);
             put("use-waterdog", false);
+            put("use-snappy-compression", false);
             put("use-client-spectator", true);
             put("compression-threshold", "256");
         }
