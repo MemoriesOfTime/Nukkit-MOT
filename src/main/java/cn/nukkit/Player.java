@@ -6359,7 +6359,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (protocol >= ProtocolInfo.v1_16_0) {
                 batch.payload = Zlib.deflateRaw(Binary.appendBytes(batchPayload), Server.getInstance().networkCompressionLevel);
             } else {
-                batch.payload = Zlib.deflate(Binary.appendBytes(batchPayload), Server.getInstance().networkCompressionLevel);
+                batch.payload = Zlib.deflatePre16Packet(Binary.appendBytes(batchPayload), Server.getInstance().networkCompressionLevel);
             }
         } catch (Exception e) {
             throw new RuntimeException(e);

@@ -21,7 +21,7 @@ public interface CompressionProvider {
     CompressionProvider ZLIB = new CompressionProvider() {
         @Override
         public byte[] compress(BinaryStream packet, int level) throws Exception {
-            return Zlib.deflate(packet.getBuffer(), level);
+            return Zlib.deflatePre16Packet(packet.getBuffer(), level);
         }
 
         @Override

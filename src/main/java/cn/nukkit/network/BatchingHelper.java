@@ -108,7 +108,7 @@ public class BatchingHelper {
                 if (protocolId >= ProtocolInfo.v1_16_0) {
                     pk.payload = Zlib.deflateRaw(bytes, Server.getInstance().networkCompressionLevel);
                 } else {
-                    pk.payload = Zlib.deflate(bytes, Server.getInstance().networkCompressionLevel);
+                    pk.payload = Zlib.deflatePre16Packet(bytes, Server.getInstance().networkCompressionLevel);
                 }
                 for (Player player : finalTargets) {
                     CompressionProvider compressionProvider = player.getNetworkSession().getCompression();
