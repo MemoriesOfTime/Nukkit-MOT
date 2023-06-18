@@ -1,7 +1,6 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
-import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
@@ -95,17 +94,12 @@ public class EntityChicken extends EntityWalkingAnimal {
     }
 
     @Override
-    public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player player) {
-            int id = player.getInventory().getItemInHandFast().getId();
-            return player.isAlive() && !player.closed
-                    && (id == Item.SEEDS
-                            || id == Item.BEETROOT_SEEDS
-                            || id == Item.MELON_SEEDS
-                            || id == Item.PUMPKIN_SEEDS)
-                    && distance <= 49;
-        }
-        return super.targetOption(creature, distance);
+    public boolean isFeedItem(Item item) {
+        int id = item.getId();
+        return id == Item.SEEDS
+                || id == Item.BEETROOT_SEEDS
+                || id == Item.MELON_SEEDS
+                || id == Item.PUMPKIN_SEEDS;
     }
 
     @Override

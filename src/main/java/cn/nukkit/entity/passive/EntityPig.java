@@ -3,7 +3,6 @@ package cn.nukkit.entity.passive;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityControllable;
-import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntityRideable;
 import cn.nukkit.entity.data.FloatEntityData;
 import cn.nukkit.entity.data.Vector3fEntityData;
@@ -68,17 +67,12 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
     }
 
     @Override
-    public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player player) {
-            int id = player.getInventory().getItemInHandFast().getId();
-            return player.spawned && player.isAlive() && !player.closed
-                    && (id == Item.CARROT
-                    || id == Item.POTATO
-                    || id == Item.CARROT_ON_A_STICK
-                    || id == Item.BEETROOT)
-                    && distance <= 49;
-        }
-        return super.targetOption(creature, distance);
+    public boolean isFeedItem(Item item) {
+        int id = item.getId();
+        return id == Item.CARROT
+                || id == Item.POTATO
+                || id == Item.CARROT_ON_A_STICK
+                || id == Item.BEETROOT;
     }
 
     @Override
