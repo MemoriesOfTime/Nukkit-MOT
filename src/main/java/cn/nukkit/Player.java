@@ -893,10 +893,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     protected boolean isValidRespawnBlock(Block block) {
-        /*if (block.getId() == BlockID.RESPAWN_ANCHOR && block.getLevel().getDimension() == Level.DIMENSION_NETHER) {
+        if (block.getId() == BlockID.RESPAWN_ANCHOR && block.getLevel().getDimension() == Level.DIMENSION_NETHER) {
             BlockRespawnAnchor anchor = (BlockRespawnAnchor) block;
             return anchor.getCharge() > 0;
-        }*/
+        }
         if (block.getId() == BlockID.BED_BLOCK && block.getLevel().getDimension() == Level.DIMENSION_OVERWORLD) {
             BlockBed bed = (BlockBed) block;
             return bed.isBedValid();
@@ -5494,6 +5494,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.resetCraftingGridType();
 
         this.checkSpawnBlockPosition();
+        if (this.spawnBlockPosition != null && this.spawnBlockPosition.isValid()) {
+            Block spawnBlock = this.spawnBlockPosition.getLevelBlock();
+            if (spawnBlock.getId() == BlockID.RESPAWN_ANCHOR) {
+                BlockRespawnAnchor respawnAnchor = (BlockRespawnAnchor) spawnBlock;
+                respawnAnchor.setCharge(respawnAnchor.getCharge() - 1);
+                respawnAnchor.getLevel().setBlock(respawnAnchor, spawnBlock);
+                respawnAnchor.getLevel().scheduleUpdate(respawnAnchor, 10);
+                respawnAnchor.getLevel().addSound(this, Sound.RESPAWN_ANCHOR_DEPLETE, 1, 1, this);
+            }
+        }
         PlayerRespawnEvent playerRespawnEvent = new PlayerRespawnEvent(this, this.getSpawn());
         this.server.getPluginManager().callEvent(playerRespawnEvent);
 
