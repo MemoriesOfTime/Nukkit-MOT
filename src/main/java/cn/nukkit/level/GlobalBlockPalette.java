@@ -8,17 +8,22 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.Config;
+import cn.nukkit.utils.Utils;
 import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import lombok.extern.log4j.Log4j2;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.GZIPInputStream;
@@ -356,6 +361,7 @@ public class GlobalBlockPalette {
         loadBlockStates(paletteFor(575), legacyToRuntimeId575, runtimeIdToLegacy575);
         loadBlockStates(paletteFor(582), legacyToRuntimeId582, runtimeIdToLegacy582);
         loadBlockStates(paletteFor(589), legacyToRuntimeId589, runtimeIdToLegacy589);
+        loadBlockStatesExtras(589, legacyToRuntimeId589, runtimeIdToLegacy589);
     }
 
     private static ListTag<CompoundTag> paletteFor(int protocol) {
@@ -364,8 +370,8 @@ public class GlobalBlockPalette {
             if (stream == null) {
                 throw new AssertionError("Unable to locate block state nbt " + protocol);
             }
-            //noinspection unchecked
             //tag = (ListTag<CompoundTag>) NBTIO.readTag(new ByteArrayInputStream(ByteStreams.toByteArray(stream)), ByteOrder.BIG_ENDIAN, false);
+            //noinspection unchecked
             tag = (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
         } catch (IOException e) {
             throw new AssertionError("Unable to load block palette " + protocol, e);
@@ -378,6 +384,24 @@ public class GlobalBlockPalette {
             int id = state.getInt("id");
             int data = state.getShort("data");
             int runtimeId = state.getInt("runtimeId");
+            int legacyId = id << 6 | data;
+            legacyToRuntime.put(legacyId, runtimeId);
+            if (!runtimeIdToLegacy.containsKey(runtimeId)) {
+                runtimeIdToLegacy.put(runtimeId, legacyId);
+            }
+        }
+    }
+
+    /**
+     * 加载扩展数据，用于在不修改runtime_block_states.dat文件的情况下额外增加一些内容
+     */
+    private static void loadBlockStatesExtras(int protocol, @NotNull Int2IntMap legacyToRuntime, @NotNull Int2IntMap runtimeIdToLegacy) {
+        List<Map> extras = new Config().loadFromStream(Server.class.getClassLoader().getResourceAsStream("RuntimeBlockStatesExtras/" + protocol + ".json")).getMapList("extras");
+        //noinspection unchecked
+        for (Map<String, Object> map : extras) {
+            int id = Utils.toInt(map.get("id"));
+            int data = Utils.toInt(map.getOrDefault("data", 0));
+            int runtimeId = Utils.toInt(map.get("runtimeId"));
             int legacyId = id << 6 | data;
             legacyToRuntime.put(legacyId, runtimeId);
             if (!runtimeIdToLegacy.containsKey(runtimeId)) {
