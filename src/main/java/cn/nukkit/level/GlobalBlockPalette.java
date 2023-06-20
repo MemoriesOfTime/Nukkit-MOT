@@ -356,12 +356,16 @@ public class GlobalBlockPalette {
         loadBlockStates(paletteFor(503), legacyToRuntimeId503, runtimeIdToLegacy503);
         loadBlockStates(paletteFor(527), legacyToRuntimeId527, runtimeIdToLegacy527);
         loadBlockStates(paletteFor(544), legacyToRuntimeId544, runtimeIdToLegacy544);
-        loadBlockStates(paletteFor(560), legacyToRuntimeId560, runtimeIdToLegacy560);
-        loadBlockStates(paletteFor(567), legacyToRuntimeId567, runtimeIdToLegacy567);
-        loadBlockStates(paletteFor(575), legacyToRuntimeId575, runtimeIdToLegacy575);
-        loadBlockStates(paletteFor(582), legacyToRuntimeId582, runtimeIdToLegacy582);
-        loadBlockStates(paletteFor(589), legacyToRuntimeId589, runtimeIdToLegacy589);
-        loadBlockStatesExtras(589, legacyToRuntimeId589, runtimeIdToLegacy589);
+        loadBlockStatesAndExtras(560, legacyToRuntimeId560, runtimeIdToLegacy560);
+        loadBlockStatesAndExtras(567, legacyToRuntimeId567, runtimeIdToLegacy567);
+        loadBlockStatesAndExtras(575, legacyToRuntimeId575, runtimeIdToLegacy575);
+        loadBlockStatesAndExtras(582, legacyToRuntimeId582, runtimeIdToLegacy582);
+        loadBlockStatesAndExtras(589, legacyToRuntimeId589, runtimeIdToLegacy589);
+    }
+
+    private static void loadBlockStatesAndExtras(int protocol, @NotNull Int2IntMap legacyToRuntime, @NotNull Int2IntMap runtimeIdToLegacy) {
+        loadBlockStates(paletteFor(protocol), legacyToRuntime, runtimeIdToLegacy);
+        loadBlockStatesExtras(protocol, legacyToRuntime, runtimeIdToLegacy);
     }
 
     private static ListTag<CompoundTag> paletteFor(int protocol) {

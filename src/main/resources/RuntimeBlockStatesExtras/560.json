@@ -1,0 +1,36 @@
+{
+  "extras": [
+    {
+      "id": 527,
+      "data": 1,
+      "runtimeId": 1297,
+      "states": {
+        "respawn_anchor_charge": 1
+      }
+    },
+    {
+      "id": 527,
+      "data": 2,
+      "runtimeId": 1298,
+      "states": {
+        "respawn_anchor_charge": 2
+      }
+    },
+    {
+      "id": 527,
+      "data": 3,
+      "runtimeId": 1299,
+      "states": {
+        "respawn_anchor_charge": 3
+      }
+    },
+    {
+      "id": 527,
+      "data": 4,
+      "runtimeId": 1300,
+      "states": {
+        "respawn_anchor_charge": 4
+      }
+    }
+  ]
+}
