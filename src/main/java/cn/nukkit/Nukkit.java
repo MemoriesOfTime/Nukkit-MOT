@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.utils.ServerKiller;
+import cn.nukkit.utils.Utils;
 import com.google.common.base.Preconditions;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 import io.netty.util.internal.logging.Log4J2LoggerFactory;
@@ -14,6 +15,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 import java.util.Scanner;
+
+import static cn.nukkit.utils.Utils.dynamic;
 
 /*
  * `_   _       _    _    _ _
@@ -38,6 +41,8 @@ public class Nukkit {
     public static final String BRANCH = "https://api.github.com/repos/MemoriesOfTime/NukkitPetteriM1Edition/commits/master";
     public final static Properties GIT_INFO = getGitInfo();
     public final static String VERSION = getVersion();
+    public final static String API_VERSION = dynamic("CUSTOM");
+    public final static String CODENAME = Utils.dynamic("MOT");
     public final static String PATH = System.getProperty("user.dir") + '/';
     public final static String DATA_PATH = System.getProperty("user.dir") + '/';
     public final static String PLUGIN_PATH = DATA_PATH + "plugins";

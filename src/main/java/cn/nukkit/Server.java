@@ -1471,7 +1471,7 @@ public class Server {
     }
 
     public String getCodename() {
-        return "MOT";
+        return Nukkit.CODENAME;
     }
 
     public String getVersion() {
@@ -1479,7 +1479,7 @@ public class Server {
     }
 
     public String getApiVersion() {
-        return "CUSTOM";
+        return Nukkit.API_VERSION;
     }
 
     public String getFilePath() {
