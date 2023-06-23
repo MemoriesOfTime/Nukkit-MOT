@@ -385,15 +385,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         if (inLove && !this.isBaby()) {
             this.inLoveTicks = 600;
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, true);
-
-            Entity[] collidingEntities = this.level.getCollidingEntities(this.boundingBox.grow(4, 4, 4));
-            for (Entity entity : collidingEntities) {
-                if (entity instanceof BaseEntity baseEntity) {
-                    if (baseEntity != this && baseEntity.getNetworkId() == this.getNetworkId() && baseEntity.isInLove()) {
-                        //TODO 靠近其他实体
-                    }
-                }
-            }
         } else {
             this.inLoveTicks = 0;
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, false);
