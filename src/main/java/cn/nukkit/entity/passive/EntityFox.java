@@ -1,7 +1,6 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
-import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
@@ -58,11 +57,7 @@ public class EntityFox extends EntityWalkingAnimal {
     }
 
     @Override
-    public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
-            return player.spawned && player.isAlive() && !player.closed && distance <= 49 && player.getInventory().getItemInHandFast().getId() == Item.SWEET_BERRIES;
-        }
-        return false;
+    public boolean isFeedItem(Item item) {
+        return item.getId() == Item.SWEET_BERRIES;
     }
 }

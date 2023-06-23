@@ -250,7 +250,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     protected boolean checkSpawnBaby(Entity entity) {
-        if (!(entity instanceof BaseEntity) || entity.getNetworkId() != this.getNetworkId()) {
+        if (!(entity instanceof BaseEntity) || entity == this || entity.getNetworkId() != this.getNetworkId()) {
             return false;
         }
         BaseEntity baseEntity = (BaseEntity) entity;
@@ -280,6 +280,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         BaseEntity newEntity = (BaseEntity) Entity.createEntity(getNetworkId(), this, new Object[0]);
         newEntity.setBaby(true);
         newEntity.spawnToAll();
+        this.level.dropExpOrb(this, Utils.rand(1, 7));
         return true;
     }
 
@@ -386,6 +387,16 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         if (inLove && !this.isBaby()) {
             this.inLoveTicks = 600;
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, true);
+
+            Entity[] collidingEntities = this.level.getCollidingEntities(this.boundingBox.grow(4, 4, 4));
+            for (Entity entity : collidingEntities) {
+                if (entity instanceof BaseEntity) {
+                    BaseEntity baseEntity = (BaseEntity) entity;
+                    if (baseEntity != this && baseEntity.getNetworkId() == this.getNetworkId() && baseEntity.isInLove()) {
+                        //TODO 靠近其他实体
+                    }
+                }
+            }
         } else {
             this.inLoveTicks = 0;
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, false);

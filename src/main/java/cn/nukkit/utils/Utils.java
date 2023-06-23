@@ -374,6 +374,10 @@ public class Utils {
         return value;
     }
 
+    public static <T> T dynamic(T value) {
+        return value;
+    }
+
     /**
      * Get game version string by protocol version.
      * For internal usage!

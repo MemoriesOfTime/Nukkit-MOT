@@ -2,18 +2,19 @@ package cn.nukkit.network;
 
 import cn.nukkit.network.protocol.types.PacketCompressionAlgorithm;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.SnappyCompression;
 import cn.nukkit.utils.Zlib;
 
 public interface CompressionProvider {
 
     CompressionProvider NONE = new CompressionProvider() {
         @Override
-        public byte[] compress(BinaryStream packet, int level) throws Exception {
+        public byte[] compress(BinaryStream packet, int level) {
             return packet.getBuffer();
         }
 
         @Override
-        public byte[] decompress(byte[] compressed) throws Exception {
+        public byte[] decompress(byte[] compressed) {
             return compressed;
         }
     };
@@ -21,7 +22,7 @@ public interface CompressionProvider {
     CompressionProvider ZLIB = new CompressionProvider() {
         @Override
         public byte[] compress(BinaryStream packet, int level) throws Exception {
-            return Zlib.deflate(packet.getBuffer(), level);
+            return Zlib.deflatePre16Packet(packet.getBuffer(), level);
         }
 
         @Override
@@ -42,6 +43,18 @@ public interface CompressionProvider {
         }
     };
 
+    CompressionProvider SNAPPY = new CompressionProvider() {
+        @Override
+        public byte[] compress(BinaryStream packet, int level) throws Exception {
+            return SnappyCompression.compress(packet.getBuffer());
+        }
+
+        @Override
+        public byte[] decompress(byte[] compressed) throws Exception {
+            return SnappyCompression.decompress(compressed, 2097152); // 2 * 1024 * 1024
+        }
+    };
+
 
     byte[] compress(BinaryStream packet, int level) throws Exception;
     byte[] decompress(byte[] compressed) throws Exception;
@@ -51,6 +64,8 @@ public interface CompressionProvider {
             return NONE;
         } else if (algorithm == PacketCompressionAlgorithm.ZLIB) {
             return raknetProtocol < 10 ? ZLIB : ZLIB_RAW;
+        } else if (algorithm == PacketCompressionAlgorithm.SNAPPY) {
+            return SNAPPY;
         }
         throw new UnsupportedOperationException();
     }

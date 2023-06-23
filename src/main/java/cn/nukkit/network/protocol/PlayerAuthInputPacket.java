@@ -59,7 +59,7 @@ public class PlayerAuthInputPacket extends DataPacket {
 
         this.inputMode = InputMode.fromOrdinal((int) this.getUnsignedVarInt());
         this.playMode = ClientPlayMode.fromOrdinal((int) this.getUnsignedVarInt());
-        if (this.protocol >= ProtocolInfo.v1_19_0) {
+        if (this.protocol >= ProtocolInfo.v1_19_0_29) {
             this.interactionModel = AuthInteractionModel.fromOrdinal((int) this.getUnsignedVarInt());
         }
 

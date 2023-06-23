@@ -8,7 +8,9 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityPrimedTNT;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBed;
+import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.Position;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
@@ -17,10 +19,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.utils.BlockColor;
-import cn.nukkit.utils.DyeColor;
-import cn.nukkit.utils.Faceable;
-import cn.nukkit.utils.Utils;
+import cn.nukkit.utils.*;
 
 /**
  * @author MagicDroidX
@@ -109,22 +108,13 @@ public class BlockBed extends BlockTransparentMeta implements Faceable {
             return true;
         }
 
-        int time = this.getLevel().getTime() % Level.TIME_FULL;
-
-        boolean isNight = (time >= Level.TIME_NIGHT && time < Level.TIME_SUNRISE);
-
-        if (player != null && !isNight) {
-            player.sendTranslation("§7%tile.bed.noSleep");
-            return true;
-        }
-
         Block blockNorth = this.north();
         Block blockSouth = this.south();
         Block blockEast = this.east();
         Block blockWest = this.west();
 
         Block b;
-        if ((this.getDamage() & 0x08) == 0x08) {
+        if (this.isHeadPiece()) {
             b = this;
         } else {
             if (blockNorth.getId() == BED_BLOCK && (blockNorth.getDamage() & 0x08) == 0x08) {
@@ -142,6 +132,19 @@ public class BlockBed extends BlockTransparentMeta implements Faceable {
 
                 return true;
             }
+        }
+
+        int time = this.getLevel().getTime() % Level.TIME_FULL;
+        boolean isNight = (time >= Level.TIME_NIGHT && time < Level.TIME_SUNRISE);
+
+        if (player != null && !isNight) {
+            Position spawn = Position.fromObject(b.add(0.5, 0.5, 0.5), player.getLevel());
+            if (!player.getSpawn().equals(spawn)) {
+                player.setSpawnBlock(this);
+            }
+            player.sendMessage(new TranslationContainer(TextFormat.GRAY + "%tile.bed.respawnSet"));
+            player.sendTranslation("§7%tile.bed.noSleep");
+            return true;
         }
 
         if (player != null) {
@@ -203,7 +206,7 @@ public class BlockBed extends BlockTransparentMeta implements Faceable {
         Block blockWest = this.west();
 
         Block secondPart = null;
-        if ((this.getDamage() & 0x08) == 0x08) { // Top part of the bed
+        if (this.isHeadPiece()) { // Top part of the bed
             if (blockNorth.getId() == BED_BLOCK && (blockNorth.getDamage() & 0x08) != 0x08) { // Check if the block ID & meta are right
                 secondPart = blockNorth;
             } else if (blockSouth.getId() == BED_BLOCK && (blockSouth.getDamage() & 0x08) != 0x08) {
@@ -214,13 +217,13 @@ public class BlockBed extends BlockTransparentMeta implements Faceable {
                 secondPart = blockWest;
             }
         } else { // Bottom part of the bed
-            if (blockNorth.getId() == BED_BLOCK && (blockNorth.getDamage() & 0x08) == 0x08) {
+            if (blockNorth.getId() == BED_BLOCK && this.isHeadPiece(blockNorth)) {
                 secondPart = blockNorth;
-            } else if (blockSouth.getId() == BED_BLOCK && (blockSouth.getDamage() & 0x08) == 0x08) {
+            } else if (blockSouth.getId() == BED_BLOCK && this.isHeadPiece(blockSouth)) {
                 secondPart = blockSouth;
-            } else if (blockEast.getId() == BED_BLOCK && (blockEast.getDamage() & 0x08) == 0x08) {
+            } else if (blockEast.getId() == BED_BLOCK && this.isHeadPiece(blockEast)) {
                 secondPart = blockEast;
-            } else if (blockWest.getId() == BED_BLOCK && (blockWest.getDamage() & 0x08) == 0x08) {
+            } else if (blockWest.getId() == BED_BLOCK && this.isHeadPiece(blockWest)) {
                 secondPart = blockWest;
             }
         }
@@ -232,11 +235,16 @@ public class BlockBed extends BlockTransparentMeta implements Faceable {
         this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, false); // Don't update both parts to prevent duplication bug if there are two fallable blocks on top of the bed
 
         for (Entity entity : this.level.getNearbyEntities(new SimpleAxisAlignedBB(this, this).grow(2, 1, 2))) {
-            if (!(entity instanceof Player)) continue;
-            Player player = (Player) entity;
+            if (!(entity instanceof Player player)) {
+                continue;
+            }
 
-            if (player.getSleepingPos() == null) continue;
-            if (!player.getSleepingPos().equals(this) && !player.getSleepingPos().equals(secondPart)) continue;
+            if (player.getSleepingPos() == null) {
+                continue;
+            }
+            if (!player.getSleepingPos().equals(this) && !player.getSleepingPos().equals(secondPart)) {
+                continue;
+            }
             player.stopSleep();
         }
 
@@ -275,5 +283,30 @@ public class BlockBed extends BlockTransparentMeta implements Faceable {
     @Override
     public BlockFace getBlockFace() {
         return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
+    }
+
+    public boolean isHeadPiece() {
+        return this.isHeadPiece(this);
+    }
+
+    protected boolean isHeadPiece(Block block) {
+        return (block.getDamage() & 0x08) == 0x08;
+    }
+
+    public boolean isBedValid() {
+        BlockFace dir = getBlockFace();
+        Block head;
+        Block foot;
+        if (isHeadPiece()) {
+            head = this;
+            foot = getSide(dir.getOpposite());
+        } else {
+            head = getSide(dir);
+            foot = this;
+        }
+
+        return head.getId() == foot.getId()
+                && ((BlockBed) head).isHeadPiece() && ((BlockBed) head).getBlockFace().equals(dir)
+                && !((BlockBed) foot).isHeadPiece() && ((BlockBed) foot).getBlockFace().equals(dir);
     }
 }

@@ -82,6 +82,7 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
         ByteBuf buffer = packet.getBuffer();
         short packetId = buffer.readUnsignedByte();
         if (packetId == 0xfe) {
+            byte[] packetBuffer;
             if (this.decryptionCipher != null) {
                 try {
                     ByteBuffer inBuffer = buffer.nioBuffer();
@@ -90,9 +91,12 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
                 } catch (Exception e) {
                     throw new RuntimeException("Unable to decrypt packet", e);
                 }
+                //TODO 校验数据包
+                packetBuffer = new byte[buffer.readableBytes() - 8];
+            } else {
+                packetBuffer = new byte[buffer.readableBytes()];
             }
 
-            byte[] packetBuffer = new byte[buffer.readableBytes()];
             buffer.readBytes(packetBuffer);
 
             try {

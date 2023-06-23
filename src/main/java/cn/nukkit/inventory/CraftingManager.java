@@ -122,9 +122,13 @@ public class CraftingManager {
                 extraResults.add(Item.fromJson(data));
             }
 
-            this.registerRecipe(419, new ShapedRecipe((String)recipe.get("id"), Utils.toInt(recipe.get("priority")), Item.fromJson(first), shape, ingredients, extraResults));
-            this.registerRecipe(527, new ShapedRecipe((String)recipe.get("id"), Utils.toInt(recipe.get("priority")), Item.fromJson(first), shape, ingredients, extraResults));
-            this.registerRecipe(567, new ShapedRecipe((String)recipe.get("id"), Utils.toInt(recipe.get("priority")), Item.fromJson(first), shape, ingredients, extraResults));
+            String recipeId = (String) recipe.get("id");
+            int priority = Utils.toInt(recipe.get("priority"));
+            Item result = Item.fromJson(first);
+
+            this.registerRecipe(419, new ShapedRecipe(recipeId, priority, result, shape, ingredients, extraResults));
+            this.registerRecipe(527, new ShapedRecipe(recipeId, priority, result, shape, ingredients, extraResults));
+            this.registerRecipe(567, new ShapedRecipe(recipeId, priority, result, shape, ingredients, extraResults));
         }
 
         for (Map<String, Object> recipe : (List<Map<String, Object>>) recipes_419_config.get((Object)"shapeless")) {

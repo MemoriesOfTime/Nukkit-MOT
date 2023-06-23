@@ -935,7 +935,7 @@ public class Level implements ChunkManager, Metadatable {
         if (this.timings.entityTick != null) this.timings.entityTick.startTiming();
 
         if (!this.updateEntities.isEmpty()) {
-            for (long id : new ArrayList<>(this.updateEntities.keySet())) {
+            for (long id : new ObjectArrayList<>(this.updateEntities.keySet())) {
                 Entity entity = this.updateEntities.get(id);
                 if (entity == null) {
                     this.updateEntities.remove(id);
@@ -4649,7 +4649,7 @@ public class Level implements ChunkManager, Metadatable {
             return ProtocolInfo.v1_19_50;
         } else if (protocol >= ProtocolInfo.v1_19_20) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_20;
-        } else if (protocol >= ProtocolInfo.v1_19_0) { //调色板 物品运行时id
+        } else if (protocol >= ProtocolInfo.v1_19_0_29) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_0;
         } else if (protocol >= ProtocolInfo.v1_18_30) { //调色板 物品运行时id
             return ProtocolInfo.v1_18_30;
@@ -4705,7 +4705,7 @@ public class Level implements ChunkManager, Metadatable {
             if (player >= ProtocolInfo.v1_18_10_26) if (player < ProtocolInfo.v1_18_30) return true;
         if (chunk == ProtocolInfo.v1_18_30) if (player == ProtocolInfo.v1_18_30) return true;
         if (chunk == ProtocolInfo.v1_19_0)
-            if (player >= ProtocolInfo.v1_19_0) if (player < ProtocolInfo.v1_19_20) return true;
+            if (player >= ProtocolInfo.v1_19_0_29) if (player < ProtocolInfo.v1_19_20) return true;
         if (chunk == ProtocolInfo.v1_19_20)
             if (player >= ProtocolInfo.v1_19_20) if (player < ProtocolInfo.v1_19_50) return true;
         if (chunk == ProtocolInfo.v1_19_50) if (player == ProtocolInfo.v1_19_50) return true;

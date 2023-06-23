@@ -2,8 +2,10 @@ package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntityWalking;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
@@ -90,8 +92,20 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
     }
 
     @Override
+    public boolean targetOption(EntityCreature creature, double distance) {
+        if (!this.isInLove() && creature instanceof Player player) {
+            return player.isAlive() && !player.closed && this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 49;
+        }
+        return super.targetOption(creature, distance);
+    }
+
+    @Override
     public boolean canTarget(Entity entity) {
         return ((this.isInLove() || entity instanceof Player) && entity.canBeFollowed());
+    }
+
+    public boolean isFeedItem(Item item) {
+        return false;
     }
 
 }

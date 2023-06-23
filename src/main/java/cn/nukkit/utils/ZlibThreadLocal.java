@@ -1,5 +1,6 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.Server;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
 
 import java.io.IOException;
@@ -62,7 +63,7 @@ public final class ZlibThreadLocal implements ZlibProvider {
     public byte[] deflateRaw(byte[][] datas, int level) throws IOException {
         Deflater deflater = DEFLATER_RAW.get();
         deflater.reset();
-        deflater.setLevel(level);
+        deflater.setLevel(datas.length < Server.getInstance().networkCompressionThreshold ? 0 : level);
         FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
         bos.reset();
         byte[] buffer = BUFFER.get();

@@ -117,6 +117,7 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
         }
     }
 
+    @Override
     public boolean isFeedItem(Item item) {
         return item.getId() == Item.WHEAT ||
                 item.getId() == Item.APPLE ||

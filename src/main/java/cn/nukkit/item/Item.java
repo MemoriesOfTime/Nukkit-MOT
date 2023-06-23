@@ -329,6 +329,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[ACACIA_CHEST_BOAT] = ItemChestBoatAcacia.class; //642
             list[DARK_OAK_CHEST_BOAT] = ItemChestBoatDarkOak.class; //643
             list[MANGROVE_CHEST_BOAT] = ItemChestBoatMangrove.class; //644
+            list[GLOW_BERRIES] = ItemGlowBerries.class; //654
+            list[RECORD_RELIC] = ItemRecordRelic.class; //701
             list[CAMPFIRE] = ItemCampfire.class; //720
             list[SUSPICIOUS_STEW] = ItemSuspiciousStew.class; //734
             list[HONEYCOMB] = ItemHoneycomb.class; //736
@@ -606,6 +608,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 return new ArrayList<>(Item.creative486);
             case v1_18_30:
                 return new ArrayList<>(Item.creative503);
+            case v1_19_0_29:
+            case v1_19_0_31:
             case v1_19_0:
                 return new ArrayList<>(Item.creative527);
             case v1_19_10:

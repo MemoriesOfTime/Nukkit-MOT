@@ -54,6 +54,12 @@ public class RuntimeItemMapping {
             String identifier = entry.get("name").getAsString();
             int runtimeId = entry.get("id").getAsInt();
 
+            //高版本"minecraft:wool"的名称改为"minecraft:white_wool"
+            //他们的legacyId均为35，这里避免冲突忽略"minecraft:wool"
+            if (protocolId >= ProtocolInfo.v1_19_63 && "minecraft:wool".equalsIgnoreCase(identifier)) {
+                continue;
+            }
+
             if (this.protocolId < ProtocolInfo.v1_16_100) {
                 this.registerOldItem(identifier, runtimeId);
                 continue;

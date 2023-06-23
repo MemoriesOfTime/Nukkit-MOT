@@ -1,6 +1,7 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
+import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.data.IntEntityData;
@@ -146,9 +147,14 @@ public class EntityLlama extends EntityHorseBase {
     public boolean targetOption(EntityCreature creature, double distance) {
         boolean canTarget = super.targetOption(creature, distance);
 
-        if (canTarget && (creature instanceof Player)) {
-            Player player = (Player) creature;
-            return player.isAlive() && !player.closed && this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 49;
+        if (canTarget) {
+            if (this.isInLove()) {
+                return creature instanceof BaseEntity && ((BaseEntity) creature).isInLove() && creature.isAlive() && !creature.closed && creature.getNetworkId() == this.getNetworkId() && distance <= 100;
+            }else if (creature instanceof Player) {
+                Player player = (Player) creature;
+                return player.spawned && player.isAlive() && !player.closed &&
+                        this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 40;
+            }
         }
 
         return false;

@@ -1053,14 +1053,14 @@ public class BinaryStream {
         }
 
         int runtimeId = item.getId();
-        int damage = item.hasMeta() ? item.getDamage() : 0x7fff;
+        int damage = item.hasMeta() ? item.getDamage() : Short.MAX_VALUE;
 
         if (protocolId >= ProtocolInfo.v1_16_100) {
             RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
             if (!item.hasMeta()) {
                 RuntimeEntry runtimeEntry = mapping.toRuntime(item.getId(), 0);
                 runtimeId = runtimeEntry.getRuntimeId();
-                damage = 0x7fff;
+                damage = Short.MAX_VALUE;
             } else {
                 RuntimeEntry runtimeEntry = mapping.toRuntime(item.getId(), item.getDamage());
                 runtimeId = runtimeEntry.getRuntimeId();
@@ -1200,6 +1200,14 @@ public class BinaryStream {
     public void putVector2f(float x, float y) {
         this.putLFloat(x);
         this.putLFloat(y);
+    }
+
+    public double getRotationByte() {
+        return this.getByte() * (360d / 256d);
+    }
+
+    public void putRotationByte(double rotation) {
+        this.putByte((byte) (rotation / (360d / 256d)));
     }
 
     public void putGameRules(GameRules gameRules) {

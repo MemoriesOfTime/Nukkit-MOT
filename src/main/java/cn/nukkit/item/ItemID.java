@@ -291,6 +291,10 @@ public interface ItemID {
     int MANGROVE_CHEST_BOAT = 644;
     int CHEST_BOAT = 645;
 
+    int GLOW_BERRIES = 654;
+
+    int RECORD_RELIC = 701;
+
     int CAMPFIRE = 720;
 
     // 514 - 733 not yet in Minecraft
