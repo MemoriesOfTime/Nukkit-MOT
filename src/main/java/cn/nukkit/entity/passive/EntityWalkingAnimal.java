@@ -93,7 +93,8 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (!this.isInLove() && creature instanceof Player player) {
+        if (!this.isInLove() && creature instanceof Player) {
+            Player player = (Player) creature;
             return player.isAlive() && !player.closed && this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 49;
         }
         return super.targetOption(creature, distance);

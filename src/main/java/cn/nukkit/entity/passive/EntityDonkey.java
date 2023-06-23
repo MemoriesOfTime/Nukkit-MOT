@@ -61,7 +61,8 @@ public class EntityDonkey extends EntityHorseBase {
         if (canTarget) {
             if (this.isInLove()) {
                 return creature instanceof BaseEntity && ((BaseEntity) creature).isInLove() && creature.isAlive() && !creature.closed && creature.getNetworkId() == this.getNetworkId() && distance <= 100;
-            }else if (creature instanceof Player player) {
+            }else if (creature instanceof Player) {
+                Player player = (Player) creature;
                 return player.spawned && player.isAlive() && !player.closed &&
                         this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 40;
             }

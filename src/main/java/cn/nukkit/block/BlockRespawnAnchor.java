@@ -131,12 +131,16 @@ public class BlockRespawnAnchor extends BlockMeta {
 
     @Override
     public int getLightLevel() {
-        return switch (getCharge()) {
-            case 0 -> 0;
-            case 1 -> 3;
-            case 2 -> 7;
-            default -> 15;
-        };
+        switch (getCharge()) {
+            case 0:
+                return 0;
+            case 1:
+                return 3;
+            case 2:
+                return 7;
+            default:
+                return 15;
+        }
     }
 
     @Override

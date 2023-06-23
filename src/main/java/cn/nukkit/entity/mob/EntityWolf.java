@@ -394,7 +394,8 @@ public class EntityWolf extends EntityTameableMob {
 
     @Override
     public boolean isMeetAttackConditions(Vector3 target) {
-        if (target instanceof BaseEntity baseEntity) {
+        if (target instanceof BaseEntity) {
+            BaseEntity baseEntity = (BaseEntity) target;
             if (this.isInLove() && baseEntity.getNetworkId() == this.getNetworkId() && baseEntity.isFriendly() == this.isFriendly()) {
                 return false;
             }

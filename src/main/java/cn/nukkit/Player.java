@@ -1353,8 +1353,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.spawnBlockPosition = null;
         } else {
             Level level;
-            if (spawnBlock instanceof Position position && position.isValid()) {
-                level = position.level;
+            if (spawnBlock instanceof Position && ((Position) spawnBlock).isValid()) {
+                level = ((Position) spawnBlock).level;
             } else {
                 level = this.level;
             }

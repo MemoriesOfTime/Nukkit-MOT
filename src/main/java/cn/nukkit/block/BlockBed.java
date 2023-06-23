@@ -235,9 +235,11 @@ public class BlockBed extends BlockTransparentMeta implements Faceable {
         this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, false); // Don't update both parts to prevent duplication bug if there are two fallable blocks on top of the bed
 
         for (Entity entity : this.level.getNearbyEntities(new SimpleAxisAlignedBB(this, this).grow(2, 1, 2))) {
-            if (!(entity instanceof Player player)) {
+            if (!(entity instanceof Player)) {
                 continue;
             }
+
+            Player player = (Player) entity;
 
             if (player.getSleepingPos() == null) {
                 continue;
