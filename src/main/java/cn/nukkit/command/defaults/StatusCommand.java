@@ -368,6 +368,10 @@ public class StatusCommand extends VanillaCommand {
             }
         }
 
+        sender.sendMessage("§c[Nukkit-MOT] You are using the java8 branch, this branch may stop being maintained in the future");
+        sender.sendMessage("§c[Nukkit-MOT] it is recommended that you update to java17 and switch to the master branch!");
+        sender.sendMessage("§c[Nukkit-MOT] 您正在使用java8分支核心，该分支可能会在以后停止维护");
+        sender.sendMessage("§c[Nukkit-MOT] 建议您更新到java17并切换到master分支核心!");
 
         return true;
     }

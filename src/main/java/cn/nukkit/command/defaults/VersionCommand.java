@@ -36,25 +36,10 @@ public class VersionCommand extends VanillaCommand {
             sender.sendMessage("§e###############################################\n§cNukkit§3-§dMOT\n§6Build: §b" + Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4) + "\n§6Multiversion: §bUp to version " + ProtocolInfo.MINECRAFT_VERSION_NETWORK + "\n§e###############################################");
 
             if (sender.isOp()) {
-                sender.sendMessage("§c[Nukkit-PM1E-MOT] §eYou are using the java8 branch, this branch may stop being maintained in the future, it is recommended that you update to java17 and switch to the master branch!");
-                /*CompletableFuture.runAsync(() -> {
-                    try {
-                        URLConnection request = new URL(Nukkit.BRANCH).openConnection();
-                        request.connect();
-                        InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
-                        String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
-                        content.close();
-
-                        if (Nukkit.getBranch().equals("master")) {
-                            if (!sender.getServer().getNukkitVersion().equals(latest) && !sender.getServer().getNukkitVersion().equals("git-null")) {
-                                sender.sendMessage("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + sender.getServer().getNukkitVersion() + " Latest: " + latest);
-                            } else {
-                                sender.sendMessage("§c[Nukkit-MOT] §aYou are running the latest version.");
-                            }
-                        }
-                    } catch (Exception ignore) {
-                    }
-                });*/
+                sender.sendMessage("§c[Nukkit-MOT] You are using the java8 branch, this branch may stop being maintained in the future");
+                sender.sendMessage("§c[Nukkit-MOT] it is recommended that you update to java17 and switch to the master branch!");
+                sender.sendMessage("§c[Nukkit-MOT] 您正在使用java8分支核心，该分支可能会在以后停止维护");
+                sender.sendMessage("§c[Nukkit-MOT] 建议您更新到java17并切换到master分支核心!");
             }
         } else {
             StringBuilder pluginName = new StringBuilder();

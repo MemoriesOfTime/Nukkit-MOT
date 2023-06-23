@@ -764,26 +764,10 @@ public class Server {
         }
 
         // Check for updates
-        /*CompletableFuture.runAsync(() -> {
-            try {
-                URLConnection request = new URL(Nukkit.BRANCH).openConnection();
-                request.connect();
-                InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
-                String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
-                content.close();
-
-                boolean isMaster = Nukkit.getBranch().equals("master");
-                if (!this.getNukkitVersion().equals(latest) && !this.getNukkitVersion().equals("git-null") && isMaster) {
-                    this.getLogger().info("\u00A7c[Nukkit-MOT][Update] \u00A7eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + this.getNukkitVersion() + " Latest: " + latest);
-                    this.getLogger().info("\u00A7c[Nukkit-MOT][Update] \u00A7eYou can download the latest build from https://github.com/MemoriesOfTime/NukkitPetteriM1Edition/");
-                } else if (!isMaster) {
-                    this.getLogger().warning("\u00A7c[Nukkit-MOT] \u00A7eYou are running a dev build! Do not use in production! Branch: " + Nukkit.getBranch());
-                }
-            } catch (Exception ignore) {
-            }
-        });*/
-
-        this.getLogger().warning("\u00A7c[Nukkit-PM1E-MOT] \u00A7eYou are using the java8 branch, this branch may stop being maintained in the future, it is recommended that you update to java17 and switch to the master branch!");
+        this.getLogger().warning("§c[Nukkit-MOT] You are using the java8 branch, this branch may stop being maintained in the future");
+        this.getLogger().warning("§c[Nukkit-MOT] it is recommended that you update to java17 and switch to the master branch!");
+        this.getLogger().warning("§c[Nukkit-MOT] 您正在使用java8分支核心，该分支可能会在以后停止维护");
+        this.getLogger().warning("§c[Nukkit-MOT] 建议您更新到java17并切换到master分支核心!");
 
         this.start();
     }

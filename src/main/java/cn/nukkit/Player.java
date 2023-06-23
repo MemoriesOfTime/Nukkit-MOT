@@ -1101,25 +1101,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.spawnToAll();
         }
 
-        if (server.updateChecks && this.isOp()) {
-            this.sendMessage("§c[Nukkit-PM1E-MOT] §eYou are using the java8 branch, this branch may stop being maintained in the future, it is recommended that you update to java17 and switch to the master branch!");
-
-            /*CompletableFuture.runAsync(() -> {
-                try {
-                    URLConnection request = new URL(Nukkit.BRANCH).openConnection();
-                    request.connect();
-                    InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
-                    String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
-                    content.close();
-
-                    if (Nukkit.getBranch().equals("master")) {
-                        if (!server.getNukkitVersion().equals(latest) && !server.getNukkitVersion().equals("git-null")) {
-                            this.sendMessage("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + server.getNukkitVersion() + " Latest: " + latest);
-                        }
-                    }
-                } catch (Exception ignore) {
-                }
-            });*/
+        if (this.isOp()) {
+            this.sendMessage("§c[Nukkit-MOT] You are using the java8 branch, this branch may stop being maintained in the future");
+            this.sendMessage("§c[Nukkit-MOT] it is recommended that you update to java17 and switch to the master branch!");
+            this.sendMessage("§c[Nukkit-MOT] 您正在使用java8分支核心，该分支可能会在以后停止维护");
+            this.sendMessage("§c[Nukkit-MOT] 建议您更新到java17并切换到master分支核心!");
         }
     }
 
