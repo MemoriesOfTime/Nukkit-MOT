@@ -11,13 +11,16 @@ import cn.nukkit.utils.VarInt;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
+import org.jetbrains.annotations.NotNull;
 import oshi.SystemInfo;
 import oshi.hardware.NetworkIF;
 
+import javax.annotation.Nonnegative;
 import java.io.ByteArrayInputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -41,8 +44,7 @@ public class Network {
     public static final byte CHANNEL_ENTITY_SPAWNING = 6; //Entity spawn/despawn channel
     public static final byte CHANNEL_TEXT = 7; //Chat and other text stuff
     public static final byte CHANNEL_END = 31;
-
-    private Class<? extends DataPacket>[] packetPool = new Class[256];
+    private final Int2ObjectOpenHashMap<Class<? extends DataPacket>> packetPool = new Int2ObjectOpenHashMap<>(256);
 
     private final Server server;
 
@@ -167,7 +169,11 @@ public class Network {
     }
 
     public void registerPacket(byte id, Class<? extends DataPacket> clazz) {
-        this.packetPool[id & 0xff] = clazz;
+        this.packetPool.put(id & 0xff, clazz);
+    }
+
+    public void registerPacketNew(@Nonnegative int id, @NotNull Class<? extends DataPacket> clazz) {
+        this.packetPool.put(id, clazz);
     }
 
     public Server getServer() {
@@ -271,7 +277,7 @@ public class Network {
     }
 
     public DataPacket getPacket(byte id) {
-        Class<? extends DataPacket> clazz = this.packetPool[id & 0xff];
+        Class<? extends DataPacket> clazz = this.packetPool.get(id & 0xff);
         if (clazz != null) {
             try {
                 return clazz.newInstance();
@@ -283,7 +289,7 @@ public class Network {
     }
 
     public DataPacket getPacket(int id) {
-        Class<? extends DataPacket> clazz = this.packetPool[id];
+        Class<? extends DataPacket> clazz = this.packetPool.get(id);
         if (clazz != null) {
             try {
                 return clazz.newInstance();
@@ -319,8 +325,6 @@ public class Network {
     }
 
     private void registerPackets() {
-        this.packetPool = new Class[256];
-
         this.registerPacket(ProtocolInfo.SERVER_TO_CLIENT_HANDSHAKE_PACKET, ServerToClientHandshakePacket.class);
         this.registerPacket(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET, ClientToServerHandshakePacket.class);
         this.registerPacket(ProtocolInfo.ADD_ENTITY_PACKET, AddEntityPacket.class);
@@ -443,6 +447,10 @@ public class Network {
         this.registerPacket(ProtocolInfo.TOAST_REQUEST_PACKET, ToastRequestPacket.class);
         this.registerPacket(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET, RequestNetworkSettingsPacket.class);
         this.registerPacket(ProtocolInfo.UPDATE_CLIENT_INPUT_LOCKS, UpdateClientInputLocksPacket.class);
+        this.registerPacket(ProtocolInfo.CAMERA_PRESETS_PACKET, CameraPresetsPacket.class);
+
+        this.registerPacketNew(ProtocolInfo.CAMERA_INSTRUCTION_PACKET, CameraInstructionPacket.class);
+        this.registerPacketNew(ProtocolInfo.OPEN_SIGN, OpenSignPacket.class);
     }
 
     @AllArgsConstructor

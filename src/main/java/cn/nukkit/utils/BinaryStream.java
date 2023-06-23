@@ -26,7 +26,9 @@ import io.netty.buffer.AbstractByteBufAllocator;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
+import lombok.SneakyThrows;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.ByteOrder;
@@ -1321,6 +1323,17 @@ public class BinaryStream {
 
     public boolean feof() {
         return this.offset < 0 || this.offset >= this.buffer.length;
+    }
+
+    @SneakyThrows(IOException.class)
+    public CompoundTag getTag() {
+        ByteArrayInputStream is = new ByteArrayInputStream(buffer, offset, buffer.length);
+        int initial = is.available();
+        try {
+            return NBTIO.read(is);
+        } finally {
+            offset += initial - is.available();
+        }
     }
 
     private void ensureCapacity(int minCapacity) {

@@ -186,13 +186,15 @@ public class StartGamePacket extends DataPacket {
         this.putGameRules(protocol, gameRules);
         if (protocol >= ProtocolInfo.v1_16_100) {
             if (Server.getInstance().enableExperimentMode) {
-                this.putLInt(3); // Experiment count
+                this.putLInt(4); // Experiment count
                 {
                     this.putString("data_driven_items");
                     this.putBoolean(true);
                     this.putString("upcoming_creator_features");
                     this.putBoolean(true);
                     this.putString("experimental_molang_features");
+                    this.putBoolean(true);
+                    this.putString("cameras");
                     this.putBoolean(true);
                 }
                 this.putBoolean(true); // Were experiments previously toggled

@@ -6,6 +6,7 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCampfire;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
 import cn.nukkit.blockentity.BlockEntitySpawnable;
+import cn.nukkit.camera.data.CameraPreset;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandDataVersions;
@@ -46,6 +47,7 @@ import cn.nukkit.item.customitem.ItemCustomArmor;
 import cn.nukkit.item.customitem.ItemCustomTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.food.Food;
+import cn.nukkit.lang.LangCode;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.*;
@@ -2098,6 +2100,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.dataPacket(pk);
     }
 
+    public void sendCameraPresets() {
+        if (this.protocol < ProtocolInfo.v1_20_0_23) {
+            return;
+        }
+        ListTag<CompoundTag> presetListTag = new ListTag<>("presets");
+        for (CameraPreset preset : CameraPreset.getPresets().values()) {
+            presetListTag.add(preset.serialize());
+        }
+        CameraPresetsPacket pk = new CameraPresetsPacket();
+        pk.setData(new CompoundTag().putList(presetListTag));
+        this.dataPacket(pk);
+    }
+
     @Override
     public boolean onUpdate(int currentTick) {
         if (!this.loggedIn) {
@@ -2964,6 +2979,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 );
                                 stackPacket.experiments.add(
                                         new ResourcePackStackPacket.ExperimentData("experimental_molang_features", true)
+                                );
+                                stackPacket.experiments.add(
+                                        new ResourcePackStackPacket.ExperimentData("cameras", true)
                                 );
                             }
 
@@ -5283,6 +5301,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public String getName() {
         return this.username;
+    }
+
+    public LangCode getLanguageCode() {
+        return LangCode.valueOf(this.getLoginChainData().getLanguageCode());
     }
 
     @Override
