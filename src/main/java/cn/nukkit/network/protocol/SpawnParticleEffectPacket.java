@@ -3,6 +3,8 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.math.Vector3f;
 import lombok.ToString;
 
+import java.util.Optional;
+
 @ToString
 public class SpawnParticleEffectPacket extends DataPacket {
 
@@ -12,6 +14,10 @@ public class SpawnParticleEffectPacket extends DataPacket {
     public long uniqueEntityId = -1;
     public Vector3f position;
     public String identifier;
+    /**
+     * @since v503
+     */
+    public Optional<String> molangVariablesJson = Optional.empty();
 
     @Override
     public byte pid() {
@@ -32,7 +38,8 @@ public class SpawnParticleEffectPacket extends DataPacket {
         this.putVector3f(this.position);
         this.putString(this.identifier);
         if (protocol >= ProtocolInfo.v1_18_30) {
-            this.putBoolean(false);
+            this.putBoolean(molangVariablesJson.isPresent());
+            molangVariablesJson.ifPresent(this::putString);
         }
     }
 }
