@@ -4,6 +4,8 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
+import cn.nukkit.entity.custom.EntityDefinition;
+import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.item.EntityVehicle;
 import cn.nukkit.entity.mob.EntityCreeper;
@@ -918,47 +920,62 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public static Entity createEntity(String name, FullChunk chunk, CompoundTag nbt, Object... args) {
+        if (knownEntities.containsKey(name)) {
+            return createEntity(knownEntities.get(name), chunk, nbt, args);
+        }
+        EntityDefinition entityDefinition = EntityManager.get().getDefinition(name);
+        if (entityDefinition != null) {
+            return createEntity(entityDefinition.getImplementation(), chunk, nbt, args);
+        }
+        return null;
+    }
+
+    public static Entity createEntity(int type, FullChunk chunk, CompoundTag nbt, Object... args) {
+        String name = String.valueOf(type);
+        if (knownEntities.containsKey(name)) {
+            return createEntity(knownEntities.get(name), chunk, nbt, args);
+        }
+        EntityDefinition entityDefinition = EntityManager.get().getDefinition(type);
+        if (entityDefinition != null) {
+            return createEntity(entityDefinition.getImplementation(), chunk, nbt, args);
+        }
+        return null;
+    }
+
+    private static Entity createEntity(Class<? extends Entity> clazz, FullChunk chunk, CompoundTag nbt, Object... args) {
         Entity entity = null;
 
-        if (knownEntities.containsKey(name)) {
-            Class<? extends Entity> clazz = knownEntities.get(name);
+        if (clazz == null) {
+            return null;
+        }
 
-            if (clazz == null) {
-                return null;
+        for (Constructor constructor : clazz.getConstructors()) {
+            if (entity != null) {
+                break;
             }
 
-            for (Constructor constructor : clazz.getConstructors()) {
-                if (entity != null) {
-                    break;
+            if (constructor.getParameterCount() != (args == null ? 2 : args.length + 2)) {
+                continue;
+            }
+
+            try {
+                if (args == null || args.length == 0) {
+                    entity = (Entity) constructor.newInstance(chunk, nbt);
+                } else {
+                    Object[] objects = new Object[args.length + 2];
+
+                    objects[0] = chunk;
+                    objects[1] = nbt;
+                    System.arraycopy(args, 0, objects, 2, args.length);
+                    entity = (Entity) constructor.newInstance(objects);
+
                 }
-
-                if (constructor.getParameterCount() != (args == null ? 2 : args.length + 2)) {
-                    continue;
-                }
-
-                try {
-                    if (args == null || args.length == 0) {
-                        entity = (Entity) constructor.newInstance(chunk, nbt);
-                    } else {
-                        Object[] objects = new Object[args.length + 2];
-
-                        objects[0] = chunk;
-                        objects[1] = nbt;
-                        System.arraycopy(args, 0, objects, 2, args.length);
-                        entity = (Entity) constructor.newInstance(objects);
-
-                    }
-                } catch (Exception e) {
-                    MainLogger.getLogger().logException(e);
-                }
+            } catch (Exception e) {
+                MainLogger.getLogger().logException(e);
             }
         }
 
         return entity;
-    }
-
-    public static Entity createEntity(int type, FullChunk chunk, CompoundTag nbt, Object... args) {
-        return createEntity(String.valueOf(type), chunk, nbt, args);
     }
 
     public static boolean registerEntity(String name, Class<? extends Entity> clazz) {
