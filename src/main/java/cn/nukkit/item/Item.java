@@ -1337,6 +1337,13 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return this.cachedNBT;
     }
 
+    public CompoundTag getOrCreateNamedTag() {
+        if (!this.hasCompoundTag()) {
+            return new CompoundTag();
+        }
+        return this.getNamedTag();
+    }
+
     public Item setNamedTag(CompoundTag tag) {
         if (tag.isEmpty()) {
             return this.clearNamedTag();
@@ -1682,5 +1689,40 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public boolean isSupportedOn(int protocolId) {
         return true;
+    }
+
+    /**
+     * 设置物品锁定在玩家的物品栏的模式
+     * @param mode lock mode
+     */
+    public void setItemLockMode(ItemLockMode mode) {
+        CompoundTag tag = getOrCreateNamedTag();
+        if (mode == ItemLockMode.NONE) {
+            tag.remove("minecraft:item_lock");
+        } else {
+            tag.putByte("minecraft:item_lock", mode.ordinal());
+        }
+        this.setCompoundTag(tag);
+    }
+
+    /**
+     * 获取物品锁定在玩家的物品栏的模式
+     * <p>
+     * Get items locked mode in the player's item inventory
+     *
+     * @return lock mode
+     */
+    public ItemLockMode getItemLockMode() {
+        CompoundTag tag = getOrCreateNamedTag();
+        if (tag.contains("minecraft:item_lock")) {
+            return ItemLockMode.values()[tag.getByte("minecraft:item_lock")];
+        }
+        return ItemLockMode.NONE;
+    }
+
+    public enum ItemLockMode {
+        NONE,//only used in server
+        LOCK_IN_SLOT,
+        LOCK_IN_INVENTORY
     }
 }
