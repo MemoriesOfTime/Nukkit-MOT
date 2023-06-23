@@ -84,9 +84,9 @@ public class AvailableCommandsPacket extends DataPacket {
     private static final TypeMap<CommandParam> COMMAND_PARAMS_575 = TypeMap.builder(CommandParam.class)
             .insert(0, CommandParam.UNKNOWN)
             .insert(1, CommandParam.INT)
-            .insert(2, CommandParam.FLOAT)
-            .insert(3, CommandParam.VALUE)
-            .insert(4, CommandParam.R_VALUE)
+            //.insert(2, CommandParam.FLOAT)
+            .insert(3, CommandParam.FLOAT) // FLOAT is actually VALUE
+            .insert(4, CommandParam.VALUE) // and VALUE is actually R_VALUE
             .insert(5, CommandParam.WILDCARD_INT)
             .insert(6, CommandParam.OPERATOR)
             .insert(7, CommandParam.COMPARE_OPERATOR)
@@ -380,9 +380,9 @@ public class AvailableCommandsPacket extends DataPacket {
         postFixes.forEach(this::putString);
 
         ObjIntConsumer<BinaryStream> indexWriter;
-        if (enumValues.size() < 256) {
+        if (enumValues.size() <= 256) {
             indexWriter = WRITE_BYTE;
-        } else if (enumValues.size() < 65536) {
+        } else if (enumValues.size() <= 65536) {
             indexWriter = WRITE_SHORT;
         } else {
             indexWriter = WRITE_INT;
