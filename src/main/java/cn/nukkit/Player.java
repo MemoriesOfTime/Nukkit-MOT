@@ -1491,7 +1491,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.gamemode = gamemode;
 
         if (this.server.useClientSpectator) {
-            List<Player> updatePlayers = this.hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_19_30).filter(p -> p != this).toList();
+            List<Player> updatePlayers = this.hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_19_30).filter(p -> p != this).collect(Collectors.toList());
             ArrayList<Player> spawnPlayers = new ArrayList<>(this.hasSpawned.values());
             spawnPlayers.removeAll(updatePlayers);
 
