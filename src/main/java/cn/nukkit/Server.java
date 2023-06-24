@@ -665,6 +665,7 @@ public class Server {
         this.network.setSubName(this.getSubMotd());
         this.network.registerInterface(new RakNetInterface(this));
 
+        this.pluginManager.loadInternalPlugin();
         if (loadPlugins) {
             this.pluginManager.loadPlugins(this.pluginPath);
             this.enablePlugins(PluginLoadOrder.STARTUP);

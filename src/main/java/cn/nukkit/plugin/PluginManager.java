@@ -75,6 +75,26 @@ public class PluginManager {
         return plugins;
     }
 
+    public void loadInternalPlugin() {
+        PluginLoader pluginLoader = fileAssociations.get(JavaPluginLoader.class.getName());
+        InternalPlugin plugin = InternalPlugin.INSTANCE;
+        Map<String, Object> info = new HashMap<>();
+        info.put("name", "Nukkit-MOT");
+        info.put("version", server.getNukkitVersion());
+        info.put("main", InternalPlugin.class.getName());
+        File file;
+        try {
+            file = new File(Server.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        } catch (Exception e) {
+            file = new File(".");
+        }
+        PluginDescription description = new PluginDescription(info);
+        plugin.init(pluginLoader, server, description, new File("Nukkit-MOT"), file);
+        plugins.put(description.getName(), plugin);
+        enablePlugin(plugin);
+    }
+
+
     public Plugin loadPlugin(String path) {
         return this.loadPlugin(path, null);
     }
@@ -469,11 +489,18 @@ public class PluginManager {
         ListIterator<Plugin> plugins = new ArrayList<>(this.plugins.values()).listIterator(this.plugins.size());
 
         while (plugins.hasPrevious()) {
-            this.disablePlugin(plugins.previous());
+            Plugin previous = plugins.previous();
+            if (previous != InternalPlugin.INSTANCE) {
+                this.disablePlugin(previous);
+            }
         }
     }
 
     public void disablePlugin(Plugin plugin) {
+        if (InternalPlugin.INSTANCE == plugin) {
+            throw new UnsupportedOperationException("The Nukkit-MOT Internal plugin can't be disabled.");
+        }
+
         if (plugin.isEnabled()) {
             try {
                 plugin.getPluginLoader().disablePlugin(plugin);

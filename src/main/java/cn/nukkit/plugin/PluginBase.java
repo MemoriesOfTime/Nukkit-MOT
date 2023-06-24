@@ -84,6 +84,9 @@ abstract public class PluginBase implements Plugin {
      */
     public final void setEnabled(boolean value) {
         if (isEnabled != value) {
+            if (!value && InternalPlugin.INSTANCE == this) {
+                throw new UnsupportedOperationException("The Nukkit-MOT Internal Plugin cannot be disabled");
+            }
             isEnabled = value;
             if (isEnabled) {
                 onEnable();

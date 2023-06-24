@@ -140,14 +140,12 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.WATER] = true;
         randomTickBlocks[Block.CAULDRON_BLOCK] = true;
 
-        if (Server.getInstance().minimumProtocol >= ProtocolInfo.v1_13_0) {
-            randomTickBlocks[Block.BAMBOO] = true;
-            randomTickBlocks[Block.BAMBOO_SAPLING] = true;
-            randomTickBlocks[Block.CORAL_FAN] = true;
-            randomTickBlocks[Block.CORAL_FAN_DEAD] = true;
-            randomTickBlocks[Block.BLOCK_KELP] = true;
-            randomTickBlocks[Block.SWEET_BERRY_BUSH] = true;
-        }
+        randomTickBlocks[Block.BAMBOO] = true;
+        randomTickBlocks[Block.BAMBOO_SAPLING] = true;
+        randomTickBlocks[Block.CORAL_FAN] = true;
+        randomTickBlocks[Block.CORAL_FAN_DEAD] = true;
+        randomTickBlocks[Block.BLOCK_KELP] = true;
+        randomTickBlocks[Block.SWEET_BERRY_BUSH] = true;
     }
 
     private final Long2ObjectOpenHashMap<BlockEntity> blockEntities = new Long2ObjectOpenHashMap<>();

@@ -142,7 +142,7 @@ public class PluginDescription {
             list.add((String) api);
             this.api = list;
         }
-        if (this.main.startsWith("cn.nukkit.")) {
+        if (this.main.startsWith("cn.nukkit.") && !this.main.equals("cn.nukkit.plugin.InternalPlugin") && !name.equals("Nukkit-MOT")) {
             throw new PluginException("Invalid PluginDescription main, cannot start within the cn.nukkit. package");
         }
 
