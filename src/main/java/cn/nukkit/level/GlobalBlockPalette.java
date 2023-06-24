@@ -348,14 +348,14 @@ public class GlobalBlockPalette {
         }
 
         loadBlockStates(paletteFor(428), legacyToRuntimeId428, runtimeIdToLegacy428);
-        loadBlockStates(paletteFor(440), legacyToRuntimeId440, runtimeIdToLegacy440);
-        loadBlockStates(paletteFor(448), legacyToRuntimeId448, runtimeIdToLegacy448);
-        loadBlockStates(paletteFor(465), legacyToRuntimeId465, runtimeIdToLegacy465);
-        loadBlockStates(paletteFor(471), legacyToRuntimeId471, runtimeIdToLegacy471);
-        loadBlockStates(paletteFor(486), legacyToRuntimeId486, runtimeIdToLegacy486);
-        loadBlockStates(paletteFor(503), legacyToRuntimeId503, runtimeIdToLegacy503);
-        loadBlockStates(paletteFor(527), legacyToRuntimeId527, runtimeIdToLegacy527);
-        loadBlockStates(paletteFor(544), legacyToRuntimeId544, runtimeIdToLegacy544);
+        loadBlockStatesAndExtras(440, legacyToRuntimeId440, runtimeIdToLegacy440);
+        loadBlockStatesAndExtras(448, legacyToRuntimeId448, runtimeIdToLegacy448);
+        loadBlockStatesAndExtras(465, legacyToRuntimeId465, runtimeIdToLegacy465);
+        loadBlockStatesAndExtras(471, legacyToRuntimeId471, runtimeIdToLegacy471);
+        loadBlockStatesAndExtras(486, legacyToRuntimeId486, runtimeIdToLegacy486);
+        loadBlockStatesAndExtras(503, legacyToRuntimeId503, runtimeIdToLegacy503);
+        loadBlockStatesAndExtras(527, legacyToRuntimeId527, runtimeIdToLegacy527);
+        loadBlockStatesAndExtras(544, legacyToRuntimeId544, runtimeIdToLegacy544);
         loadBlockStatesAndExtras(560, legacyToRuntimeId560, runtimeIdToLegacy560);
         loadBlockStatesAndExtras(567, legacyToRuntimeId567, runtimeIdToLegacy567);
         loadBlockStatesAndExtras(575, legacyToRuntimeId575, runtimeIdToLegacy575);
