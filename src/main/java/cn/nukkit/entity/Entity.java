@@ -34,6 +34,7 @@ import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.EntityLink;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.ChunkException;
@@ -1871,6 +1872,16 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final void scheduleUpdate() {
+        //TODO 这是为了防止插件错误操作的，支持异步后移除这个检查
+        if (!this.server.isPrimaryThread()) {
+            this.server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, this::scheduleUpdate);
+            try {
+                throw new UnsupportedOperationException("Asynchronous Entity#scheduleUpdate()");
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return;
+        }
         this.level.updateEntities.put(this.id, this);
     }
 
