@@ -275,7 +275,7 @@ public interface AxisAlignedBB extends Cloneable {
             face = 1;
         } else if (vector == v5) {
             face = 2;
-        } else if (vector == v6) {
+        } else {
             face = 3;
         }
 

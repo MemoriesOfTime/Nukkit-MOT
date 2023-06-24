@@ -23,6 +23,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -1397,6 +1398,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return ((this.block != null) && this.block.canBePlaced());
     }
 
+    @NotNull
     public Block getBlock() {
         if (this.block != null) {
             return this.block.clone();

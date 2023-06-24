@@ -1,6 +1,7 @@
 package cn.nukkit.item;
 
 import cn.nukkit.block.Block;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -21,6 +22,7 @@ public class ItemBlock extends Item {
         this.block = block;
     }
 
+    @Override
     public void setDamage(Integer meta) {
         if (meta != null) {
             this.meta = meta & 0xffff;
@@ -37,6 +39,8 @@ public class ItemBlock extends Item {
         return block;
     }
 
+    @NotNull
+    @Override
     public Block getBlock() {
         return this.block.clone();
     }
