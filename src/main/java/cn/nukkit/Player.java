@@ -5488,6 +5488,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             if (showMessages && !ev.getDeathMessage().toString().isEmpty()) {
                 this.server.broadcast(ev.getDeathMessage(), Server.BROADCAST_CHANNEL_USERS);
+
+                if (this.protocol >= ProtocolInfo.v1_19_10) {
+                    DeathInfoPacket pk = new DeathInfoPacket();
+                    if (ev.getDeathMessage() instanceof TranslationContainer) {
+                        pk.messageTranslationKey = this.server.getLanguage().translateString(ev.getDeathMessage().getText(), ((TranslationContainer) ev.getDeathMessage()).getParameters(), null);
+                    } else {
+                        pk.messageTranslationKey = ev.getDeathMessage().getText();
+                    }
+                    this.dataPacket(pk);
+                }
             }
 
             RespawnPacket pk = new RespawnPacket();
