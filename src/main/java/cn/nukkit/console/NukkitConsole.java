@@ -3,6 +3,8 @@ package cn.nukkit.console;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.event.server.ServerCommandEvent;
+import cn.nukkit.plugin.InternalPlugin;
+import cn.nukkit.scheduler.ServerScheduler;
 import co.aikar.timings.Timings;
 import lombok.RequiredArgsConstructor;
 import net.minecrell.terminalconsole.SimpleTerminalConsole;
@@ -27,15 +29,27 @@ public class NukkitConsole extends SimpleTerminalConsole {
     @Override
     protected void runCommand(String command) {
         if (executingCommands.get()) {
-            if (Timings.serverCommandTimer != null) Timings.serverCommandTimer.startTiming();
+            if (Timings.serverCommandTimer != null) {
+                Timings.serverCommandTimer.startTiming();
+            }
+
             ServerCommandEvent event = new ServerCommandEvent(Server.getInstance().getConsoleSender(), command);
             if (Server.getInstance().getPluginManager() != null) {
                 Server.getInstance().getPluginManager().callEvent(event);
             }
             if (!event.isCancelled()) {
-                Server.getInstance().getScheduler().scheduleTask(() -> Server.getInstance().dispatchCommand(event.getSender(), event.getCommand()));
+                ServerScheduler scheduler = Server.getInstance().getScheduler();
+                if (scheduler != null) { //忽略服务器启动之前输入的命令
+                    scheduler.scheduleTask(
+                            InternalPlugin.INSTANCE.isEnabled() ? InternalPlugin.INSTANCE : null,
+                            () -> Server.getInstance().dispatchCommand(event.getSender(), event.getCommand())
+                    );
+                }
             }
-            if (Timings.serverCommandTimer != null) Timings.serverCommandTimer.stopTiming();
+
+            if (Timings.serverCommandTimer != null) {
+                Timings.serverCommandTimer.stopTiming();
+            }
         } else {
             consoleQueue.add(command);
         }
