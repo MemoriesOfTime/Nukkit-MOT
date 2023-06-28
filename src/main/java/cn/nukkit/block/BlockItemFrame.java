@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
+import cn.nukkit.event.block.ItemFrameUseEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemItemFrame;
@@ -87,6 +88,11 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
         BlockEntityItemFrame itemFrame = (BlockEntityItemFrame) blockEntity;
         if (itemFrame.getItem().getId() == Item.AIR) {
             Item itemToFrame = item.clone();
+            ItemFrameUseEvent event = new ItemFrameUseEvent(player, this, itemFrame, itemToFrame, ItemFrameUseEvent.Action.PUT);
+            this.getLevel().getServer().getPluginManager().callEvent(event);
+            if (event.isCancelled()) {
+                return false;
+            }
             if (player != null && player.isSurvival()) {
                 item.setCount(item.getCount() - 1);
                 player.getInventory().setItemInHand(item);
@@ -99,6 +105,11 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
             }
             this.getLevel().addSound(new ItemFrameItemAddedSound(this));
         } else {
+            ItemFrameUseEvent event = new ItemFrameUseEvent(player, this, itemFrame, null, ItemFrameUseEvent.Action.ROTATION);
+            this.getLevel().getServer().getPluginManager().callEvent(event);
+            if (event.isCancelled()) {
+                return false;
+            }
             itemFrame.setItemRotation((itemFrame.getItemRotation() + 1) % 8);
             if (isStoringMap()) {
                 setStoringMap(false);
