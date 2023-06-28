@@ -453,6 +453,8 @@ public abstract class Entity extends Location implements Metadatable {
     private volatile boolean init;
     private volatile boolean initEntity;
 
+    protected volatile boolean saveWithChunk = true;
+
     public float getHeight() {
         return 0;
     }
@@ -1441,6 +1443,18 @@ public abstract class Entity extends Location implements Metadatable {
 
     public boolean canCollideWith(Entity entity) {
         return !this.justCreated && this != entity && !this.noClip;
+    }
+
+    public boolean canBeSavedWithChunk() {
+        return this.saveWithChunk;
+    }
+
+    /**
+     * 设置实体是否可以保存到区块
+     * @param saveWithChunk 是否可以保存到区块
+     */
+    public void setCanBeSavedWithChunk(boolean saveWithChunk) {
+        this.saveWithChunk = saveWithChunk;
     }
 
     protected boolean checkObstruction(double x, double y, double z) {
