@@ -1122,6 +1122,7 @@ public class Server {
 
                         if (allocated > 0 || !doLevelGC) {
                             try {
+                                //noinspection BusyWait
                                 Thread.sleep(allocated, 900000);
                             } catch (Exception e) {
                                 this.getLogger().logException(e);
@@ -1129,12 +1130,11 @@ public class Server {
                         }
                     }
                 } catch (RuntimeException e) {
-                    this.getLogger().logException(e);
+                    log.error("A RuntimeException happened while ticking the server", e);
                 }
             }
         } catch (Throwable e) {
-            log.fatal("Exception happened while ticking server", e);
-            log.fatal(Utils.getAllThreadDumps());
+            log.fatal("Exception happened while ticking server\n{}", Utils.getAllThreadDumps(), e);
         }
     }
 
