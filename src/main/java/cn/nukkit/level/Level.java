@@ -4625,15 +4625,18 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         double x;
+        double y;
         double z;
         if (this == nether) {
-            x = Math.floor(portal.getFloorX() << 3);
-            z = Math.floor(portal.getFloorZ() << 3);
+            x = portal.getFloorX() << 3;
+            y = NukkitMath.clamp(portal.getFloorY(), 70, 246);
+            z = portal.getFloorZ() << 3;
         } else {
-            x = Math.floor(portal.getFloorX() >> 3);
-            z = Math.floor(portal.getFloorZ() >> 3);
+            x = portal.getFloorX() >> 3;
+            y = NukkitMath.clamp(portal.getFloorY(), 70, 118);
+            z = portal.getFloorZ() >> 3;
         }
-        return new Position(x, portal.getFloorY(), z, this == nether ? Server.getInstance().getDefaultLevel() : nether);
+        return new Position(x, y, z, this == nether ? Server.getInstance().getDefaultLevel() : nether);
     }
 
     private ConcurrentMap<Long, Int2ObjectMap<Player>> getChunkSendQueue(int protocol) {

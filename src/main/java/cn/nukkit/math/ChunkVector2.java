@@ -18,6 +18,8 @@
 
 package cn.nukkit.math;
 
+import java.util.Objects;
+
 /**
  * @author joserobjr
  * @since 2020-09-20
@@ -132,4 +134,20 @@ public class ChunkVector2 {
         return "MutableChunkVector(x=" + this.x + ",z=" + this.z + ")";
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ChunkVector2 that = (ChunkVector2) o;
+        return x == that.x && z == that.z;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(x, z);
+    }
 }
