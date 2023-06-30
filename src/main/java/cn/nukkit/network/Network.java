@@ -187,7 +187,7 @@ public class Network {
     public void processBatch(BatchPacket packet, Player player) {
         ObjectArrayList<DataPacket> packets = new ObjectArrayList<>();
         try {
-            this.processBatch(packet.payload, packets, player.getNetworkSession().getCompression(), player.protocol, player.raknetProtocol);
+            this.processBatch(packet.payload, packets, player.getNetworkSession().getCompression(), player.raknetProtocol, player);
             this.processPackets(player, packets);
         } catch (Exception e) {
             log.error("Error whilst decoding batch packet from " + player.getName(), e);
@@ -195,10 +195,14 @@ public class Network {
         }
     }
 
-    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int protocol, int raknetProtocol) throws ProtocolException {
+    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) throws ProtocolException {
+        int maxSize = 3145728; // 3 * 1024 * 1024
+        if (player != null && player.getSkin() == null) {
+            maxSize = 6291456; // 6 * 1024 * 1024
+        }
         byte[] data;
         try {
-            data = compression.decompress(payload);
+            data = compression.decompress(payload, maxSize);
         } catch (Exception e) {
             log.debug("Exception while inflating batch packet", e);
             return;
@@ -236,7 +240,7 @@ public class Network {
                 DataPacket pk = this.getPacket(packetId);
 
                 if (pk != null) {
-                    pk.protocol = protocol;
+                    pk.protocol = player == null ? Integer.MAX_VALUE : player.protocol;
                     pk.setBuffer(buf, buf.length - bais.available());
                     try {
                         if (raknetProtocol > 8) {

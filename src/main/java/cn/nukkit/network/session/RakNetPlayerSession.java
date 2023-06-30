@@ -100,7 +100,7 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
             buffer.readBytes(packetBuffer);
 
             try {
-                this.server.getNetwork().processBatch(packetBuffer, this.inbound, this.getCompression(), this.player == null ? ProtocolInfo.CURRENT_PROTOCOL : this.player.protocol, this.session.getProtocolVersion());
+                this.server.getNetwork().processBatch(packetBuffer, this.inbound, this.getCompression(), this.session.getProtocolVersion(), this.player);
             } catch (ProtocolException e) {
                 this.disconnect("Sent malformed packet");
                 log.error("Unable to process batch packet", e);

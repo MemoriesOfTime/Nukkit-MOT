@@ -27,7 +27,12 @@ public interface CompressionProvider {
 
         @Override
         public byte[] decompress(byte[] compressed) throws Exception {
-            return Zlib.inflate(compressed, 2097152); // 2 * 1024 * 1024
+            return Zlib.inflate(compressed, 3145728); // 3 * 1024 * 1024
+        }
+
+        @Override
+        public byte[] decompress(byte[] compressed, int maxSize) throws Exception {
+            return Zlib.inflate(compressed, maxSize);
         }
     };
 
@@ -39,7 +44,12 @@ public interface CompressionProvider {
 
         @Override
         public byte[] decompress(byte[] compressed) throws Exception {
-            return Zlib.inflateRaw(compressed, 2097152); // 2 * 1024 * 1024
+            return Zlib.inflateRaw(compressed, 3145728); // 3 * 1024 * 1024
+        }
+
+        @Override
+        public byte[] decompress(byte[] compressed, int maxSize) throws Exception {
+            return Zlib.inflateRaw(compressed, maxSize);
         }
     };
 
@@ -51,13 +61,22 @@ public interface CompressionProvider {
 
         @Override
         public byte[] decompress(byte[] compressed) throws Exception {
-            return SnappyCompression.decompress(compressed, 2097152); // 2 * 1024 * 1024
+            return SnappyCompression.decompress(compressed, 3145728); // 3 * 1024 * 1024
+        }
+
+        @Override
+        public byte[] decompress(byte[] compressed, int maxSize) throws Exception {
+            return SnappyCompression.decompress(compressed, maxSize);
         }
     };
 
 
     byte[] compress(BinaryStream packet, int level) throws Exception;
     byte[] decompress(byte[] compressed) throws Exception;
+
+    default byte[] decompress(byte[] compressed, int maxSize) throws Exception {
+        return this.decompress(compressed);
+    }
 
     static CompressionProvider from(PacketCompressionAlgorithm algorithm, int raknetProtocol) {
         if (algorithm == null) {
