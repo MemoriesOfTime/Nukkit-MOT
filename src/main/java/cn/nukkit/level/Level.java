@@ -52,7 +52,6 @@ import cn.nukkit.metadata.Metadatable;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.*;
-import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.scheduler.BlockUpdateScheduler;
@@ -155,7 +154,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public final Long2ObjectOpenHashMap<Entity> entities = new Long2ObjectOpenHashMap<>();
 
-    public final Long2ObjectOpenHashMap<Entity> updateEntities = new Long2ObjectOpenHashMap<>();
+    public final Long2ObjectMap<Entity> updateEntities = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
 
     private final ConcurrentLinkedQueue<BlockEntity> updateBlockEntities = new ConcurrentLinkedQueue<>();
 
@@ -3508,17 +3507,6 @@ public class Level implements ChunkManager, Metadatable {
     public void removeEntity(Entity entity) {
         if (entity.getLevel() != this) {
             throw new LevelException("Invalid Entity level");
-        }
-
-        //TODO 这是为了防止插件错误操作的，支持异步后移除这个检查
-        if (!this.server.isPrimaryThread()) {
-            this.server.getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> removeEntity(entity));
-            try {
-                throw new UnsupportedOperationException("Asynchronous Level#removeEntity()");
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            return;
         }
 
         if (entity instanceof Player) {

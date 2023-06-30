@@ -70,6 +70,7 @@ import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.permission.Permission;
 import cn.nukkit.permission.PermissionAttachment;
 import cn.nukkit.permission.PermissionAttachmentInfo;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
@@ -1827,14 +1828,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (server.vanillaPortals) {
-                    Position foundPortal = BlockNetherPortal.findNearestPortal(this.portalPos);
-                    if (foundPortal == null) {
-                        BlockNetherPortal.spawnPortal(this.portalPos);
-                        this.teleport(this.portalPos.add(1.5, 1, 0.5));
-                    } else {
-                        this.teleport(BlockNetherPortal.getSafePortal(foundPortal));
-                    }
-                    this.portalPos = null;
+                    this.inPortalTicks = 81;
+                    this.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask() {
+                        @Override
+                        public void onRun() {
+                            Position foundPortal = BlockNetherPortal.findNearestPortal(portalPos);
+                            getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
+                                if (foundPortal == null) {
+                                    BlockNetherPortal.spawnPortal(portalPos);
+                                    teleport(portalPos.add(1.5, 1, 0.5));
+                                } else {
+                                    teleport(BlockNetherPortal.getSafePortal(foundPortal));
+                                }
+                                portalPos = null;
+                            });
+                        }
+                    });
                 } else {
                     if (this.getLevel().getDimension() == Level.DIMENSION_NETHER) {
                         this.teleport(this.getServer().getDefaultLevel().getSafeSpawn(), TeleportCause.NETHER_PORTAL);
