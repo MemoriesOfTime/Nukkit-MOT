@@ -10,11 +10,10 @@ import cn.nukkit.item.ItemItemFrame;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.sound.ItemFrameItemAddedSound;
 import cn.nukkit.level.sound.ItemFrameItemRotated;
-import cn.nukkit.level.sound.ItemFramePlacedSound;
-import cn.nukkit.level.sound.ItemFrameRemovedSound;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
 
@@ -138,7 +137,7 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
                 }
             }
             BlockEntity.createBlockEntity(BlockEntity.ITEM_FRAME, this.getChunk(), nbt);
-            this.getLevel().addSound(new ItemFramePlacedSound(this));
+            this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_ITEM_FRAME_PLACED);
             return true;
         }
         return false;
@@ -147,7 +146,7 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
     @Override
     public boolean onBreak(Item item) {
         this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
-        this.getLevel().addSound(new ItemFrameRemovedSound(this));
+        this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_ITEM_FRAME_REMOVED);
         return true;
     }
 

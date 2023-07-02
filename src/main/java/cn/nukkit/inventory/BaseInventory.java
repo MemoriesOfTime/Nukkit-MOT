@@ -60,11 +60,7 @@ public abstract class BaseInventory implements Inventory {
 
         this.type = type;
 
-        if (overrideSize != null) {
-            this.size = overrideSize;
-        } else {
-            this.size = this.type.getDefaultSize();
-        }
+        this.size = Objects.requireNonNullElseGet(overrideSize, this.type::getDefaultSize);
 
         if (overrideTitle != null) {
             this.title = overrideTitle;
@@ -109,7 +105,7 @@ public abstract class BaseInventory implements Inventory {
     }
 
     public Item getItemFast(int index) {
-        return this.slots.containsKey(index) ? this.slots.get(index) : air;
+        return this.slots.getOrDefault(index, air);
     }
 
     @Override
@@ -341,7 +337,7 @@ public abstract class BaseInventory implements Inventory {
             }
         }
 
-        return itemSlots.toArray(new Item[0]);
+        return itemSlots.toArray(Item.EMPTY_ARRAY);
     }
 
     @Override
@@ -376,7 +372,7 @@ public abstract class BaseInventory implements Inventory {
             }
         }
 
-        return itemSlots.toArray(new Item[0]);
+        return itemSlots.toArray(Item.EMPTY_ARRAY);
     }
 
     @Override
