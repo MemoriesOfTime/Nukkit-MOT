@@ -6,6 +6,8 @@ import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.custom.EntityDefinition;
+import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
 import cn.nukkit.entity.mob.EntitySnowGolem;
@@ -534,52 +536,56 @@ public class Level implements ChunkManager, Metadatable {
         this.addSound(sound, players.toArray(new Player[0]));
     }
 
-    public void addLevelSoundEvent(Vector3 pos, int type, int data, int entityType) {
+    public void addLevelSoundEvent(@NotNull Vector3 pos, int type, int data, int entityType) {
         this.addLevelSoundEvent(pos, type, data, entityType, null);
     }
 
-    public void addLevelSoundEvent(Vector3 pos, int type, int data, int entityType, Player[] players) {
+    public void addLevelSoundEvent(@NotNull Vector3 pos, int type, int data, int entityType, Player[] players) {
         this.addLevelSoundEvent(pos, type, data, entityType, false, false, players);
     }
 
-    public void addLevelSoundEvent(Vector3 pos, int type, int data, int entityType, boolean isBaby, boolean isGlobal) {
+    public void addLevelSoundEvent(@NotNull Vector3 pos, int type, int data, int entityType, boolean isBaby, boolean isGlobal) {
         this.addLevelSoundEvent(pos, type, data, entityType, isBaby, isGlobal, null);
     }
 
-    public void addLevelSoundEvent(Vector3 pos, int type, int data, int entityType, boolean isBaby, boolean isGlobal, Player[] players) {
-        String identifier = Entity.getEntityRuntimeMapping().getOrDefault(entityType, ":");
+    public void addLevelSoundEvent(@NotNull Vector3 pos, int type, int data, int entityType, boolean isBaby, boolean isGlobal, Player[] players) {
+        String identifier = Entity.getEntityRuntimeMapping().get(entityType);
+        if (identifier == null) {
+            EntityDefinition entityDefinition = EntityManager.get().getDefinition(entityType);
+            identifier = entityDefinition == null ? ":" : entityDefinition.getIdentifier();
+        }
         this.addLevelSoundEvent(pos, type, data, identifier, isBaby, isGlobal, players);
     }
 
-    public void addLevelSoundEvent(Vector3 pos, int type) {
+    public void addLevelSoundEvent(@NotNull Vector3 pos, int type) {
         this.addLevelSoundEvent(pos, type, null);
     }
 
-    public void addLevelSoundEvent(Vector3 pos, int type, Player[] players) {
+    public void addLevelSoundEvent(@NotNull Vector3 pos, int type, Player[] players) {
         this.addLevelSoundEvent(pos, type, -1, players);
     }
 
-    public void addLevelSoundEvent(int type, int pitch, int data, Vector3 pos) {
+    public void addLevelSoundEvent(int type, int pitch, int data, @NotNull Vector3 pos) {
         this.addLevelSoundEvent(type, pitch, data, pos, null);
     }
 
-    public void addLevelSoundEvent(int type, int pitch, int data, Vector3 pos, Player[] players) {
+    public void addLevelSoundEvent(int type, int pitch, int data, @NotNull Vector3 pos, Player[] players) {
         this.addLevelSoundEvent(pos, type, data, ":", false, false, players);
     }
 
-    public void addLevelSoundEvent(Vector3 pos, int type, int data) {
+    public void addLevelSoundEvent(@NotNull Vector3 pos, int type, int data) {
         this.addLevelSoundEvent(pos, type, data, null);
     }
 
-    public void addLevelSoundEvent(Vector3 pos, int type, int data, Player[] players) {
+    public void addLevelSoundEvent(@NotNull Vector3 pos, int type, int data, Player[] players) {
         this.addLevelSoundEvent(pos, type, data, ":", false, false, players);
     }
 
-    public void addLevelSoundEvent(Vector3 pos, int type, int data, String identifier, boolean isBaby, boolean isGlobal) {
+    public void addLevelSoundEvent(@NotNull Vector3 pos, int type, int data, @NotNull String identifier, boolean isBaby, boolean isGlobal) {
         this.addLevelSoundEvent(pos, type, data, identifier, isBaby, isGlobal, null);
     }
 
-    public void addLevelSoundEvent(Vector3 pos, int type, int data, String identifier, boolean isBaby, boolean isGlobal, Player[] players) {
+    public void addLevelSoundEvent(@NotNull Vector3 pos, int type, int data, @NotNull String identifier, boolean isBaby, boolean isGlobal, Player[] players) {
         LevelSoundEventPacket pk = new LevelSoundEventPacket();
         pk.sound = type;
         pk.extraData = data;
