@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
  */
 public class HastebinUtility {
 
-    public static final String BIN_URL = "https://www.toptal.com/developers/hastebin/documents", USER_AGENT = "Mozilla/5.0";
+    public static final String BIN_URL = "https://hastebin.com/documents", USER_AGENT = "Mozilla/5.0";
     public static final Pattern PATTERN = Pattern.compile("\\{\"key\":\"([\\S\\s]*)\"}");
 
     /**
@@ -28,6 +28,8 @@ public class HastebinUtility {
         final HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
         connection.setRequestMethod("POST");
+        //TODO
+        connection.setRequestProperty("Authorization", "Bearer 728cd24267434cd5c872909229b7294f1649f8ffd28b5ef4d4938a683535308762ac9ed05caa6212f37d2ab031d6cdad78bf8dcc59f24a1c5707838a7b4c118e");
         connection.setRequestProperty("User-Agent", USER_AGENT);
         connection.setDoOutput(true);
 
@@ -48,7 +50,7 @@ public class HastebinUtility {
 
         Matcher matcher = PATTERN.matcher(response.toString());
         if (matcher.matches()) {
-            return "https://www.toptal.com/developers/hastebin/" + matcher.group(1);
+            return "https://hastebin.com/share/" + matcher.group(1);
         } else {
             throw new RuntimeException("Couldn't read response!");
         }
