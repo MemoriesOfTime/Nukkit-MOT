@@ -26,7 +26,6 @@ import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.TextPacket;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockIterator;
-import co.aikar.timings.Timings;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -276,8 +275,6 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        if (Timings.livingEntityBaseTickTimer != null) Timings.livingEntityBaseTickTimer.startTiming();
-
         boolean inWater = this.isSubmerged();
 
         if (this instanceof Player && !this.closed) {
@@ -390,8 +387,6 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 }
             }
         }
-
-        if (Timings.livingEntityBaseTickTimer != null) Timings.livingEntityBaseTickTimer.stopTiming();
 
         return hasUpdate;
     }

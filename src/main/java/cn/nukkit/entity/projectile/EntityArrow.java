@@ -107,8 +107,6 @@ public class EntityArrow extends EntitySlenderProjectile {
             return false;
         }
 
-        if (this.timing != null) this.timing.startTiming();
-
         if (this.age > 1200) {
             this.close();
             return false;
@@ -121,8 +119,6 @@ public class EntityArrow extends EntitySlenderProjectile {
         if (this.fireTicks > 0 && this.level.isRaining() && this.canSeeSky()) {
             this.extinguish();
         }
-
-        if (this.timing != null) this.timing.stopTiming();
 
         return super.onUpdate(currentTick);
     }

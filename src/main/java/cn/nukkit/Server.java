@@ -76,7 +76,6 @@ import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.scheduler.Task;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.bugreport.ExceptionHandler;
-import co.aikar.timings.Timings;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonParser;
@@ -500,6 +499,10 @@ public class Server {
      * Network Compression Threshold
      */
     public int networkCompressionThreshold;
+    /**
+     * Enable Spark Plugin
+     */
+    public boolean enableSpark;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -668,6 +671,9 @@ public class Server {
         this.pluginManager.loadInternalPlugin();
         if (loadPlugins) {
             this.pluginManager.loadPlugins(this.pluginPath);
+            if (this.enableSpark) {
+                SparkInstaller.initSpark(this);
+            }
             this.enablePlugins(PluginLoadOrder.STARTUP);
         }
 
@@ -975,9 +981,11 @@ public class Server {
 
         this.pluginManager.registerInterface(JavaPluginLoader.class);
         this.pluginManager.loadPlugins(this.pluginPath);
+        if (this.enableSpark) {
+            SparkInstaller.initSpark(this);
+        }
         this.enablePlugins(PluginLoadOrder.STARTUP);
         this.enablePlugins(PluginLoadOrder.POSTWORLD);
-        Timings.reset();
     }
 
     public void shutdown() {
@@ -1045,9 +1053,6 @@ public class Server {
                 this.getLogger().debug("Closing name lookup DB...");
                 nameLookup.close();
             }
-
-            this.getLogger().debug("Disabling timings...");
-            Timings.stopServer();
         } catch (Exception e) {
             log.fatal("Exception happened while shutting down, exiting the process", e);
             System.exit(1);
@@ -1320,7 +1325,6 @@ public class Server {
 
     public void doAutoSave() {
         if (this.autoSave) {
-            if (Timings.levelSaveTimer != null) Timings.levelSaveTimer.startTiming();
             for (Player player : new ArrayList<>(this.players.values())) {
                 if (player.isOnline()) {
                     player.save(true);
@@ -1334,7 +1338,6 @@ public class Server {
                     level.save();
                 }
             }
-            if (Timings.levelSaveTimer != null) Timings.levelSaveTimer.stopTiming();
         }
     }
 
@@ -1355,23 +1358,15 @@ public class Server {
             return;
         }
 
-        if (Timings.isTimingsEnabled()) {
-            Timings.fullServerTickTimer.startTiming();
-        }
-
         ++this.tickCounter;
 
-        if (Timings.connectionTimer != null) Timings.connectionTimer.startTiming();
         this.network.processInterfaces();
 
         if (this.rcon != null) {
             this.rcon.check();
         }
-        if (Timings.connectionTimer != null) Timings.connectionTimer.stopTiming();
 
-        if (Timings.schedulerTimer != null) Timings.schedulerTimer.startTiming();
         this.scheduler.mainThreadHeartbeat(this.tickCounter);
-        if (Timings.schedulerTimer != null) Timings.schedulerTimer.stopTiming();
 
         this.checkTickUpdates(this.tickCounter);
 
@@ -1409,10 +1404,6 @@ public class Server {
             for (Level level : this.levelArray) {
                 level.doChunkGarbageCollection();
             }
-        }
-
-        if (Timings.isTimingsEnabled()) {
-            Timings.fullServerTickTimer.stopTiming();
         }
 
         long nowNano = System.nanoTime();
@@ -3030,16 +3021,9 @@ public class Server {
         this.asyncChunkSending = this.getPropertyBoolean("async-chunks", false);
         this.deprecatedVerbose = this.getPropertyBoolean("deprecated-verbose", true);
         switch (this.getPropertyString("server-authoritative-movement")) {
-            case "client-auth":
-                this.serverAuthoritativeMovementMode = 0;
-                break;
-            case "server-auth-with-rewind":
-                this.serverAuthoritativeMovementMode = 2;
-                break;
-            case "server-auth":
-            default:
-                this.serverAuthoritativeMovementMode = 1;
-                break;
+            case "client-auth" -> this.serverAuthoritativeMovementMode = 0;
+            case "server-auth-with-rewind" -> this.serverAuthoritativeMovementMode = 2;
+            default -> this.serverAuthoritativeMovementMode = 1;
         }
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
         this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
@@ -3047,6 +3031,7 @@ public class Server {
         this.useSnappy = this.getPropertyBoolean("use-snappy-compression", false);
         this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);
         this.networkCompressionThreshold = this.getPropertyInt("compression-threshold", 256);
+        this.enableSpark = this.getPropertyBoolean("enable-spark", true);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
@@ -3131,12 +3116,6 @@ public class Server {
             put("auto-tick-rate-limit", 20);
             put("base-tick-rate", 1);
             put("always-tick-players", false);
-            put("enable-timings", false);
-            put("timings-verbose", false);
-            put("timings-privacy", false);
-            put("timings-history-interval", 6000);
-            put("timings-history-length", 72000);
-            put("timings-bypass-max", false);
             put("light-updates", false);
             put("clear-chunk-tick-list", true);
             put("cache-chunks", false);
@@ -3197,6 +3176,7 @@ public class Server {
             put("use-snappy-compression", false);
             put("use-client-spectator", true);
             put("compression-threshold", "256");
+            put("enable-spark", true);
         }
     }
 

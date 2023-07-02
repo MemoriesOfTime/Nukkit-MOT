@@ -20,7 +20,6 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.utils.Utils;
-import co.aikar.timings.Timings;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.apache.commons.math3.util.FastMath;
@@ -198,15 +197,8 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        if (Timings.entityBaseTickTimer != null) {
-            Timings.entityBaseTickTimer.startTiming();
-        }
-
         if (this.canDespawn() && this.age > Server.getInstance().mobDespawnTicks && !this.hasCustomName() && !(this instanceof EntityBoss)) {
             this.close();
-            if (Timings.entityBaseTickTimer != null) {
-                Timings.entityBaseTickTimer.stopTiming();
-            }
             return true;
         }
 
@@ -239,10 +231,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             }
         } else if (this.isInLoveCooldown()) {
             this.inLoveCooldown -= tickDiff;
-        }
-
-        if (Timings.entityBaseTickTimer != null) {
-            Timings.entityBaseTickTimer.stopTiming();
         }
 
         return hasUpdate;
@@ -324,10 +312,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             return false;
         }
 
-        if (Timings.entityMoveTimer != null) {
-            Timings.entityMoveTimer.startTiming();
-        }
-
         this.blocksAround = null;
 
         double movX = dx * moveMultiplier;
@@ -357,9 +341,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.checkGroundState(movX, movY, movZ, dx, dy, dz);
         this.updateFallState(this.onGround);
 
-        if (Timings.entityMoveTimer != null) {
-            Timings.entityMoveTimer.stopTiming();
-        }
         return true;
     }
 

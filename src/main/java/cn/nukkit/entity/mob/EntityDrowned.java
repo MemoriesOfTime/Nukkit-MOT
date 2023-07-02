@@ -18,7 +18,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.utils.Utils;
-import co.aikar.timings.Timings;
 import org.apache.commons.math3.util.FastMath;
 
 import java.util.ArrayList;
@@ -124,8 +123,6 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
     
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.startTiming();
-
         if (getServer().getDifficulty() == 0) {
             this.close();
             return true;
@@ -137,7 +134,6 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
             this.setOnFire(100);
         }
 
-        if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.stopTiming();
         return hasUpdate;
     }
 

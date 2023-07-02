@@ -11,7 +11,6 @@ import cn.nukkit.math.BVector3;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
-import co.aikar.timings.Timings;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -55,9 +54,6 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
     public boolean move(double dx, double dy, double dz) {
         if (dx == 0 && dz == 0 && dy == 0) {
             return true;
-        }
-        if (Timings.entityMoveTimer != null) {
-            Timings.entityMoveTimer.startTiming();
         }
 
         this.ySize *= 0.4;
@@ -186,9 +182,6 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
             this.onHitGround(getPosition());
         }
 
-        if (Timings.entityMoveTimer != null) {
-            Timings.entityMoveTimer.stopTiming();
-        }
         return true;
     }
 

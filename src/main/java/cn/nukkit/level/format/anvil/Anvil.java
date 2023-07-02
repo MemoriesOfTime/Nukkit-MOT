@@ -166,7 +166,6 @@ public class Anvil extends BaseLevelProvider {
         int regionX = getRegionIndexX(chunkX);
         int regionZ = getRegionIndexZ(chunkZ);
         BaseRegionLoader region = this.loadRegion(regionX, regionZ);
-        if (this.level.timings.syncChunkLoadDataTimer != null) this.level.timings.syncChunkLoadDataTimer.startTiming();
         BaseFullChunk chunk;
         try {
             chunk = region.readChunk(chunkX - (regionX << 5), chunkZ - (regionZ << 5));
@@ -181,7 +180,6 @@ public class Anvil extends BaseLevelProvider {
         } else {
             putChunk(index, chunk);
         }
-        if (this.level.timings.syncChunkLoadDataTimer != null) this.level.timings.syncChunkLoadDataTimer.stopTiming();
         return chunk;
     }
 

@@ -5,7 +5,6 @@ import cn.nukkit.Server;
 import cn.nukkit.event.server.ServerCommandEvent;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.ServerScheduler;
-import co.aikar.timings.Timings;
 import lombok.RequiredArgsConstructor;
 import net.minecrell.terminalconsole.SimpleTerminalConsole;
 import org.jline.reader.LineReader;
@@ -29,10 +28,6 @@ public class NukkitConsole extends SimpleTerminalConsole {
     @Override
     protected void runCommand(String command) {
         if (executingCommands.get()) {
-            if (Timings.serverCommandTimer != null) {
-                Timings.serverCommandTimer.startTiming();
-            }
-
             ServerCommandEvent event = new ServerCommandEvent(Server.getInstance().getConsoleSender(), command);
             if (Server.getInstance().getPluginManager() != null) {
                 Server.getInstance().getPluginManager().callEvent(event);
@@ -45,10 +40,6 @@ public class NukkitConsole extends SimpleTerminalConsole {
                             () -> Server.getInstance().dispatchCommand(event.getSender(), event.getCommand())
                     );
                 }
-            }
-
-            if (Timings.serverCommandTimer != null) {
-                Timings.serverCommandTimer.stopTiming();
             }
         } else {
             consoleQueue.add(command);

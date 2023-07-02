@@ -145,8 +145,6 @@ public class EntityPotion extends EntityProjectile {
             return false;
         }
 
-        if (this.timing != null) this.timing.startTiming();
-
         if (this.isCollided) {
             this.splash(null);
         }
@@ -155,8 +153,6 @@ public class EntityPotion extends EntityProjectile {
             this.close();
             return false;
         }
-
-        if (this.timing != null) this.timing.stopTiming();
 
         return super.onUpdate(currentTick);
     }

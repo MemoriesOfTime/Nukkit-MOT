@@ -27,6 +27,7 @@ import java.util.ArrayDeque;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
+@Deprecated
 class TimingIdentifier {
 
     static final Map<String, TimingGroup> GROUP_MAP = new IdentityHashMap<>(64);

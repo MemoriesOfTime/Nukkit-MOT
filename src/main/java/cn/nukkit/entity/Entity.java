@@ -39,9 +39,6 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.ChunkException;
 import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.Utils;
-import co.aikar.timings.Timing;
-import co.aikar.timings.Timings;
-import co.aikar.timings.TimingsHistory;
 import com.google.common.collect.Iterables;
 import org.apache.commons.math3.util.FastMath;
 
@@ -445,8 +442,6 @@ public abstract class Entity extends Location implements Metadatable {
 
     public boolean noClip = false;
 
-    protected Timing timing;
-
     public final boolean isPlayer;
 
     private volatile boolean init;
@@ -561,8 +556,6 @@ public abstract class Entity extends Location implements Metadatable {
         }
 
         this.init = true;
-
-        this.timing = Timings.getEntityTiming(this);
 
         this.temporalVector = new Vector3();
 
@@ -1556,8 +1549,6 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean entityBaseTick(int tickDiff) {
-        if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.startTiming();
-
         if (!this.isPlayer) {
             //this.blocksAround = null; // Use only when entity moves for better performance
             this.collisionBlocks = null;
@@ -1571,7 +1562,6 @@ public abstract class Entity extends Location implements Metadatable {
             if (!this.isPlayer) {
                 this.close();
             }
-            if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.stopTiming();
             return false;
         }
         if (riding != null && !riding.isAlive() && riding instanceof EntityRideable) {
@@ -1648,9 +1638,7 @@ public abstract class Entity extends Location implements Metadatable {
 
         this.age += tickDiff;
         this.ticksLived += tickDiff;
-        TimingsHistory.activatedEntityTicks++;
 
-        if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.stopTiming();
         return hasUpdate;
     }
 
@@ -2184,8 +2172,6 @@ public abstract class Entity extends Location implements Metadatable {
             return true;
         }
 
-        if (Timings.entityMoveTimer != null) Timings.entityMoveTimer.startTiming();
-
         AxisAlignedBB newBB = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
 
         if (server.getAllowFlight() || !this.level.hasCollision(this, newBB, false)) {
@@ -2206,7 +2192,6 @@ public abstract class Entity extends Location implements Metadatable {
         }
         this.isCollided = this.onGround;
         this.updateFallState(this.onGround);
-        if (Timings.entityMoveTimer != null) Timings.entityMoveTimer.stopTiming();
         return true;
     }
 
@@ -2225,8 +2210,6 @@ public abstract class Entity extends Location implements Metadatable {
             this.onGround = this.isPlayer;
             return true;
         } else {
-            if (Timings.entityMoveTimer != null) Timings.entityMoveTimer.startTiming();
-
             this.ySize *= STEP_CLIP_MULTIPLIER;
 
             double movX = dx;
@@ -2327,7 +2310,6 @@ public abstract class Entity extends Location implements Metadatable {
                 this.motionZ = 0;
             }
 
-            if (Timings.entityMoveTimer != null) Timings.entityMoveTimer.stopTiming();
             return true;
         }
     }
