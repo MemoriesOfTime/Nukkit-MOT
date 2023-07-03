@@ -158,7 +158,7 @@ public class Explosion {
 
             if (distance <= 1) {
                 Vector3 motion = entity.subtract(this.source).normalize();
-                int exposure = 1;
+                float exposure = 1 - this.level.getBlockDensity(this.source, entity.boundingBox);
                 double impact = (1 - distance) * exposure;
 
                 int damage = this.doesDamage ? (int) (((impact * impact + impact) / 2) * 8 * explosionSize + 1) : 0;
