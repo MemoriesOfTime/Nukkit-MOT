@@ -19,6 +19,7 @@ import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
@@ -46,7 +47,7 @@ public class Anvil extends BaseLevelProvider {
     public static boolean isValid(String path) {
         boolean isValid = (new File(path + "/level.dat").exists()) && new File(path + "/region/").isDirectory();
         if (isValid) {
-            for (File file : new File(path + "/region/").listFiles((dir, name) -> Pattern.matches("^.+\\.mc[r|a]$", name))) {
+            for (File file : Objects.requireNonNull(new File(path + "/region/").listFiles((dir, name) -> Pattern.matches("^.+\\.mc[r|a]$", name)))) {
                 if (!file.getName().endsWith(".mca")) {
                     isValid = false;
                     break;

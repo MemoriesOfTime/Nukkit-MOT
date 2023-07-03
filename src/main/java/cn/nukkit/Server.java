@@ -90,6 +90,7 @@ import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.impl.Iq80DBFactory;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.net.*;
@@ -98,6 +99,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -197,18 +199,23 @@ public class Server {
 
     private static final Pattern uuidPattern = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}.dat$");
 
-    private final Map<Integer, Level> levels = new HashMap<Integer, Level>() {
-        public Level put(Integer key, Level value) {
+    private final Map<Integer, Level> levels = new ConcurrentHashMap<>() {
+        @Override
+        public Level put(@NotNull Integer key, @NotNull Level value) {
             Level result = super.put(key, value);
             levelArray = levels.values().toArray(new Level[0]);
             return result;
         }
+
+        @Override
         public boolean remove(Object key, Object value) {
             boolean result = super.remove(key, value);
             levelArray = levels.values().toArray(new Level[0]);
             return result;
         }
-        public Level remove(Object key) {
+
+        @Override
+        public Level remove(@NotNull Object key) {
             Level result = super.remove(key);
             levelArray = levels.values().toArray(new Level[0]);
             return result;

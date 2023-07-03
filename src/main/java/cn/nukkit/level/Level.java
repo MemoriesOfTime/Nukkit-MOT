@@ -147,11 +147,11 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.SWEET_BERRY_BUSH] = true;
     }
 
-    private final Long2ObjectOpenHashMap<BlockEntity> blockEntities = new Long2ObjectOpenHashMap<>();
+    private final Map<Long, BlockEntity> blockEntities = new ConcurrentHashMap<>();
 
-    private final Long2ObjectOpenHashMap<Player> players = new Long2ObjectOpenHashMap<>();
+    private final Map<Long, Player> players = new ConcurrentHashMap<>();
 
-    public final Long2ObjectOpenHashMap<Entity> entities = new Long2ObjectOpenHashMap<>();
+    public final Map<Long, Entity> entities = new ConcurrentHashMap<>();
 
     public final Long2ObjectMap<Entity> updateEntities = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
 
@@ -167,11 +167,11 @@ public class Level implements ChunkManager, Metadatable {
 
     private final Int2IntMap loaderCounter = new Int2IntOpenHashMap();
 
-    private final Long2ObjectOpenHashMap<Map<Integer, ChunkLoader>> chunkLoaders = new Long2ObjectOpenHashMap<>();
+    private final Map<Long, Map<Integer, ChunkLoader>> chunkLoaders = new ConcurrentHashMap<>();
 
-    private final Long2ObjectOpenHashMap<Map<Integer, Player>> playerLoaders = new Long2ObjectOpenHashMap<>();
+    private final Map<Long, Map<Integer, Player>> playerLoaders = new ConcurrentHashMap<>();
 
-    private final Long2ObjectOpenHashMap<Deque<DataPacket>> chunkPackets = new Long2ObjectOpenHashMap<>();
+    private final Map<Long, Deque<DataPacket>> chunkPackets = new ConcurrentHashMap<>();
 
     private final Long2LongMap unloadQueue = Long2LongMaps.synchronize(new Long2LongOpenHashMap());
 
@@ -3830,7 +3830,7 @@ public class Level implements ChunkManager, Metadatable {
     public void doChunkGarbageCollection() {
         // Remove all invalid block entities
         if (!blockEntities.isEmpty()) {
-            ObjectIterator<BlockEntity> iter = blockEntities.values().iterator();
+            Iterator<BlockEntity> iter = blockEntities.values().iterator();
             while (iter.hasNext()) {
                 BlockEntity blockEntity = iter.next();
                 if (blockEntity != null) {
