@@ -188,7 +188,7 @@ public final class VarInt {
      * @param value  Unsigned int
      */
     public static void writeUnsignedVarInt(BinaryStream stream, long value) {
-        write(stream, value);
+        write(stream, value & 0xFFFFFFFFL);
     }
 
     /**

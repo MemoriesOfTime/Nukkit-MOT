@@ -3174,7 +3174,7 @@ public class Server {
             put("min-mtu", 576);
             put("max-mtu", 1492);
             put("enable-experiment-mode", false);
-            put("async-chunks", false);
+            put("async-chunks", true);
             put("deprecated-verbose", true);
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);

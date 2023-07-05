@@ -1,6 +1,5 @@
 package cn.nukkit.level;
 
-import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockFace;
@@ -110,9 +109,6 @@ public class Position extends Vector3 {
     @NotNull
     public final Level getValidLevel() {
         Level level = this.level;
-        if (level.getProvider() == null) {
-            level = Server.getInstance().getLevelByName(this.level.getFolderName());
-        }
         if (level == null) {
             throw new LevelException("Undefined Level reference");
         }
