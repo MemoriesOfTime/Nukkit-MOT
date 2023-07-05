@@ -2268,12 +2268,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        if (this.level == null || this.level.getProvider() == null) {
-            //TODO find why
-            log.warn("Player {} has no valid level", this.getName());
-            this.teleport(this.server.getDefaultLevel().getSafeSpawn());
-        }
-
         boolean hasUpdated = false;
         if (isUsingItem()) {
             if (noShieldTicks < NO_SHIELD_DELAY) {
