@@ -1,5 +1,8 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.Server;
+import lombok.extern.log4j.Log4j2;
+
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -11,6 +14,7 @@ import java.util.regex.Pattern;
 /**
  * An utility that is used to send debugpaste reports to hastebin.com
  */
+@Log4j2
 public class HastebinUtility {
 
     public static final String BIN_URL = "https://hastebin.com/documents", USER_AGENT = "Mozilla/5.0";
@@ -28,8 +32,12 @@ public class HastebinUtility {
         final HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
         connection.setRequestMethod("POST");
-        //TODO
-        connection.setRequestProperty("Authorization", "Bearer 728cd24267434cd5c872909229b7294f1649f8ffd28b5ef4d4938a683535308762ac9ed05caa6212f37d2ab031d6cdad78bf8dcc59f24a1c5707838a7b4c118e");
+        String key = Server.getInstance().getPropertyString("hastebin-token");
+        if (key == null || key.isBlank()) {
+            log.error("You haven't set a Hastebin token yet! Please create a token on https://www.toptal.com/developers/hastebin/documentation and fill in the obtained key as `hastebin-token` in the `server.properties` file.");
+        } else {
+            connection.setRequestProperty("Authorization", "Bearer " + key.trim());
+        }
         connection.setRequestProperty("User-Agent", USER_AGENT);
         connection.setDoOutput(true);
 

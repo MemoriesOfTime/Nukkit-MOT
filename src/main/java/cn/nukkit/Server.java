@@ -3187,6 +3187,7 @@ public class Server {
             put("use-client-spectator", true);
             put("compression-threshold", "256");
             put("enable-spark", true);
+            put("hastebin-token", "");
         }
     }
 
