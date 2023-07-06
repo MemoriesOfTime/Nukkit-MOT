@@ -1301,6 +1301,7 @@ public class Server {
 
             try {
                 long levelTime = System.currentTimeMillis();
+                level.inTickLock.lock();
                 level.doTick(currentTick);
                 int tickMs = (int) (System.currentTimeMillis() - levelTime);
                 level.tickRateTime = tickMs;
@@ -1326,6 +1327,8 @@ public class Server {
                 }
             } catch (Exception e) {
                 log.error(this.baseLang.translateString("nukkit.level.tickError", new String[]{level.getFolderName(), Utils.getExceptionMessage(e)}));
+            } finally {
+                level.inTickLock.unlock();
             }
         }
     }
@@ -3025,7 +3028,7 @@ public class Server {
         this.minimumProtocol = this.getPropertyInt("multiversion-min-protocol", 0);
         this.whitelistReason = this.getPropertyString("whitelist-reason", "§cServer is white-listed").replace("§n", "\n");
         this.enableExperimentMode = this.getPropertyBoolean("enable-experiment-mode", true);
-        this.asyncChunkSending = this.getPropertyBoolean("async-chunks", false);
+        this.asyncChunkSending = this.getPropertyBoolean("async-chunks", true);
         this.deprecatedVerbose = this.getPropertyBoolean("deprecated-verbose", true);
         switch (this.getPropertyString("server-authoritative-movement")) {
             case "client-auth" -> this.serverAuthoritativeMovementMode = 0;

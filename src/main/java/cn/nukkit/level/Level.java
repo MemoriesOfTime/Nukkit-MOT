@@ -273,7 +273,7 @@ public class Level implements ChunkManager, Metadatable {
     /**
      * 进行世界tick时上锁，防止中途卸载世界
      */
-    private final ReentrantLock inTickLock = new ReentrantLock();
+    public final ReentrantLock inTickLock = new ReentrantLock();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
         this.levelId = levelIdCounter++;
@@ -884,171 +884,165 @@ public class Level implements ChunkManager, Metadatable {
 
     @SuppressWarnings("unchecked")
     public void doTick(int currentTick) {
-        this.inTickLock.lock();
+        if (this.getProvider() == null) {//世界在其他线程上卸载
+            return;
+        }
 
-        try {
-            if (this.getProvider() == null) {//世界在其他线程上卸载
-                return;
-            }
+        updateBlockLight(lightQueue);
+        this.checkTime();
 
-            updateBlockLight(lightQueue);
-            this.checkTime();
+        if (/*stopTime || !this.gameRules.getBoolean(GameRule.DO_DAYLIGHT_CYCLE) ||*/ currentTick % 6000 == 0) { // Keep the time in sync
+            this.sendTime();
+        }
 
-            if (/*stopTime || !this.gameRules.getBoolean(GameRule.DO_DAYLIGHT_CYCLE) ||*/ currentTick % 6000 == 0) { // Keep the time in sync
-                this.sendTime();
-            }
-
-            // Tick Weather
-            if (this.getDimension() != DIMENSION_NETHER && this.getDimension() != DIMENSION_THE_END && this.gameRules.getBoolean(GameRule.DO_WEATHER_CYCLE) && this.randomTickingEnabled()) {
-                this.rainTime--;
-                if (this.rainTime <= 0) {
-                    if (!this.setRaining(!this.raining)) {
-                        if (this.raining) {
-                            setRainTime(Utils.random.nextInt(12000) + 12000);
-                        } else {
-                            setRainTime(Utils.random.nextInt(168000) + 12000);
-                        }
-                    }
-                }
-
-                this.thunderTime--;
-                if (this.thunderTime <= 0) {
-                    if (!this.setThundering(!this.thundering)) {
-                        if (this.thundering) {
-                            setThunderTime(Utils.random.nextInt(12000) + 3600);
-                        } else {
-                            setThunderTime(Utils.random.nextInt(168000) + 12000);
-                        }
-                    }
-                }
-
-                if (this.isThundering()) {
-                    Map<Long, ? extends FullChunk> chunks = getChunks();
-                    if (chunks instanceof Long2ObjectOpenHashMap) {
-                        @SuppressWarnings("rawtypes")
-                        Long2ObjectOpenHashMap<? extends FullChunk> fastChunks = (Long2ObjectOpenHashMap) chunks;
-                        ObjectIterator<? extends Long2ObjectMap.Entry<? extends FullChunk>> iter = fastChunks.long2ObjectEntrySet().fastIterator();
-                        while (iter.hasNext()) {
-                            Long2ObjectMap.Entry<? extends FullChunk> entry = iter.next();
-                            performThunder(entry.getLongKey(), entry.getValue());
-                        }
+        // Tick Weather
+        if (this.getDimension() != DIMENSION_NETHER && this.getDimension() != DIMENSION_THE_END && this.gameRules.getBoolean(GameRule.DO_WEATHER_CYCLE) && this.randomTickingEnabled()) {
+            this.rainTime--;
+            if (this.rainTime <= 0) {
+                if (!this.setRaining(!this.raining)) {
+                    if (this.raining) {
+                        setRainTime(Utils.random.nextInt(12000) + 12000);
                     } else {
-                        for (Map.Entry<Long, ? extends FullChunk> entry : getChunks().entrySet()) {
-                            performThunder(entry.getKey(), entry.getValue());
-                        }
+                        setRainTime(Utils.random.nextInt(168000) + 12000);
                     }
                 }
             }
 
-            if (Server.getInstance().lightUpdates) {
-                this.skyLightSubtracted = this.calculateSkylightSubtracted(1);
-            }
-
-            this.levelCurrentTick++;
-
-            this.unloadChunks();
-
-            this.updateQueue.tick(this.levelCurrentTick);
-
-            QueuedUpdate queuedUpdate;
-            while ((queuedUpdate = this.normalUpdateQueue.poll()) != null) {
-                Block block = getBlock(queuedUpdate.block, queuedUpdate.block.layer);
-                BlockUpdateEvent event = new BlockUpdateEvent(block);
-                this.server.getPluginManager().callEvent(event);
-
-                if (!event.isCancelled()) {
-                    block.onUpdate(BLOCK_UPDATE_NORMAL);
-                    if (queuedUpdate.neighbor != null) {
-                        block.onNeighborChange(queuedUpdate.neighbor.getOpposite());
+            this.thunderTime--;
+            if (this.thunderTime <= 0) {
+                if (!this.setThundering(!this.thundering)) {
+                    if (this.thundering) {
+                        setThunderTime(Utils.random.nextInt(12000) + 3600);
+                    } else {
+                        setThunderTime(Utils.random.nextInt(168000) + 12000);
                     }
                 }
             }
 
-            if (!this.updateEntities.isEmpty()) {
-                for (long id : new ObjectArrayList<>(this.updateEntities.keySet())) {
-                    Entity entity = this.updateEntities.get(id);
-                    if (entity == null) {
-                        this.updateEntities.remove(id);
-                        continue;
+            if (this.isThundering()) {
+                Map<Long, ? extends FullChunk> chunks = getChunks();
+                if (chunks instanceof Long2ObjectOpenHashMap) {
+                    @SuppressWarnings("rawtypes")
+                    Long2ObjectOpenHashMap<? extends FullChunk> fastChunks = (Long2ObjectOpenHashMap) chunks;
+                    ObjectIterator<? extends Long2ObjectMap.Entry<? extends FullChunk>> iter = fastChunks.long2ObjectEntrySet().fastIterator();
+                    while (iter.hasNext()) {
+                        Long2ObjectMap.Entry<? extends FullChunk> entry = iter.next();
+                        performThunder(entry.getLongKey(), entry.getValue());
                     }
-                    if (entity.closed || !entity.onUpdate(currentTick)) {
-                        this.updateEntities.remove(id);
+                } else {
+                    for (Map.Entry<Long, ? extends FullChunk> entry : getChunks().entrySet()) {
+                        performThunder(entry.getKey(), entry.getValue());
                     }
                 }
             }
+        }
 
-            this.updateBlockEntities.removeIf(blockEntity -> !blockEntity.isValid() || !blockEntity.onUpdate());
+        if (Server.getInstance().lightUpdates) {
+            this.skyLightSubtracted = this.calculateSkylightSubtracted(1);
+        }
 
-            this.tickChunks();
+        this.levelCurrentTick++;
 
-            synchronized (changedBlocks) {
-                if (!this.changedBlocks.isEmpty()) {
-                    if (!this.players.isEmpty()) {
-                        ObjectIterator<Long2ObjectMap.Entry<SoftReference<Map<Character, Object>>>> iter = changedBlocks.long2ObjectEntrySet().fastIterator();
-                        while (iter.hasNext()) {
-                            Long2ObjectMap.Entry<SoftReference<Map<Character, Object>>> entry = iter.next();
-                            long index = entry.getLongKey();
-                            Map<Character, Object> blocks = entry.getValue().get();
-                            int chunkX = Level.getHashX(index);
-                            int chunkZ = Level.getHashZ(index);
-                            if (blocks == null || blocks.size() > MAX_BLOCK_CACHE) {
-                                FullChunk chunk = this.getChunk(chunkX, chunkZ);
-                                for (Player p : this.getChunkPlayers(chunkX, chunkZ).values()) {
-                                    p.onChunkChanged(chunk);
-                                }
-                            } else {
-                                Player[] playerArray = this.getChunkPlayers(chunkX, chunkZ).values().toArray(new Player[0]);
-                                Vector3[] blocksArray = new Vector3[blocks.size()];
-                                int i = 0;
-                                for (char blockHash : blocks.keySet()) {
-                                    Vector3 hash = getBlockXYZ(index, blockHash);
-                                    blocksArray[i++] = hash;
-                                }
-                                this.sendBlocks(playerArray, blocksArray, UpdateBlockPacket.FLAG_ALL);
+        this.unloadChunks();
+
+        this.updateQueue.tick(this.levelCurrentTick);
+
+        QueuedUpdate queuedUpdate;
+        while ((queuedUpdate = this.normalUpdateQueue.poll()) != null) {
+            Block block = getBlock(queuedUpdate.block, queuedUpdate.block.layer);
+            BlockUpdateEvent event = new BlockUpdateEvent(block);
+            this.server.getPluginManager().callEvent(event);
+
+            if (!event.isCancelled()) {
+                block.onUpdate(BLOCK_UPDATE_NORMAL);
+                if (queuedUpdate.neighbor != null) {
+                    block.onNeighborChange(queuedUpdate.neighbor.getOpposite());
+                }
+            }
+        }
+
+        if (!this.updateEntities.isEmpty()) {
+            for (long id : new ObjectArrayList<>(this.updateEntities.keySet())) {
+                Entity entity = this.updateEntities.get(id);
+                if (entity == null) {
+                    this.updateEntities.remove(id);
+                    continue;
+                }
+                if (entity.closed || !entity.onUpdate(currentTick)) {
+                    this.updateEntities.remove(id);
+                }
+            }
+        }
+
+        this.updateBlockEntities.removeIf(blockEntity -> !blockEntity.isValid() || !blockEntity.onUpdate());
+
+        this.tickChunks();
+
+        synchronized (changedBlocks) {
+            if (!this.changedBlocks.isEmpty()) {
+                if (!this.players.isEmpty()) {
+                    ObjectIterator<Long2ObjectMap.Entry<SoftReference<Map<Character, Object>>>> iter = changedBlocks.long2ObjectEntrySet().fastIterator();
+                    while (iter.hasNext()) {
+                        Long2ObjectMap.Entry<SoftReference<Map<Character, Object>>> entry = iter.next();
+                        long index = entry.getLongKey();
+                        Map<Character, Object> blocks = entry.getValue().get();
+                        int chunkX = Level.getHashX(index);
+                        int chunkZ = Level.getHashZ(index);
+                        if (blocks == null || blocks.size() > MAX_BLOCK_CACHE) {
+                            FullChunk chunk = this.getChunk(chunkX, chunkZ);
+                            for (Player p : this.getChunkPlayers(chunkX, chunkZ).values()) {
+                                p.onChunkChanged(chunk);
                             }
-                        }
-                    }
-                    this.changedBlocks.clear();
-                }
-            }
-
-            if (this.server.asyncChunkSending) {
-                NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
-                int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
-                for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
-                    this.chunkRequestCallback(data.getProtocol(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload());
-                }
-            }
-
-            this.processChunkRequest();
-
-            if (this.sleepTicks > 0 && --this.sleepTicks <= 0) {
-                this.checkSleep();
-            }
-
-            synchronized (chunkPackets) {
-                for (long index : this.chunkPackets.keySet()) {
-                    int chunkX = Level.getHashX(index);
-                    int chunkZ = Level.getHashZ(index);
-                    Map<Integer, Player> map = this.getChunkPlayers(chunkX, chunkZ);
-                    if (!map.isEmpty()) {
-                        Player[] chunkPlayers = map.values().toArray(new Player[0]);
-                        for (DataPacket pk : this.chunkPackets.get(index)) {
-                            Server.broadcastPacket(chunkPlayers, pk);
+                        } else {
+                            Player[] playerArray = this.getChunkPlayers(chunkX, chunkZ).values().toArray(new Player[0]);
+                            Vector3[] blocksArray = new Vector3[blocks.size()];
+                            int i = 0;
+                            for (char blockHash : blocks.keySet()) {
+                                Vector3 hash = getBlockXYZ(index, blockHash);
+                                blocksArray[i++] = hash;
+                            }
+                            this.sendBlocks(playerArray, blocksArray, UpdateBlockPacket.FLAG_ALL);
                         }
                     }
                 }
-                this.chunkPackets.clear();
+                this.changedBlocks.clear();
             }
+        }
 
-            if (gameRules.isStale()) {
-                GameRulesChangedPacket packet = new GameRulesChangedPacket();
-                packet.gameRulesMap = gameRules.getGameRules();
-                Server.broadcastPacket(players.values().toArray(new Player[0]), packet);
-                gameRules.refresh();
+        if (this.server.asyncChunkSending) {
+            NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
+            int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
+            for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
+                this.chunkRequestCallback(data.getProtocol(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload());
             }
-        } finally {
-            this.inTickLock.unlock();
+        }
+
+        this.processChunkRequest();
+
+        if (this.sleepTicks > 0 && --this.sleepTicks <= 0) {
+            this.checkSleep();
+        }
+
+        synchronized (chunkPackets) {
+            for (long index : this.chunkPackets.keySet()) {
+                int chunkX = Level.getHashX(index);
+                int chunkZ = Level.getHashZ(index);
+                Map<Integer, Player> map = this.getChunkPlayers(chunkX, chunkZ);
+                if (!map.isEmpty()) {
+                    Player[] chunkPlayers = map.values().toArray(new Player[0]);
+                    for (DataPacket pk : this.chunkPackets.get(index)) {
+                        Server.broadcastPacket(chunkPlayers, pk);
+                    }
+                }
+            }
+            this.chunkPackets.clear();
+        }
+
+        if (gameRules.isStale()) {
+            GameRulesChangedPacket packet = new GameRulesChangedPacket();
+            packet.gameRulesMap = gameRules.getGameRules();
+            Server.broadcastPacket(players.values().toArray(new Player[0]), packet);
+            gameRules.refresh();
         }
     }
 
