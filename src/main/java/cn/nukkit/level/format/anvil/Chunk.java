@@ -512,8 +512,7 @@ public class Chunk extends BaseChunk {
         super.compress();
         boolean result = false;
         for (cn.nukkit.level.format.ChunkSection section : getSections()) {
-            if (section instanceof ChunkSection) {
-                ChunkSection anvilSection = (ChunkSection) section;
+            if (section instanceof ChunkSection anvilSection) {
                 if (!anvilSection.isEmpty()) {
                     result |= anvilSection.compress();
                 }
