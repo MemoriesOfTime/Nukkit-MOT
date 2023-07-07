@@ -5003,7 +5003,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void setSubtitle(String subtitle) {
         SetTitlePacket pk = new SetTitlePacket();
         pk.type = SetTitlePacket.TYPE_SUBTITLE;
-        pk.text = subtitle;
+        pk.text = Strings.isNullOrEmpty(subtitle) ? " " : subtitle;
         this.dataPacket(pk);
     }
 
@@ -5081,6 +5081,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param content the content
      */
     public void sendToast(String title, String content) {
+        title = Strings.isNullOrEmpty(title) ? " " : title;
+        content = Strings.isNullOrEmpty(content) ? " " : content;
         if (this.protocol < ProtocolInfo.v1_19_0) {
             this.sendTitle(title, content);
             return;
