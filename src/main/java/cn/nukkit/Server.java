@@ -1301,7 +1301,7 @@ public class Server {
 
             try {
                 long levelTime = System.currentTimeMillis();
-                level.inTickLock.lock();
+                level.providerLock.readLock().lock();
                 level.doTick(currentTick);
                 int tickMs = (int) (System.currentTimeMillis() - levelTime);
                 level.tickRateTime = tickMs;
@@ -1328,7 +1328,7 @@ public class Server {
             } catch (Exception e) {
                 log.error(this.baseLang.translateString("nukkit.level.tickError", new String[]{level.getFolderName(), Utils.getExceptionMessage(e)}));
             } finally {
-                level.inTickLock.unlock();
+                level.providerLock.readLock().unlock();
             }
         }
     }

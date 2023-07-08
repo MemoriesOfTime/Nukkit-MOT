@@ -73,7 +73,7 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.ref.SoftReference;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Predicate;
 
 
@@ -163,6 +163,10 @@ public class Level implements ChunkManager, Metadatable {
     private final int levelId;
 
     private LevelProvider provider;
+    /**
+     * 防止读取provider时卸载世界导致空指针
+     */
+    public final ReentrantReadWriteLock providerLock = new ReentrantReadWriteLock();
 
     private final Int2ObjectOpenHashMap<ChunkLoader> loaders = new Int2ObjectOpenHashMap<>();
 
@@ -269,11 +273,6 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     private ExecutorService asyncChuckExecutor;
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
-
-    /**
-     * 进行世界tick时上锁，防止中途卸载世界
-     */
-    public final ReentrantLock inTickLock = new ReentrantLock();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
         this.levelId = levelIdCounter++;
@@ -453,22 +452,27 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void close() {
-        if (this.asyncChuckExecutor != null) {
-            this.asyncChuckExecutor.shutdownNow();
-        }
-
-        LevelProvider levelProvider = this.provider;
-        if (levelProvider != null) {
-            if (this.autoSave) {
-                this.save(true);
+        this.providerLock.writeLock().lock();
+        try {
+            if (this.asyncChuckExecutor != null) {
+                this.asyncChuckExecutor.shutdownNow();
             }
-            levelProvider.close();
-        }
 
-        this.provider = null;
-        this.blockMetadata = null;
-        this.server.getLevels().remove(this.levelId);
-        this.generators.remove();
+            LevelProvider levelProvider = this.provider;
+            if (levelProvider != null) {
+                if (this.autoSave) {
+                    this.save(true);
+                }
+                levelProvider.close();
+            }
+
+            this.provider = null;
+            this.blockMetadata = null;
+            this.server.getLevels().remove(this.levelId);
+            this.generators.remove();
+        } finally {
+            this.providerLock.writeLock().unlock();
+        }
     }
 
     public void addSound(Vector3 pos, String sound) {
@@ -726,43 +730,37 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean unload(boolean force) {
-        this.inTickLock.lock();
+        LevelUnloadEvent ev = new LevelUnloadEvent(this);
 
-        try {
-            LevelUnloadEvent ev = new LevelUnloadEvent(this);
-
-            if (this == this.server.getDefaultLevel() && !force) {
-                ev.setCancelled();
-            }
-
-            this.server.getPluginManager().callEvent(ev);
-
-            if (!force && ev.isCancelled()) {
-                return false;
-            }
-
-            this.server.getLogger().info(this.server.getLanguage().translateString("nukkit.level.unloading",
-                    TextFormat.GREEN + this.getName() + TextFormat.WHITE));
-            Level defaultLevel = this.server.getDefaultLevel();
-
-            for (Player player : new ArrayList<>(this.getPlayers().values())) {
-                if (this == defaultLevel || defaultLevel == null) {
-                    player.close(player.getLeaveMessage(), "Forced default level unload");
-                } else {
-                    player.teleport(this.server.getDefaultLevel().getSafeSpawn());
-                }
-            }
-
-            if (this == defaultLevel) {
-                this.server.setDefaultLevel(null);
-            }
-
-            this.close();
-
-            return true;
-        } finally {
-            this.inTickLock.unlock();
+        if (this == this.server.getDefaultLevel() && !force) {
+            ev.setCancelled();
         }
+
+        this.server.getPluginManager().callEvent(ev);
+
+        if (!force && ev.isCancelled()) {
+            return false;
+        }
+
+        this.server.getLogger().info(this.server.getLanguage().translateString("nukkit.level.unloading",
+                TextFormat.GREEN + this.getName() + TextFormat.WHITE));
+        Level defaultLevel = this.server.getDefaultLevel();
+
+        for (Player player : new ArrayList<>(this.getPlayers().values())) {
+            if (this == defaultLevel || defaultLevel == null) {
+                player.close(player.getLeaveMessage(), "Forced default level unload");
+            } else {
+                player.teleport(this.server.getDefaultLevel().getSafeSpawn());
+            }
+        }
+
+        if (this == defaultLevel) {
+            this.server.setDefaultLevel(null);
+        }
+
+        this.close();
+
+        return true;
     }
 
     public Map<Integer, Player> getChunkPlayers(int chunkX, int chunkZ) {

@@ -2356,12 +2356,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (this.nextChunkOrderRun-- <= 0 || this.chunk == null) {
-            this.orderChunks();
-        }
+        Level nowLevel = this.getLevel();
+        nowLevel.providerLock.readLock().lock();
 
-        if (!this.loadQueue.isEmpty() || !this.spawned) {
-            this.sendNextChunk();
+        try {
+            if (this.nextChunkOrderRun-- <= 0 || this.chunk == null) {
+                this.orderChunks();
+            }
+
+            if (!this.loadQueue.isEmpty() || !this.spawned) {
+                this.sendNextChunk();
+            }
+        } finally {
+            nowLevel.providerLock.readLock().unlock();
         }
     }
 
