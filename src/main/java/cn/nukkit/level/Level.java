@@ -438,7 +438,15 @@ public class Level implements ChunkManager, Metadatable {
         if (levelProvider == null) {
             LevelException levelException = new LevelException("The level \"" + getFolderName() + "\" is already closed (have no providers)");
             try {
-                close();
+                this.server.getLevels().remove(this.levelId);
+                Level defaultLevel = Server.getInstance().getDefaultLevel();
+                for (Player player : new ArrayList<>(this.getPlayers().values())) {
+                    if (this == defaultLevel || defaultLevel == null) {
+                        player.close(player.getLeaveMessage(), "Default level unload");
+                    } else {
+                        player.teleport(this.server.getDefaultLevel().getSafeSpawn());
+                    }
+                }
             } catch (Exception e) {
                 levelException.addSuppressed(e);
             }
