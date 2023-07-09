@@ -3037,6 +3037,9 @@ public class Server {
         }
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
         this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
+        if (!this.encryptionEnabled) {
+            log.warn("Encryption is not enabled. For better security, it's recommended to enable it if you don't use a proxy software.");
+        }
         this.useWaterdog = this.getPropertyBoolean("use-waterdog", false);
         this.useSnappy = this.getPropertyBoolean("use-snappy-compression", false);
         this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);

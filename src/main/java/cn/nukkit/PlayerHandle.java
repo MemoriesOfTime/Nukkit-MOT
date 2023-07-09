@@ -430,11 +430,19 @@ public final class PlayerHandle {
     }
 
     public boolean isVerified() {
-        return player.verified;
+        return player.loginVerified;
     }
 
     public void setVerified(boolean verified) {
-        player.verified = verified;
+        player.loginVerified = verified;
+    }
+
+    public boolean isAwaitingEncryptionHandshake() {
+        return player.awaitingEncryptionHandshake;
+    }
+
+    public void setAwaitingEncryptionHandshake(boolean awaitingEncryptionHandshake) {
+        player.awaitingEncryptionHandshake = awaitingEncryptionHandshake;
     }
 
     public AsyncTask getPreLoginEventTask() {
@@ -451,5 +459,9 @@ public final class PlayerHandle {
 
     public void processLogin() {
         player.processLogin();
+    }
+
+    public void processPreLogin() {
+        player.processPreLogin();
     }
 }

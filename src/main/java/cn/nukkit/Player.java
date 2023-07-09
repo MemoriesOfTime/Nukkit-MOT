@@ -27,7 +27,6 @@ import cn.nukkit.event.inventory.InventoryPickupArrowEvent;
 import cn.nukkit.event.inventory.InventoryPickupItemEvent;
 import cn.nukkit.event.inventory.InventoryPickupTridentEvent;
 import cn.nukkit.event.player.*;
-import cn.nukkit.event.player.PlayerAsyncPreLoginEvent.LoginResult;
 import cn.nukkit.event.player.PlayerInteractEvent.Action;
 import cn.nukkit.event.player.PlayerTeleportEvent.TeleportCause;
 import cn.nukkit.event.server.DataPacketReceiveEvent;
@@ -161,8 +160,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public boolean playedBefore;
     public boolean spawned = false;
     public boolean loggedIn = false;
-    protected boolean verified = false;
+    protected boolean loginVerified = false;
     private int unverifiedPackets;
+    private boolean loginPacketReceived;
+    protected boolean awaitingEncryptionHandshake;
     public int gamemode;
     public long lastBreak = -1;
     private BlockVector3 lastBreakPosition = new BlockVector3();
@@ -2715,7 +2716,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (!verified && packet.pid() != ProtocolInfo.LOGIN_PACKET && packet.pid() != ProtocolInfo.BATCH_PACKET && packet.pid() != ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET) {
+        byte pid = packet.pid();
+        if (!loginVerified && pid != ProtocolInfo.LOGIN_PACKET && pid != ProtocolInfo.BATCH_PACKET && pid != ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET && pid != ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET) {
             server.getLogger().warning("Ignoring " + packet.getClass().getSimpleName() + " from " + getAddress() + " due to player not verified yet");
             if (unverifiedPackets++ > 100) {
                 this.close("", "Too many failed login attempts");
@@ -2723,7 +2725,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (!loggedIn && !PRE_LOGIN_PACKETS.contains(packet.pid())) {
+        if (!loggedIn && !PRE_LOGIN_PACKETS.contains(pid)) {
             server.getLogger().warning("Ignoring " + packet.getClass().getSimpleName() + " from " + username + " due to player not logged in yet");
             return;
         }
@@ -2738,7 +2740,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (packet.pid() == ProtocolInfo.BATCH_PACKET) {
+        if (pid == ProtocolInfo.BATCH_PACKET) {
             this.server.getNetwork().processBatch((BatchPacket) packet, this);
             return;
         }
@@ -2753,13 +2755,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         packetswitch:
-        switch (packet.pid()) {
+        switch (pid) {
             case ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET:
                 if (this.raknetProtocol < 11) {
                     return;
                 }
-                if (this.loggedIn) {
-                    break;
+                if (this.loginPacketReceived) {
+                    log.debug("{}: got a RequestNetworkSettingsPacket but player is already logged in", username);
+                    return;
                 }
 
                 this.protocol = ((RequestNetworkSettingsPacket) packet).protocolVersion;
@@ -2789,13 +2792,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
                 break;
             case ProtocolInfo.LOGIN_PACKET:
-                if (this.loggedIn) {
-                    break;
+                if (this.loginPacketReceived) {
+                    this.close("", "Invalid login packet");
+                    return;
                 }
+
+                this.loginPacketReceived = true;
 
                 LoginPacket loginPacket = (LoginPacket) packet;
 
                 this.protocol = loginPacket.getProtocol();
+
+                this.username = TextFormat.clean(loginPacket.username);
 
                 if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
                     this.close("", "You are running unsupported Minecraft version");
@@ -2809,7 +2817,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
-                this.username = TextFormat.clean(loginPacket.username);
                 this.displayName = this.username;
                 this.iusername = this.username.toLowerCase();
                 this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
@@ -2844,7 +2851,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 boolean valid = true;
                 int len = loginPacket.username.length();
-                if (len > 16 || len < 3) {
+                if (len > 16 || len < 3 || loginPacket.username.trim().isEmpty()) {
                     valid = false;
                 }
 
@@ -2883,58 +2890,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
-                Player playerInstance = this;
-                this.verified = true;
-
-                this.preLoginEventTask = new AsyncTask() {
-                    private PlayerAsyncPreLoginEvent event;
-
-                    @Override
-                    public void onRun() {
-                        this.event = new PlayerAsyncPreLoginEvent(username, uuid, loginChainData, playerInstance.getSkin(), playerInstance.getAddress(), playerInstance.getPort());
-                        server.getPluginManager().callEvent(this.event);
-                    }
-
-                    @Override
-                    public void onCompletion(Server server) {
-                        if (playerInstance.closed) {
-                            return;
-                        }
-
-                        if (this.event.getLoginResult() == LoginResult.KICK) {
-                            playerInstance.close(this.event.getKickMessage(), this.event.getKickMessage());
-                        } else if (playerInstance.shouldLogin) {
-                            playerInstance.setSkin(this.event.getSkin());
-                            playerInstance.completeLoginSequence();
-                            for (Consumer<Server> action : this.event.getScheduledActions()) {
-                                action.accept(server);
-                            }
-                        }
-                    }
-                };
-
-                this.server.getScheduler().scheduleAsyncTask(this.preLoginEventTask);
-
                 if (this.isEnableNetworkEncryption()) {
                     this.server.getScheduler().scheduleAsyncTask(new PrepareEncryptionTask(this) {
                         @Override
                         public void onCompletion(Server server) {
-                            if (!playerInstance.isConnected()) {
+                            if (!Player.this.isConnected()) {
                                 return;
                             }
+
                             if (this.getHandshakeJwt() == null || this.getEncryptionKey() == null || this.getEncryptionCipher() == null || this.getDecryptionCipher() == null) {
-                                playerInstance.close("", "Network Encryption error");
+                                Player.this.close("", "Network Encryption error");
                                 return;
                             }
+
                             ServerToClientHandshakePacket pk = new ServerToClientHandshakePacket();
                             pk.setJwt(this.getHandshakeJwt());
-                            playerInstance.forceDataPacket(pk, () -> {
-                                playerInstance.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
+                            Player.this.forceDataPacket(pk, () -> {
+                                Player.this.awaitingEncryptionHandshake = true;
+                                Player.this.getNetworkSession().setEncryption(this.getEncryptionKey(), this.getEncryptionCipher(), this.getDecryptionCipher());
                             });
                         }
                     });
                 } else {
-                    this.processLogin();
+                    this.processPreLogin();
                 }
                 break;
             case ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET:
@@ -6882,6 +6860,41 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.networkSession;
     }
 
+    protected void processPreLogin() {
+        this.loginVerified = true;
+        final Player playerInstance = this;
+
+        this.preLoginEventTask = new AsyncTask() {
+            private PlayerAsyncPreLoginEvent event;
+
+            @Override
+            public void onRun() {
+                this.event = new PlayerAsyncPreLoginEvent(username, uuid, loginChainData, playerInstance.getSkin(), playerInstance.getAddress(), playerInstance.getPort());
+                server.getPluginManager().callEvent(this.event);
+            }
+
+            @Override
+            public void onCompletion(Server server) {
+                if (!playerInstance.connected) {
+                    return;
+                }
+
+                if (this.event.getLoginResult() == PlayerAsyncPreLoginEvent.LoginResult.KICK) {
+                    playerInstance.close(this.event.getKickMessage(), this.event.getKickMessage());
+                } else if (playerInstance.shouldLogin) {
+                    playerInstance.setSkin(this.event.getSkin());
+                    playerInstance.completeLoginSequence();
+                    for (Consumer<Server> action : this.event.getScheduledActions()) {
+                        action.accept(server);
+                    }
+                }
+            }
+        };
+
+        this.server.getScheduler().scheduleAsyncTask(this.preLoginEventTask);
+        this.processLogin();
+    }
+
     public boolean shouldLogin() {
         return this.shouldLogin;
     }
@@ -6940,6 +6953,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean isEnableNetworkEncryption() {
-        return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled && loginChainData.isXboxAuthed();
+        return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled /*&& loginChainData.isXboxAuthed()*/;
     }
 }

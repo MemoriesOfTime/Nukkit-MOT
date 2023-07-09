@@ -12,7 +12,9 @@ public interface NetworkPlayerSession {
     void sendPacket(DataPacket packet);
     void sendImmediatePacket(DataPacket packet, Runnable callback);
 
-    void flush();
+    default void flush() {
+
+    }
 
     void disconnect(String reason);
 
@@ -21,7 +23,7 @@ public interface NetworkPlayerSession {
     void setCompression(CompressionProvider compression);
     CompressionProvider getCompression();
 
-    default void setEncryption(SecretKey agreedKey, Cipher encryptionCipher, Cipher decryptionCipher) {
+    default void setEncryption(SecretKey encryptionKey, Cipher encryptionCipher, Cipher decryptionCipher) {
 
     }
 }
