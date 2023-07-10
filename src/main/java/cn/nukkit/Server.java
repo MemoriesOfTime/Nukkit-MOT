@@ -1302,6 +1302,9 @@ public class Server {
             try {
                 long levelTime = System.currentTimeMillis();
                 level.providerLock.readLock().lock();
+                if (level.getProvider() == null) {//世界在其他线程上卸载
+                    continue;
+                }
                 level.doTick(currentTick);
                 int tickMs = (int) (System.currentTimeMillis() - levelTime);
                 level.tickRateTime = tickMs;

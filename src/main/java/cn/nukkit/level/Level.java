@@ -444,7 +444,7 @@ public class Level implements ChunkManager, Metadatable {
                     if (this == defaultLevel || defaultLevel == null) {
                         player.close(player.getLeaveMessage(), "Default level unload");
                     } else {
-                        player.teleport(this.server.getDefaultLevel().getSafeSpawn());
+                        player.teleport(this.server.getDefaultLevel().getSafeSpawn(), null);
                     }
                 }
             } catch (Exception e) {
@@ -890,10 +890,6 @@ public class Level implements ChunkManager, Metadatable {
 
     @SuppressWarnings("unchecked")
     public void doTick(int currentTick) {
-        if (this.getProvider() == null) {//世界在其他线程上卸载
-            return;
-        }
-
         updateBlockLight(lightQueue);
         this.checkTime();
 

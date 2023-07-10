@@ -2269,6 +2269,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
+        //解决插件异步卸载世界导致的问题
+        if (this.level == null || this.level.getProvider() == null) {
+            log.warn("Player {} has no valid level", this.getName());
+            Level defaultLevel = this.server.getDefaultLevel();
+            if (this.level == defaultLevel || defaultLevel == null || defaultLevel.getProvider() == null) {
+                this.close(this.getLeaveMessage(), "Default level unload");
+            } else {
+                this.teleport(defaultLevel.getSafeSpawn(), null);
+            }
+        }
+
         boolean hasUpdated = false;
         if (isUsingItem()) {
             if (noShieldTicks < NO_SHIELD_DELAY) {
