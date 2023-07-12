@@ -200,6 +200,7 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_PLAYER_LAST_DEATH_POS = 127;
     public static final int DATA_PLAYER_LAST_DEATH_DIMENSION = 128;
     public static final int DATA_PLAYER_HAS_DIED = 129;
+    public static final int DATA_COLLISION_BOX = 130; //vector3f
 
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
@@ -316,6 +317,7 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FLAG_RISING = 111;
     public static final int DATA_FLAG_FEELING_HAPPY = 112;
     public static final int DATA_FLAG_SEARCHING = 113;
+    public static final int DATA_FLAG_CRAWLING = 114;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
 

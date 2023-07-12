@@ -19,7 +19,11 @@ public class RequestAbilityPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.setAbility(ABILITIES[this.getVarInt()]);
+        if (this.protocol >= ProtocolInfo.v1_20_10) {
+            this.setAbility(ABILITIES[this.getByte()]);
+        } else {
+            this.setAbility(ABILITIES[this.getVarInt()]);
+        }
         this.setType(ABILITY_TYPES[this.getByte()]);
         this.setBoolValue(this.getBoolean());
         this.setFloatValue(this.getLFloat());

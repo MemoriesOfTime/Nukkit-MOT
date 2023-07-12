@@ -1,6 +1,8 @@
 package cn.nukkit.command.data;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class CommandData implements Cloneable {
@@ -11,6 +13,8 @@ public class CommandData implements Cloneable {
 
     public int flags;
     public int permission;
+
+    public List<ChainedSubCommandData> subcommands = new ArrayList<>();
 
     @Override
     public CommandData clone() {
