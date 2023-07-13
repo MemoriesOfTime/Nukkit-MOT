@@ -2006,7 +2006,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        //if plugin cancel move
+        // if plugin cancel move
         if (invalidMotion) {
             this.positionChanged = false;
             this.setPositionAndRotation(revertPos.asVector3f().asVector3(), revertPos.getYaw(), revertPos.getPitch(), revertPos.getHeadYaw());
@@ -2044,6 +2044,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastY = location.getY();
         this.lastZ = location.getZ();
         this.lastYaw = location.getYaw();
+        this.lastHeadYaw = location.getHeadYaw();
         this.lastPitch = location.getPitch();
     }
 

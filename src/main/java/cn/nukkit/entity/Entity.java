@@ -2503,6 +2503,10 @@ public abstract class Entity extends Location implements Metadatable {
                 if (this.isPlayer && this.server.dimensionsEnabled && newLevel.getDimension() != oldLevel.getDimension()) {
                     ((Player) this).setDimension(newLevel.getDimension());
                 }
+
+                // 切换世界后重置碰撞计算
+                this.blocksAround = null;
+                this.collisionBlocks = null;
             } else {
                 this.x = pos.x;
                 this.y = pos.y;
