@@ -1482,7 +1482,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             newSettings.set(Type.WORLD_IMMUTABLE, (gamemode & 0x02) > 0);
             newSettings.set(Type.MINE, (gamemode & 0x02) <= 0);
             newSettings.set(Type.BUILD, (gamemode & 0x02) <= 0);
-            newSettings.set(Type.PRIVILEGED_BUILDER, gamemode == CREATIVE);
             newSettings.set(Type.NO_PVM, gamemode == SPECTATOR);
             newSettings.set(Type.ALLOW_FLIGHT, (gamemode & 0x01) > 0);
             newSettings.set(Type.NO_CLIP, gamemode == SPECTATOR);
@@ -3281,31 +3280,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 RequestAbilityPacket abilityPacket = (RequestAbilityPacket) packet;
 
                 PlayerAbility ability = abilityPacket.getAbility();
-
-                if (ability == PlayerAbility.FLYING) {
-                    if (!server.getAllowFlight() && abilityPacket.isBoolValue() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                        this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
-                        break;
-                    }
-
-                    PlayerToggleFlightEvent playerToggleFlightEvent1 = new PlayerToggleFlightEvent(this, abilityPacket.isBoolValue());
-                    if (this.isSpectator()) {
-                        playerToggleFlightEvent1.setCancelled();
-                    }
-                    this.server.getPluginManager().callEvent(playerToggleFlightEvent1);
-                    if (playerToggleFlightEvent1.isCancelled()) {
-                        this.getAdventureSettings().update();
-                    } else {
-                        this.getAdventureSettings().set(Type.FLYING, playerToggleFlightEvent1.isFlying());
-                    }
-                } else if (this.protocol >= ProtocolInfo.v1_20_10 && ability == PlayerAbility.PRIVILEGED_BUILDER) {
-                    if (abilityPacket.isBoolValue() && !this.isCreative()) {
-                        this.kick("No permission to use PRIVILEGED BUILDER");
-                        break;
-                    }
-                    this.getAdventureSettings().set(Type.PRIVILEGED_BUILDER, abilityPacket.isBoolValue());
-                } else {
+                if (ability != PlayerAbility.FLYING) {
                     this.server.getLogger().info("[" + this.getName() + "] has tried to trigger " + ability + " ability " + (abilityPacket.isBoolValue() ? "on" : "off"));
+                    return;
+                }
+
+                if (!server.getAllowFlight() && abilityPacket.isBoolValue() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
+                    this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                    break;
+                }
+
+                PlayerToggleFlightEvent playerToggleFlightEvent1 = new PlayerToggleFlightEvent(this, abilityPacket.isBoolValue());
+                if (this.isSpectator()) {
+                    playerToggleFlightEvent1.setCancelled();
+                }
+                this.server.getPluginManager().callEvent(playerToggleFlightEvent1);
+                if (playerToggleFlightEvent1.isCancelled()) {
+                    this.getAdventureSettings().update();
+                } else {
+                    this.getAdventureSettings().set(Type.FLYING, playerToggleFlightEvent1.isFlying());
                 }
                 break;
             case ProtocolInfo.MOB_EQUIPMENT_PACKET:
