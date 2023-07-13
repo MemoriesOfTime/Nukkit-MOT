@@ -795,47 +795,31 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         list[id] = c;
 
         ItemCustom item = (ItemCustom) get(id);
-        if (RuntimeItems.getMapping(v1_16_100).registerCustomItem(item)) {
-            addCreativeItem(v1_16_0, item);
-        }
-        if (RuntimeItems.getMapping(v1_17_0).registerCustomItem(item)) {
-            addCreativeItem(v1_17_0, item);
-        }
-        if (RuntimeItems.getMapping(v1_17_10).registerCustomItem(item)) {
-            addCreativeItem(v1_17_10, item);
-            addCreativeItem(v1_17_30, item);
-            addCreativeItem(v1_17_40, item);
-        }
-        RuntimeItems.getMapping(v1_18_0).registerCustomItem(item);
-        if (RuntimeItems.getMapping(v1_18_10).registerCustomItem(item)) {
-            addCreativeItem(v1_18_10, item);
-        }
-        if (RuntimeItems.getMapping(v1_18_30).registerCustomItem(item)) {
-            addCreativeItem(v1_18_30, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_0).registerCustomItem(item)) {
-            addCreativeItem(v1_19_0, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_10).registerCustomItem(item)) {
-            addCreativeItem(v1_19_10, item);
-            addCreativeItem(v1_19_20, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_50).registerCustomItem(item)) {
-            addCreativeItem(v1_19_50, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_60).registerCustomItem(item)) {
-            addCreativeItem(v1_19_60, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_70).registerCustomItem(item)) {
-            addCreativeItem(v1_19_70, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_80).registerCustomItem(item)) {
-            addCreativeItem(v1_19_80, item);
-        }
-        if (RuntimeItems.getMapping(v1_20_0).registerCustomItem(item)) {
-            addCreativeItem(v1_20_0, item);
-        }
+
+        registerCustomItem(item, v1_16_100, v1_16_0);
+        registerCustomItem(item, v1_17_0, v1_17_0);
+        registerCustomItem(item, v1_17_10, v1_17_10, v1_17_30, v1_17_40);
+        registerCustomItem(item, v1_18_0, v1_18_0);
+        registerCustomItem(item, v1_18_10, v1_18_10);
+        registerCustomItem(item, v1_18_30, v1_18_30);
+        registerCustomItem(item, v1_19_0, v1_19_0);
+        registerCustomItem(item, v1_19_10, v1_19_10, v1_19_20);
+        registerCustomItem(item, v1_19_50, v1_19_50);
+        registerCustomItem(item, v1_19_60, v1_19_60);
+        registerCustomItem(item, v1_19_70, v1_19_70);
+        registerCustomItem(item, v1_19_80, v1_19_80);
+        registerCustomItem(item, v1_20_0, v1_20_0);
+        registerCustomItem(item, v1_20_10, v1_20_10);
+
         return true;
+    }
+
+    private static void registerCustomItem(ItemCustom item, int protocol, int... creativeProtocols) {
+        if (RuntimeItems.getMapping(protocol).registerCustomItem(item)) {
+            for (int creativeProtocol : creativeProtocols) {
+                addCreativeItem(creativeProtocol, item);
+            }
+        }
     }
 
     public static boolean deleteCustomItem(int id) {
@@ -845,21 +829,32 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[id] = null;
 
             ItemCustom item = (ItemCustom) get(id);
-            return RuntimeItems.getMapping(v1_16_100).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_17_0).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_17_10).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_18_0).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_18_10).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_18_30).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_0).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_10).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_50).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_60).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_70).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_80).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_20_0).deleteCustomItem(item);
+
+            deleteCustomItem(item, v1_16_100, v1_16_0);
+            deleteCustomItem(item, v1_17_0, v1_17_0);
+            deleteCustomItem(item, v1_17_10, v1_17_10, v1_17_30, v1_17_40);
+            deleteCustomItem(item, v1_18_0, v1_18_0);
+            deleteCustomItem(item, v1_18_10, v1_18_10);
+            deleteCustomItem(item, v1_18_30, v1_18_30);
+            deleteCustomItem(item, v1_19_0, v1_19_0);
+            deleteCustomItem(item, v1_19_10, v1_19_10, v1_19_20);
+            deleteCustomItem(item, v1_19_50, v1_19_50);
+            deleteCustomItem(item, v1_19_60, v1_19_60);
+            deleteCustomItem(item, v1_19_70, v1_19_70);
+            deleteCustomItem(item, v1_19_80, v1_19_80);
+            deleteCustomItem(item, v1_20_0, v1_20_0);
+            deleteCustomItem(item, v1_20_10, v1_20_10);
+
+            return true;
         }else {
             return false;
+        }
+    }
+
+    private static void deleteCustomItem(ItemCustom item, int protocol, int... creativeProtocols) {
+        RuntimeItems.getMapping(protocol).deleteCustomItem(item);
+        for (int creativeProtocol : creativeProtocols) {
+            removeCreativeItem(creativeProtocol, item);
         }
     }
 
