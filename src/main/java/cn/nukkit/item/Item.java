@@ -652,80 +652,32 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static void addCreativeItem(int protocol, Item item) {
         switch (protocol) { // NOTE: Not all versions are supposed to be here
-            case v1_2_0:
-                Item.creative137.add(item.clone());
-            case v1_5_0:
-                Item.creative274.add(item.clone());
-            case v1_7_0:
-                Item.creative291.add(item.clone());
-                break;
-            case v1_8_0:
-                Item.creative313.add(item.clone());
-                break;
-            case v1_9_0:
-                Item.creative332.add(item.clone());
-                break;
-            case v1_10_0:
-                Item.creative340.add(item.clone());
-                break;
-            case v1_11_0:
-                Item.creative354.add(item.clone());
-                break;
-            case v1_14_0:
-                Item.creative389.add(item.clone());
-                break;
-            case v1_16_0:
-                Item.creative407.add(item.clone());
-                break;
-            case v1_17_0:
-                Item.creative440.add(item.clone());
-                break;
-            case v1_17_10:
-                Item.creative448.add(item.clone());
-                break;
-            case v1_17_30:
-                Item.creative465.add(item.clone());
-                break;
-            case v1_17_40:
-                Item.creative471.add(item.clone());
-                break;
-            case v1_18_10:
-                Item.creative486.add(item.clone());
-                break;
-            case v1_18_0:
-                Item.creative475.add(item.clone());
-                break;
-            case v1_18_30:
-                Item.creative503.add(item.clone());
-                break;
-            case v1_19_0:
-                Item.creative527.add(item.clone());
-                break;
-            case v1_19_10:
-                Item.creative534.add(item.clone());
-                break;
-            case v1_19_20:
-                Item.creative544.add(item.clone());
-                break;
-            case v1_19_50:
-                Item.creative560.add(item.clone());
-                break;
-            case v1_19_60:
-                Item.creative567.add(item.clone());
-                break;
-            case v1_19_70:
-                Item.creative575.add(item.clone());
-                break;
-            case v1_19_80:
-                Item.creative582.add(item.clone());
-                break;
-            case v1_20_0:
-                Item.creative589.add(item.clone());
-                break;
-            case v1_20_10:
-                Item.creative594.add(item.clone());
-            default:
-                throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
+            case v1_2_0 -> Item.creative137.add(item.clone());
+            case v1_5_0 -> Item.creative274.add(item.clone());
+            case v1_7_0 -> Item.creative291.add(item.clone());
+            case v1_8_0 -> Item.creative313.add(item.clone());
+            case v1_9_0 -> Item.creative332.add(item.clone());
+            case v1_10_0 -> Item.creative340.add(item.clone());
+            case v1_11_0 -> Item.creative354.add(item.clone());
+            case v1_14_0 -> Item.creative389.add(item.clone());
+            case v1_16_0 -> Item.creative407.add(item.clone());
+            case v1_17_0 -> Item.creative440.add(item.clone());
+            case v1_17_10 -> Item.creative448.add(item.clone());
+            case v1_17_30 -> Item.creative465.add(item.clone());
+            case v1_17_40 -> Item.creative471.add(item.clone());
+            case v1_18_10 -> Item.creative486.add(item.clone());
+            case v1_18_0 -> Item.creative475.add(item.clone());
+            case v1_18_30 -> Item.creative503.add(item.clone());
+            case v1_19_0 -> Item.creative527.add(item.clone());
+            case v1_19_10 -> Item.creative534.add(item.clone());
+            case v1_19_20 -> Item.creative544.add(item.clone());
+            case v1_19_50 -> Item.creative560.add(item.clone());
+            case v1_19_60 -> Item.creative567.add(item.clone());
+            case v1_19_70 -> Item.creative575.add(item.clone());
+            case v1_19_80 -> Item.creative582.add(item.clone());
+            case v1_20_0 -> Item.creative589.add(item.clone());
+            case v1_20_10 -> Item.creative594.add(item.clone());
+            default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
     }
 
