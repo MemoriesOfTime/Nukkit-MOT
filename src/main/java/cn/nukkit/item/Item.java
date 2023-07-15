@@ -388,6 +388,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     private static final List<Item> creative575 = new ObjectArrayList<>();
     private static final List<Item> creative582 = new ObjectArrayList<>();
     private static final List<Item> creative589 = new ObjectArrayList<>();
+    private static final List<Item> creative594 = new ObjectArrayList<>();
 
     @SuppressWarnings("unchecked")
     private static void initCreativeItems() {
@@ -494,6 +495,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCreativeItemsNew(ProtocolInfo.v1_19_70, ProtocolInfo.v1_19_70, creative575);
         registerCreativeItemsNew(ProtocolInfo.v1_19_80, ProtocolInfo.v1_19_80, creative582);
         registerCreativeItemsNew(ProtocolInfo.v1_20_0, ProtocolInfo.v1_20_0, creative589);
+        registerCreativeItemsNew(ProtocolInfo.v1_20_10, ProtocolInfo.v1_20_10, creative594);
     }
 
     private static void registerCreativeItemsNew(int protocol, int blockPaletteProtocol, List<Item> creativeItems) {
@@ -538,6 +540,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         Item.creative575.clear();
         Item.creative582.clear();
         Item.creative589.clear();
+        Item.creative594.clear();
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -634,6 +637,9 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_20_0_23:
             case v1_20_0:
                 return new ArrayList<>(Item.creative589);
+            case v1_20_10:
+                return new ArrayList<>(Item.creative594);
+            // TODO Multiversion
             default:
                 throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
         }
@@ -641,83 +647,37 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static void addCreativeItem(Item item) {
         Server.mvw("Item#addCreativeItem(Item)");
-        addCreativeItem(v1_20_0, item);
+        addCreativeItem(v1_20_10, item);
     }
 
     public static void addCreativeItem(int protocol, Item item) {
         switch (protocol) { // NOTE: Not all versions are supposed to be here
-            case v1_2_0:
-                Item.creative137.add(item.clone());
-            case v1_5_0:
-                Item.creative274.add(item.clone());
-            case v1_7_0:
-                Item.creative291.add(item.clone());
-                break;
-            case v1_8_0:
-                Item.creative313.add(item.clone());
-                break;
-            case v1_9_0:
-                Item.creative332.add(item.clone());
-                break;
-            case v1_10_0:
-                Item.creative340.add(item.clone());
-                break;
-            case v1_11_0:
-                Item.creative354.add(item.clone());
-                break;
-            case v1_14_0:
-                Item.creative389.add(item.clone());
-                break;
-            case v1_16_0:
-                Item.creative407.add(item.clone());
-                break;
-            case v1_17_0:
-                Item.creative440.add(item.clone());
-                break;
-            case v1_17_10:
-                Item.creative448.add(item.clone());
-                break;
-            case v1_17_30:
-                Item.creative465.add(item.clone());
-                break;
-            case v1_17_40:
-                Item.creative471.add(item.clone());
-                break;
-            case v1_18_10:
-                Item.creative486.add(item.clone());
-                break;
-            case v1_18_0:
-                Item.creative475.add(item.clone());
-                break;
-            case v1_18_30:
-                Item.creative503.add(item.clone());
-                break;
-            case v1_19_0:
-                Item.creative527.add(item.clone());
-                break;
-            case v1_19_10:
-                Item.creative534.add(item.clone());
-                break;
-            case v1_19_20:
-                Item.creative544.add(item.clone());
-                break;
-            case v1_19_50:
-                Item.creative560.add(item.clone());
-                break;
-            case v1_19_60:
-                Item.creative567.add(item.clone());
-                break;
-            case v1_19_70:
-                Item.creative575.add(item.clone());
-                break;
-            case v1_19_80:
-                Item.creative582.add(item.clone());
-                break;
-            case v1_20_0:
-                Item.creative589.add(item.clone());
-                break;
-            default:
-                throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
+            case v1_2_0 -> Item.creative137.add(item.clone());
+            case v1_5_0 -> Item.creative274.add(item.clone());
+            case v1_7_0 -> Item.creative291.add(item.clone());
+            case v1_8_0 -> Item.creative313.add(item.clone());
+            case v1_9_0 -> Item.creative332.add(item.clone());
+            case v1_10_0 -> Item.creative340.add(item.clone());
+            case v1_11_0 -> Item.creative354.add(item.clone());
+            case v1_14_0 -> Item.creative389.add(item.clone());
+            case v1_16_0 -> Item.creative407.add(item.clone());
+            case v1_17_0 -> Item.creative440.add(item.clone());
+            case v1_17_10 -> Item.creative448.add(item.clone());
+            case v1_17_30 -> Item.creative465.add(item.clone());
+            case v1_17_40 -> Item.creative471.add(item.clone());
+            case v1_18_10 -> Item.creative486.add(item.clone());
+            case v1_18_0 -> Item.creative475.add(item.clone());
+            case v1_18_30 -> Item.creative503.add(item.clone());
+            case v1_19_0 -> Item.creative527.add(item.clone());
+            case v1_19_10 -> Item.creative534.add(item.clone());
+            case v1_19_20 -> Item.creative544.add(item.clone());
+            case v1_19_50 -> Item.creative560.add(item.clone());
+            case v1_19_60 -> Item.creative567.add(item.clone());
+            case v1_19_70 -> Item.creative575.add(item.clone());
+            case v1_19_80 -> Item.creative582.add(item.clone());
+            case v1_20_0 -> Item.creative589.add(item.clone());
+            case v1_20_10 -> Item.creative594.add(item.clone());
+            default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
     }
 
@@ -787,47 +747,31 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         list[id] = c;
 
         ItemCustom item = (ItemCustom) get(id);
-        if (RuntimeItems.getMapping(v1_16_100).registerCustomItem(item)) {
-            addCreativeItem(v1_16_0, item);
-        }
-        if (RuntimeItems.getMapping(v1_17_0).registerCustomItem(item)) {
-            addCreativeItem(v1_17_0, item);
-        }
-        if (RuntimeItems.getMapping(v1_17_10).registerCustomItem(item)) {
-            addCreativeItem(v1_17_10, item);
-            addCreativeItem(v1_17_30, item);
-            addCreativeItem(v1_17_40, item);
-        }
-        RuntimeItems.getMapping(v1_18_0).registerCustomItem(item);
-        if (RuntimeItems.getMapping(v1_18_10).registerCustomItem(item)) {
-            addCreativeItem(v1_18_10, item);
-        }
-        if (RuntimeItems.getMapping(v1_18_30).registerCustomItem(item)) {
-            addCreativeItem(v1_18_30, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_0).registerCustomItem(item)) {
-            addCreativeItem(v1_19_0, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_10).registerCustomItem(item)) {
-            addCreativeItem(v1_19_10, item);
-            addCreativeItem(v1_19_20, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_50).registerCustomItem(item)) {
-            addCreativeItem(v1_19_50, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_60).registerCustomItem(item)) {
-            addCreativeItem(v1_19_60, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_70).registerCustomItem(item)) {
-            addCreativeItem(v1_19_70, item);
-        }
-        if (RuntimeItems.getMapping(v1_19_80).registerCustomItem(item)) {
-            addCreativeItem(v1_19_80, item);
-        }
-        if (RuntimeItems.getMapping(v1_20_0).registerCustomItem(item)) {
-            addCreativeItem(v1_20_0, item);
-        }
+
+        registerCustomItem(item, v1_16_100, v1_16_0);
+        registerCustomItem(item, v1_17_0, v1_17_0);
+        registerCustomItem(item, v1_17_10, v1_17_10, v1_17_30, v1_17_40);
+        registerCustomItem(item, v1_18_0, v1_18_0);
+        registerCustomItem(item, v1_18_10, v1_18_10);
+        registerCustomItem(item, v1_18_30, v1_18_30);
+        registerCustomItem(item, v1_19_0, v1_19_0);
+        registerCustomItem(item, v1_19_10, v1_19_10, v1_19_20);
+        registerCustomItem(item, v1_19_50, v1_19_50);
+        registerCustomItem(item, v1_19_60, v1_19_60);
+        registerCustomItem(item, v1_19_70, v1_19_70);
+        registerCustomItem(item, v1_19_80, v1_19_80);
+        registerCustomItem(item, v1_20_0, v1_20_0);
+        registerCustomItem(item, v1_20_10, v1_20_10);
+
         return true;
+    }
+
+    private static void registerCustomItem(ItemCustom item, int protocol, int... creativeProtocols) {
+        if (RuntimeItems.getMapping(protocol).registerCustomItem(item)) {
+            for (int creativeProtocol : creativeProtocols) {
+                addCreativeItem(creativeProtocol, item);
+            }
+        }
     }
 
     public static boolean deleteCustomItem(int id) {
@@ -837,21 +781,32 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[id] = null;
 
             ItemCustom item = (ItemCustom) get(id);
-            return RuntimeItems.getMapping(v1_16_100).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_17_0).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_17_10).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_18_0).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_18_10).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_18_30).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_0).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_10).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_50).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_60).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_70).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_19_80).deleteCustomItem(item) &&
-                    RuntimeItems.getMapping(v1_20_0).deleteCustomItem(item);
+
+            deleteCustomItem(item, v1_16_100, v1_16_0);
+            deleteCustomItem(item, v1_17_0, v1_17_0);
+            deleteCustomItem(item, v1_17_10, v1_17_10, v1_17_30, v1_17_40);
+            deleteCustomItem(item, v1_18_0, v1_18_0);
+            deleteCustomItem(item, v1_18_10, v1_18_10);
+            deleteCustomItem(item, v1_18_30, v1_18_30);
+            deleteCustomItem(item, v1_19_0, v1_19_0);
+            deleteCustomItem(item, v1_19_10, v1_19_10, v1_19_20);
+            deleteCustomItem(item, v1_19_50, v1_19_50);
+            deleteCustomItem(item, v1_19_60, v1_19_60);
+            deleteCustomItem(item, v1_19_70, v1_19_70);
+            deleteCustomItem(item, v1_19_80, v1_19_80);
+            deleteCustomItem(item, v1_20_0, v1_20_0);
+            deleteCustomItem(item, v1_20_10, v1_20_10);
+
+            return true;
         }else {
             return false;
+        }
+    }
+
+    private static void deleteCustomItem(ItemCustom item, int protocol, int... creativeProtocols) {
+        RuntimeItems.getMapping(protocol).deleteCustomItem(item);
+        for (int creativeProtocol : creativeProtocols) {
+            removeCreativeItem(creativeProtocol, item);
         }
     }
 

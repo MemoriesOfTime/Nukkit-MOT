@@ -1238,7 +1238,9 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_20_0_23) {
+        if (player.protocol >= ProtocolInfo.v1_20_10) {
+            player.dataPacket(CraftingManager.packet594);
+        } else if (player.protocol >= ProtocolInfo.v1_20_0_23) {
             player.dataPacket(CraftingManager.packet589);
         } else if (player.protocol >= ProtocolInfo.v1_19_80) {
             player.dataPacket(CraftingManager.packet582);
@@ -3047,7 +3049,7 @@ public class Server {
         this.useSnappy = this.getPropertyBoolean("use-snappy-compression", false);
         this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);
         this.networkCompressionThreshold = this.getPropertyInt("compression-threshold", 256);
-        this.enableSpark = this.getPropertyBoolean("enable-spark", true);
+        this.enableSpark = this.getPropertyBoolean("enable-spark", false);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
@@ -3192,7 +3194,7 @@ public class Server {
             put("use-snappy-compression", false);
             put("use-client-spectator", true);
             put("compression-threshold", "256");
-            put("enable-spark", true);
+            put("enable-spark", false);
             put("hastebin-token", "");
         }
     }
