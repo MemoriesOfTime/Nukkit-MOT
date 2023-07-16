@@ -377,6 +377,9 @@ public interface BlockID {
     int SMOOTH_STONE = 438;
     int RED_NETHER_BRICK_STAIRS = 439;
     int SMOOTH_QUARTZ_STAIRS = 440;
+
+    int LECTERN = 449;
+
     int SMITHING_TABLE = 457;
     int BARREL = 458;
     int BELL = 461;

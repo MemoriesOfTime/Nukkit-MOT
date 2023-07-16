@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
 import cn.nukkit.event.block.ItemFrameUseEvent;
+import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemItemFrame;
@@ -16,6 +17,7 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -79,6 +81,18 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
     @Override
     public boolean sticksToPiston() {
         return false;
+    }
+
+    @Override
+    public int onTouch(@Nullable Player player, PlayerInteractEvent.Action action) {
+        this.onUpdate(Level.BLOCK_UPDATE_TOUCH);
+        if (player != null && action == PlayerInteractEvent.Action.LEFT_CLICK_BLOCK) {
+            BlockEntity itemFrame = this.level.getBlockEntity(this);
+            if (itemFrame instanceof BlockEntityItemFrame && ((BlockEntityItemFrame) itemFrame).dropItem(player)) {
+                return 1;
+            }
+        }
+        return 0;
     }
 
     @Override

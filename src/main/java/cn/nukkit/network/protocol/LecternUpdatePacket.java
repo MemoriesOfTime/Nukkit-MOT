@@ -20,16 +20,12 @@ public class LecternUpdatePacket extends DataPacket {
 
     @Override
     public void decode() {
-        if (protocol < 354) {
-            this.page = this.getByte();
-            this.blockPosition = this.getBlockVector3();
-            this.dropBook = this.getBoolean();
-        } else {
-            this.page = this.getByte();
+        this.page = this.getByte();
+        if (protocol >= 354) {
             this.totalPages = this.getByte();
-            this.blockPosition = this.getBlockVector3();
-            this.dropBook = this.getBoolean();
         }
+        this.blockPosition = this.getBlockVector3();
+        this.dropBook = this.getBoolean();
     }
 
     @Override
