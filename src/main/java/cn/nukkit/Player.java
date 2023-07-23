@@ -5452,6 +5452,28 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (this.playerUIInventory != null) {
                     this.playerUIInventory.clearAll();
                 }
+            } else {
+                // 发包给客户端清除不死图腾，防止影响自杀等操作
+                if (this.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                    InventorySlotPacket pk = new InventorySlotPacket();
+                    pk.slot = 0;
+                    pk.item = Item.AIR_ITEM;
+                    int id = this.getWindowId(this.getOffhandInventory());
+                    if (id != -1) {
+                        pk.inventoryId = id;
+                        this.dataPacket(pk);
+                    }
+                }
+                if (this.getInventory().getItemInHandFast() instanceof ItemTotem) {
+                    InventorySlotPacket pk = new InventorySlotPacket();
+                    pk.slot = this.getInventory().getHeldItemSlot();
+                    pk.item = Item.AIR_ITEM;
+                    int id = this.getWindowId(this.getInventory());
+                    if (id != -1) {
+                        pk.inventoryId = id;
+                        this.dataPacket(pk);
+                    }
+                }
             }
 
             if (!ev.getKeepExperience() && this.level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
