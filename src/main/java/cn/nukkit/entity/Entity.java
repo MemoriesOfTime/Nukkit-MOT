@@ -17,12 +17,9 @@ import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerInteractEvent.Action;
 import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemID;
+import cn.nukkit.item.ItemTotem;
 import cn.nukkit.item.enchantment.Enchantment;
-import cn.nukkit.level.GameRule;
-import cn.nukkit.level.Level;
-import cn.nukkit.level.Location;
-import cn.nukkit.level.Position;
+import cn.nukkit.level.*;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
@@ -1341,15 +1338,16 @@ public abstract class Entity extends Location implements Metadatable {
             if (source.getCause() != DamageCause.VOID && source.getCause() != DamageCause.SUICIDE) {
                 Player p = (Player) this;
                 boolean totem = false;
-                if (p.getOffhandInventory().getItemFast(0).getId() == ItemID.TOTEM) {
+                if (p.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
                     p.getOffhandInventory().clear(0);
                     totem = true;
-                } else if (p.getInventory().getItemInHandFast().getId() == ItemID.TOTEM) {
+                } else if (p.getInventory().getItemInHandFast() instanceof ItemTotem) {
                     p.getInventory().clear(p.getInventory().getHeldItemIndex());
                     totem = true;
                 }
                 if (totem) {
                     this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_TOTEM);
+                    this.getLevel().addParticleEffect(this, ParticleEffect.TOTEM);
 
                     this.extinguish();
                     this.removeAllEffects();
@@ -1369,7 +1367,7 @@ public abstract class Entity extends Location implements Metadatable {
                 }
             }
         }
-        setHealth(newHealth);
+        this.setHealth(newHealth);
         return true;
     }
 
