@@ -5464,14 +5464,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.dataPacket(pk);
                     }
                 }
-                if (this.getInventory().getItemInHandFast() instanceof ItemTotem) {
-                    InventorySlotPacket pk = new InventorySlotPacket();
-                    pk.slot = this.getInventory().getHeldItemSlot();
-                    pk.item = Item.AIR_ITEM;
-                    int id = this.getWindowId(this.getInventory());
-                    if (id != -1) {
-                        pk.inventoryId = id;
-                        this.dataPacket(pk);
+                int id = this.getWindowId(this.getInventory());
+                if (id != -1) {
+                    for (Map.Entry<Integer, Item> entry : this.getInventory().getContents().entrySet()) {
+                        if (entry.getValue() instanceof ItemTotem) {
+                            InventorySlotPacket pk = new InventorySlotPacket();
+                            pk.slot = entry.getKey();
+                            pk.item = Item.AIR_ITEM;
+                            pk.inventoryId = id;
+                            this.dataPacket(pk);
+                        }
                     }
                 }
             }
