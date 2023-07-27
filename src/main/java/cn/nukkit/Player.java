@@ -16,6 +16,7 @@ import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
+import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
@@ -189,6 +190,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected EnchantTransaction enchantTransaction;
     protected RepairItemTransaction repairItemTransaction;
     protected SmithingTransaction smithingTransaction;
+    protected TradingTransaction tradingTransaction;
 
     protected long randomClientId;
 
@@ -4097,6 +4099,37 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (!players.isEmpty()) {
                             level.addSound(this, sound, 1f, 1f, players);
                         }
+                    }
+                    return;
+                } else if (transactionPacket.isTradeItemPart) {
+                    if (this.tradingTransaction == null) {
+                        this.tradingTransaction = new TradingTransaction(this, actions);
+                    } else {
+                        for (InventoryAction action : actions) {
+                            this.tradingTransaction.addAction(action);
+                        }
+                    }
+                    if (this.tradingTransaction.canExecute()) {
+                        this.tradingTransaction.execute();
+
+                        for (Inventory inventory : this.tradingTransaction.getInventories()) {
+
+                            if (inventory instanceof TradeInventory tradeInventory) {
+                                EntityVillager ent = tradeInventory.getHolder();
+                                ent.namedTag.putBoolean("traded", true);
+                                for (Tag tag : ent.getRecipes().getAll()) {
+                                    CompoundTag ta = (CompoundTag) tag;
+                                    if (ta.getCompound("buyA").getShort("id") == tradeInventory.getItem(0).getId()) {
+                                        int tradeXP = ta.getInt("traderExp");
+                                        this.addExperience(ta.getByte("rewardExp"));
+                                        ent.addExperience(tradeXP);
+                                        this.level.addSound(this, Sound.RANDOM_ORB, 0,3f, this);
+                                    }
+                                }
+                            }
+                        }
+
+                        this.tradingTransaction = null;
                     }
                     return;
                 } else if (this.craftingTransaction != null) {

@@ -9,6 +9,7 @@ import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityHuman;
 import cn.nukkit.entity.data.Skin;
+import cn.nukkit.entity.data.profession.Profession;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.entity.passive.*;
@@ -627,6 +628,7 @@ public class Server {
         this.commandMap = new SimpleCommandMap(this);
 
         registerEntities();
+        registerProfessions();
         registerBlockEntities();
 
         Block.init();
@@ -2748,6 +2750,10 @@ public class Server {
      */
     public Thread getPrimaryThread() {
         return currentThread;
+    }
+
+    private void registerProfessions() {
+        Profession.init();
     }
 
     /**

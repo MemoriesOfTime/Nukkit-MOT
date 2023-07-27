@@ -3,9 +3,7 @@ package cn.nukkit;
 import cn.nukkit.form.window.FormWindow;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerUIInventory;
-import cn.nukkit.inventory.transaction.CraftingTransaction;
-import cn.nukkit.inventory.transaction.EnchantTransaction;
-import cn.nukkit.inventory.transaction.RepairItemTransaction;
+import cn.nukkit.inventory.transaction.*;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.SourceInterface;
@@ -151,7 +149,7 @@ public final class PlayerHandle {
 
     public void setGrindstoneTransaction(GrindstoneTransaction grindstoneTransaction) {
         player.grindstoneTransaction = grindstoneTransaction;
-    }
+    }*/
 
     public SmithingTransaction getSmithingTransaction() {
         return player.smithingTransaction;
@@ -167,7 +165,7 @@ public final class PlayerHandle {
 
     public void setTradingTransaction(TradingTransaction tradingTransaction) {
         player.tradingTransaction = tradingTransaction;
-    }*/
+    }
 
     public long getRandomClientId() {
         return player.randomClientId;
