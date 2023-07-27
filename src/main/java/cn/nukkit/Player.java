@@ -1646,19 +1646,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public boolean fastMove(double dx, double dy, double dz) {
-        if (dx == 0 && dy == 0 && dz == 0) {
-            return true;
-        }
-
-        AxisAlignedBB newBB = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
-
-        if (this.isSpectator() || server.getAllowFlight() || !this.level.hasCollision(this, newBB.shrink(0, this.getStepHeight(), 0), false)) {
-            this.boundingBox = newBB;
-        }
-
-        this.x = (this.boundingBox.getMinX() + this.boundingBox.getMaxX()) / 2;
-        this.y = this.boundingBox.getMinY() - this.ySize;
-        this.z = (this.boundingBox.getMinZ() + this.boundingBox.getMaxZ()) / 2;
+        this.x += dx;
+        this.y += dy;
+        this.z += dz;
+        this.recalculateBoundingBox();
 
         this.checkChunks();
 
@@ -1881,7 +1872,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (invalidMotion) {
-            this.revertClientMotion(this.getLocation());
+            this.revertClientMotion(revertPos);
             return;
         }
 
@@ -1915,18 +1906,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            if (!invalidMotion) {
-                this.x = clientPos.getX();
-                this.y = clientPos.getY();
-                this.z = clientPos.getZ();
-                double radius = this.getWidth() / 2;
-                this.boundingBox.setBounds(this.x - radius, this.y, this.z - radius, this.x + radius, this.y + this.getHeight(), this.z + radius);
+            if (invalidMotion) {
+                this.setPositionAndRotation(revertPos.asVector3f().asVector3(), revertPos.getYaw(), revertPos.getPitch(), revertPos.getHeadYaw());
+                this.revertClientMotion(revertPos);
+                this.resetClientMovement();
+                return;
             }
-        }
-
-        if (invalidMotion) {
-            this.revertClientMotion(revertPos);
-            return;
         }
 
         // 瞬移检测

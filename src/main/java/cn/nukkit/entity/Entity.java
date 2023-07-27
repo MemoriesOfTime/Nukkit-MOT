@@ -851,7 +851,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void recalculateBoundingBox() {
-        this.recalculateBoundingBox(false);
+        this.recalculateBoundingBox(true);
     }
 
     public void recalculateBoundingBox(boolean send) {
@@ -2522,7 +2522,7 @@ public abstract class Entity extends Location implements Metadatable {
             this.z = pos.z;
         }
 
-        this.recalculateBoundingBox();
+        this.recalculateBoundingBox(false);
 
         if (!this.isPlayer) {
             this.blocksAround = null;
