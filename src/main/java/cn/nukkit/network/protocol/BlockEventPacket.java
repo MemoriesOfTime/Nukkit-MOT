@@ -22,12 +22,25 @@ public class BlockEventPacket extends DataPacket {
     public int eventType;
     public int eventData;
 
+    @Deprecated
+    public int case1 = -1;
+    @Deprecated
+    public int case2 = -1;
+
     @Override
     public void decode() {
     }
 
     @Override
     public void encode() {
+        //兼容NK插件
+        if (this.case1 != -1) {
+            this.eventType = this.case1;
+        }
+        if (this.case2 != -1) {
+            this.eventData = this.case2;
+        }
+
         this.reset();
         this.putBlockVector3(this.x, this.y, this.z);
         this.putVarInt(this.eventType);
