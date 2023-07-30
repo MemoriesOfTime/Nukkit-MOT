@@ -398,7 +398,7 @@ public class AvailableCommandsPacket extends DataPacket {
         this.putUnsignedVarInt(enumValues.size());
         enumValues.forEach(this::putString);
 
-        if (this.protocol >= ProtocolInfo.v1_20_10) {
+        if (this.protocol >= ProtocolInfo.v1_20_10_21) {
             this.putUnsignedVarInt(subCommandValues.size());
             subCommandValues.forEach(this::putString);
         }
@@ -433,7 +433,7 @@ public class AvailableCommandsPacket extends DataPacket {
             }
         });
 
-        if (this.protocol >= ProtocolInfo.v1_20_10) {
+        if (this.protocol >= ProtocolInfo.v1_20_10_21) {
             this.putUnsignedVarInt(subCommandData.size());
             for (ChainedSubCommandData chainedSubCommandData : subCommandData) {
                 this.putString(chainedSubCommandData.getName());
@@ -467,7 +467,7 @@ public class AvailableCommandsPacket extends DataPacket {
 
             putLInt(data.aliases == null ? -1 : enums.indexOf(data.aliases));
 
-            if (this.protocol >= ProtocolInfo.v1_20_10) {
+            if (this.protocol >= ProtocolInfo.v1_20_10_21) {
                 this.putUnsignedVarInt(data.subcommands.size());
                 for (ChainedSubCommandData subcommand : data.subcommands) {
                     int index = subCommandData.indexOf(subcommand);
@@ -478,7 +478,7 @@ public class AvailableCommandsPacket extends DataPacket {
 
             putUnsignedVarInt(data.overloads.size());
             for (CommandOverload overload : data.overloads.values()) {
-                if (this.protocol >= ProtocolInfo.v1_20_10) {
+                if (this.protocol >= ProtocolInfo.v1_20_10_21) {
                     this.putBoolean(overload.chaining);
                 }
                 putUnsignedVarInt(overload.input.parameters.length);

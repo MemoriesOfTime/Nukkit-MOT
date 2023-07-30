@@ -637,6 +637,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_20_0_23:
             case v1_20_0:
                 return new ArrayList<>(Item.creative589);
+            case v1_20_10_21:
             case v1_20_10:
                 return new ArrayList<>(Item.creative594);
             // TODO Multiversion
