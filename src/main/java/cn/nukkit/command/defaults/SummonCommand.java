@@ -16,8 +16,8 @@ public class SummonCommand extends Command {
         this.setPermission("nukkit.command.summon");
         this.commandParameters.clear();
         this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("entityType", false, CommandParameter.ENUM_TYPE_ENTITY_LIST),
-                new CommandParameter("player", CommandParamType.TARGET, true)
+                CommandParameter.newEnum("entityType", false, Entity.getEntityRuntimeMapping().values().toArray(new String[0])),
+                CommandParameter.newType("player", true, CommandParamType.TARGET)
         });
     }
 
@@ -32,7 +32,8 @@ public class SummonCommand extends Command {
         }
 
         // Convert Minecraft format to the format what Nukkit uses
-        String mob = Character.toUpperCase(args[0].charAt(0)) + args[0].substring(1);
+        String mob = args[0].toLowerCase().replace("minecraft:", "");
+        mob = Character.toUpperCase(mob.charAt(0)) + mob.substring(1);
         int max = mob.length() - 1;
         for (int x = 2; x < max; x++) {
             if (mob.charAt(x) == '_') {
@@ -43,7 +44,7 @@ public class SummonCommand extends Command {
         Player playerThatSpawns;
 
         if (args.length == 2) {
-            playerThatSpawns = Server.getInstance().getPlayer(args[1].replace("@s", sender.getName()));
+            playerThatSpawns = Server.getInstance().getPlayerExact(args[1].replace("@s", sender.getName()));
         } else {
             playerThatSpawns = (Player) sender;
         }
