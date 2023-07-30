@@ -5980,6 +5980,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
             //this.removeAllWindows();
             //this.formOpen = false;
+            this.getTopWindow().ifPresent(this::removeWindow);
 
             this.teleportPosition = this;
             if (cause != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
