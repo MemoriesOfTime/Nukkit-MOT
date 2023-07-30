@@ -5978,8 +5978,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
-            this.removeAllWindows();
-            this.formOpen = false;
+            //this.removeAllWindows();
+            //this.formOpen = false;
 
             this.teleportPosition = this;
             if (cause != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
