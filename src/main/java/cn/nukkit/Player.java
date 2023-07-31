@@ -2224,6 +2224,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (this.foodData != null) {
                     this.foodData.update(tickDiff);
                 }
+
+                if (this.age%20 == 0 && this.isGliding()) {
+                    if (this.onGround) {
+                        this.setGliding(false);
+                    }
+                    PlayerInventory playerInventory = this.getInventory();
+                    if (playerInventory != null) {
+                        Item chestplate = playerInventory.getChestplateFast();
+                        if ((chestplate == null || chestplate.getId() != ItemID.ELYTRA)) {
+                            this.setGliding(false);
+                        }
+                    }
+                }
             }
         }
 
