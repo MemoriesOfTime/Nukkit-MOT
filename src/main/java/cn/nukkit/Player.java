@@ -90,6 +90,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math3.util.FastMath;
 import org.jetbrains.annotations.NotNull;
@@ -337,6 +339,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET,
             ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET,
             ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET);
+
+    @Getter
+    @Setter
+    protected List<PlayerFogPacket.Fog> fogStack = new ArrayList<>();
 
     private final @NotNull PlayerHandle playerHandle = new PlayerHandle(this);
 
@@ -1106,6 +1112,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (!this.isSpectator() || this.server.useClientSpectator) {
             this.spawnToAll();
         }
+
+        this.sendFogStack();
+        this.sendCameraPresets();
 
         if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
@@ -2084,6 +2093,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.dataPacket(pk);
     }
 
+    public void sendFogStack() {
+        PlayerFogPacket pk = new PlayerFogPacket();
+        pk.setFogStack(this.fogStack);
+        this.dataPacket(pk);
+    }
+
     public void sendCameraPresets() {
         if (this.protocol < ProtocolInfo.v1_20_0_23) {
             return;
@@ -2504,6 +2519,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.timeSinceRest = nbt.getInt("TimeSinceRest");
+
+        ListTag<StringTag> fogIdentifiers = nbt.getList("fogIdentifiers", StringTag.class);
+        ListTag<StringTag> userProvidedFogIds = nbt.getList("userProvidedFogIds", StringTag.class);
+        for (int i = 0; i < fogIdentifiers.size(); i++) {
+            this.fogStack.add(i, new PlayerFogPacket.Fog(Identifier.tryParse(fogIdentifiers.get(i).data), userProvidedFogIds.get(i).data));
+        }
+
 
         for (Tag achievement : nbt.getCompound("Achievements").getAllTags()) {
             if (!(achievement instanceof ByteTag)) {
@@ -5278,6 +5300,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.namedTag.putFloat("foodSaturationLevel", this.foodData.getFoodSaturationLevel());
 
             this.namedTag.putInt("TimeSinceRest", this.timeSinceRest);
+
+            ListTag<StringTag> fogIdentifiers = new ListTag<>("fogIdentifiers");
+            ListTag<StringTag> userProvidedFogIds = new ListTag<>("userProvidedFogIds");
+            this.fogStack.forEach(fog -> {
+                fogIdentifiers.add(new StringTag("", fog.identifier().toString()));
+                userProvidedFogIds.add(new StringTag("", fog.userProvidedId()));
+            });
+            this.namedTag.putList(fogIdentifiers);
+            this.namedTag.putList(userProvidedFogIds);
 
             if (!this.username.isEmpty() && this.namedTag != null) {
                 if (this.server.savePlayerDataByUuid) {

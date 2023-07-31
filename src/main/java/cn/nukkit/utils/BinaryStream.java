@@ -35,6 +35,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -1312,6 +1313,26 @@ public class BinaryStream {
             deque.add(function.apply(this));
         }
         return deque.toArray((T[]) Array.newInstance(clazz, 0));
+    }
+
+    public <T> void putArray(Collection<T> collection, Consumer<T> writer) {
+        if (collection == null) {
+            putUnsignedVarInt(0);
+            return;
+        }
+        putUnsignedVarInt(collection.size());
+        collection.forEach(writer);
+    }
+
+    public <T> void putArray(T[] collection, Consumer<T> writer) {
+        if (collection == null) {
+            putUnsignedVarInt(0);
+            return;
+        }
+        putUnsignedVarInt(collection.length);
+        for (T t : collection) {
+            writer.accept(t);
+        }
     }
 
     public <T> void putArray(Collection<T> array, BiConsumer<BinaryStream, T> biConsumer) {
