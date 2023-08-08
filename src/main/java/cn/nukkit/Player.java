@@ -3578,7 +3578,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             break;
                         }
                         if (this.protocol >= 407) {
-                            if (!this.inventoryOpen) {
+                            Optional<Inventory> topWindow = this.getTopWindow();
+                            if (!this.inventoryOpen && !(topWindow.isPresent() && topWindow.get().getViewers().contains(this))) {
                                 this.inventoryOpen = this.inventory.open(this);
                             }
                         }
@@ -6257,7 +6258,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.permanentWindows.add(cnt);
         }
 
-        if (this.spawned && inventory.open(this)) {
+        if (this.spawned && !this.inventoryOpen && inventory.open(this)) {
             return cnt;
         } else if (!alwaysOpen) {
             this.removeWindow(inventory);
