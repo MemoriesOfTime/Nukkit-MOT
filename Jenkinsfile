@@ -7,6 +7,15 @@ pipeline {
     options {
         buildDiscarder(logRotator(artifactNumToKeepStr: '5'))
     }
+    triggers {
+        GenericTrigger (
+            causeString: 'Triggered by develop',
+            genericVariables: [[key: 'ref', value: '$.ref']],
+            printContributedVariables: true,
+            printPostContent: true,
+            token: 'nkmotmaster'
+        )
+    }
     stages {
         stage ('Build') {
             steps {

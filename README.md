@@ -8,7 +8,7 @@ note: If you need higher version features, please use [PowerNukkitX](https://git
 
 ### Link
 [Download Jar(Jenkins)](https://ci.lanink.cn/job/Nukkit-MOT/)  
-[Download Jar(GitHub Actions)](https://github.com/MemoriesOfTime/NukkitPetteriM1Edition/actions/workflows/maven.yml?query=branch%3Amaster)  
+[Download Jar(GitHub Actions)](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)  
 [Discord](https://discord.gg/pJjQDQC)  
 
 ### License
