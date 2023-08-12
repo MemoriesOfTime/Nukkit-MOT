@@ -3955,7 +3955,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 InventoryTransactionPacket transactionPacket = (InventoryTransactionPacket) packet;
-                System.out.println(transactionPacket);
                 // Nasty hack because the client won't change the right packet in survival when creating netherite stuff,
                 // so we are emulating what Mojang should be sending
                 if (getWindowById(SMITHING_WINDOW_ID) instanceof SmithingInventory smithingInventory) {
