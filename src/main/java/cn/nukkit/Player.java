@@ -3959,10 +3959,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 // so we are emulating what Mojang should be sending
                 if (getWindowById(SMITHING_WINDOW_ID) instanceof SmithingInventory smithingInventory) {
                     // When players in creative mode are about to see the result, a fixed packet can help.
-                    // It's so weird that players in survival will receive a mismatch-type packet, while players in creative won't.
-                    // Instead, sending a normal packet upon getting result item.
-                    boolean creativeSmithingAboutToGetResult = this.isCreative() && (transactionPacket.transactionType == InventoryTransactionPacket.TYPE_NORMAL)
-                            && !smithingInventory.getEquipment().isNull() && !smithingInventory.getIngredient().isNull() && !smithingInventory.getResult().isNull();
+                    // One of those actions in the inventory transaction packet contains to-do sourceType,
+                    // which can serve as a symbol to detect whether player is upgrading an item or not.
+                    boolean creativeSmithingAboutToGetResult = this.isCreative() && (transactionPacket.transactionType == InventoryTransactionPacket.TYPE_NORMAL) && Arrays.stream(transactionPacket.actions).anyMatch(action -> action.sourceType == NetworkInventoryAction.SOURCE_TODO);
                     if ((transactionPacket.transactionType == InventoryTransactionPacket.TYPE_MISMATCH) || creativeSmithingAboutToGetResult) {
                         if (!smithingInventory.getResult().isNull()) {
                             InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
