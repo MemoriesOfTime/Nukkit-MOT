@@ -3955,12 +3955,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 InventoryTransactionPacket transactionPacket = (InventoryTransactionPacket) packet;
-
-                // Nasty hack because the client won't change the right packet in survival when creating netherite stuff
+                System.out.println(transactionPacket);
+                // Nasty hack because the client won't change the right packet in survival when creating netherite stuff,
                 // so we are emulating what Mojang should be sending
                 if (getWindowById(SMITHING_WINDOW_ID) instanceof SmithingInventory smithingInventory) {
-                    if (transactionPacket.transactionType == InventoryTransactionPacket.TYPE_MISMATCH
-                            || transactionPacket.transactionType == InventoryTransactionPacket.TYPE_NORMAL) {
+                    // When players in creative mode are about to see the result, a fixed packet can help.
+                    // It's so weird that players in survival will receive a mismatch-type packet, while players in creative won't.
+                    // Instead, sending a normal packet upon getting result item.
+                    boolean creativeSmithingAboutToGetResult = this.isCreative() && (transactionPacket.transactionType == InventoryTransactionPacket.TYPE_NORMAL)
+                            && !smithingInventory.getEquipment().isNull() && !smithingInventory.getIngredient().isNull() && !smithingInventory.getResult().isNull();
+                    if ((transactionPacket.transactionType == InventoryTransactionPacket.TYPE_MISMATCH) || creativeSmithingAboutToGetResult) {
                         if (!smithingInventory.getResult().isNull()) {
                             InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
                             fixedPacket.isRepairItemPart = true;
