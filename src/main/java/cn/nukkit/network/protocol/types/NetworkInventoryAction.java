@@ -223,6 +223,15 @@ public class NetworkInventoryAction {
                             this.windowId = Player.SMITHING_WINDOW_ID;
                             this.inventorySlot = 1;
                             break;
+                        //124:53 -> 6:2
+                        case SmithingInventory.SMITHING_TEMPLATE_UI_SLOT:
+                            if (player.getWindowById(Player.SMITHING_WINDOW_ID) == null) {
+                                player.getServer().getLogger().error("Player " + player.getName() + " does not have smithing table window open");
+                                return null;
+                            }
+                            this.windowId = Player.SMITHING_WINDOW_ID;
+                            this.inventorySlot = 2;
+                            break;
                         //124:4 -> 500:0
                         case TradeInventory.TRADE_INPUT1_UI_SLOT:
                             if (player.getWindowById(Player.TRADE_WINDOW_ID) == null) {
