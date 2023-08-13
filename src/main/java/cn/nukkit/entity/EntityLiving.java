@@ -3,6 +3,8 @@ package cn.nukkit.entity;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockCactus;
+import cn.nukkit.block.BlockMagma;
 import cn.nukkit.entity.mob.EntityDrowned;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.projectile.EntityProjectile;
@@ -17,6 +19,7 @@ import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.BubbleParticle;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.FloatTag;
@@ -357,11 +360,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             // Check collisions with blocks
             if (this instanceof Player) {
                 if (this.age % 5 == 0) {
-                    int block = this.level.getBlockIdAt(chunk, getFloorX(), getFloorY() - 1, getFloorZ());
-                    if (block == Block.CACTUS) {
-                        Block.get(Block.CACTUS).onEntityCollide(this);
-                    } else if (block == Block.MAGMA) {
-                        Block.get(Block.MAGMA).onEntityCollide(this);
+                    Block block = this.level.getBlock(getFloorX(), NukkitMath.floorDouble(this.y - 0.25), getFloorZ());
+                    if (block instanceof BlockCactus) {
+                        block.onEntityCollide(this);
+                    } else if (block instanceof BlockMagma) {
+                        block.onEntityCollide(this);
                         if (this.isInsideOfWater()) {
                             this.level.addParticle(new BubbleParticle(this));
                             this.setMotion(this.getMotion().add(0, -0.3, 0));
