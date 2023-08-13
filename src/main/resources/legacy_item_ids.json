@@ -1027,5 +1027,23 @@
   "minecraft:music_disc_5": 636,
   "minecraft:disc_fragment_5": 637,
   "minecraft:glow_berries": 654,
-  "minecraft:music_disc_relic": 701
+  "minecraft:music_disc_relic": 701,
+
+  "minecraft:netherite_upgrade_smithing_template": 802,
+  "minecraft:sentry_armor_trim_smithing_template": 803,
+  "minecraft:dune_armor_trim_smithing_template": 804,
+  "minecraft:coast_armor_trim_smithing_template": 805,
+  "minecraft:wild_armor_trim_smithing_template": 806,
+  "minecraft:ward_armor_trim_smithing_template": 807,
+  "minecraft:eye_armor_trim_smithing_template": 808,
+  "minecraft:vex_armor_trim_smithing_template": 809,
+  "minecraft:tide_armor_trim_smithing_template": 810,
+  "minecraft:snout_armor_trim_smithing_template": 811,
+  "minecraft:rib_armor_trim_smithing_template": 812,
+  "minecraft:spire_armor_trim_smithing_template": 813,
+  "minecraft:silence_armor_trim_smithing_template": 814,
+  "minecraft:wayfinder_armor_trim_smithing_template": 815,
+  "minecraft:raiser_armor_trim_smithing_template": 816,
+  "minecraft:shaper_armor_trim_smithing_template": 817,
+  "minecraft:host_armor_trim_smithing_template": 818
 }

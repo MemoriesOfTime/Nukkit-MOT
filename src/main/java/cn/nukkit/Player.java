@@ -47,6 +47,7 @@ import cn.nukkit.item.customitem.ItemCustomArmor;
 import cn.nukkit.item.customitem.ItemCustomTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.food.Food;
+import cn.nukkit.item.trim.TrimFactory;
 import cn.nukkit.lang.LangCode;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
@@ -2716,6 +2717,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
             this.sendAllInventories();
             this.inventory.sendHeldItemIfNotAir(this);
+
+            // BDS sends armor trim templates and materials before the CraftingDataPacket
+            TrimDataPacket trimDataPacket = new TrimDataPacket();
+            trimDataPacket.getMaterials().addAll(TrimFactory.trimMaterials);
+            trimDataPacket.getPatterns().addAll(TrimFactory.trimPatterns);
+            this.dataPacket(trimDataPacket);
+
             this.server.sendRecipeList(this);
 
             if (this.isEnableClientCommand()) {

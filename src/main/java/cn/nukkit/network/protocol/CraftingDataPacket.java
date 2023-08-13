@@ -117,7 +117,7 @@ public class CraftingDataPacket extends DataPacket {
                         SmithingRecipe smithing = (SmithingRecipe) recipe;
                         this.putString(smithing.getRecipeId());
                         if (protocol >= ProtocolInfo.v1_19_80) {
-                            this.putRecipeIngredient(protocol, Item.get(Item.AIR)); //template
+                            this.putRecipeIngredient(protocol, protocol >= ProtocolInfo.v1_20_10_21 ? smithing.getTemplate() : Item.AIR_ITEM); //template
                         }
                         this.putRecipeIngredient(protocol, smithing.getEquipment());
                         this.putRecipeIngredient(protocol, smithing.getIngredient());

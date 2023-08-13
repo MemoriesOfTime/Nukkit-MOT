@@ -32,6 +32,8 @@ import java.util.List;
  */
 @ToString
 public class SmithingRecipe extends ShapelessRecipe {
+
+    private final Item template;
     private final Item equipment;
     private final Item ingredient;
     private final Item result;
@@ -42,6 +44,11 @@ public class SmithingRecipe extends ShapelessRecipe {
         super(recipeId, priority, result, ingredients);
         this.equipment = (Item) ingredients.toArray()[0];
         this.ingredient = (Item) ingredients.toArray()[1];
+        if (ingredients.size() >= 3) {
+            this.template = (Item) ingredients.toArray()[2];
+        } else {
+            this.template = Item.AIR_ITEM;
+        }
         this.result = result;
 
         ArrayList<Item> aggregation = new ArrayList<>(2);
@@ -73,6 +80,11 @@ public class SmithingRecipe extends ShapelessRecipe {
         return result;
     }
 
+    public Item getFinalResult(Item equip, Item template) {
+        //TODO template
+        return this.getFinalResult(equip);
+    }
+
     public Item getFinalResult(Item equip) {
         Item finalResult = getResult().clone();
 
@@ -102,6 +114,12 @@ public class SmithingRecipe extends ShapelessRecipe {
     @Override
     public RecipeType getType() {
         return RecipeType.SMITHING_TRANSFORM;
+    }
+
+    public Item getTemplate() {
+        return Item.get(Item.NETHERITE_UPGRADE_SMITHING_TEMPLATE);
+
+        //return template;
     }
 
     public Item getEquipment() {

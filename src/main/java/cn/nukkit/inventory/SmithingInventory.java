@@ -32,10 +32,12 @@ import javax.annotation.Nullable;
 public class SmithingInventory extends FakeBlockUIComponent {
     private static final int EQUIPMENT = 0;
     private static final int INGREDIENT = 1;
+    private static final int TEMPLATE = 2;
 
     public static final int SMITHING_EQUIPMENT_UI_SLOT = 51;
 
     public static final int SMITHING_INGREDIENT_UI_SLOT = 52;
+    public static final int SMITHING_TEMPLATE_UI_SLOT = 53;
 
     private Item currentResult = Item.get(0);
 
@@ -46,12 +48,12 @@ public class SmithingInventory extends FakeBlockUIComponent {
 
     @Nullable
     public SmithingRecipe matchRecipe() {
-        return Server.getInstance().getCraftingManager().matchSmithingRecipe(getEquipment(), getIngredient());
+        return Server.getInstance().getCraftingManager().matchSmithingRecipe(getEquipment(), getIngredient(), getTemplate());
     }
 
     @Override
     public void onSlotChange(int index, Item before, boolean send) {
-        if (index == EQUIPMENT || index == INGREDIENT) {
+        if (index == EQUIPMENT || index == INGREDIENT || index == TEMPLATE) {
             updateResult();
         }
         super.onSlotChange(index, before, send);
@@ -63,7 +65,7 @@ public class SmithingInventory extends FakeBlockUIComponent {
         if (recipe == null) {
             result = Item.get(0);
         } else {
-            result = recipe.getFinalResult(getEquipment());
+            result = recipe.getFinalResult(getEquipment(), getTemplate());
         }
         setResult(result);
     }
@@ -77,7 +79,15 @@ public class SmithingInventory extends FakeBlockUIComponent {
         if (recipe == null) {
             return Item.get(0);
         }
-        return recipe.getFinalResult(getEquipment());
+        return recipe.getFinalResult(getEquipment(), getTemplate());
+    }
+
+    public Item getTemplate() {
+        return getItem(TEMPLATE);
+    }
+
+    public void setTemplate(Item template) {
+        setItem(TEMPLATE, template);
     }
 
     public Item getEquipment() {

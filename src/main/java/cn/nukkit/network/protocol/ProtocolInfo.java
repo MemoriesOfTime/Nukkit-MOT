@@ -301,6 +301,7 @@ public interface ProtocolInfo {
     // MC packet IDs continue from 300 (0x12c)
     // Hack: 100 is added to the IDs below on encode
     byte __INTERNAL__CAMERA_INSTRUCTION_PACKET = (byte) 200; // 300
+    byte __INTERNAL__TRIM_DATA = (byte) 202; // 302
     byte __INTERNAL__OPEN_SIGN_PACKET = (byte) 203; // 303
     byte __INTERNAL__AGENT_ANIMATION = (byte) 204; // 304
 }

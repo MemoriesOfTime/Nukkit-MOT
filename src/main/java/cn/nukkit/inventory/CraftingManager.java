@@ -925,6 +925,11 @@ public class CraftingManager {
         this.multiRecipes.put(recipe.getId(), recipe);
     }
 
+    public SmithingRecipe matchSmithingRecipe(Item equipment, Item ingredient, Item template) {
+        //TODO template
+        return matchSmithingRecipe(equipment, ingredient);
+    }
+
     public SmithingRecipe matchSmithingRecipe(Item equipment, Item ingredient) {
         return this.getSmithingRecipeMap().get(getContainerHash(ingredient.getId(), equipment.getId()));
     }

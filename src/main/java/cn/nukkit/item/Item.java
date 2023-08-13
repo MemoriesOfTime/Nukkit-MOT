@@ -354,6 +354,25 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[SPYGLASS] = ItemSpyglass.class; //772
             list[RECORD_OTHERSIDE] = ItemRecordOtherside.class; //773
 
+            list[NETHERITE_UPGRADE_SMITHING_TEMPLATE] = ItemNetheriteUpgradeSmithingTemplate.class; // 802
+            list[SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemSentryArmorTrimSmithingTemplate.class; // 803
+            list[DUNE_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemDuneArmorTrimSmithingTemplate.class; // 804
+            list[COAST_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemCoastArmorTrimSmithingTemplate.class; // 805
+            list[WILD_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemWildArmorTrimSmithingTemplate.class; // 806
+            list[WARD_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemWardArmorTrimSmithingTemplate.class; // 807
+            list[EYE_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemEyeArmorTrimSmithingTemplate.class; // 808
+            list[VEX_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemVexArmorTrimSmithingTemplate.class; // 809
+            list[TIDE_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemTideArmorTrimSmithingTemplate.class; // 810
+            list[SNOUT_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemSnoutArmorTrimSmithingTemplate.class; // 811
+            list[RIB_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemRibArmorTrimSmithingTemplate.class; // 812
+            list[SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemSpireArmorTrimSmithingTemplate.class; // 813
+            list[SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemSilenceArmorTrimSmithingTemplate.class; // 814
+            list[WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemWayfinderArmorTrimSmithingTemplate.class; // 815
+            list[RAISER_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemRaiserArmorTrimSmithingTemplate.class; // 816
+            list[SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemShaperArmorTrimSmithingTemplate.class; // 817
+            list[HOST_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemHostArmorTrimSmithingTemplate.class; // 818
+
+
             for (int i = 0; i < 256; ++i) {
                 if (Block.list[i] != null) {
                     list[i] = Block.list[i];
