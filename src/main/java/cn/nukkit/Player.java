@@ -2269,6 +2269,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.timeSinceRest++;
         }
 
+        if (protocol >= ProtocolInfo.v1_20_10_21) {
+            if (this.age%200 == 0) {
+                this.dataPacket(new NetworkStackLatencyPacket());
+            }
+        }
+
         return true;
     }
 

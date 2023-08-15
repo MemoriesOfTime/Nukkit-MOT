@@ -8,6 +8,8 @@ public class NetworkStackLatencyPacket extends DataPacket {
     public static final byte NETWORK_ID = ProtocolInfo.NETWORK_STACK_LATENCY_PACKET;
 
     public long timestamp;
+    public boolean fromServer;
+    @Deprecated
     public boolean unknownBool;
 
     @Override
@@ -18,6 +20,10 @@ public class NetworkStackLatencyPacket extends DataPacket {
     @Override
     public void decode() {
         timestamp = this.getLLong();
+        if (this.protocol >= 332) {
+            this.fromServer = this.getBoolean();
+            this.unknownBool = this.fromServer;
+        }
     }
 
     @Override
@@ -25,7 +31,7 @@ public class NetworkStackLatencyPacket extends DataPacket {
         this.reset();
         this.putLLong(timestamp);
         if (protocol >= 332) {
-            this.putBoolean(unknownBool);
+            this.putBoolean(fromServer || unknownBool);
         }
     }
 }
