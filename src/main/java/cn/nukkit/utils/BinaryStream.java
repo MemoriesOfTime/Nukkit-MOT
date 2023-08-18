@@ -1081,6 +1081,16 @@ public class BinaryStream {
         this.putVarInt(item.getCount());
     }
 
+    //TODO 改成ItemDescriptor 合并两个putRecipeIngredient方法
+    public void putRecipeIngredient(int protocolId, String itemTag, int count) {
+        if (protocolId < ProtocolInfo.v1_19_30_23) {
+            throw new UnsupportedOperationException("This method is only supported on protocol 553+");
+        }
+        this.putByte((byte) 3);
+        this.putString(itemTag);
+        this.putVarInt(count);
+    }
+
     private static List<String> extractStringList(Item item, String tagName) {
         CompoundTag namedTag = item.getNamedTag();
         if (namedTag == null) {

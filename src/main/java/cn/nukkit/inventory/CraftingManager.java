@@ -77,7 +77,7 @@ public class CraftingManager {
     private final Map<Integer, SmithingRecipe> smithingRecipeMap = new Int2ObjectOpenHashMap<>(); //567
 
     private static int RECIPE_COUNT = 0;
-    static int NEXT_NETWORK_ID = 0;
+    static int NEXT_NETWORK_ID = 1;
 
     public static final Comparator<Item> recipeComparator = (i1, i2) -> {
         if (i1.getId() > i2.getId()) {
