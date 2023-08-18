@@ -17,7 +17,7 @@ public class BlockCobweb extends BlockFlowable {
     }
 
     public BlockCobweb(int meta) {
-        super(0);
+        super(meta);
     }
 
     @Override

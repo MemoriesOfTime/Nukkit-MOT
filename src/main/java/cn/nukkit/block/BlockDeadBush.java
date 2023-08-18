@@ -19,7 +19,7 @@ public class BlockDeadBush extends BlockFlowable {
     }
 
     public BlockDeadBush(int meta) {
-        super(0);
+        super(meta);
     }
 
     @Override

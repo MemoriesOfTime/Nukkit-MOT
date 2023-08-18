@@ -15,7 +15,7 @@ public class BlockPodzol extends BlockDirt {
     }
 
     public BlockPodzol(int meta) {
-        super(0);
+        super(meta);
     }
 
     @Override

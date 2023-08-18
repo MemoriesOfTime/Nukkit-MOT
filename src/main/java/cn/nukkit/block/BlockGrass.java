@@ -25,7 +25,7 @@ public class BlockGrass extends BlockDirt {
     }
 
     public BlockGrass(int meta) {
-        super(0);
+        super(meta);
     }
 
     @Override

@@ -19,7 +19,7 @@ public class BlockWaterLily extends BlockFlowable {
     }
 
     public BlockWaterLily(int meta) {
-        super(0);
+        super(meta);
     }
 
     @Override

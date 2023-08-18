@@ -20,7 +20,7 @@ public abstract class BlockMushroom extends BlockFlowable {
     }
 
     public BlockMushroom(int meta) {
-        super(0);
+        super(meta);
     }
 
     @Override

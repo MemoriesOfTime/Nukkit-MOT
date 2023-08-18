@@ -11,7 +11,7 @@ public class BlockDandelion extends BlockFlower {
     }
 
     public BlockDandelion(int meta) {
-        super(0);
+        super(meta);
     }
 
     @Override
