@@ -2185,6 +2185,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     this.inAirTicks = 0;
                     this.highestPosition = this.y;
+                    if (this.isGliding()) {
+                        this.setGliding(false);
+                    }
                 } else {
                     if (this.checkMovement && !this.isGliding() && !server.getAllowFlight() && this.inAirTicks > 20 && !this.getAllowFlight() && !this.isSleeping() && !this.isImmobile() && !this.isSwimming() && this.riding == null && !this.hasEffect(Effect.LEVITATION) && !this.hasEffect(Effect.SLOW_FALLING)) {
                         double expectedVelocity = (-this.getGravity()) / ((double) this.getDrag()) - ((-this.getGravity()) / ((double) this.getDrag())) * FastMath.exp(-((double) this.getDrag()) * ((double) (this.inAirTicks - this.startAirTicks)));
@@ -2226,15 +2229,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.foodData.update(tickDiff);
                 }
 
-                if (this.age%20 == 0 && this.isGliding()) {
-                    if (this.onGround) {
-                        this.setGliding(false);
-                    }
+                //鞘翅检查和耐久计算
+                if (this.isGliding()) {
                     PlayerInventory playerInventory = this.getInventory();
                     if (playerInventory != null) {
                         Item chestplate = playerInventory.getChestplateFast();
                         if ((chestplate == null || chestplate.getId() != ItemID.ELYTRA)) {
                             this.setGliding(false);
+                        } else if (this.age % (20 * (chestplate.getEnchantmentLevel(Enchantment.ID_DURABILITY) + 1)) == 0) {
+                            int newDamage = chestplate.getDamage() + 1;
+                            if (newDamage < chestplate.getMaxDurability()) {
+                                chestplate.setDamage(newDamage);
+                                playerInventory.setChestplate(chestplate);
+                            } else {
+                                this.setGliding(false);
+                            }
                         }
                     }
                 }
@@ -2259,6 +2268,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (!this.isSleeping()) {
             this.timeSinceRest++;
+        }
+
+        if (protocol >= ProtocolInfo.v1_20_10_21) {
+            if (this.age%200 == 0) {
+                this.dataPacket(new NetworkStackLatencyPacket());
+            }
         }
 
         return true;
