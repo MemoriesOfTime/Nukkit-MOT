@@ -15,12 +15,10 @@ import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.lang.ref.WeakReference;
 import java.nio.ByteOrder;
 import java.util.HashMap;
@@ -34,6 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author MagicDroidX
  * Nukkit Project
  */
+@Log4j2
 public abstract class BaseLevelProvider implements LevelProvider {
 
     protected Level level;
@@ -56,10 +55,37 @@ public abstract class BaseLevelProvider implements LevelProvider {
         this.level = level;
         this.path = path;
         File file_path = new File(this.path);
-        if (!file_path.exists()) {
-            file_path.mkdirs();
+        if (!file_path.exists() && !file_path.mkdirs()) {
+            throw new LevelException("Could not create the directory " + file_path);
         }
-        CompoundTag levelData = NBTIO.readCompressed(new FileInputStream(new File(this.path + "level.dat")), ByteOrder.BIG_ENDIAN);
+        CompoundTag levelData;
+        File levelDatFile = new File(getPath(), "level.dat");
+        try (FileInputStream fos = new FileInputStream(levelDatFile); BufferedInputStream input = new BufferedInputStream(fos)) {
+            levelData = NBTIO.readCompressed(input, ByteOrder.BIG_ENDIAN);
+        } catch (Exception e) {
+            log.fatal("Failed to load the level.dat file at {}, attempting to load level.dat.bak instead!", levelDatFile.getAbsolutePath(), e);
+            try {
+                File bak = new File(getPath(), "level.dat.bak");
+                if (!bak.isFile()) {
+                    log.fatal("The file {} does not exists!", bak.getAbsolutePath());
+                    FileNotFoundException ex = new FileNotFoundException("The file " + bak.getAbsolutePath() + " does not exists!");
+                    ex.addSuppressed(e);
+                    throw ex;
+                }
+                try (FileInputStream fos = new FileInputStream(bak); BufferedInputStream input = new BufferedInputStream(fos)) {
+                    levelData = NBTIO.readCompressed(input, ByteOrder.BIG_ENDIAN);
+                } catch (Exception e2) {
+                    log.fatal("Failed to load the level.dat.bak file at {}", levelDatFile.getAbsolutePath());
+                    e2.addSuppressed(e);
+                    throw e2;
+                }
+            } catch (Exception e2) {
+                LevelException ex = new LevelException("Could not load the level.dat and the level.dat.bak files. You might need to restore them from a backup!", e);
+                ex.addSuppressed(e2);
+                throw ex;
+            }
+        }
+
         if (levelData.get("Data") instanceof CompoundTag) {
             this.levelData = levelData.getCompound("Data");
         } else {
