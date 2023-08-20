@@ -5,7 +5,6 @@ import cn.nukkit.level.MovingObjectPosition;
 import java.util.List;
 
 public interface AxisAlignedBB extends Cloneable {
-
     AxisAlignedBB[] EMPTY_ARRAY = new AxisAlignedBB[0];
     List<AxisAlignedBB> EMPTY_LIST = List.of();
 

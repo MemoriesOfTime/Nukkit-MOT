@@ -1,5 +1,6 @@
 package cn.nukkit.level.generator.populator.impl;
 
+import cn.nukkit.block.Block;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.generator.object.ore.OreType;
@@ -7,39 +8,42 @@ import cn.nukkit.level.generator.populator.type.Populator;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.NukkitRandom;
 
-/**
- * @author DaPorkchop_
- */
 public class PopulatorOre extends Populator {
+	private final int replaceId;
+	private OreType[] oreTypes = OreType.EMPTY_ARRAY;
 
-    private final int replaceId;
-    private final OreType[] oreTypes;
+	public PopulatorOre() {
+		this(Block.STONE);
+	}
 
-    public PopulatorOre(int replaceId, OreType[] oreTypes) {
-        this.replaceId = replaceId;
-        this.oreTypes = oreTypes;
-    }
+	public PopulatorOre(final int id) {
+		replaceId = id;
+	}
 
-    @Override
-    public void populate(ChunkManager level, int chunkX, int chunkZ, NukkitRandom random, FullChunk chunk) {
-        int sx = chunkX << 4;
-        int ex = sx + 15;
-        int sz = chunkZ << 4;
-        int ez = sz + 15;
-        for (OreType type : this.oreTypes) {
-            for (int i = 0; i < type.clusterCount; i++) {
-                int x = NukkitMath.randomRange(random, sx, ex);
-                int z = NukkitMath.randomRange(random, sz, ez);
-                int y = NukkitMath.randomRange(random, type.minHeight, type.maxHeight);
-                if (level.getBlockIdAt(x, y, z) != replaceId) {
-                    continue;
-                }
-                if (type.clusterSize == 1) {
-                    level.setBlockFullIdAt(x, y, z, type.fullId);
-                } else {
-                    type.spawn(level, random, replaceId, x, y, z);
-                }
-            }
-        }
-    }
+	public PopulatorOre(final int replaceId, final OreType[] oreTypes) {
+		this.replaceId = replaceId;
+		this.oreTypes = oreTypes;
+	}
+
+	@Override
+	public void populate(final ChunkManager level, final int chunkX, final int chunkZ, final NukkitRandom random, final FullChunk chunk) {
+		final int sx = chunkX << 4;
+		final int ex = sx + 15;
+		final int sz = chunkZ << 4;
+		final int ez = sz + 15;
+		for (final OreType type : oreTypes) {
+			for (int i = 0; i < type.clusterCount; i++) {
+				final int x = NukkitMath.randomRange(random, sx, ex);
+				final int z = NukkitMath.randomRange(random, sz, ez);
+				final int y = NukkitMath.randomRange(random, type.minHeight, type.maxHeight);
+				if (level.getBlockIdAt(x, y, z) == replaceId) {
+					type.spawn(level, random, replaceId, x, y, z);
+				}
+			}
+		}
+	}
+
+	public void setOreTypes(final OreType[] oreTypes) {
+		this.oreTypes = oreTypes;
+	}
 }

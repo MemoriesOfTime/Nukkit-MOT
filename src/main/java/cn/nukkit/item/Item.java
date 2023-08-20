@@ -13,7 +13,11 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
-import cn.nukkit.nbt.tag.*;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.IntTag;
+import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.StringTag;
+import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.Config;
@@ -30,7 +34,13 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.OptionalInt;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -353,6 +363,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[RECORD_PIGSTEP] = ItemRecordPigstep.class; //759
             list[SPYGLASS] = ItemSpyglass.class; //772
             list[RECORD_OTHERSIDE] = ItemRecordOtherside.class; //773
+
+            list[SOUL_CAMPFIRE] = ItemCampfireSoul.class; //801
 
             for (int i = 0; i < 256; ++i) {
                 if (Block.list[i] != null) {
