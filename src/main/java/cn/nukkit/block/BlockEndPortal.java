@@ -13,7 +13,7 @@ public class BlockEndPortal extends BlockFlowable {
     }
 
     public BlockEndPortal(int meta) {
-        super(meta);
+        super(0);
     }
 
     @Override

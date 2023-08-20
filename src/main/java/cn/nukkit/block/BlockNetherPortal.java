@@ -24,7 +24,7 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
     }
 
     public BlockNetherPortal(int meta) {
-        super(meta);
+        super(0);
     }
 
     @Override

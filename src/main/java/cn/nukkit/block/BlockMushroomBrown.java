@@ -10,7 +10,7 @@ public class BlockMushroomBrown extends BlockMushroom {
     }
 
     public BlockMushroomBrown(int meta) {
-        super(meta);
+        super(0);
     }
 
     @Override
