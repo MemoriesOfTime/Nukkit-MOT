@@ -1,14 +1,36 @@
 package cn.nukkit.level.generator;
 
+import cn.nukkit.Server;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.DimensionEnum;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.generator.populator.nether.PopulatorNetherFortress;
+import cn.nukkit.level.generator.populator.overworld.PopulatorDesertPyramid;
+import cn.nukkit.level.generator.populator.overworld.PopulatorDesertWell;
+import cn.nukkit.level.generator.populator.overworld.PopulatorDungeon;
+import cn.nukkit.level.generator.populator.overworld.PopulatorFossil;
+import cn.nukkit.level.generator.populator.overworld.PopulatorIgloo;
+import cn.nukkit.level.generator.populator.overworld.PopulatorJungleTemple;
+import cn.nukkit.level.generator.populator.overworld.PopulatorMineshaft;
+import cn.nukkit.level.generator.populator.overworld.PopulatorOceanRuin;
+import cn.nukkit.level.generator.populator.overworld.PopulatorPillagerOutpost;
+import cn.nukkit.level.generator.populator.overworld.PopulatorShipwreck;
+import cn.nukkit.level.generator.populator.overworld.PopulatorStronghold;
+import cn.nukkit.level.generator.populator.overworld.PopulatorSwampHut;
+import cn.nukkit.level.generator.populator.overworld.PopulatorVillage;
+import cn.nukkit.level.generator.populator.type.Populator;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.MainLogger;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -16,94 +38,122 @@ import java.util.Map;
  * Nukkit Project
  */
 public abstract class Generator implements BlockID {
+	public static final int TYPE_OLD = 0;
+	public static final int TYPE_INFINITE = 1;
+	public static final int TYPE_FLAT = 2;
+	public static final int TYPE_NETHER = 3;
+	public static final int TYPE_THE_END = 4;
+	public static final int TYPE_VOID = 5;
 
-    public static final int TYPE_OLD = 0;
-    public static final int TYPE_INFINITE = 1;
-    public static final int TYPE_FLAT = 2;
-    public static final int TYPE_NETHER = 3;
-    public static final int TYPE_THE_END = 4;
-    public static final int TYPE_VOID = 5;
+	public abstract int getId();
 
-    public abstract int getId();
+	public static final List<Populator> netherPopulator = List.of(
+		new PopulatorNetherFortress()
+	);
 
-    public DimensionData getDimensionData() {
-        DimensionData dimensionData = DimensionEnum.getDataFromId(this.getDimension());
-        if (dimensionData == null) {
-            dimensionData = DimensionEnum.OVERWORLD.getDimensionData();
-        }
-        return dimensionData;
-    }
+	public static final List<Populator> overworldPopulators = List.of(
+		new PopulatorFossil(),
+		new PopulatorShipwreck(),
+		new PopulatorSwampHut(),
+		new PopulatorDesertPyramid(),
+		new PopulatorJungleTemple(),
+		new PopulatorIgloo(),
+		new PopulatorPillagerOutpost(),
+		new PopulatorOceanRuin(),
+		new PopulatorVillage(),
+		new PopulatorStronghold(),
+		new PopulatorMineshaft(),
+		new PopulatorDesertWell(),
+		new PopulatorDungeon()
+	);
 
-    @Deprecated
-    public int getDimension() {
-        return Level.DIMENSION_OVERWORLD;
-    }
+	public DimensionData getDimensionData() {
+		DimensionData dimensionData = DimensionEnum.getDataFromId(this.getDimension());
+		if (dimensionData == null) {
+			dimensionData = DimensionEnum.OVERWORLD.getDimensionData();
+		}
+		return dimensionData;
+	}
 
-    private static final Map<String, Class<? extends Generator>> nameList = new HashMap<>();
+	@Deprecated
+	public int getDimension() {
+		return Level.DIMENSION_OVERWORLD;
+	}
 
-    private static final Map<Integer, Class<? extends Generator>> typeList = new HashMap<>();
+	private static final Map<String, Class<? extends Generator>> nameList = new HashMap<>();
 
-    public static boolean addGenerator(Class<? extends Generator> clazz, String name, int type) {
-        name = name.toLowerCase();
-        if (clazz != null && !Generator.nameList.containsKey(name)) {
-            Generator.nameList.put(name, clazz);
-            if (!Generator.typeList.containsKey(type)) {
-                Generator.typeList.put(type, clazz);
-            }
-            return true;
-        }
-        return false;
-    }
+	private static final Map<Integer, Class<? extends Generator>> typeList = new HashMap<>();
 
-    public static String[] getGeneratorList() {
-        String[] keys = new String[Generator.nameList.size()];
-        return Generator.nameList.keySet().toArray(keys);
-    }
+	public static boolean addGenerator(Class<? extends Generator> clazz, String name, int type) {
+		name = name.toLowerCase();
+		if (clazz != null && !Generator.nameList.containsKey(name)) {
+			Generator.nameList.put(name, clazz);
+			if (!Generator.typeList.containsKey(type)) {
+				Generator.typeList.put(type, clazz);
+			}
+			return true;
+		}
+		return false;
+	}
 
-    public static Class<? extends Generator> getGenerator(String name) {
-        name = name.toLowerCase();
-        if (Generator.nameList.containsKey(name)) {
-            return Generator.nameList.get(name);
-        }
-        return Normal.class;
-    }
+	public static String[] getGeneratorList() {
+		String[] keys = new String[Generator.nameList.size()];
+		return Generator.nameList.keySet().toArray(keys);
+	}
 
-    public static Class<? extends Generator> getGenerator(int type) {
-        if (Generator.typeList.containsKey(type)) {
-            return Generator.typeList.get(type);
-        }
-        return Normal.class;
-    }
+	public static Class<? extends Generator> getGenerator(String name) {
+		name = name.toLowerCase();
+		if (Generator.nameList.containsKey(name)) {
+			return Generator.nameList.get(name);
+		}
+		return Normal.class;
+	}
 
-    public static String getGeneratorName(Class<? extends Generator> c) {
-        for (Map.Entry<String, Class<? extends Generator>> entry : Generator.nameList.entrySet()) {
-            if (entry.getValue() == c) {
-                return entry.getKey();
-            }
-        }
-        return "unknown";
-    }
+	public static Class<? extends Generator> getGenerator(int type) {
+		if (Generator.typeList.containsKey(type)) {
+			return Generator.typeList.get(type);
+		}
+		return Normal.class;
+	}
 
-    public static int getGeneratorType(Class<? extends Generator> c) {
-        for (Map.Entry<Integer, Class<? extends Generator>> entry : Generator.typeList.entrySet()) {
-            if (entry.getValue() == c) {
-                return entry.getKey();
-            }
-        }
-        return Generator.TYPE_INFINITE;
-    }
+	public static String getGeneratorName(Class<? extends Generator> c) {
+		for (Map.Entry<String, Class<? extends Generator>> entry : Generator.nameList.entrySet()) {
+			if (entry.getValue() == c) {
+				return entry.getKey();
+			}
+		}
+		return "unknown";
+	}
 
-    public abstract void init(ChunkManager level, NukkitRandom random);
+	public static int getGeneratorType(Class<? extends Generator> c) {
+		for (Map.Entry<Integer, Class<? extends Generator>> entry : Generator.typeList.entrySet()) {
+			if (entry.getValue() == c) {
+				return entry.getKey();
+			}
+		}
+		return Generator.TYPE_INFINITE;
+	}
 
-    public abstract void generateChunk(int chunkX, int chunkZ);
+	public static CompoundTag loadNBT(final String path) {
+		try (final InputStream inputStream = Server.class.getClassLoader().getResourceAsStream(path)) {
+			return NBTIO.readCompressed(inputStream);
+		} catch (final IOException e) {
+			MainLogger.getLogger().error("Error while loading: " + path);
+			throw new RuntimeException(e);
+		}
+	}
 
-    public abstract void populateChunk(int chunkX, int chunkZ);
+	public abstract void init(ChunkManager level, NukkitRandom random);
 
-    public abstract Map<String, Object> getSettings();
+	public abstract void generateChunk(int chunkX, int chunkZ);
 
-    public abstract String getName();
+	public abstract void populateChunk(int chunkX, int chunkZ);
 
-    public abstract Vector3 getSpawn();
+	public abstract Map<String, Object> getSettings();
 
-    public abstract ChunkManager getChunkManager();
+	public abstract String getName();
+
+	public abstract Vector3 getSpawn();
+
+	public abstract ChunkManager getChunkManager();
 }
