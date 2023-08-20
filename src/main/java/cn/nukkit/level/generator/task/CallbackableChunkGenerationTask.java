@@ -1,9 +1,9 @@
 package cn.nukkit.level.generator.task;
 
 import cn.nukkit.level.Level;
-import cn.nukkit.level.SimpleChunkManager;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.generator.Generator;
+import cn.nukkit.level.generator.PopChunkManager;
 import cn.nukkit.scheduler.AsyncTask;
 
 import java.util.function.Consumer;
@@ -28,7 +28,7 @@ public class CallbackableChunkGenerationTask<T> extends AsyncTask {
 
 		final Generator generator = level.getGenerator();
 		if (generator != null) {
-			final SimpleChunkManager manager = (SimpleChunkManager) generator.getChunkManager();
+			final PopChunkManager manager = (PopChunkManager) generator.getChunkManager();
 			if (manager != null) {
 				manager.cleanChunks(level.getSeed());
 				try {
