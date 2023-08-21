@@ -78,8 +78,6 @@ public class ReadOnlyLegacyStructureTemplate extends AbstractLegacyStructureTemp
                 continue;
             }
 
-            System.out.println(entry.getId());
-
             final BlockVector3 vec = blockInfo.pos.add(0, position.y, 0);
 
             if (entry.getId() != BlockID.STRUCTURE_BLOCK) {
