@@ -5306,7 +5306,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             if (spawnBlockPosition == null) {
                 namedTag.remove("SpawnBlockPositionX").remove("SpawnBlockPositionY").remove("SpawnBlockPositionZ").remove("SpawnBlockLevel");
-            } else {
+            } else if (spawnBlockPosition.isValid()) {
                 namedTag.putInt("SpawnBlockPositionX", spawnBlockPosition.getFloorX())
                         .putInt("SpawnBlockPositionY", spawnBlockPosition.getFloorY())
                         .putInt("SpawnBlockPositionZ", spawnBlockPosition.getFloorZ())
