@@ -9,11 +9,11 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import java.util.function.Consumer;
 
 public interface ReadableStructureTemplate extends StructureTemplate {
-	ReadableStructureTemplate load(CompoundTag root);
+    ReadableStructureTemplate load(CompoundTag root);
 
-	void placeInChunk(FullChunk chunk, NukkitRandom random, BlockVector3 position, StructurePlaceSettings settings);
+    void placeInChunk(FullChunk chunk, NukkitRandom random, BlockVector3 position, StructurePlaceSettings settings);
 
-	void placeInChunk(FullChunk chunk, NukkitRandom random, BlockVector3 position, int integrity, Consumer<CompoundTag> blockActorProcessor);
+    void placeInChunk(FullChunk chunk, NukkitRandom random, BlockVector3 position, int integrity, Consumer<CompoundTag> blockActorProcessor);
 
-	void placeInLevel(ChunkManager level, NukkitRandom random, BlockVector3 position, int integrity, Consumer<CompoundTag> blockActorProcessor);
+    void placeInLevel(ChunkManager level, NukkitRandom random, BlockVector3 position, int integrity, Consumer<CompoundTag> blockActorProcessor);
 }

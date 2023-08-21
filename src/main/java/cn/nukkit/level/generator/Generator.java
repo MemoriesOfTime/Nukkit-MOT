@@ -38,122 +38,122 @@ import java.util.Map;
  * Nukkit Project
  */
 public abstract class Generator implements BlockID {
-	public static final int TYPE_OLD = 0;
-	public static final int TYPE_INFINITE = 1;
-	public static final int TYPE_FLAT = 2;
-	public static final int TYPE_NETHER = 3;
-	public static final int TYPE_THE_END = 4;
-	public static final int TYPE_VOID = 5;
+    public static final int TYPE_OLD = 0;
+    public static final int TYPE_INFINITE = 1;
+    public static final int TYPE_FLAT = 2;
+    public static final int TYPE_NETHER = 3;
+    public static final int TYPE_THE_END = 4;
+    public static final int TYPE_VOID = 5;
 
-	public abstract int getId();
+    public abstract int getId();
 
-	public static final List<Populator> netherPopulator = List.of(
-		new PopulatorNetherFortress()
-	);
+    public static final List<Populator> netherPopulator = List.of(
+        new PopulatorNetherFortress()
+    );
 
-	public static final List<Populator> overworldPopulators = List.of(
-		new PopulatorFossil(),
-		new PopulatorShipwreck(),
-		new PopulatorSwampHut(),
-		new PopulatorDesertPyramid(),
-		new PopulatorJungleTemple(),
-		new PopulatorIgloo(),
-		new PopulatorPillagerOutpost(),
-		new PopulatorOceanRuin(),
-		new PopulatorVillage(),
-		new PopulatorStronghold(),
-		new PopulatorMineshaft(),
-		new PopulatorDesertWell(),
-		new PopulatorDungeon()
-	);
+    public static final List<Populator> overworldPopulators = List.of(
+        new PopulatorFossil(),
+        new PopulatorShipwreck(),
+        new PopulatorSwampHut(),
+        new PopulatorDesertPyramid(),
+        new PopulatorJungleTemple(),
+        new PopulatorIgloo(),
+        new PopulatorPillagerOutpost(),
+        new PopulatorOceanRuin(),
+        new PopulatorVillage(),
+        new PopulatorStronghold(),
+        new PopulatorMineshaft(),
+        new PopulatorDesertWell(),
+        new PopulatorDungeon()
+    );
 
-	public DimensionData getDimensionData() {
-		DimensionData dimensionData = DimensionEnum.getDataFromId(this.getDimension());
-		if (dimensionData == null) {
-			dimensionData = DimensionEnum.OVERWORLD.getDimensionData();
-		}
-		return dimensionData;
-	}
+    public DimensionData getDimensionData() {
+        DimensionData dimensionData = DimensionEnum.getDataFromId(this.getDimension());
+        if (dimensionData == null) {
+            dimensionData = DimensionEnum.OVERWORLD.getDimensionData();
+        }
+        return dimensionData;
+    }
 
-	@Deprecated
-	public int getDimension() {
-		return Level.DIMENSION_OVERWORLD;
-	}
+    @Deprecated
+    public int getDimension() {
+        return Level.DIMENSION_OVERWORLD;
+    }
 
-	private static final Map<String, Class<? extends Generator>> nameList = new HashMap<>();
+    private static final Map<String, Class<? extends Generator>> nameList = new HashMap<>();
 
-	private static final Map<Integer, Class<? extends Generator>> typeList = new HashMap<>();
+    private static final Map<Integer, Class<? extends Generator>> typeList = new HashMap<>();
 
-	public static boolean addGenerator(Class<? extends Generator> clazz, String name, int type) {
-		name = name.toLowerCase();
-		if (clazz != null && !Generator.nameList.containsKey(name)) {
-			Generator.nameList.put(name, clazz);
-			if (!Generator.typeList.containsKey(type)) {
-				Generator.typeList.put(type, clazz);
-			}
-			return true;
-		}
-		return false;
-	}
+    public static boolean addGenerator(Class<? extends Generator> clazz, String name, int type) {
+        name = name.toLowerCase();
+        if (clazz != null && !Generator.nameList.containsKey(name)) {
+            Generator.nameList.put(name, clazz);
+            if (!Generator.typeList.containsKey(type)) {
+                Generator.typeList.put(type, clazz);
+            }
+            return true;
+        }
+        return false;
+    }
 
-	public static String[] getGeneratorList() {
-		String[] keys = new String[Generator.nameList.size()];
-		return Generator.nameList.keySet().toArray(keys);
-	}
+    public static String[] getGeneratorList() {
+        String[] keys = new String[Generator.nameList.size()];
+        return Generator.nameList.keySet().toArray(keys);
+    }
 
-	public static Class<? extends Generator> getGenerator(String name) {
-		name = name.toLowerCase();
-		if (Generator.nameList.containsKey(name)) {
-			return Generator.nameList.get(name);
-		}
-		return Normal.class;
-	}
+    public static Class<? extends Generator> getGenerator(String name) {
+        name = name.toLowerCase();
+        if (Generator.nameList.containsKey(name)) {
+            return Generator.nameList.get(name);
+        }
+        return Normal.class;
+    }
 
-	public static Class<? extends Generator> getGenerator(int type) {
-		if (Generator.typeList.containsKey(type)) {
-			return Generator.typeList.get(type);
-		}
-		return Normal.class;
-	}
+    public static Class<? extends Generator> getGenerator(int type) {
+        if (Generator.typeList.containsKey(type)) {
+            return Generator.typeList.get(type);
+        }
+        return Normal.class;
+    }
 
-	public static String getGeneratorName(Class<? extends Generator> c) {
-		for (Map.Entry<String, Class<? extends Generator>> entry : Generator.nameList.entrySet()) {
-			if (entry.getValue() == c) {
-				return entry.getKey();
-			}
-		}
-		return "unknown";
-	}
+    public static String getGeneratorName(Class<? extends Generator> c) {
+        for (Map.Entry<String, Class<? extends Generator>> entry : Generator.nameList.entrySet()) {
+            if (entry.getValue() == c) {
+                return entry.getKey();
+            }
+        }
+        return "unknown";
+    }
 
-	public static int getGeneratorType(Class<? extends Generator> c) {
-		for (Map.Entry<Integer, Class<? extends Generator>> entry : Generator.typeList.entrySet()) {
-			if (entry.getValue() == c) {
-				return entry.getKey();
-			}
-		}
-		return Generator.TYPE_INFINITE;
-	}
+    public static int getGeneratorType(Class<? extends Generator> c) {
+        for (Map.Entry<Integer, Class<? extends Generator>> entry : Generator.typeList.entrySet()) {
+            if (entry.getValue() == c) {
+                return entry.getKey();
+            }
+        }
+        return Generator.TYPE_INFINITE;
+    }
 
-	public static CompoundTag loadNBT(final String path) {
-		try (final InputStream inputStream = Server.class.getClassLoader().getResourceAsStream(path)) {
-			return NBTIO.readCompressed(inputStream);
-		} catch (final IOException e) {
-			MainLogger.getLogger().error("Error while loading: " + path);
-			throw new RuntimeException(e);
-		}
-	}
+    public static CompoundTag loadNBT(final String path) {
+        try (final InputStream inputStream = Server.class.getClassLoader().getResourceAsStream(path)) {
+            return NBTIO.readCompressed(inputStream);
+        } catch (final IOException e) {
+            MainLogger.getLogger().error("Error while loading: " + path);
+            throw new RuntimeException(e);
+        }
+    }
 
-	public abstract void init(ChunkManager level, NukkitRandom random);
+    public abstract void init(ChunkManager level, NukkitRandom random);
 
-	public abstract void generateChunk(int chunkX, int chunkZ);
+    public abstract void generateChunk(int chunkX, int chunkZ);
 
-	public abstract void populateChunk(int chunkX, int chunkZ);
+    public abstract void populateChunk(int chunkX, int chunkZ);
 
-	public abstract Map<String, Object> getSettings();
+    public abstract Map<String, Object> getSettings();
 
-	public abstract String getName();
+    public abstract String getName();
 
-	public abstract Vector3 getSpawn();
+    public abstract Vector3 getSpawn();
 
-	public abstract ChunkManager getChunkManager();
+    public abstract ChunkManager getChunkManager();
 }

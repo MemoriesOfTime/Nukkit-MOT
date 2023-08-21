@@ -2,17 +2,24 @@ package cn.nukkit.entity.data;
 
 import cn.nukkit.Server;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
-import cn.nukkit.utils.*;
+import cn.nukkit.utils.Binary;
+import cn.nukkit.utils.PersonaPiece;
+import cn.nukkit.utils.PersonaPieceTint;
+import cn.nukkit.utils.SerializedImage;
+import cn.nukkit.utils.SkinAnimation;
 import com.google.common.base.Preconditions;
 import com.nimbusds.jose.shaded.json.JSONObject;
 import com.nimbusds.jose.shaded.json.JSONValue;
 import lombok.ToString;
 
-import java.awt.*;
+import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
-import java.util.*;
+import java.util.Objects;
+import java.util.UUID;
 
 /**
  * @author MagicDroidX
@@ -25,7 +32,7 @@ public class Skin {
     public static final int DOUBLE_SKIN_SIZE = 16384;
     public static final int SKIN_128_64_SIZE = 32768;
     public static final int SKIN_128_128_SIZE = 65536;
-    
+
     private static final int MAX_DATA_SIZE = 262144;
 
     public static final String GEOMETRY_CUSTOM = convertLegacyGeometryName("geometry.humanoid.custom");
