@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -681,6 +682,18 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             }
         }
         return null;
+    }
+
+    public void lookAt(Vector3 target) {
+        super.lookAt(target);
+    }
+
+    public EntityHuman getNearbyHuman(double distance) {
+        var bb = this.boundingBox.clone().grow(distance, distance, distance);
+        return (EntityHuman) Arrays.stream(this.level.getCollidingEntities(bb))
+                .filter(entity -> entity instanceof EntityHuman)
+                .findFirst()
+                .orElse(null);
     }
 
     protected boolean isInTickingRange() {

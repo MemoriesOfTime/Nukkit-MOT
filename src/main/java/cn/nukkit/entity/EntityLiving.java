@@ -564,12 +564,4 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         this.setRotation(yaw, pitch);
     }
 
-    public EntityHuman getFirstHuman(double distance) {
-        var bb = this.boundingBox.clone().grow(distance, distance, distance);
-        return (EntityHuman) Arrays.stream(this.level.getCollidingEntities(bb))
-                .filter(entity -> entity instanceof EntityHuman)
-                .findFirst()
-                .orElse(null);
-    }
-
 }
