@@ -919,8 +919,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
 
         int blockId = this.getId();
-        boolean correctTool = correctTool0(this.getToolType(), item, blockId);
-        if (correctTool){
+        if (correctTool0(this.getToolType(), item, blockId)) {
             speedMultiplier = toolBreakTimeBonus0(item);
             int efficiencyLevel = Optional.ofNullable(item.getEnchantment(Enchantment.ID_EFFICIENCY))
                     .map(Enchantment::getLevel).orElse(0);

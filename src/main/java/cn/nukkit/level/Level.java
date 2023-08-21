@@ -2244,14 +2244,15 @@ public class Level implements ChunkManager, Metadatable {
 
             Item[] eventDrops;
             if (!player.isSurvival()) {
-                eventDrops = new Item[0];
+                eventDrops = Item.EMPTY_ARRAY;
             } else if (isSilkTouch && target.canSilkTouch()) {
                 eventDrops = new Item[]{target.toItem()};
             } else {
                 eventDrops = target.getDrops(item);
             }
-            BlockBreakEvent ev = new BlockBreakEvent(player, target, face, item, eventDrops, player.isCreative(),
-                    (player.lastBreak + breakTime * 1000) > System.currentTimeMillis());
+            //TODO 直接加1000可能会影响其他判断，需要进一步改进
+            boolean fastBreak = (player.lastBreak + breakTime * 1000) > Long.sum(System.currentTimeMillis(), 1000);
+            BlockBreakEvent ev = new BlockBreakEvent(player, target, face, item, eventDrops, player.isCreative(), fastBreak);
 
             if ((player.isSurvival() || player.isAdventure()) && !target.isBreakable(item)) {
                 ev.setCancelled();
