@@ -564,4 +564,20 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         this.setRotation(yaw, pitch);
     }
 
+    public EntityHuman getNearbyHuman() {
+        return this.getNearbyHuman(2.5);
+    }
+
+    public EntityHuman getNearbyHuman(double distance) {
+        AxisAlignedBB bb = this.boundingBox.clone().expand(distance, distance, distance);
+        EntityHuman human = null;
+        for (Entity collidingEntity : this.level.getCollidingEntities(bb)) {
+            if (collidingEntity instanceof EntityHuman) {
+                human = (EntityHuman) collidingEntity;
+                break;
+            }
+        }
+        return human;
+    }
+
 }
