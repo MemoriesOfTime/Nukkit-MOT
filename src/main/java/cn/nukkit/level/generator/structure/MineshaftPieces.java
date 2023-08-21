@@ -332,7 +332,7 @@ public final class MineshaftPieces {
             }
         }
 
-        protected boolean createChest(final ChunkManager level, final BoundingBox boundingBox, final NukkitRandom random, final int x, final int y, final int z) {
+        protected void createChest(final ChunkManager level, final BoundingBox boundingBox, final NukkitRandom random, final int x, final int y, final int z) {
             final BlockVector3 vec = new BlockVector3(getWorldX(x, z), getWorldY(y), getWorldZ(x, z));
 
             if (boundingBox.isInside(vec) && level.getBlockIdAt(vec.x, vec.y, vec.z) == BlockID.AIR && level.getBlockIdAt(vec.x, vec.y - 1, vec.z) != BlockID.AIR) {
@@ -351,10 +351,8 @@ public final class MineshaftPieces {
                     Server.getInstance().getScheduler().scheduleTask(new ActorSpawnTask(chunk.getProvider().getLevel(), nbt));
                 }
 
-                return true;
             }
 
-            return false;
         }
 
         @Override

@@ -8,7 +8,6 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.generator.math.BoundingBox;
 import cn.nukkit.level.generator.populator.type.Populator;
 import cn.nukkit.level.generator.structure.MineshaftPieces;
-import cn.nukkit.level.generator.structure.StructurePiece;
 import cn.nukkit.level.generator.structure.StructureStart;
 import cn.nukkit.level.generator.task.CallbackableChunkGenerationTask;
 import cn.nukkit.math.NukkitRandom;
@@ -18,7 +17,7 @@ public class PopulatorMineshaft extends Populator {
     protected static final boolean[] VALID_BIOMES = new boolean[256];
 
     static {
-        VALID_BIOMES[0] = true; // OCEAN
+        VALID_BIOMES[EnumBiome.OCEAN.id] = true;
         VALID_BIOMES[EnumBiome.PLAINS.id] = true;
         VALID_BIOMES[EnumBiome.DESERT.id] = true;
         VALID_BIOMES[EnumBiome.EXTREME_HILLS.id] = true;
@@ -26,7 +25,7 @@ public class PopulatorMineshaft extends Populator {
         VALID_BIOMES[EnumBiome.TAIGA.id] = true;
         VALID_BIOMES[EnumBiome.SWAMP.id] = true;
         VALID_BIOMES[EnumBiome.RIVER.id] = true;
-        VALID_BIOMES[10] = true; // FROZEN_OCEAN
+        VALID_BIOMES[EnumBiome.FROZEN_OCEAN.id] = true;
         VALID_BIOMES[EnumBiome.FROZEN_RIVER.id] = true;
         VALID_BIOMES[EnumBiome.MUSHROOM_ISLAND.id] = true;
         VALID_BIOMES[EnumBiome.MUSHROOM_ISLAND_SHORE.id] = true;
@@ -38,7 +37,7 @@ public class PopulatorMineshaft extends Populator {
         VALID_BIOMES[EnumBiome.JUNGLE.id] = true;
         VALID_BIOMES[EnumBiome.JUNGLE_HILLS.id] = true;
         VALID_BIOMES[EnumBiome.JUNGLE_EDGE.id] = true;
-        VALID_BIOMES[24] = true;
+        VALID_BIOMES[EnumBiome.DEEP_OCEAN.id] = true;
         VALID_BIOMES[EnumBiome.STONE_BEACH.id] = true;
         VALID_BIOMES[EnumBiome.BIRCH_FOREST.id] = true;
         VALID_BIOMES[EnumBiome.BIRCH_FOREST_HILLS.id] = true;
@@ -124,15 +123,7 @@ public class PopulatorMineshaft extends Populator {
 
     public enum Type {
         NORMAL,
-        MESA;
-
-        public static Type byId(final int id) {
-            final Type[] values = values();
-            if (id < 0 || id >= values.length) {
-                return Type.NORMAL;
-            }
-            return values[id];
-        }
+        MESA
     }
 
     public static class MineshaftStart extends StructureStart {
@@ -154,11 +145,7 @@ public class PopulatorMineshaft extends Populator {
                 calculateBoundingBox();
 
                 if (type == Type.MESA) {
-                    final int offset = 64 - boundingBox.y1 + boundingBox.getYSpan() / 2 + 5;
-                    boundingBox.move(0, offset, 0);
-                    for (final StructurePiece piece : pieces) {
-                        piece.move(0, offset, 0);
-                    }
+                    moveBelowSeaLevel(64, random, 40);
                 } else {
                     moveBelowSeaLevel(64, random, 10);
                 }
