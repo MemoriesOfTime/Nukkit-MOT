@@ -1,13 +1,7 @@
 package cn.nukkit.level.generator.structure;
 
 import cn.nukkit.Server;
-import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockFence;
-import cn.nukkit.block.BlockID;
-import cn.nukkit.block.BlockPlanks;
-import cn.nukkit.block.BlockSandstone;
-import cn.nukkit.block.BlockWood;
-import cn.nukkit.block.BlockWood2;
+import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.level.ChunkManager;
