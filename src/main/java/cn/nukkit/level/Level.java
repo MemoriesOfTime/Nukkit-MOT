@@ -2972,6 +2972,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public final void generateChunkCallback(final int x, final int z, BaseFullChunk chunk, final boolean isPopulated) {
         final long index = Level.chunkHash(x, z);
+        LevelProvider levelProvider = this.requireProvider();
         if (chunkPopulationQueue.containsKey(index)) {
             final FullChunk oldChunk = getChunk(x, z, false);
             for (int xx = -1; xx <= 1; ++xx) {
@@ -2980,7 +2981,7 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
             chunkPopulationQueue.remove(index);
-            chunk.setProvider(provider);
+            chunk.setProvider(levelProvider);
             setChunk(x, z, chunk, false);
             chunk = getChunk(x, z, false);
             if (chunk != null && (oldChunk == null || !isPopulated) && chunk.isPopulated() && chunk.getProvider() != null) {
@@ -2989,10 +2990,10 @@ public class Level implements ChunkManager, Metadatable {
         } else if (chunkGenerationQueue.containsKey(index) || chunkPopulationLock.containsKey(index)) {
             chunkGenerationQueue.remove(index);
             chunkPopulationLock.remove(index);
-            chunk.setProvider(provider);
+            chunk.setProvider(levelProvider);
             setChunk(x, z, chunk, false);
         } else {
-            chunk.setProvider(provider);
+            chunk.setProvider(levelProvider);
             setChunk(x, z, chunk, false);
         }
     }
