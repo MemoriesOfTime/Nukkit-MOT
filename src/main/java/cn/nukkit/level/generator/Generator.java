@@ -6,9 +6,6 @@ import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.DimensionEnum;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.generator.populator.nether.PopulatorNetherFortress;
-import cn.nukkit.level.generator.populator.overworld.*;
-import cn.nukkit.level.generator.populator.type.Populator;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
@@ -18,7 +15,6 @@ import cn.nukkit.utils.MainLogger;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,26 +30,6 @@ public abstract class Generator implements BlockID {
     public static final int TYPE_VOID = 5;
 
     public abstract int getId();
-
-    public static final List<Populator> netherPopulator = List.of(
-        new PopulatorNetherFortress()
-    );
-
-    public static final List<Populator> overworldPopulators = List.of(
-        new PopulatorFossil(),
-        new PopulatorShipwreck(),
-        new PopulatorSwampHut(),
-        new PopulatorDesertPyramid(),
-        new PopulatorJungleTemple(),
-        new PopulatorIgloo(),
-        new PopulatorPillagerOutpost(),
-        new PopulatorOceanRuin(),
-        new PopulatorVillage(),
-        new PopulatorStronghold(),
-        new PopulatorMineshaft(),
-        new PopulatorDesertWell(),
-        new PopulatorDungeon()
-    );
 
     public DimensionData getDimensionData() {
         DimensionData dimensionData = DimensionEnum.getDataFromId(this.getDimension());

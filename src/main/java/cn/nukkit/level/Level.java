@@ -2,7 +2,13 @@ package cn.nukkit.level;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.block.*;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockGlass;
+import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockLiquid;
+import cn.nukkit.block.BlockRedstoneDiode;
+import cn.nukkit.block.BlockScaffolding;
+import cn.nukkit.block.BlockWater;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
@@ -19,7 +25,14 @@ import cn.nukkit.event.block.BlockBreakEvent;
 import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.block.BlockUpdateEvent;
 import cn.nukkit.event.entity.CreatureSpawnEvent;
-import cn.nukkit.event.level.*;
+import cn.nukkit.event.level.ChunkLoadEvent;
+import cn.nukkit.event.level.ChunkPopulateEvent;
+import cn.nukkit.event.level.ChunkUnloadEvent;
+import cn.nukkit.event.level.LevelSaveEvent;
+import cn.nukkit.event.level.LevelUnloadEvent;
+import cn.nukkit.event.level.SpawnChangeEvent;
+import cn.nukkit.event.level.ThunderChangeEvent;
+import cn.nukkit.event.level.WeatherChangeEvent;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerInteractEvent.Action;
 import cn.nukkit.event.weather.LightningStrikeEvent;
@@ -39,7 +52,6 @@ import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.level.generator.PopChunkManager;
-import cn.nukkit.level.generator.task.ChunkPopulationTask;
 import cn.nukkit.level.generator.task.GenerationTask;
 import cn.nukkit.level.generator.task.LightPopulationTask;
 import cn.nukkit.level.generator.task.PopulationTask;
@@ -47,22 +59,72 @@ import cn.nukkit.level.particle.DestroyBlockParticle;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.Particle;
 import cn.nukkit.level.sound.Sound;
-import cn.nukkit.math.*;
+import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Plane;
+import cn.nukkit.math.BlockVector3;
+import cn.nukkit.math.MathHelper;
+import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.NukkitRandom;
+import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.math.Vector2;
+import cn.nukkit.math.Vector3;
+import cn.nukkit.math.Vector3f;
 import cn.nukkit.metadata.BlockMetadataStore;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.metadata.Metadatable;
 import cn.nukkit.nbt.NBTIO;
-import cn.nukkit.nbt.tag.*;
-import cn.nukkit.network.protocol.*;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.DoubleTag;
+import cn.nukkit.nbt.tag.FloatTag;
+import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.StringTag;
+import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.BatchPacket;
+import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.GameRulesChangedPacket;
+import cn.nukkit.network.protocol.LevelEventPacket;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.LevelSoundEventPacketV1;
+import cn.nukkit.network.protocol.MoveEntityAbsolutePacket;
+import cn.nukkit.network.protocol.MoveEntityDeltaPacket;
+import cn.nukkit.network.protocol.MovePlayerPacket;
+import cn.nukkit.network.protocol.PlaySoundPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.protocol.SetSpawnPositionPacket;
+import cn.nukkit.network.protocol.SetTimePacket;
+import cn.nukkit.network.protocol.SpawnParticleEffectPacket;
+import cn.nukkit.network.protocol.UpdateBlockPacket;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.scheduler.BlockUpdateScheduler;
-import cn.nukkit.utils.*;
+import cn.nukkit.utils.BlockColor;
+import cn.nukkit.utils.BlockUpdateEntry;
+import cn.nukkit.utils.Hash;
+import cn.nukkit.utils.LevelException;
+import cn.nukkit.utils.MainLogger;
+import cn.nukkit.utils.TextFormat;
+import cn.nukkit.utils.Utils;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import it.unimi.dsi.fastutil.ints.*;
-import it.unimi.dsi.fastutil.longs.*;
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.longs.Long2IntMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2LongMap;
+import it.unimi.dsi.fastutil.longs.Long2LongMaps;
+import it.unimi.dsi.fastutil.longs.Long2LongOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectList;
@@ -72,8 +134,27 @@ import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.ref.SoftReference;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Queue;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Predicate;
 
@@ -2971,30 +3052,34 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public final void generateChunkCallback(final int x, final int z, BaseFullChunk chunk, final boolean isPopulated) {
-        final long index = Level.chunkHash(x, z);
+        long index = Level.chunkHash(x, z);
         LevelProvider levelProvider = this.requireProvider();
-        if (chunkPopulationQueue.containsKey(index)) {
-            final FullChunk oldChunk = getChunk(x, z, false);
+        if (this.chunkPopulationQueue.containsKey(index)) {
+            FullChunk oldChunk = this.getChunk(x, z, false);
             for (int xx = -1; xx <= 1; ++xx) {
                 for (int zz = -1; zz <= 1; ++zz) {
-                    chunkPopulationLock.remove(Level.chunkHash(x + xx, z + zz));
+                    this.chunkPopulationLock.remove(Level.chunkHash(x + xx, z + zz));
                 }
             }
-            chunkPopulationQueue.remove(index);
+            this.chunkPopulationQueue.remove(index);
             chunk.setProvider(levelProvider);
-            setChunk(x, z, chunk, false);
-            chunk = getChunk(x, z, false);
+            this.setChunk(x, z, chunk, false);
+            chunk = this.getChunk(x, z, false);
             if (chunk != null && (oldChunk == null || !isPopulated) && chunk.isPopulated() && chunk.getProvider() != null) {
-                new ChunkPopulationTask(this, chunk, getDimension() == Level.DIMENSION_NETHER ? Generator.netherPopulator : Generator.overworldPopulators).start();
+                this.server.getPluginManager().callEvent(new ChunkPopulateEvent(chunk));
+
+                for (ChunkLoader loader : this.getChunkLoaders(x, z)) {
+                    loader.onChunkPopulated(chunk);
+                }
             }
-        } else if (chunkGenerationQueue.containsKey(index) || chunkPopulationLock.containsKey(index)) {
-            chunkGenerationQueue.remove(index);
-            chunkPopulationLock.remove(index);
+        } else if (this.chunkGenerationQueue.containsKey(index) || this.chunkPopulationLock.containsKey(index)) {
+            this.chunkGenerationQueue.remove(index);
+            this.chunkPopulationLock.remove(index);
             chunk.setProvider(levelProvider);
-            setChunk(x, z, chunk, false);
+            this.setChunk(x, z, chunk, false);
         } else {
             chunk.setProvider(levelProvider);
-            setChunk(x, z, chunk, false);
+            this.setChunk(x, z, chunk, false);
         }
     }
 

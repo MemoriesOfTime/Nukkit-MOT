@@ -14,6 +14,19 @@ import cn.nukkit.level.generator.populator.impl.PopulatorBedrock;
 import cn.nukkit.level.generator.populator.impl.PopulatorCaves;
 import cn.nukkit.level.generator.populator.impl.PopulatorGroundCover;
 import cn.nukkit.level.generator.populator.impl.PopulatorOre;
+import cn.nukkit.level.generator.populator.overworld.PopulatorDesertPyramid;
+import cn.nukkit.level.generator.populator.overworld.PopulatorDesertWell;
+import cn.nukkit.level.generator.populator.overworld.PopulatorDungeon;
+import cn.nukkit.level.generator.populator.overworld.PopulatorFossil;
+import cn.nukkit.level.generator.populator.overworld.PopulatorIgloo;
+import cn.nukkit.level.generator.populator.overworld.PopulatorJungleTemple;
+import cn.nukkit.level.generator.populator.overworld.PopulatorMineshaft;
+import cn.nukkit.level.generator.populator.overworld.PopulatorOceanRuin;
+import cn.nukkit.level.generator.populator.overworld.PopulatorPillagerOutpost;
+import cn.nukkit.level.generator.populator.overworld.PopulatorShipwreck;
+import cn.nukkit.level.generator.populator.overworld.PopulatorStronghold;
+import cn.nukkit.level.generator.populator.overworld.PopulatorSwampHut;
+import cn.nukkit.level.generator.populator.overworld.PopulatorVillage;
 import cn.nukkit.level.generator.populator.type.Populator;
 import cn.nukkit.math.MathHelper;
 import cn.nukkit.math.NukkitRandom;
@@ -114,8 +127,8 @@ public class Normal extends Generator {
 
         //this should run before all other populators so that we don't do things like generate ground cover on bedrock or something
         this.generationPopulators = ImmutableList.of(
-                new PopulatorBedrock(),
-                new PopulatorGroundCover()
+            new PopulatorBedrock(),
+            new PopulatorGroundCover()
         );
 
         this.populators = ImmutableList.of(
@@ -132,7 +145,20 @@ public class Normal extends Generator {
                 new OreType(Block.get(BlockID.STONE, BlockStone.DIORITE), 10, 33, 0, 80),
                 new OreType(Block.get(BlockID.STONE, BlockStone.ANDESITE), 10, 33, 0, 80)
             }),
-            new PopulatorCaves()
+            new PopulatorCaves(),
+            new PopulatorFossil(),
+            new PopulatorShipwreck(),
+            new PopulatorSwampHut(),
+            new PopulatorDesertPyramid(),
+            new PopulatorJungleTemple(),
+            new PopulatorIgloo(),
+            new PopulatorPillagerOutpost(),
+            new PopulatorOceanRuin(),
+            new PopulatorVillage(),
+            new PopulatorStronghold(),
+            new PopulatorMineshaft(),
+            new PopulatorDesertWell(),
+            new PopulatorDungeon()
         );
     }
 
