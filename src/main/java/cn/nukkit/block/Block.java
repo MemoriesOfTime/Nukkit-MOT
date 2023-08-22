@@ -772,7 +772,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             return 255 - id;
         }
 
-		return id;
+        return id;
 	}
 
     /**
