@@ -354,6 +354,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[SPYGLASS] = ItemSpyglass.class; //772
             list[RECORD_OTHERSIDE] = ItemRecordOtherside.class; //773
 
+            list[SOUL_CAMPFIRE] = ItemCampfireSoul.class; //801
+
             for (int i = 0; i < 256; ++i) {
                 if (Block.list[i] != null) {
                     list[i] = Block.list[i];

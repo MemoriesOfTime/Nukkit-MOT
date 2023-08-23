@@ -92,7 +92,7 @@ public class VersionCommand extends VanillaCommand {
                 }
                 List<String> authors = desc.getAuthors();
                 final String[] authorsString = {""};
-                authors.forEach((s) -> authorsString[0] += s);
+                authors.forEach(s -> authorsString[0] += s);
                 if (authors.size() == 1) {
                     sender.sendMessage("Author: " + authorsString[0]);
                 } else if (authors.size() >= 2) {

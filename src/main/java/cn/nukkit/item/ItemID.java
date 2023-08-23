@@ -334,4 +334,6 @@ public interface ItemID {
     //
     int SPYGLASS = 772;
     int RECORD_OTHERSIDE = 773;
+
+    int SOUL_CAMPFIRE = 801;
 }

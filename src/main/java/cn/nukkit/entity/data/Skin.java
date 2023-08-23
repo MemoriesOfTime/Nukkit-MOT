@@ -25,7 +25,7 @@ public class Skin {
     public static final int DOUBLE_SKIN_SIZE = 16384;
     public static final int SKIN_128_64_SIZE = 32768;
     public static final int SKIN_128_128_SIZE = 65536;
-    
+
     private static final int MAX_DATA_SIZE = 262144;
 
     public static final String GEOMETRY_CUSTOM = convertLegacyGeometryName("geometry.humanoid.custom");
