@@ -229,12 +229,10 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             //使矿车通知漏斗更新而不是漏斗来检测矿车
             //通常情况下，矿车的数量远远少于漏斗，所以说此举能大福提高性能
             if (this instanceof InventoryHolder holder) {
-                var pickupArea = new SimpleAxisAlignedBB(this.x, this.y - 1, this.z, this.x + 1, this.y, this.z + 1);
-                checkPickupHopper(pickupArea, holder);
+                checkPickupHopper(new SimpleAxisAlignedBB(this.x, this.y - 1, this.z, this.x, this.y, this.z), holder);
                 //漏斗矿车会自行拉取物品!
                 if (!(this instanceof EntityMinecartHopper)) {
-                    var pushArea = new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x + 1, this.y + 2, this.z + 1);
-                    checkPushHopper(pushArea, holder);
+                    checkPushHopper(new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x, this.y + 2, this.z), holder);
                 }
             }
 
@@ -408,12 +406,12 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
      * @return 是否有漏斗被通知
      */
     private boolean checkPushHopper(AxisAlignedBB pushArea, InventoryHolder holder) {
-        int minX = NukkitMath.floorDouble(pushArea.getMinX());
-        int minY = NukkitMath.floorDouble(pushArea.getMinY());
-        int minZ = NukkitMath.floorDouble(pushArea.getMinZ());
-        int maxX = NukkitMath.ceilDouble(pushArea.getMaxX());
-        int maxY = NukkitMath.ceilDouble(pushArea.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(pushArea.getMaxZ());
+        int minX = NukkitMath.ceilDouble(pushArea.getMinX());
+        int minY = NukkitMath.ceilDouble(pushArea.getMinY());
+        int minZ = NukkitMath.ceilDouble(pushArea.getMinZ());
+        int maxX = NukkitMath.floorDouble(pushArea.getMaxX());
+        int maxY = NukkitMath.floorDouble(pushArea.getMaxY());
+        int maxZ = NukkitMath.floorDouble(pushArea.getMaxZ());
         var tmpBV = new BlockVector3();
         for (int z = minZ; z <= maxZ; ++z) {
             for (int x = minX; x <= maxX; ++x) {
@@ -437,12 +435,12 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
      * @return 是否有漏斗被通知
      */
     private boolean checkPickupHopper(AxisAlignedBB pickupArea, InventoryHolder holder) {
-        int minX = NukkitMath.floorDouble(pickupArea.getMinX());
-        int minY = NukkitMath.floorDouble(pickupArea.getMinY());
-        int minZ = NukkitMath.floorDouble(pickupArea.getMinZ());
-        int maxX = NukkitMath.ceilDouble(pickupArea.getMaxX());
-        int maxY = NukkitMath.ceilDouble(pickupArea.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(pickupArea.getMaxZ());
+        int minX = NukkitMath.ceilDouble(pickupArea.getMinX());
+        int minY = NukkitMath.ceilDouble(pickupArea.getMinY());
+        int minZ = NukkitMath.ceilDouble(pickupArea.getMinZ());
+        int maxX = NukkitMath.floorDouble(pickupArea.getMaxX());
+        int maxY = NukkitMath.floorDouble(pickupArea.getMaxY());
+        int maxZ = NukkitMath.floorDouble(pickupArea.getMaxZ());
         var tmpBV = new BlockVector3();
         for (int z = minZ; z <= maxZ; ++z) {
             for (int x = minX; x <= maxX; ++x) {
