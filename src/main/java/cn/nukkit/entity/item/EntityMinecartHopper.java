@@ -2,7 +2,6 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockID;
 import cn.nukkit.blockentity.BlockEntityChest;
 import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.blockentity.BlockEntityHopper;
@@ -10,7 +9,6 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.inventory.*;
 import cn.nukkit.item.Item;
-import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
@@ -130,9 +128,9 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
         for (Entity nearbyEntity : this.getLevel().getNearbyEntities(new SimpleAxisAlignedBB(this.getPosition().add(1, 0.5, 1), this.getPosition().subtract(1, -0.5, 1)))) {
             if(nearbyEntity instanceof EntityItem) {
                 if(minecartHopperInventory.canAddItem(((EntityItem) nearbyEntity).getItem())) {
-                    minecartHopperInventory.addItem(((EntityItem) nearbyEntity).item);
                     nearbyEntity.kill();
                     nearbyEntity.close();
+                    minecartHopperInventory.addItem(((EntityItem) nearbyEntity).item);
                 }
             }
         }
@@ -146,7 +144,7 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
                         for (Item pullItem : chestInventory.getContents().values()) {
                             pullItem = pullItem.clone();
                             pullItem.setCount(1);
-                            if (!pullItem.isNull() && !minecartHopperInventory.isFull() && minecartHopperInventory.canAddItem(pullItem)) {
+                            if (!pullItem.isNull() && minecartHopperInventory.canAddItem(pullItem)) {
                                 chestInventory.removeItem(pullItem);
                                 minecartHopperInventory.addItem(pullItem);
                                 break;
@@ -159,7 +157,7 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
                         for (Item pullItem : hopperInventory.getContents().values()) {
                             pullItem = pullItem.clone();
                             pullItem.setCount(1);
-                            if (!pullItem.isNull() && !minecartHopperInventory.isFull() && minecartHopperInventory.canAddItem(pullItem)) {
+                            if (!pullItem.isNull() && minecartHopperInventory.canAddItem(pullItem)) {
                                 hopperInventory.removeItem(pullItem);
                                 minecartHopperInventory.addItem(pullItem);
                                 break;
@@ -171,7 +169,7 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
                         FurnaceInventory furnaceInventory = entityFurnace.getInventory();
                         Item resultItem = furnaceInventory.getResult().clone();
                         resultItem.setCount(1);
-                        if (!resultItem.isNull() && !minecartHopperInventory.isFull() && minecartHopperInventory.canAddItem(resultItem)) {
+                        if (!resultItem.isNull() && minecartHopperInventory.canAddItem(resultItem)) {
                             furnaceInventory.removeItem(resultItem);
                             minecartHopperInventory.addItem(resultItem);
                         }
@@ -194,9 +192,9 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
                         case Block.HOPPER_BLOCK:
                             BlockEntityHopper entityHopper = (BlockEntityHopper) bottomBlock.getLevel().getBlockEntity(bottomBlock);
                             HopperInventory hopperInventory = entityHopper.getInventory();
-                            if (!hopperInventory.isFull() && hopperInventory.canAddItem(pullItemToBottom)) {
-                                hopperInventory.addItem(pullItemToBottom);
+                            if (hopperInventory.canAddItem(pullItemToBottom)) {
                                 minecartHopperInventory.removeItem(pullItemToBottom);
+                                hopperInventory.addItem(pullItemToBottom);
                             }
                             break;
                         case Block.FURNACE:
@@ -204,13 +202,13 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
                             FurnaceInventory furnaceInventory = entityFurnace.getInventory();
                             Item fuel = furnaceInventory.getFuel();
                             if (fuel.isNull() || fuel.equals(pullItemToBottom, false, false)) {
+                                minecartHopperInventory.removeItem(pullItemToBottom);
                                 if(fuel.isNull()){
                                     furnaceInventory.setFuel(pullItemToBottom);
                                 }else{
                                     pullItemToBottom.increment(fuel.getCount());
                                     furnaceInventory.setItem(0, pullItemToBottom);
                                 }
-                                minecartHopperInventory.removeItem(pullItemToBottom);
                             }
                             break;
                     }
