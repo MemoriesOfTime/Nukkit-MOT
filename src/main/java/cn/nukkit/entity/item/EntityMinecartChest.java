@@ -155,7 +155,7 @@ public class EntityMinecartChest extends EntityMinecartAbstract implements Inven
                 }
             }
             transferCooldown = 8;
-        }else{
+        } else {
             transferCooldown--;
         }
         return super.onUpdate(currentTick);

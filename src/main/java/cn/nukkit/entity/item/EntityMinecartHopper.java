@@ -147,7 +147,7 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
                 }
             }
             transferCooldown = 8;
-        }else{
+        } else {
             transferCooldown--;
         }
         return super.onUpdate(currentTick);
