@@ -10,7 +10,6 @@ import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.inventory.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -130,15 +129,6 @@ public class EntityMinecartChest extends EntityMinecartAbstract implements Inven
     @Override
     public boolean onUpdate(int currentTick) {
         MinecartChestInventory minecartChestInventory = this.getInventory();
-        for (Entity nearbyEntity : this.getLevel().getNearbyEntities(new SimpleAxisAlignedBB(this.getPosition().add(1, 0.5, 1), this.getPosition().subtract(1, -0.5, 1)))) {
-            if(nearbyEntity instanceof EntityItem) {
-                if(minecartChestInventory.canAddItem(((EntityItem) nearbyEntity).getItem())) {
-                    nearbyEntity.kill();
-                    nearbyEntity.close();
-                    minecartChestInventory.addItem(((EntityItem) nearbyEntity).item);
-                }
-            }
-        }
         if(!isOnTransferCooldown()) {
             Block upperBlock = this.getPosition().floor().add(0, 1, 0).getLevelBlock();
             if (upperBlock != null) {
