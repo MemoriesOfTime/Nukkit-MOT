@@ -2,11 +2,16 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
+import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
+import cn.nukkit.inventory.HopperInventory;
 import cn.nukkit.inventory.InventoryHolder;
+import cn.nukkit.inventory.MinecartChestInventory;
 import cn.nukkit.inventory.MinecartHopperInventory;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
@@ -19,6 +24,8 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
     public static final int NETWORK_ID = 96;
 
     protected MinecartHopperInventory inventory;
+
+    public int transferCooldown = 8;
 
     public EntityMinecartHopper(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -115,5 +122,42 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
     @Override
     public String getInteractButtonText() {
         return "action.interact.opencontainer";
+    }
+
+    @Override
+    public boolean onUpdate(int currentTick) {
+        if(!isOnTransferCooldown()) {
+            Position position = this.getPosition().floor().subtract(0, 1, 0);
+            Block block = position.getLevelBlock();
+            if (block != null) {
+                if(block.getId() == BlockID.HOPPER_BLOCK) {
+                    MinecartHopperInventory minecartChestInventory = this.getInventory();
+                    Item pullItem = minecartChestInventory.getItem(0).clone();
+                    pullItem.setCount(1);
+                    if (pullItem.getId() != Item.AIR) {
+                        BlockEntityHopper hopper = (BlockEntityHopper) block.getLevel().getBlockEntity(block);
+                        HopperInventory hopperInventory = hopper.getInventory();
+                        if (!hopperInventory.isFull()) {
+                            if (hopperInventory.canAddItem(pullItem)) {
+                                hopperInventory.addItem(pullItem);
+                                minecartChestInventory.removeItem(pullItem);
+                            }
+                        }
+                    }
+                }
+            }
+            transferCooldown = 8;
+        }else{
+            transferCooldown--;
+        }
+        return super.onUpdate(currentTick);
+    }
+
+    public boolean isOnTransferCooldown() {
+        return this.transferCooldown > 0;
+    }
+
+    public void setTransferCooldown(int transferCooldown) {
+        this.transferCooldown = transferCooldown;
     }
 }

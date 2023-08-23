@@ -2,11 +2,19 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockHopper;
+import cn.nukkit.block.BlockID;
+import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityFurnace;
+import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
+import cn.nukkit.inventory.FurnaceInventory;
+import cn.nukkit.inventory.HopperInventory;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.inventory.MinecartChestInventory;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
@@ -24,10 +32,13 @@ public class EntityMinecartChest extends EntityMinecartAbstract implements Inven
 
     protected MinecartChestInventory inventory;
 
+    public int transferCooldown = 8;
+
     public EntityMinecartChest(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
         setDisplayBlock(Block.get(Block.CHEST), false);
         setName("Minecart with Chest");
+        this.scheduleUpdate();
     }
 
     @Override
@@ -119,5 +130,42 @@ public class EntityMinecartChest extends EntityMinecartAbstract implements Inven
     @Override
     public String getInteractButtonText() {
         return "action.interact.opencontainer";
+    }
+
+    @Override
+    public boolean onUpdate(int currentTick) {
+        if(!isOnTransferCooldown()) {
+            Position position = this.getPosition().floor().subtract(0, 1, 0);
+            Block block = position.getLevelBlock();
+            if (block != null) {
+                if(block.getId() == BlockID.HOPPER_BLOCK) {
+                    MinecartChestInventory minecartChestInventory = this.getInventory();
+                    Item pullItem = minecartChestInventory.getItem(0).clone();
+                    pullItem.setCount(1);
+                    if (pullItem.getId() != Item.AIR) {
+                        BlockEntityHopper hopper = (BlockEntityHopper) block.getLevel().getBlockEntity(block);
+                        HopperInventory hopperInventory = hopper.getInventory();
+                        if (!hopperInventory.isFull()) {
+                            if (hopperInventory.canAddItem(pullItem)) {
+                                hopperInventory.addItem(pullItem);
+                                minecartChestInventory.removeItem(pullItem);
+                            }
+                        }
+                    }
+                }
+            }
+            transferCooldown = 8;
+        }else{
+            transferCooldown--;
+        }
+        return super.onUpdate(currentTick);
+    }
+
+    public boolean isOnTransferCooldown() {
+        return this.transferCooldown > 0;
+    }
+
+    public void setTransferCooldown(int transferCooldown) {
+        this.transferCooldown = transferCooldown;
     }
 }
