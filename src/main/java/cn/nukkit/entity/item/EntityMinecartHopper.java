@@ -174,7 +174,6 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
                         if (!resultItem.isNull() && !minecartHopperInventory.isFull() && minecartHopperInventory.canAddItem(resultItem)) {
                             furnaceInventory.removeItem(resultItem);
                             minecartHopperInventory.addItem(resultItem);
-                            break;
                         }
                         break;
                 }

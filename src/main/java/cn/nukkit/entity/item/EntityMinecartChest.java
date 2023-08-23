@@ -183,7 +183,6 @@ public class EntityMinecartChest extends EntityMinecartAbstract implements Inven
                         if (!resultItem.isNull() && !minecartChestInventory.isFull() && minecartChestInventory.canAddItem(resultItem)) {
                             furnaceInventory.removeItem(resultItem);
                             minecartChestInventory.addItem(resultItem);
-                            break;
                         }
                         break;
                 }
