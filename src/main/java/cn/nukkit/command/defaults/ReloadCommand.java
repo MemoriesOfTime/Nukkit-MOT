@@ -29,8 +29,8 @@ public class ReloadCommand extends VanillaCommand {
             sender.getServer().reload();
 
             Command.broadcastCommandMessage(sender, new TranslationContainer(TextFormat.YELLOW + "%nukkit.command.reload.reloaded" + TextFormat.WHITE));
-        }else {
-            sender.sendMessage(TextFormat.RED + "reload命令会导致部分插件报错,如确定执行请使用: /reload true");
+        } else {
+            sender.sendMessage(new TranslationContainer("nukkit.command.reload.confirm"));
         }
 
         return true;

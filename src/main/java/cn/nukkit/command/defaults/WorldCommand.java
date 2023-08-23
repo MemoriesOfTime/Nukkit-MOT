@@ -26,26 +26,26 @@ public class WorldCommand extends Command {
         if (!this.testPermission(sender)) {
             return true;
         }
-        
+
         if (args.length == 0 && !Server.getInstance().isLowProfileServer()) {
-            sender.sendMessage("Available worlds:");
+            sender.sendMessage(new TranslationContainer("nukkit.command.world.list"));
             for (Level level : Server.getInstance().getLevels().values()) {
                 sender.sendMessage(level.getName());
             }
             return true;
         }
-        
+
         if (args.length == 2) {
             if (!sender.hasPermission("nukkit.command.world.others")) {
                 return false;
             }
 
             if (Server.getInstance().getPlayer(args[1].replace("@s", sender.getName())) == null) {
-                sender.sendMessage("\u00A7cUnknown player");
+                sender.sendMessage(new TranslationContainer("nukkit.command.world.unknownPlayer"));
                 return true;
             }
             if (Server.getInstance().getLevelByName(args[0]) == null) {
-                sender.sendMessage("\u00A7cUnknown level");
+                sender.sendMessage(new TranslationContainer("nukkit.command.world.unknownLevel"));
                 return true;
             }
             Server.getInstance().getPlayer(args[1].replace("@s", sender.getName())).teleport(Server.getInstance().getLevelByName(args[0]).getSafeSpawn(), PlayerTeleportEvent.TeleportCause.COMMAND);
@@ -61,7 +61,7 @@ public class WorldCommand extends Command {
             if (Server.getInstance().getLevelByName(args[0]) != null) {
                 ((Player) sender).teleport(Server.getInstance().getLevelByName(args[0]).getSafeSpawn(), PlayerTeleportEvent.TeleportCause.COMMAND);
             } else {
-                sender.sendMessage("\u00A7cUnknown level");
+                sender.sendMessage(new TranslationContainer("nukkit.command.world.unknownLevel"));
             }
             return true;
         }

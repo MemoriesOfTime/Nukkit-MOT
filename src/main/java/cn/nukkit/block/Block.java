@@ -34,7 +34,6 @@ import java.util.function.Predicate;
  * Nukkit Project
  */
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
-
     public static final int MAX_BLOCK_ID = 600;
     public static final int DATA_BITS = 6;
     public static final int DATA_SIZE = 1 << DATA_BITS;
@@ -50,13 +49,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static boolean[] transparent = null;
     public static boolean[] diffusesSkyLight = null;
 
-    public AxisAlignedBB boundingBox = null;
-    public AxisAlignedBB collisionBoundingBox = null;
     public static boolean[] hasMeta = null;
-
-    public int layer = 0;
-
     private static final boolean[] usesFakeWater = new boolean[512];
+
+    public AxisAlignedBB boundingBox = null;
+    public int layer = 0;
 
     protected Block() {}
 
@@ -405,18 +402,26 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[CRIMSON_NYLIUM] = BlockNyliumCrimson.class; //487
             list[WARPED_NYLIUM] = BlockNyliumWarped.class; //488
+            list[BASALT] = BlockBasalt.class; //489
+
             list[STRIPPED_CRIMSON_STEM] = BlockStemStrippedCrimson.class; //495
             list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
             list[CRIMSON_PLANKS] = BlockPlanksCrimson.class; //497
             list[WARPED_PLANKS] = BlockPlanksWarped.class; //498
             list[CRIMSON_DOOR_BLOCK] = BlockDoorCrimson.class; //499
             list[WARPED_DOOR_BLOCK] = BlockDoorWarped.class; //500
+            list[CRIMSON_TRAPDOOR] = BlockTrapdoorCrimson.class; //501
+            list[WARPED_TRAPDOOR] = BlockTrapdoorWarped.class; //502
 
-            //TODO
-            //list[CRIMSON_TRAPDOOR] = BlockTrapdoorCrimson.class; //501
-            //list[WARPED_TRAPDOOR] = BlockTrapdoorWarped.class; //502
-
+            list[SOUL_LANTERN] = BlockSoulLantern.class; //524
+            list[NETHERITE_BLOCK] = BlockNetheriteBlock.class; //525
+            list[ANCIENT_DEBRIS] = BlockAncientDebris.class; //526
             list[RESPAWN_ANCHOR] = BlockRespawnAnchor.class; //527
+            list[BLACKSTONE] = BlockBlackstone.class; //528
+
+            list[NETHER_GOLD_ORE] = BlockOreGoldNether.class; //543
+            list[CRYING_OBSIDIAN] = BlockCryingObsidian.class; //544
+            list[SOUL_CAMPFIRE_BLOCK] = BlockCampfireSoul.class; //545
 
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];
@@ -764,19 +769,20 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public int getItemId() {
         int id = getId();
+
         if (id > 255) {
             return 255 - id;
-        } else {
-            return id;
         }
-    }
+
+        return id;
+	}
 
     /**
      * The full id is a combination of the id and data.
      * @return full id
      */
     public int getFullId() {
-        return (getId() << DATA_BITS);
+        return getId() << DATA_BITS;
     }
 
     public void addVelocityToEntity(Entity entity, Vector3 vector) {
