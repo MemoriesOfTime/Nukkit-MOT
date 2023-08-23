@@ -2,12 +2,10 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
-import cn.nukkit.blockentity.BlockEntityChest;
-import cn.nukkit.blockentity.BlockEntityFurnace;
-import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
-import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.InventoryHolder;
+import cn.nukkit.inventory.MinecartChestInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
@@ -26,13 +24,10 @@ public class EntityMinecartChest extends EntityMinecartAbstract implements Inven
 
     protected MinecartChestInventory inventory;
 
-    public int transferCooldown = 8;
-
     public EntityMinecartChest(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
         setDisplayBlock(Block.get(Block.CHEST), false);
         setName("Minecart with Chest");
-        this.scheduleUpdate();
     }
 
     @Override
@@ -124,103 +119,5 @@ public class EntityMinecartChest extends EntityMinecartAbstract implements Inven
     @Override
     public String getInteractButtonText() {
         return "action.interact.opencontainer";
-    }
-
-    @Override
-    public boolean onUpdate(int currentTick) {
-        MinecartChestInventory minecartChestInventory = this.getInventory();
-        if(!isOnTransferCooldown()) {
-            Block upperBlock = this.getPosition().floor().add(0, 1, 0).getLevelBlock();
-            if (upperBlock != null) {
-                switch (upperBlock.getId()) {
-                    case Block.CHEST:
-                        BlockEntityChest entityChest = (BlockEntityChest) upperBlock.getLevel().getBlockEntity(upperBlock);
-                        ChestInventory chestInventory = (ChestInventory) entityChest.getInventory();
-                        for (Item pullItem : chestInventory.getContents().values()) {
-                            pullItem = pullItem.clone();
-                            pullItem.setCount(1);
-                            if (!pullItem.isNull() && minecartChestInventory.canAddItem(pullItem)) {
-                                chestInventory.removeItem(pullItem);
-                                minecartChestInventory.addItem(pullItem);
-                                break;
-                            }
-                        }
-                        break;
-                    case Block.HOPPER_BLOCK:
-                        BlockEntityHopper entityHopper = (BlockEntityHopper) upperBlock.getLevel().getBlockEntity(upperBlock);
-                        HopperInventory hopperInventory = entityHopper.getInventory();
-                        for (Item pullItem : hopperInventory.getContents().values()) {
-                            pullItem = pullItem.clone();
-                            pullItem.setCount(1);
-                            if (!pullItem.isNull() && minecartChestInventory.canAddItem(pullItem)) {
-                                hopperInventory.removeItem(pullItem);
-                                minecartChestInventory.addItem(pullItem);
-                                break;
-                            }
-                        }
-                        break;
-                    case Block.FURNACE:
-                        BlockEntityFurnace entityFurnace = (BlockEntityFurnace) upperBlock.getLevel().getBlockEntity(upperBlock);
-                        FurnaceInventory furnaceInventory = entityFurnace.getInventory();
-                        Item resultItem = furnaceInventory.getResult().clone();
-                        resultItem.setCount(1);
-                        if (!resultItem.isNull() && minecartChestInventory.canAddItem(resultItem)) {
-                            furnaceInventory.removeItem(resultItem);
-                            minecartChestInventory.addItem(resultItem);
-                        }
-                        break;
-                }
-            }
-
-            Item pullItemToBottom = minecartChestInventory.getItem(0).clone();
-            if(pullItemToBottom.getId() != Item.AIR) {
-                for (Item value : minecartChestInventory.getContents().values()) {
-                    if(value.getId() != Item.AIR){
-                        pullItemToBottom = value.clone();
-                        break;
-                    }
-                }
-                pullItemToBottom.setCount(1);
-                Block bottomBlock = this.getPosition().floor().subtract(0, 1, 0).getLevelBlock();
-                if (bottomBlock != null) {
-                    switch (bottomBlock.getId()) {
-                        case Block.HOPPER_BLOCK:
-                            BlockEntityHopper entityHopper = (BlockEntityHopper) bottomBlock.getLevel().getBlockEntity(bottomBlock);
-                            HopperInventory hopperInventory = entityHopper.getInventory();
-                            if (hopperInventory.canAddItem(pullItemToBottom)) {
-                                minecartChestInventory.removeItem(pullItemToBottom);
-                                hopperInventory.addItem(pullItemToBottom);
-                            }
-                            break;
-                        case Block.FURNACE:
-                            BlockEntityFurnace entityFurnace = (BlockEntityFurnace) bottomBlock.getLevel().getBlockEntity(bottomBlock);
-                            FurnaceInventory furnaceInventory = entityFurnace.getInventory();
-                            Item fuel = furnaceInventory.getFuel();
-                            if (fuel.isNull() || fuel.equals(pullItemToBottom, false, false)) {
-                                minecartChestInventory.removeItem(pullItemToBottom);
-                                if(fuel.isNull()){
-                                    furnaceInventory.setFuel(pullItemToBottom);
-                                }else{
-                                    pullItemToBottom.increment(fuel.getCount());
-                                    furnaceInventory.setItem(0, pullItemToBottom);
-                                }
-                            }
-                            break;
-                    }
-                }
-            }
-            transferCooldown = 8;
-        } else {
-            transferCooldown--;
-        }
-        return super.onUpdate(currentTick);
-    }
-
-    public boolean isOnTransferCooldown() {
-        return this.transferCooldown > 0;
-    }
-
-    public void setTransferCooldown(int transferCooldown) {
-        this.transferCooldown = transferCooldown;
     }
 }

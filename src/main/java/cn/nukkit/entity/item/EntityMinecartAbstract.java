@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockRail;
 import cn.nukkit.block.BlockRailActivator;
 import cn.nukkit.block.BlockRailPowered;
+import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityControllable;
 import cn.nukkit.entity.EntityLiving;
@@ -14,14 +15,13 @@ import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.vehicle.VehicleMoveEvent;
 import cn.nukkit.event.vehicle.VehicleUpdateEvent;
+import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemMinecart;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.MathHelper;
-import cn.nukkit.math.NukkitMath;
-import cn.nukkit.math.Vector3;
+import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.MinecartType;
 import cn.nukkit.utils.Rail;
@@ -226,6 +226,18 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                 }
             }
 
+            //使矿车通知漏斗更新而不是漏斗来检测矿车
+            //通常情况下，矿车的数量远远少于漏斗，所以说此举能大福提高性能
+            if (this instanceof InventoryHolder holder) {
+                var pickupArea = new SimpleAxisAlignedBB(this.x, this.y - 1, this.z, this.x + 1, this.y, this.z + 1);
+                checkPickupHopper(pickupArea, holder);
+                //漏斗矿车会自行拉取物品!
+                if (!(this instanceof EntityMinecartHopper)) {
+                    var pushArea = new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x + 1, this.y + 2, this.z + 1);
+                    checkPushHopper(pushArea, holder);
+                }
+            }
+
             // No need to onGround or Motion diff! This always have an update
             return true;
         }
@@ -388,6 +400,64 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
     }
 
     private boolean hasUpdated = false;
+
+    /**
+     * 检查邻近的漏斗并通知它输出物品
+     *
+     * @param pushArea 漏斗输出范围
+     * @return 是否有漏斗被通知
+     */
+    private boolean checkPushHopper(AxisAlignedBB pushArea, InventoryHolder holder) {
+        int minX = NukkitMath.floorDouble(pushArea.getMinX());
+        int minY = NukkitMath.floorDouble(pushArea.getMinY());
+        int minZ = NukkitMath.floorDouble(pushArea.getMinZ());
+        int maxX = NukkitMath.ceilDouble(pushArea.getMaxX());
+        int maxY = NukkitMath.ceilDouble(pushArea.getMaxY());
+        int maxZ = NukkitMath.ceilDouble(pushArea.getMaxZ());
+        var tmpBV = new BlockVector3();
+        for (int z = minZ; z <= maxZ; ++z) {
+            for (int x = minX; x <= maxX; ++x) {
+                for (int y = minY; y <= maxY; ++y) {
+                    tmpBV.setComponents(x, y, z);
+                    var be = this.level.getBlockEntity(tmpBV);
+                    if (be instanceof BlockEntityHopper blockEntityHopper) {
+                        blockEntityHopper.setMinecartInvPushTo(holder);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 检查邻近的漏斗并通知它获取物品
+     *
+     * @param pickupArea 漏斗拉取范围
+     * @return 是否有漏斗被通知
+     */
+    private boolean checkPickupHopper(AxisAlignedBB pickupArea, InventoryHolder holder) {
+        int minX = NukkitMath.floorDouble(pickupArea.getMinX());
+        int minY = NukkitMath.floorDouble(pickupArea.getMinY());
+        int minZ = NukkitMath.floorDouble(pickupArea.getMinZ());
+        int maxX = NukkitMath.ceilDouble(pickupArea.getMaxX());
+        int maxY = NukkitMath.ceilDouble(pickupArea.getMaxY());
+        int maxZ = NukkitMath.ceilDouble(pickupArea.getMaxZ());
+        var tmpBV = new BlockVector3();
+        for (int z = minZ; z <= maxZ; ++z) {
+            for (int x = minX; x <= maxX; ++x) {
+                for (int y = minY; y <= maxY; ++y) {
+                    tmpBV.setComponents(x, y, z);
+                    var be = this.level.getBlockEntity(tmpBV);
+                    if (be instanceof BlockEntityHopper blockEntityHopper) {
+                        blockEntityHopper.setMinecartInvPickupFrom(holder);
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
 
     private void setFalling() {
         motionX = NukkitMath.clamp(motionX, -maxSpeed, maxSpeed);
