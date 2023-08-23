@@ -77,7 +77,7 @@ public class HastebinUtility {
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (!line.contains("rcon.password=")) {
+                if (!line.contains("rcon.password=") && !line.contains("hastebin-token=")) {
                     lines.add(line);
                 }
             }
