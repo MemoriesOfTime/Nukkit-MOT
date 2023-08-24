@@ -114,7 +114,9 @@ public abstract class EntityTameableMob extends EntityWalkingMob implements Enti
      * If the owner is online, set owner properly
      */
     public void checkOwner() {
-        if (this.owner == null && this.namedTag != null) {
+        if (this.namedTag == null) return;
+
+        if (this.owner == null || !owner.isOnline()) {
             String ownerName = namedTag.getString(NAMED_TAG_OWNER);
             if (ownerName != null && !ownerName.isEmpty()) {
                 Player player = this.getServer().getPlayerExact(ownerName);
