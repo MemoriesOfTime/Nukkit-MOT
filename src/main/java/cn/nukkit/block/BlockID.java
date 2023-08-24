@@ -350,6 +350,12 @@ public interface BlockID {
     int BLOCK_KELP = 393;
     int DRIED_KELP_BLOCK = 394;
 
+    int ACACIA_TRAPDOOR = 400;
+    int BIRCH_TRAPDOOR = 401;
+    int DARK_OAK_TRAPDOOR = 402;
+    int JUNGLE_TRAPDOOR = 403;
+    int SPRUCE_TRAPDOOR = 404;
+
     int CARVED_PUMPKIN = 410;
     int SEA_PICKLE = 411;
     int BARRIER = 416;
