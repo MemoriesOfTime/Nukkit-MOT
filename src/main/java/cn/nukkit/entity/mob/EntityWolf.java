@@ -193,7 +193,7 @@ public class EntityWolf extends EntityTameableMob {
                 return true;
             }
         } else if (this.isBreedingItem(item)) {
-            if (!this.isInLove() || healable != 0 && this.getHealth() != this.getMaxHealth()) {
+            if (!this.isInLove() || healable != 0 && this.getHealth() < this.getMaxHealth()) {
                 this.getLevel().addSound(this, Sound.RANDOM_EAT);
                 this.getLevel().addParticle(new ItemBreakParticle(this.add(0, this.getHeight() * 0.75F, 0), Item.get(item.getId(), 0, 1)));
                 this.setInLove();
