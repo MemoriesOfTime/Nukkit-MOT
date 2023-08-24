@@ -4,7 +4,6 @@ package cn.nukkit.block;
  * List of block IDs
  */
 public interface BlockID {
-
     int AIR = 0;
     int STONE = 1;
     int GRASS = 2;
@@ -377,6 +376,18 @@ public interface BlockID {
     int SMOOTH_STONE = 438;
     int RED_NETHER_BRICK_STAIRS = 439;
     int SMOOTH_QUARTZ_STAIRS = 440;
+
+    int LECTERN = 449;
+    int GRINDSTONE = 450;
+    int BLAST_FURNACE = 451;
+    int STONECUTTER_BLOCK = 452;
+    int SMOKER = 453;
+
+    int CARTOGRAPHY_TABLE = 455;
+    int FLETCHING_TABLE = 456;
+
+    int LOOM = 459;
+
     int SMITHING_TABLE = 457;
     int BARREL = 458;
     int BELL = 461;
@@ -414,7 +425,13 @@ public interface BlockID {
     int CRIMSON_TRAPDOOR = 501;
     int WARPED_TRAPDOOR = 502;
 
+    int SOUL_LANTERN = 524;
+    int NETHERITE_BLOCK = 525;
+    int ANCIENT_DEBRIS = 526;
     int RESPAWN_ANCHOR = 527;
+    int BLACKSTONE = 528;
 
     int NETHER_GOLD_ORE = 543;
+    int CRYING_OBSIDIAN = 544;
+    int SOUL_CAMPFIRE_BLOCK = 545;
 }

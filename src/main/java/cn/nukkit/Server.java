@@ -9,6 +9,7 @@ import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityHuman;
 import cn.nukkit.entity.data.Skin;
+import cn.nukkit.entity.data.profession.Profession;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.entity.passive.*;
@@ -97,10 +98,14 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.security.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 /**
@@ -510,6 +515,10 @@ public class Server {
      * Enable Spark Plugin
      */
     public boolean enableSpark;
+    /**
+     * This is needed for structure generation
+     */
+    public final ForkJoinPool computeThreadPool;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -567,6 +576,7 @@ public class Server {
         }
 
         this.baseLang = new BaseLang(this.getPropertyString("language", BaseLang.FALLBACK_LANGUAGE));
+        computeThreadPool = new ForkJoinPool(Math.min(0x7fff, Runtime.getRuntime().availableProcessors()), new ComputeThreadPoolThreadFactory(), null, false);
 
         Object poolSize = this.getProperty("async-workers", "auto");
         if (!(poolSize instanceof Integer)) {
@@ -627,6 +637,7 @@ public class Server {
         this.commandMap = new SimpleCommandMap(this);
 
         registerEntities();
+        registerProfessions();
         registerBlockEntities();
 
         Block.init();
@@ -790,10 +801,10 @@ public class Server {
 
                 boolean isMaster = Nukkit.getBranch().equals("master");
                 if (!this.getNukkitVersion().equals(latest) && !this.getNukkitVersion().equals("git-null") && isMaster) {
-                    this.getLogger().info("\u00A7c[Nukkit-MOT][Update] \u00A7eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + this.getNukkitVersion() + " Latest: " + latest);
-                    this.getLogger().info("\u00A7c[Nukkit-MOT][Update] \u00A7eYou can download the latest build from https://github.com/MemoriesOfTime/NukkitPetteriM1Edition/");
+                    this.getLogger().info("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + this.getNukkitVersion() + " Latest: " + latest);
+                    this.getLogger().info("§c[Nukkit-MOT][Update] §eYou can download the latest build from https://github.com/MemoriesOfTime/Nukkit-MOT/");
                 } else if (!isMaster) {
-                    this.getLogger().warning("\u00A7c[Nukkit-MOT] \u00A7eYou are running a dev build! Do not use in production! Branch: " + Nukkit.getBranch());
+                    this.getLogger().warning("§c[Nukkit-MOT] §eYou are running a dev build! Do not use in production! Branch: " + Nukkit.getBranch());
                 }
             } catch (Exception ignore) {
             }
@@ -1238,7 +1249,7 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_20_10) {
+        if (player.protocol >= ProtocolInfo.v1_20_10_21) {
             player.dataPacket(CraftingManager.packet594);
         } else if (player.protocol >= ProtocolInfo.v1_20_0_23) {
             player.dataPacket(CraftingManager.packet589);
@@ -2750,6 +2761,10 @@ public class Server {
         return currentThread;
     }
 
+    private void registerProfessions() {
+        Profession.init();
+    }
+
     /**
      * Internal method to register all default entities
      */
@@ -2899,6 +2914,7 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.DISPENSER, BlockEntityDispenser.class);
         BlockEntity.registerBlockEntity(BlockEntity.MOB_SPAWNER, BlockEntitySpawner.class);
         BlockEntity.registerBlockEntity(BlockEntity.MUSIC, BlockEntityMusic.class);
+        BlockEntity.registerBlockEntity(BlockEntity.LECTERN, BlockEntityLectern.class);
         BlockEntity.registerBlockEntity(BlockEntity.CAMPFIRE, BlockEntityCampfire.class);
         BlockEntity.registerBlockEntity(BlockEntity.BELL, BlockEntityBell.class);
         BlockEntity.registerBlockEntity(BlockEntity.BARREL, BlockEntityBarrel.class);
@@ -3200,10 +3216,40 @@ public class Server {
     }
 
     private class ConsoleThread extends Thread implements InterruptibleThread {
-
         @Override
         public void run() {
             console.start();
+        }
+    }
+
+    private static class ComputeThread extends ForkJoinWorkerThread {
+        ComputeThread(final ForkJoinPool pool, final AtomicInteger threadCount) {
+            super(pool);
+            setName("ComputeThreadPool-thread-" + threadCount.getAndIncrement());
+        }
+    }
+
+    private static class ComputeThreadPoolThreadFactory implements ForkJoinPool.ForkJoinWorkerThreadFactory {
+        private static final AtomicInteger threadCount = new AtomicInteger(0);
+
+        @SuppressWarnings("removal")
+        private static final AccessControlContext ACC = contextWithPermissions(
+            new RuntimePermission("getClassLoader"),
+            new RuntimePermission("setContextClassLoader")
+        );
+
+        @SuppressWarnings("removal")
+        static AccessControlContext contextWithPermissions(final Permission... perms) {
+            final Permissions permissions = new Permissions();
+            for (final Permission perm : perms) {
+                permissions.add(perm);
+            }
+            return new AccessControlContext(new ProtectionDomain[]{new ProtectionDomain(null, permissions)});
+        }
+
+        @SuppressWarnings("removal")
+        public ForkJoinWorkerThread newThread(final ForkJoinPool pool) {
+            return AccessController.doPrivileged((PrivilegedAction<ForkJoinWorkerThread>) () -> new ComputeThread(pool, threadCount), ACC);
         }
     }
 }

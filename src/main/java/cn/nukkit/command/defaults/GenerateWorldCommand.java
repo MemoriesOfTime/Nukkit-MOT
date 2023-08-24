@@ -5,6 +5,7 @@ import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.generator.Generator;
 
 public class GenerateWorldCommand extends Command {
@@ -26,28 +27,28 @@ public class GenerateWorldCommand extends Command {
             return true;
         }
 
-        if (args.length == 3) {
-            if (Server.getInstance().isLevelGenerated(args[0])) {
-                sender.sendMessage("\u00A7cWorld \u00A77" + args[0] + " \u00A7calready exists");
-                return true;
-            }
+        if (args.length != 3) {
+            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
+            return false;
+        }
 
-            long seed;
-
-            try {
-                seed = Long.parseLong(args[2]);
-            } catch (NumberFormatException e) {
-                sender.sendMessage("\u00A7cThe seed must be numeric");
-                return true;
-            }
-
-            Server.getInstance().generateLevel(args[0], seed, Generator.getGenerator(args[1]));
-            
-            sender.sendMessage("\u00A72Generating world \u00A77" + args[0] + "\u00A72...");
-
+        if (Server.getInstance().isLevelGenerated(args[0])) {
+            sender.sendMessage(new TranslationContainer("nukkit.command.generateworld.exists", args[0]));
             return true;
         }
 
-        return false;
+        long seed;
+
+        try {
+            seed = Long.parseLong(args[2]);
+        } catch (NumberFormatException e) {
+            sender.sendMessage(new TranslationContainer("nukkit.command.generateworld.numericSeed"));
+            return true;
+        }
+
+        Server.getInstance().generateLevel(args[0], seed, Generator.getGenerator(args[1]));
+
+        sender.sendMessage(new TranslationContainer("nukkit.command.generateworld.generating", args[0]));
+        return true;
     }
 }

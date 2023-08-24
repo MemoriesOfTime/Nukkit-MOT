@@ -354,6 +354,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[SPYGLASS] = ItemSpyglass.class; //772
             list[RECORD_OTHERSIDE] = ItemRecordOtherside.class; //773
 
+            list[SOUL_CAMPFIRE] = ItemCampfireSoul.class; //801
+
             for (int i = 0; i < 256; ++i) {
                 if (Block.list[i] != null) {
                     list[i] = Block.list[i];
@@ -637,6 +639,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_20_0_23:
             case v1_20_0:
                 return new ArrayList<>(Item.creative589);
+            case v1_20_10_21:
             case v1_20_10:
                 return new ArrayList<>(Item.creative594);
             // TODO Multiversion

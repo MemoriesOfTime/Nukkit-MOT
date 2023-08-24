@@ -38,7 +38,7 @@ import static cn.nukkit.utils.Utils.dynamic;
 public class Nukkit {
 
     public static final String NUKKIT = "Nukkit MOT";
-    public static final String BRANCH = "https://api.github.com/repos/MemoriesOfTime/NukkitPetteriM1Edition/commits/master";
+    public static final String BRANCH = "https://api.github.com/repos/MemoriesOfTime/Nukkit-MOT/commits/master";
     public final static Properties GIT_INFO = getGitInfo();
     public final static String VERSION = getVersion();
     public final static String API_VERSION = dynamic("CUSTOM");

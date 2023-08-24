@@ -1,7 +1,10 @@
 package cn.nukkit.nbt;
 
 import cn.nukkit.item.Item;
-import cn.nukkit.nbt.stream.*;
+import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
+import cn.nukkit.nbt.stream.NBTInputStream;
+import cn.nukkit.nbt.stream.NBTOutputStream;
+import cn.nukkit.nbt.stream.PGZIPOutputStream;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.ThreadCache;

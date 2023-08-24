@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
@@ -21,6 +22,7 @@ import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.List;
 import java.util.Objects;
@@ -32,7 +34,6 @@ import java.util.function.Predicate;
  * Nukkit Project
  */
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
-
     public static final int MAX_BLOCK_ID = 600;
     public static final int DATA_BITS = 6;
     public static final int DATA_SIZE = 1 << DATA_BITS;
@@ -48,13 +49,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static boolean[] transparent = null;
     public static boolean[] diffusesSkyLight = null;
 
-    public AxisAlignedBB boundingBox = null;
-    public AxisAlignedBB collisionBoundingBox = null;
     public static boolean[] hasMeta = null;
-
-    public int layer = 0;
-
     private static final boolean[] usesFakeWater = new boolean[512];
+
+    public AxisAlignedBB boundingBox = null;
+    public int layer = 0;
 
     protected Block() {}
 
@@ -380,6 +379,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[RED_NETHER_BRICK_STAIRS] = BlockStairsRedNetherBrick.class; //439
             list[SMOOTH_QUARTZ_STAIRS] = BlockStairsSmoothQuartz.class; //440
 
+            list[LECTERN] = BlockLectern.class; //449
+
             list[SMITHING_TABLE] = BlockSmithingTable.class; //457
             list[BARREL] = BlockBarrel.class; //458
 
@@ -401,18 +402,26 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[CRIMSON_NYLIUM] = BlockNyliumCrimson.class; //487
             list[WARPED_NYLIUM] = BlockNyliumWarped.class; //488
+            list[BASALT] = BlockBasalt.class; //489
+
             list[STRIPPED_CRIMSON_STEM] = BlockStemStrippedCrimson.class; //495
             list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
             list[CRIMSON_PLANKS] = BlockPlanksCrimson.class; //497
             list[WARPED_PLANKS] = BlockPlanksWarped.class; //498
             list[CRIMSON_DOOR_BLOCK] = BlockDoorCrimson.class; //499
             list[WARPED_DOOR_BLOCK] = BlockDoorWarped.class; //500
+            list[CRIMSON_TRAPDOOR] = BlockTrapdoorCrimson.class; //501
+            list[WARPED_TRAPDOOR] = BlockTrapdoorWarped.class; //502
 
-            //TODO
-            //list[CRIMSON_TRAPDOOR] = BlockTrapdoorCrimson.class; //501
-            //list[WARPED_TRAPDOOR] = BlockTrapdoorWarped.class; //502
-
+            list[SOUL_LANTERN] = BlockSoulLantern.class; //524
+            list[NETHERITE_BLOCK] = BlockNetheriteBlock.class; //525
+            list[ANCIENT_DEBRIS] = BlockAncientDebris.class; //526
             list[RESPAWN_ANCHOR] = BlockRespawnAnchor.class; //527
+            list[BLACKSTONE] = BlockBlackstone.class; //528
+
+            list[NETHER_GOLD_ORE] = BlockOreGoldNether.class; //543
+            list[CRYING_OBSIDIAN] = BlockCryingObsidian.class; //544
+            list[SOUL_CAMPFIRE_BLOCK] = BlockCampfireSoul.class; //545
 
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];
@@ -617,6 +626,23 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     }
 
+
+    /**
+     * 当玩家使用与左键或者右键方块时会触发，常被用于处理例如物品展示框左键掉落物品这种逻辑<br>
+     * 触发点在{@link Player}的onBlockBreakStart中
+     * <p>
+     * It will be triggered when the player uses the left or right click on the block, which is often used to deal with logic such as left button dropping items in the item frame<br>
+     * The trigger point is in the onBlockBreakStart of {@link Player}
+     *
+     * @param player the player
+     * @param action the action
+     * @return 状态值，返回值不为0代表这是一个touch操作而不是一个挖掘方块的操作<br>Status value, if the return value is not 0, it means that this is a touch operation rather than a mining block operation
+     */
+    public int onTouch(@Nullable Player player, PlayerInteractEvent.Action action) {
+        this.onUpdate(Level.BLOCK_UPDATE_TOUCH);
+        return 0;
+    }
+
     public boolean onActivate(Item item) {
         return this.onActivate(item, null);
     }
@@ -743,19 +769,20 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public int getItemId() {
         int id = getId();
+
         if (id > 255) {
             return 255 - id;
-        } else {
-            return id;
         }
-    }
+
+        return id;
+	}
 
     /**
      * The full id is a combination of the id and data.
      * @return full id
      */
     public int getFullId() {
-        return (getId() << DATA_BITS);
+        return getId() << DATA_BITS;
     }
 
     public void addVelocityToEntity(Entity entity, Vector3 vector) {
@@ -898,8 +925,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
 
         int blockId = this.getId();
-        boolean correctTool = correctTool0(this.getToolType(), item, blockId);
-        if (correctTool){
+        if (correctTool0(this.getToolType(), item, blockId)) {
             speedMultiplier = toolBreakTimeBonus0(item);
             int efficiencyLevel = Optional.ofNullable(item.getEnchantment(Enchantment.ID_EFFICIENCY))
                     .map(Enchantment::getLevel).orElse(0);

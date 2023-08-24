@@ -90,7 +90,11 @@ public class RuntimeItemMapping {
 
             this.runtime2Legacy.put(runtimeId, legacyEntry);
             this.identifier2Legacy.put(identifier, legacyEntry);
-            this.legacy2Runtime.put(fullId, new RuntimeEntry(identifier, runtimeId, hasDamage));
+            if (!hasDamage && this.legacy2Runtime.containsKey(fullId)) {
+                log.debug("RuntimeItemMapping contains duplicated legacy item state runtimeId=" + runtimeId + " identifier=" + identifier);
+            } else {
+                this.legacy2Runtime.put(fullId, new RuntimeEntry(identifier, runtimeId, hasDamage));
+            }
         }
 
         this.generatePalette();

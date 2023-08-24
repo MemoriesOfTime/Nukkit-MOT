@@ -1,7 +1,6 @@
 package cn.nukkit.entity.item;
 
 import cn.nukkit.Server;
-import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -9,7 +8,6 @@ import cn.nukkit.event.entity.ItemDespawnEvent;
 import cn.nukkit.event.entity.ItemSpawnEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.NukkitMath;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -381,11 +379,5 @@ public class EntityItem extends Entity {
 
         this.age += tickDiff;
         return hasUpdate;
-    }
-
-    @Override
-    public boolean isInsideOfWater() {
-        int bid = level.getBlockIdAt(chunk, this.getFloorX(), NukkitMath.floorDouble(this.y + 0.53), this.getFloorZ());
-        return bid == BlockID.WATER || bid == BlockID.STILL_WATER;
     }
 }

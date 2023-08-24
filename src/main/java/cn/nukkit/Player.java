@@ -16,6 +16,7 @@ import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
+import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
@@ -89,6 +90,8 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math3.util.FastMath;
 import org.jetbrains.annotations.NotNull;
@@ -189,6 +192,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected EnchantTransaction enchantTransaction;
     protected RepairItemTransaction repairItemTransaction;
     protected SmithingTransaction smithingTransaction;
+    protected TradingTransaction tradingTransaction;
 
     protected long randomClientId;
 
@@ -335,6 +339,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET,
             ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET,
             ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET);
+
+    @Getter
+    @Setter
+    protected List<PlayerFogPacket.Fog> fogStack = new ArrayList<>();
 
     private final @NotNull PlayerHandle playerHandle = new PlayerHandle(this);
 
@@ -1105,6 +1113,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.spawnToAll();
         }
 
+        this.sendFogStack();
+        this.sendCameraPresets();
+
         if (server.updateChecks && this.isOp()) {
             CompletableFuture.runAsync(() -> {
                 try {
@@ -1644,19 +1655,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public boolean fastMove(double dx, double dy, double dz) {
-        if (dx == 0 && dy == 0 && dz == 0) {
-            return true;
-        }
-
-        AxisAlignedBB newBB = this.boundingBox.getOffsetBoundingBox(dx, dy, dz);
-
-        if (this.isSpectator() || server.getAllowFlight() || !this.level.hasCollision(this, newBB.shrink(0, this.getStepHeight(), 0), false)) {
-            this.boundingBox = newBB;
-        }
-
-        this.x = (this.boundingBox.getMinX() + this.boundingBox.getMaxX()) / 2;
-        this.y = this.boundingBox.getMinY() - this.ySize;
-        this.z = (this.boundingBox.getMinZ() + this.boundingBox.getMaxZ()) / 2;
+        this.x += dx;
+        this.y += dy;
+        this.z += dz;
+        this.recalculateBoundingBox();
 
         this.checkChunks();
 
@@ -1879,7 +1881,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (invalidMotion) {
-            this.revertClientMotion(this.getLocation());
+            this.revertClientMotion(revertPos);
             return;
         }
 
@@ -1913,18 +1915,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
 
-            if (!invalidMotion) {
-                this.x = clientPos.getX();
-                this.y = clientPos.getY();
-                this.z = clientPos.getZ();
-                double radius = this.getWidth() / 2;
-                this.boundingBox.setBounds(this.x - radius, this.y, this.z - radius, this.x + radius, this.y + this.getHeight(), this.z + radius);
+            if (invalidMotion) {
+                this.setPositionAndRotation(revertPos.asVector3f().asVector3(), revertPos.getYaw(), revertPos.getPitch(), revertPos.getHeadYaw());
+                this.revertClientMotion(revertPos);
+                this.resetClientMovement();
+                return;
             }
-        }
-
-        if (invalidMotion) {
-            this.revertClientMotion(revertPos);
-            return;
         }
 
         // 瞬移检测
@@ -2097,6 +2093,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.dataPacket(pk);
     }
 
+    public void sendFogStack() {
+        PlayerFogPacket pk = new PlayerFogPacket();
+        pk.setFogStack(this.fogStack);
+        this.dataPacket(pk);
+    }
+
     public void sendCameraPresets() {
         if (this.protocol < ProtocolInfo.v1_20_0_23) {
             return;
@@ -2182,6 +2184,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     this.inAirTicks = 0;
                     this.highestPosition = this.y;
+                    if (this.isGliding()) {
+                        this.setGliding(false);
+                    }
                 } else {
                     if (this.checkMovement && !this.isGliding() && !server.getAllowFlight() && this.inAirTicks > 20 && !this.getAllowFlight() && !this.isSleeping() && !this.isImmobile() && !this.isSwimming() && this.riding == null && !this.hasEffect(Effect.LEVITATION) && !this.hasEffect(Effect.SLOW_FALLING)) {
                         double expectedVelocity = (-this.getGravity()) / ((double) this.getDrag()) - ((-this.getGravity()) / ((double) this.getDrag())) * FastMath.exp(-((double) this.getDrag()) * ((double) (this.inAirTicks - this.startAirTicks)));
@@ -2222,6 +2227,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (this.foodData != null) {
                     this.foodData.update(tickDiff);
                 }
+
+                //鞘翅检查和耐久计算
+                if (this.isGliding()) {
+                    PlayerInventory playerInventory = this.getInventory();
+                    if (playerInventory != null) {
+                        Item chestplate = playerInventory.getChestplateFast();
+                        if ((chestplate == null || chestplate.getId() != ItemID.ELYTRA)) {
+                            this.setGliding(false);
+                        } else if (this.age % (20 * (chestplate.getEnchantmentLevel(Enchantment.ID_DURABILITY) + 1)) == 0) {
+                            int newDamage = chestplate.getDamage() + 1;
+                            if (newDamage < chestplate.getMaxDurability()) {
+                                chestplate.setDamage(newDamage);
+                                playerInventory.setChestplate(chestplate);
+                            } else {
+                                this.setGliding(false);
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -2243,6 +2267,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (!this.isSleeping()) {
             this.timeSinceRest++;
+        }
+
+        if (protocol >= ProtocolInfo.v1_20_10_21) {
+            if (this.age%200 == 0) {
+                this.dataPacket(new NetworkStackLatencyPacket());
+            }
         }
 
         return true;
@@ -2517,6 +2547,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.timeSinceRest = nbt.getInt("TimeSinceRest");
+
+        ListTag<StringTag> fogIdentifiers = nbt.getList("fogIdentifiers", StringTag.class);
+        ListTag<StringTag> userProvidedFogIds = nbt.getList("userProvidedFogIds", StringTag.class);
+        for (int i = 0; i < fogIdentifiers.size(); i++) {
+            this.fogStack.add(i, new PlayerFogPacket.Fog(Identifier.tryParse(fogIdentifiers.get(i).data), userProvidedFogIds.get(i).data));
+        }
+
 
         for (Tag achievement : nbt.getCompound("Achievements").getAllTags()) {
             if (!(achievement instanceof ByteTag)) {
@@ -3556,7 +3593,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             break;
                         }
                         if (this.protocol >= 407) {
-                            if (!this.inventoryOpen) {
+                            Optional<Inventory> topWindow = this.getTopWindow();
+                            if (!this.inventoryOpen && !(topWindow.isPresent() && topWindow.get().getViewers().contains(this))) {
                                 this.inventoryOpen = this.inventory.open(this);
                             }
                         }
@@ -3921,89 +3959,97 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.level.addChunkPacket(this.getChunkX(), this.getChunkZ(), packet);
                 break;
             case ProtocolInfo.INVENTORY_TRANSACTION_PACKET:
+                if (!this.spawned || !this.isAlive()) {
+                    log.debug("Player {} sent inventory transaction packet while not spawned or not alive", this.username);
+                    break packetswitch;
+                }
+
                 if (this.isSpectator()) {
                     this.sendAllInventories();
                     break;
                 }
 
                 InventoryTransactionPacket transactionPacket = (InventoryTransactionPacket) packet;
-
-                // Nasty hack because the client won't change the right packet in survival when creating netherite stuff
+                // Nasty hack because the client won't change the right packet in survival when creating netherite stuff,
                 // so we are emulating what Mojang should be sending
-                if (transactionPacket.transactionType == InventoryTransactionPacket.TYPE_MISMATCH
-                        && !isCreative()
-                        && (inv = getWindowById(SMITHING_WINDOW_ID)) instanceof SmithingInventory smithingInventory) {
-                    if (!smithingInventory.getResult().isNull()) {
-                        InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
-                        fixedPacket.isRepairItemPart = true;
-                        fixedPacket.actions = new NetworkInventoryAction[6];
+                if (getWindowById(SMITHING_WINDOW_ID) instanceof SmithingInventory smithingInventory) {
+                    // When players in creative mode are about to see the result, a fixed packet can help.
+                    // One of those actions in the inventory transaction packet contains to-do sourceType,
+                    // which can serve as a symbol to detect whether player is upgrading an item or not.
+                    boolean creativeSmithingAboutToGetResult = this.isCreative() && (transactionPacket.transactionType == InventoryTransactionPacket.TYPE_NORMAL) && Arrays.stream(transactionPacket.actions).anyMatch(action -> action.sourceType == NetworkInventoryAction.SOURCE_TODO);
+                    if ((transactionPacket.transactionType == InventoryTransactionPacket.TYPE_MISMATCH) || creativeSmithingAboutToGetResult) {
+                        if (!smithingInventory.getResult().isNull()) {
+                            InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
+                            fixedPacket.isRepairItemPart = true;
+                            fixedPacket.actions = new NetworkInventoryAction[6];
 
-                        Item fromIngredient = smithingInventory.getIngredient().clone();
-                        Item toIngredient = fromIngredient.decrement(1);
+                            Item fromIngredient = smithingInventory.getIngredient().clone();
+                            Item toIngredient = fromIngredient.decrement(1);
 
-                        Item fromEquipment = smithingInventory.getEquipment().clone();
-                        Item toEquipment = fromEquipment.decrement(1);
+                            Item fromEquipment = smithingInventory.getEquipment().clone();
+                            Item toEquipment = fromEquipment.decrement(1);
 
-                        Item fromResult = Item.get(Item.AIR);
-                        Item toResult = smithingInventory.getResult().clone();
+                            Item fromResult = Item.get(Item.AIR);
+                            Item toResult = smithingInventory.getResult().clone();
 
-                        NetworkInventoryAction action = new NetworkInventoryAction();
-                        action.windowId = ContainerIds.UI;
-                        action.inventorySlot = SmithingInventory.SMITHING_INGREDIENT_UI_SLOT;
-                        action.oldItem = fromIngredient.clone();
-                        action.newItem = toIngredient.clone();
-                        fixedPacket.actions[0] = action;
+                            NetworkInventoryAction action = new NetworkInventoryAction();
+                            action.windowId = ContainerIds.UI;
+                            action.inventorySlot = SmithingInventory.SMITHING_INGREDIENT_UI_SLOT;
+                            action.oldItem = fromIngredient.clone();
+                            action.newItem = toIngredient.clone();
+                            fixedPacket.actions[0] = action;
 
-                        action = new NetworkInventoryAction();
-                        action.windowId = ContainerIds.UI;
-                        action.inventorySlot = SmithingInventory.SMITHING_EQUIPMENT_UI_SLOT;
-                        action.oldItem = fromEquipment.clone();
-                        action.newItem = toEquipment.clone();
-                        fixedPacket.actions[1] = action;
+                            action = new NetworkInventoryAction();
+                            action.windowId = ContainerIds.UI;
+                            action.inventorySlot = SmithingInventory.SMITHING_EQUIPMENT_UI_SLOT;
+                            action.oldItem = fromEquipment.clone();
+                            action.newItem = toEquipment.clone();
+                            fixedPacket.actions[1] = action;
 
-                        int emptyPlayerSlot = -1;
-                        for (int slot = 0; slot < inventory.getSize(); slot++) {
-                            if (inventory.getItem(slot).isNull()) {
-                                emptyPlayerSlot = slot;
-                                break;
+                            int emptyPlayerSlot = -1;
+                            for (int slot = 0; slot < inventory.getSize(); slot++) {
+                                if (inventory.getItem(slot).isNull()) {
+                                    emptyPlayerSlot = slot;
+                                    break;
+                                }
                             }
-                        }
-                        if (emptyPlayerSlot == -1) {
-                            sendAllInventories();
-                            getCursorInventory().sendContents(this);
-                        } else {
-                            action = new NetworkInventoryAction();
-                            action.windowId = ContainerIds.INVENTORY;
-                            action.inventorySlot = emptyPlayerSlot; // Cursor
-                            action.oldItem = Item.get(Item.AIR);
-                            action.newItem = toResult.clone();
-                            fixedPacket.actions[2] = action;
+                            if (emptyPlayerSlot == -1) {
+                                sendAllInventories();
+                                getCursorInventory().sendContents(this);
+                            } else {
+                                action = new NetworkInventoryAction();
+                                action.windowId = ContainerIds.INVENTORY;
+                                action.inventorySlot = emptyPlayerSlot; // Cursor
+                                action.oldItem = Item.get(Item.AIR);
+                                action.newItem = toResult.clone();
+                                fixedPacket.actions[2] = action;
 
-                            action = new NetworkInventoryAction();
-                            action.sourceType = NetworkInventoryAction.SOURCE_TODO;
-                            action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT;
-                            action.inventorySlot = 2; // result
-                            action.oldItem = toResult.clone();
-                            action.newItem = fromResult.clone();
-                            fixedPacket.actions[3] = action;
+                                action = new NetworkInventoryAction();
+                                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_RESULT;
+                                action.inventorySlot = 2; // result
+                                action.oldItem = toResult.clone();
+                                action.newItem = fromResult.clone();
+                                fixedPacket.actions[3] = action;
 
-                            action = new NetworkInventoryAction();
-                            action.sourceType = NetworkInventoryAction.SOURCE_TODO;
-                            action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_INPUT;
-                            action.inventorySlot = 0; // equipment
-                            action.oldItem = toEquipment.clone();
-                            action.newItem = fromEquipment.clone();
-                            fixedPacket.actions[4] = action;
+                                action = new NetworkInventoryAction();
+                                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_INPUT;
+                                action.inventorySlot = 0; // equipment
+                                action.oldItem = toEquipment.clone();
+                                action.newItem = fromEquipment.clone();
+                                fixedPacket.actions[4] = action;
 
-                            action = new NetworkInventoryAction();
-                            action.sourceType = NetworkInventoryAction.SOURCE_TODO;
-                            action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL;
-                            action.inventorySlot = 1; // material
-                            action.oldItem = toIngredient.clone();
-                            action.newItem = fromIngredient.clone();
-                            fixedPacket.actions[5] = action;
+                                action = new NetworkInventoryAction();
+                                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL;
+                                action.inventorySlot = 1; // material
+                                action.oldItem = toIngredient.clone();
+                                action.newItem = fromIngredient.clone();
+                                fixedPacket.actions[5] = action;
 
-                            transactionPacket = fixedPacket;
+                                transactionPacket = fixedPacket;
+                            }
                         }
                     }
                 }
@@ -4092,6 +4138,37 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (!players.isEmpty()) {
                             level.addSound(this, sound, 1f, 1f, players);
                         }
+                    }
+                    return;
+                } else if (transactionPacket.isTradeItemPart) {
+                    if (this.tradingTransaction == null) {
+                        this.tradingTransaction = new TradingTransaction(this, actions);
+                    } else {
+                        for (InventoryAction action : actions) {
+                            this.tradingTransaction.addAction(action);
+                        }
+                    }
+                    if (this.tradingTransaction.canExecute()) {
+                        this.tradingTransaction.execute();
+
+                        for (Inventory inventory : this.tradingTransaction.getInventories()) {
+
+                            if (inventory instanceof TradeInventory tradeInventory) {
+                                EntityVillager ent = tradeInventory.getHolder();
+                                ent.namedTag.putBoolean("traded", true);
+                                for (Tag tag : ent.getRecipes().getAll()) {
+                                    CompoundTag ta = (CompoundTag) tag;
+                                    if (ta.getCompound("buyA").getShort("id") == tradeInventory.getItem(0).getId()) {
+                                        int tradeXP = ta.getInt("traderExp");
+                                        this.addExperience(ta.getByte("rewardExp"));
+                                        ent.addExperience(tradeXP);
+                                        this.level.addSound(this, Sound.RANDOM_ORB, 0,3f, this);
+                                    }
+                                }
+                            }
+                        }
+
+                        this.tradingTransaction = null;
                     }
                     return;
                 } else if (this.craftingTransaction != null) {
@@ -4704,22 +4781,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        switch (target.getId()) {
-            case Block.NOTEBLOCK:
-                ((BlockNoteblock) target).emitSound();
-                return;
-            case Block.DRAGON_EGG:
-                if (!this.isCreative()) {
-                    ((BlockDragonEgg) target).teleport();
-                    return;
-                }
-                break;
-            case Block.ITEM_FRAME_BLOCK:
-                BlockEntity itemFrame = this.level.getBlockEntity(pos);
-                if (itemFrame instanceof BlockEntityItemFrame && ((BlockEntityItemFrame) itemFrame).dropItem(this)) {
-                    return;
-                }
-                break;
+        if (target.onTouch(this, playerInteractEvent.getAction()) != 0) {
+            return;
         }
 
         Block block = target.getSide(face);
@@ -5243,7 +5306,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             if (spawnBlockPosition == null) {
                 namedTag.remove("SpawnBlockPositionX").remove("SpawnBlockPositionY").remove("SpawnBlockPositionZ").remove("SpawnBlockLevel");
-            } else {
+            } else if (spawnBlockPosition.isValid()) {
                 namedTag.putInt("SpawnBlockPositionX", spawnBlockPosition.getFloorX())
                         .putInt("SpawnBlockPositionY", spawnBlockPosition.getFloorY())
                         .putInt("SpawnBlockPositionZ", spawnBlockPosition.getFloorZ())
@@ -5269,6 +5332,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.namedTag.putFloat("foodSaturationLevel", this.foodData.getFoodSaturationLevel());
 
             this.namedTag.putInt("TimeSinceRest", this.timeSinceRest);
+
+            ListTag<StringTag> fogIdentifiers = new ListTag<>("fogIdentifiers");
+            ListTag<StringTag> userProvidedFogIds = new ListTag<>("userProvidedFogIds");
+            this.fogStack.forEach(fog -> {
+                fogIdentifiers.add(new StringTag("", fog.identifier().toString()));
+                userProvidedFogIds.add(new StringTag("", fog.userProvidedId()));
+            });
+            this.namedTag.putList(fogIdentifiers);
+            this.namedTag.putList(userProvidedFogIds);
 
             if (!this.username.isEmpty() && this.namedTag != null) {
                 if (this.server.savePlayerDataByUuid) {
@@ -5460,6 +5532,30 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (this.playerUIInventory != null) {
                     this.playerUIInventory.clearAll();
+                }
+            } else {
+                // 发包给客户端清除不死图腾，防止影响自杀等操作
+                if (this.getOffhandInventory().getItemFast(0) instanceof ItemTotem) {
+                    InventorySlotPacket pk = new InventorySlotPacket();
+                    pk.slot = 0;
+                    pk.item = Item.AIR_ITEM;
+                    int id = this.getWindowId(this.getOffhandInventory());
+                    if (id != -1) {
+                        pk.inventoryId = id;
+                        this.dataPacket(pk);
+                    }
+                }
+                int id = this.getWindowId(this.getInventory());
+                if (id != -1) {
+                    for (Map.Entry<Integer, Item> entry : this.getInventory().getContents().entrySet()) {
+                        if (entry.getValue() instanceof ItemTotem) {
+                            InventorySlotPacket pk = new InventorySlotPacket();
+                            pk.slot = entry.getKey();
+                            pk.item = Item.AIR_ITEM;
+                            pk.inventoryId = id;
+                            this.dataPacket(pk);
+                        }
+                    }
                 }
             }
 
@@ -5945,8 +6041,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         // HACK: solve the client-side teleporting bug (inside into the block)
         if (super.teleport(to.getY() == to.getFloorY() ? to.add(0, 0.00001, 0) : to, null)) { // null to prevent fire of duplicate EntityTeleportEvent
-            this.removeAllWindows();
-            this.formOpen = false;
+            //this.removeAllWindows();
+            //this.formOpen = false;
 
             this.teleportPosition = this;
             if (cause != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
@@ -6180,7 +6276,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.permanentWindows.add(cnt);
         }
 
-        if (this.spawned && inventory.open(this)) {
+        if (this.spawned && !this.inventoryOpen && inventory.open(this)) {
             return cnt;
         } else if (!alwaysOpen) {
             this.removeWindow(inventory);

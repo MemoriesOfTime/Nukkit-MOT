@@ -9,7 +9,6 @@ import java.util.zip.CRC32;
  * Nukkit Project
  */
 public class NukkitRandom {
-
     protected long seed;
 
     public NukkitRandom() {
@@ -29,6 +28,10 @@ public class NukkitRandom {
         buffer.putInt((int) seeds);
         crc32.update(buffer.array());
         this.seed = crc32.getValue();
+    }
+
+    public final long getSeed() {
+        return seed;
     }
 
     public int nextSignedInt() {

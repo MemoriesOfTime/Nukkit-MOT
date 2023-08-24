@@ -3,12 +3,11 @@ package cn.nukkit;
 import cn.nukkit.form.window.FormWindow;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerUIInventory;
-import cn.nukkit.inventory.transaction.CraftingTransaction;
-import cn.nukkit.inventory.transaction.EnchantTransaction;
-import cn.nukkit.inventory.transaction.RepairItemTransaction;
+import cn.nukkit.inventory.transaction.*;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.SourceInterface;
+import cn.nukkit.network.protocol.PlayerFogPacket;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.utils.DummyBossBar;
@@ -17,6 +16,7 @@ import com.google.common.collect.BiMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -151,7 +151,7 @@ public final class PlayerHandle {
 
     public void setGrindstoneTransaction(GrindstoneTransaction grindstoneTransaction) {
         player.grindstoneTransaction = grindstoneTransaction;
-    }
+    }*/
 
     public SmithingTransaction getSmithingTransaction() {
         return player.smithingTransaction;
@@ -167,7 +167,7 @@ public final class PlayerHandle {
 
     public void setTradingTransaction(TradingTransaction tradingTransaction) {
         player.tradingTransaction = tradingTransaction;
-    }*/
+    }
 
     public long getRandomClientId() {
         return player.randomClientId;
@@ -407,7 +407,7 @@ public final class PlayerHandle {
 
     public void setLastAttackEntity(Entity lastAttackEntity) {
         player.lastAttackEntity = lastAttackEntity;
-    }
+    }*/
 
     public List<PlayerFogPacket.Fog> getFogStack() {
         return player.fogStack;
@@ -417,7 +417,7 @@ public final class PlayerHandle {
         player.fogStack = fogStack;
     }
 
-    public void setLastBeAttackEntity(Entity lastBeAttackEntity) {
+    /*public void setLastBeAttackEntity(Entity lastBeAttackEntity) {
         player.lastBeAttackEntity = lastBeAttackEntity;
     }*/
 

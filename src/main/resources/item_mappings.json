@@ -118,7 +118,8 @@
     "3": "minecraft:jungle_boat",
     "4": "minecraft:acacia_boat",
     "5": "minecraft:dark_oak_boat",
-    "6": "minecraft:mangrove_boat"
+    "6": "minecraft:mangrove_boat",
+    "7": "minecraft:bamboo_raft"
   },
   "minecraft:bucket": {
     "0": "minecraft:bucket",
@@ -171,6 +172,8 @@
     "17": "minecraft:squid_spawn_egg",
     "18": "minecraft:rabbit_spawn_egg",
     "19": "minecraft:bat_spawn_egg",
+    "20": "minecraft:iron_golem_spawn_egg",
+    "21": "minecraft:snow_golem_spawn_egg",
     "22": "minecraft:ocelot_spawn_egg",
     "23": "minecraft:horse_spawn_egg",
     "24": "minecraft:donkey_spawn_egg",

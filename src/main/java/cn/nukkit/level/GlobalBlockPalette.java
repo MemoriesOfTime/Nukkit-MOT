@@ -598,35 +598,20 @@ public class GlobalBlockPalette {
                     }
                 }
                 return runtimeId;
-            case ProtocolInfo.v1_19_20:
-            case ProtocolInfo.v1_19_21:
-            case ProtocolInfo.v1_19_30_23:
-            case ProtocolInfo.v1_19_30:
-            case ProtocolInfo.v1_19_40:
-            case ProtocolInfo.v1_19_50:
-            case ProtocolInfo.v1_19_60:
-            case ProtocolInfo.v1_19_63:
-            case ProtocolInfo.v1_19_70_24:
-            case ProtocolInfo.v1_19_70:
-            case ProtocolInfo.v1_19_80:
-            case ProtocolInfo.v1_20_0_23:
-            case ProtocolInfo.v1_20_0:
-            case ProtocolInfo.v1_20_10:
-                return legacyToRuntimeId(protocol, id, meta, legacyId);
-            // TODO Multiversion
             default:
-                throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
+                return legacyToRuntimeId(protocol, id, meta, legacyId);
         }
     }
 
     private static int legacyToRuntimeId(int protocol, int id, int meta, int legacyId) {
         int runtimeId;
-        runtimeId = getLegacyToRuntimeIdMap(protocol).get(legacyId);
+        Int2IntMap legacyToRuntimeIdMap = getLegacyToRuntimeIdMap(protocol);
+        runtimeId = legacyToRuntimeIdMap.get(legacyId);
         if (runtimeId == -1) {
-            runtimeId = getLegacyToRuntimeIdMap(protocol).get(id << 6);
+            runtimeId = legacyToRuntimeIdMap.get(id << 6);
             if (runtimeId == -1) {
                 log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
-                runtimeId = getLegacyToRuntimeIdMap(protocol).get(BlockID.INFO_UPDATE << 6);
+                runtimeId = legacyToRuntimeIdMap.get(BlockID.INFO_UPDATE << 6);
             }
         }
         return runtimeId;
@@ -653,6 +638,7 @@ public class GlobalBlockPalette {
             case ProtocolInfo.v1_20_0_23:
             case ProtocolInfo.v1_20_0:
                 return legacyToRuntimeId589;
+            case ProtocolInfo.v1_20_10_21:
             case ProtocolInfo.v1_20_10:
                 return legacyToRuntimeId594;
             // TODO Multiversion

@@ -11,8 +11,8 @@ public class ResourcePacksInfoPacket extends DataPacket {
     public boolean mustAccept;
     public boolean scripting;
     public boolean forceServerPacks;
-    public ResourcePack[] behaviourPackEntries = new ResourcePack[0];
-    public ResourcePack[] resourcePackEntries = new ResourcePack[0];
+    public ResourcePack[] behaviourPackEntries = ResourcePack.EMPTY_ARRAY;
+    public ResourcePack[] resourcePackEntries = ResourcePack.EMPTY_ARRAY;
 
     @Override
     public void decode() {
@@ -41,7 +41,7 @@ public class ResourcePacksInfoPacket extends DataPacket {
             this.putLLong(entry.getPackSize());
             this.putString(entry.getEncryptionKey()); // encryption key
             this.putString(""); // sub-pack name
-            this.putString(!entry.getEncryptionKey().equals("") ? entry.getPackId().toString() : ""); // content identity
+            this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
             this.putBoolean(false); // scripting
         }
     }
@@ -52,10 +52,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
             this.putString(entry.getPackId().toString());
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
-            this.putString(""); // encryption key
+            this.putString(entry.getEncryptionKey()); // encryption key
             this.putString(""); // sub-pack name
             if (protocol > ProtocolInfo.v1_5_0) {
-                this.putString(""); // content identity
+                this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
                 if (protocol >= ProtocolInfo.v1_9_0) {
                     this.putBoolean(false); // scripting
                     if (protocol >= ProtocolInfo.v1_16_200) {
