@@ -2782,6 +2782,7 @@ public class Server {
         Entity.registerEntity("Arrow", EntityArrow.class);
         Entity.registerEntity("Snowball", EntitySnowball.class);
         Entity.registerEntity("EnderPearl", EntityEnderPearl.class);
+        Entity.registerEntity("EnderEye", EntityEnderEye.class);
         Entity.registerEntity("ThrownExpBottle", EntityExpBottle.class);
         Entity.registerEntity("ThrownPotion", EntityPotion.class);
         Entity.registerEntity("Egg", EntityEgg.class);
