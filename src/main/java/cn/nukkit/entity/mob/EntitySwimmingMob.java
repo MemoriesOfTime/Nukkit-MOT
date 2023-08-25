@@ -81,11 +81,11 @@ public abstract class EntitySwimmingMob extends EntitySwimming implements Entity
         }
 
         if (minDamage == null || minDamage.length < 4) {
-            minDamage = Utils.emptyDamageArray;
+            minDamage = Utils.getEmptyDamageArray();
         }
 
         if (maxDamage == null || maxDamage.length < 4) {
-            maxDamage = Utils.emptyDamageArray;
+            maxDamage = Utils.getEmptyDamageArray();
         }
 
         for (int i = 0; i < 4; i++) {
