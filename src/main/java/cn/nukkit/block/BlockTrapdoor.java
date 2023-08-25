@@ -7,23 +7,44 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.Sound;
-import cn.nukkit.level.sound.DoorSound;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
 
-/**
- * Created by Pub4Game on 26.12.2015.
- */
 public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
+    public static final int DIRECTION_MASK = 0b11;
+    public static final int TRAPDOOR_TOP_BIT = 0x04;
+    public static final int TRAPDOOR_OPEN_BIT = 0x08;
+    private static final AxisAlignedBB[] boundingBoxDamage = new AxisAlignedBB[16];
 
-    public static int TRAPDOOR_OPEN_BIT = 0x08;
-    public static int TRAPDOOR_TOP_BIT = 0x04;
-
-    private static final int[] faces = {2, 1, 3, 0};
+    static {
+        for (int damage = 0; damage < 16; damage++) {
+            AxisAlignedBB bb;
+            double f = 0.1875;
+            if ((damage & TRAPDOOR_TOP_BIT) > 0) {
+                bb = new SimpleAxisAlignedBB(0, 1 - f, 0, 1, 1, 1);
+            } else {
+                bb = new SimpleAxisAlignedBB(0, 0, 0, 1, 0 + f, 1);
+            }
+            if ((damage & TRAPDOOR_OPEN_BIT) > 0) {
+                if ((damage & DIRECTION_MASK) == 0) {
+                    bb.setBounds(0, 0, 1 - f, 1, 1, 1);
+                } else if ((damage & DIRECTION_MASK) == 1) {
+                    bb.setBounds(0, 0, 0, 1, 1, 0 + f);
+                }
+                if ((damage & DIRECTION_MASK) == 2) {
+                    bb.setBounds(1 - f, 0, 0, 1, 1, 1);
+                }
+                if ((damage & DIRECTION_MASK) == 3) {
+                    bb.setBounds(0, 0, 0, 0 + f, 1, 1);
+                }
+            }
+            boundingBoxDamage[damage] = bb;
+        }
+    }
 
     public BlockTrapdoor() {
         this(0);
@@ -34,13 +55,18 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public int getId() {
-        return TRAPDOOR;
-    }
+    public int onUpdate(int type) {
+        if (type == Level.BLOCK_UPDATE_REDSTONE && (
+                !this.isOpen() && level.isBlockPowered(this) || this.isOpen() && !level.isBlockPowered(this)
+        )) {
+            level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, this.isOpen() ? 15 : 0, this.isOpen() ? 0 : 15));
+            this.setDamage(this.getDamage() ^ TRAPDOOR_OPEN_BIT);
+            level.setBlock(this, this, true);
+            level.addLevelEvent(this.add(0.5, 0.5, 0.5), LevelEventPacket.EVENT_SOUND_DOOR);
+            return type;
+        }
 
-    @Override
-    public String getName() {
-        return "Wooden Trapdoor";
+        return 0;
     }
 
     @Override
@@ -54,105 +80,58 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public boolean canBeActivated() {
-        return true;
-    }
-
-    @Override
     public int getToolType() {
         return ItemTool.TYPE_AXE;
     }
 
     @Override
-    protected AxisAlignedBB recalculateBoundingBox() {
-        int damage = this.getDamage();
-        AxisAlignedBB bb;
-        double f = 0.1875;
-        if ((damage & TRAPDOOR_TOP_BIT) > 0) {
-            bb = new SimpleAxisAlignedBB(
-                    this.x,
-                    this.y + 1 - f,
-                    this.z,
-                    this.x + 1,
-                    this.y + 1,
-                    this.z + 1
-            );
-        } else {
-            bb = new SimpleAxisAlignedBB(
-                    this.x,
-                    this.y,
-                    this.z,
-                    this.x + 1,
-                    this.y + f,
-                    this.z + 1
-            );
-        }
-        if ((damage & TRAPDOOR_OPEN_BIT) > 0) {
-            if ((damage & 0x03) == 0) {
-                bb.setBounds(
-                        this.x,
-                        this.y,
-                        this.z + 1 - f,
-                        this.x + 1,
-                        this.y + 1,
-                        this.z + 1
-                );
-            } else if ((damage & 0x03) == 1) {
-                bb.setBounds(
-                        this.x,
-                        this.y,
-                        this.z,
-                        this.x + 1,
-                        this.y + 1,
-                        this.z + f
-                );
-            }
-            if ((damage & 0x03) == 2) {
-                bb.setBounds(
-                        this.x + 1 - f,
-                        this.y,
-                        this.z,
-                        this.x + 1,
-                        this.y + 1,
-                        this.z + 1
-                );
-            }
-            if ((damage & 0x03) == 3) {
-                bb.setBounds(
-                        this.x,
-                        this.y,
-                        this.z,
-                        this.x + f,
-                        this.y + 1,
-                        this.z + 1
-                );
-            }
-        }
-        return bb;
+    public boolean isSolid() {
+        return false;
     }
 
     @Override
-    public int getWaterloggingLevel() {
-        return 1;
+    public boolean canBeActivated() {
+        return true;
     }
 
     @Override
-    public int onUpdate(int type) {
-        if (type == Level.BLOCK_UPDATE_REDSTONE) {
-            if ((!isOpen() && this.level.isBlockPowered(this.getLocation())) || (isOpen() && !this.level.isBlockPowered(this.getLocation()))) {
-                this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, isOpen() ? 15 : 0, isOpen() ? 0 : 15));
-                this.setDamage(this.getDamage() ^ TRAPDOOR_OPEN_BIT);
-                this.level.setBlock(this, this, true);
-                if (this.isOpen()) {
-                    this.level.addSound(this, Sound.RANDOM_DOOR_OPEN);
-                } else {
-                    this.level.addSound(this, Sound.RANDOM_DOOR_CLOSE);
-                }
-                return type;
-            }
-        }
+    public String getName() {
+        return "Oak Trapdoor";
+    }
 
-        return 0;
+    @Override
+    public int getId() {
+        return TRAPDOOR;
+    }
+
+    @Override
+    public double getMinX() {
+        return x + this.getRelativeBoundingBox().getMinX();
+    }
+
+    @Override
+    public double getMinY() {
+        return y + this.getRelativeBoundingBox().getMinY();
+    }
+
+    @Override
+    public double getMinZ() {
+        return z + this.getRelativeBoundingBox().getMinZ();
+    }
+
+    @Override
+    public double getMaxX() {
+        return x + this.getRelativeBoundingBox().getMaxX();
+    }
+
+    @Override
+    public double getMaxY() {
+        return y + this.getRelativeBoundingBox().getMaxY();
+    }
+
+    @Override
+    public double getMaxZ() {
+        return z + this.getRelativeBoundingBox().getMaxZ();
     }
 
     @Override
@@ -169,14 +148,14 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
             top = face != BlockFace.UP;
         }
 
+        int faceBit = facing.getReversedHorizontalIndex();
+        meta |= faceBit;
+
         if (top) {
             meta |= TRAPDOOR_TOP_BIT;
-        } else {
-            meta |= faces[facing.getHorizontalIndex()];
         }
-
         this.setDamage(meta);
-        this.level.setBlock(block, this, true, true);
+        this.getLevel().setBlock(block, this, true, true);
         return true;
     }
 
@@ -187,8 +166,8 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
 
     @Override
     public boolean onActivate(Item item, Player player) {
-        if (toggle(player)) {
-            this.level.addSound(new DoorSound(this));
+        if (this.toggle(player)) {
+            level.addLevelEvent(this.add(0.5, 0.5, 0.5), LevelEventPacket.EVENT_SOUND_DOOR);
             return true;
         }
         return false;
@@ -196,13 +175,31 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
 
     public boolean toggle(Player player) {
         DoorToggleEvent ev = new DoorToggleEvent(this, player);
-        level.getServer().getPluginManager().callEvent(ev);
+        this.getLevel().getServer().getPluginManager().callEvent(ev);
         if (ev.isCancelled()) {
             return false;
         }
         this.setDamage(this.getDamage() ^ TRAPDOOR_OPEN_BIT);
-        level.setBlock(this, this, true, true);
+        this.getLevel().setBlock(this, this, true);
         return true;
+    }
+
+    public boolean isOpen() {
+        return (this.getDamage() & TRAPDOOR_OPEN_BIT) == TRAPDOOR_OPEN_BIT;
+    }
+
+    public boolean isTop() {
+        return (this.getDamage() & TRAPDOOR_TOP_BIT) == TRAPDOOR_TOP_BIT;
+    }
+
+    @Override
+    public BlockFace getBlockFace() {
+        return BlockFace.fromReversedHorizontalIndex(this.getDamage() & DIRECTION_MASK);
+    }
+
+    @Override
+    public int getWaterloggingLevel() {
+        return 1;
     }
 
     @Override
@@ -210,21 +207,7 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
         return BlockColor.WOOD_BLOCK_COLOR;
     }
 
-    public boolean isOpen() {
-        return (this.getDamage() & TRAPDOOR_OPEN_BIT) != 0;
-    }
-
-    public boolean isTop() {
-        return (this.getDamage() & TRAPDOOR_TOP_BIT) != 0;
-    }
-
-    @Override
-    public BlockFace getBlockFace() {
-        return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
-    }
-
-    @Override
-    public boolean canPassThrough() {
-        return this.isOpen();
+    private AxisAlignedBB getRelativeBoundingBox() {
+        return boundingBoxDamage[this.getDamage()];
     }
 }
