@@ -11,6 +11,7 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.network.protocol.LevelEventPacket;
+import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
 
 public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
@@ -199,6 +200,11 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
     @Override
     public int getWaterloggingLevel() {
         return 1;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.WOOD_BLOCK_COLOR;
     }
 
     private AxisAlignedBB getRelativeBoundingBox() {
