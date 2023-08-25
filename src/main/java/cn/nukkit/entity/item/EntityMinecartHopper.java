@@ -2,12 +2,15 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.blockentity.BlockEntityChest;
+import cn.nukkit.blockentity.BlockEntityFurnace;
+import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
-import cn.nukkit.inventory.InventoryHolder;
-import cn.nukkit.inventory.MinecartHopperInventory;
+import cn.nukkit.inventory.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -19,6 +22,8 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
     public static final int NETWORK_ID = 96;
 
     protected MinecartHopperInventory inventory;
+
+    public int transferCooldown = 8;
 
     public EntityMinecartHopper(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -115,5 +120,111 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
     @Override
     public String getInteractButtonText() {
         return "action.interact.opencontainer";
+    }
+
+    @Override
+    public boolean onUpdate(int currentTick) {
+        MinecartHopperInventory minecartHopperInventory = this.getInventory();
+        for (Entity nearbyEntity : this.getLevel().getNearbyEntities(new SimpleAxisAlignedBB(this.getPosition().add(0.8, 0.5, 0.8), this.getPosition().subtract(0.8, 0.5, 0.8)))) {
+            if(nearbyEntity instanceof EntityItem) {
+                if(minecartHopperInventory.canAddItem(((EntityItem) nearbyEntity).getItem())) {
+                    nearbyEntity.close();
+                    minecartHopperInventory.addItem(((EntityItem) nearbyEntity).item);
+                }
+            }
+        }
+        if(!isOnTransferCooldown()) {
+            Block upperBlock = this.getPosition().floor().add(0, 1, 0).getLevelBlock();
+            if (upperBlock != null) {
+                switch (upperBlock.getId()) {
+                    case Block.CHEST:
+                        BlockEntityChest entityChest = (BlockEntityChest) upperBlock.getLevel().getBlockEntity(upperBlock);
+                        ChestInventory chestInventory = (ChestInventory) entityChest.getInventory();
+                        for (Item pullItem : chestInventory.getContents().values()) {
+                            pullItem = pullItem.clone();
+                            pullItem.setCount(1);
+                            if (!pullItem.isNull() && minecartHopperInventory.canAddItem(pullItem)) {
+                                chestInventory.removeItem(pullItem);
+                                minecartHopperInventory.addItem(pullItem);
+                                break;
+                            }
+                        }
+                        break;
+                    case Block.HOPPER_BLOCK:
+                        BlockEntityHopper entityHopper = (BlockEntityHopper) upperBlock.getLevel().getBlockEntity(upperBlock);
+                        HopperInventory hopperInventory = entityHopper.getInventory();
+                        for (Item pullItem : hopperInventory.getContents().values()) {
+                            pullItem = pullItem.clone();
+                            pullItem.setCount(1);
+                            if (!pullItem.isNull() && minecartHopperInventory.canAddItem(pullItem)) {
+                                hopperInventory.removeItem(pullItem);
+                                minecartHopperInventory.addItem(pullItem);
+                                break;
+                            }
+                        }
+                        break;
+                    case Block.FURNACE:
+                        BlockEntityFurnace entityFurnace = (BlockEntityFurnace) upperBlock.getLevel().getBlockEntity(upperBlock);
+                        FurnaceInventory furnaceInventory = entityFurnace.getInventory();
+                        Item resultItem = furnaceInventory.getResult().clone();
+                        resultItem.setCount(1);
+                        if (!resultItem.isNull() && minecartHopperInventory.canAddItem(resultItem)) {
+                            furnaceInventory.removeItem(resultItem);
+                            minecartHopperInventory.addItem(resultItem);
+                        }
+                        break;
+                }
+            }
+
+            Item pullItemToBottom = minecartHopperInventory.getItem(0).clone();
+            if(pullItemToBottom.getId() != Item.AIR) {
+                for (Item value : minecartHopperInventory.getContents().values()) {
+                    if(value.getId() != Item.AIR){
+                        pullItemToBottom = value.clone();
+                        break;
+                    }
+                }
+                pullItemToBottom.setCount(1);
+                Block bottomBlock = this.getPosition().floor().subtract(0, 1, 0).getLevelBlock();
+                if (bottomBlock != null) {
+                    switch (bottomBlock.getId()) {
+                        case Block.HOPPER_BLOCK:
+                            BlockEntityHopper entityHopper = (BlockEntityHopper) bottomBlock.getLevel().getBlockEntity(bottomBlock);
+                            HopperInventory hopperInventory = entityHopper.getInventory();
+                            if (hopperInventory.canAddItem(pullItemToBottom)) {
+                                minecartHopperInventory.removeItem(pullItemToBottom);
+                                hopperInventory.addItem(pullItemToBottom);
+                            }
+                            break;
+                        case Block.FURNACE:
+                            BlockEntityFurnace entityFurnace = (BlockEntityFurnace) bottomBlock.getLevel().getBlockEntity(bottomBlock);
+                            FurnaceInventory furnaceInventory = entityFurnace.getInventory();
+                            Item fuel = furnaceInventory.getFuel();
+                            if (fuel.isNull() || fuel.equals(pullItemToBottom, false, false)) {
+                                minecartHopperInventory.removeItem(pullItemToBottom);
+                                if(fuel.isNull()){
+                                    furnaceInventory.setFuel(pullItemToBottom);
+                                }else{
+                                    pullItemToBottom.increment(fuel.getCount());
+                                    furnaceInventory.setItem(0, pullItemToBottom);
+                                }
+                            }
+                            break;
+                    }
+                }
+            }
+            transferCooldown = 8;
+        } else {
+            transferCooldown--;
+        }
+        return super.onUpdate(currentTick);
+    }
+
+    public boolean isOnTransferCooldown() {
+        return this.transferCooldown > 0;
+    }
+
+    public void setTransferCooldown(int transferCooldown) {
+        this.transferCooldown = transferCooldown;
     }
 }
