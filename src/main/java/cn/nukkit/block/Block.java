@@ -351,15 +351,21 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[BLOCK_KELP] = BlockKelp.class; //393
             list[DRIED_KELP_BLOCK] = BlockDriedKelpBlock.class; //394
 
+            list[ACACIA_TRAPDOOR] = BlockTrapdoorAcacia.class; //400
+            list[BIRCH_TRAPDOOR] = BlockTrapdoorBirch.class; //401
+            list[DARK_OAK_TRAPDOOR] = BlockTrapdoorDarkOak.class; //402
+            list[JUNGLE_TRAPDOOR] = BlockTrapdoorJungle.class; //403
+            list[SPRUCE_TRAPDOOR] = BlockTrapdoorSpruce.class; //404
+
             list[CARVED_PUMPKIN] = BlockCarvedPumpkin.class; //410
             list[SEA_PICKLE] = BlockSeaPickle.class; //411
 
             list[BARRIER] = BlockBarrier.class; //416
-            list[STONE_SLAB3] = BlockSlabStone3.class ; //417
+            list[STONE_SLAB3] = BlockSlabStone3.class; //417
             list[BAMBOO] = BlockBamboo.class; //418
             list[BAMBOO_SAPLING] = BlockBambooSapling.class; //419
             list[SCAFFOLDING] = BlockScaffolding.class; //420
-            list[STONE_SLAB4] = BlockSlabStone4.class ; //421
+            list[STONE_SLAB4] = BlockSlabStone4.class; //421
             list[DOUBLE_STONE_SLAB3] = BlockDoubleSlabStone3.class; //422
             list[DOUBLE_STONE_SLAB4] = BlockDoubleSlabStone4.class; //423
             list[GRANITE_STAIRS] = BlockStairsGranite.class; //424
@@ -393,6 +399,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[PISTON_HEAD_STICKY] = BlockPistonHeadSticky.class; //472
 
+            list[CRIMSON_ROOTS] = BlockRootsCrimson.class; //478
+            list[WARPED_ROOTS] = BlockRootsWarped.class; //479
             list[CRIMSON_STEM] = BlockStemCrimson.class; //480
             list[WARPED_STEM] = BlockStemWarped.class; //481
             list[WARPED_WART_BLOCK] = BlockWarpedWartBlock.class; //482

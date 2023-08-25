@@ -5,6 +5,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.BlockEntityDataPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -28,7 +29,15 @@ public abstract class BlockEntitySpawnable extends BlockEntity {
 
     public abstract CompoundTag getSpawnCompound();
 
+    public CompoundTag getSpawnCompound(int protocol) {
+        return this.getSpawnCompound();
+    }
+
     public BlockEntityDataPacket createSpawnPacket() {
+        return this.createSpawnPacket(ProtocolInfo.CURRENT_PROTOCOL);
+    }
+
+    public BlockEntityDataPacket createSpawnPacket(int protocol) {
         CompoundTag tag = this.getSpawnCompound();
         BlockEntityDataPacket pk = new BlockEntityDataPacket();
         pk.x = (int) this.x;
@@ -46,17 +55,16 @@ public abstract class BlockEntitySpawnable extends BlockEntity {
 
     public void spawnTo(Player player) {
         if (!this.closed) {
-            player.dataPacket(this.createSpawnPacket());
+            player.dataPacket(this.createSpawnPacket(player.protocol));
         }
     }
 
     public void spawnToAll() {
         if (!this.closed) {
-            this.level.addChunkPacket(this.chunk.getX(), this.chunk.getZ(), this.createSpawnPacket());
-        }
-        for (Player player : this.getLevel().getChunkPlayers(this.chunk.getX(), this.chunk.getZ()).values()) {
-            if (player.spawned) {
-                this.spawnTo(player);
+            for (Player player : this.getLevel().getChunkPlayers(this.chunk.getX(), this.chunk.getZ()).values()) {
+                if (player.spawned) {
+                    this.spawnTo(player);
+                }
             }
         }
     }
