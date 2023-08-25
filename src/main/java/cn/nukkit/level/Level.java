@@ -40,7 +40,6 @@ import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.level.generator.PopChunkManager;
-import cn.nukkit.level.generator.task.ChunkPopulationTask;
 import cn.nukkit.level.generator.task.GenerationTask;
 import cn.nukkit.level.generator.task.LightPopulationTask;
 import cn.nukkit.level.generator.task.PopulationTask;
@@ -69,7 +68,6 @@ import it.unimi.dsi.fastutil.longs.*;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import it.unimi.dsi.fastutil.objects.ObjectList;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
@@ -4011,13 +4009,22 @@ public class Level implements ChunkManager, Metadatable {
                     }
                 }
 
-                int X = getHashX(index);
-                int Z = getHashZ(index);
-                if (this.unloadChunk(X, Z, true)) {
-                    this.unloadQueue.remove(index);
-                    if (System.currentTimeMillis() - now >= allocatedTime) {
-                        result = false;
-                        break;
+                if (toUnload == null) {
+                    toUnload = new LongArrayList();
+                }
+                toUnload.add(index);
+            }
+
+            if (toUnload != null) {
+                for (long index : toUnload) {
+                    int X = getHashX(index);
+                    int Z = getHashZ(index);
+                    if (this.unloadChunk(X, Z, true)) {
+                        this.unloadQueue.remove(index);
+                        if (System.currentTimeMillis() - now >= allocatedTime) {
+                            result = false;
+                            break;
+                        }
                     }
                 }
             }
