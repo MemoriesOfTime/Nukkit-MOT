@@ -6676,15 +6676,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (near) {
-            if (entity instanceof EntityArrow && ((EntityArrow) entity).hadCollision) {
-                ItemArrow item = new ItemArrow();
+            if (entity instanceof EntityArrow entityArrow && entityArrow.hadCollision) {
+                Item item;
+                if (entityArrow.namedTag != null && entityArrow.namedTag.containsCompound("item")) {
+                    CompoundTag tag = entityArrow.namedTag.getCompound("item");
+                    item = Item.get(tag.getInt("id"), tag.getInt("Damage"), tag.getInt("Count"));
+                    item.setCompoundTag(tag.getCompound("tag"));
+                } else {
+                    item = new ItemArrow();
+                }
                 if (!this.isCreative() && !this.inventory.canAddItem(item)) {
                     return false;
                 }
 
-                InventoryPickupArrowEvent ev = new InventoryPickupArrowEvent(this.inventory, (EntityArrow) entity);
+                InventoryPickupArrowEvent ev = new InventoryPickupArrowEvent(this.inventory, entityArrow);
 
-                int pickupMode = ((EntityArrow) entity).getPickupMode();
+                int pickupMode = entityArrow.getPickupMode();
                 if (pickupMode == EntityArrow.PICKUP_NONE || (pickupMode == EntityArrow.PICKUP_CREATIVE && !this.isCreative())) {
                     ev.setCancelled();
                 }
