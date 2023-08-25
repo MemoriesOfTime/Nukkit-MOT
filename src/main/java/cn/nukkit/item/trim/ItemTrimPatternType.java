@@ -4,7 +4,7 @@ package cn.nukkit.item.trim;
  * @author glorydark
  * @date {2023/8/9} {18:23}
  */
-public enum ItemArmorPatternType {
+public enum ItemTrimPatternType {
 
     COAST_ARMOR_TRIM("coast"),
     DUNE_ARMOR_TRIM("dune"),
@@ -25,7 +25,7 @@ public enum ItemArmorPatternType {
 
     private final String trimPattern;
 
-    ItemArmorPatternType(String name)
+    ItemTrimPatternType(String name)
     {
         this.trimPattern = name;
     }

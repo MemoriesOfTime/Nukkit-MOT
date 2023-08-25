@@ -331,6 +331,8 @@ public interface ItemID {
     int WARPED_FUNGUS_ON_A_STICK = 757;
     //
     int RECORD_PIGSTEP = 759;
+
+    int AMETHYST_SHARD = 771;
     //
     int SPYGLASS = 772;
     int RECORD_OTHERSIDE = 773;
@@ -371,4 +373,8 @@ public interface ItemID {
     int SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE = 817;
 
     int HOST_ARMOR_TRIM_SMITHING_TEMPLATE = 818;
+
+    int COPPER_INGOT = 850;
+
+    int LAPIS_LAZULI = 851;
 }

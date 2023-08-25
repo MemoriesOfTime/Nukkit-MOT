@@ -21,7 +21,11 @@ package cn.nukkit.inventory;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemArmor;
+import cn.nukkit.item.ItemTrimMaterial;
+import cn.nukkit.item.ItemTrimPattern;
 import cn.nukkit.level.Position;
+import cn.nukkit.nbt.tag.CompoundTag;
 
 import javax.annotation.Nullable;
 
@@ -126,5 +130,19 @@ public class SmithingInventory extends FakeBlockUIComponent {
 
     public Item getCurrentResult() {
         return currentResult;
+    }
+
+    public Item getTrimOutPutItem(){
+        Item input = this.getEquipment().clone();
+        if(this.getIngredient() instanceof ItemTrimMaterial && this.getTemplate() instanceof ItemTrimPattern){
+            if(!input.isNull() && input instanceof ItemArmor) {
+                ItemArmor trimmedArmor = (ItemArmor) input.clone();
+                ItemTrimMaterial material = (ItemTrimMaterial) this.getIngredient();
+                ItemTrimPattern pattern = (ItemTrimPattern) this.getTemplate();
+                trimmedArmor.setTrim(pattern.getPattern(), material.getMaterial());
+                return trimmedArmor;
+            }
+        }
+        return Item.AIR_ITEM;
     }
 }

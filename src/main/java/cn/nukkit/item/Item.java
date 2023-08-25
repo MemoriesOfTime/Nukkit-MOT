@@ -351,6 +351,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[WARPED_DOOR] = ItemDoorWarped.class; //756
             list[WARPED_FUNGUS_ON_A_STICK] = ItemWarpedFungusOnAStick.class; //757
             list[RECORD_PIGSTEP] = ItemRecordPigstep.class; //759
+
+            list[AMETHYST_SHARD] = ItemAmethystShard.class; //771
             list[SPYGLASS] = ItemSpyglass.class; //772
             list[RECORD_OTHERSIDE] = ItemRecordOtherside.class; //773
 
@@ -371,6 +373,9 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[RAISER_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemRaiserArmorTrimSmithingTemplate.class; // 816
             list[SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemShaperArmorTrimSmithingTemplate.class; // 817
             list[HOST_ARMOR_TRIM_SMITHING_TEMPLATE] = ItemHostArmorTrimSmithingTemplate.class; // 818
+
+            list[COPPER_INGOT] = ItemCopperIngot.class; // 850
+            list[LAPIS_LAZULI] = ItemLapisLazuli.class; // 851
 
 
             for (int i = 0; i < 256; ++i) {

@@ -4,7 +4,7 @@ package cn.nukkit.item.trim;
  * @author glorydark
  * @date {2023/8/9} {17:26}
  */
-public enum ItemMaterialType {
+public enum ItemTrimMaterialType {
 
     MATERIAL_QUARTZ("quartz"),
     MATERIAL_IRON("iron"),
@@ -18,7 +18,7 @@ public enum ItemMaterialType {
 
     private final String materialName;
 
-    ItemMaterialType(String input){
+    ItemTrimMaterialType(String input){
         this.materialName = input;
     }
 
