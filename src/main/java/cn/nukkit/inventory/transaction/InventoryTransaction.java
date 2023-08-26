@@ -75,9 +75,7 @@ public class InventoryTransaction {
             return;
         }
 
-        if (action instanceof SlotChangeAction) {
-            SlotChangeAction slotChangeAction = (SlotChangeAction)action;
-
+        if (action instanceof SlotChangeAction slotChangeAction) {
             Item targetItem = slotChangeAction.getTargetItem();
             Item sourceItem = slotChangeAction.getSourceItem();
             if (targetItem.getCount() > targetItem.getMaxStackSize() || sourceItem.getCount() > sourceItem.getMaxStackSize()) {
