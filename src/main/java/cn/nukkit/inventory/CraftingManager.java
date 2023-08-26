@@ -133,7 +133,7 @@ public class CraftingManager {
         }
 
         for (Map<String, Object> recipe : (List<Map<String, Object>>) recipes_419_config.get((Object)"shapeless")) {
-            if (!"crafting_table".equals((String) recipe.get("block"))) {
+            if (!"crafting_table".equals(recipe.get("block"))) {
                 // Ignore other recipes than crafting table ones
                 continue;
             }
@@ -244,7 +244,7 @@ public class CraftingManager {
             Item resultItem = Item.fromJson(resultMap);
             Item inputItem;
             try {
-                inputItem = Item.fromJson(resultMap);
+                inputItem = Item.fromJson((Map) recipe.get("input"));
             } catch (Exception exception) {
                 inputItem = Item.get(Utils.toInt(recipe.get("inputId")), recipe.containsKey("inputDamage") ? Utils.toInt(recipe.get("inputDamage")) : -1, 1);
             }
