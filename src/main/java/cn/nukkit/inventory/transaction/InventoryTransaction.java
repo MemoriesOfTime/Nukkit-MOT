@@ -87,14 +87,14 @@ public class InventoryTransaction {
 
             while (iterator.hasNext()) {
                 InventoryAction existingAction = iterator.next();
-                if (existingAction instanceof SlotChangeAction) {
+                if (existingAction instanceof SlotChangeAction existingSlotChangeAction) {
                     if (slotChangeAction.getInventory() instanceof ShulkerBoxInventory && (targetItem.getId() == BlockID.SHULKER_BOX || targetItem.getId() == BlockID.UNDYED_SHULKER_BOX)) {
                         invalid = true;
                         return;
                     }
-                    SlotChangeAction existingSlotChangeAction = (SlotChangeAction) existingAction;
-                    if (!existingSlotChangeAction.getInventory().equals(slotChangeAction.getInventory()))
+                    if (!existingSlotChangeAction.getInventory().equals(slotChangeAction.getInventory())) {
                         continue;
+                    }
                     Item existingSource = existingSlotChangeAction.getSourceItem();
                     Item existingTarget = existingSlotChangeAction.getTargetItem();
                     if (existingSlotChangeAction.getSlot() == slotChangeAction.getSlot() && slotChangeAction.getSourceItem().equals(existingTarget, existingTarget.hasMeta(), existingTarget.hasCompoundTag())) {
