@@ -33,6 +33,14 @@ public class EntityEnderEye extends EntityProjectile {
                 strongHold = strong;
             }
         }
+
+        if (strongHold == null) {
+            if (entity != null) {
+                strongHold = entity.getPosition();
+            } else {
+                strongHold = new Vector3(0, 0, 0);
+            }
+        }
     }
 
     @Override
