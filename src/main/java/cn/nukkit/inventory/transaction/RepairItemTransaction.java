@@ -39,8 +39,10 @@ public class RepairItemTransaction extends InventoryTransaction {
             return false;
         }
         AnvilInventory anvilInventory = (AnvilInventory) inventory;
-        return this.inputItem != null && this.outputItem != null && this.inputItem.equals(anvilInventory.getInputSlot(), true, true)
+        return this.inputItem != null && this.outputItem != null
+                && this.inputItem.equals(anvilInventory.getInputSlot(), true, true)
                 && (!this.hasMaterial() || this.materialItem.equals(anvilInventory.getMaterialSlot(), true, true))
+                && this.inputItem.getCount() == this.outputItem.getCount()
                 && this.checkRecipeValid();
     }
 
@@ -243,6 +245,11 @@ public class RepairItemTransaction extends InventoryTransaction {
                     }
                 }
             }
+        }
+
+        //通查情况下输出物品应该和输入物品是同一个id，特殊情况需要在这里添加额外判断
+        if (this.outputItem.getId() != this.inputItem.getId()) {
+            return false;
         }
 
         int renameCost = 0;
