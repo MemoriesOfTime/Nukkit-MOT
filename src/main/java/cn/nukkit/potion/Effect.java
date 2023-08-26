@@ -274,7 +274,7 @@ public class Effect implements Cloneable {
                 }
                 player.setMovementSpeed(player.getMovementSpeed() * (1 - 0.15f * (this.amplifier + 1)));
             }
-        }else if (entity instanceof EntityLiving entityLiving) {
+        } else if (entity instanceof EntityLiving entityLiving) {
             if (this.id == Effect.SPEED && (oldEffect == null || oldEffect.amplifier != this.amplifier)) {
                 if (oldEffect != null) {
                     entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 + 0.2f * (oldEffect.amplifier + 1)));
