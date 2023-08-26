@@ -1,3 +1,5 @@
+![Nukkit-MOT](.github/images/banner.png)  
+
 # Nukkit MOT
 
 ### Introduction
