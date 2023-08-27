@@ -3245,7 +3245,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
-                if(protocol >= ProtocolInfo.v1_20_10){
+                if (protocol >= ProtocolInfo.v1_20_10) {
                     if (authPacket.getInputData().contains(AuthInputAction.START_CRAWLING)) {
                         PlayerToggleCrawlEvent event = new PlayerToggleCrawlEvent(this, true);
                         this.server.getPluginManager().callEvent(event);
