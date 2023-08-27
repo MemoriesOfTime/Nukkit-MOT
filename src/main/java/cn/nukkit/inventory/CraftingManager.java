@@ -4,6 +4,7 @@ import cn.nukkit.Server;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
 import cn.nukkit.item.ItemID;
+import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.CraftingDataPacket;
 import cn.nukkit.network.protocol.DataPacket;
@@ -11,7 +12,9 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
 import io.netty.util.collection.CharObjectHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.zip.Deflater;
 
@@ -76,6 +79,8 @@ public class CraftingManager {
     public final Map<Integer, CampfireRecipe> campfireRecipes = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, SmithingRecipe> smithingRecipeMap = new Int2ObjectOpenHashMap<>(); //567
 
+    private final Object2DoubleOpenHashMap<Recipe> recipeXpMap = new Object2DoubleOpenHashMap<>();
+
     private static int RECIPE_COUNT = 0;
     static int NEXT_NETWORK_ID = 0;
 
@@ -100,6 +105,12 @@ public class CraftingManager {
         List<Map> recipes_313 = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes313.json")).getMapList("recipes");
 
         ConfigSection recipes_smithing_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes_smithing.json")).getRootSection();
+        Config furnaceXpConfig = new Config(Config.JSON);
+        try {
+            furnaceXpConfig.load(Server.class.getModule().getResourceAsStream("furnace_xp.json"));
+        } catch (IOException e) {
+            MainLogger.getLogger().warning("Failed to load furnace xp config");
+        }
 
         for (Map<String, Object> recipe : (List<Map<String, Object>>)recipes_419_config.get((Object)"shaped")) {
             if (!"crafting_table".equals(recipe.get("block"))) {
@@ -133,7 +144,7 @@ public class CraftingManager {
         }
 
         for (Map<String, Object> recipe : (List<Map<String, Object>>) recipes_419_config.get((Object)"shapeless")) {
-            if (!"crafting_table".equals((String) recipe.get("block"))) {
+            if (!"crafting_table".equals(recipe.get("block"))) {
                 // Ignore other recipes than crafting table ones
                 continue;
             }
@@ -244,14 +255,20 @@ public class CraftingManager {
             Item resultItem = Item.fromJson(resultMap);
             Item inputItem;
             try {
-                inputItem = Item.fromJson(resultMap);
+                inputItem = Item.fromJson((Map) recipe.get("input"));
             } catch (Exception exception) {
                 inputItem = Item.get(Utils.toInt(recipe.get("inputId")), recipe.containsKey("inputDamage") ? Utils.toInt(recipe.get("inputDamage")) : -1, 1);
             }
 
             switch (craftingBlock) {
                 case "furnace": {
-                    this.registerRecipe(419, new FurnaceRecipe(resultItem, inputItem));
+                    FurnaceRecipe furnaceRecipe = new FurnaceRecipe(resultItem, inputItem);
+                    this.registerRecipe(419, furnaceRecipe);
+                    String runtimeId = RuntimeItems.getMapping(419).toRuntime(inputItem.getId(), inputItem.getDamage()).getIdentifier();
+                    double xp = furnaceXpConfig.getDouble(runtimeId + ":" + inputItem.getDamage(), 0d);
+                    if (xp != 0) {
+                        this.setRecipeXp(furnaceRecipe, xp);
+                    }
                     break;
                 }
                 case "campfire": {
@@ -334,7 +351,13 @@ public class CraftingManager {
 
                         switch (craftingBlock){
                             case "furnace":
-                                this.registerRecipe(388, new FurnaceRecipe(resultItem, inputItem));
+                                FurnaceRecipe furnaceRecipe = new FurnaceRecipe(resultItem, inputItem);
+                                this.registerRecipe(388, furnaceRecipe);
+                                String runtimeId = RuntimeItems.getMapping(388).toRuntime(inputItem.getId(), inputItem.getDamage()).getIdentifier();
+                                double xp = furnaceXpConfig.getDouble(runtimeId + ":" + inputItem.getDamage(), 0d);
+                                if (xp != 0) {
+                                    this.setRecipeXp(furnaceRecipe, xp);
+                                }
                                 break;
                             case "campfire":
                                 this.registerRecipe(388, new CampfireRecipe(resultItem, inputItem));
@@ -392,7 +415,13 @@ public class CraftingManager {
                         } catch (Exception old) {
                             inputItem = Item.get(Utils.toInt(recipe.get("inputId")), recipe.containsKey("inputDamage") ? Utils.toInt(recipe.get("inputDamage")) : -1, 1);
                         }
-                        this.furnaceRecipesOld.put(getItemHash(inputItem), new FurnaceRecipe(resultItem, inputItem));
+                        FurnaceRecipe furnaceRecipe = new FurnaceRecipe(resultItem, inputItem);
+                        this.furnaceRecipesOld.put(getItemHash(inputItem), furnaceRecipe);
+                        String runtimeId = RuntimeItems.getMapping(594).toRuntime(inputItem.getId(), inputItem.getDamage()).getIdentifier();
+                        double xp = furnaceXpConfig.getDouble(runtimeId + ":" + inputItem.getDamage(), 0d);
+                        if (xp != 0) {
+                            this.setRecipeXp(furnaceRecipe, xp);
+                        }
                         break;
                     default:
                         break;
@@ -945,5 +974,17 @@ public class CraftingManager {
             this.recipeShape = recipeShape;
             this.resultAmount = resultAmount;
         }
+    }
+
+    public double getRecipeXp(Recipe recipe) {
+        return recipeXpMap.getOrDefault(recipe, 0.0);
+    }
+
+    public Object2DoubleOpenHashMap<Recipe> getRecipeXpMap() {
+        return recipeXpMap;
+    }
+
+    public void setRecipeXp(Recipe recipe, double xp) {
+        recipeXpMap.put(recipe, xp);
     }
 }
