@@ -109,9 +109,6 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
                     if ((entity instanceof EntityCreature entityCreature) && entity.motionY < -entityCreature.getGravity() * 8) {
                         entity.motionY = -entityCreature.getGravity() * 2;
                     }
-                    if ((entity instanceof EntityHuman entityHuman) && entity.motionY < -entityHuman.getGravity() * 8) {
-                        entity.motionY = -entityHuman.getGravity() * 2;
-                    }
                     entity.motionY = Math.min(1.8, entity.motionY + 0.1);
                 }
 
@@ -128,7 +125,6 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
                     entity.motionY = Math.min(0.7, entity.motionY + 0.06);
                 }
             }
-            entity.updateMovement();
             entity.resetFallDistance();
         }
     }
