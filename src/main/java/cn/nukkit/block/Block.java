@@ -360,6 +360,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[CARVED_PUMPKIN] = BlockCarvedPumpkin.class; //410
             list[SEA_PICKLE] = BlockSeaPickle.class; //411
 
+            list[BUBBLE_COLUMN] = BlockBubbleColumn.class; //415
             list[BARRIER] = BlockBarrier.class; //416
             list[STONE_SLAB3] = BlockSlabStone3.class; //417
             list[BAMBOO] = BlockBamboo.class; //418
