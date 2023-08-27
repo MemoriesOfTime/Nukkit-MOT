@@ -11,12 +11,17 @@ import java.util.Random;
 public class EnchantmentDurability extends Enchantment {
 
     protected EnchantmentDurability() {
-        super(ID_DURABILITY, "durability", Rarity.UNCOMMON, EnchantmentType.BREAKABLE);
+        super(ID_DURABILITY, "durability", Rarity.UNCOMMON, EnchantmentType.BREAKABLE, 50);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 8 * (level - 1) + 5;
     }
 
     @Override
     public int getMinEnchantAbility(int level) {
-        return 5 + ((level - 1) << 3);
+        return 5 + (level - 1 << 3);
     }
 
     @Override

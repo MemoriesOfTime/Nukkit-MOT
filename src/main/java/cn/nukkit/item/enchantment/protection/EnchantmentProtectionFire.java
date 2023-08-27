@@ -10,12 +10,17 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 public class EnchantmentProtectionFire extends EnchantmentProtection {
 
     public EnchantmentProtectionFire() {
-        super(ID_PROTECTION_FIRE, "fire", Rarity.UNCOMMON, TYPE.FIRE);
+        super(ID_PROTECTION_FIRE, "fire", Rarity.UNCOMMON, TYPE.FIRE, 12);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 8 * (level - 1) + 10;
     }
 
     @Override
     public int getMinEnchantAbility(int level) {
-        return 10 + ((level - 1) << 3);
+        return 10 + (level - 1 << 3);
     }
 
     @Override

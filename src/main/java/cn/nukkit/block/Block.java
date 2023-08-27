@@ -784,7 +784,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         return id;
-	}
+    }
 
     /**
      * The full id is a combination of the id and data.

@@ -7,7 +7,12 @@ package cn.nukkit.item.enchantment;
 public class EnchantmentWaterBreath extends Enchantment {
 
     protected EnchantmentWaterBreath() {
-        super(ID_WATER_BREATHING, "oxygen", Rarity.RARE, EnchantmentType.ARMOR_HEAD);
+        super(ID_WATER_BREATHING, "oxygen", Rarity.RARE, EnchantmentType.ARMOR_HEAD, 30);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 10 * level;
     }
 
     @Override

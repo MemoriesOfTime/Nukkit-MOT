@@ -76,6 +76,10 @@ public abstract class Enchantment implements Cloneable {
     public static void init() {
         enchantments = new Enchantment[256];
 
+        // TODO: some enchantments are not implemented to
+        //  enchanted table because they need enchantingPowerRange
+        //  and getMinEnchantingPower methods
+
         enchantments[ID_PROTECTION_ALL] = new EnchantmentProtectionAll();
         enchantments[ID_PROTECTION_FIRE] = new EnchantmentProtectionFire();
         enchantments[ID_PROTECTION_FALL] = new EnchantmentProtectionFall();
@@ -83,13 +87,13 @@ public abstract class Enchantment implements Cloneable {
         enchantments[ID_PROTECTION_PROJECTILE] = new EnchantmentProtectionProjectile();
         enchantments[ID_THORNS] = new EnchantmentThorns();
         enchantments[ID_WATER_BREATHING] = new EnchantmentWaterBreath();
-        enchantments[ID_WATER_WORKER] = new EnchantmentWaterWorker();
-        enchantments[ID_WATER_WALKER] = new EnchantmentWaterWalker();
+        enchantments[ID_WATER_WORKER] = new EnchantmentWaterWorker(); // TODO
+        enchantments[ID_WATER_WALKER] = new EnchantmentWaterWalker(); // TODO
         enchantments[ID_DAMAGE_ALL] = new EnchantmentDamageAll();
-        enchantments[ID_DAMAGE_SMITE] = new EnchantmentDamageSmite();
-        enchantments[ID_DAMAGE_ARTHROPODS] = new EnchantmentDamageArthropods();
+        enchantments[ID_DAMAGE_SMITE] = new EnchantmentDamageSmite(); // TODO
+        enchantments[ID_DAMAGE_ARTHROPODS] = new EnchantmentDamageArthropods(); // TODO
         enchantments[ID_KNOCKBACK] = new EnchantmentKnockback();
-        enchantments[ID_FIRE_ASPECT] = new EnchantmentFireAspect();
+        enchantments[ID_FIRE_ASPECT] = new EnchantmentFireAspect(); // TODO
         enchantments[ID_LOOTING] = new EnchantmentLootWeapon();
         enchantments[ID_EFFICIENCY] = new EnchantmentEfficiency();
         enchantments[ID_SILK_TOUCH] = new EnchantmentSilkTouch();
@@ -99,20 +103,20 @@ public abstract class Enchantment implements Cloneable {
         enchantments[ID_BOW_KNOCKBACK] = new EnchantmentBowKnockback();
         enchantments[ID_BOW_FLAME] = new EnchantmentBowFlame();
         enchantments[ID_BOW_INFINITY] = new EnchantmentBowInfinity();
-        enchantments[ID_FORTUNE_FISHING] = new EnchantmentLootFishing();
-        enchantments[ID_LURE] = new EnchantmentLure();
-        enchantments[ID_FROST_WALKER] = new EnchantmentFrostWalker();
+        enchantments[ID_FORTUNE_FISHING] = new EnchantmentLootFishing(); // TODO
+        enchantments[ID_LURE] = new EnchantmentLure(); // TODO
+        enchantments[ID_FROST_WALKER] = new EnchantmentFrostWalker(); // TODO
         enchantments[ID_MENDING] = new EnchantmentMending();
-        enchantments[ID_BINDING_CURSE] = new EnchantmentBindingCurse();
+        enchantments[ID_BINDING_CURSE] = new EnchantmentBindingCurse(); // TODO
         enchantments[ID_VANISHING_CURSE] = new EnchantmentVanishingCurse();
-        enchantments[ID_TRIDENT_IMPALING] = new EnchantmentTridentImpaling();
-        enchantments[ID_TRIDENT_LOYALTY] = new EnchantmentTridentLoyalty();
-        enchantments[ID_TRIDENT_RIPTIDE] = new EnchantmentTridentRiptide();
-        enchantments[ID_TRIDENT_CHANNELING] = new EnchantmentTridentChanneling();
-        enchantments[ID_CROSSBOW_MULTISHOT] = new EnchantmentCrossbowMultishot();
-        enchantments[ID_CROSSBOW_PIERCING] = new EnchantmentCrossbowPiercing();
-        enchantments[ID_CROSSBOW_QUICK_CHARGE] = new EnchantmentCrossbowQuickCharge();
-        enchantments[ID_SOUL_SPEED] = new EnchantmentSoulSpeed();
+        enchantments[ID_TRIDENT_IMPALING] = new EnchantmentTridentImpaling(); // TODO
+        enchantments[ID_TRIDENT_LOYALTY] = new EnchantmentTridentLoyalty(); // TODO
+        enchantments[ID_TRIDENT_RIPTIDE] = new EnchantmentTridentRiptide(); // TODO
+        enchantments[ID_TRIDENT_CHANNELING] = new EnchantmentTridentChanneling(); // TODO
+        enchantments[ID_CROSSBOW_MULTISHOT] = new EnchantmentCrossbowMultishot(); // TODO
+        enchantments[ID_CROSSBOW_PIERCING] = new EnchantmentCrossbowPiercing(); // TODO
+        enchantments[ID_CROSSBOW_QUICK_CHARGE] = new EnchantmentCrossbowQuickCharge(); // TODO
+        enchantments[ID_SOUL_SPEED] = new EnchantmentSoulSpeed(); // TODO
         enchantments[ID_SWIFT_SNEAK] = new EnchantmentSwiftSneak();
     }
 
@@ -144,20 +148,25 @@ public abstract class Enchantment implements Cloneable {
         return list.toArray(new Enchantment[0]);
     }
 
-    public final int id;
-    private final Rarity rarity;
-    public EnchantmentType type;
-
+    protected final String name;
     protected int level = 1;
 
-    protected final String name;
+    public final int id;
+    public EnchantmentType type;
+
+    private final Rarity rarity;
+    private final int enchantingPowerRange;
 
     protected Enchantment(int id, String name, Rarity rarity, EnchantmentType type) {
+        this(id, name, rarity, type, 50);
+    }
+
+    protected Enchantment(int id, String name, Rarity rarity, EnchantmentType type, int enchantingPowerRange) {
         this.id = id;
+        this.name = name;
         this.rarity = rarity;
         this.type = type;
-
-        this.name = name;
+        this.enchantingPowerRange = enchantingPowerRange;
     }
 
     public int getLevel() {
@@ -187,6 +196,14 @@ public abstract class Enchantment implements Cloneable {
 
     public Rarity getRarity() {
         return this.rarity;
+    }
+
+    public int getMinEnchantingPower(int level) {
+        return 1;
+    }
+
+    public int getMaxEnchantingPower(int level) {
+        return this.getMinEnchantingPower(level) + enchantingPowerRange;
     }
 
     public int getWeight() {

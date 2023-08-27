@@ -10,7 +10,12 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 public class EnchantmentProtectionFall extends EnchantmentProtection {
 
     public EnchantmentProtectionFall() {
-        super(ID_PROTECTION_FALL, "fall", Rarity.UNCOMMON, TYPE.FALL);
+        super(ID_PROTECTION_FALL, "fall", Rarity.UNCOMMON, TYPE.FALL, 10);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 6 * (level - 1) + 5;
     }
 
     @Override

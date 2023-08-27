@@ -11,7 +11,12 @@ import cn.nukkit.item.enchantment.Enchantment;
 public class EnchantmentProtectionAll extends EnchantmentProtection {
 
     public EnchantmentProtectionAll() {
-        super(Enchantment.ID_PROTECTION_ALL, "all", Rarity.COMMON, TYPE.ALL);
+        super(Enchantment.ID_PROTECTION_ALL, "all", Rarity.COMMON, TYPE.ALL, 20);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 11 * (level - 1) + 1;
     }
 
     @Override

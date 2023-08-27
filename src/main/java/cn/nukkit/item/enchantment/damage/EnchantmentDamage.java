@@ -17,7 +17,11 @@ public abstract class EnchantmentDamage extends Enchantment {
     }
 
     protected EnchantmentDamage(int id, String name, Rarity rarity, TYPE type) {
-        super(id, name, rarity, EnchantmentType.SWORD);
+        super(id, name, rarity, EnchantmentType.SWORD, -1);
+    }
+
+    protected EnchantmentDamage(int id, String name, Rarity rarity, TYPE type, int enchantingPowerRange) {
+        super(id, name, rarity, EnchantmentType.SWORD, enchantingPowerRange);
     }
 
     @Override

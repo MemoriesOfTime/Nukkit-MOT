@@ -109,6 +109,7 @@ import java.nio.ByteOrder;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -265,6 +266,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private int exp = 0;
     private int expLevel = 0;
+    private int expSeed;
 
     protected PlayerFood foodData = null;
 
@@ -2390,6 +2392,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return null;
     }
 
+    public int getEnchantmentSeed() {
+        return this.expSeed;
+    }
+
+    public void setEnchantmentSeed(int seed) {
+        this.expSeed = seed;
+    }
+
+    public int generateEnchantmentSeed() {
+        return ThreadLocalRandom.current().nextInt(Integer.MAX_VALUE);
+    }
+
     public void checkNetwork() {
         if (this.protocol < ProtocolInfo.v1_16_100 && !this.isOnline()) {
             return;
@@ -2442,11 +2456,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (!this.server.isWhitelisted(lowerName)) {
             this.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, server.whitelistReason);
             return;
-        } else if (this.isBanned()) {
+        }
+
+        if (this.isBanned()) {
             String reason = this.server.getNameBans().getEntires().get(lowerName).getReason();
             this.kick(PlayerKickEvent.Reason.NAME_BANNED, "You are banned!" + (reason.isEmpty() ? "" : (" Reason: " + reason)));
             return;
-        } else if (!server.strongIPBans && this.server.getIPBans().isBanned(this.getAddress())) {
+        }
+
+        if (!server.strongIPBans && this.server.getIPBans().isBanned(this.getAddress())) {
             this.kick(PlayerKickEvent.Reason.IP_BANNED, "Your IP is banned!");
             return;
         }
@@ -2554,7 +2572,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.fogStack.add(i, new PlayerFogPacket.Fog(Identifier.tryParse(fogIdentifiers.get(i).data), userProvidedFogIds.get(i).data));
         }
 
-
         for (Tag achievement : nbt.getCompound("Achievements").getAllTags()) {
             if (!(achievement instanceof ByteTag)) {
                 continue;
@@ -2591,6 +2608,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (!this.namedTag.contains("foodSaturationLevel")) {
             this.namedTag.putFloat("foodSaturationLevel", 20);
+        }
+
+        if (this.namedTag.contains("xpSeed")) {
+            this.expSeed = this.namedTag.getInt("xpSeed");
+        } else {
+            this.expSeed = this.generateEnchantmentSeed();
+            this.namedTag.putInt("xpSeed", this.expSeed);
         }
 
         this.foodData = new PlayerFood(this, this.namedTag.getInt("foodLevel"), this.namedTag.getFloat("foodSaturationLevel"));
@@ -5316,9 +5340,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 namedTag.remove("SpawnBlockPositionX").remove("SpawnBlockPositionY").remove("SpawnBlockPositionZ").remove("SpawnBlockLevel");
             } else if (spawnBlockPosition.isValid()) {
                 namedTag.putInt("SpawnBlockPositionX", spawnBlockPosition.getFloorX())
-                        .putInt("SpawnBlockPositionY", spawnBlockPosition.getFloorY())
-                        .putInt("SpawnBlockPositionZ", spawnBlockPosition.getFloorZ())
-                        .putString("SpawnBlockLevel", this.spawnBlockPosition.getLevel().getFolderName());
+                    .putInt("SpawnBlockPositionY", spawnBlockPosition.getFloorY())
+                    .putInt("SpawnBlockPositionZ", spawnBlockPosition.getFloorZ())
+                    .putString("SpawnBlockLevel", this.spawnBlockPosition.getLevel().getFolderName());
             }
 
             CompoundTag achievements = new CompoundTag();
@@ -5339,6 +5363,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.namedTag.putInt("foodLevel", this.foodData.getLevel());
             this.namedTag.putFloat("foodSaturationLevel", this.foodData.getFoodSaturationLevel());
 
+            this.namedTag.putInt("xpSeed", this.expSeed);
             this.namedTag.putInt("TimeSinceRest", this.timeSinceRest);
 
             ListTag<StringTag> fogIdentifiers = new ListTag<>("fogIdentifiers");
