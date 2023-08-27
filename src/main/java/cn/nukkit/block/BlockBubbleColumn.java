@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
+import cn.nukkit.entity.EntityHuman;
 import cn.nukkit.event.block.BlockFadeEvent;
 import cn.nukkit.event.block.BlockFromToEvent;
 import cn.nukkit.item.Item;
@@ -105,8 +106,11 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
                 if (getDamage() == 1) {
                     entity.motionY = Math.max(-0.9, entity.motionY - 0.03);
                 } else {
-                    if (entity instanceof EntityCreature entityPhysical && entity.motionY < -entityPhysical.getGravity() * 8) {
-                        entity.motionY = -entityPhysical.getGravity() * 2;
+                    if ((entity instanceof EntityCreature entityCreature) && entity.motionY < -entityCreature.getGravity() * 8) {
+                        entity.motionY = -entityCreature.getGravity() * 2;
+                    }
+                    if ((entity instanceof EntityHuman entityHuman) && entity.motionY < -entityHuman.getGravity() * 8) {
+                        entity.motionY = -entityHuman.getGravity() * 2;
                     }
                     entity.motionY = Math.min(1.8, entity.motionY + 0.1);
                 }
