@@ -253,7 +253,7 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
     public void fall(float fallDistance) {
         super.fall(fallDistance);
 
-        this.level.addLevelSoundEvent(this, LevelEventPacket.EVENT_SOUND_ARMOR_STAND_FALL);
+        this.level.addLevelEvent(this, LevelEventPacket.EVENT_SOUND_ARMOR_STAND_FALL);
     }
 
     @Override
