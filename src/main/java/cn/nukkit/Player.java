@@ -3242,6 +3242,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
+                if (protocol >= ProtocolInfo.v1_20_10_21 && authPacket.getInputData().contains(AuthInputAction.MISSED_SWING)) {
+                    PlayerMissedSwingEvent pmse = new PlayerMissedSwingEvent(this);
+                    this.server.getPluginManager().callEvent(pmse);
+                    if (!pmse.isCancelled()) {
+                        this.level.addSound(this, Sound.GAME_PLAYER_ATTACK_NODAMAGE);
+                    }
+                }
+
                 Vector3 clientPosition = authPacket.getPosition().asVector3()
                         .subtract(0, this.getBaseOffset(), 0);
 
