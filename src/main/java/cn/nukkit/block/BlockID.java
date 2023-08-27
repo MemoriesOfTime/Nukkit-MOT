@@ -358,6 +358,7 @@ public interface BlockID {
 
     int CARVED_PUMPKIN = 410;
     int SEA_PICKLE = 411;
+    int BUBBLE_COLUMN = 415;
     int BARRIER = 416;
     int STONE_SLAB3 = 417;
     int BAMBOO = 418;

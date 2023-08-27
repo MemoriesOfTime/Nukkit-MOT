@@ -47,7 +47,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     @Override
-    protected float getGravity() {
+    public float getGravity() {
         return 0.08f;
     }
 
