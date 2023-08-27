@@ -66,7 +66,7 @@ public class EntityHuman extends EntityHumanType {
         if(isSwimming() || isGliding()) {
             return 0.42f;
         } else if (isSneaking()) {
-            return 1.495f;
+            return 1.27f;
         }
         return 1.62f;
     }
