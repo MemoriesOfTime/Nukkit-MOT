@@ -50,7 +50,7 @@ public class EntityHuman extends EntityHumanType {
     public float getHeight() {
         if(isSwimming() || isGliding()) {
             return 0.6f;
-        } else if (isSneaking()){
+        } else if (isSneaking()) {
             return 1.5f;
         }
         return 1.8f;

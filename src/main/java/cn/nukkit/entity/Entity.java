@@ -747,7 +747,7 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
-    public boolean isCrawling(){
+    public boolean isCrawling() {
         return crawling;
     }
 

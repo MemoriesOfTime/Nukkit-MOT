@@ -5977,7 +5977,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         MovePlayerPacket pk = new MovePlayerPacket();
         pk.eid = this.getId();
         pk.x = (float) x;
-        pk.y = (float) y + this.getBaseOffset();
+        pk.y = (float) y + this.getEyeHeight();
         pk.z = (float) z;
         pk.headYaw = (float) yaw;
         pk.pitch = (float) pitch;
