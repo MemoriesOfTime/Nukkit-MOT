@@ -48,7 +48,12 @@ public class EntityHuman extends EntityHumanType {
 
     @Override
     public float getHeight() {
-        return isSwimming() || isGliding() ? 0.6f : 1.8f;
+        if(isSwimming() || isGliding()) {
+            return 0.6f;
+        } else if (isSneaking()){
+            return 1.5f;
+        }
+        return 1.8f;
     }
 
     @Override
@@ -58,7 +63,12 @@ public class EntityHuman extends EntityHumanType {
 
     @Override
     public float getEyeHeight() {
-        return isSwimming() || isGliding() ? 0.42f : 1.62f;
+        if(isSwimming() || isGliding()) {
+            return 0.42f;
+        } else if (isSneaking()) {
+            return 1.495f;
+        }
+        return 1.62f;
     }
 
     @Override

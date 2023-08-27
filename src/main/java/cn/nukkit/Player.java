@@ -3242,6 +3242,28 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
+                if(protocol >= ProtocolInfo.v1_20_10){
+                    if (authPacket.getInputData().contains(AuthInputAction.START_CRAWLING)) {
+                        PlayerToggleCrawlEvent event = new PlayerToggleCrawlEvent(this, true);
+                        this.server.getPluginManager().callEvent(event);
+                        if (event.isCancelled()) {
+                            this.sendData(this);
+                        } else {
+                            this.setCrawling(true);
+                        }
+                    }
+
+                    if (authPacket.getInputData().contains(AuthInputAction.STOP_CRAWLING)) {
+                        PlayerToggleCrawlEvent event = new PlayerToggleCrawlEvent(this, false);
+                        this.server.getPluginManager().callEvent(event);
+                        if (event.isCancelled()) {
+                            this.sendData(this);
+                        } else {
+                            this.setCrawling(false);
+                        }
+                    }
+                }
+
                 if (protocol >= ProtocolInfo.v1_20_10_21 && authPacket.getInputData().contains(AuthInputAction.MISSED_SWING)) {
                     PlayerMissedSwingEvent pmse = new PlayerMissedSwingEvent(this);
                     this.server.getPluginManager().callEvent(pmse);
@@ -3524,6 +3546,26 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.setSwimming(false);
                         }
                         break;
+                    case PlayerActionPacket.ACTION_START_CRAWLING:
+                        if (this.isMovementServerAuthoritative()) break;
+                        PlayerToggleCrawlEvent playerToggleCrawlEvent = new PlayerToggleCrawlEvent(this, true);
+                        this.server.getPluginManager().callEvent(playerToggleCrawlEvent);
+                        if (playerToggleCrawlEvent.isCancelled()) {
+                            this.sendData(this);
+                        } else {
+                            this.setCrawling(true);
+                        }
+                        break packetswitch;
+                    case PlayerActionPacket.ACTION_STOP_CRAWLING:
+                        if (this.isMovementServerAuthoritative()) break;
+                        playerToggleCrawlEvent = new PlayerToggleCrawlEvent(this, false);
+                        this.server.getPluginManager().callEvent(playerToggleCrawlEvent);
+                        if (playerToggleCrawlEvent.isCancelled()) {
+                            this.sendData(this);
+                        } else {
+                            this.setCrawling(false);
+                        }
+                        break packetswitch;
                 }
 
                 this.setUsingItem(false);
@@ -6637,6 +6679,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (isSprinting() != value) {
             super.setSprinting(value);
             this.setMovementSpeed(value ? getMovementSpeed() * 1.3f : getMovementSpeed() / 1.3f, false);
+        }
+    }
+
+    @Override
+    public void setSneaking(boolean value) {
+        if (isSneaking() != value) {
+            super.setSneaking(value);
+            this.setMovementSpeed(value ? getMovementSpeed() * 0.75f : getMovementSpeed() / 0.75f, false);
+        }
+    }
+
+    @Override
+    public void setCrawling(boolean value) {
+        if (isCrawling() != value) {
+            super.setCrawling(value);
+            this.setMovementSpeed(value ? getMovementSpeed() * 0.75f : getMovementSpeed() / 0.75f, false);
         }
     }
 
