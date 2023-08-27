@@ -6689,7 +6689,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (entityArrow.namedTag != null && entityArrow.namedTag.containsCompound("item")) {
                     CompoundTag tag = entityArrow.namedTag.getCompound("item");
                     item = Item.get(tag.getInt("id"), tag.getInt("Damage"), tag.getInt("Count"));
-                    item.setCompoundTag(tag.getCompound("tag"));
+                    if (tag.containsCompound("tag")) {
+                        item.setCompoundTag(tag.getCompound("tag"));
+                    }
                 } else {
                     item = new ItemArrow();
                 }

@@ -93,8 +93,11 @@ public class ItemBow extends ItemTool {
                 .putCompound("item", new CompoundTag()
                         .putInt("id", itemArrow.getId())
                         .putInt("Damage", itemArrow.getDamage())
-                        .putInt("Count", 1)
-                        .putCompound("tag", itemArrow.getNamedTag()));
+                        .putInt("Count", 1));
+
+        if (itemArrow.hasCompoundTag()) {
+            nbt.getCompound("item").putCompound("tag", itemArrow.getNamedTag());
+        }
 
         double p = (double) ticksUsed / 20;
 
