@@ -50,7 +50,7 @@ public class ItemBow extends ItemTool {
 
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
-        return player.isCreative() || this.getArrow(player.getInventory()) != null;
+        return player.isCreative() || (this.getArrow(player.getInventory()) != null || this.getArrow(player.getOffhandInventory()) != null);
     }
 
     @Override
