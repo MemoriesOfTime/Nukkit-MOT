@@ -2641,6 +2641,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         startGamePacket.spawnY = (int) this.y;
         startGamePacket.spawnZ = (int) this.z;
         startGamePacket.commandsEnabled = this.enableClientCommand;
+        startGamePacket.experiments.addAll(this.getExperiments());
         startGamePacket.gameRules = this.getLevel().getGameRules();
         startGamePacket.worldName = this.getServer().getNetwork().getName();
         startGamePacket.version = this.getLoginChainData().getGameVersion();
@@ -2994,24 +2995,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         ResourcePackStackPacket stackPacket = new ResourcePackStackPacket();
                         stackPacket.mustAccept = this.server.getForceResources() && !this.server.forceResourcesAllowOwnPacks;
                         stackPacket.resourcePackStack = this.server.getResourcePackManager().getResourceStack();
-                        if (this.server.enableExperimentMode) {
-                            stackPacket.experiments.add(
-                                    new ResourcePackStackPacket.ExperimentData("data_driven_items", true)
-                            );
-                            stackPacket.experiments.add(
-                                    new ResourcePackStackPacket.ExperimentData("experimental_custom_ui", true)
-                            );
-                            stackPacket.experiments.add(
-                                    new ResourcePackStackPacket.ExperimentData("upcoming_creator_features", true)
-                            );
-                            stackPacket.experiments.add(
-                                    new ResourcePackStackPacket.ExperimentData("experimental_molang_features", true)
-                            );
-                            stackPacket.experiments.add(
-                                    new ResourcePackStackPacket.ExperimentData("cameras", true)
-                            );
-                        }
-
+                        stackPacket.experiments.addAll(this.getExperiments());
                         this.dataPacket(stackPacket);
                         break;
                     case ResourcePackClientResponsePacket.STATUS_COMPLETED:
@@ -3245,7 +3229,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
-                if (protocol >= ProtocolInfo.v1_20_10) {
+                if (protocol >= ProtocolInfo.v1_20_10 && this.server.enableExperimentMode) {
                     if (authPacket.getInputData().contains(AuthInputAction.START_CRAWLING)) {
                         PlayerToggleCrawlEvent event = new PlayerToggleCrawlEvent(this, true);
                         this.server.getPluginManager().callEvent(event);
@@ -3550,7 +3534,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         break;
                     case PlayerActionPacket.ACTION_START_CRAWLING:
-                        if (this.isMovementServerAuthoritative()) break;
+                        if (this.isMovementServerAuthoritative() || this.protocol < ProtocolInfo.v1_20_10 || !this.server.enableExperimentMode) break;
                         PlayerToggleCrawlEvent playerToggleCrawlEvent = new PlayerToggleCrawlEvent(this, true);
                         this.server.getPluginManager().callEvent(playerToggleCrawlEvent);
                         if (playerToggleCrawlEvent.isCancelled()) {
@@ -3560,7 +3544,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         break packetswitch;
                     case PlayerActionPacket.ACTION_STOP_CRAWLING:
-                        if (this.isMovementServerAuthoritative()) break;
+                        if (this.isMovementServerAuthoritative() || this.protocol < ProtocolInfo.v1_20_10 || !this.server.enableExperimentMode) break;
                         playerToggleCrawlEvent = new PlayerToggleCrawlEvent(this, false);
                         this.server.getPluginManager().callEvent(playerToggleCrawlEvent);
                         if (playerToggleCrawlEvent.isCancelled()) {
@@ -7140,5 +7124,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public boolean isEnableNetworkEncryption() {
         return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled /*&& loginChainData.isXboxAuthed()*/;
+    }
+
+    private List<ResourcePackStackPacket.ExperimentData> getExperiments() {
+        List<ResourcePackStackPacket.ExperimentData> experiments = new ObjectArrayList<>();
+        //TODO Multiversion 当新版本删除部分实验性玩法时，这里也需要加上判断
+        if (this.server.enableExperimentMode) {
+            experiments.add(new ResourcePackStackPacket.ExperimentData("data_driven_items", true));
+            experiments.add(new ResourcePackStackPacket.ExperimentData("experimental_custom_ui", true));
+            experiments.add(new ResourcePackStackPacket.ExperimentData("upcoming_creator_features", true));
+            experiments.add(new ResourcePackStackPacket.ExperimentData("experimental_molang_features", true));
+            if (protocol >= ProtocolInfo.v1_20_0_23) {
+                experiments.add(new ResourcePackStackPacket.ExperimentData("cameras", true));
+                if (protocol >= ProtocolInfo.v1_20_10) {
+                    experiments.add(new ResourcePackStackPacket.ExperimentData("short_sneaking", true));
+                }
+            }
+        }
+        return experiments;
     }
 }
