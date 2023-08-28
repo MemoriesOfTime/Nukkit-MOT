@@ -253,13 +253,10 @@ public abstract class StructurePiece {
         int worldY = getWorldY(y);
         final int worldZ = getWorldZ(x, z);
         if (boundingBox.isInside(new BlockVector3(worldX, worldY, worldZ))) {
-            final BaseFullChunk chunk = level.getChunk(worldX >> 4, worldZ >> 4);
-            final int cx = worldX & 0xf;
-            final int cz = worldZ & 0xf;
-            int blockId = chunk.getBlockId(cx, worldY, cz);
+            int blockId = level.getBlockIdAt(worldX, worldY, worldZ);
             while ((blockId == BlockID.AIR || blockId == BlockID.WATER || blockId == BlockID.STILL_WATER || blockId == BlockID.LAVA || blockId == BlockID.STILL_LAVA) && worldY > 1) {
-                chunk.setBlock(cx, worldY, cz, block.getId(), block.getMeta());
-                blockId = chunk.getBlockId(cx, --worldY, cz);
+                level.setBlockAt(worldX, worldY, worldZ, block.getId(), block.getMeta());
+                blockId = level.getBlockIdAt(worldX, --worldY, worldZ);
             }
         }
     }
