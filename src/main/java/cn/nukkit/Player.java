@@ -3229,6 +3229,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
+                if (protocol >= ProtocolInfo.v1_20_10_21 && authPacket.getInputData().contains(AuthInputAction.MISSED_SWING)) {
+                    PlayerMissedSwingEvent pmse = new PlayerMissedSwingEvent(this);
+                    this.server.getPluginManager().callEvent(pmse);
+                    if (!pmse.isCancelled()) {
+                        this.level.addSound(this, Sound.GAME_PLAYER_ATTACK_NODAMAGE);
+                    }
+                }
+
                 if (protocol >= ProtocolInfo.v1_20_10 && this.server.enableExperimentMode) {
                     if (authPacket.getInputData().contains(AuthInputAction.START_CRAWLING)) {
                         PlayerToggleCrawlEvent event = new PlayerToggleCrawlEvent(this, true);
@@ -3248,14 +3256,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         } else {
                             this.setCrawling(false);
                         }
-                    }
-                }
-
-                if (protocol >= ProtocolInfo.v1_20_10_21 && authPacket.getInputData().contains(AuthInputAction.MISSED_SWING)) {
-                    PlayerMissedSwingEvent pmse = new PlayerMissedSwingEvent(this);
-                    this.server.getPluginManager().callEvent(pmse);
-                    if (!pmse.isCancelled()) {
-                        this.level.addSound(this, Sound.GAME_PLAYER_ATTACK_NODAMAGE);
                     }
                 }
 
@@ -3533,6 +3533,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.setSwimming(false);
                         }
                         break;
+                    case PlayerActionPacket.ACTION_MISSED_SWING:
+                        if (this.isMovementServerAuthoritative() || this.protocol < ProtocolInfo.v1_20_10_21) break;
+                        PlayerMissedSwingEvent pmse = new PlayerMissedSwingEvent(this);
+                        this.server.getPluginManager().callEvent(pmse);
+                        if (!pmse.isCancelled()) {
+                            this.level.addSound(this, Sound.GAME_PLAYER_ATTACK_NODAMAGE);
+                        }
+                        break packetswitch;
                     case PlayerActionPacket.ACTION_START_CRAWLING:
                         if (this.isMovementServerAuthoritative() || this.protocol < ProtocolInfo.v1_20_10 || !this.server.enableExperimentMode) break;
                         PlayerToggleCrawlEvent playerToggleCrawlEvent = new PlayerToggleCrawlEvent(this, true);
