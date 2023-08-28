@@ -1043,9 +1043,9 @@ public abstract class Entity extends Location implements Metadatable {
     private static int correctEntityIdentifiersProtocol(int protocolId) {
         if (protocolId >= ProtocolInfo.v1_19_20) {
             return ProtocolInfo.v1_19_20;
-        }else if (protocolId >= ProtocolInfo.v1_19_0_29) {
+        } else if (protocolId >= ProtocolInfo.v1_19_0_29) {
             return ProtocolInfo.v1_19_0;
-        }else if (protocolId >= ProtocolInfo.v1_17_0) {
+        } else if (protocolId >= ProtocolInfo.v1_17_0) {
             return ProtocolInfo.v1_17_0;
         } else if (protocolId >= ProtocolInfo.v1_16_100) {
             return ProtocolInfo.v1_16_100;
@@ -1466,6 +1466,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     /**
      * 设置实体是否可以保存到区块
+     *
      * @param saveWithChunk 是否可以保存到区块
      */
     public void setCanBeSavedWithChunk(boolean saveWithChunk) {
@@ -1612,7 +1613,8 @@ public abstract class Entity extends Location implements Metadatable {
 
         if (this.y <= -16 && this.isAlive()) {
             if (this.isPlayer) {
-                if (((Player) this).getGamemode() != Player.CREATIVE) this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
+                if (((Player) this).getGamemode() != Player.CREATIVE)
+                    this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
             } else {
                 this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
                 hasUpdate = true;
@@ -1683,7 +1685,7 @@ public abstract class Entity extends Location implements Metadatable {
             this.lastHeadYaw = this.headYaw;
 
             this.positionChanged = true;
-        }else {
+        } else {
             this.positionChanged = false;
         }
 
@@ -1917,7 +1919,8 @@ public abstract class Entity extends Location implements Metadatable {
     public void setAbsorption(float absorption) {
         if (absorption != this.absorption) {
             this.absorption = absorption;
-            if (this.isPlayer) ((Player) this).setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
+            if (this.isPlayer)
+                ((Player) this).setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
         }
     }
 
@@ -2074,7 +2077,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void onPushByPiston(BlockEntityPistonArm piston, BlockFace moveDirection) {
-        if (this.closed){
+        if (this.closed) {
             return;
         }
 
@@ -2793,7 +2796,7 @@ public abstract class Entity extends Location implements Metadatable {
                 flags ^= 1 << id;
                 this.setDataProperty(new ByteEntityData(propertyId, flags), send);
             } else {
-                LongEntityData longEntityData = (LongEntityData)this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
+                LongEntityData longEntityData = (LongEntityData) this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
                 long flags = longEntityData.getData() ^ 1L << id;
                 LongEntityData newLongEntityData = new LongEntityData(propertyId, flags);
                 if (propertyId == DATA_FLAGS) {
@@ -2815,7 +2818,7 @@ public abstract class Entity extends Location implements Metadatable {
                         data137 = 0L;
                     }
 
-                    newLongEntityData.dataVersions = new long[] {
+                    newLongEntityData.dataVersions = new long[]{
                             data137 ^ 1L << id137,
                             data223 ^ 1L << id223,
                             data291 ^ 1L << id291
@@ -2837,7 +2840,7 @@ public abstract class Entity extends Location implements Metadatable {
                 flags ^= 1 << id;
                 this.setDataPropertyAndSendOnlyToSelf(new ByteEntityData(propertyId, flags));
             } else {
-                LongEntityData longEntityData = (LongEntityData)this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
+                LongEntityData longEntityData = (LongEntityData) this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
                 long flags = longEntityData.getData() ^ 1L << id;
                 LongEntityData newLongEntityData = new LongEntityData(propertyId, flags);
                 if (propertyId == DATA_FLAGS) {
@@ -2859,7 +2862,7 @@ public abstract class Entity extends Location implements Metadatable {
                         data137 = 0L;
                     }
 
-                    newLongEntityData.dataVersions = new long[] {
+                    newLongEntityData.dataVersions = new long[]{
                             data137 ^ 1L << id137,
                             data223 ^ 1L << id223,
                             data291 ^ 1L << id291
