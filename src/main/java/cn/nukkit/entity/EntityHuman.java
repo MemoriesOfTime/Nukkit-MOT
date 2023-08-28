@@ -51,7 +51,8 @@ public class EntityHuman extends EntityHumanType {
         if(isSwimming() || isGliding()) {
             return 0.6f;
         } else if (isSneaking()) {
-            return 1.5f;
+            return 1.49f;
+            // Enable the player to enter 1.5 Spaces when jumping while sneaking.
         }
         return 1.8f;
     }
