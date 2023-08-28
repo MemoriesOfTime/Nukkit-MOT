@@ -56,7 +56,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         return 0.02f;
     }
 
-    protected int attackCooldown = 0;
+    protected int attackTime = 0;
 
     protected float movementSpeed = 0.1f;
 
@@ -113,12 +113,10 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public boolean attack(EntityDamageEvent source) {
         if (this.noDamageTicks > 0) {
             return false;
-        } else if (source instanceof EntityDamageByEntityEvent) {
-            Entity damager = ((EntityDamageByEntityEvent) source).getDamager();
-            if (((EntityDamageByEntityEvent) source).getDamager() instanceof EntityLiving) {
-                if (((EntityLiving) damager).getAttackCooldown() > 0) {
-                    return false;
-                }
+        } else if (this.attackTime > 0) {
+            EntityDamageEvent lastCause = this.getLastDamageCause();
+            if (lastCause != null && lastCause.getDamage() >= source.getDamage()) {
+                return false;
             }
         }
 
@@ -152,10 +150,6 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 double deltaX = this.x - damager.x;
                 double deltaZ = this.z - damager.z;
                 this.knockBack(damager, source.getDamage(), deltaX, deltaZ, ((EntityDamageByEntityEvent) source).getKnockBack());
-
-                if (damager instanceof EntityLiving) {
-                    ((EntityLiving) damager).setAttackCooldown(source.getAttackCooldown());
-                }
             }
 
             EntityEventPacket pk = new EntityEventPacket();
@@ -163,6 +157,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             pk.event = this.getHealth() < 1 ? EntityEventPacket.DEATH_ANIMATION : EntityEventPacket.HURT_ANIMATION;
             Server.broadcastPacket(this.hasSpawned.values(), pk);
 
+            this.attackTime = source.getAttackCooldown();
             this.scheduleUpdate();
             return true;
         } else {
@@ -198,7 +193,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         if (event.getKnockBackAttacker() && damager instanceof EntityLiving) {
             double deltaX = damager.getX() - this.getX();
             double deltaZ = damager.getZ() - this.getZ();
-            ((EntityLiving) damager).attackCooldown = source.getAttackCooldown();
+            ((EntityLiving) damager).attackTime = source.getAttackCooldown();
             ((EntityLiving) damager).knockBack(this, 0, deltaX, deltaZ);
         }
 
@@ -382,8 +377,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 }
             }
 
-            if (this.attackCooldown > 0) {
-                this.attackCooldown -= tickDiff;
+            if (this.attackTime > 0) {
+                this.attackTime -= tickDiff;
                 hasUpdate = true;
             }
 
@@ -474,8 +469,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                     return block;
                 }
             }
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
 
         return null;
     }
@@ -487,7 +481,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public float getMovementSpeed() {
         return this.movementSpeed;
     }
-
+    
     public int getAirTicks() {
         return this.airTicks;
     }
@@ -586,11 +580,4 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         return human;
     }
 
-    public int getAttackCooldown() {
-        return attackCooldown;
-    }
-
-    public void setAttackCooldown(int attackCooldown) {
-        this.attackCooldown = attackCooldown;
-    }
 }
