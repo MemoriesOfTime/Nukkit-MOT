@@ -6681,7 +6681,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void setSneaking(boolean value) {
         if (isSneaking() != value) {
             super.setSneaking(value);
-            this.setMovementSpeed(value ? getMovementSpeed() * 0.75f : getMovementSpeed() / 0.75f, false);
+            this.setMovementSpeed(value ? getMovementSpeed() * 0.3f : getMovementSpeed() / 0.3f, false);
         }
     }
 
@@ -6689,7 +6689,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void setCrawling(boolean value) {
         if (isCrawling() != value) {
             super.setCrawling(value);
-            this.setMovementSpeed(value ? getMovementSpeed() * 0.75f : getMovementSpeed() / 0.75f, false);
+            this.setMovementSpeed(value ? getMovementSpeed() * 0.3f : getMovementSpeed() / 0.3f, false);
         }
     }
 
