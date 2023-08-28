@@ -48,9 +48,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static double[] hardness = null;
     public static boolean[] transparent = null;
     public static boolean[] diffusesSkyLight = null;
-
     public static boolean[] hasMeta = null;
-    private static final boolean[] usesFakeWater = new boolean[512];
+
+    private static final boolean[] usesFakeWater = new boolean[MAX_BLOCK_ID];
 
     public AxisAlignedBB boundingBox = null;
     public int layer = 0;
