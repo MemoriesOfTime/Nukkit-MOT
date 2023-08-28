@@ -114,10 +114,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         if (this.noDamageTicks > 0) {
             return false;
         } else if (this.attackTime > 0) {
-            EntityDamageEvent lastCause = this.getLastDamageCause();
-            if (lastCause != null && lastCause.getDamage() >= source.getDamage()) {
-                return false;
-            }
+            return false;
         }
 
         if (this.blockedByShield(source)) {
