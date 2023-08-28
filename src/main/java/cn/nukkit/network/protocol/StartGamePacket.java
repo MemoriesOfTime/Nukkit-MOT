@@ -8,9 +8,11 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.types.NetworkPermissions;
 import cn.nukkit.utils.Utils;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @ToString
@@ -63,6 +65,7 @@ public class StartGamePacket extends DataPacket {
     public int platformBroadcastIntent = GAME_PUBLISH_SETTING_PUBLIC;
     public boolean commandsEnabled;
     public boolean isTexturePacksRequired = false;
+    public final List<ResourcePackStackPacket.ExperimentData> experiments = new ObjectArrayList<>();
     public GameRules gameRules;
     public boolean bonusChest = false;
     public boolean hasStartWithMapEnabled = false;
@@ -185,17 +188,11 @@ public class StartGamePacket extends DataPacket {
         this.putBoolean(this.isTexturePacksRequired);
         this.putGameRules(protocol, gameRules);
         if (protocol >= ProtocolInfo.v1_16_100) {
-            if (Server.getInstance().enableExperimentMode) {
-                this.putLInt(4); // Experiment count
-                {
-                    this.putString("data_driven_items");
-                    this.putBoolean(true);
-                    this.putString("upcoming_creator_features");
-                    this.putBoolean(true);
-                    this.putString("experimental_molang_features");
-                    this.putBoolean(true);
-                    this.putString("cameras");
-                    this.putBoolean(true);
+            if (Server.getInstance().enableExperimentMode && !this.experiments.isEmpty()) {
+                this.putLInt(this.experiments.size()); // Experiment count
+                for (ResourcePackStackPacket.ExperimentData experiment : this.experiments) {
+                    this.putString(experiment.getName());
+                    this.putBoolean(experiment.isEnabled());
                 }
                 this.putBoolean(true); // Were experiments previously toggled
             } else {
