@@ -69,6 +69,14 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable {
         return 1;
     }
 
+    protected int getPostId() {
+        return getId();
+    }
+
+    public int getWallId() {
+        return WALL_SIGN;
+    }
+
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         if (face != BlockFace.DOWN) {
@@ -84,10 +92,10 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable {
 
             if (face == BlockFace.UP) {
                 setDamage((int) Math.floor(((player.yaw + 180) * 16 / 360) + 0.5) & 0x0f);
-                getLevel().setBlock(block, Block.get(SIGN_POST, getDamage()), true);
+                getLevel().setBlock(block, Block.get(getPostId(), getDamage()), true);
             } else {
                 setDamage(face.getIndex());
-                getLevel().setBlock(block, Block.get(WALL_SIGN, getDamage()), true);
+                getLevel().setBlock(block, Block.get(getWallId(), getDamage()), true);
             }
 
             if (player != null) {
