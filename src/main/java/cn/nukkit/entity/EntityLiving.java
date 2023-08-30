@@ -113,8 +113,6 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public boolean attack(EntityDamageEvent source) {
         if (this.noDamageTicks > 0) {
             return false;
-        } else if (this.attackTime > 0) {
-            return false;
         }
 
         if (this.blockedByShield(source)) {
@@ -147,6 +145,10 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 double deltaX = this.x - damager.x;
                 double deltaZ = this.z - damager.z;
                 this.knockBack(damager, source.getDamage(), deltaX, deltaZ, ((EntityDamageByEntityEvent) source).getKnockBack());
+
+                if (damager instanceof EntityLiving entityLiving) {
+                    entityLiving.attackTime = source.getAttackCooldown();
+                }
             }
 
             EntityEventPacket pk = new EntityEventPacket();
@@ -154,7 +156,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             pk.event = this.getHealth() < 1 ? EntityEventPacket.DEATH_ANIMATION : EntityEventPacket.HURT_ANIMATION;
             Server.broadcastPacket(this.hasSpawned.values(), pk);
 
-            this.attackTime = source.getAttackCooldown();
+            this.noDamageTicks = source.getAttackCooldown();
             this.scheduleUpdate();
             return true;
         } else {
@@ -187,11 +189,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             return false;
         }
 
-        if (event.getKnockBackAttacker() && damager instanceof EntityLiving) {
+        if (event.getKnockBackAttacker() && damager instanceof EntityLiving entityLiving) {
             double deltaX = damager.getX() - this.getX();
             double deltaZ = damager.getZ() - this.getZ();
-            ((EntityLiving) damager).attackTime = source.getAttackCooldown();
-            ((EntityLiving) damager).knockBack(this, 0, deltaX, deltaZ);
+            entityLiving.attackTime = source.getAttackCooldown();
+            entityLiving.knockBack(this, 0, deltaX, deltaZ);
         }
 
         onBlock(damager, source, event.getAnimation());

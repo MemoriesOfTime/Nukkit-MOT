@@ -1311,33 +1311,39 @@ public abstract class Entity extends Location implements Metadatable {
             return false;
         }
 
-        if (source instanceof EntityDamageByEntityEvent) {
+        if (source instanceof EntityDamageByEntityEvent entityDamageByEntityEvent) {
+            if (entityDamageByEntityEvent.getDamager() instanceof EntityLiving entityLiving) {
+                if (entityLiving.attackTime > 0) {
+                    return false;
+                }
+            }
+
             // Make fire aspect to set the target in fire before dealing any damage so the target is in fire on death even if killed by the first hit
-            Enchantment[] enchantments = ((EntityDamageByEntityEvent) source).getWeaponEnchantments();
+            Enchantment[] enchantments = entityDamageByEntityEvent.getWeaponEnchantments();
             if (enchantments != null) {
                 for (Enchantment enchantment : enchantments) {
-                    enchantment.doAttack(((EntityDamageByEntityEvent) source).getDamager(), this);
+                    enchantment.doAttack(entityDamageByEntityEvent.getDamager(), this);
                 }
             }
 
             // Wolf targets
             if (source.getEntity() instanceof Player) {
                 for (Entity entity : source.getEntity().getLevel().getNearbyEntities(source.getEntity().getBoundingBox().grow(17, 17, 17), source.getEntity())) {
-                    if (entity instanceof EntityWolf) {
-                        if (((EntityWolf) entity).hasOwner()) {
-                            ((EntityWolf) entity).isAngryTo = ((EntityDamageByEntityEvent) source).getDamager().getId();
-                            ((EntityWolf) entity).setAngry(true);
+                    if (entity instanceof EntityWolf entityWolf) {
+                        if (entityWolf.hasOwner()) {
+                            entityWolf.isAngryTo = entityDamageByEntityEvent.getDamager().getId();
+                            entityWolf.setAngry(true);
                         }
                     }
                 }
-            } else if (((EntityDamageByEntityEvent) source).getDamager() instanceof Player) {
-                for (Entity entity : ((EntityDamageByEntityEvent) source).getDamager().getLevel().getNearbyEntities(((EntityDamageByEntityEvent) source).getDamager().getBoundingBox().grow(17, 17, 17), ((EntityDamageByEntityEvent) source).getDamager())) {
+            } else if (entityDamageByEntityEvent.getDamager() instanceof Player) {
+                for (Entity entity : entityDamageByEntityEvent.getDamager().getLevel().getNearbyEntities(entityDamageByEntityEvent.getDamager().getBoundingBox().grow(17, 17, 17), entityDamageByEntityEvent.getDamager())) {
                     if (entity.getId() != source.getEntity().getId()) {
-                        if (entity instanceof EntityWolf) {
-                            if (((EntityWolf) entity).hasOwner()) {
-                                if (((EntityWolf) entity).getOwner().equals(((EntityDamageByEntityEvent) source).getDamager())) {
-                                    ((EntityWolf) entity).isAngryTo = source.getEntity().getId();
-                                    ((EntityWolf) entity).setAngry(true);
+                        if (entity instanceof EntityWolf entityWolf) {
+                            if (entityWolf.hasOwner()) {
+                                if (entityWolf.getOwner().equals(entityDamageByEntityEvent.getDamager())) {
+                                    entityWolf.isAngryTo = source.getEntity().getId();
+                                    entityWolf.setAngry(true);
                                 }
                             }
                         }

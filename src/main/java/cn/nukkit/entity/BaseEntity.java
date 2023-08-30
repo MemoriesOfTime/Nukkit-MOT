@@ -97,7 +97,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     public boolean isKnockback() {
-        return this.attackTime > 0;
+        return this.noDamageTicks > 0;
     }
 
     public void setFriendly(boolean bool) {
