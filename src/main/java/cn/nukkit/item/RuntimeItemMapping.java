@@ -13,16 +13,17 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
+import org.jetbrains.annotations.NotNull;
 
+import javax.annotation.Nullable;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 @Log4j2
 public class RuntimeItemMapping {
@@ -32,6 +33,9 @@ public class RuntimeItemMapping {
     private final Int2ObjectMap<LegacyEntry> runtime2Legacy = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<RuntimeEntry> legacy2Runtime = new Int2ObjectOpenHashMap<>();
     private final Map<String, LegacyEntry> identifier2Legacy = new HashMap<>();
+
+    private final Int2ObjectMap<String> runtimeId2Name = new Int2ObjectOpenHashMap<>();
+    private final Object2IntMap<String> name2RuntimeId = new Object2IntOpenHashMap<>();
 
     private final ArrayList<Integer> customItems = new ArrayList<>();
 
@@ -95,6 +99,8 @@ public class RuntimeItemMapping {
             } else {
                 this.legacy2Runtime.put(fullId, new RuntimeEntry(identifier, runtimeId, hasDamage));
             }
+            this.runtimeId2Name.put(runtimeId, identifier);
+            this.name2RuntimeId.put(identifier, runtimeId);
         }
 
         this.generatePalette();
@@ -189,7 +195,7 @@ public class RuntimeItemMapping {
         }
 
         if (runtimeEntry == null) {
-            throw new IllegalArgumentException("Unknown legacy2Runtime mapping: id=" + id + " meta=" + meta);
+            throw new IllegalArgumentException("Unknown legacy2Runtime mapping: id=" + id + " meta=" + meta + " protocol=" + this.protocolId);
         }
         return runtimeEntry;
     }
@@ -249,6 +255,47 @@ public class RuntimeItemMapping {
 
     public int getFullId(int id, int data) {
         return (((short) id) << 16) | ((data & 0x7fff) << 1);
+    }
+
+    /**
+     * Returns the <b>namespaced id</b> of a given <b>network id</b>.
+     *
+     * @param networkId The given <b>network id</b>
+     * @return The <b>namespace id</b> or {@code null} if it is unknown
+     */
+    @Nullable
+    public String getNamespacedIdByNetworkId(int networkId) {
+        return this.runtimeId2Name.get(networkId);
+    }
+
+    /**
+     * Returns the <b>network id</b> of a given <b>namespaced id</b>.
+     *
+     * @param namespaceId The given <b>namespaced id</b>
+     * @return A <b>network id</b> wrapped in {@link OptionalInt} or an empty {@link OptionalInt} if it is unknown
+     */
+    @NotNull
+    public OptionalInt getNetworkIdByNamespaceId(@NotNull String namespaceId) {
+        int id = this.name2RuntimeId.getOrDefault(namespaceId, -1);
+        if (id == -1) {
+            return OptionalInt.empty();
+        }
+        return OptionalInt.of(id);
+    }
+
+    public int getNetworkId(Item item) {
+        if (item instanceof StringItem) {
+            OptionalInt networkIdByNamespaceId = getNetworkIdByNamespaceId(item.getNamespaceId());
+            if (networkIdByNamespaceId.isEmpty()) {
+                throw new IllegalArgumentException("Unknown item mapping " + item + " protocol=" + this.protocolId);
+            }
+            return networkIdByNamespaceId.getAsInt();
+        }
+        RuntimeEntry runtimeEntry = toRuntime(item.getId(), item.getDamage());
+        if (runtimeEntry == null) {
+            throw new IllegalArgumentException("Unknown item mapping " + item + " protocol=" + this.protocolId);
+        }
+        return runtimeEntry.runtimeId;
     }
 
     public byte[] getItemPalette() {

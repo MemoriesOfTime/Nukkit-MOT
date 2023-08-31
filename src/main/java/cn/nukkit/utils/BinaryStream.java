@@ -613,20 +613,24 @@ public class BinaryStream {
         int damage = (int) this.getUnsignedVarInt();
 
         RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
-        LegacyEntry legacyEntry = mapping.fromRuntime(runtimeId);
 
-        int id = legacyEntry.getLegacyId();
-        if (legacyEntry.isHasDamage()) {
-            damage = legacyEntry.getDamage();
+
+        Integer id = null;
+        String stringId = mapping.getNamespacedIdByNetworkId(runtimeId);
+        if (stringId == null) {
+            LegacyEntry legacyEntry = mapping.fromRuntime(runtimeId);
+            id = legacyEntry.getLegacyId();
+            if (legacyEntry.isHasDamage()) {
+                damage = legacyEntry.getDamage();
+            }
         }
-
 
         if (this.getBoolean()) { // hasNetId
             this.getVarInt(); // netId
         }
 
         int blockRuntimeId = this.getVarInt();// blockRuntimeId
-        if (id < 256 && id != 166) { // ItemBlock
+        if (id != null && id < 256 && id != 166) { // ItemBlock
             int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, blockRuntimeId);
             if (fullId != -1) {
                 damage = fullId & 0x3f;
@@ -653,9 +657,11 @@ public class BinaryStream {
                 compoundTag = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
             }
 
-            if (compoundTag != null && compoundTag.getAllTags().size() > 0) {
-                if (compoundTag.contains("Damage") && !legacyEntry.isHasDamage()) {
-                    damage = compoundTag.getInt("Damage");
+            if (compoundTag != null && !compoundTag.getAllTags().isEmpty()) {
+                if (compoundTag.contains("Damage")) {
+                    if (stringId != null || id > 255) {
+                        damage = compoundTag.getInt("Damage");
+                    }
                     compoundTag.remove("Damage");
                 }
                 if (compoundTag.contains("__DamageConflict__")) {
@@ -676,16 +682,18 @@ public class BinaryStream {
                 canBreak[i] = stream.readUTF();
             }
 
-            if (id == ItemID.SHIELD) {
-                stream.readLong();
-            }
-
-            if (id == Item.INFO_UPDATE && compoundTag != null && compoundTag.contains(MV_ORIGIN_ID) && compoundTag.contains(MV_ORIGIN_META)) {
-                Item item = Item.get(compoundTag.getInt(MV_ORIGIN_ID), compoundTag.getInt(MV_ORIGIN_META), count);
-                if (compoundTag.contains(MV_ORIGIN_NBT)) {
-                    item.setNamedTag(compoundTag.getCompound(MV_ORIGIN_NBT));
+            if (id != null) {
+                if (id == ItemID.SHIELD) {
+                    stream.readLong();
                 }
-                return item;
+
+                if (id == Item.INFO_UPDATE && compoundTag != null && compoundTag.contains(MV_ORIGIN_ID) && compoundTag.contains(MV_ORIGIN_META)) {
+                    Item item = Item.get(compoundTag.getInt(MV_ORIGIN_ID), compoundTag.getInt(MV_ORIGIN_META), count);
+                    if (compoundTag.contains(MV_ORIGIN_NBT)) {
+                        item.setNamedTag(compoundTag.getCompound(MV_ORIGIN_NBT));
+                    }
+                    return item;
+                }
             }
         } catch (IOException e) {
             throw new IllegalStateException("Unable to read item user data", e);
@@ -693,7 +701,15 @@ public class BinaryStream {
             buf.release();
         }
 
-        Item item = Item.get(id, damage, count, nbt);
+        Item item;
+        if (id != null) {
+            item = Item.get(id, damage, count, nbt);
+        } else {
+            item = Item.fromString(stringId);
+            item.setDamage(damage);
+            item.setCount(count);
+            item.setCompoundTag(nbt);
+        }
 
         if (canBreak.length > 0 || canPlace.length > 0) {
             CompoundTag namedTag = item.getNamedTag();
@@ -924,8 +940,13 @@ public class BinaryStream {
 
         RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
         boolean isErrorItem = false;
+        boolean isStringItem = item instanceof StringItem;
         try {
-            mapping.toRuntime(item.getId(), item.getDamage());
+            if (isStringItem && mapping.getNetworkIdByNamespaceId(item.getNamespaceId()).isEmpty()) {
+                throw new IllegalArgumentException("Unknown StringItem : NamespaceId=" + item.getNamespaceId() + " protocol=" + protocolId);
+            } else {
+                mapping.toRuntime(item.getId(), item.getDamage());
+            }
         }catch (Exception e) {
             Server.getInstance().getLogger().logException(e);
             isErrorItem = true;
@@ -947,9 +968,15 @@ public class BinaryStream {
         boolean isBlock = item instanceof ItemBlock;
         boolean isDurable = item instanceof ItemDurable;
 
-        RuntimeEntry runtimeEntry = mapping.toRuntime(id, meta);
-        int runtimeId = runtimeEntry.getRuntimeId();
-        int damage = isBlock || isDurable || runtimeEntry.isHasDamage() ? 0 : meta;
+        int runtimeId;
+        int damage = 0;
+        if (isStringItem) {
+            runtimeId = mapping.getNetworkId(item);
+        } else {
+            RuntimeEntry runtimeEntry = mapping.toRuntime(id, meta);
+            runtimeId = runtimeEntry.getRuntimeId();
+            damage = isBlock || isDurable || runtimeEntry.isHasDamage() ? 0 : meta;
+        }
 
         this.putVarInt(runtimeId);
         this.putLShort(item.getCount());
@@ -966,7 +993,7 @@ public class BinaryStream {
 
         ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();
         try (LittleEndianByteBufOutputStream stream = new LittleEndianByteBufOutputStream(userDataBuf)) {
-            if (!instanceItem && isDurable && !runtimeEntry.isHasDamage()) {
+            if (!instanceItem && (isDurable || block != null && block.getDamage() > 0)) {
                 byte[] nbt = item.getCompoundTag();
                 CompoundTag tag;
                 if (nbt == null || nbt.length == 0) {

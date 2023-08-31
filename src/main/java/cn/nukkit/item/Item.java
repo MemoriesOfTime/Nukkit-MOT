@@ -19,18 +19,23 @@ import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.Utils;
+import com.google.common.base.Preconditions;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import lombok.SneakyThrows;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Constructor;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,6 +43,7 @@ import java.util.regex.Pattern;
  * @author MagicDroidX
  * Nukkit Project
  */
+@Log4j2
 public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static final Item AIR_ITEM = new Item(0);
@@ -60,6 +66,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     protected static final String UNKNOWN_STR = "Unknown";
     public static Class<?>[] list = null;
+    public static final Map<String, Supplier<Item>> NAMESPACED_ID_ITEM = new HashMap<>();
 
     protected Block block = null;
     protected final int id;
@@ -368,6 +375,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                     list[i] = Block.list[i];
                 }
             }
+
+            registerNamespacedIdItem(ItemRawIron.class);
         }
 
         initCreativeItems();
@@ -740,6 +749,47 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return -1;
     }
 
+    @SneakyThrows
+    public static void registerNamespacedIdItem(@NotNull Class<? extends StringItem> item) {
+        Constructor<? extends StringItem> declaredConstructor = item.getDeclaredConstructor();
+        var Item = declaredConstructor.newInstance();
+        registerNamespacedIdItem(Item.getNamespaceId(), stringItemSupplier(declaredConstructor));
+    }
+
+    public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Constructor<? extends Item> constructor) {
+        Preconditions.checkNotNull(namespacedId, "namespacedId is null");
+        Preconditions.checkNotNull(constructor, "constructor is null");
+        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ENGLISH), itemSupplier(constructor));
+    }
+
+    public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Supplier<Item> constructor) {
+        Preconditions.checkNotNull(namespacedId, "namespacedId is null");
+        Preconditions.checkNotNull(constructor, "constructor is null");
+        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ENGLISH), constructor);
+    }
+
+    @NotNull
+    private static Supplier<Item> itemSupplier(@NotNull Constructor<? extends Item> constructor) {
+        return () -> {
+            try {
+                return constructor.newInstance();
+            } catch (ReflectiveOperationException e) {
+                throw new UnsupportedOperationException(e);
+            }
+        };
+    }
+
+    @NotNull
+    private static Supplier<Item> stringItemSupplier(@NotNull Constructor<? extends StringItem> constructor) {
+        return () -> {
+            try {
+                return (Item) constructor.newInstance();
+            } catch (ReflectiveOperationException e) {
+                throw new UnsupportedOperationException(e);
+            }
+        };
+    }
+
     private static final HashMap<Integer, Class<? extends Item>> CUSTOM_ITEMS = new HashMap<>();
 
     public static boolean registerCustomItem(int id, Class<? extends ItemCustom> c) {
@@ -897,8 +947,17 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             } else {
                 namespacedId = "minecraft:" + name;
             }
-            if (namespacedId.equals("minecraft:air")) {
+            if ("minecraft:air".equals(namespacedId)) {
                 return Item.AIR_ITEM;
+            }
+
+            Supplier<Item> constructor = NAMESPACED_ID_ITEM.get(namespacedId);
+            if (constructor != null) {
+                try {
+                    return constructor.get();
+                } catch (Exception e) {
+                    log.warn("Could not create a new instance of {} using the namespaced id {}", constructor, namespacedId, e);
+                }
             }
 
             //common item
@@ -1359,6 +1418,11 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return this.hasCustomName() ? this.getCustomName() : this.name;
     }
 
+    @NotNull
+    final public String getDisplayName() {
+        return this.hasCustomName() ? this.getCustomName() : this.name == null ? StringItem.createItemName(getNamespaceId()) : name;
+    }
+
     final public boolean canBePlaced() {
         return ((this.block != null) && this.block.canBePlaced());
     }
@@ -1512,7 +1576,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     @Override
     final public String toString() {
-        return "Item " + this.name + " (" + this.id + ':' + (!this.hasMeta ? "?" : this.meta) + ")x" + this.count + (this.hasCompoundTag() ? " tags:0x" + Binary.bytesToHexString(this.getCompoundTag()) : "");
+        return "Item " + this.name + " (" + (this instanceof StringItem ? this.getNamespaceId() : this.id) + ':' + (!this.hasMeta ? "?" : this.meta) + ")x" + this.count + (this.hasCompoundTag() ? " tags:0x" + Binary.bytesToHexString(this.getCompoundTag()) : "");
     }
 
     public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
@@ -1554,7 +1618,14 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public final boolean equals(Item item, boolean checkDamage, boolean checkCompound) {
-        if (this.id == item.id && (!checkDamage || this.meta == item.meta)) {
+        if (this.id == STRING_IDENTIFIED_ITEM && item.id == STRING_IDENTIFIED_ITEM) {
+            if (!this.getNamespaceId().equals(item.getNamespaceId())) {
+                return false;
+            }
+        } else if (this.id != item.id) {
+            return false;
+        }
+        if (!checkDamage || this.meta == item.meta) {
             if (checkCompound) {
                 if (Arrays.equals(this.getCompoundTag(), item.getCompoundTag())) {
                     return true;
@@ -1633,11 +1704,13 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         }
     }
 
+    @Deprecated
     public final RuntimeEntry getRuntimeEntry() {
         Server.mvw("Item#getRuntimeEntry()");
         return this.getRuntimeEntry(ProtocolInfo.CURRENT_PROTOCOL);
     }
 
+    @Deprecated
     public final RuntimeEntry getRuntimeEntry(int protocolId) {
         return RuntimeItems.getMapping(protocolId).toRuntime(this.getId(), this.getDamage());
     }
@@ -1651,7 +1724,17 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         if (protocolId < ProtocolInfo.v1_16_100) {
             return getId();
         }
-        return this.getRuntimeEntry(protocolId).getRuntimeId();
+        return RuntimeItems.getMapping(protocolId).getNetworkId(this);
+    }
+
+    public String getNamespaceId() {
+        Server.mvw("Item#getNamespaceId()");
+        return this.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL);
+    }
+
+    public String getNamespaceId(int protocolId) {
+        RuntimeItemMapping runtimeMapping = RuntimeItems.getMapping(protocolId);
+        return runtimeMapping.getNamespacedIdByNetworkId(this.getNetworkId());
     }
 
     public boolean isSupportedOn(int protocolId) {
