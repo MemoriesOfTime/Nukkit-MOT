@@ -313,7 +313,6 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[JUNGLE_SIGN] = ItemJungleSign.class; //474
             list[ACACIA_SIGN] = ItemAcaciaSign.class; //475
             list[DARKOAK_SIGN] = ItemDarkOakSign.class; //476
-            list[DARKOAK_SIGN] = ItemDarkOakSign.class; //476
             list[SWEET_BERRIES] = ItemSweetBerries.class; //477
             list[RECORD_11] = ItemRecord11.class; //510
             list[RECORD_CAT] = ItemRecordCat.class; //501
@@ -353,6 +352,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[NETHERITE_LEGGINGS] = ItemLeggingsNetherite.class; //750
             list[NETHERITE_BOOTS] = ItemBootsNetherite.class; //751
             list[NETHERITE_SCRAP] = ItemScrapNetherite.class; //752
+            list[CRIMSON_SIGN] = ItemCrimsonSign.class; //753
+            list[WARPED_SIGN] = ItemWarpedSign.class; //754
             list[CRIMSON_DOOR] = ItemDoorCrimson.class; //755
             list[WARPED_DOOR] = ItemDoorWarped.class; //756
             list[WARPED_FUNGUS_ON_A_STICK] = ItemWarpedFungusOnAStick.class; //757
