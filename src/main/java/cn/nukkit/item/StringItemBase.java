@@ -23,6 +23,11 @@ public abstract class StringItemBase extends Item implements StringItem {
     }
 
     @Override
+    public String getNamespaceId(int protocolId) {
+        return this.getNamespaceId();
+    }
+
+    @Override
     public final int getId() {
         return StringItem.super.getId();
     }

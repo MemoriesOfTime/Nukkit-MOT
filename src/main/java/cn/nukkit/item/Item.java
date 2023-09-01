@@ -1734,7 +1734,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public String getNamespaceId(int protocolId) {
         RuntimeItemMapping runtimeMapping = RuntimeItems.getMapping(protocolId);
-        return runtimeMapping.getNamespacedIdByNetworkId(this.getNetworkId());
+        return runtimeMapping.getNamespacedIdByNetworkId(this.getNetworkId(protocolId));
     }
 
     public boolean isSupportedOn(int protocolId) {

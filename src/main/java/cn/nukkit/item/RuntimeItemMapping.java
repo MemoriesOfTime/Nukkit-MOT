@@ -69,6 +69,9 @@ public class RuntimeItemMapping {
                 continue;
             }
 
+            this.runtimeId2Name.put(runtimeId, identifier);
+            this.name2RuntimeId.put(identifier, runtimeId);
+
             boolean hasDamage = false;
             int damage = 0;
             int legacyId;
@@ -99,8 +102,6 @@ public class RuntimeItemMapping {
             } else {
                 this.legacy2Runtime.put(fullId, new RuntimeEntry(identifier, runtimeId, hasDamage));
             }
-            this.runtimeId2Name.put(runtimeId, identifier);
-            this.name2RuntimeId.put(identifier, runtimeId);
         }
 
         this.generatePalette();
@@ -183,7 +184,7 @@ public class RuntimeItemMapping {
     public LegacyEntry fromRuntime(int runtimeId) {
         LegacyEntry legacyEntry = this.runtime2Legacy.get(runtimeId);
         if (legacyEntry == null) {
-            throw new IllegalArgumentException("Unknown runtime2Legacy mapping: " + runtimeId);
+            throw new IllegalArgumentException("Unknown runtime2Legacy mapping: runtimeID=" + runtimeId + " protocol=" + this.protocolId);
         }
         return legacyEntry;
     }

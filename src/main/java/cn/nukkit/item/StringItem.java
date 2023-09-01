@@ -1,7 +1,12 @@
 package cn.nukkit.item;
 
 public interface StringItem {
+
     String getNamespaceId();
+
+    default String getNamespaceId(int protocolId) {
+        return this.getNamespaceId();
+    }
 
     static String notEmpty(String value) {
         if (value != null && value.trim().isEmpty()) {

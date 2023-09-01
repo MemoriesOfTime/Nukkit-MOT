@@ -625,10 +625,15 @@ public class BinaryStream {
                 damage = legacyEntry.getDamage();
             }
         } catch (IllegalArgumentException e) {
+
+        }
+
+        if (id == null || Item.list[id] == null) {
             stringId = mapping.getNamespacedIdByNetworkId(runtimeId);
             if (stringId == null) {
-                throw e;
+                throw new IllegalArgumentException("Unknown item: runtimeID=" + runtimeId + " protocol=" + protocolId);
             }
+            id = null;
         }
 
         if (this.getBoolean()) { // hasNetId
