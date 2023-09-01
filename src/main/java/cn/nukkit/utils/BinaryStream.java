@@ -460,6 +460,7 @@ public class BinaryStream {
     private static final String NukkitPetteriM1EditionTag = "NukkitPetteriM1Edition";
     private static final String MV_ORIGIN_NBT = "mv_origin_nbt";
     private static final String MV_ORIGIN_ID = "mv_origin_id";
+    private static final String MV_ORIGIN_NAMESPACE = "mv_origin_namespace";
     private static final String MV_ORIGIN_META = "mv_origin_meta";
 
     public Item getSlot() {
@@ -616,12 +617,17 @@ public class BinaryStream {
 
 
         Integer id = null;
-        String stringId = mapping.getNamespacedIdByNetworkId(runtimeId);
-        if (stringId == null) {
+        String stringId = null;
+        try {
             LegacyEntry legacyEntry = mapping.fromRuntime(runtimeId);
             id = legacyEntry.getLegacyId();
             if (legacyEntry.isHasDamage()) {
                 damage = legacyEntry.getDamage();
+            }
+        } catch (IllegalArgumentException e) {
+            stringId = mapping.getNamespacedIdByNetworkId(runtimeId);
+            if (stringId == null) {
+                throw e;
             }
         }
 
@@ -688,7 +694,16 @@ public class BinaryStream {
                 }
 
                 if (id == Item.INFO_UPDATE && compoundTag != null && compoundTag.contains(MV_ORIGIN_ID) && compoundTag.contains(MV_ORIGIN_META)) {
-                    Item item = Item.get(compoundTag.getInt(MV_ORIGIN_ID), compoundTag.getInt(MV_ORIGIN_META), count);
+                    int originID = compoundTag.getInt(MV_ORIGIN_ID);
+                    int originMeta = compoundTag.getInt(MV_ORIGIN_META);
+                    Item item;
+                    if (originID == ItemID.STRING_IDENTIFIED_ITEM && compoundTag.contains(MV_ORIGIN_NAMESPACE)) {
+                        item = Item.fromString(compoundTag.getString(MV_ORIGIN_NAMESPACE));
+                        item.setDamage(originMeta);
+                        item.setCount(count);
+                    } else {
+                        item = Item.get(originID, originMeta, count);
+                    }
                     if (compoundTag.contains(MV_ORIGIN_NBT)) {
                         item.setNamedTag(compoundTag.getCompound(MV_ORIGIN_NBT));
                     }
@@ -947,7 +962,7 @@ public class BinaryStream {
             } else {
                 mapping.toRuntime(item.getId(), item.getDamage());
             }
-        }catch (Exception e) {
+        } catch (Exception e) {
             Server.getInstance().getLogger().logException(e);
             isErrorItem = true;
         }
@@ -961,6 +976,9 @@ public class BinaryStream {
             }
             item.setCustomName(originItem.getName());
             item.setNamedTag(item.getNamedTag().putInt(MV_ORIGIN_ID, originItem.getId()).putInt(MV_ORIGIN_META, originItem.getDamage()));
+            if (isStringItem) {
+                item.setNamedTag(item.getNamedTag().putString(MV_ORIGIN_NAMESPACE, originItem.getNamespaceId(protocolId)));
+            }
         }
 
         int id = item.getId();
@@ -970,7 +988,7 @@ public class BinaryStream {
 
         int runtimeId;
         int damage = 0;
-        if (isStringItem) {
+        if (isStringItem && !isErrorItem) {
             runtimeId = mapping.getNetworkId(item);
         } else {
             RuntimeEntry runtimeEntry = mapping.toRuntime(id, meta);
