@@ -1651,6 +1651,11 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public final boolean equalsFast(Item other) {
+        if (this.id == STRING_IDENTIFIED_ITEM && other.id == STRING_IDENTIFIED_ITEM) {
+            if (!this.getNamespaceId().equals(other.getNamespaceId())) {
+                return false;
+            }
+        }
         return other != null && other.id == this.id && other.meta == this.meta;
     }
 
