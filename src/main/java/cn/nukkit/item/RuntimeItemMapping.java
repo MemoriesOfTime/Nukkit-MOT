@@ -208,12 +208,20 @@ public class RuntimeItemMapping {
     public Item parseCreativeItem(JsonObject json, boolean ignoreUnknown, int protocolId) {
         String identifier = json.get("id").getAsString();
         LegacyEntry legacyEntry = this.fromIdentifier(identifier);
-        if (legacyEntry == null) {
-            if (!ignoreUnknown) {
-                throw new IllegalStateException("Can not find legacyEntry for " + identifier);
+        if (legacyEntry == null || !Utils.hasItemOrBlock(legacyEntry.getLegacyId())) {
+            OptionalInt networkId = this.getNetworkIdByNamespaceId(identifier);
+            if ("minecraft:raw_iron".equalsIgnoreCase(identifier)) {
+                int test = 1;
             }
-            log.trace("Can not find legacyEntry for " + identifier);
-            return null;
+            if (networkId.isEmpty() || !Item.NAMESPACED_ID_ITEM.containsKey(identifier)) {
+                if (!ignoreUnknown) {
+                    throw new IllegalStateException("Can not find legacyEntry for " + identifier);
+                }
+                log.trace("Can not find legacyEntry for " + identifier);
+                return null;
+            } else {
+                legacyEntry = null;
+            }
         }
 
         byte[] nbtBytes;
@@ -225,11 +233,14 @@ public class RuntimeItemMapping {
             nbtBytes = new byte[0];
         }
 
-        int legacyId = legacyEntry.getLegacyId();
+        int legacyId = ItemID.STRING_IDENTIFIED_ITEM;
+        if (legacyEntry != null) {
+            legacyId = legacyEntry.getLegacyId();
+        }
         int damage = 0;
         if (json.has("damage")) {
             damage = json.get("damage").getAsInt();
-        } else if (legacyEntry.isHasDamage()) {
+        } else if (legacyEntry != null && legacyEntry.isHasDamage()) {
             damage = legacyEntry.getDamage();
         } else if (json.has("blockRuntimeId")) {
             int runtimeId = json.get("blockRuntimeId").getAsInt();
@@ -246,7 +257,15 @@ public class RuntimeItemMapping {
         }
 
         int count = json.has("count") ? json.get("count").getAsInt() : 1;
-        return Item.get(legacyId, damage, count, nbtBytes);
+        if (legacyEntry != null) {
+            return Item.get(legacyId, damage, count, nbtBytes);
+        } else {
+            Item item = Item.fromString(identifier);
+            item.setDamage(damage);
+            item.setCount(count);
+            item.setCompoundTag(nbtBytes);
+            return item;
+        }
     }
 
 
