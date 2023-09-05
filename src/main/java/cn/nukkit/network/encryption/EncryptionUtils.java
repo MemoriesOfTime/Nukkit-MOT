@@ -1,5 +1,6 @@
 package cn.nukkit.network.encryption;
 
+import cn.nukkit.Server;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -160,7 +161,8 @@ public class EncryptionUtils {
                 return !iterator.hasNext();
             }
 
-            if (lastKey.equals(EncryptionUtils.MOJANG_PUBLIC_KEY) || lastKey.equals(EncryptionUtils.OLD_MOJANG_PUBLIC_KEY)) {
+            if (lastKey.equals(EncryptionUtils.MOJANG_PUBLIC_KEY)
+                    || (!Server.getInstance().ignoreOldMojangPublicKey) && lastKey.equals(EncryptionUtils.OLD_MOJANG_PUBLIC_KEY)) {
                 validChain = true;
             }
 

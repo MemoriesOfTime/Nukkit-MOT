@@ -516,6 +516,10 @@ public class Server {
      */
     public boolean enableSpark;
     /**
+     * ignore OLD_MOJANG_PUBLIC_KEY
+     */
+    public boolean ignoreOldMojangPublicKey;
+    /**
      * This is needed for structure generation
      */
     public final ForkJoinPool computeThreadPool;
@@ -3068,6 +3072,7 @@ public class Server {
         this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);
         this.networkCompressionThreshold = this.getPropertyInt("compression-threshold", 256);
         this.enableSpark = this.getPropertyBoolean("enable-spark", false);
+        this.ignoreOldMojangPublicKey = this.getPropertyBoolean("ignore-old-mojang-public-key", true);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
@@ -3214,6 +3219,7 @@ public class Server {
             put("compression-threshold", "256");
             put("enable-spark", false);
             put("hastebin-token", "");
+            put("ignore-old-mojang-public-key", true);
         }
     }
 
