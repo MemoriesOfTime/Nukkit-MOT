@@ -267,7 +267,8 @@ public class RepairItemTransaction extends InventoryTransaction {
         }
 
         //通查情况下输出物品应该和输入物品是同一个id，特殊情况需要在这里添加额外判断
-        if (this.outputItem.getId() != this.inputItem.getId()) {
+        if (this.outputItem.getId() != this.inputItem.getId()
+                || (this.inputItem.getId() == Item.STRING_IDENTIFIED_ITEM && !this.inputItem.getNamespaceId().equalsIgnoreCase(this.outputItem.getNamespaceId()))) {
             return false;
         }
 
