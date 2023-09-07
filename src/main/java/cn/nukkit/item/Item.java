@@ -376,7 +376,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 }
             }
 
+            registerNamespacedIdItem(ItemIngotCopper.class);
             registerNamespacedIdItem(ItemRawIron.class);
+            registerNamespacedIdItem(ItemRawGold.class);
+            registerNamespacedIdItem(ItemRawCopper.class);
         }
 
         initCreativeItems();

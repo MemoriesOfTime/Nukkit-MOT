@@ -2,7 +2,6 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemCrimsonSign;
-import cn.nukkit.item.ItemID;
 
 public class BlockCrimsonSignPost extends BlockSignPost {
 
