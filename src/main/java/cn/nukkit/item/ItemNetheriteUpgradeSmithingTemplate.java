@@ -3,17 +3,9 @@ package cn.nukkit.item;
 /**
  * @author Glorydark
  */
-public class ItemNetheriteUpgradeSmithingTemplate extends Item {
+public class ItemNetheriteUpgradeSmithingTemplate extends StringItemBase {
 
     public ItemNetheriteUpgradeSmithingTemplate() {
-        this(0, 1);
-    }
-
-    public ItemNetheriteUpgradeSmithingTemplate(Integer meta) {
-        this(meta, 1);
-    }
-
-    public ItemNetheriteUpgradeSmithingTemplate(Integer meta, int count) {
-        super(NETHERITE_UPGRADE_SMITHING_TEMPLATE, meta, count, "Netherite Upgrade Smithing Template");
+        super("minecraft:netherite_upgrade_smithing_template", "Netherite Upgrade Smithing Template");
     }
 }

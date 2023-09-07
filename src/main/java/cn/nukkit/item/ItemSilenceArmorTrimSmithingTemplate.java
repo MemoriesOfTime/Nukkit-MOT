@@ -5,18 +5,10 @@ import cn.nukkit.item.trim.ItemTrimPatternType;
 /**
  * @author Glorydark
  */
-public class ItemSilenceArmorTrimSmithingTemplate extends Item implements ItemTrimPattern {
+public class ItemSilenceArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemSilenceArmorTrimSmithingTemplate() {
-        this(0, 1);
-    }
-
-    public ItemSilenceArmorTrimSmithingTemplate(Integer meta) {
-        this(meta, 1);
-    }
-
-    public ItemSilenceArmorTrimSmithingTemplate(Integer meta, int count) {
-        super(SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE, meta, count, "Silence Armor Trim Smithing Template");
+        super("minecraft:silence_armor_trim_smithing_template", "Silence Armor Trim Smithing Template");
     }
 
     @Override

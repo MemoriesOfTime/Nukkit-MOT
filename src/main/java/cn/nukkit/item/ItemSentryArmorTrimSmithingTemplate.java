@@ -5,18 +5,10 @@ import cn.nukkit.item.trim.ItemTrimPatternType;
 /**
  * @author Glorydark
  */
-public class ItemSentryArmorTrimSmithingTemplate extends Item implements ItemTrimPattern {
+public class ItemSentryArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemSentryArmorTrimSmithingTemplate() {
-        this(0, 1);
-    }
-
-    public ItemSentryArmorTrimSmithingTemplate(Integer meta) {
-        this(meta, 1);
-    }
-
-    public ItemSentryArmorTrimSmithingTemplate(Integer meta, int count) {
-        super(SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE, meta, count, "Sentry Armor Trim Smithing Template");
+        super("minecraft:sentry_armor_trim_smithing_template", "Sentry Armor Trim Smithing Template");
     }
 
     @Override

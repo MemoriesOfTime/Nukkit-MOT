@@ -379,6 +379,24 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             }
 
             registerNamespacedIdItem(ItemRawIron.class);
+            registerNamespacedIdItem(ItemCopperIngot.class);
+            registerNamespacedIdItem(ItemNetheriteUpgradeSmithingTemplate.class);
+            registerNamespacedIdItem(ItemSentryArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemDuneArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemCoastArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemWildArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemWardArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemEyeArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemVexArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemTideArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemSnoutArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemRibArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemSpireArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemSilenceArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemWayfinderArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemRaiserArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemShaperArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemHostArmorTrimSmithingTemplate.class);
         }
 
         initCreativeItems();

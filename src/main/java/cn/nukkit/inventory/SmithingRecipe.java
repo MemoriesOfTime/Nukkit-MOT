@@ -117,7 +117,7 @@ public class SmithingRecipe extends ShapelessRecipe {
     }
 
     public Item getTemplate() {
-        return Item.get(Item.NETHERITE_UPGRADE_SMITHING_TEMPLATE);
+        return Item.fromString("minecraft:netherite_upgrade_smithing_template");
 
         //return template;
     }

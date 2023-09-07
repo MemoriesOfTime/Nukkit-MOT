@@ -6,18 +6,10 @@ import cn.nukkit.item.trim.ItemTrimMaterialType;
  * @author MagicDroidX
  * Nukkit Project
  */
-public class ItemCopperIngot extends Item implements ItemTrimMaterial {
+public class ItemCopperIngot extends StringItemBase implements ItemTrimMaterial {
 
     public ItemCopperIngot() {
-        this(0, 1);
-    }
-
-    public ItemCopperIngot(Integer meta) {
-        this(meta, 1);
-    }
-
-    public ItemCopperIngot(Integer meta, int count) {
-        super(COPPER_INGOT, meta, count, "Copper Ingot");
+        super("minecraft:copper_ingot", "Copper Ingot");
     }
 
     @Override

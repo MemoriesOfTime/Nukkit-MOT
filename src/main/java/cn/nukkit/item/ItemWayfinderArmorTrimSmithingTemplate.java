@@ -5,18 +5,10 @@ import cn.nukkit.item.trim.ItemTrimPatternType;
 /**
  * @author Glorydark
  */
-public class ItemWayfinderArmorTrimSmithingTemplate extends Item implements ItemTrimPattern {
+public class ItemWayfinderArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemWayfinderArmorTrimSmithingTemplate() {
-        this(0, 1);
-    }
-
-    public ItemWayfinderArmorTrimSmithingTemplate(Integer meta) {
-        this(meta, 1);
-    }
-
-    public ItemWayfinderArmorTrimSmithingTemplate(Integer meta, int count) {
-        super(WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE, meta, count, "Wayfinder Armor Trim Smithing Template");
+        super("minecraft:wayfinder_armor_trim_smithing_template", "Wayfinder Armor Trim Smithing Template");
     }
 
     @Override

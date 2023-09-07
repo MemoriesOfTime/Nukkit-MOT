@@ -5,18 +5,10 @@ import cn.nukkit.item.trim.ItemTrimPatternType;
 /**
  * @author Glorydark
  */
-public class ItemTideArmorTrimSmithingTemplate extends Item implements ItemTrimPattern {
+public class ItemTideArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemTideArmorTrimSmithingTemplate() {
-        this(0, 1);
-    }
-
-    public ItemTideArmorTrimSmithingTemplate(Integer meta) {
-        this(meta, 1);
-    }
-
-    public ItemTideArmorTrimSmithingTemplate(Integer meta, int count) {
-        super(TIDE_ARMOR_TRIM_SMITHING_TEMPLATE, meta, count, "Tide Armor Trim Smithing Template");
+        super("minecraft:tide_armor_trim_smithing_template", "Tide Armor Trim Smithing Template");
     }
 
     @Override
