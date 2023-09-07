@@ -21,9 +21,11 @@ package cn.nukkit.inventory.transaction;
 import cn.nukkit.Player;
 import cn.nukkit.event.inventory.SmithingTableEvent;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.SmithingInventory;
 import cn.nukkit.inventory.transaction.action.CreativeInventoryAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.inventory.transaction.action.SmithingItemAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
@@ -40,8 +42,24 @@ public class SmithingTransaction extends InventoryTransaction {
     private Item ingredientItem;
     private Item outputItem;
 
+    private boolean isError = false;
+
     public SmithingTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions);
+        //额外检查 保证在所有action处理完成后再检查
+        boolean hasSlotChangeAction = false;
+        for (InventoryAction action : actions) {
+            if (action instanceof SlotChangeAction slotChangeAction) {
+                if (slotChangeAction.getInventory() instanceof PlayerInventory) { //真正给玩家背包物品的操作
+                    if (hasSlotChangeAction) {
+                        this.isError = true;
+                        return;
+                    }
+                    hasSlotChangeAction = true;
+                    this.outputItem = slotChangeAction.getTargetItem();
+                }
+            }
+        }
     }
 
     @Override
@@ -70,6 +88,9 @@ public class SmithingTransaction extends InventoryTransaction {
 
     @Override
     public boolean canExecute() {
+        if (this.isError) {
+            return false;
+        }
         Inventory inventory = getSource().getWindowById(Player.SMITHING_WINDOW_ID);
         if (inventory == null) {
             return false;

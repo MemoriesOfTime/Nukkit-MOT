@@ -1,7 +1,9 @@
 package cn.nukkit.utils;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
 import cn.nukkit.entity.mob.*;
+import cn.nukkit.item.Item;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -39,6 +41,7 @@ public class Utils {
     /**
      * An empty damage array used when mobs have no attack damage.
      */
+    @Deprecated
     public static final int[] emptyDamageArray = new int[] { 0, 0, 0, 0 };
     /**
      * List of network ids of monsters. Currently used for example to check which entities will make players unable to sleep when nearby the bed.
@@ -49,6 +52,19 @@ public class Utils {
      */
     public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(10, 11, 12, 26, 30, 31, 140, 158));
 
+    public static boolean hasItemOrBlock(int id) {
+        if (id < 0) {
+            int blockId = 255 - id;
+            return blockId < Block.MAX_BLOCK_ID && Block.list[blockId] != null;
+        } else {
+            return id < 65535 && Item.list[id] != null;
+        }
+    }
+
+    public static int[] getEmptyDamageArray() {
+        return new int[] { 0, 0, 0, 0 };
+    }
+    
     public static void writeFile(String fileName, String content) throws IOException {
         writeFile(fileName, new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
     }

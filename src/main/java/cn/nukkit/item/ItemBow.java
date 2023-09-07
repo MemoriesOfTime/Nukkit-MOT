@@ -50,7 +50,7 @@ public class ItemBow extends ItemTool {
 
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
-        return player.getInventory().contains(Item.get(ItemID.ARROW)) || player.isCreative();
+        return player.isCreative() || (this.getArrow(player.getInventory()) != null || this.getArrow(player.getOffhandInventory()) != null);
     }
 
     @Override
@@ -59,7 +59,9 @@ public class ItemBow extends ItemTool {
 
         Inventory inventory = player.getOffhandInventory();
 
-        if (!inventory.contains(itemArrow) && !(inventory = player.getInventory()).contains(itemArrow) && player.isSurvival()) {
+        if ((player.isSurvival() || player.isAdventure()) &&
+                (itemArrow = this.getArrow(inventory)) == null &&
+                (itemArrow = this.getArrow(inventory = player.getInventory())) == null) {
             player.getOffhandInventory().sendContents(player);
             inventory.sendContents(player);
             return false;
@@ -87,7 +89,15 @@ public class ItemBow extends ItemTool {
                         .add(new FloatTag("", (player.yaw > 180 ? 360 : 0) - (float) player.yaw))
                         .add(new FloatTag("", (float) -player.pitch)))
                 .putShort("Fire", flame ? 2700 : 0)
-                .putDouble("damage", damage);
+                .putDouble("damage", damage)
+                .putCompound("item", new CompoundTag()
+                        .putInt("id", itemArrow.getId())
+                        .putInt("Damage", itemArrow.getDamage())
+                        .putInt("Count", 1));
+
+        if (itemArrow.hasCompoundTag()) {
+            nbt.getCompound("item").putCompound("tag", itemArrow.getNamedTag());
+        }
 
         double p = (double) ticksUsed / 20;
 
@@ -142,5 +152,17 @@ public class ItemBow extends ItemTool {
         }
 
         return true;
+    }
+
+    protected Item getArrow(Inventory inventory) {
+        for (Item item : inventory.getContents().values()) {
+            //忽略物品的特殊值和nbt数据
+            if (item.getId() == ItemID.ARROW && item.getCount() > 0) {
+                Item clone = item.clone();
+                clone.setCount(1);
+                return clone;
+            }
+        }
+        return null;
     }
 }

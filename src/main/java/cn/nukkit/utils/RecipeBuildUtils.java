@@ -24,7 +24,7 @@ public class RecipeBuildUtils {
                 .putCompound("buyA", new CompoundTag()
                         .putByte("Count", buyA.getCount())
                         .putShort("Damage", buyA.getDamage())
-                        .putString("Name", buyA.getName())
+                        .putString("Name", buyA.getNamespaceId())
                         .putShort("id", buyA.getId() & 0xFFFF)
                         .putBoolean("WasPickedUp", false))//是否是掉落物？？
                 .putInt("buyCountA", buyA.getCount())
@@ -35,7 +35,7 @@ public class RecipeBuildUtils {
                 .putCompound("sell", new CompoundTag()
                         .putByte("Count", output.getCount())
                         .putShort("Damage", output.getDamage())
-                        .putString("Name", output.getName())
+                        .putString("Name", output.getNamespaceId())
                         .putShort("id", output.getId() & 0xFFFF)
                         .putBoolean("WasPickedUp", false))
                 .putInt("uses", 0);//未知
@@ -59,13 +59,13 @@ public class RecipeBuildUtils {
                 .putCompound("buyA", new CompoundTag()
                         .putByte("Count", buyA.getCount())
                         .putShort("Damage", buyA.getDamage())
-                        .putString("Name", buyA.getName())
+                        .putString("Name", buyA.getNamespaceId())
                         .putShort("id", buyA.getId() & 0xFFFF)
                         .putBoolean("WasPickedUp", false))//是否是掉落物？？
                 .putCompound("buyB", new CompoundTag()
                         .putByte("Count", buyB.getCount())
                         .putShort("Damage", buyB.getDamage())
-                        .putString("Name", buyB.getName())
+                        .putString("Name", buyB.getNamespaceId())
                         .putShort("id", buyB.getId() & 0xFFFF)
                         .putBoolean("WasPickedUp", false))
                 .putInt("buyCountA", buyA.getCount())
@@ -75,7 +75,7 @@ public class RecipeBuildUtils {
                 .putCompound("sell", new CompoundTag()
                         .putByte("Count", output.getCount())
                         .putShort("Damage", output.getDamage())
-                        .putString("Name", output.getName())
+                        .putString("Name", output.getNamespaceId())
                         .putShort("id", output.getId() & 0xFFFF)
                         .putBoolean("WasPickedUp", false))
                 .putInt("uses", 0);//未知

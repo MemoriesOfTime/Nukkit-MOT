@@ -25,7 +25,7 @@ public class TimingsCommand extends VanillaCommand {
         if (!this.testPermission(sender)) {
             return true;
         }
-        sender.sendMessage("§c Timings are deprecated. Please use Spark.");
+        sender.sendMessage("§cTimings are deprecated. Please use Spark.");
         Server.getInstance().dispatchCommand(sender, "spark help");
         return true;
     }

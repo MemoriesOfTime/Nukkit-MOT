@@ -74,7 +74,7 @@ public class EntityMagmaCube extends EntityJumpingMob {
         } else if (size == SIZE_MEDIUM) {
             this.setDamage(new int[] { 0, 2, 2, 3 });
         } else {
-            this.setDamage(Utils.emptyDamageArray);
+            this.setDamage(Utils.getEmptyDamageArray());
         }
     }
 

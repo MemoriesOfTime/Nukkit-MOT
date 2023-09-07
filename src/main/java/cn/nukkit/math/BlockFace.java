@@ -100,6 +100,10 @@ public enum BlockFace {
         return HORIZONTALS[MathHelper.abs(index % HORIZONTALS.length)];
     }
 
+    public static BlockFace fromReversedHorizontalIndex(final int index) {
+        return VALUES[5 - (index & 0x3)];
+    }
+
     /**
      * Get the BlockFace corresponding to the given angle (0-360). An angle of 0 is SOUTH, an angle of 90 would be WEST
      *
@@ -146,6 +150,10 @@ public enum BlockFace {
      */
     public int getHorizontalIndex() {
         return horizontalIndex;
+    }
+
+    public int getReversedHorizontalIndex() {
+        return 5 - index;
     }
 
     /**

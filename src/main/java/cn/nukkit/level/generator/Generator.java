@@ -1,5 +1,6 @@
 package cn.nukkit.level.generator;
 
+import cn.nukkit.Server;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.DimensionData;
@@ -7,7 +8,12 @@ import cn.nukkit.level.DimensionEnum;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.MainLogger;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,7 +22,6 @@ import java.util.Map;
  * Nukkit Project
  */
 public abstract class Generator implements BlockID {
-
     public static final int TYPE_OLD = 0;
     public static final int TYPE_INFINITE = 1;
     public static final int TYPE_FLAT = 2;
@@ -91,6 +96,15 @@ public abstract class Generator implements BlockID {
             }
         }
         return Generator.TYPE_INFINITE;
+    }
+
+    public static CompoundTag loadNBT(final String path) {
+        try (final InputStream inputStream = Server.class.getClassLoader().getResourceAsStream(path)) {
+            return NBTIO.readCompressed(inputStream);
+        } catch (final IOException e) {
+            MainLogger.getLogger().error("Error while loading: " + path);
+            throw new RuntimeException(e);
+        }
     }
 
     public abstract void init(ChunkManager level, NukkitRandom random);

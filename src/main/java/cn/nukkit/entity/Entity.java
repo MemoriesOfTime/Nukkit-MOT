@@ -432,7 +432,7 @@ public abstract class Entity extends Location implements Metadatable {
     private boolean sprinting;
     private boolean swimming;
     private boolean sneaking;
-
+    private boolean crawling;
     protected Server server;
 
     public double highestPosition;
@@ -685,6 +685,7 @@ public abstract class Entity extends Location implements Metadatable {
     public void setSneaking(boolean value) {
         this.sneaking = value;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_SNEAKING, value);
+        this.recalculateBoundingBox(true);
     }
 
     public boolean isSwimming() {
@@ -732,6 +733,22 @@ public abstract class Entity extends Location implements Metadatable {
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_GLIDING, value);
             this.recalculateBoundingBox(true);
         }
+    }
+
+    public void setCrawling() {
+        this.setCrawling(true);
+    }
+
+    public void setCrawling(boolean value) {
+        if (this.crawling != value) {
+            this.crawling = value;
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_CRAWLING, value);
+            this.recalculateBoundingBox(true);
+        }
+    }
+
+    public boolean isCrawling() {
+        return crawling;
     }
 
     public boolean isImmobile() {

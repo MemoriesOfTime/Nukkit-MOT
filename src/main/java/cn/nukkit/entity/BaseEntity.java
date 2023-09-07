@@ -683,31 +683,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return null;
     }
 
-    protected void lookAt(Vector3 target) {
-        double dx = this.x - target.x;
-        double dy = this.y - target.y;
-        double dz = this.z - target.z;
-        double yaw = Math.asin(dx / Math.sqrt(dx * dx + dz * dz)) / Math.PI * 180.0d;
-        double asin = Math.asin(dy / Math.sqrt(dx * dx + dz * dz + dy * dy)) / Math.PI * 180.0d;
-        long pitch = Math.round(asin);
-        if (dz > 0.0d) {
-            yaw = -yaw + 180.0d;
-        }
-        this.setRotation(yaw, pitch);
-    }
-
-    protected EntityHuman getNearbyHuman() {
-        AxisAlignedBB bb = this.boundingBox.clone().expand(2.5, 2.5, 2.5);
-        EntityHuman human = null;
-        for (Entity collidingEntity : this.level.getCollidingEntities(bb)) {
-            if (collidingEntity instanceof EntityHuman) {
-                human = (EntityHuman) collidingEntity;
-                break;
-            }
-        }
-        return human;
-    }
-
     protected boolean isInTickingRange() {
         for (Player player : this.level.getPlayers().values()) {
             if (player.distanceSquared(this) < 6400) { // 80 blocks

@@ -1,6 +1,7 @@
 package cn.nukkit.inventory.transaction.action;
 
 import cn.nukkit.Player;
+import cn.nukkit.inventory.FurnaceInventory;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.transaction.InventoryTransaction;
 import cn.nukkit.item.Item;
@@ -59,7 +60,11 @@ public class SlotChangeAction extends InventoryAction {
      * @return successfully executed
      */
     public boolean execute(Player source) {
-        return this.inventory.setItem(this.inventorySlot, this.targetItem, false);
+        if(this.getInventory() instanceof FurnaceInventory){
+            return ((FurnaceInventory) this.getInventory()).setItemByPlayer(source, this.inventorySlot, this.targetItem, false);
+        } else {
+            return this.inventory.setItem(this.inventorySlot, this.targetItem, false);
+        }
     }
 
     /**

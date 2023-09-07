@@ -251,7 +251,7 @@ public class BlockStorage {
     }
 
     private void setFullBlock(int index, int value) {
-        Preconditions.checkArgument(value < (32767), "Invalid full block");
+        Preconditions.checkArgument(value < 32767, "Invalid full block");
         byte extra = (byte) ((value >> (14)) & 0xFF);
         byte block = (byte) ((value >> Block.DATA_BITS) & 0xFF);
         byte dataExtra = (byte) (value >> 4 & 3 & 0xF);

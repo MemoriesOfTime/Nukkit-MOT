@@ -187,7 +187,7 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
             if (!toBatch.isEmpty()) {
                 this.sendPackets(toBatch);
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.error("[{}] Failed to tick RakNetPlayerSession", this.session.getAddress(), e);
         }
     }
@@ -197,7 +197,7 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
         while ((packet = this.inbound.poll()) != null) {
             try {
                 this.player.handleDataPacket(packet);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 log.error(new FormattedMessage("An error occurred whilst handling {} for {}",
                         new Object[]{packet.getClass().getSimpleName(), this.player.getName()}, e));
             }

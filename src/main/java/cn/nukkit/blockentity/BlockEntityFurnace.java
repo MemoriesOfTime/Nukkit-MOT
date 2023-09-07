@@ -35,6 +35,8 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
 
     private int crackledTime;
 
+    protected float storedXP;
+
     public BlockEntityFurnace(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
     }
@@ -81,6 +83,12 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
             this.namedTag.remove("BurnTicks");
         }
 
+        if (this.namedTag.contains("StoredXpInt")) {
+            storedXP = this.namedTag.getShort("StoredXpInt");
+        } else {
+            storedXP = 0;
+        }
+
         if (burnTime > 0) {
             this.scheduleUpdate();
         }
@@ -125,6 +133,11 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
             level.dropItem(this, content);
         }
         inventory.clearAll();
+        int xp = calculateXpDrop();
+        if (xp > 0) {
+            setStoredXP(0);
+            level.dropExpOrb(this, xp);
+        }
     }
 
     @Override
@@ -138,6 +151,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
         this.namedTag.putShort("BurnTime", burnTime);
         this.namedTag.putShort("BurnDuration", burnDuration);
         this.namedTag.putShort("MaxTime", maxTime);
+        this.namedTag.putShort("StoredXpInt", (int) storedXP);
     }
 
     @Override
@@ -256,7 +270,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
                 if (cookTime >= 200) {
                     product = Item.get(smelt.getResult().getId(), smelt.getResult().getDamage(), product.getCount() + 1);
 
-                    FurnaceSmeltEvent ev = new FurnaceSmeltEvent(this, raw, product);
+                    FurnaceSmeltEvent ev = new FurnaceSmeltEvent(this, raw, product, (float) this.server.getCraftingManager().getRecipeXp(smelt));
                     this.server.getPluginManager().callEvent(ev);
                     if (!ev.isCancelled()) {
                         this.inventory.setResult(ev.getResult());
@@ -264,6 +278,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
                         if (raw.getCount() == 0) {
                             raw = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
                         }
+                        this.storedXP += ev.getXp();
                         this.inventory.setSmelting(raw);
                     }
 
@@ -358,4 +373,17 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
     public void setMaxTime(int maxTime) {
         this.maxTime = maxTime;
     }
+
+    public float getStoredXP() {
+        return storedXP;
+    }
+
+    public void setStoredXP(float storedXP) {
+        this.storedXP = storedXP;
+    }
+
+    public short calculateXpDrop() {
+        return (short) (Math.floor(this.storedXP) + (ThreadLocalRandom.current().nextFloat() < (this.storedXP % 1) ? 1 : 0));
+    }
+
 }

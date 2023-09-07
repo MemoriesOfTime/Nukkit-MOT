@@ -19,6 +19,7 @@ import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.BubbleParticle;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -46,7 +47,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     @Override
-    protected float getGravity() {
+    public float getGravity() {
         return 0.08f;
     }
 
@@ -549,4 +550,34 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             ((EntityTameable) this).getOwner().dataPacket(tameDeathMessage);
         }
     }
+
+    public void lookAt(Vector3 target) {
+        double dx = this.x - target.x;
+        double dy = this.y - target.y;
+        double dz = this.z - target.z;
+        double yaw = Math.asin(dx / Math.sqrt(dx * dx + dz * dz)) / Math.PI * 180.0d;
+        double asin = Math.asin(dy / Math.sqrt(dx * dx + dz * dz + dy * dy)) / Math.PI * 180.0d;
+        long pitch = Math.round(asin);
+        if (dz > 0.0d) {
+            yaw = -yaw + 180.0d;
+        }
+        this.setRotation(yaw, pitch);
+    }
+
+    public EntityHuman getNearbyHuman() {
+        return this.getNearbyHuman(2.5);
+    }
+
+    public EntityHuman getNearbyHuman(double distance) {
+        AxisAlignedBB bb = this.boundingBox.clone().expand(distance, distance, distance);
+        EntityHuman human = null;
+        for (Entity collidingEntity : this.level.getCollidingEntities(bb)) {
+            if (collidingEntity instanceof EntityHuman) {
+                human = (EntityHuman) collidingEntity;
+                break;
+            }
+        }
+        return human;
+    }
+
 }

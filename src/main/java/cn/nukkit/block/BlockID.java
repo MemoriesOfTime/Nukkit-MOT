@@ -4,7 +4,6 @@ package cn.nukkit.block;
  * List of block IDs
  */
 public interface BlockID {
-
     int AIR = 0;
     int STONE = 1;
     int GRASS = 2;
@@ -351,8 +350,15 @@ public interface BlockID {
     int BLOCK_KELP = 393;
     int DRIED_KELP_BLOCK = 394;
 
+    int ACACIA_TRAPDOOR = 400;
+    int BIRCH_TRAPDOOR = 401;
+    int DARK_OAK_TRAPDOOR = 402;
+    int JUNGLE_TRAPDOOR = 403;
+    int SPRUCE_TRAPDOOR = 404;
+
     int CARVED_PUMPKIN = 410;
     int SEA_PICKLE = 411;
+    int BUBBLE_COLUMN = 415;
     int BARRIER = 416;
     int STONE_SLAB3 = 417;
     int BAMBOO = 418;
@@ -373,11 +379,19 @@ public interface BlockID {
     int END_BRICK_STAIRS = 433;
     int MOSSY_COBBLESTONE_STAIRS = 434;
     int NORMAL_STONE_STAIRS = 435;
-
+    int SPRUCE_STANDING_SIGN = 436;
+    int SPRUCE_WALL_SIGN = 437;
     int SMOOTH_STONE = 438;
     int RED_NETHER_BRICK_STAIRS = 439;
     int SMOOTH_QUARTZ_STAIRS = 440;
-
+    int BIRCH_STANDING_SIGN = 441;
+    int BIRCH_WALL_SIGN = 442;
+    int JUNGLE_STANDING_SIGN = 443;
+    int JUNGLE_WALL_SIGN = 444;
+    int ACACIA_STANDING_SIGN = 445;
+    int ACACIA_WALL_SIGN = 446;
+    int DARKOAK_STANDING_SIGN = 447;
+    int DARKOAK_WALL_SIGN = 448;
     int LECTERN = 449;
     int GRINDSTONE = 450;
     int BLAST_FURNACE = 451;
@@ -426,7 +440,18 @@ public interface BlockID {
     int CRIMSON_TRAPDOOR = 501;
     int WARPED_TRAPDOOR = 502;
 
+    int CRIMSON_STANDING_SIGN = 505;
+    int WARPED_STANDING_SIGN = 506;
+    int CRIMSON_WALL_SIGN = 507;
+    int WARPED_WALL_SIGN = 508;
+
+    int SOUL_LANTERN = 524;
+    int NETHERITE_BLOCK = 525;
+    int ANCIENT_DEBRIS = 526;
     int RESPAWN_ANCHOR = 527;
+    int BLACKSTONE = 528;
 
     int NETHER_GOLD_ORE = 543;
+    int CRYING_OBSIDIAN = 544;
+    int SOUL_CAMPFIRE_BLOCK = 545;
 }

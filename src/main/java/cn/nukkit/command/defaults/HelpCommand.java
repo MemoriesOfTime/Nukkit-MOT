@@ -93,28 +93,28 @@ public class HelpCommand extends VanillaCommand {
             }
 
             return true;
-        } else {
-            Command cmd = sender.getServer().getCommandMap().getCommand(command.toString().toLowerCase());
-            if (cmd != null) {
-                if (cmd.testPermissionSilent(sender)) {
-                    String message = TextFormat.YELLOW + "--------- " + TextFormat.WHITE + " Help: /" + cmd.getName() + TextFormat.YELLOW + " ---------\n";
-                    message += TextFormat.GOLD + "Description: " + TextFormat.WHITE + cmd.getDescription() + '\n';
-                    StringBuilder usage = new StringBuilder();
-                    String[] usages = cmd.getUsage().split("\n");
-                    for (String u : usages) {
-                        if (usage.length() > 0) {
-                            usage.append("\n" + TextFormat.WHITE);
-                        }
-                        usage.append(u);
-                    }
-                    message += TextFormat.GOLD + "Usage: " + TextFormat.WHITE + usage + '\n';
-                    sender.sendMessage(message);
-                    return true;
-                }
-            }
-
-            sender.sendMessage(TextFormat.RED + "No help for " + command.toString().toLowerCase());
-            return true;
         }
+
+        Command cmd = sender.getServer().getCommandMap().getCommand(command.toString().toLowerCase());
+        if (cmd != null) {
+            if (cmd.testPermissionSilent(sender)) {
+                String message = TextFormat.YELLOW + "--------- " + TextFormat.WHITE + " Help: /" + cmd.getName() + TextFormat.YELLOW + " ---------\n";
+                message += TextFormat.GOLD + "Description: " + TextFormat.WHITE + cmd.getDescription() + '\n';
+                StringBuilder usage = new StringBuilder();
+                String[] usages = cmd.getUsage().split("\n");
+                for (String u : usages) {
+                    if (usage.length() > 0) {
+                        usage.append("\n" + TextFormat.WHITE);
+                    }
+                    usage.append(u);
+                }
+                message += TextFormat.GOLD + "Usage: " + TextFormat.WHITE + usage + '\n';
+                sender.sendMessage(message);
+                return true;
+            }
+        }
+
+        sender.sendMessage(TextFormat.RED + "No help for " + command.toString().toLowerCase());
+        return true;
     }
 }
