@@ -509,6 +509,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 (!this.isSpectator() || (this.server.useClientSpectator && player.protocol >= ProtocolInfo.v1_19_30)) &&
                 this.showToOthers) {
             super.spawnTo(player);
+            if (this.isSpectator()) {
+                UpdatePlayerGameTypePacket pk = new UpdatePlayerGameTypePacket();
+                pk.gameType = GameType.from(getClientFriendlyGamemode(gamemode));
+                pk.entityId = this.getId();
+                player.dataPacket(pk);
+            }
         }
     }
 
@@ -1542,15 +1548,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.spawnToAll();
             }
         }
-
-        /*if (this.isSpectator()) {
-            this.keepMovement = true;
-            this.onGround = false;
-            this.despawnFromAll();
-        } else {
-            this.keepMovement = false;
-            this.spawnToAll();
-        }*/
 
         this.namedTag.putInt("playerGameType", this.gamemode);
 
