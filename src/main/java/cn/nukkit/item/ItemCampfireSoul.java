@@ -7,11 +7,11 @@ public class ItemCampfireSoul extends Item {
         this(0, 1);
     }
 
-    public ItemCampfireSoul(final int meta) {
+    public ItemCampfireSoul(final Integer meta) {
         this(meta, 1);
     }
 
-    public ItemCampfireSoul(final int meta, final int count) {
+    public ItemCampfireSoul(final Integer meta, final int count) {
         super(SOUL_CAMPFIRE, meta, count, "Soul Campfire");
         block = new BlockCampfireSoul();
     }
