@@ -3020,7 +3020,9 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     private boolean validateAndSetIntProperty(String identifier, int value) {
-        if(!intProperties.containsKey(identifier)) return false;
+        if(!intProperties.containsKey(identifier)) {
+            return false;
+        }
         intProperties.put(identifier, value);
         return true;
     }
@@ -3034,7 +3036,9 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final boolean setFloatEntityProperty(String identifier, float value) {
-        if(!floatProperties.containsKey(identifier)) return false;
+        if(!floatProperties.containsKey(identifier)) {
+            return false;
+        }
         floatProperties.put(identifier, value);
         return true;
     }
@@ -3065,13 +3069,15 @@ public abstract class Entity extends Location implements Metadatable {
 
     private void initEntityProperties(String entityIdentifier) {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(entityIdentifier);
-        if (entityPropertyList.isEmpty()) return;
+        if (entityPropertyList.isEmpty()) {
+            return;
+        }
 
         for (EntityProperty property : entityPropertyList) {
             final String identifier = property.getIdentifier();
 
             if (property instanceof FloatEntityProperty floatProperty) {
-                floatProperties.put(identifier, floatProperty .getDefaultValue());
+                floatProperties.put(identifier, floatProperty.getDefaultValue());
             } else if (property instanceof IntEntityProperty intProperty) {
                 intProperties.put(identifier, intProperty.getDefaultValue());
             } else if (property instanceof BooleanEntityProperty booleanProperty) {
