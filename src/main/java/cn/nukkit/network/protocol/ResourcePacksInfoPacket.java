@@ -1,7 +1,11 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.resourcepacks.ResourcePack;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
+import lombok.Value;
+
+import java.util.List;
 
 @ToString
 public class ResourcePacksInfoPacket extends DataPacket {
@@ -13,6 +17,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
     public boolean forceServerPacks;
     public ResourcePack[] behaviourPackEntries = ResourcePack.EMPTY_ARRAY;
     public ResourcePack[] resourcePackEntries = ResourcePack.EMPTY_ARRAY;
+    /**
+     * @since v618
+     */
+    private List<CDNEntry> CDNEntries = new ObjectArrayList<>();
 
     @Override
     public void decode() {
@@ -31,6 +39,14 @@ public class ResourcePacksInfoPacket extends DataPacket {
 
         this.encodeBehaviourPacks(this.behaviourPackEntries);
         this.encodeResourcePacks(this.resourcePackEntries);
+
+        if (protocol >= ProtocolInfo.v1_20_30) {
+            this.putUnsignedVarInt(this.CDNEntries.size());
+            for (CDNEntry entry : this.CDNEntries) {
+                this.putString(entry.getPackId());
+                this.putString(entry.getRemoteUrl());
+            }
+        }
     }
 
     private void encodeBehaviourPacks(ResourcePack[] packs) {
@@ -69,5 +85,11 @@ public class ResourcePacksInfoPacket extends DataPacket {
     @Override
     public byte pid() {
         return NETWORK_ID;
+    }
+
+    @Value
+    public static class CDNEntry {
+        private final String packId;
+        private final String remoteUrl;
     }
 }
