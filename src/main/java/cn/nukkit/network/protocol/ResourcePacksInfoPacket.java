@@ -41,11 +41,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
         this.encodeResourcePacks(this.resourcePackEntries);
 
         if (protocol >= ProtocolInfo.v1_20_30) {
-            this.putUnsignedVarInt(this.CDNEntries.size());
-            for (CDNEntry entry : this.CDNEntries) {
+            this.putArray(this.CDNEntries, (entry) -> {
                 this.putString(entry.getPackId());
                 this.putString(entry.getRemoteUrl());
-            }
+            });
         }
     }
 

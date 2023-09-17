@@ -3,10 +3,13 @@ package cn.nukkit.camera.data;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.command.data.CommandEnum;
-import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.math.Vector3f;
 import cn.nukkit.network.protocol.UpdateSoftEnumPacket;
+import cn.nukkit.utils.OptionalBoolean;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import javax.annotation.Nullable;
 import java.util.Map;
@@ -17,6 +20,10 @@ import java.util.TreeMap;
  * @date 2023/6/11
  * PowerNukkitX Project
  */
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public final class CameraPreset {
 
     private static final Map<String, CameraPreset> PRESETS = new TreeMap<>();
@@ -32,8 +39,9 @@ public final class CameraPreset {
 
     public static void registerCameraPresets(CameraPreset... presets) {
         for (var preset : presets) {
-            if (PRESETS.containsKey(preset.getIdentifier()))
+            if (PRESETS.containsKey(preset.getIdentifier())) {
                 throw new IllegalArgumentException("Camera preset " + preset.getIdentifier() + " already exists!");
+            }
             PRESETS.put(preset.getIdentifier(), preset);
             CommandEnum.CAMERA_PRESETS.updateSoftEnum(UpdateSoftEnumPacket.Type.ADD, preset.getIdentifier());
         }
@@ -56,8 +64,9 @@ public final class CameraPreset {
                 .build();
         FREE = CameraPreset.builder()
                 .identifier("minecraft:free")
-                .pos(new Pos(0, 0, 0))
-                .rot(new Rot(0, 0))
+                .pos(new Vector3f(0, 0, 0))
+                .yaw(0F)
+                .pitch(0F)
                 .build();
         THIRD_PERSON = CameraPreset.builder()
                 .identifier("minecraft:third_person")
@@ -69,48 +78,28 @@ public final class CameraPreset {
         registerCameraPresets(FIRST_PERSON, FREE, THIRD_PERSON, THIRD_PERSON_FRONT);
     }
 
-    @Getter
-    private final String identifier;
-    @Getter
-    private final String inheritFrom;
-    @Getter
+    private String identifier;
+    private String parentPreset;
     @Nullable
-    private final Pos pos;
-    @Getter
+    private Vector3f pos;
     @Nullable
-    private final Rot rot;
+    private Float yaw;
+    @Nullable
+    private Float pitch;
+    @Nullable
+    private CameraAudioListener listener;
+    private OptionalBoolean playEffect;
 
-    @Getter
+    //TODO
     private int id;
 
-    /**
-     * Remember to call the registerCameraPresets() method to register!
-     */
-    @Builder
-    public CameraPreset(String identifier, String inheritFrom, @Nullable Pos pos, @Nullable Rot rot) {
+    public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, @Nullable CameraAudioListener listener, OptionalBoolean playEffect) {
         this.identifier = identifier;
-        this.inheritFrom = inheritFrom != null ? inheritFrom : "";
+        this.parentPreset = parentPreset;
         this.pos = pos;
-        this.rot = rot;
-    }
-
-    private CompoundTag cache;
-
-    public CompoundTag serialize() {
-        if (cache == null) {
-            cache = new CompoundTag()
-                    .putString("identifier", identifier)
-                    .putString("inherit_from", inheritFrom);
-            if (pos != null) {
-                cache.putFloat("pos_x", pos.x())
-                        .putFloat("pos_y", pos.y())
-                        .putFloat("pos_z", pos.z());
-            }
-            if (rot != null) {
-                cache.putFloat("rot_x", rot.x())
-                        .putFloat("rot_y", rot.y());
-            }
-        }
-        return cache;
+        this.yaw = yaw;
+        this.pitch = pitch;
+        this.listener = listener;
+        this.playEffect = playEffect;
     }
 }

@@ -2103,12 +2103,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.protocol < ProtocolInfo.v1_20_0_23) {
             return;
         }
-        ListTag<CompoundTag> presetListTag = new ListTag<>("presets");
-        for (CameraPreset preset : CameraPreset.getPresets().values()) {
-            presetListTag.add(preset.serialize());
-        }
         CameraPresetsPacket pk = new CameraPresetsPacket();
-        pk.setData(new CompoundTag().putList(presetListTag));
+        pk.getPresets().addAll(CameraPreset.getPresets().values());
         this.dataPacket(pk);
     }
 
