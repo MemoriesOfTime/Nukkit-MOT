@@ -41,18 +41,18 @@ public class CameraPresetsPacket extends DataPacket {
                 preset.setIdentifier(presetTag.getString("identifier"));
                 preset.setParentPreset(presetTag.getString("inherit_from"));
 
-                if (presetTag.contains("pos_x", FloatTag.class) || presetTag.contains("pos_y") || presetTag.contains("pos_z")) {
+                if (presetTag.contains("pos_x", FloatTag.class) || presetTag.contains("pos_y", FloatTag.class) || presetTag.contains("pos_z", FloatTag.class)) {
                     float x = presetTag.contains("pos_x") ? presetTag.getFloat("pos_x") : 0;
                     float y = presetTag.contains("pos_y") ? presetTag.getFloat("pos_y") : 0;
                     float z = presetTag.contains("pos_z") ? presetTag.getFloat("pos_z") : 0;
                     preset.setPos(new Vector3f(x, y, z));
                 }
 
-                if (presetTag.contains("rot_y")) {
+                if (presetTag.contains("rot_y", FloatTag.class)) {
                     preset.setYaw(presetTag.getFloat("rot_y"));
                 }
 
-                if (presetTag.contains("rot_x")) {
+                if (presetTag.contains("rot_x", FloatTag.class)) {
                     preset.setPitch(presetTag.getFloat("rot_x"));
                 }
                 this.presets.add(preset);
