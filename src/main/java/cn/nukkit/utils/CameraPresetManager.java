@@ -1,31 +1,24 @@
-package cn.nukkit.camera.data;
+package cn.nukkit.utils;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.network.protocol.UpdateSoftEnumPacket;
-import cn.nukkit.utils.OptionalBoolean;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import cn.nukkit.network.protocol.types.camera.CameraPreset;
+import lombok.Getter;
+import org.cloudburstmc.protocol.common.DefinitionRegistry;
+import org.cloudburstmc.protocol.common.NamedDefinition;
+import org.cloudburstmc.protocol.common.SimpleDefinitionRegistry;
 
 import javax.annotation.Nullable;
 import java.util.Map;
 import java.util.TreeMap;
 
-/**
- * @author daoge_cmd
- * @date 2023/6/11
- * PowerNukkitX Project
- */
-@Data
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
-public final class CameraPreset {
+public class CameraPresetManager {
 
+    @Getter
+    private static DefinitionRegistry<NamedDefinition> cameraPresetDefinitions;
     private static final Map<String, CameraPreset> PRESETS = new TreeMap<>();
 
     public static Map<String, CameraPreset> getPresets() {
@@ -47,9 +40,13 @@ public final class CameraPreset {
         }
         int id = 0;
         //重新分配id
+        SimpleDefinitionRegistry.Builder<NamedDefinition> builder = SimpleDefinitionRegistry.builder();
         for (var preset : presets) {
-            preset.id = id++;
+            preset.setRuntimeId(id++);
+            builder.add(preset);
         }
+        cameraPresetDefinitions = builder.build();
+
         Server.getInstance().getOnlinePlayers().values().forEach(Player::sendCameraPresets);
     }
 
@@ -78,28 +75,4 @@ public final class CameraPreset {
         registerCameraPresets(FIRST_PERSON, FREE, THIRD_PERSON, THIRD_PERSON_FRONT);
     }
 
-    private String identifier;
-    private String parentPreset;
-    @Nullable
-    private Vector3f pos;
-    @Nullable
-    private Float yaw;
-    @Nullable
-    private Float pitch;
-    @Nullable
-    private CameraAudioListener listener;
-    private OptionalBoolean playEffect;
-
-    //TODO
-    private int id;
-
-    public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, @Nullable CameraAudioListener listener, OptionalBoolean playEffect) {
-        this.identifier = identifier;
-        this.parentPreset = parentPreset;
-        this.pos = pos;
-        this.yaw = yaw;
-        this.pitch = pitch;
-        this.listener = listener;
-        this.playEffect = playEffect;
-    }
 }

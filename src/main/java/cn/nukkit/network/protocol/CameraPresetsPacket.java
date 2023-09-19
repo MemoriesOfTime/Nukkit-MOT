@@ -1,17 +1,17 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.camera.data.CameraAudioListener;
-import cn.nukkit.camera.data.CameraPreset;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.types.camera.CameraAudioListener;
+import cn.nukkit.network.protocol.types.camera.CameraPreset;
 import cn.nukkit.utils.BinaryStream;
-import cn.nukkit.utils.OptionalBoolean;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.Getter;
 import lombok.Setter;
+import org.cloudburstmc.protocol.common.util.OptionalBoolean;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
