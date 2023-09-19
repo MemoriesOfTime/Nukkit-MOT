@@ -44,4 +44,8 @@ public final class CameraPreset implements NamedDefinition {
         this.listener = listener;
         this.playEffect = playEffect;
     }
+
+    public String getParentPreset() {
+        return parentPreset == null ? "" : parentPreset;
+    }
 }

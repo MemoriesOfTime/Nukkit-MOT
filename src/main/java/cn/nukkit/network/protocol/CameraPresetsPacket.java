@@ -105,7 +105,7 @@ public class CameraPresetsPacket extends DataPacket {
         this.putOptionalNull(preset.getPitch(), this::putLFloat);
         this.putOptionalNull(preset.getYaw(), this::putLFloat);
         this.putOptionalNull(preset.getListener(), (listener) -> this.putByte((byte) listener.ordinal()));
-        this.putOptional(OptionalBoolean::isPresent, preset.getPlayEffect(), (optional) -> this.putBoolean(optional.getAsBoolean()));
+        this.putOptional(o -> o != null && o.isPresent(), preset.getPlayEffect(), (optional) -> this.putBoolean(optional.getAsBoolean()));
     }
 
     protected CameraPreset getPreset() {
