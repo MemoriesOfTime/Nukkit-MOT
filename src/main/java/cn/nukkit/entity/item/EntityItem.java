@@ -1,6 +1,7 @@
 package cn.nukkit.entity.item;
 
 import cn.nukkit.Server;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -8,6 +9,7 @@ import cn.nukkit.event.entity.ItemDespawnEvent;
 import cn.nukkit.event.entity.ItemSpawnEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -25,6 +27,7 @@ public class EntityItem extends Entity {
     protected String thrower;
     protected Item item;
     protected int pickupDelay;
+    protected boolean floatsInLava;
 
     public EntityItem(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -103,6 +106,7 @@ public class EntityItem extends Entity {
         int id = this.item.getId();
         if (id >= Item.NETHERITE_INGOT && id <= Item.NETHERITE_SCRAP) {
             this.fireProof = true; // Netherite items are fireproof
+            this.floatsInLava = true;
         }
 
         this.server.getPluginManager().callEvent(new ItemSpawnEvent(this));
@@ -226,7 +230,8 @@ public class EntityItem extends Entity {
                 }
             }
 
-            if (this.isInsideOfWater()) {
+            int bid = level.getBlock(this.getFloorX(), NukkitMath.floorDouble(this.y + 0.53), this.getFloorZ(), false).getId();
+            if (this.isInsideOfWater() || (this.floatsInLava && (bid == BlockID.LAVA || bid == BlockID.STILL_LAVA))) {
                 this.motionY = this.getGravity() / 2;
             } else if (!this.isOnGround()) {
                 this.motionY -= this.getGravity();
