@@ -6,7 +6,6 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCampfire;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
 import cn.nukkit.blockentity.BlockEntitySpawnable;
-import cn.nukkit.camera.data.CameraPreset;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandDataVersions;
@@ -2103,12 +2102,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.protocol < ProtocolInfo.v1_20_0_23) {
             return;
         }
-        ListTag<CompoundTag> presetListTag = new ListTag<>("presets");
-        for (CameraPreset preset : CameraPreset.getPresets().values()) {
-            presetListTag.add(preset.serialize());
-        }
         CameraPresetsPacket pk = new CameraPresetsPacket();
-        pk.setData(new CompoundTag().putList(presetListTag));
+        pk.getPresets().addAll(CameraPresetManager.getPresets().values());
         this.dataPacket(pk);
     }
 
