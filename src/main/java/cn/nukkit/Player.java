@@ -7125,18 +7125,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled /*&& loginChainData.isXboxAuthed()*/;
     }
 
-    private List<ResourcePackStackPacket.ExperimentData> getExperiments() {
-        List<ResourcePackStackPacket.ExperimentData> experiments = new ObjectArrayList<>();
+    private List<ExperimentData> getExperiments() {
+        List<ExperimentData> experiments = new ObjectArrayList<>();
         //TODO Multiversion 当新版本删除部分实验性玩法时，这里也需要加上判断
         if (this.server.enableExperimentMode) {
-            experiments.add(new ResourcePackStackPacket.ExperimentData("data_driven_items", true));
-            experiments.add(new ResourcePackStackPacket.ExperimentData("experimental_custom_ui", true));
-            experiments.add(new ResourcePackStackPacket.ExperimentData("upcoming_creator_features", true));
-            experiments.add(new ResourcePackStackPacket.ExperimentData("experimental_molang_features", true));
+            experiments.add(new ExperimentData("data_driven_items", true));
+            experiments.add(new ExperimentData("experimental_custom_ui", true));
+            experiments.add(new ExperimentData("upcoming_creator_features", true));
+            experiments.add(new ExperimentData("experimental_molang_features", true));
             if (protocol >= ProtocolInfo.v1_20_0_23) {
-                experiments.add(new ResourcePackStackPacket.ExperimentData("cameras", true));
+                experiments.add(new ExperimentData("cameras", true));
                 if (protocol >= ProtocolInfo.v1_20_10) {
-                    experiments.add(new ResourcePackStackPacket.ExperimentData("short_sneaking", true));
+                    experiments.add(new ExperimentData("short_sneaking", true));
                 }
             }
         }
