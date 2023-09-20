@@ -370,7 +370,7 @@ public class GlobalBlockPalette {
         loadBlockStatesAndExtras(582, legacyToRuntimeId582, runtimeIdToLegacy582);
         loadBlockStatesAndExtras(589, legacyToRuntimeId589, runtimeIdToLegacy589);
         loadBlockStates(paletteFor(594), legacyToRuntimeId594, runtimeIdToLegacy594);
-        loadBlockStates(paletteFor(618), legacyToRuntimeId618, runtimeIdToLegacy618);
+        loadBlockStatesAndExtras(618, legacyToRuntimeId618, runtimeIdToLegacy618);
     }
 
     private static void loadBlockStatesAndExtras(int protocol, @NotNull Int2IntMap legacyToRuntime, @NotNull Int2IntMap runtimeIdToLegacy) {
