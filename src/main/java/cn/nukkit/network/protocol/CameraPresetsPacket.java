@@ -30,7 +30,7 @@ public class CameraPresetsPacket extends DataPacket {
 
     @Override
     public void decode() {
-        if (protocol >= ProtocolInfo.v1_20_30) {
+        if (protocol >= ProtocolInfo.v1_20_30_24) {
             this.getArray(this.presets, value -> this.getPreset());
         } else {
             CompoundTag data = this.getTag();
@@ -63,7 +63,7 @@ public class CameraPresetsPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (protocol >= ProtocolInfo.v1_20_30) {
+        if (protocol >= ProtocolInfo.v1_20_30_24) {
             this.putArray(this.presets, this::putPreset);
         } else {
             try {

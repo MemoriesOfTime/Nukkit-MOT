@@ -44,7 +44,7 @@ public class CameraInstructionPacket extends DataPacket {
 
     @Override
     public void decode() {
-        if (protocol >= ProtocolInfo.v1_20_30) {
+        if (protocol >= ProtocolInfo.v1_20_30_24) {
             CameraSetInstruction set = this.getOptional(null, b -> {
                 int runtimeId = b.getLInt();
                 NamedDefinition definition = CameraPresetManager.getCameraPresetDefinitions().getDefinition(runtimeId);
@@ -141,7 +141,7 @@ public class CameraInstructionPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (protocol >= ProtocolInfo.v1_20_30) {
+        if (protocol >= ProtocolInfo.v1_20_30_24) {
             this.putOptionalNull(this.getSetInstruction(), (b, set) -> {
                 DefinitionUtils.checkDefinition(CameraPresetManager.getCameraPresetDefinitions(), set.getPreset());
                 b.putLInt(set.getPreset().getRuntimeId());

@@ -40,7 +40,7 @@ public class ResourcePacksInfoPacket extends DataPacket {
         this.encodeBehaviourPacks(this.behaviourPackEntries);
         this.encodeResourcePacks(this.resourcePackEntries);
 
-        if (protocol >= ProtocolInfo.v1_20_30) {
+        if (protocol >= ProtocolInfo.v1_20_30_24) {
             this.putArray(this.CDNEntries, (entry) -> {
                 this.putString(entry.getPackId());
                 this.putString(entry.getRemoteUrl());
