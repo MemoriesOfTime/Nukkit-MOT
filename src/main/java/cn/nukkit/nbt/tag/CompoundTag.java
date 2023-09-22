@@ -137,6 +137,10 @@ public class CompoundTag extends Tag implements Cloneable {
         return tags.containsKey(name);
     }
 
+    public boolean contains(String name, Class<? extends Tag> clazz) {
+        return clazz.isInstance(tags.get(name));
+    }
+
     public boolean containsCompound(String name) {
         return tags.get(name) instanceof CompoundTag;
     }

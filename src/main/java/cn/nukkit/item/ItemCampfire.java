@@ -7,11 +7,11 @@ public class ItemCampfire extends Item {
         this(0, 1);
     }
 
-    public ItemCampfire(final int meta) {
+    public ItemCampfire(final Integer meta) {
         this(meta, 1);
     }
 
-    public ItemCampfire(final int meta, final int count) {
+    public ItemCampfire(final Integer meta, final int count) {
         super(CAMPFIRE, meta, count, "Campfire");
         block = new BlockCampfire();
     }

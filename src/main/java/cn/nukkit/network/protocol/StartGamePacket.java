@@ -6,6 +6,7 @@ import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.network.protocol.types.NetworkPermissions;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -65,7 +66,7 @@ public class StartGamePacket extends DataPacket {
     public int platformBroadcastIntent = GAME_PUBLISH_SETTING_PUBLIC;
     public boolean commandsEnabled;
     public boolean isTexturePacksRequired = false;
-    public final List<ResourcePackStackPacket.ExperimentData> experiments = new ObjectArrayList<>();
+    public final List<ExperimentData> experiments = new ObjectArrayList<>();
     public GameRules gameRules;
     public boolean bonusChest = false;
     public boolean hasStartWithMapEnabled = false;
@@ -95,6 +96,10 @@ public class StartGamePacket extends DataPacket {
     public String multiplayerCorrelationId = "";
     public boolean isDisablingPersonas;
     public boolean isDisablingCustomSkins;
+    /**
+     * @since v527
+     */
+    public CompoundTag playerPropertyData = new CompoundTag("");
     public boolean clientSideGenerationEnabled;
     public byte chatRestrictionLevel;
     public boolean disablePlayerInteractions;
@@ -190,7 +195,7 @@ public class StartGamePacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_16_100) {
             if (Server.getInstance().enableExperimentMode && !this.experiments.isEmpty()) {
                 this.putLInt(this.experiments.size()); // Experiment count
-                for (ResourcePackStackPacket.ExperimentData experiment : this.experiments) {
+                for (ExperimentData experiment : this.experiments) {
                     this.putString(experiment.getName());
                     this.putBoolean(experiment.isEnabled());
                 }
@@ -298,7 +303,7 @@ public class StartGamePacket extends DataPacket {
                     if (protocol >= ProtocolInfo.v1_18_0) {
                         if (protocol >= ProtocolInfo.v1_19_0_29) {
                             try {
-                                this.put(NBTIO.writeNetwork(new CompoundTag(""))); // playerPropertyData
+                                this.put(NBTIO.writeNetwork(this.playerPropertyData));
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }

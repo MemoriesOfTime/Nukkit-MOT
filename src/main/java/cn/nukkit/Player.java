@@ -6,13 +6,13 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCampfire;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
 import cn.nukkit.blockentity.BlockEntitySpawnable;
-import cn.nukkit.camera.data.CameraPreset;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandDataVersions;
 import cn.nukkit.command.defaults.HelpCommand;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.*;
+import cn.nukkit.entity.data.property.EntityProperty;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
@@ -510,6 +510,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 (!this.isSpectator() || (this.server.useClientSpectator && player.protocol >= ProtocolInfo.v1_19_30)) &&
                 this.showToOthers) {
             super.spawnTo(player);
+            if (this.isSpectator()) {
+                UpdatePlayerGameTypePacket pk = new UpdatePlayerGameTypePacket();
+                pk.gameType = GameType.from(getClientFriendlyGamemode(gamemode));
+                pk.entityId = this.getId();
+                player.dataPacket(pk);
+            }
         }
     }
 
@@ -1544,15 +1550,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        /*if (this.isSpectator()) {
-            this.keepMovement = true;
-            this.onGround = false;
-            this.despawnFromAll();
-        } else {
-            this.keepMovement = false;
-            this.spawnToAll();
-        }*/
-
         this.namedTag.putInt("playerGameType", this.gamemode);
 
         if (!clientSide) {
@@ -2107,12 +2104,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.protocol < ProtocolInfo.v1_20_0_23) {
             return;
         }
-        ListTag<CompoundTag> presetListTag = new ListTag<>("presets");
-        for (CameraPreset preset : CameraPreset.getPresets().values()) {
-            presetListTag.add(preset.serialize());
-        }
         CameraPresetsPacket pk = new CameraPresetsPacket();
-        pk.setData(new CompoundTag().putList(presetListTag));
+        pk.getPresets().addAll(CameraPresetManager.getPresets().values());
         this.dataPacket(pk);
     }
 
@@ -2655,6 +2648,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         startGamePacket.isMovementServerAuthoritative = this.isMovementServerAuthoritative();
         startGamePacket.isServerAuthoritativeBlockBreaking = this.isServerAuthoritativeBlockBreaking();
+        startGamePacket.playerPropertyData = EntityProperty.getPlayerPropertyCache();
         this.forceDataPacket(startGamePacket, null);
 
         this.loggedIn = true;
@@ -2672,6 +2666,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.protocol >= ProtocolInfo.v1_8_0) {
                 if (this.protocol >= ProtocolInfo.v1_12_0) {
                     if (this.protocol >= ProtocolInfo.v1_16_100) {
+                        if (this.protocol >= ProtocolInfo.v1_17_0) {
+                            //注册实体属性
+                            for(SyncEntityPropertyPacket pk : EntityProperty.getPacketCache()) {
+                                this.dataPacket(pk);
+                            }
+                        }
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
                         if (this.server.enableExperimentMode) {
                             ArrayList<Integer> customItems = RuntimeItems.getMapping(this.protocol).getCustomItems();
@@ -3267,8 +3267,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
-                Vector3 clientPosition = authPacket.getPosition().asVector3()
-                        .subtract(0, this.getBaseOffset(), 0);
+                Vector3 clientPosition = authPacket.getPosition().subtract(0, this.getEyeHeight(), 0).asVector3();
 
                 double distSqrt = clientPosition.distanceSquared(this);
                 if (distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
@@ -7142,18 +7141,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return protocol >= ProtocolInfo.v1_7_0 && this.server.encryptionEnabled /*&& loginChainData.isXboxAuthed()*/;
     }
 
-    private List<ResourcePackStackPacket.ExperimentData> getExperiments() {
-        List<ResourcePackStackPacket.ExperimentData> experiments = new ObjectArrayList<>();
+    private List<ExperimentData> getExperiments() {
+        List<ExperimentData> experiments = new ObjectArrayList<>();
         //TODO Multiversion 当新版本删除部分实验性玩法时，这里也需要加上判断
         if (this.server.enableExperimentMode) {
-            experiments.add(new ResourcePackStackPacket.ExperimentData("data_driven_items", true));
-            experiments.add(new ResourcePackStackPacket.ExperimentData("experimental_custom_ui", true));
-            experiments.add(new ResourcePackStackPacket.ExperimentData("upcoming_creator_features", true));
-            experiments.add(new ResourcePackStackPacket.ExperimentData("experimental_molang_features", true));
+            experiments.add(new ExperimentData("data_driven_items", true));
+            experiments.add(new ExperimentData("experimental_custom_ui", true));
+            experiments.add(new ExperimentData("upcoming_creator_features", true));
+            experiments.add(new ExperimentData("experimental_molang_features", true));
             if (protocol >= ProtocolInfo.v1_20_0_23) {
-                experiments.add(new ResourcePackStackPacket.ExperimentData("cameras", true));
+                experiments.add(new ExperimentData("cameras", true));
                 if (protocol >= ProtocolInfo.v1_20_10) {
-                    experiments.add(new ResourcePackStackPacket.ExperimentData("short_sneaking", true));
+                    experiments.add(new ExperimentData("short_sneaking", true));
                 }
             }
         }

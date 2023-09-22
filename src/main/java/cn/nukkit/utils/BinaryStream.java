@@ -22,11 +22,13 @@ import cn.nukkit.network.LittleEndianByteBufInputStream;
 import cn.nukkit.network.LittleEndianByteBufOutputStream;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.EntityLink;
+import com.google.common.base.Preconditions;
 import io.netty.buffer.AbstractByteBufAllocator;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
 import lombok.SneakyThrows;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -34,9 +36,7 @@ import java.lang.reflect.Array;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.function.*;
 
 /**
  * BinaryStream
@@ -1418,6 +1418,17 @@ public class BinaryStream {
         return deque.toArray((T[]) Array.newInstance(clazz, 0));
     }
 
+    public <T> void getArray(Collection<T> array, Function<BinaryStream, T> function) {
+        getArray(array, BinaryStream::getUnsignedVarInt, function);
+    }
+
+    public <T> void getArray(Collection<T> array, ToLongFunction<BinaryStream> lengthReader, Function<BinaryStream, T> function) {
+        long length = lengthReader.applyAsLong(this);
+        for (int i = 0; i < length; i++) {
+            array.add(function.apply(this));
+        }
+    }
+
     public <T> void putArray(Collection<T> collection, Consumer<T> writer) {
         if (collection == null) {
             putUnsignedVarInt(0);
@@ -1438,11 +1449,46 @@ public class BinaryStream {
         }
     }
 
-    public <T> void putArray(Collection<T> array, BiConsumer<BinaryStream, T> biConsumer) {
+    public <T> void putArray(@NotNull Collection<T> array, BiConsumer<BinaryStream, T> biConsumer) {
         this.putUnsignedVarInt(array.size());
         for (T val : array) {
             biConsumer.accept(this, val);
         }
+    }
+
+    public <O> O getOptional(O emptyValue, Function<BinaryStream, O> function) {
+        if (this.getBoolean()) {
+            return function.apply(this);
+        }
+        return emptyValue;
+    }
+
+    public <T> void putOptional(@NotNull Predicate<T> isPresent, T object, Consumer<T> consumer) {
+        Preconditions.checkNotNull(consumer, "read consumer");
+
+        boolean exists = isPresent.test(object);
+        this.putBoolean(exists);
+        if (exists) {
+            consumer.accept(object);
+        }
+    }
+
+    public <T> void putOptional(@NotNull Predicate<T> isPresent, T object, BiConsumer<BinaryStream, T> consumer) {
+        Preconditions.checkNotNull(consumer, "read consumer");
+
+        boolean exists = isPresent.test(object);
+        this.putBoolean(exists);
+        if (exists) {
+            consumer.accept(this, object);
+        }
+    }
+
+    public <T> void putOptionalNull(T object, Consumer<T> consumer) {
+        this.putOptional(Objects::nonNull, object, consumer);
+    }
+
+    public <T> void putOptionalNull(T object, BiConsumer<BinaryStream, T> consumer) {
+        this.putOptional(Objects::nonNull, object, consumer);
     }
 
     public boolean feof() {
