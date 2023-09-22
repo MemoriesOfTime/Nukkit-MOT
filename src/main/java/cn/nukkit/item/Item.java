@@ -561,6 +561,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         Item.creative582.clear();
         Item.creative589.clear();
         Item.creative594.clear();
+        Item.creative618.clear();
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
