@@ -1,10 +1,10 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
-import lombok.Value;
 
 import java.util.List;
 
@@ -76,11 +76,5 @@ public class ResourcePackStackPacket extends DataPacket {
     @Override
     public byte pid() {
         return NETWORK_ID;
-    }
-
-    @Value
-    public static class ExperimentData {
-        String name;
-        boolean enabled;
     }
 }

@@ -124,6 +124,10 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
 
     @Override
     public boolean onUpdate(int currentTick) {
+        if (!super.onUpdate(currentTick)) {
+            return false;
+        }
+
         MinecartHopperInventory minecartHopperInventory = this.getInventory();
         for (Entity nearbyEntity : this.getLevel().getNearbyEntities(new SimpleAxisAlignedBB(this.getPosition().add(0.8, 0.5, 0.8), this.getPosition().subtract(0.8, 0.5, 0.8)))) {
             if(nearbyEntity instanceof EntityItem) {
@@ -217,7 +221,7 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
         } else {
             transferCooldown--;
         }
-        return super.onUpdate(currentTick);
+        return true;
     }
 
     public boolean isOnTransferCooldown() {

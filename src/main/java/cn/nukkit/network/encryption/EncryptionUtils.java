@@ -162,7 +162,7 @@ public class EncryptionUtils {
             }
 
             if (lastKey.equals(EncryptionUtils.MOJANG_PUBLIC_KEY)
-                    || (!Server.getInstance().ignoreOldMojangPublicKey) && lastKey.equals(EncryptionUtils.OLD_MOJANG_PUBLIC_KEY)) {
+                    || (!Server.getInstance().ignoreOldMojangPublicKey && lastKey.equals(EncryptionUtils.OLD_MOJANG_PUBLIC_KEY))) {
                 validChain = true;
             }
 
