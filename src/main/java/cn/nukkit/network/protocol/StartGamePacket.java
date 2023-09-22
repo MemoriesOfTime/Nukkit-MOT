@@ -96,6 +96,10 @@ public class StartGamePacket extends DataPacket {
     public String multiplayerCorrelationId = "";
     public boolean isDisablingPersonas;
     public boolean isDisablingCustomSkins;
+    /**
+     * @since v527
+     */
+    public CompoundTag playerPropertyData = new CompoundTag("");
     public boolean clientSideGenerationEnabled;
     public byte chatRestrictionLevel;
     public boolean disablePlayerInteractions;
@@ -299,7 +303,7 @@ public class StartGamePacket extends DataPacket {
                     if (protocol >= ProtocolInfo.v1_18_0) {
                         if (protocol >= ProtocolInfo.v1_19_0_29) {
                             try {
-                                this.put(NBTIO.writeNetwork(new CompoundTag(""))); // playerPropertyData
+                                this.put(NBTIO.writeNetwork(this.playerPropertyData));
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }

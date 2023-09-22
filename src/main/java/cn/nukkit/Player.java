@@ -12,6 +12,7 @@ import cn.nukkit.command.data.CommandDataVersions;
 import cn.nukkit.command.defaults.HelpCommand;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.*;
+import cn.nukkit.entity.data.property.EntityProperty;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
@@ -2646,6 +2647,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         startGamePacket.isMovementServerAuthoritative = this.isMovementServerAuthoritative();
         startGamePacket.isServerAuthoritativeBlockBreaking = this.isServerAuthoritativeBlockBreaking();
+        startGamePacket.playerPropertyData = EntityProperty.getPlayerPropertyCache();
         this.forceDataPacket(startGamePacket, null);
 
         this.loggedIn = true;
@@ -2663,6 +2665,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.protocol >= ProtocolInfo.v1_8_0) {
                 if (this.protocol >= ProtocolInfo.v1_12_0) {
                     if (this.protocol >= ProtocolInfo.v1_16_100) {
+                        if (this.protocol >= ProtocolInfo.v1_17_0) {
+                            //注册实体属性
+                            for(SyncEntityPropertyPacket pk : EntityProperty.getPacketCache()) {
+                                this.dataPacket(pk);
+                            }
+                        }
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
                         if (this.server.enableExperimentMode) {
                             ArrayList<Integer> customItems = RuntimeItems.getMapping(this.protocol).getCustomItems();
