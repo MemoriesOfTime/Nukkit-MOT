@@ -1021,7 +1021,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (!this.hasSpawnChunks && this.chunksSent >= server.spawnThreshold) {
             this.hasSpawnChunks = true;
 
-            if (this.protocol <= 274) {
+            if (this.protocol < ProtocolInfo.v1_5_0) {
                 this.doFirstSpawn();
             }
 
@@ -4679,13 +4679,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.dataPacket(re);
                     });
                 }
-                break;
-            case ProtocolInfo.SET_LOCAL_PLAYER_AS_INITIALIZED_PACKET:
-                if (this.locallyInitialized || this.protocol <= 274) {
-                    return;
-                }
-
-                this.doFirstSpawn();
                 break;
             case ProtocolInfo.RESPAWN_PACKET:
                 if (this.isAlive() || this.protocol < 388) {
