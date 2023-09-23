@@ -1027,8 +1027,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.sendPlayStatus(PlayStatusPacket.PLAYER_SPAWN);
 
-            // Not really needed on Nukkit PM1E, but it's here for plugin compatibility
-            this.server.getPluginManager().callEvent(new PlayerLocallyInitializedEvent(this));
+            if (protocol < ProtocolInfo.v1_5_0) {
+                this.server.getPluginManager().callEvent(new PlayerLocallyInitializedEvent(this));
+            }
         }
     }
 
