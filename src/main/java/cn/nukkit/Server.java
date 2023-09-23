@@ -693,10 +693,10 @@ public class Server {
 
         this.pluginManager.loadInternalPlugin();
         if (loadPlugins) {
-            this.pluginManager.loadPlugins(this.pluginPath);
             if (this.enableSpark) {
                 SparkInstaller.initSpark(this);
             }
+            this.pluginManager.loadPlugins(this.pluginPath);
             this.enablePlugins(PluginLoadOrder.STARTUP);
         }
 
@@ -1006,10 +1006,10 @@ public class Server {
         }
 
         this.pluginManager.registerInterface(JavaPluginLoader.class);
-        this.pluginManager.loadPlugins(this.pluginPath);
         if (this.enableSpark) {
             SparkInstaller.initSpark(this);
         }
+        this.pluginManager.loadPlugins(this.pluginPath);
         this.enablePlugins(PluginLoadOrder.STARTUP);
         this.enablePlugins(PluginLoadOrder.POSTWORLD);
     }
