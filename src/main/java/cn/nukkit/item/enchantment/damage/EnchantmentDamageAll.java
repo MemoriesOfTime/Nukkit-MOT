@@ -9,7 +9,12 @@ import cn.nukkit.entity.Entity;
 public class EnchantmentDamageAll extends EnchantmentDamage {
 
     public EnchantmentDamageAll() {
-        super(ID_DAMAGE_ALL, "all", Rarity.COMMON, TYPE.ALL);
+        super(ID_DAMAGE_ALL, "all", Rarity.COMMON, TYPE.ALL, 20);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 11 * (level - 1) + 1;
     }
 
     @Override

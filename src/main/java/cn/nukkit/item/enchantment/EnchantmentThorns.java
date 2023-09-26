@@ -15,7 +15,12 @@ import java.util.concurrent.ThreadLocalRandom;
 public class EnchantmentThorns extends Enchantment {
 
     protected EnchantmentThorns() {
-        super(ID_THORNS, "thorns", Rarity.RARE, EnchantmentType.ARMOR);
+        super(ID_THORNS, "thorns", Rarity.RARE, EnchantmentType.ARMOR, 50);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 20 * (level - 1) + 10;
     }
 
     @Override

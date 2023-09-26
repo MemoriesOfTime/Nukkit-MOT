@@ -9,7 +9,12 @@ import cn.nukkit.item.Item;
 public class EnchantmentEfficiency extends Enchantment {
 
     protected EnchantmentEfficiency() {
-        super(ID_EFFICIENCY, "digging", Rarity.COMMON, EnchantmentType.DIGGER);
+        super(ID_EFFICIENCY, "digging", Rarity.COMMON, EnchantmentType.DIGGER, 50);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 10 * (level - 1) + 1;
     }
 
     @Override

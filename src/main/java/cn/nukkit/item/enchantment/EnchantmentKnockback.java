@@ -7,7 +7,12 @@ package cn.nukkit.item.enchantment;
 public class EnchantmentKnockback extends Enchantment {
 
     protected EnchantmentKnockback() {
-        super(ID_KNOCKBACK, "knockback", Rarity.UNCOMMON, EnchantmentType.SWORD);
+        super(ID_KNOCKBACK, "knockback", Rarity.UNCOMMON, EnchantmentType.SWORD, 50);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 20 * (level - 1) + 5;
     }
 
     @Override

@@ -10,6 +10,10 @@ import cn.nukkit.item.enchantment.EnchantmentType;
 public abstract class EnchantmentBow extends Enchantment {
 
     protected EnchantmentBow(int id, String name, Rarity rarity) {
-        super(id, name, rarity, EnchantmentType.BOW);
+        super(id, name, rarity, EnchantmentType.BOW, -1);
+    }
+
+    protected EnchantmentBow(int id, String name, Rarity rarity, int enchantingPowerRange) {
+        super(id, name, rarity, EnchantmentType.BOW, enchantingPowerRange);
     }
 }

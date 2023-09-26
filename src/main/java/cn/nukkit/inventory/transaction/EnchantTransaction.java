@@ -3,11 +3,12 @@ package cn.nukkit.inventory.transaction;
 import cn.nukkit.Player;
 import cn.nukkit.event.inventory.EnchantItemEvent;
 import cn.nukkit.inventory.EnchantInventory;
-import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.transaction.action.EnchantingAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.network.protocol.PlayerEnchantOptionsPacket;
 import cn.nukkit.network.protocol.types.NetworkInventoryAction;
 import lombok.Getter;
 import lombok.Setter;
@@ -17,7 +18,7 @@ import java.util.List;
 @Getter
 @Setter
 public class EnchantTransaction extends InventoryTransaction {
-
+    private EnchantInventory inv;
     private Item inputItem;
     private Item outputItem;
     private int cost = -1;
@@ -35,16 +36,19 @@ public class EnchantTransaction extends InventoryTransaction {
 
     @Override
     public boolean canExecute() {
-        Inventory inv = getSource().getWindowById(Player.ENCHANT_WINDOW_ID);
-        if (inv == null) return false;
-        EnchantInventory eInv = (EnchantInventory) inv;
-        if (!getSource().isCreative()) {
-            if (cost == -1 || !eInv.getReagentSlot().equals(Item.get(Item.DYE, 4), true, false) || eInv.getReagentSlot().count < cost)
-                return false;
+        if (!(this.getSource().getWindowById(Player.ENCHANT_WINDOW_ID) instanceof final EnchantInventory inv)) {
+            return false;
         }
+
+        if (!this.getSource().isCreative()) {
+            if (cost == -1 || !inv.getReagentSlot().equals(Item.get(Item.DYE, 4), true, false) || inv.getReagentSlot().count < cost) {
+                return false;
+            }
+        }
+
         return inputItem != null && outputItem != null
-                && inputItem.equals(eInv.getInputSlot(), true, true)
-                && this.checkEnchantValid();
+            && inputItem.equals(inv.getInputSlot(), true, true)
+            && this.checkEnchantValid(inv);
     }
 
     @Override
@@ -55,7 +59,7 @@ public class EnchantTransaction extends InventoryTransaction {
             this.sendInventories();
             return false;
         }
-        EnchantInventory inv = (EnchantInventory) getSource().getWindowById(Player.ENCHANT_WINDOW_ID);
+        EnchantInventory inv = (EnchantInventory) this.getSource().getWindowById(Player.ENCHANT_WINDOW_ID);
         EnchantItemEvent ev = new EnchantItemEvent(inv, inputItem, outputItem, cost, source);
         source.getServer().getPluginManager().callEvent(ev);
         if (ev.isCancelled()) {
@@ -80,8 +84,10 @@ public class EnchantTransaction extends InventoryTransaction {
         }
 
         if (!source.isCreative()) {
+            source.setEnchantmentSeed(source.generateEnchantmentSeed());
             source.setExperience(source.getExperience(), source.getExperienceLevel() - ev.getXpCost());
         }
+
         return true;
     }
 
@@ -90,21 +96,18 @@ public class EnchantTransaction extends InventoryTransaction {
         super.addAction(action);
         if (action instanceof EnchantingAction) {
             switch (((EnchantingAction) action).getType()) {
-                case NetworkInventoryAction.SOURCE_TYPE_ENCHANT_INPUT:
+                case NetworkInventoryAction.SOURCE_TYPE_ENCHANT_INPUT ->
                     this.inputItem = action.getTargetItem(); // Input sent as newItem
-                    break;
-                case NetworkInventoryAction.SOURCE_TYPE_ENCHANT_OUTPUT:
+                case NetworkInventoryAction.SOURCE_TYPE_ENCHANT_OUTPUT ->
                     this.outputItem = action.getSourceItem(); // Output sent as oldItem
-                    break;
-                case NetworkInventoryAction.SOURCE_TYPE_ENCHANT_MATERIAL:
+                case NetworkInventoryAction.SOURCE_TYPE_ENCHANT_MATERIAL -> {
                     if (action.getTargetItem().equals(Item.get(Item.AIR), false, false)) {
                         this.cost = action.getSourceItem().count;
                     } else {
                         this.cost = action.getSourceItem().count - action.getTargetItem().count;
                     }
-                    break;
+                }
             }
-
         }
     }
 
@@ -115,14 +118,17 @@ public class EnchantTransaction extends InventoryTransaction {
         return false;
     }
 
-    public boolean checkEnchantValid() {
-        if (this.inputItem.getId() != this.outputItem.getId()
-                || this.inputItem.getCount() != this.outputItem.getCount()) {
-            return false;
+    public boolean checkEnchantValid(EnchantInventory inv) {
+        for (final PlayerEnchantOptionsPacket.EnchantOptionData option : inv.getOptions()) {
+            for (final Enchantment ench : option.enchantments()) {
+                if (outputItem.hasEnchantment(ench.getId())) {
+                    return outputItem.getId() == inputItem.getId() && outputItem.getDamage() == inputItem.getDamage();
+                }
+            }
         }
 
-        //TODO 检查附魔
+        System.out.println(inv.getOptions());
 
-        return true;
+        return false;
     }
 }

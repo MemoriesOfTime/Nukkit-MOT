@@ -10,7 +10,11 @@ import cn.nukkit.item.enchantment.EnchantmentType;
 public abstract class EnchantmentLoot extends Enchantment {
 
     protected EnchantmentLoot(int id, String name, Rarity rarity, EnchantmentType type) {
-        super(id, name, rarity, type);
+        super(id, name, rarity, type, -1);
+    }
+
+    protected EnchantmentLoot(int id, String name, Rarity rarity, EnchantmentType type, int enchantingPowerRange) {
+        super(id, name, rarity, type, enchantingPowerRange);
     }
 
     @Override

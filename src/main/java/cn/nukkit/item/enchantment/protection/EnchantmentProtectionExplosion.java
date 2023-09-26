@@ -10,7 +10,12 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 public class EnchantmentProtectionExplosion extends EnchantmentProtection {
 
     public EnchantmentProtectionExplosion() {
-        super(ID_PROTECTION_EXPLOSION, "explosion", Rarity.RARE, TYPE.EXPLOSION);
+        super(ID_PROTECTION_EXPLOSION, "explosion", Rarity.RARE, TYPE.EXPLOSION, 12);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 8 * (level - 1) + 5;
     }
 
     @Override

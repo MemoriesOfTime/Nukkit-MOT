@@ -8,7 +8,12 @@ import cn.nukkit.item.enchantment.Enchantment;
  */
 public class EnchantmentBowKnockback extends EnchantmentBow {
     public EnchantmentBowKnockback() {
-        super(Enchantment.ID_BOW_KNOCKBACK, "arrowKnockback", Rarity.RARE);
+        super(Enchantment.ID_BOW_KNOCKBACK, "arrowKnockback", Rarity.RARE, 25);
+    }
+
+    @Override
+    public int getMinEnchantingPower(int level) {
+        return 20 * (level - 1) + 12;
     }
 
     @Override
