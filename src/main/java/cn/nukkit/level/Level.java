@@ -4077,12 +4077,12 @@ public class Level implements ChunkManager, Metadatable {
     public void addEntityMovement(Entity entity, double x, double y, double z, double yaw, double pitch, double headYaw) {
         MoveEntityAbsolutePacket pk = new MoveEntityAbsolutePacket();
         pk.eid = entity.getId();
-        pk.x = (float) x;
-        pk.y = (float) y;
-        pk.z = (float) z;
-        pk.yaw = (float) yaw;
-        pk.headYaw = (float) headYaw;
-        pk.pitch = (float) pitch;
+        pk.x = x;
+        pk.y = y;
+        pk.z = z;
+        pk.yaw = yaw;
+        pk.headYaw = headYaw;
+        pk.pitch = pitch;
         pk.onGround = entity.onGround;
 
         if (this.server.isLowProfileServer()) {
@@ -4695,7 +4695,9 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_20_10_21) {
+        if (protocol >= ProtocolInfo.v1_20_30_24) {
+            return ProtocolInfo.v1_20_30;
+        } else if (protocol >= ProtocolInfo.v1_20_10_21) {
             return ProtocolInfo.v1_20_10;
         } else if (protocol >= ProtocolInfo.v1_20_0_23) {
             return ProtocolInfo.v1_20_0;
@@ -4776,7 +4778,9 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_19_80) if (player == ProtocolInfo.v1_19_80) return true;
         if (chunk == ProtocolInfo.v1_20_0)
             if (player >= ProtocolInfo.v1_20_0_23) if (player < ProtocolInfo.v1_20_10_21) return true;
-        if (chunk == ProtocolInfo.v1_20_10) if (player >= ProtocolInfo.v1_20_10_21) return true;
+        if (chunk == ProtocolInfo.v1_20_10)
+            if (player >= ProtocolInfo.v1_20_10_21) if (player < ProtocolInfo.v1_20_30_24) return true;
+        if (chunk == ProtocolInfo.v1_20_30) if (player >= ProtocolInfo.v1_20_30_24) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

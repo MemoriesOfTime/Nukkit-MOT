@@ -183,4 +183,9 @@ public class BlockSnowLayer extends BlockFallableMeta {
                 this.z + 1
         );
     }
+
+    @Override
+    public boolean canPassThrough() {
+        return (this.getDamage() & 0x7) < 3;
+    }
 }

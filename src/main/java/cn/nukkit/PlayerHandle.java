@@ -464,4 +464,8 @@ public final class PlayerHandle {
     public void processPreLogin() {
         player.processPreLogin();
     }
+
+    public void doFirstSpawn() {
+        player.doFirstSpawn();
+    }
 }

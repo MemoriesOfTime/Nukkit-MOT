@@ -10,6 +10,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityHuman;
 import cn.nukkit.entity.data.Skin;
 import cn.nukkit.entity.data.profession.Profession;
+import cn.nukkit.entity.data.property.EntityProperty;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.entity.passive.*;
@@ -692,10 +693,10 @@ public class Server {
 
         this.pluginManager.loadInternalPlugin();
         if (loadPlugins) {
-            this.pluginManager.loadPlugins(this.pluginPath);
             if (this.enableSpark) {
                 SparkInstaller.initSpark(this);
             }
+            this.pluginManager.loadPlugins(this.pluginPath);
             this.enablePlugins(PluginLoadOrder.STARTUP);
         }
 
@@ -762,6 +763,9 @@ public class Server {
         if (loadPlugins) {
             this.enablePlugins(PluginLoadOrder.POSTWORLD);
         }
+
+        EntityProperty.buildPacket();
+        EntityProperty.buildPlayerProperty();
 
         if (this.getPropertyBoolean("thread-watchdog", true)) {
             this.watchdog = new Watchdog(this, this.getPropertyInt("thread-watchdog-tick", 60000));
@@ -1002,10 +1006,10 @@ public class Server {
         }
 
         this.pluginManager.registerInterface(JavaPluginLoader.class);
-        this.pluginManager.loadPlugins(this.pluginPath);
         if (this.enableSpark) {
             SparkInstaller.initSpark(this);
         }
+        this.pluginManager.loadPlugins(this.pluginPath);
         this.enablePlugins(PluginLoadOrder.STARTUP);
         this.enablePlugins(PluginLoadOrder.POSTWORLD);
     }
@@ -1253,7 +1257,9 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_20_10_21) {
+        if (player.protocol >= ProtocolInfo.v1_20_30_24) {
+            player.dataPacket(CraftingManager.packet618);
+        } else if (player.protocol >= ProtocolInfo.v1_20_10_21) {
             player.dataPacket(CraftingManager.packet594);
         } else if (player.protocol >= ProtocolInfo.v1_20_0_23) {
             player.dataPacket(CraftingManager.packet589);

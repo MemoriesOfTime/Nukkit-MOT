@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.entity.data.EntityMetadata;
+import cn.nukkit.network.protocol.types.PropertySyncData;
 import cn.nukkit.utils.Binary;
 import lombok.ToString;
 
@@ -21,6 +22,10 @@ public class SetEntityDataPacket extends DataPacket {
     public long eid;
     public EntityMetadata metadata;
     public long frame;
+    /**
+     * @since v557
+     */
+    public PropertySyncData syncedProperties = new PropertySyncData(new int[]{}, new float[]{});
 
     @Override
     public void decode() {
@@ -33,8 +38,16 @@ public class SetEntityDataPacket extends DataPacket {
         this.put(Binary.writeMetadata(protocol, this.metadata));
         if (protocol >= ProtocolInfo.v1_16_100) {
             if (protocol >= ProtocolInfo.v1_19_40) {
-                this.putUnsignedVarInt(0); // Entity properties int
-                this.putUnsignedVarInt(0); // Entity properties float
+                this.putUnsignedVarInt(this.syncedProperties.intProperties().length);
+                for (int i = 0, len = this.syncedProperties.intProperties().length; i < len; ++i) {
+                    this.putUnsignedVarInt(i);
+                    this.putVarInt(this.syncedProperties.intProperties()[i]);
+                }
+                this.putUnsignedVarInt(this.syncedProperties.floatProperties().length);
+                for (int i = 0, len = this.syncedProperties.floatProperties().length; i < len; ++i) {
+                    this.putUnsignedVarInt(i);
+                    this.putLFloat(this.syncedProperties.floatProperties()[i]);
+                }
             }
             this.putUnsignedVarLong(this.frame);
         }

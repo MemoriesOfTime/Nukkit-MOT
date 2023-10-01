@@ -7,6 +7,7 @@ import cn.nukkit.blockentity.BlockEntityPistonArm;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.data.*;
+import cn.nukkit.entity.data.property.*;
 import cn.nukkit.entity.item.EntityVehicle;
 import cn.nukkit.entity.mob.EntityCreeper;
 import cn.nukkit.entity.mob.EntityWolf;
@@ -31,14 +32,17 @@ import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.EntityLink;
+import cn.nukkit.network.protocol.types.PropertySyncData;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.ChunkException;
+import cn.nukkit.utils.Identifier;
 import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.Utils;
 import com.google.common.collect.Iterables;
 import org.apache.commons.math3.util.FastMath;
 
+import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -448,6 +452,9 @@ public abstract class Entity extends Location implements Metadatable {
 
     protected volatile boolean saveWithChunk = true;
 
+    private Map<String, Integer> intProperties = new LinkedHashMap<>();
+    private Map<String, Float> floatProperties = new LinkedHashMap<>();
+
     public float getHeight() {
         return 0;
     }
@@ -494,9 +501,12 @@ public abstract class Entity extends Location implements Metadatable {
 
     public Entity(FullChunk chunk, CompoundTag nbt) {
         this.isPlayer = this instanceof Player;
-        if (!this.isPlayer) {
-            this.init(chunk, nbt);
+        if (this.isPlayer) {
+            initEntityProperties("minecraft:player");
+            return;
         }
+        initEntityProperties();
+        this.init(chunk, nbt);
     }
 
     protected void initEntity() {
@@ -628,6 +638,18 @@ public abstract class Entity extends Location implements Metadatable {
         this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
 
         this.scheduleUpdate();
+    }
+
+    /**
+     * 获取该实体的标识符
+     * <p>
+     * Get the identifier of the entity
+     *
+     * @return the identifier
+     */
+    @Nullable
+    public Identifier getIdentifier() {
+        return Entity.getIdentifier(this.getNetworkId());
     }
 
     public boolean hasCustomName() {
@@ -1084,6 +1106,22 @@ public abstract class Entity extends Location implements Metadatable {
         return entityIdentifiersCache.get(correctEntityIdentifiersProtocol(protocolId));
     }
 
+    /**
+     * 获取指定网络id实体的标识符
+     * <p>
+     * Get the identifier of the specified network id entity
+     *
+     * @return the identifier
+     */
+    @Nullable
+    public static Identifier getIdentifier(int networkID) {
+        String str = getEntityRuntimeMapping().get(networkID);
+        if (str == null) {
+            return null;
+        }
+        return new Identifier(str);
+    }
+
     public static CompoundTag getDefaultNBT(Vector3 pos) {
         return getDefaultNBT(pos, null);
     }
@@ -1263,6 +1301,7 @@ public abstract class Entity extends Location implements Metadatable {
         SetEntityDataPacket pk = new SetEntityDataPacket();
         pk.eid = this.id;
         pk.metadata = data == null ? this.dataProperties.clone() : data;
+        pk.syncedProperties = this.propertySyncData();
 
         player.dataPacket(pk);
     }
@@ -1275,13 +1314,14 @@ public abstract class Entity extends Location implements Metadatable {
         SetEntityDataPacket pk = new SetEntityDataPacket();
         pk.eid = this.id;
         //pk.metadata = data == null ? this.dataProperties : data;
+        pk.syncedProperties = this.propertySyncData();
 
         for (Player player : players) {
             if (player == this) {
                 continue;
             }
             pk.metadata = data == null ? this.dataProperties.clone() : data;
-            player.dataPacket(pk/*.clone()*/);
+            player.dataPacket(pk);
         }
         if (this.isPlayer) {
             pk.metadata = data == null ? this.dataProperties.clone() : data;
@@ -2977,5 +3017,92 @@ public abstract class Entity extends Location implements Metadatable {
     public void setNoClip(boolean noClip) {
         this.noClip = noClip;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_HAS_COLLISION, noClip);
+    }
+
+    private boolean validateAndSetIntProperty(String identifier, int value) {
+        if(!intProperties.containsKey(identifier)) {
+            return false;
+        }
+        intProperties.put(identifier, value);
+        return true;
+    }
+
+    public final boolean setIntEntityProperty(String identifier, int value) {
+        return validateAndSetIntProperty(identifier, value);
+    }
+
+    public final boolean setBooleanEntityProperty(String identifier, boolean value) {
+        return validateAndSetIntProperty(identifier, value ? 1 : 0);
+    }
+
+    public final boolean setFloatEntityProperty(String identifier, float value) {
+        if(!floatProperties.containsKey(identifier)) {
+            return false;
+        }
+        floatProperties.put(identifier, value);
+        return true;
+    }
+
+    public final boolean setEnumEntityProperty(String identifier, String value) {
+        if(!intProperties.containsKey(identifier)) return false;
+        List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
+
+        for (EntityProperty property : entityPropertyList) {
+            if(property.getIdentifier() == identifier && property instanceof EnumEntityProperty enumEntityProperty) {
+                int index = enumEntityProperty.findIndex(value);
+
+                if(index >= 0) {
+                    intProperties.put(identifier, index);
+                    return true;
+                }
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private void initEntityProperties() {
+        if(this.getIdentifier() != null) {
+            initEntityProperties(this.getIdentifier().toString());
+        }
+    }
+
+    private void initEntityProperties(String entityIdentifier) {
+        List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(entityIdentifier);
+        if (entityPropertyList.isEmpty()) {
+            return;
+        }
+
+        for (EntityProperty property : entityPropertyList) {
+            final String identifier = property.getIdentifier();
+
+            if (property instanceof FloatEntityProperty floatProperty) {
+                floatProperties.put(identifier, floatProperty.getDefaultValue());
+            } else if (property instanceof IntEntityProperty intProperty) {
+                intProperties.put(identifier, intProperty.getDefaultValue());
+            } else if (property instanceof BooleanEntityProperty booleanProperty) {
+                intProperties.put(identifier, booleanProperty.getDefaultValue() ? 1 : 0);
+            } else if (property instanceof EnumEntityProperty enumProperty) {
+                intProperties.put(identifier, enumProperty.findIndex(enumProperty.getDefaultValue()));
+            }
+        }
+    }
+
+    private PropertySyncData propertySyncData() {
+        Collection<Integer> intValues = intProperties.values();
+        int[] intArray = new int[intValues.size()];
+        int i = 0;
+        for (Integer value : intValues) {
+            intArray[i++] = value;
+        }
+
+        Collection<Float> floatValues = floatProperties.values();
+        float[] floatArray = new float[floatValues.size()];
+        i = 0;
+        for (Float value : floatValues) {
+            floatArray[i++] = value;
+        }
+
+        return new PropertySyncData(intArray, floatArray);
     }
 }

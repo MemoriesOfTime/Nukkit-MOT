@@ -5,6 +5,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityPotion;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.event.block.BlockBurnEvent;
+import cn.nukkit.event.block.BlockFadeEvent;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.event.entity.EntityCombustByBlockEvent;
 import cn.nukkit.event.entity.EntityDamageByBlockEvent;
@@ -70,7 +71,11 @@ public class BlockFire extends BlockFlowable {
     public void onEntityCollide(Entity entity) {
         if (entity instanceof EntityPotion) {
             if (((EntityPotion) entity).potionId == Potion.WATER) {
-                this.level.setBlock(this, Block.get(AIR));
+                BlockFadeEvent event = new BlockFadeEvent(this, Block.get(AIR));
+                this.level.getServer().getPluginManager().callEvent(event);
+                if (!event.isCancelled()) {
+                    this.level.setBlock(this, event.getNewState(), true);
+                }
             }
             return;
         }

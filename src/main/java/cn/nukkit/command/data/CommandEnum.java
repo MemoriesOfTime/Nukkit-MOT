@@ -1,8 +1,8 @@
 package cn.nukkit.command.data;
 
 import cn.nukkit.Server;
-import cn.nukkit.camera.data.CameraPreset;
 import cn.nukkit.network.protocol.UpdateSoftEnumPacket;
+import cn.nukkit.utils.CameraPresetManager;
 import com.google.common.collect.ImmutableList;
 
 import java.util.Arrays;
@@ -22,7 +22,7 @@ public class CommandEnum {
     /**
      * @since 589
      */
-    public static final CommandEnum CAMERA_PRESETS = new CommandEnum("preset", () -> CameraPreset.getPresets().keySet());
+    public static final CommandEnum CAMERA_PRESETS = new CommandEnum("preset", () -> CameraPresetManager.getPresets().keySet());
     public static final CommandEnum ENUM_BLOCK;
     public static final CommandEnum ENUM_ITEM;
 

@@ -317,7 +317,8 @@ public final class ClientChainData implements LoginChainData {
                 return !iterator.hasNext();
             }
 
-            if (lastKey.equals(EncryptionUtils.getMojangPublicKey()) || lastKey.equals(EncryptionUtils.getOldMojangPublicKey())) {
+            if (lastKey.equals(EncryptionUtils.getMojangPublicKey())
+                    || (!Server.getInstance().ignoreOldMojangPublicKey && lastKey.equals(EncryptionUtils.OLD_MOJANG_PUBLIC_KEY))) {
                 mojangKeyVerified = true;
             }
 
