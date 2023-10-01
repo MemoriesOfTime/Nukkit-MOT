@@ -1631,7 +1631,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public final boolean equals(Item item, boolean checkDamage, boolean checkCompound) {
         if (this.id == STRING_IDENTIFIED_ITEM && item.id == STRING_IDENTIFIED_ITEM) {
-            if (!this.getNamespaceId().equals(item.getNamespaceId())) {
+            if (!this.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL).equals(item.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL))) {
                 return false;
             }
         } else if (this.id != item.id) {
