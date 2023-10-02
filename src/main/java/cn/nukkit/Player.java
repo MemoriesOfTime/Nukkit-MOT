@@ -1503,11 +1503,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             newSettings.set(Type.NO_PVM, gamemode == SPECTATOR);
             newSettings.set(Type.ALLOW_FLIGHT, (gamemode & 0x01) > 0);
             newSettings.set(Type.NO_CLIP, gamemode == SPECTATOR);
-            if (gamemode == SPECTATOR) {
-                newSettings.set(Type.FLYING, true);
-            } else if ((gamemode & 0x1) == 0) {
-                newSettings.set(Type.FLYING, false);
-            }
+            newSettings.set(Type.FLYING, switch (gamemode) {
+                case CREATIVE -> newSettings.get(Type.FLYING);
+                case SPECTATOR -> true;
+                default -> false;
+            });
         }
 
         PlayerGameModeChangeEvent ev;
@@ -3238,6 +3238,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
+                if (protocol >= ProtocolInfo.v1_20_30_24) {
+                    if (authPacket.getInputData().contains(AuthInputAction.START_FLYING)) {
+                        PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
+                        this.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
+                        if (playerToggleFlightEvent.isCancelled()) {
+                            this.getAdventureSettings().update();
+                        } else {
+                            this.getAdventureSettings().set(AdventureSettings.Type.FLYING, playerToggleFlightEvent.isFlying());
+                        }
+                    }
+
+                    if (authPacket.getInputData().contains(AuthInputAction.STOP_FLYING)) {
+                        PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, false);
+                        this.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
+                        if (playerToggleFlightEvent.isCancelled()) {
+                            this.getAdventureSettings().update();
+                        } else {
+                            this.getAdventureSettings().set(AdventureSettings.Type.FLYING, playerToggleFlightEvent.isFlying());
+                        }
+                    }
+
+                }
+
                 if (protocol >= ProtocolInfo.v1_20_10 && this.server.enableExperimentMode) {
                     if (authPacket.getInputData().contains(AuthInputAction.START_CRAWLING)) {
                         PlayerToggleCrawlEvent event = new PlayerToggleCrawlEvent(this, true);
@@ -3326,34 +3349,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.adventureSettings.update();
                 } else {
                     this.adventureSettings.set(Type.FLYING, playerToggleFlightEvent.isFlying());
-                }
-                break;
-            case ProtocolInfo.REQUEST_ABILITY_PACKET:
-                if (this.protocol < ProtocolInfo.v1_19_30_23) {
-                    return;
-                }
-                RequestAbilityPacket abilityPacket = (RequestAbilityPacket) packet;
-
-                PlayerAbility ability = abilityPacket.getAbility();
-                if (ability != PlayerAbility.FLYING) {
-                    this.server.getLogger().info("[" + this.getName() + "] has tried to trigger " + ability + " ability " + (abilityPacket.isBoolValue() ? "on" : "off"));
-                    return;
-                }
-
-                if (!server.getAllowFlight() && abilityPacket.isBoolValue() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
-                    this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
-                    break;
-                }
-
-                PlayerToggleFlightEvent playerToggleFlightEvent1 = new PlayerToggleFlightEvent(this, abilityPacket.isBoolValue());
-                if (this.isSpectator()) {
-                    playerToggleFlightEvent1.setCancelled();
-                }
-                this.server.getPluginManager().callEvent(playerToggleFlightEvent1);
-                if (playerToggleFlightEvent1.isCancelled()) {
-                    this.getAdventureSettings().update();
-                } else {
-                    this.getAdventureSettings().set(Type.FLYING, playerToggleFlightEvent1.isFlying());
                 }
                 break;
             case ProtocolInfo.MOB_EQUIPMENT_PACKET:
@@ -3559,6 +3554,26 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.sendData(this);
                         } else {
                             this.setCrawling(false);
+                        }
+                        break packetswitch;
+                    case PlayerActionPacket.ACTION_START_FLYING:
+                        if (this.isMovementServerAuthoritative() || protocol < ProtocolInfo.v1_20_30_24) break;
+                        playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
+                        this.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
+                        if (playerToggleFlightEvent.isCancelled()) {
+                            this.getAdventureSettings().update();
+                        } else {
+                            this.getAdventureSettings().set(AdventureSettings.Type.FLYING, playerToggleFlightEvent.isFlying());
+                        }
+                        break packetswitch;
+                    case PlayerActionPacket.ACTION_STOP_FLYING:
+                        if (this.isMovementServerAuthoritative() || protocol < ProtocolInfo.v1_20_30_24) break;
+                        playerToggleFlightEvent = new PlayerToggleFlightEvent(this, false);
+                        this.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
+                        if (playerToggleFlightEvent.isCancelled()) {
+                            this.getAdventureSettings().update();
+                        } else {
+                            this.getAdventureSettings().set(AdventureSettings.Type.FLYING, playerToggleFlightEvent.isFlying());
                         }
                         break packetswitch;
                 }

@@ -59,6 +59,14 @@ public class PlayerActionPacket extends DataPacket {
      * @since 1.20.10
      */
     public static final int ACTION_STOP_CRAWLING = 33;
+    /**
+     * @since v618 1.20.30
+     */
+    public static final int ACTION_START_FLYING = 34;
+    /**
+     * @since v618 1.20.30
+     */
+    public static final int ACTION_STOP_FLYING = 35;
 
     public long entityId;
     public int action;
