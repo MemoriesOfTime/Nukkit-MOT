@@ -450,6 +450,13 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[CRYING_OBSIDIAN] = BlockCryingObsidian.class; //544
             list[SOUL_CAMPFIRE_BLOCK] = BlockCampfireSoul.class; //545
 
+            //TODO We need to update the GlobalBlockPalette first
+            //list[COPPER_ORE] = BlockOreCopper.class; // 566
+
+            //list[RAW_IRON_BLOCK] = BlockRawIron.class; //706
+            //list[RAW_COPPER_BLOCK] = BlockRawCopper.class; //707
+            //list[RAW_GOLD_BLOCK] = BlockRawGold.class; //708
+
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];
                 if (c != null) {
