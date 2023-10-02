@@ -3562,6 +3562,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break packetswitch;
                     case PlayerActionPacket.ACTION_START_FLYING:
                         if (this.isMovementServerAuthoritative() || protocol < ProtocolInfo.v1_20_30_24) break;
+                        if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
+                            this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
+                            break;
+                        }
                         playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
                         this.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
                         if (playerToggleFlightEvent.isCancelled()) {
