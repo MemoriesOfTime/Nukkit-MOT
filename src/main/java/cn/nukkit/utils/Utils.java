@@ -315,6 +315,15 @@ public class Utils {
         return (int) Math.round((double) number);
     }
 
+    public static double toDouble(Object number) {
+        if (number instanceof Double doubleNumber) {
+            return doubleNumber;
+        } else if (number instanceof String) {
+            return new BigDecimal(number.toString()).doubleValue();
+        }
+        return (double) number;
+    }
+
     public static byte[] parseHexBinary(String s) {
         final int len = s.length();
 
