@@ -3265,7 +3265,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 }
 
-                if (protocol >= ProtocolInfo.v1_20_10 && this.server.enableExperimentMode) {
+                if (protocol >= ProtocolInfo.v1_20_30_24 //1.20.20.22开始爬行模式不属于实验性玩法
+                        || (protocol >= ProtocolInfo.v1_20_10_21 && this.server.enableExperimentMode)) {
                     if (authPacket.getInputData().contains(AuthInputAction.START_CRAWLING)) {
                         PlayerToggleCrawlEvent event = new PlayerToggleCrawlEvent(this, true);
                         this.server.getPluginManager().callEvent(event);
@@ -7160,7 +7161,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             experiments.add(new ExperimentData("experimental_molang_features", true));
             if (protocol >= ProtocolInfo.v1_20_0_23) {
                 experiments.add(new ExperimentData("cameras", true));
-                if (protocol >= ProtocolInfo.v1_20_10) {
+                if (protocol >= ProtocolInfo.v1_20_10_21 && protocol < ProtocolInfo.v1_20_30_24) {
                     experiments.add(new ExperimentData("short_sneaking", true));
                 }
             }
