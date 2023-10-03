@@ -201,7 +201,7 @@ public class StartGamePacket extends DataPacket {
                 }
                 this.putBoolean(true); // Were experiments previously toggled
             } else {
-                this.putLInt(0);
+                this.putLInt(0); // Experiment count
                 this.putBoolean(false); // Were experiments previously toggled
             }
         }
@@ -256,7 +256,7 @@ public class StartGamePacket extends DataPacket {
                     this.putString(""); // buttonName
                     this.putString(""); // linkUri
                 }
-                this.putBoolean(Server.getInstance().enableExperimentMode); // Experimental Gameplay
+                this.putBoolean(/*Server.getInstance().enableExperimentMode*/ false); //Force Experimental Gameplay (exclusive to debug clients)
                 if (protocol >= ProtocolInfo.v1_19_20) {
                     this.putByte(this.chatRestrictionLevel);
                     this.putBoolean(this.disablePlayerInteractions);
