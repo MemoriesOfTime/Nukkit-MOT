@@ -3542,7 +3542,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         break packetswitch;
                     case PlayerActionPacket.ACTION_START_CRAWLING:
-                        if (this.isMovementServerAuthoritative() || this.protocol < ProtocolInfo.v1_20_10 || !this.server.enableExperimentMode) break;
+                        if (this.isMovementServerAuthoritative()
+                                || this.protocol < ProtocolInfo.v1_20_10_21
+                                || (!this.server.enableExperimentMode && this.protocol < ProtocolInfo.v1_20_30_24)) break;
                         PlayerToggleCrawlEvent playerToggleCrawlEvent = new PlayerToggleCrawlEvent(this, true);
                         this.server.getPluginManager().callEvent(playerToggleCrawlEvent);
                         if (playerToggleCrawlEvent.isCancelled()) {
@@ -3552,7 +3554,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         break packetswitch;
                     case PlayerActionPacket.ACTION_STOP_CRAWLING:
-                        if (this.isMovementServerAuthoritative() || this.protocol < ProtocolInfo.v1_20_10 || !this.server.enableExperimentMode) break;
+                        if (this.isMovementServerAuthoritative()
+                                || this.protocol < ProtocolInfo.v1_20_10_21
+                                || (!this.server.enableExperimentMode && this.protocol < ProtocolInfo.v1_20_30_24)) break;
                         playerToggleCrawlEvent = new PlayerToggleCrawlEvent(this, false);
                         this.server.getPluginManager().callEvent(playerToggleCrawlEvent);
                         if (playerToggleCrawlEvent.isCancelled()) {
