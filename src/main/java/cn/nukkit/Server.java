@@ -247,10 +247,6 @@ public class Server {
      */
     public String whitelistReason;
     /**
-     * optimizations server enabled.
-     */
-    public boolean lowProfileServer;
-    /**
      * Mob AI enabled.
      */
     public boolean mobAiEnabled;
@@ -306,10 +302,6 @@ public class Server {
      * XP bottles can be used on creative.
      */
     public boolean xpBottlesOnCreative;
-    /**
-     * Dimension changes enabled.
-     */
-    public boolean dimensionsEnabled;
     /**
      * Call DataPacketSendEvent on data packet sending.
      */
@@ -516,10 +508,6 @@ public class Server {
      * Enable Spark Plugin
      */
     public boolean enableSpark;
-    /**
-     * ignore OLD_MOJANG_PUBLIC_KEY
-     */
-    public boolean ignoreOldMojangPublicKey;
     /**
      * This is needed for structure generation
      */
@@ -2974,15 +2962,6 @@ public class Server {
     }
 
     /**
-     * 低配服务器模式
-     *
-     * @return 是否开启低配服务器模式
-     */
-    public boolean isLowProfileServer() {
-        return lowProfileServer;
-    }
-
-    /**
      * Get the mob spawner task
      *
      * @return spawner task
@@ -3002,8 +2981,6 @@ public class Server {
         this.autoTickRateLimit = this.getPropertyInt("auto-tick-rate-limit", 20);
         this.alwaysTickPlayers = this.getPropertyBoolean("always-tick-players", false);
         this.baseTickRate = this.getPropertyInt("base-tick-rate", 1);
-        // 低配服务器模式（会减少多场景下如：下雪，火焰等等...）
-        this.lowProfileServer = this.getPropertyBoolean("low-profile-server-mode", false);
         this.callDataPkSendEv = this.getPropertyBoolean("call-data-pk-send-event", true);
         this.callBatchPkEv = this.getPropertyBoolean("call-batch-pk-send-event", true);
         this.doLevelGC = this.getPropertyBoolean("do-level-gc", true);
@@ -3013,7 +2990,6 @@ public class Server {
         this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
         this.bedSpawnpoints = this.getPropertyBoolean("bed-spawnpoints", true);
         this.achievementsEnabled = this.getPropertyBoolean("achievements", true);
-        this.dimensionsEnabled = this.getPropertyBoolean("dimensions", true);
         this.banXBAuthFailed = this.getPropertyBoolean("temp-ip-ban-failed-xbox-auth", false);
         this.pvpEnabled = this.getPropertyBoolean("pvp", true);
         this.announceAchievements = this.getPropertyBoolean("announce-player-achievements", false);
@@ -3078,7 +3054,6 @@ public class Server {
         this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);
         this.networkCompressionThreshold = this.getPropertyInt("compression-threshold", 256);
         this.enableSpark = this.getPropertyBoolean("enable-spark", false);
-        this.ignoreOldMojangPublicKey = this.getPropertyBoolean("ignore-old-mojang-public-key", true);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
@@ -3113,34 +3088,37 @@ public class Server {
     private static class ServerProperties extends ConfigSection {
         {
             put("motd", "Minecraft Server");
-            put("sub-motd", "Powered by Nukkit");
+            put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
             put("view-distance", 8);
-            put("white-list", false);
             put("achievements", true);
-            put("announce-player-achievements", false);
+            put("announce-player-achievements", true);
             put("spawn-protection", 10);
             put("max-players", 50);
-            put("drop-spawners", true);
+            put("drop-spawners", true); //TODO 考虑弃用
             put("spawn-animals", true);
             put("spawn-mobs", true);
             put("gamemode", 0);
             put("force-gamemode", true);
+            put("difficulty", 2);
             put("hardcore", false);
             put("pvp", true);
-            put("difficulty", 2);
+
+            put("white-list", false);
+            put("whitelist-reason", "§cServer is white-listed");
+
             put("generator-settings", "");
             put("level-name", "world");
             put("level-seed", "");
             put("level-type", "default");
-            put("enable-query", true);
             put("enable-rcon", false);
             put("rcon.password", Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13));
             put("auto-save", true);
             put("force-resources", false);
             put("force-resources-allow-client-packs", false);
             put("xbox-auth", true);
+            put("encryption", true);
             put("bed-spawnpoints", true);
             put("explosion-break-blocks", true);
             put("stop-in-game", false);
@@ -3154,18 +3132,25 @@ public class Server {
             put("force-language", false);
             put("shutdown-message", "§cServer closed");
             put("save-player-data", true);
+            put("enable-query", true);
             put("query-plugins", false);
             put("debug-level", 1);
             put("async-workers", "auto");
+
             put("zlib-provider", 2);
             put("compression-level", 4);
+            put("compression-threshold", "256");
+            put("use-snappy-compression", true);
+            put("min-mtu", 576);
+            put("max-mtu", 1492);
+            put("timeout-milliseconds", 25000);
+
             put("auto-tick-rate", true);
             put("auto-tick-rate-limit", 20);
             put("base-tick-rate", 1);
             put("always-tick-players", false);
             put("light-updates", false);
             put("clear-chunk-tick-list", true);
-            put("cache-chunks", false);
             put("spawn-threshold", 56);
             put("chunk-sending-per-tick", 4);
             put("chunk-ticking-per-tick", 40);
@@ -3177,55 +3162,47 @@ public class Server {
             put("ticks-per-entity-despawns", 12000);
             put("thread-watchdog", true);
             put("thread-watchdog-tick", 60000);
+
             put("nether", true);
             put("end", false);
-            put("low-profile-server-mode", false);
+            put("vanilla-portals", true);
+            put("multi-nether-worlds", "");
+
             put("do-not-tick-worlds", "");
+            put("worlds-entity-spawning-disabled", "");
             put("load-all-worlds", true);
             put("ansi-title", false);
-            put("worlds-entity-spawning-disabled", "");
             put("block-listener", true);
             put("allow-flight", false);
-            put("timeout-milliseconds", 25000);
             put("multiversion-min-protocol", 0);
             put("vanilla-bossbars", false);
-            put("dimensions", true);
-            put("whitelist-reason", "§cServer is white-listed");
-            put("chemistry-resources-enabled", false);
             put("strong-ip-bans", false);
             put("worlds-level-auto-save-disabled", "");
             put("temp-ip-ban-failed-xbox-auth", false);
             put("call-data-pk-send-event", true);
             put("call-batch-pk-send-event", true);
             put("do-level-gc", true);
-            put("skin-change-cooldown", 30);
+            put("skin-change-cooldown", 15);
             put("check-op-movement", false);
             put("do-not-limit-interactions", false);
             put("do-not-limit-skin-geometry", true);
             put("automatic-bug-report", true);
             put("anvils-enabled", true);
             put("save-player-data-by-uuid", true);
-            put("vanilla-portals", true);
             put("persona-skins", true);
-            put("multi-nether-worlds", "");
             put("call-entity-motion-event", true);
             put("update-notifications", true);
             put("bstats-metrics", true);
-            put("min-mtu", 576);
-            put("max-mtu", 1492);
-            put("enable-experiment-mode", false);
+            put("cache-chunks", false);
             put("async-chunks", true);
             put("deprecated-verbose", true);
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
-            put("encryption", true);
-            put("use-waterdog", false);
-            put("use-snappy-compression", false);
             put("use-client-spectator", true);
-            put("compression-threshold", "256");
+            put("enable-experiment-mode", false);
+            put("use-waterdog", false);
             put("enable-spark", false);
             put("hastebin-token", "");
-            put("ignore-old-mojang-public-key", true);
         }
     }
 

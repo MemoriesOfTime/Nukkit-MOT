@@ -104,7 +104,7 @@ public class BlockFire extends BlockFlowable {
         if (type == Level.BLOCK_UPDATE_NORMAL || type == Level.BLOCK_UPDATE_RANDOM) {
             if (!this.isBlockTopFacingSurfaceSolid(this.down()) && !this.canNeighborBurn()) {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
-            } else if (!Server.getInstance().isLowProfileServer() && this.level.gameRules.getBoolean(GameRule.DO_FIRE_TICK) && !level.isUpdateScheduled(this, this)) {
+            } else if (this.level.gameRules.getBoolean(GameRule.DO_FIRE_TICK) && !level.isUpdateScheduled(this, this)) {
                 level.scheduleUpdate(this, tickRate());
             }
 
@@ -121,14 +121,6 @@ public class BlockFire extends BlockFlowable {
 
             if (!forever && this.getLevel().isRaining() && canBlockSeeSky) {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
-            }
-
-            if (Server.getInstance().isLowProfileServer()) {
-                if (forever) {
-                    return 0;
-                }
-                this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
-                return 0;
             }
 
             if (!this.isBlockTopFacingSurfaceSolid(down) && !this.canNeighborBurn()) {

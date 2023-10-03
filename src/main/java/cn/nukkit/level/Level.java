@@ -124,8 +124,8 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.LEAVES2] = true;
         randomTickBlocks[Block.SNOW_LAYER] = true;
         randomTickBlocks[Block.ICE] = true;
-        if (!Server.getInstance().isLowProfileServer()) randomTickBlocks[Block.LAVA] = true;
-        if (!Server.getInstance().isLowProfileServer()) randomTickBlocks[Block.STILL_LAVA] = true;
+        randomTickBlocks[Block.LAVA] = true;
+        randomTickBlocks[Block.STILL_LAVA] = true;
         randomTickBlocks[Block.CACTUS] = true;
         randomTickBlocks[Block.BEETROOT_BLOCK] = true;
         randomTickBlocks[Block.CARROT_BLOCK] = true;
@@ -135,7 +135,7 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.WHEAT_BLOCK] = true;
         randomTickBlocks[Block.SUGARCANE_BLOCK] = true;
         randomTickBlocks[Block.NETHER_WART_BLOCK] = true;
-        if (!Server.getInstance().isLowProfileServer()) randomTickBlocks[Block.FIRE] = true;
+        randomTickBlocks[Block.FIRE] = true;
         randomTickBlocks[Block.GLOWING_REDSTONE_ORE] = true;
         randomTickBlocks[Block.COCOA_BLOCK] = true;
         randomTickBlocks[Block.ICE_FROSTED] = true;
@@ -2343,29 +2343,15 @@ public class Level implements ChunkManager, Metadatable {
 
     public void dropExpOrb(Vector3 source, int exp, Vector3 motion, int delay) {
         Random rand = ThreadLocalRandom.current();
-        if (server.isLowProfileServer()) {
+        for (int split : EntityXPOrb.splitIntoOrbSizes(exp)) {
             CompoundTag nbt = Entity.getDefaultNBT(source, motion == null ? new Vector3(
                             (rand.nextDouble() * 0.2 - 0.1) * 2,
                             rand.nextDouble() * 0.4,
                             (rand.nextDouble() * 0.2 - 0.1) * 2) : motion,
                     rand.nextFloat() * 360f, 0);
-            nbt.putShort("Value", exp);
+            nbt.putShort("Value", split);
             nbt.putShort("PickupDelay", delay);
-            Entity entity = Entity.createEntity("XpOrb", this.getChunk(source.getChunkX(), source.getChunkZ()), nbt);
-            if (entity != null) {
-                entity.spawnToAll();
-            }
-        } else {
-            for (int split : EntityXPOrb.splitIntoOrbSizes(exp)) {
-                CompoundTag nbt = Entity.getDefaultNBT(source, motion == null ? new Vector3(
-                                (rand.nextDouble() * 0.2 - 0.1) * 2,
-                                rand.nextDouble() * 0.4,
-                                (rand.nextDouble() * 0.2 - 0.1) * 2) : motion,
-                        rand.nextFloat() * 360f, 0);
-                nbt.putShort("Value", split);
-                nbt.putShort("PickupDelay", delay);
-                Entity.createEntity("XpOrb", this.getChunk(source.getChunkX(), source.getChunkZ()), nbt).spawnToAll();
-            }
+            Entity.createEntity("XpOrb", this.getChunk(source.getChunkX(), source.getChunkZ()), nbt).spawnToAll();
         }
     }
 
@@ -3709,15 +3695,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public boolean isSpawnChunk(int X, int Z) {
         Vector3 spawn = this.getSpawnLocation();
-
-        if (this.server.isLowProfileServer() && !this.randomTickingEnabled()) {
-            if (this.equals(this.getServer().getDefaultLevel())) {
-                return Math.abs(X - (spawn.getFloorX() >> 4)) <= 9 && Math.abs(Z - (spawn.getFloorZ() >> 4)) <= 9;
-            }
-            return Math.abs(X - (spawn.getFloorX() >> 4)) <= 5 && Math.abs(Z - (spawn.getFloorZ() >> 4)) <= 5;
-        } else {
-            return Math.abs(X - (spawn.getFloorX() >> 4)) <= 1 && Math.abs(Z - (spawn.getFloorZ() >> 4)) <= 1;
-        }
+        return Math.abs(X - (spawn.getFloorX() >> 4)) <= 1 && Math.abs(Z - (spawn.getFloorZ() >> 4)) <= 1;
     }
 
     public Position getSafeSpawn() {
@@ -4085,12 +4063,6 @@ public class Level implements ChunkManager, Metadatable {
         pk.pitch = pitch;
         pk.onGround = entity.onGround;
 
-        if (this.server.isLowProfileServer()) {
-            for (Player p : entity.getViewers().values()) {
-                p.dataPacket(pk);
-            }
-            return;
-        }
         entity.getViewers().values().stream().filter(p -> p.protocol < ProtocolInfo.v1_16_100).forEach(p -> p.dataPacket(pk));
 
         MoveEntityDeltaPacket pk2 = new MoveEntityDeltaPacket();
