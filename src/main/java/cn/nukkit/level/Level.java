@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.api.NonComputationAtomic;
 import cn.nukkit.block.*;
+import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
@@ -1211,7 +1212,7 @@ public class Level implements ChunkManager, Metadatable {
                 try {
                     if (protocolId > 201) {
                         if (b instanceof Block block) {
-                            packet.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocolId, block.getId(), block.getDamage());
+                            packet.blockRuntimeId = block.getRuntimeId(protocolId);//GlobalBlockPalette.getOrCreateRuntimeId(protocolId, block.getId(), block.getDamage());
                         } else {
                             packet.blockRuntimeId = this.getBlockRuntimeId(protocolId, (int) b.x, (int) b.y, (int) b.z, dataLayer);
                         }
@@ -1245,8 +1246,8 @@ public class Level implements ChunkManager, Metadatable {
 
             try {
                 if (target.protocol > 201) {
-                    if (b instanceof Block) {
-                        updateBlockPacket.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(target.protocol, ((Block) b).getId(), ((Block) b).getDamage());
+                    if (b instanceof Block block) {
+                        updateBlockPacket.blockRuntimeId = block.getRuntimeId(target.protocol);//GlobalBlockPalette.getOrCreateRuntimeId(target.protocol, block.getId(), block.getDamage());
                     } else {
                         updateBlockPacket.blockRuntimeId = this.getBlockRuntimeId(target.protocol, (int) b.x, (int) b.y, (int) b.z);
                     }
@@ -1330,9 +1331,9 @@ public class Level implements ChunkManager, Metadatable {
                                     int y = lcg >>> 8 & 0x0f;
                                     int z = lcg >>> 16 & 0x0f;
 
-                                    int[] state = section.getBlockState(x, y, z);
-                                    if (randomTickBlocks[state[0]]) {
-                                        Block block = Block.get(state[0], state[1], this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
+                                    BlockState state = section.getBlockState(x, y, z);
+                                    if (randomTickBlocks[state.getBlockId()]) {
+                                        Block block = state.getBlockRepairing(this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
                                         block.onUpdate(BLOCK_UPDATE_RANDOM);
                                     }
                                 }
@@ -1347,11 +1348,11 @@ public class Level implements ChunkManager, Metadatable {
                                 int y = lcg >>> 8 & 0x0f;
                                 int z = lcg >>> 16 & 0x0f;
 
-                                int[] state = chunk.getBlockState(x, y + (Y << 4), z);
-                                int blockId = state[0];
-                                blockTest |= state[0] != 0 && state[1] != 0;
+                                BlockState state = chunk.getBlockState(x, y + (Y << 4), z);
+                                int blockId = state.getBlockId();
+                                blockTest |= blockId != 0 && state.getDataStorage().intValue() != 0;
                                 if (Level.randomTickBlocks[blockId]) {
-                                    Block block = Block.get(state[0], state[1], this, x, y + (Y << 4), z);
+                                    Block block = state.getBlock(this, x, y + (Y << 4), z);
                                     block.onUpdate(BLOCK_UPDATE_RANDOM);
                                 }
                             }
@@ -1803,7 +1804,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Block getBlock(FullChunk chunk, int x, int y, int z, int layer, boolean load) {
-        int[] fullState;
+        BlockState fullState;
         if (y >= 0 && y < 256) {
             int cx = x >> 4;
             int cz = z >> 4;
@@ -1817,19 +1818,13 @@ public class Level implements ChunkManager, Metadatable {
             if (chunk != null) {
                 fullState = chunk.getBlockState(x & 0xF, y, z & 0xF, layer);
             } else {
-                fullState = new int[]{0, 0};
+                fullState = BlockState.AIR;
             }
         } else {
-            fullState = new int[]{0, 0};
+            fullState = BlockState.AIR;
         }
 
-        Block block = Block.get(fullState[0], fullState[1]);
-        block.x = x;
-        block.y = y;
-        block.z = z;
-        block.level = this;
-        block.layer = layer;
-        return block;
+        return fullState.getBlockRepairing(this, x, y, z, layer);
     }
 
     public synchronized void updateAllLight(Vector3 pos) {
@@ -3715,8 +3710,8 @@ public class Level implements ChunkManager, Metadatable {
             int y = NukkitMath.clamp((int) pos.y, 1, 254);
             boolean wasAir = chunk.getBlockId(x, y - 1, z) == 0;
             for (; y > 0; --y) {
-                int[] b = chunk.getBlockState(x, y, z);
-                Block block = Block.get(b[0], b[1]);
+                BlockState b = chunk.getBlockState(x, y, z);
+                Block block = b.getBlock();
                 if (this.isFullBlock(block)) {
                     if (wasAir) {
                         y++;
@@ -3728,11 +3723,11 @@ public class Level implements ChunkManager, Metadatable {
             }
 
             for (; y >= 0 && y < 255; y++) {
-                int[] b = chunk.getBlockState(x, y + 1, z);
-                Block block = Block.get(b[0], b[1]);
+                BlockState b = chunk.getBlockState(x, y + 1, z);
+                Block block = b.getBlock();
                 if (!this.isFullBlock(block)) {
                     b = chunk.getBlockState(x, y, z);
-                    block = Block.get(b[0], b[1]);
+                    block = b.getBlock();
                     if (!this.isFullBlock(block)) {
                         return new Position(pos.x + 0.5, pos.y + 0.1, pos.z + 0.5, this);
                     }

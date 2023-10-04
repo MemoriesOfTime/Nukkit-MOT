@@ -865,7 +865,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     @Override
     public int getRuntimeId(int protocolId) {
         BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(protocolId);
-        if (mapping == null) {
+        if (mapping == null || !this.useProperties()) {
             return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getId(), this.getDamage());
         }
         return getCurrentState().getRuntimeId(protocolId);
@@ -1562,5 +1562,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public static boolean usesFakeWater(int id) {
         return usesFakeWater[id];
+    }
+
+    //TODO 完成所有方块的Properties后删除它
+    public boolean useProperties() {
+        return false;
     }
 }
