@@ -2,7 +2,7 @@ package cn.nukkit.block.blockstate;
 
 import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.block.blockproperty.BlockProperty;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyException;
+import cn.nukkit.utils.exception.InvalidBlockPropertyException;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Value;

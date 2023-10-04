@@ -2,7 +2,7 @@ package cn.nukkit.block.blockstate;
 
 import cn.nukkit.api.API;
 import cn.nukkit.block.blockproperty.BlockProperties;
-import cn.nukkit.block.blockstate.exception.InvalidBlockStateException;
+import cn.nukkit.utils.exception.InvalidBlockStateException;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.jetbrains.annotations.NotNull;

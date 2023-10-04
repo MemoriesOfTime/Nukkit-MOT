@@ -1,4 +1,4 @@
-package cn.nukkit.block.blockproperty.exception;
+package cn.nukkit.utils.exception;
 
 import cn.nukkit.block.blockproperty.BlockProperties;
 

@@ -1,9 +1,9 @@
 package cn.nukkit.block.blockproperty;
 
-import cn.nukkit.block.blockproperty.exception.BlockPropertyNotFoundException;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyMetaException;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyValueException;
 import cn.nukkit.block.blockstate.*;
+import cn.nukkit.utils.exception.BlockPropertyNotFoundException;
+import cn.nukkit.utils.exception.InvalidBlockPropertyMetaException;
+import cn.nukkit.utils.exception.InvalidBlockPropertyValueException;
 import cn.nukkit.utils.functional.ToIntTriFunctionTwoInts;
 import cn.nukkit.utils.functional.ToLongTriFunctionOneIntOneLong;
 import cn.nukkit.utils.functional.TriFunction;

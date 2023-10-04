@@ -1,4 +1,4 @@
-package cn.nukkit.block.blockstate.exception;
+package cn.nukkit.utils.exception;
 
 import org.jetbrains.annotations.NotNull;
 

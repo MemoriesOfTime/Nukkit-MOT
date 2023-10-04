@@ -2,11 +2,11 @@ package cn.nukkit.block.blockstate;
 
 import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.block.blockproperty.BlockProperty;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyException;
-import cn.nukkit.block.blockstate.exception.InvalidBlockStateDataTypeException;
-import cn.nukkit.block.blockstate.exception.InvalidBlockStateException;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.utils.Validation;
+import cn.nukkit.utils.exception.InvalidBlockPropertyException;
+import cn.nukkit.utils.exception.InvalidBlockStateDataTypeException;
+import cn.nukkit.utils.exception.InvalidBlockStateException;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnegative;

@@ -5,7 +5,6 @@ import cn.nukkit.Server;
 import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.block.blockstate.*;
-import cn.nukkit.block.blockstate.exception.InvalidBlockStateException;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
@@ -29,6 +28,7 @@ import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.MinecraftNamespaceComparator;
+import cn.nukkit.utils.exception.InvalidBlockStateException;
 import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
 
@@ -81,7 +81,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static void init() {
         Block.usesFakeWater[SEAGRASS] = true;
         Block.usesFakeWater[BLOCK_KELP] = true;
-        Block.usesFakeWater[415] = true;
+        Block.usesFakeWater[BUBBLE_COLUMN] = true;
 
         if (list == null) {
             list = new Class[MAX_BLOCK_ID];

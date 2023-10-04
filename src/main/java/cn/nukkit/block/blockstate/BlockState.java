@@ -4,14 +4,14 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.block.blockproperty.BlockProperty;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyValueException;
-import cn.nukkit.block.blockstate.exception.InvalidBlockStateDataTypeException;
-import cn.nukkit.block.blockstate.exception.InvalidBlockStateException;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Validation;
+import cn.nukkit.utils.exception.InvalidBlockPropertyValueException;
+import cn.nukkit.utils.exception.InvalidBlockStateDataTypeException;
+import cn.nukkit.utils.exception.InvalidBlockStateException;
 import lombok.Getter;
 import lombok.ToString;
 import lombok.extern.log4j.Log4j2;
@@ -21,6 +21,7 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.Nonnegative;
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigInteger;
 import java.util.*;
@@ -32,6 +33,7 @@ import java.util.function.Consumer;
 @ParametersAreNonnullByDefault
 @Log4j2
 public final class BlockState implements Serializable, IBlockState {
+    @Serial
     private static final long serialVersionUID = 623759888114628578L;
 
     private static final BigInteger SIXTEEN = BigInteger.valueOf(16);

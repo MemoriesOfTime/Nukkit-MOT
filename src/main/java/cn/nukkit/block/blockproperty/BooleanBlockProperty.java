@@ -1,14 +1,16 @@
 package cn.nukkit.block.blockproperty;
 
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyMetaException;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyPersistenceValueException;
+import cn.nukkit.utils.exception.InvalidBlockPropertyMetaException;
+import cn.nukkit.utils.exception.InvalidBlockPropertyPersistenceValueException;
 import com.google.common.base.Preconditions;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
+import java.io.Serial;
 import java.math.BigInteger;
 
 public final class BooleanBlockProperty extends BlockProperty<Boolean> {
+    @Serial
     private static final long serialVersionUID = 8249827149092664486L;
     
     public BooleanBlockProperty(String name, boolean exportedToItem, String persistenceName) {

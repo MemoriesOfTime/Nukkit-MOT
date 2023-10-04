@@ -1,18 +1,20 @@
 package cn.nukkit.block.blockproperty;
 
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyMetaException;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyPersistenceValueException;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyValueException;
+import cn.nukkit.utils.exception.InvalidBlockPropertyMetaException;
+import cn.nukkit.utils.exception.InvalidBlockPropertyPersistenceValueException;
+import cn.nukkit.utils.exception.InvalidBlockPropertyValueException;
 import com.google.common.base.Preconditions;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import javax.annotation.ParametersAreNonnullByDefault;
+import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigInteger;
 
 @ParametersAreNonnullByDefault
 public abstract class BlockProperty<T extends Serializable> implements Serializable {
+    @Serial
     private static final long serialVersionUID = -2594821043880025191L;
     
     private final int bitSize;

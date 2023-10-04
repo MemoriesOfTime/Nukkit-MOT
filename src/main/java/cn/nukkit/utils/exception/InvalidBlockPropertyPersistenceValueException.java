@@ -1,5 +1,5 @@
 
-package cn.nukkit.block.blockproperty.exception;
+package cn.nukkit.utils.exception;
 
 import cn.nukkit.block.blockproperty.BlockProperty;
 import org.jetbrains.annotations.NotNull;

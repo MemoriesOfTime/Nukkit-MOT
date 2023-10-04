@@ -4,7 +4,6 @@ import cn.nukkit.Player;
 import cn.nukkit.block.blockproperty.ArrayBlockProperty;
 import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.block.blockproperty.BlockProperty;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyValueException;
 import cn.nukkit.block.blockproperty.value.SmallFlowerType;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
@@ -13,6 +12,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import cn.nukkit.utils.exception.InvalidBlockPropertyValueException;
 import org.jetbrains.annotations.NotNull;
 
 /**

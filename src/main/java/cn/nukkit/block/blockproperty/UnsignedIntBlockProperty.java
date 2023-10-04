@@ -1,15 +1,17 @@
 package cn.nukkit.block.blockproperty;
 
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyMetaException;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyPersistenceValueException;
-import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyValueException;
 import cn.nukkit.math.NukkitMath;
+import cn.nukkit.utils.exception.InvalidBlockPropertyMetaException;
+import cn.nukkit.utils.exception.InvalidBlockPropertyPersistenceValueException;
+import cn.nukkit.utils.exception.InvalidBlockPropertyValueException;
 import com.google.common.base.Preconditions;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
+import java.io.Serial;
 
 public class UnsignedIntBlockProperty extends BlockProperty<Integer> {
+    @Serial
     private static final long serialVersionUID = 7896101036099245755L;
     
     private final long minValue;
