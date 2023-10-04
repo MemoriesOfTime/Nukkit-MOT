@@ -111,7 +111,7 @@ public class BlockEntityCauldron extends BlockEntitySpawnable {
                 air.y = (int) y;
                 air.z = (int) z;
                 UpdateBlockPacket self = (UpdateBlockPacket) air.clone();
-                self.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(p.protocol, block.getId(), block.getDamage());
+                self.blockRuntimeId = block.getRuntimeId(p.protocol);//GlobalBlockPalette.getOrCreateRuntimeId(p.protocol, block.getId(), block.getDamage());
                 p.dataPacket(air);
                 p.dataPacket(self);
             }

@@ -1054,7 +1054,7 @@ public class BinaryStream {
         }
 
         Block block = isBlock ? item.getBlockUnsafe() : null;
-        int blockRuntimeId = block == null ? 0 : GlobalBlockPalette.getOrCreateRuntimeId(protocolId, block.getId(), block.getDamage());
+        int blockRuntimeId = block == null ? 0 : block.getRuntimeId(protocolId);//GlobalBlockPalette.getOrCreateRuntimeId(protocolId, block.getId(), block.getDamage());
         this.putVarInt(blockRuntimeId);
 
         ByteBuf userDataBuf = ByteBufAllocator.DEFAULT.ioBuffer();

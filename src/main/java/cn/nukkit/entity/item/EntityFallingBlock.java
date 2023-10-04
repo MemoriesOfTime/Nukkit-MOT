@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockLava;
 import cn.nukkit.block.BlockLiquid;
+import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityLiving;
 import cn.nukkit.entity.data.IntEntityData;
@@ -14,7 +15,6 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.GameRule;
-import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.DestroyBlockParticle;
@@ -116,7 +116,7 @@ public class EntityFallingBlock extends Entity {
             addEntity.speedX = (float) this.motionX;
             addEntity.speedY = (float) this.motionY;
             addEntity.speedZ = (float) this.motionZ;
-            addEntity.metadata = this.dataProperties.clone().put(new IntEntityData(DATA_VARIANT, GlobalBlockPalette.getOrCreateRuntimeId(player.protocol, this.blockId, this.damage)));
+            addEntity.metadata = this.dataProperties.clone().put(new IntEntityData(DATA_VARIANT, BlockState.of(this.blockId, this.damage).getRuntimeId(player.protocol) /*GlobalBlockPalette.getOrCreateRuntimeId(player.protocol, this.blockId, this.damage)*/));
             player.dataPacket(addEntity);
             this.hasSpawned.put(player.getLoaderId(), player);
         }

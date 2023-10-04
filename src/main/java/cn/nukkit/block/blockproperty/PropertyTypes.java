@@ -17,7 +17,7 @@ public final class PropertyTypes {
 
     static {
         Gson gson = new GsonBuilder().create();
-        try (InputStream resourceAsStream = Server.class.getModule().getResourceAsStream("block_property_types.json")) {
+        try (InputStream resourceAsStream = Server.class.getModule().getResourceAsStream("RuntimeBlockStates/block_property_types.json")) {
             assert resourceAsStream != null;
             propertyTypeMap = new Object2ObjectOpenHashMap<String, String>(gson.fromJson(new InputStreamReader(resourceAsStream), Map.class));
         } catch (IOException e) {

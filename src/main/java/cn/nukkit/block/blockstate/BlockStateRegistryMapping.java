@@ -6,6 +6,7 @@ import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockUnknown;
 import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.RuntimeItems;
+import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
@@ -46,6 +47,7 @@ public class BlockStateRegistryMapping {
 
     private static final Pattern BLOCK_ID_NAME_PATTERN = Pattern.compile("^blockid:(\\d+)$");
     private final Registration updateBlockRegistration;
+    @Getter
     private final Map<BlockState, Registration> blockStateRegistration = new ConcurrentHashMap<>();
     private final Map<String, Registration> stateIdRegistration = new ConcurrentHashMap<>();
     private final Int2ObjectMap<Registration> runtimeIdRegistration = new Int2ObjectOpenHashMap<>();
@@ -219,7 +221,6 @@ public class BlockStateRegistryMapping {
     }
 
     private Registration findRegistration(final BlockState state) {
-        // Special case for PN-96 PowerNukkit#210 where the world contains blocks like 0:13, 0:7, etc
         if (state.getBlockId() == BlockID.AIR) {
             Registration airRegistration = blockStateRegistration.get(BlockState.AIR);
             if (airRegistration != null) {
@@ -269,6 +270,17 @@ public class BlockStateRegistryMapping {
         } catch (Exception e) {
             log.fatal("An error has occurred while trying to parse the legacyStateId of {}:{}", state.getBlockId(), state.getDataStorage(), e);
         }
+
+        //对于未实现BlockProperties的方块，先加载以前的数据
+        try {
+            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(this.protocolId, state.getBlockId(), state.getDataStorage().intValue());
+            if (runtimeId != -1) {
+                return new Registration(state, runtimeId, state.getBlock().computeBlockStateHash(), null);
+            }
+        } catch (Exception e) {
+            log.fatal("An error has occurred while trying to get the runtimeId of {}:{}", state.getBlockId(), state.getDataStorage(), e);
+        }
+
         return logDiscoveryError(state);
     }
 

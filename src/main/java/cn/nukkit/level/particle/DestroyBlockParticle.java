@@ -1,7 +1,6 @@
 package cn.nukkit.level.particle;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.LevelEventPacket;
@@ -27,7 +26,7 @@ public class DestroyBlockParticle extends Particle {
         packet.x = (float) this.x;
         packet.y = (float) this.y;
         packet.z = (float) this.z;
-        packet.data = protocol <= ProtocolInfo.v1_2_10 ? (block.getId() | (block.getDamage() << 8)) : GlobalBlockPalette.getOrCreateRuntimeId(protocol, block.getId(), block.getDamage());
+        packet.data = protocol <= ProtocolInfo.v1_2_10 ? (block.getId() | (block.getDamage() << 8)) : block.getRuntimeId(protocol);//GlobalBlockPalette.getOrCreateRuntimeId(protocol, block.getId(), block.getDamage());
         packet.protocol = protocol;
         packet.tryEncode();
         return new DataPacket[]{packet};

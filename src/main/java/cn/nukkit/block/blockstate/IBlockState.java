@@ -7,6 +7,7 @@ import cn.nukkit.block.blockproperty.BlockProperty;
 import cn.nukkit.event.blockstate.BlockStateRepairEvent;
 import cn.nukkit.event.blockstate.BlockStateRepairFinishEvent;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.BlockVector3;
@@ -336,7 +337,11 @@ public interface IBlockState {
     }
 
     default int getRuntimeId(int protocolId) {
-        return BlockStateRegistry.getMapping(protocolId).getRuntimeId(getCurrentState());
+        BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(protocolId);
+        if (mapping == null) {
+            return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getBlockId(), this.getDataStorage().intValue());
+        }
+        return mapping.getRuntimeId(getCurrentState());
     }
 
     @SuppressWarnings("rawtypes")

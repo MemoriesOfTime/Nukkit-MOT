@@ -2,6 +2,8 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.event.block.BlockSpreadEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -13,6 +15,7 @@ import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Angelic47
@@ -31,6 +34,12 @@ public class BlockGrass extends BlockDirt {
     @Override
     public int getId() {
         return GRASS;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return CommonBlockProperties.EMPTY_PROPERTIES;
     }
 
     @Override

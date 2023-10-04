@@ -1,7 +1,7 @@
 package cn.nukkit.level.particle;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.DataPacket;
@@ -34,7 +34,7 @@ public class PunchBlockParticle extends Particle {
         packet.x = (float) this.x;
         packet.y = (float) this.y;
         packet.z = (float) this.z;
-        packet.data = protocol <= ProtocolInfo.v1_2_10 ? (blockId | (blockDamage << 8) | (face << 16)) : GlobalBlockPalette.getOrCreateRuntimeId(protocol, blockId, blockDamage) | index;
+        packet.data = protocol <= ProtocolInfo.v1_2_10 ? (blockId | (blockDamage << 8) | (face << 16)) : BlockState.of(blockId, blockDamage).getRuntimeId(protocol)/*GlobalBlockPalette.getOrCreateRuntimeId(protocol, blockId, blockDamage)*/ | index;
         packet.protocol = protocol;
         packet.tryEncode();
         return new DataPacket[]{packet};

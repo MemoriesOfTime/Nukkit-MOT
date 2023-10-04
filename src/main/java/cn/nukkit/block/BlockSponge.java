@@ -4,9 +4,9 @@ import cn.nukkit.Player;
 import cn.nukkit.block.blockproperty.ArrayBlockProperty;
 import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.block.blockproperty.value.SpongeType;
+import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
-import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.particle.ExplodeParticle;
@@ -97,7 +97,7 @@ public class BlockSponge extends BlockSolidMeta {
                 packet.x = (float) block.getX() + 0.5f;
                 packet.y = (float) block.getY() + 1f;
                 packet.z = (float) block.getZ() + 0.5f;
-                packet.data = GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, BlockID.WATER, 0);
+                packet.data = BlockState.of(BlockID.WATER).getRuntimeId(ProtocolInfo.CURRENT_PROTOCOL);//GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, BlockID.WATER, 0);
                 level.addChunkPacket(getChunkX(), getChunkZ(), packet);
             }
 

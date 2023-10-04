@@ -4,7 +4,6 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.level.GlobalBlockPalette;
 
 import java.io.IOException;
 import java.util.Map;
@@ -43,7 +42,8 @@ public interface FullChunk extends Cloneable {
     }
 
     default int getBlockRuntimeId(int protocolId, int x, int y, int z, int layer) {
-        return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getBlockId(x, y, z, layer), this.getBlockData(x, y, z, layer));
+        //return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getBlockId(x, y, z, layer), this.getBlockData(x, y, z, layer));
+        return getBlockState(x, y, z, layer).getRuntimeId(protocolId);
     }
 
     default BlockState getBlockState(int x, int y, int z) {

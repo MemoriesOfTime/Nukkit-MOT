@@ -2,7 +2,6 @@ package cn.nukkit.level.format.anvil.util;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.blockstate.BlockState;
-import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -419,7 +418,8 @@ public class BlockStorage {
         AtomicInteger maxRuntimeId = new AtomicInteger(0);
 
         for (int i = 0; i < blockStates.length; i++) {
-            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, ids[i], data[i]);
+            //int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, ids[i], data[i]);
+            int runtimeId = BlockState.of(ids[i], data[i]).getRuntimeId(protocol);
             int paletteId = runtime2palette.computeIfAbsent(runtimeId, rid -> {
                 int pid = nextPaletteId.getAndIncrement();
                 palette2runtime.add(rid);

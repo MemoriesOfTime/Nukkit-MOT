@@ -1,8 +1,11 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Sound;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/11/22 by xtypr.
@@ -21,6 +24,12 @@ public class BlockPodzol extends BlockDirt {
     @Override
     public int getId() {
         return PODZOL;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return CommonBlockProperties.EMPTY_PROPERTIES;
     }
 
     @Override

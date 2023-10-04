@@ -2,10 +2,12 @@ package cn.nukkit.nbt;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.blockproperty.PropertyTypes;
+import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.block.blockstate.BlockStateRegistry;
 import cn.nukkit.block.blockstate.BlockStateRegistryMapping;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
+import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
 import cn.nukkit.nbt.stream.NBTInputStream;
 import cn.nukkit.nbt.stream.NBTOutputStream;
@@ -102,7 +104,14 @@ public class NBTIO {
 
     public static CompoundTag putBlockHelper(Block block, String nbtName) {
         BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(ProtocolInfo.CURRENT_PROTOCOL);
-        String[] states = mapping.getKnownBlockStateIdByRuntimeId(block.getRuntimeId()).split(";");
+        BlockState state = block.getCurrentState();
+        int runtimeId;
+        if (!mapping.getBlockStateRegistration().containsKey(state)) {
+            runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, block.getId(), block.getDamage());
+        } else {
+            runtimeId = state.getRuntimeId(ProtocolInfo.CURRENT_PROTOCOL);
+        }
+        String[] states = mapping.getKnownBlockStateIdByRuntimeId(runtimeId).split(";");
         CompoundTag result = new CompoundTag(nbtName).putString("name", states[0]);
         var nbt = new CompoundTag("", new TreeMap<>());
         /*if (block instanceof CustomBlock) {
