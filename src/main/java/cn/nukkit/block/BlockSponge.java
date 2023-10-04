@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.value.SpongeType;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -11,6 +14,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayDeque;
 import java.util.Queue;
@@ -20,6 +24,10 @@ import java.util.Queue;
  * Nukkit Project
  */
 public class BlockSponge extends BlockSolidMeta {
+
+    public static final ArrayBlockProperty<SpongeType> SPONGE_TYPE = new ArrayBlockProperty<>("sponge_type", true, SpongeType.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(SPONGE_TYPE);
 
     public static final int DRY = 0;
     public static final int WET = 1;
@@ -40,6 +48,12 @@ public class BlockSponge extends BlockSolidMeta {
     @Override
     public int getId() {
         return SPONGE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

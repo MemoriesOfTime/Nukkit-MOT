@@ -1,14 +1,23 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemRedstoneRepeater;
 import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.CARDINAL_DIRECTION;
 
 /**
  * Created by CreeperFace on 10.4.2017.
  */
 public class BlockRedstoneRepeaterPowered extends BlockRedstoneDiode {
+
+    protected static final IntBlockProperty REPEATER_DELAY = new IntBlockProperty("repeater_delay", false, 3);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(CARDINAL_DIRECTION, REPEATER_DELAY);
 
     public BlockRedstoneRepeaterPowered() {
         this(0);
@@ -22,6 +31,12 @@ public class BlockRedstoneRepeaterPowered extends BlockRedstoneDiode {
     @Override
     public int getId() {
         return POWERED_REPEATER;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

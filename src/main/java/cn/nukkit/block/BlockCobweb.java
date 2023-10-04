@@ -1,10 +1,13 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemString;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/12/2 by xtypr.
@@ -28,6 +31,12 @@ public class BlockCobweb extends BlockFlowable {
     @Override
     public int getId() {
         return COBWEB;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return CommonBlockProperties.EMPTY_PROPERTIES;
     }
 
     @Override

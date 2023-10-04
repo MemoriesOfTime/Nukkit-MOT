@@ -2,6 +2,8 @@ package cn.nukkit.block;
 
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityBrewingStand;
 import cn.nukkit.inventory.ContainerInventory;
@@ -14,10 +16,19 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
 public class BlockBrewingStand extends BlockTransparentMeta {
+
+    public static final BooleanBlockProperty HAS_POTION_A = new BooleanBlockProperty("brewing_stand_slot_a_bit", false);
+
+    public static final BooleanBlockProperty HAS_POTION_B = new BooleanBlockProperty("brewing_stand_slot_b_bit", false);
+
+    public static final BooleanBlockProperty HAS_POTION_C = new BooleanBlockProperty("brewing_stand_slot_c_bit", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(HAS_POTION_A, HAS_POTION_B, HAS_POTION_C);
 
     public BlockBrewingStand() {
         this(0);
@@ -60,6 +71,12 @@ public class BlockBrewingStand extends BlockTransparentMeta {
     @Override
     public int getId() {
         return BREWING_STAND_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityLectern;
 import cn.nukkit.event.block.BlockRedstoneEvent;
@@ -17,7 +18,12 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.DIRECTION;
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.POWERED;
+
 public class BlockLectern extends BlockTransparentMeta implements Faceable {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(DIRECTION, POWERED);
 
     public BlockLectern() {
         this(0);
@@ -35,6 +41,12 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return LECTERN;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

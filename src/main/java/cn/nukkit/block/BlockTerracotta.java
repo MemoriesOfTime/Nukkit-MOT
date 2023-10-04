@@ -1,9 +1,12 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.TerracottaColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/11/24 by xtypr.
@@ -30,6 +33,12 @@ public class BlockTerracotta extends BlockSolidMeta {
     @Override
     public int getId() {
         return TERRACOTTA;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return CommonBlockProperties.EMPTY_PROPERTIES;
     }
 
     @Override

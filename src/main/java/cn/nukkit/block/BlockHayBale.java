@@ -1,17 +1,21 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/11/24 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
 public class BlockHayBale extends BlockSolidMeta implements Faceable {
+
+    public static final BlockProperties PROPERTIES = BlockBone.PROPERTIES;
 
     private static final short[] faces = new short[]{
             0,
@@ -33,6 +37,12 @@ public class BlockHayBale extends BlockSolidMeta implements Faceable {
     @Override
     public int getId() {
         return HAY_BALE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

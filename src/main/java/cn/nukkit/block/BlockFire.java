@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Server;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityPotion;
 import cn.nukkit.entity.projectile.EntityArrow;
@@ -22,12 +25,17 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public class BlockFire extends BlockFlowable {
+
+    public static final IntBlockProperty FIRE_AGE = CommonBlockProperties.AGE_15;
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(FIRE_AGE);
 
     public BlockFire() {
         this(0);
@@ -40,6 +48,12 @@ public class BlockFire extends BlockFlowable {
     @Override
     public int getId() {
         return FIRE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

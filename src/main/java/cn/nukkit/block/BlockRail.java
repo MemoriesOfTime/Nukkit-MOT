@@ -1,6 +1,10 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemRail;
@@ -13,6 +17,7 @@ import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Rail;
 import cn.nukkit.utils.Rail.Orientation;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -26,6 +31,27 @@ import static cn.nukkit.utils.Rail.Orientation.*;
  * Package cn.nukkit.block in project nukkit
  */
 public class BlockRail extends BlockFlowable implements Faceable {
+
+    public static final BooleanBlockProperty ACTIVE = new BooleanBlockProperty("rail_data_bit", false);
+
+    public static final BlockProperty<Orientation> UNCURVED_RAIL_DIRECTION = new ArrayBlockProperty<>("rail_direction", false, new Rail.Orientation[]{
+            STRAIGHT_NORTH_SOUTH, STRAIGHT_EAST_WEST,
+            ASCENDING_EAST, ASCENDING_WEST,
+            ASCENDING_NORTH, ASCENDING_SOUTH
+    }).ordinal(true);
+
+    public static final BlockProperty<Rail.Orientation> CURVED_RAIL_DIRECTION = new ArrayBlockProperty<>("rail_direction", false, new Rail.Orientation[]{
+            STRAIGHT_NORTH_SOUTH, STRAIGHT_EAST_WEST,
+            ASCENDING_EAST, ASCENDING_WEST,
+            ASCENDING_NORTH, ASCENDING_SOUTH,
+            CURVED_SOUTH_EAST, CURVED_SOUTH_WEST,
+            CURVED_NORTH_WEST, CURVED_NORTH_EAST
+    }).ordinal(true);
+
+    public static final BlockProperties ACTIVABLE_PROPERTIES = new BlockProperties(UNCURVED_RAIL_DIRECTION, ACTIVE);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(CURVED_RAIL_DIRECTION);
+
 
     // 0x8: Set the block active
     // 0x7: Reset the block to normal
@@ -48,6 +74,12 @@ public class BlockRail extends BlockFlowable implements Faceable {
     @Override
     public int getId() {
         return RAIL;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

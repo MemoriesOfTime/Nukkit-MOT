@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.blockstate.BlockStateRegistry;
 import cn.nukkit.blockentity.*;
 import cn.nukkit.command.*;
 import cn.nukkit.console.NukkitConsole;
@@ -637,6 +638,7 @@ public class Server {
         Enchantment.init();
         GlobalBlockPalette.init();
         RuntimeItems.init();
+        BlockStateRegistry.init();
         Item.init();
         EnumBiome.values();
         Effect.init();
@@ -1032,6 +1034,8 @@ public class Server {
             for (Player player : new ArrayList<>(this.players.values())) {
                 player.close(player.getLeaveMessage(), reason);
             }
+
+            BlockStateRegistry.close();
 
             this.getLogger().debug("Disabling all plugins...");
             this.disablePlugins();

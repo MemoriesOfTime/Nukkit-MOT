@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
@@ -11,6 +13,7 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2016/1/5 by xtypr.
@@ -18,6 +21,12 @@ import cn.nukkit.utils.Faceable;
  * The name NetherPortalBlock comes from minecraft wiki.
  */
 public class BlockNetherPortal extends BlockFlowable implements Faceable {
+
+    private static final ArrayBlockProperty<String> PORTAL_AXIS = new ArrayBlockProperty<>("portal_axis", false,
+            new String[]{"unknown", "x", "z"}
+    );
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(PORTAL_AXIS);
 
     public BlockNetherPortal() {
         this(0);
@@ -35,6 +44,12 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
     @Override
     public int getId() {
         return NETHER_PORTAL;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

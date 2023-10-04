@@ -1,11 +1,16 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.Item;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by PetteriM1
  */
 public class BlockHardGlassStained extends BlockTransparentMeta {
+
+    public static final BlockProperties PROPERTIES = CommonBlockProperties.COLOR_BLOCK_PROPERTIES;
 
     public BlockHardGlassStained() {
         this(0);
@@ -17,6 +22,12 @@ public class BlockHardGlassStained extends BlockTransparentMeta {
     @Override
     public int getId() {
         return HARD_STAINED_GLASS;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

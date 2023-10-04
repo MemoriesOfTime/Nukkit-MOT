@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.event.redstone.RedstoneUpdateEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
@@ -10,11 +13,19 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author CreeperFace
  */
 public abstract class BlockRedstoneDiode extends BlockFlowable implements Faceable {
+
+    protected static final IntBlockProperty REPEATER_DELAY = new IntBlockProperty("repeater_delay", false, 3);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(
+            CommonBlockProperties.CARDINAL_DIRECTION,
+            REPEATER_DELAY
+    );
 
     protected boolean isPowered = false;
 
@@ -24,6 +35,12 @@ public abstract class BlockRedstoneDiode extends BlockFlowable implements Faceab
 
     public BlockRedstoneDiode(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

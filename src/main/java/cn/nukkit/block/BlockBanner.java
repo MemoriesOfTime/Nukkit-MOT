@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityBanner;
 import cn.nukkit.item.Item;
@@ -16,6 +17,7 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by PetteriM1
@@ -33,6 +35,12 @@ public class BlockBanner extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return STANDING_BANNER;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return BlockSignPost.PROPERTIES;
     }
 
     @Override

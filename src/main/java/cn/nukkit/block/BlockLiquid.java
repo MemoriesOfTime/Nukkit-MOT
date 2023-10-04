@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.block.BlockFromToEvent;
 import cn.nukkit.event.block.LiquidFlowEvent;
@@ -14,6 +16,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import it.unimi.dsi.fastutil.longs.Long2ByteMap;
 import it.unimi.dsi.fastutil.longs.Long2ByteOpenHashMap;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -22,6 +25,10 @@ import java.util.concurrent.ThreadLocalRandom;
  * Nukkit Project
  */
 public abstract class BlockLiquid extends BlockTransparentMeta {
+
+    public static final IntBlockProperty LIQUID_DEPTH = new IntBlockProperty("liquid_depth", false, 15);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(LIQUID_DEPTH);
 
     protected static final byte CAN_FLOW_DOWN = 1;
     protected static final byte CAN_FLOW = 0;
@@ -32,6 +39,12 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
 
     protected BlockLiquid(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

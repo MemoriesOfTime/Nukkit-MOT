@@ -1,11 +1,15 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -13,11 +17,21 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
  */
 public abstract class BlockSlab extends BlockTransparentMeta {
 
+    public static final BooleanBlockProperty TOP_SLOT_PROPERTY = new BooleanBlockProperty("top_slot_bit", false);
+
+    public static final BlockProperties SIMPLE_SLAB_PROPERTIES = CommonBlockProperties.VERTICAL_HALF_PROPERTIES;
+
     protected final int doubleSlab;
 
     public BlockSlab(int meta, int doubleSlab) {
         super(meta);
         this.doubleSlab = doubleSlab;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return SIMPLE_SLAB_PROPERTIES;
     }
 
     @Override

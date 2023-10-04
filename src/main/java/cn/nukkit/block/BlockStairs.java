@@ -1,11 +1,16 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -13,10 +18,25 @@ import cn.nukkit.utils.Faceable;
  */
 public abstract class BlockStairs extends BlockSolidMeta implements Faceable {
 
+    public static final BooleanBlockProperty UPSIDE_DOWN = new BooleanBlockProperty("upside_down_bit", false);
+
+    public static final BlockProperty<BlockFace> STAIRS_DIRECTION = new ArrayBlockProperty<>("weirdo_direction", false, new BlockFace[]{
+            BlockFace.EAST, BlockFace.WEST,
+            BlockFace.SOUTH, BlockFace.NORTH
+    }).ordinal(true);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(STAIRS_DIRECTION, UPSIDE_DOWN);
+
     private static final short[] faces = new short[]{2, 1, 3, 0};
 
     protected BlockStairs(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

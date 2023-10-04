@@ -1,8 +1,10 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -30,6 +32,12 @@ public class BlockDoubleSlab extends BlockSolidMeta {
     @Override
     public int getId() {
         return DOUBLE_SLAB;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return BlockSlabStone.PROPERTIES;
     }
 
     //todo hardness and residence

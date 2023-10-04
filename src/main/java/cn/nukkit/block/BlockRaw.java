@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.ItemTool;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LoboMetalurgico
@@ -9,12 +12,20 @@ import cn.nukkit.item.ItemTool;
 
 public abstract class BlockRaw extends BlockSolidMeta {
 
+    public static final BlockProperties PROPERTIES = CommonBlockProperties.EMPTY_PROPERTIES;
+
     public BlockRaw() {
         this(0);
     }
 
     public BlockRaw(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.event.block.BlockSpreadEvent;
@@ -12,6 +14,7 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
@@ -20,6 +23,10 @@ import java.util.concurrent.ThreadLocalRandom;
  * Created by Pub4Game on 15.01.2016.
  */
 public class BlockVine extends BlockTransparentMeta {
+
+    private static final IntBlockProperty VINE_DIRECTION_BITS = new IntBlockProperty("vine_direction_bits", false, 15);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(VINE_DIRECTION_BITS);
 
     public BlockVine(int meta) {
         super(meta);
@@ -37,6 +44,12 @@ public class BlockVine extends BlockTransparentMeta {
     @Override
     public int getId() {
         return VINE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

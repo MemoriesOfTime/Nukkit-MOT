@@ -1,6 +1,10 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.value.BambooLeafSize;
+import cn.nukkit.block.blockproperty.value.BambooStalkThickness;
 import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -12,11 +16,23 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
 import cn.nukkit.network.protocol.AnimatePacket;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static cn.nukkit.block.BlockSapling.AGED;
+
 public class BlockBamboo extends BlockTransparentMeta {
+
+    public static final ArrayBlockProperty<BambooStalkThickness> STALK_THICKNESS = new ArrayBlockProperty<>(
+            "bamboo_stalk_thickness", false, BambooStalkThickness.class
+    );
+
+    public static final ArrayBlockProperty<BambooLeafSize> LEAF_SIZE = new ArrayBlockProperty<>(
+            "bamboo_leaf_size", false, BambooLeafSize.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(STALK_THICKNESS, LEAF_SIZE, AGED);
 
     public static final int LEAF_SIZE_NONE = 0;
     public static final int LEAF_SIZE_SMALL = 1;
@@ -33,6 +49,12 @@ public class BlockBamboo extends BlockTransparentMeta {
     @Override
     public int getId() {
         return BAMBOO;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

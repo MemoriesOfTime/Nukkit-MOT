@@ -12,6 +12,7 @@ public final class CommonBlockProperties {
     public static final BlockProperties EMPTY_PROPERTIES = new BlockProperties();
 
     public static final BooleanBlockProperty OPEN = new BooleanBlockProperty("open_bit", false);
+    public static final BooleanBlockProperty UPSIDE_DOWN = new BooleanBlockProperty("upside_down_bit", false);
     public static final BooleanBlockProperty TOGGLE = new BooleanBlockProperty("toggle_bit", false);
     public static final IntBlockProperty REDSTONE_SIGNAL = new IntBlockProperty("redstone_signal", false, 15);
     public static final BooleanBlockProperty PERMANENTLY_DEAD = new BooleanBlockProperty("dead_bit", true);

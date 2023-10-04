@@ -1,6 +1,10 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
+import cn.nukkit.block.blockproperty.value.CauldronLiquid;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCauldron;
 import cn.nukkit.event.player.PlayerBucketEmptyEvent;
@@ -16,6 +20,7 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -25,6 +30,12 @@ import java.util.concurrent.ThreadLocalRandom;
  * Nukkit Project
  */
 public class BlockCauldron extends BlockSolidMeta {
+
+    public static final IntBlockProperty FILL_LEVEL = new IntBlockProperty("fill_level", false, 6);
+
+    public static final ArrayBlockProperty<CauldronLiquid> LIQUID = new ArrayBlockProperty<>("cauldron_liquid", false, CauldronLiquid.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(FILL_LEVEL, LIQUID);
 
     /**
      * Used to cache biome check for freezing
@@ -43,6 +54,12 @@ public class BlockCauldron extends BlockSolidMeta {
     @Override
     public int getId() {
         return CAULDRON_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     public String getName() {

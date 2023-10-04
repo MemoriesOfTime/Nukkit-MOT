@@ -1,14 +1,21 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.VERTICAL_HALF;
+import static cn.nukkit.block.blockproperty.value.StoneSlab1Type.PROPERTY;
 
 /**
  * Created by CreeperFace on 26. 11. 2016.
  */
 public class BlockSlabStone extends BlockSlab {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(PROPERTY, VERTICAL_HALF);
 
     public static final int STONE = 0;
     public static final int SANDSTONE = 1;
@@ -30,6 +37,12 @@ public class BlockSlabStone extends BlockSlab {
     @Override
     public int getId() {
         return STONE_SLAB;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

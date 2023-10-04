@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.event.block.BlockExplosionPrimeEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
@@ -17,6 +19,10 @@ import java.util.Objects;
 
 public class BlockRespawnAnchor extends BlockMeta {
 
+    public static final IntBlockProperty RESPAWN_ANCHOR_CHARGE = new IntBlockProperty("respawn_anchor_charge", true, 4);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(RESPAWN_ANCHOR_CHARGE);
+
     private static final int RESPAWN_ANCHOR_CHARGE_MAX = 4;
     private static final int CHARGE_BIT = 0x7; //0111
 
@@ -31,6 +37,12 @@ public class BlockRespawnAnchor extends BlockMeta {
     @Override
     public int getId() {
         return RESPAWN_ANCHOR;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

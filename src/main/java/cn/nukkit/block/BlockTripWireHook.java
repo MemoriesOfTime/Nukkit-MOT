@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -8,11 +9,16 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.*;
 
 /**
  * @author CreeperFace
  */
 public class BlockTripWireHook extends BlockFlowable {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(DIRECTION, ATTACHED, POWERED);
 
     public BlockTripWireHook() {
         this(0);
@@ -30,6 +36,12 @@ public class BlockTripWireHook extends BlockFlowable {
     @Override
     public int getId() {
         return TRIPWIRE_HOOK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     public BlockFace getFacing() {

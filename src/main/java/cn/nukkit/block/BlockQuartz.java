@@ -1,17 +1,24 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.CHISEL_TYPE;
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.PILLAR_AXIS;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public class BlockQuartz extends BlockSolidMeta {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(CHISEL_TYPE, PILLAR_AXIS);
 
     public static final int QUARTZ_NORMAL = 0;
     public static final int QUARTZ_CHISELED = 1;
@@ -38,6 +45,12 @@ public class BlockQuartz extends BlockSolidMeta {
     @Override
     public int getId() {
         return QUARTZ_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

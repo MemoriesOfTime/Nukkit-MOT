@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.event.block.BlockHarvestEvent;
@@ -17,11 +18,14 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockSweetBerryBush extends BlockFlowable {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(BlockCrops.GROWTH);
 
     public BlockSweetBerryBush() {
         this(0);
@@ -34,6 +38,12 @@ public class BlockSweetBerryBush extends BlockFlowable {
     @Override
     public int getId() {
         return SWEET_BERRY_BUSH;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -9,11 +11,20 @@ import cn.nukkit.level.sound.LeverSound;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.OPEN;
 
 /**
  * @author Nukkit Project Team
  */
 public class BlockLever extends BlockFlowable implements Faceable {
+
+    public static final ArrayBlockProperty<LeverOrientation> LEVER_DIRECTION = new ArrayBlockProperty<>("lever_direction", false,
+            LeverOrientation.values(), 3, "lever_direction", false, new String[]{
+            "down_east_west", "east", "west", "south", "north", "up_north_south", "up_east_west", "down_north_south"
+    });
+    public static final BlockProperties PROPERTIES = new BlockProperties(LEVER_DIRECTION, OPEN);
 
     public BlockLever() {
         this(0);
@@ -31,6 +42,12 @@ public class BlockLever extends BlockFlowable implements Faceable {
     @Override
     public int getId() {
         return LEVER;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

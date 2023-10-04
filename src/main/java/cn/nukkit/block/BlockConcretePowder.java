@@ -1,17 +1,22 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by CreeperFace on 2.6.2017.
  */
 public class BlockConcretePowder extends BlockFallableMeta {
+
+    public static final BlockProperties PROPERTIES = CommonBlockProperties.COLOR_BLOCK_PROPERTIES;
 
     public BlockConcretePowder() {
         super(0);
@@ -29,6 +34,12 @@ public class BlockConcretePowder extends BlockFallableMeta {
     @Override
     public int getId() {
         return CONCRETE_POWDER;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

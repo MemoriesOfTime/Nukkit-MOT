@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCampfire;
 import cn.nukkit.entity.Entity;
@@ -18,11 +20,19 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.CARDINAL_DIRECTION;
+
 public class BlockCampfire extends BlockTransparentMeta implements Faceable {
+
+    public static final BooleanBlockProperty EXTINGUISHED = new BooleanBlockProperty("extinguished", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(EXTINGUISHED, CARDINAL_DIRECTION);
+
     public BlockCampfire() {
         super(0);
     }
@@ -34,6 +44,12 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return CAMPFIRE_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

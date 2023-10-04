@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.value.SeaGrassType;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
@@ -9,8 +12,13 @@ import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockSeagrass extends BlockFlowable {
+
+    public static final ArrayBlockProperty<SeaGrassType> SEA_GRASS_TYPE = new ArrayBlockProperty<>("sea_grass_type", false, SeaGrassType.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(SEA_GRASS_TYPE);
     
     public BlockSeagrass() {
         this(0);
@@ -23,6 +31,12 @@ public class BlockSeagrass extends BlockFlowable {
     @Override
     public int getId() {
         return SEAGRASS;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
     
     @Override

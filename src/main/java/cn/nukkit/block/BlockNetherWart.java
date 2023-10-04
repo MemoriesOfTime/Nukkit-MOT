@@ -2,6 +2,8 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemNetherWart;
@@ -9,11 +11,16 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by Leonidius20 on 22.03.17.
  */
 public class BlockNetherWart extends BlockFlowable {
+
+    public static final IntBlockProperty AGE = new IntBlockProperty("age", false, 3);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(AGE);
 
     public BlockNetherWart() {
         this(0);
@@ -21,6 +28,12 @@ public class BlockNetherWart extends BlockFlowable {
 
     public BlockNetherWart(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

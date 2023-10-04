@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.inventory.ContainerInventory;
@@ -12,6 +14,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
@@ -20,6 +23,8 @@ import java.util.Map;
  * Nukkit Project
  */
 public class BlockFurnaceBurning extends BlockSolidMeta {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(CommonBlockProperties.CARDINAL_DIRECTION);
 
     private static final int[] faces = {2, 5, 3, 4};
 
@@ -34,6 +39,12 @@ public class BlockFurnaceBurning extends BlockSolidMeta {
     @Override
     public int getId() {
         return BURNING_FURNACE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

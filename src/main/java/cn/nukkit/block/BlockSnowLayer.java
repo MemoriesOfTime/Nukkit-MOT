@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.event.block.BlockFadeEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemSnowball;
@@ -11,12 +14,20 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/12/6 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
 public class BlockSnowLayer extends BlockFallableMeta {
+
+    public static final IntBlockProperty SNOW_HEIGHT = new IntBlockProperty("height", true, 7);
+
+    public static final BooleanBlockProperty COVERED = new BooleanBlockProperty("covered_bit", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(SNOW_HEIGHT, COVERED);
+
 
     public BlockSnowLayer() {
         this(0);
@@ -34,6 +45,12 @@ public class BlockSnowLayer extends BlockFallableMeta {
     @Override
     public int getId() {
         return SNOW_LAYER;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

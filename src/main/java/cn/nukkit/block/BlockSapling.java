@@ -1,6 +1,11 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
+import cn.nukkit.block.blockproperty.value.WoodType;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.generator.object.BasicGenerator;
@@ -11,6 +16,7 @@ import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -19,6 +25,12 @@ import java.util.concurrent.ThreadLocalRandom;
  * Nukkit Project
  */
 public class BlockSapling extends BlockFlowable {
+
+    public static final BlockProperty<WoodType> SAPLING_TYPE = new ArrayBlockProperty<>("sapling_type", true, WoodType.class);
+
+    public static final BooleanBlockProperty AGED = new BooleanBlockProperty("age_bit", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(SAPLING_TYPE, AGED);
 
     public static final int OAK = 0;
     public static final int SPRUCE = 1;
@@ -39,6 +51,12 @@ public class BlockSapling extends BlockFlowable {
     @Override
     public int getId() {
         return SAPLING;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

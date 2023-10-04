@@ -2,6 +2,8 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityBed;
 import cn.nukkit.entity.Entity;
@@ -20,12 +22,21 @@ import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.*;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.DIRECTION;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public class BlockBed extends BlockTransparentMeta implements Faceable {
+
+    public static final BooleanBlockProperty HEAD_PIECE = new BooleanBlockProperty("head_piece_bit", false);
+
+    public static final BooleanBlockProperty OCCUPIED = new BooleanBlockProperty("occupied_bit", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(DIRECTION, OCCUPIED, HEAD_PIECE);
 
     public BlockBed() {
         this(0);
@@ -38,6 +49,12 @@ public class BlockBed extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return BED_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

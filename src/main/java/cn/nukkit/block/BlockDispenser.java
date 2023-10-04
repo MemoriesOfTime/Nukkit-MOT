@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityDispenser;
 import cn.nukkit.dispenser.DispenseBehavior;
@@ -15,13 +17,21 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map.Entry;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.FACING_DIRECTION;
 
 /**
  * Created by CreeperFace on 15.4.2017.
  */
 public class BlockDispenser extends BlockSolidMeta implements Faceable {
+
+    public static final BooleanBlockProperty TRIGGERED = new BooleanBlockProperty("triggered_bit", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(FACING_DIRECTION, TRIGGERED);
+
 
     public BlockDispenser() {
         this(0);
@@ -44,6 +54,12 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable {
     @Override
     public int getId() {
         return DISPENSER;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

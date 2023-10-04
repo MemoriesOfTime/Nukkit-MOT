@@ -1,6 +1,11 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyValueException;
+import cn.nukkit.block.blockproperty.value.SmallFlowerType;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.particle.BoneMealParticle;
@@ -8,12 +13,29 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/11/23 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
 public class BlockFlower extends BlockFlowable {
+
+    public static final BlockProperty<SmallFlowerType> RED_FLOWER_TYPE = new ArrayBlockProperty<>("flower_type", true, new SmallFlowerType[]{
+            SmallFlowerType.POPPY,
+            SmallFlowerType.ORCHID,
+            SmallFlowerType.ALLIUM,
+            SmallFlowerType.HOUSTONIA,
+            SmallFlowerType.TULIP_RED,
+            SmallFlowerType.TULIP_ORANGE,
+            SmallFlowerType.TULIP_WHITE,
+            SmallFlowerType.TULIP_PINK,
+            SmallFlowerType.OXEYE,
+            SmallFlowerType.CORNFLOWER,
+            SmallFlowerType.LILY_OF_THE_VALLEY
+    });
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(RED_FLOWER_TYPE);
 
     public static final int TYPE_POPPY = 0;
     public static final int TYPE_BLUE_ORCHID = 1;
@@ -63,16 +85,62 @@ public class BlockFlower extends BlockFlowable {
         return FLOWER;
     }
 
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
+    }
+
     @Override
     public String getName() {
         return names[this.getDamage() & 0x0f];
     }
 
+    public SmallFlowerType getFlowerType() {
+        return getPropertyValue(RED_FLOWER_TYPE);
+    }
+
+    protected void setOnSingleFlowerType(SmallFlowerType acceptsOnly, SmallFlowerType attemptedToSet) {
+        if (attemptedToSet == null || attemptedToSet == acceptsOnly) {
+            return;
+        }
+        String persistenceName = getPersistenceName();
+        throw new InvalidBlockPropertyValueException(
+                new ArrayBlockProperty<>(persistenceName +"_type", false, new SmallFlowerType[]{acceptsOnly}),
+                acceptsOnly,
+                attemptedToSet,
+                persistenceName+" only accepts "+acceptsOnly.name().toLowerCase()
+        );
+    }
+
+    public void setFlowerType(SmallFlowerType flowerType) {
+        setPropertyValue(RED_FLOWER_TYPE, flowerType);
+    }
+
+    public static boolean isSupportValid(Block block) {
+        switch (block.getId()) {
+            case GRASS:
+            case DIRT:
+            case FARMLAND:
+            case PODZOL:
+            case MYCELIUM:
+                //TODO
+                //case DIRT_WITH_ROOTS:
+                //case MOSS_BLOCK:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public boolean canPlantOn(Block block) {
+        return isSupportValid(block);
+    }
+
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = this.down();
-        int id = down.getId();
-        if (id == Block.GRASS || id == Block.DIRT || id == Block.FARMLAND || id == Block.PODZOL || id == MYCELIUM) {
+        if (this.canPlantOn(down)) {
             this.getLevel().setBlock(block, this, true);
 
             return true;

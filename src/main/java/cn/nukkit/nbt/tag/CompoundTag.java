@@ -13,7 +13,7 @@ import java.util.StringJoiner;
 
 public class CompoundTag extends Tag implements Cloneable {
 
-    private final Map<String, Tag> tags;
+    protected final Map<String, Tag> tags;
 
     public CompoundTag() {
         this("");

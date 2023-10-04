@@ -5,6 +5,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Data;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import lombok.experimental.UtilityClass;
@@ -20,6 +21,9 @@ import java.util.Map;
 public class RuntimeItems {
 
     private static final Map<String, Integer> legacyString2LegacyInt = new HashMap<>();
+
+    @Getter
+    private final Map<String, MappingEntry> mappingEntries = new HashMap<>();
 
     private static RuntimeItemMapping mapping361;
     private static RuntimeItemMapping mapping419;
@@ -62,7 +66,6 @@ public class RuntimeItems {
         }
         JsonObject itemMapping = JsonParser.parseReader(new InputStreamReader(mappingStream)).getAsJsonObject();
 
-        Map<String, MappingEntry> mappingEntries = new HashMap<>();
         for (String legacyName : itemMapping.keySet()) {
             JsonObject convertData = itemMapping.getAsJsonObject(legacyName);
             for (String damageStr : convertData.keySet()) {

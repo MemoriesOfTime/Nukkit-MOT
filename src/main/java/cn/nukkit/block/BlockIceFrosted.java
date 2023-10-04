@@ -1,16 +1,23 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by PetteriM1
  */
 public class BlockIceFrosted extends BlockTransparentMeta {
+
+    public static final IntBlockProperty AGE = new IntBlockProperty("age", false, 3);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(AGE);
 
     public BlockIceFrosted() {
         this(0);
@@ -23,6 +30,12 @@ public class BlockIceFrosted extends BlockTransparentMeta {
     @Override
     public int getId() {
         return ICE_FROSTED;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

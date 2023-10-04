@@ -1,15 +1,24 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.value.SandStoneType;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public class BlockSandstone extends BlockSolidMeta {
+
+    public static final BlockProperty<SandStoneType> SAND_STONE_TYPE = new ArrayBlockProperty<>("sand_stone_type", true, SandStoneType.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(SAND_STONE_TYPE);
 
     public static final int NORMAL = 0;
     public static final int CHISELED = 1;
@@ -26,6 +35,12 @@ public class BlockSandstone extends BlockSolidMeta {
     @Override
     public int getId() {
         return SANDSTONE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

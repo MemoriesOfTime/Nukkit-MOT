@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
@@ -8,12 +10,17 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/12/2 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
 public class BlockFarmland extends BlockTransparentMeta {
+
+    public static final IntBlockProperty MOISTURIZED_AMOUNT = new IntBlockProperty("moisturized_amount", false, 7);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(MOISTURIZED_AMOUNT);
 
     public BlockFarmland() {
         this(0);
@@ -31,6 +38,12 @@ public class BlockFarmland extends BlockTransparentMeta {
     @Override
     public int getId() {
         return FARMLAND;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

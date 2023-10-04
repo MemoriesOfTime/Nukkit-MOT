@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityFlowerPot;
 import cn.nukkit.item.Item;
@@ -11,11 +12,16 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.BlockLeaves.UPDATE;
 
 /**
  * @author Nukkit Project Team
  */
 public class BlockFlowerPot extends BlockFlowable {
+
+    public static BlockProperties PROPERTIES = new BlockProperties(UPDATE);
 
     public BlockFlowerPot() {
         this(0);
@@ -57,6 +63,12 @@ public class BlockFlowerPot extends BlockFlowable {
     @Override
     public int getId() {
         return FLOWER_POT_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     private boolean isSupportValid(Block block) {

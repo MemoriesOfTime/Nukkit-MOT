@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.event.block.DoorToggleEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
@@ -11,12 +13,20 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.DIRECTION;
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.OPEN;
 
 /**
  * Created on 2015/11/23 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
 public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
+
+    public static final BooleanBlockProperty IN_WALL = new BooleanBlockProperty("in_wall_bit", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(DIRECTION, OPEN, IN_WALL);
 
     public BlockFenceGate() {
         this(0);
@@ -29,6 +39,12 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return FENCE_GATE_OAK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

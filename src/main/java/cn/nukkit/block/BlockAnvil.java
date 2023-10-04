@@ -2,6 +2,11 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
+import cn.nukkit.block.blockproperty.value.AnvilDamage;
 import cn.nukkit.inventory.AnvilInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -10,6 +15,7 @@ import cn.nukkit.level.sound.AnvilFallSound;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 
@@ -17,6 +23,12 @@ import java.util.Collection;
  * Created by Pub4Game on 27.12.2015.
  */
 public class BlockAnvil extends BlockFallableMeta implements Faceable {
+
+    public static final BlockProperty<AnvilDamage> DAMAGE = new ArrayBlockProperty<>("damage", false, AnvilDamage.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(
+            CommonBlockProperties.CARDINAL_DIRECTION.exportingToItems(true), DAMAGE.exportingToItems(true)
+    );
 
     private static final int[] faces = {1, 2, 3, 0};
 
@@ -51,6 +63,12 @@ public class BlockAnvil extends BlockFallableMeta implements Faceable {
     @Override
     public int getId() {
         return ANVIL;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

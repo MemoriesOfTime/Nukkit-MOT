@@ -1,9 +1,11 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by CreeperFace on 26. 11. 2016.
@@ -21,6 +23,12 @@ public class BlockDoubleSlabRedSandstone extends BlockSolidMeta {
     @Override
     public int getId() {
         return DOUBLE_RED_SANDSTONE_SLAB;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return BlockSlab.SIMPLE_SLAB_PROPERTIES;
     }
 
     @Override

@@ -2,6 +2,8 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityMovingBlock;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
@@ -16,6 +18,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Faceable;
 import com.google.common.collect.Lists;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,6 +30,8 @@ import java.util.stream.Collectors;
  */
 public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable {
 
+    public static final BlockProperties PROPERTIES = CommonBlockProperties.FACING_DIRECTION_BLOCK_PROPERTIES;
+
     public boolean sticky = false;
 
     public BlockPistonBase() {
@@ -35,6 +40,11 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
     public BlockPistonBase(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

@@ -1,14 +1,19 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by CreeperFace on 2.6.2017.
  */
 public class BlockConcrete extends BlockSolidMeta {
+
+    public static final BlockProperties PROPERTIES = CommonBlockProperties.COLOR_BLOCK_PROPERTIES;
 
     public BlockConcrete() {
         this(0);
@@ -21,6 +26,12 @@ public class BlockConcrete extends BlockSolidMeta {
     @Override
     public int getId() {
         return CONCRETE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

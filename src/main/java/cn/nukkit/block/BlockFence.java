@@ -1,17 +1,22 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.value.WoodType;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created on 2015/12/7 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
 public class BlockFence extends BlockTransparentMeta {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(WoodType.PROPERTY);
 
     public static final int FENCE_OAK = 0;
     public static final int FENCE_SPRUCE = 1;
@@ -31,6 +36,12 @@ public class BlockFence extends BlockTransparentMeta {
     @Override
     public int getId() {
         return FENCE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

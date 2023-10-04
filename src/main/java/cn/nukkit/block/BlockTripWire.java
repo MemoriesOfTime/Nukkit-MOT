@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemString;
@@ -8,11 +10,21 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.ATTACHED;
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.POWERED;
 
 /**
  * @author CreeperFace
  */
 public class BlockTripWire extends BlockFlowable {
+
+    public static final BooleanBlockProperty DISARMED = new BooleanBlockProperty("disarmed_bit", false);
+
+    public static final BooleanBlockProperty SUSPENDED = new BooleanBlockProperty("suspended_bit", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(POWERED, SUSPENDED, ATTACHED, DISARMED);
 
     public BlockTripWire(int meta) {
         super(meta);
@@ -25,6 +37,12 @@ public class BlockTripWire extends BlockFlowable {
     @Override
     public int getId() {
         return TRIPWIRE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

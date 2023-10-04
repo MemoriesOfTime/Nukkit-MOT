@@ -1,13 +1,23 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.value.StoneBrickType;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public class BlockBricksStone extends BlockSolidMeta {
+
+    public static final BlockProperty<StoneBrickType> STONE_BRICK_TYPE = new ArrayBlockProperty<>("stone_brick_type", true, StoneBrickType.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(STONE_BRICK_TYPE);
+
     public static final int NORMAL = 0;
     public static final int MOSSY = 1;
     public static final int CRACKED = 2;
@@ -25,6 +35,12 @@ public class BlockBricksStone extends BlockSolidMeta {
     @Override
     public int getId() {
         return STONE_BRICKS;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

@@ -1,16 +1,26 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.value.CoralType;
 import cn.nukkit.event.block.BlockFadeEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.PERMANENTLY_DEAD;
+
 public class BlockCoral extends BlockFlowable {
+
+    public static final ArrayBlockProperty<CoralType> COLOR = new ArrayBlockProperty<>("coral_color", true, CoralType.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(COLOR, PERMANENTLY_DEAD);
 
     public static final int TYPE_TUBE = 0;
     public static final int TYPE_BRAIN = 1;
@@ -29,6 +39,12 @@ public class BlockCoral extends BlockFlowable {
     @Override
     public int getId() {
         return CORAL;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

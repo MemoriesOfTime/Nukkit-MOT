@@ -3,6 +3,8 @@ package cn.nukkit.level;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.blockstate.BlockStateRegistry;
+import cn.nukkit.block.blockstate.BlockStateRegistryMapping;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -615,6 +617,10 @@ public class GlobalBlockPalette {
         if (runtimeId == -1) {
             runtimeId = legacyToRuntimeIdMap.get(id << 6);
             if (runtimeId == -1) {
+                BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(protocol);
+                if (mapping != null) {
+                    return mapping.getRuntimeId(id, meta);
+                }
                 log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
                 runtimeId = legacyToRuntimeIdMap.get(BlockID.INFO_UPDATE << 6);
             }

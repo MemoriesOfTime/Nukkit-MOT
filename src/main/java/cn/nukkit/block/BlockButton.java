@@ -1,17 +1,28 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.sound.ButtonClickSound;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.FACING_DIRECTION;
 
 /**
  * Created by CreeperFace on 27. 11. 2016.
  */
 public abstract class BlockButton extends BlockFlowable implements Faceable {
+
+    protected static final BooleanBlockProperty BUTTON_PRESSED = new BooleanBlockProperty("button_pressed_bit", false);
+    public static final BlockProperties PROPERTIES = new BlockProperties(
+            FACING_DIRECTION,
+            BUTTON_PRESSED
+    );
 
     public BlockButton() {
         this(0);
@@ -19,6 +30,12 @@ public abstract class BlockButton extends BlockFlowable implements Faceable {
 
     public BlockButton(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

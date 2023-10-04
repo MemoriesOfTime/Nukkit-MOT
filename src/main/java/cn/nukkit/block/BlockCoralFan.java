@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.event.block.BlockFadeEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -8,10 +10,17 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
+import static cn.nukkit.block.BlockCoral.COLOR;
+
 public class BlockCoralFan extends BlockFlowable implements Faceable {
+
+    public static final IntBlockProperty FAN_DIRECTION = new IntBlockProperty("coral_fan_direction", false, 1, 0, 1);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(COLOR, FAN_DIRECTION);
 
     public BlockCoralFan() {
         this(0);
@@ -24,6 +33,12 @@ public class BlockCoralFan extends BlockFlowable implements Faceable {
     @Override
     public int getId() {
         return CORAL_FAN;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
     
     @Override

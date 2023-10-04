@@ -1,6 +1,10 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntitySign;
 import cn.nukkit.event.block.SignColorChangeEvent;
@@ -12,6 +16,7 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.CompassRoseDirection;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelEventPacket;
@@ -20,11 +25,23 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.math.CompassRoseDirection.*;
 
 /**
  * @author Nukkit Project Team
  */
 public class BlockSignPost extends BlockTransparentMeta implements Faceable {
+
+    public static final BlockProperty<CompassRoseDirection> GROUND_SIGN_DIRECTION = new ArrayBlockProperty<>("ground_sign_direction", false, new CompassRoseDirection[]{
+            SOUTH, SOUTH_SOUTH_WEST, SOUTH_WEST, WEST_SOUTH_WEST,
+            WEST, WEST_NORTH_WEST, NORTH_WEST, NORTH_NORTH_WEST,
+            NORTH, NORTH_NORTH_EAST, NORTH_EAST, EAST_NORTH_EAST,
+            EAST, EAST_SOUTH_EAST, SOUTH_EAST, SOUTH_SOUTH_EAST
+    }).ordinal(true);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(CommonBlockProperties.GROUND_SIGN_DIRECTION);
 
     public BlockSignPost() {
         this(0);
@@ -37,6 +54,12 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return SIGN_POST;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

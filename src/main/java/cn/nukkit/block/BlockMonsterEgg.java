@@ -1,14 +1,23 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Server;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.value.MonsterEggStoneType;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.mob.EntitySilverfish;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockMonsterEgg extends BlockSolidMeta {
+
+    public static final ArrayBlockProperty<MonsterEggStoneType> MONSTER_EGG_STONE_TYPE = new ArrayBlockProperty<>(
+            "monster_egg_stone_type", true, MonsterEggStoneType.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(MONSTER_EGG_STONE_TYPE);
 
     public static final int STONE = 0;
     public static final int COBBLESTONE = 1;
@@ -37,6 +46,12 @@ public class BlockMonsterEgg extends BlockSolidMeta {
     @Override
     public int getId() {
         return MONSTER_EGG;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

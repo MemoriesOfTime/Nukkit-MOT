@@ -1,10 +1,13 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by PetteriM1
@@ -22,6 +25,12 @@ public class BlockChemistryTable extends BlockSolidMeta {
     @Override
     public int getId() {
         return CHEMISTRY_TABLE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return CommonBlockProperties.EMPTY_PROPERTIES;
     }
 
     @Override

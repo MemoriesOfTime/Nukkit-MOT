@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
 import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.event.block.DoorToggleEvent;
 import cn.nukkit.item.Item;
@@ -13,8 +16,21 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.OPEN;
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.UPSIDE_DOWN;
 
 public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
+
+    public static final BlockProperty<BlockFace> TRAPDOOR_DIRECTION = new ArrayBlockProperty<>("direction", false, new BlockFace[]{
+            // It's basically weirdo_direction but renamed
+            BlockFace.EAST, BlockFace.WEST,
+            BlockFace.SOUTH, BlockFace.NORTH
+    }).ordinal(true);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(TRAPDOOR_DIRECTION, UPSIDE_DOWN, OPEN);
+
     public static final int DIRECTION_MASK = 0b11;
     public static final int TRAPDOOR_TOP_BIT = 0x04;
     public static final int TRAPDOOR_OPEN_BIT = 0x08;
@@ -102,6 +118,12 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return TRAPDOOR;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

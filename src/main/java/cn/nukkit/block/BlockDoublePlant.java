@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.value.DoublePlantType;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemSeedsWheat;
@@ -9,12 +12,21 @@ import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.UPPER_BLOCK;
 
 /**
  * Created on 2015/11/23 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
 public class BlockDoublePlant extends BlockFlowable {
+
+    public static final ArrayBlockProperty<DoublePlantType> DOUBLE_PLANT_TYPE = new ArrayBlockProperty<>(
+            "double_plant_type", true, DoublePlantType.class
+    );
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(DOUBLE_PLANT_TYPE, UPPER_BLOCK);
 
     public static final int SUNFLOWER = 0;
     public static final int LILAC = 1;
@@ -44,6 +56,12 @@ public class BlockDoublePlant extends BlockFlowable {
     @Override
     public int getId() {
         return DOUBLE_PLANT;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

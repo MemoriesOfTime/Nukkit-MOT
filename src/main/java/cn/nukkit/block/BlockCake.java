@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemCake;
 import cn.nukkit.item.food.Food;
@@ -9,11 +11,16 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Nukkit Project Team
  */
 public class BlockCake extends BlockTransparentMeta {
+
+    public static final IntBlockProperty BITES = new IntBlockProperty("bite_counter", false, 6);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(BITES);
 
     public BlockCake(int meta) {
         super(meta);
@@ -31,6 +38,12 @@ public class BlockCake extends BlockTransparentMeta {
     @Override
     public int getId() {
         return CAKE_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

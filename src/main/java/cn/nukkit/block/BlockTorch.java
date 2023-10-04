@@ -1,18 +1,29 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import lombok.RequiredArgsConstructor;
+import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nullable;
 
 /**
  * Created on 2015/12/2 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
 public class BlockTorch extends BlockFlowable implements Faceable {
+
+    public static final BlockProperty<TorchAttachment> TORCH_FACING_DIRECTION = new ArrayBlockProperty<>("torch_facing_direction", false, TorchAttachment.class);
+    
+    public static final BlockProperties PROPERTIES = new BlockProperties(TORCH_FACING_DIRECTION);
 
     private static final short[] faces = new short[]{
             0, //0, never used
@@ -49,6 +60,12 @@ public class BlockTorch extends BlockFlowable implements Faceable {
     @Override
     public int getId() {
         return TORCH;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override
@@ -119,6 +136,83 @@ public class BlockTorch extends BlockFlowable implements Faceable {
                 return BlockFace.NORTH;
             default:
                 return BlockFace.UP;
+        }
+    }
+
+    @RequiredArgsConstructor
+    public enum TorchAttachment {
+        UNKNOWN(BlockFace.UP),
+        WEST(BlockFace.EAST),
+        EAST(BlockFace.WEST),
+        NORTH(BlockFace.SOUTH),
+        SOUTH(BlockFace.NORTH),
+        TOP(BlockFace.UP);
+        private final BlockFace torchDirection;
+
+        /**
+         * The direction that the flame is pointing.
+         */
+        public BlockFace getTorchDirection() {
+            return torchDirection;
+        }
+        
+        @Nullable
+        public static TorchAttachment getByTorchDirection(@NotNull BlockFace face) {
+            switch (face) {
+                default:
+                case DOWN:
+                    return null;
+                case UP:
+                    return TOP;
+                case EAST:
+                    return WEST;
+                case WEST:
+                    return EAST;
+                case SOUTH:
+                    return NORTH;
+                case NORTH:
+                    return SOUTH;
+            }
+        }
+
+        /**
+         * The direction that is touching the attached block.
+         */
+        @NotNull
+        public BlockFace getAttachedFace() {
+            switch (this) {
+                default:
+                case UNKNOWN:
+                case TOP:
+                    return BlockFace.DOWN;
+                case EAST:
+                    return BlockFace.EAST;
+                case WEST:
+                    return BlockFace.WEST;
+                case SOUTH:
+                    return BlockFace.SOUTH;
+                case NORTH:
+                    return BlockFace.NORTH;
+            }
+        }
+        
+        @Nullable
+        public static TorchAttachment getByAttachedFace(@NotNull BlockFace face) {
+            switch (face) {
+                default:
+                case UP:
+                    return null;
+                case DOWN:
+                    return TorchAttachment.TOP;
+                case SOUTH:
+                    return TorchAttachment.SOUTH;
+                case NORTH:
+                    return TorchAttachment.NORTH;
+                case EAST:
+                    return TorchAttachment.EAST;
+                case WEST:
+                    return TorchAttachment.WEST;
+            }
         }
     }
 }

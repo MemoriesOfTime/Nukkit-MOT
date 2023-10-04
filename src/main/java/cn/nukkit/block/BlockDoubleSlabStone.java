@@ -1,9 +1,11 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -31,6 +33,12 @@ public class BlockDoubleSlabStone extends BlockSolidMeta {
     @Override
     public int getId() {
         return DOUBLE_SLAB;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return BlockSlabStone.PROPERTIES;
     }
 
     @Override

@@ -8,6 +8,19 @@ import java.math.BigInteger;
  */
 public class NukkitMath {
 
+    private static final Byte ZERO_BYTE = 0;
+    private static final Integer ZERO_INTEGER = 0;
+    private static final Short ZERO_SHORT = 0;
+    private static final Long ZERO_LONG = 0L;
+
+    public static boolean isZero(Number storage) {
+        return ZERO_BYTE.equals(storage)
+                || ZERO_INTEGER.equals(storage)
+                || ZERO_SHORT.equals(storage)
+                || ZERO_LONG.equals(storage)
+                || BigInteger.ZERO.equals(storage);
+    }
+
     public static int floorDouble(double n) {
         int i = (int) n;
         return n >= i ? i : i - 1;

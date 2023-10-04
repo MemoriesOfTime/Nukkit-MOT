@@ -1,15 +1,25 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.value.WoodType;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.VERTICAL_HALF;
 
 /**
  * Created on 2015/12/2 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
  */
 public class BlockSlabWood extends BlockSlab {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(
+            WoodType.PROPERTY,
+            VERTICAL_HALF
+    );
 
     public BlockSlabWood() {
         this(0);
@@ -37,6 +47,12 @@ public class BlockSlabWood extends BlockSlab {
     @Override
     public int getId() {
         return WOOD_SLAB;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

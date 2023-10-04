@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
@@ -8,6 +10,7 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * http://minecraft.gamepedia.com/End_Rod
@@ -15,6 +18,8 @@ import cn.nukkit.utils.Faceable;
  * @author PikyCZ
  */
 public class BlockEndRod extends BlockTransparentMeta implements Faceable {
+
+    public static final BlockProperties PROPERTIES = CommonBlockProperties.FACING_DIRECTION_BLOCK_PROPERTIES;
 
     private static final int[] faces = {0, 1, 3, 2, 5, 4};
 
@@ -34,6 +39,12 @@ public class BlockEndRod extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return END_ROD;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

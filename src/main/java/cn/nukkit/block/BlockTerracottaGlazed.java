@@ -1,14 +1,19 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by CreeperFace on 2.6.2017.
  */
 public abstract class BlockTerracottaGlazed extends BlockSolidMeta {
+
+    public static final BlockProperties PROPERTIES = CommonBlockProperties.FACING_DIRECTION_BLOCK_PROPERTIES;
 
     private static final int[] faces = {2, 5, 3, 4};
 
@@ -18,6 +23,12 @@ public abstract class BlockTerracottaGlazed extends BlockSolidMeta {
 
     public BlockTerracottaGlazed(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

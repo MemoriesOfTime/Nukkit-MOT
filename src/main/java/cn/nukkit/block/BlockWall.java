@@ -1,15 +1,38 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public class BlockWall extends BlockTransparentMeta {
+
+    public static final BlockProperty<WallConnectionType> WALL_CONNECTION_TYPE_SOUTH = new ArrayBlockProperty<>("wall_connection_type_south", false, WallConnectionType .class);
+    
+    public static final BlockProperty<WallConnectionType> WALL_CONNECTION_TYPE_WEST = new ArrayBlockProperty<>("wall_connection_type_west", false, WallConnectionType .class);
+    
+    public static final BlockProperty<WallConnectionType> WALL_CONNECTION_TYPE_NORTH = new ArrayBlockProperty<>("wall_connection_type_north", false, WallConnectionType .class);
+    
+    public static final BlockProperty<WallConnectionType> WALL_CONNECTION_TYPE_EAST = new ArrayBlockProperty<>("wall_connection_type_east", false, WallConnectionType .class);
+    
+    public static final BooleanBlockProperty WALL_POST_BIT = new BooleanBlockProperty("wall_post_bit", false);
+    
+    public static final BlockProperties PROPERTIES = new BlockProperties(
+            WALL_CONNECTION_TYPE_SOUTH,
+            WALL_CONNECTION_TYPE_WEST,
+            WALL_CONNECTION_TYPE_NORTH,
+            WALL_CONNECTION_TYPE_EAST,
+            WALL_POST_BIT
+    );
 
     public static final int NONE_MOSSY_WALL = 0;
     public static final int MOSSY_WALL = 1;
@@ -25,6 +48,12 @@ public class BlockWall extends BlockTransparentMeta {
     @Override
     public int getId() {
         return STONE_WALL;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override
@@ -58,7 +87,6 @@ public class BlockWall extends BlockTransparentMeta {
 
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
-
         boolean north = this.canConnect(this.getSide(BlockFace.NORTH));
         boolean south = this.canConnect(this.getSide(BlockFace.SOUTH));
         boolean west = this.canConnect(this.getSide(BlockFace.WEST));
@@ -104,5 +132,11 @@ public class BlockWall extends BlockTransparentMeta {
     @Override
     public boolean canHarvestWithHand() {
         return false;
+    }
+
+    public enum WallConnectionType {
+        NONE,
+        SHORT,
+        TALL
     }
 }

@@ -1,11 +1,16 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.value.DirtType;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Sound;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -13,6 +18,10 @@ import cn.nukkit.utils.BlockColor;
  * Nukkit Project
  */
 public class BlockDirt extends BlockSolidMeta {
+
+    public static final BlockProperty<DirtType> DIRT_TYPE = new ArrayBlockProperty<>("dirt_type", true, DirtType.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(DIRT_TYPE);
 
     public BlockDirt() {
         this(0);
@@ -25,6 +34,12 @@ public class BlockDirt extends BlockSolidMeta {
     @Override
     public int getId() {
         return DIRT;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

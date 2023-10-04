@@ -1,17 +1,24 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.IntBlockProperty;
 import cn.nukkit.event.block.ComposterEmptyEvent;
 import cn.nukkit.event.block.ComposterFillEvent;
 import cn.nukkit.item.*;
 import cn.nukkit.level.Sound;
 import cn.nukkit.utils.DyeColor;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockComposter extends BlockSolidMeta implements ItemID {
+
+    public static final IntBlockProperty COMPOSTER_FILL_LEVEL = new IntBlockProperty("composter_fill_level", false, 8);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(COMPOSTER_FILL_LEVEL);
 
     private static Int2IntOpenHashMap compostableItems = new Int2IntOpenHashMap();
 
@@ -30,6 +37,12 @@ public class BlockComposter extends BlockSolidMeta implements ItemID {
     @Override
     public int getId() {
         return COMPOSTER;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

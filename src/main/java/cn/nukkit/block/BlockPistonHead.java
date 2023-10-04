@@ -1,14 +1,18 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author CreeperFace
  */
 public class BlockPistonHead extends BlockTransparentMeta implements Faceable {
+
+    public static final BlockProperties PROPERTIES = BlockPistonBase.PROPERTIES;
 
     public BlockPistonHead() {
         this(0);
@@ -21,6 +25,12 @@ public class BlockPistonHead extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return PISTON_HEAD;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

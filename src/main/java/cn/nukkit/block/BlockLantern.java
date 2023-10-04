@@ -1,14 +1,22 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockLantern extends BlockFlowable {
+
+    public static final BooleanBlockProperty HANGING = new BooleanBlockProperty("hanging", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(CommonBlockProperties.HANGING);
 
     public BlockLantern() {
         this(0);
@@ -21,6 +29,12 @@ public class BlockLantern extends BlockFlowable {
     @Override
     public int getId() {
         return LANTERN;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

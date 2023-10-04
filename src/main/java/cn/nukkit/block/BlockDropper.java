@@ -17,7 +17,7 @@ import cn.nukkit.utils.Utils;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class BlockDropper extends BlockSolidMeta implements Faceable {
+public class BlockDropper extends BlockDispenser implements Faceable {
 
     protected boolean triggered = false;
 

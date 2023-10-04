@@ -2,31 +2,47 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.CommonBlockProperties;
+import cn.nukkit.block.blockstate.*;
+import cn.nukkit.block.blockstate.exception.InvalidBlockStateException;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.metadata.Metadatable;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
+import cn.nukkit.utils.MinecraftNamespaceComparator;
+import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
 
+import javax.annotation.Nonnegative;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.io.Serializable;
 import java.lang.reflect.Constructor;
+import java.math.BigInteger;
+import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 import static cn.nukkit.utils.Utils.dynamic;
@@ -35,8 +51,8 @@ import static cn.nukkit.utils.Utils.dynamic;
  * @author MagicDroidX
  * Nukkit Project
  */
-public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
-    public static final int MAX_BLOCK_ID = dynamic(600);
+public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID, IMutableBlockState {
+    public static final int MAX_BLOCK_ID = dynamic(800);
     public static final int DATA_BITS = dynamic(6);
     public static final int DATA_SIZE = dynamic(1 << DATA_BITS);
     public static final int DATA_MASK = dynamic(DATA_SIZE - 1);
@@ -56,6 +72,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public AxisAlignedBB boundingBox = null;
     public int layer = 0;
+
+    @Nullable
+    private MutableBlockState mutableState;
 
     protected Block() {}
 
@@ -411,6 +430,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[WOOD_BARK] = BlockWoodBark.class; //467
             list[COMPOSTER] = BlockComposter.class; //468
 
+            list[WITHER_ROSE] = BlockWitherRose.class; //471
             list[PISTON_HEAD_STICKY] = BlockPistonHeadSticky.class; //472
 
             list[CRIMSON_ROOTS] = BlockRootsCrimson.class; //478
@@ -450,12 +470,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[CRYING_OBSIDIAN] = BlockCryingObsidian.class; //544
             list[SOUL_CAMPFIRE_BLOCK] = BlockCampfireSoul.class; //545
 
-            //TODO We need to update the GlobalBlockPalette first
-            //list[COPPER_ORE] = BlockOreCopper.class; // 566
+            list[COPPER_ORE] = BlockOreCopper.class; // 566
 
-            //list[RAW_IRON_BLOCK] = BlockRawIron.class; //706
-            //list[RAW_COPPER_BLOCK] = BlockRawCopper.class; //707
-            //list[RAW_GOLD_BLOCK] = BlockRawGold.class; //708
+            list[RAW_IRON_BLOCK] = BlockRawIron.class; //706
+            list[RAW_COPPER_BLOCK] = BlockRawCopper.class; //707
+            list[RAW_GOLD_BLOCK] = BlockRawGold.class; //708
 
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];
@@ -626,6 +645,14 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         block.level = level;
         //block.layer = layer;
         return block;
+    }
+
+    @NotNull
+    public final MutableBlockState getMutableState() {
+        if (mutableState == null) {
+            mutableState = getProperties().createMutableState(getId());
+        }
+        return mutableState;
     }
 
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
@@ -817,6 +844,31 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
      */
     public int getFullId() {
         return getId() << DATA_BITS;
+    }
+
+    @NotNull
+    public BlockProperties getProperties() {
+        return CommonBlockProperties.EMPTY_PROPERTIES;
+    }
+
+    @NotNull
+    public final BlockState getCurrentState() {
+        return mutableState == null ? BlockState.of(getId()) : mutableState.getCurrentState();
+    }
+
+    @Override
+    public final int getRuntimeId() {
+        Server.mvw("IBlockState#getRuntimeId()");
+        return this.getRuntimeId(ProtocolInfo.CURRENT_PROTOCOL);
+    }
+
+    @Override
+    public int getRuntimeId(int protocolId) {
+        BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(protocolId);
+        if (mapping == null) {
+            return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getId(), this.getDamage());
+        }
+        return getCurrentState().getRuntimeId(protocolId);
     }
 
     public void addVelocityToEntity(Entity entity, Vector3 vector) {
@@ -1328,6 +1380,21 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return b1 != null && b2 != null && b1.getId() == b2.getId() && (!checkDamage || b1.getDamage() == b2.getDamage());
     }
 
+    private int cachedBlockStateHash = -1;
+
+    @SneakyThrows
+    public int computeBlockStateHash() {
+        if (cachedBlockStateHash != -1) {
+            return cachedBlockStateHash;
+        } else {
+            if (getPersistenceName().equals("minecraft:unknown")) {
+                return cachedBlockStateHash = -2; // This is special case
+            }
+            CompoundTag tag = NBTIO.putBlockHelper(this, "").remove("version");
+            return cachedBlockStateHash = MinecraftNamespaceComparator.fnv1a_32(NBTIO.write(tag, ByteOrder.LITTLE_ENDIAN));
+        }
+    }
+
     @Override
     public int hashCode() {
         return  ((int) x ^ ((int) z << 12)) ^ ((int) (y + 64)/*这里不删除+64，为以后支持384世界高度准备*/ << 23);
@@ -1355,6 +1422,138 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         return Optional.empty();
+    }
+
+    @Override
+    public boolean isDefaultState() {
+        return mutableState == null || mutableState.isDefaultState();
+    }
+
+    @Override
+    public void setState(@NotNull IBlockState state) throws InvalidBlockStateException {
+        if (state.getBlockId() == getId() && this.isDefaultState() && state.isDefaultState()) {
+            return;
+        }
+        getMutableState().setState(state);
+    }
+
+    @Override
+    @NotNull
+    public Block forState(@NotNull IBlockState state) throws InvalidBlockStateException {
+        return (Block) IMutableBlockState.super.forState(state);
+    }
+
+    @Override
+    public void setDataStorage(@Nonnegative @NotNull Number storage) {
+        if (NukkitMath.isZero(storage) && isDefaultState()) {
+            return;
+        }
+        getMutableState().setDataStorage(storage);
+    }
+
+    @Override
+    public void setDataStorageFromInt(@Nonnegative int storage) {
+        if (storage == 0 && isDefaultState()) {
+            return;
+        }
+        getMutableState().setDataStorageFromInt(storage);
+    }
+
+    @Override
+    public boolean setDataStorage(@Nonnegative @NotNull Number storage, boolean repair, Consumer<BlockStateRepair> callback) {
+        if (NukkitMath.isZero(storage) && isDefaultState()) {
+            return false;
+        }
+        return getMutableState().setDataStorage(storage, repair, callback);
+    }
+
+    @Override
+    public boolean setDataStorageFromInt(@Nonnegative int storage, boolean repair, Consumer<BlockStateRepair> callback) {
+        if (storage == 0 && isDefaultState()) {
+            return false;
+        }
+        return getMutableState().setDataStorageFromInt(storage, repair, callback);
+    }
+
+    @Override
+    public void setPropertyValue(@NotNull String propertyName, @Nullable Serializable value) {
+        if (isDefaultState() && getProperties().isDefaultValue(propertyName, value)) {
+            return;
+        }
+        getMutableState().setPropertyValue(propertyName, value);
+    }
+
+    @Override
+    public void setBooleanValue(@NotNull String propertyName, boolean value) {
+        if (isDefaultState() && getProperties().isDefaultBooleanValue(propertyName, value)) {
+            return;
+        }
+        getMutableState().setBooleanValue(propertyName, value);
+    }
+
+    @Override
+    public void setIntValue(@NotNull String propertyName, int value) {
+        if (isDefaultState() && getProperties().isDefaultIntValue(propertyName, value)) {
+            return;
+        }
+        getMutableState().setIntValue(propertyName, value);
+    }
+
+    @Override
+    @Deprecated
+    public final int getBlockId() {
+        return getId();
+    }
+
+    @NotNull
+    @Override
+    public final Number getDataStorage() {
+        return mutableState == null ? 0 : mutableState.getDataStorage();
+    }
+
+    @NotNull
+    @Override
+    public BigInteger getHugeDamage() {
+        return mutableState == null ? BigInteger.ZERO : mutableState.getHugeDamage();
+    }
+
+    @NotNull
+    @Override
+    public Serializable getPropertyValue(@NotNull String propertyName) {
+        if (isDefaultState()) {
+            return getProperties().getBlockProperty(propertyName).getDefaultValue();
+        }
+        return getMutableState().getPropertyValue(propertyName);
+    }
+
+    @Override
+    public int getIntValue(@NotNull String propertyName) {
+        if (isDefaultState()) {
+            return getProperties().getBlockProperty(propertyName).getDefaultIntValue();
+        }
+        return getMutableState().getIntValue(propertyName);
+    }
+
+    @Override
+    public boolean getBooleanValue(@NotNull String propertyName) {
+        if (isDefaultState()) {
+            return getProperties().getBlockProperty(propertyName).getDefaultBooleanValue();
+        }
+        return getMutableState().getBooleanValue(propertyName);
+    }
+
+    @NotNull
+    @Override
+    public String getPersistenceValue(@NotNull String propertyName) {
+        if (isDefaultState()) {
+            return getProperties().getBlockProperty(propertyName).getPersistenceValueForMeta(0);
+        }
+        return getMutableState().getPersistenceValue(propertyName);
+    }
+
+    @Override
+    public final int getExactIntStorage() {
+        return mutableState == null ? 0 : mutableState.getExactIntStorage();
     }
 
     public static boolean hasWater(int id) {

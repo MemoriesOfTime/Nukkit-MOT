@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.value.TallGrassType;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemSeedsWheat;
 import cn.nukkit.item.ItemTool;
@@ -9,12 +12,17 @@ import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Angelic47
  * Nukkit Project
  */
 public class BlockTallGrass extends BlockFlowable {
+
+    public static final ArrayBlockProperty<TallGrassType> TALL_GRASS_TYPE = new ArrayBlockProperty<>("tall_grass_type", true, TallGrassType.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(TALL_GRASS_TYPE);
 
     public BlockTallGrass() {
         this(1);
@@ -27,6 +35,12 @@ public class BlockTallGrass extends BlockFlowable {
     @Override
     public int getId() {
         return TALL_GRASS;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

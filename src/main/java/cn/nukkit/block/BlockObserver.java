@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.event.redstone.RedstoneUpdateEvent;
 import cn.nukkit.item.Item;
@@ -12,7 +13,12 @@ import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
 
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.FACING_DIRECTION;
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.POWERED;
+
 public class BlockObserver extends BlockSolidMeta implements Faceable {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(FACING_DIRECTION, POWERED);
 
     private static final int FACE_BIT = 0x7; //0111
     private static final int POWERED_BIT = 0x8; //1000
@@ -28,6 +34,12 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
     @Override
     public int getId() {
         return OBSERVER;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

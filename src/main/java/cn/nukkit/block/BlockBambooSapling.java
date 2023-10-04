@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -10,10 +11,13 @@ import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockBambooSapling extends BlockFlowable {
+
+    public static final BlockProperties PROPERTIES = BlockSapling.PROPERTIES;
 
     public BlockBambooSapling() {
         this(0);
@@ -26,6 +30,12 @@ public class BlockBambooSapling extends BlockFlowable {
     @Override
     public int getId() {
         return BAMBOO_SAPLING;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

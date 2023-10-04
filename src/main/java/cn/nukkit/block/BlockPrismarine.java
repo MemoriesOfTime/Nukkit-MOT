@@ -1,10 +1,19 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BlockProperty;
+import cn.nukkit.block.blockproperty.value.PrismarineBlockType;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 
 public class BlockPrismarine extends BlockSolidMeta {
+
+    public static final BlockProperty<PrismarineBlockType> PRISMARINE_BLOCK_TYPE = new ArrayBlockProperty<>("prismarine_block_type", true, PrismarineBlockType.class);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(PRISMARINE_BLOCK_TYPE);
 
     public static final int NORMAL = 0;
     public static final int DARK = 1;
@@ -27,6 +36,12 @@ public class BlockPrismarine extends BlockSolidMeta {
     @Override
     public int getId() {
         return PRISMARINE;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

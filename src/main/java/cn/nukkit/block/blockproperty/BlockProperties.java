@@ -3,6 +3,7 @@ package cn.nukkit.block.blockproperty;
 import cn.nukkit.block.blockproperty.exception.BlockPropertyNotFoundException;
 import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyMetaException;
 import cn.nukkit.block.blockproperty.exception.InvalidBlockPropertyValueException;
+import cn.nukkit.block.blockstate.*;
 import cn.nukkit.utils.functional.ToIntTriFunctionTwoInts;
 import cn.nukkit.utils.functional.ToLongTriFunctionOneIntOneLong;
 import cn.nukkit.utils.functional.TriFunction;
@@ -70,8 +71,7 @@ public final class BlockProperties {
         return itemBlockProperties;
     }
 
-    //TODO
-    /*@NotNull
+    @NotNull
     public MutableBlockState createMutableState(int blockId) {
         if (bitSize == 0) {
             return new ZeroMutableBlockState(blockId, this);
@@ -84,7 +84,7 @@ public final class BlockProperties {
         } else {
             return new BigIntegerMutableBlockState(blockId, this);
         }
-    }*/
+    }
 
     public boolean contains(String propertyName) {
         return byName.containsKey(propertyName);

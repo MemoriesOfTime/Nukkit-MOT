@@ -149,4 +149,12 @@ public class HandlerList {
             return new ArrayList<>(allLists);
         }
     }
+
+    public boolean isEmpty() {
+        RegisteredListener[] handlers = this.handlers;
+        if (handlers != null) {
+            return handlers.length == 0;
+        }
+        return getRegisteredListeners().length == 0;
+    }
 }

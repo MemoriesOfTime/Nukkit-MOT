@@ -1,12 +1,14 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
-public abstract class BlockStem extends BlockSolidMeta {
+public abstract class BlockStem extends BlockLog {
 
     private static final short[] faces = new short[]{
             0,
@@ -23,6 +25,12 @@ public abstract class BlockStem extends BlockSolidMeta {
 
     protected BlockStem(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PILLAR_PROPERTIES;
     }
 
     @Override

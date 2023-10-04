@@ -1,13 +1,18 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.value.WoodType;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public class BlockPlanks extends BlockSolidMeta {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(WoodType.PROPERTY);
 
     public static final int OAK = 0;
     public static final int SPRUCE = 1;
@@ -27,6 +32,12 @@ public class BlockPlanks extends BlockSolidMeta {
     @Override
     public int getId() {
         return WOODEN_PLANKS;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

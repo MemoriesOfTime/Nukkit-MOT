@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.math.AxisAlignedBB;
@@ -9,11 +11,18 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.CARDINAL_DIRECTION;
 
 /**
  * Created by Pub4Game on 26.12.2015.
  */
 public class BlockEndPortalFrame extends BlockTransparentMeta implements Faceable {
+
+    public static final BooleanBlockProperty END_PORTAL_EYE = new BooleanBlockProperty("end_portal_eye_bit", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(CARDINAL_DIRECTION, END_PORTAL_EYE);
 
     private static final int[] faces = {2, 3, 0, 1};
 
@@ -28,6 +37,12 @@ public class BlockEndPortalFrame extends BlockTransparentMeta implements Faceabl
     @Override
     public int getId() {
         return END_PORTAL_FRAME;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

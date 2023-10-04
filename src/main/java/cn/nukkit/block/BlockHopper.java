@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.inventory.ContainerInventory;
@@ -12,11 +13,17 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.FACING_DIRECTION;
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.TOGGLE;
 
 /**
  * @author CreeperFace
  */
 public class BlockHopper extends BlockTransparentMeta implements Faceable {
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(FACING_DIRECTION, TOGGLE);
 
     public BlockHopper() {
         this(0);
@@ -29,6 +36,12 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return HOPPER_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

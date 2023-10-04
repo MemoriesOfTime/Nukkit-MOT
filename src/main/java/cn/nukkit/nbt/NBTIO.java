@@ -1,5 +1,9 @@
 package cn.nukkit.nbt;
 
+import cn.nukkit.block.Block;
+import cn.nukkit.block.blockproperty.PropertyTypes;
+import cn.nukkit.block.blockstate.BlockStateRegistry;
+import cn.nukkit.block.blockstate.BlockStateRegistryMapping;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
@@ -8,6 +12,7 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 import cn.nukkit.nbt.stream.PGZIPOutputStream;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.ThreadCache;
 
 import java.io.*;
@@ -15,6 +20,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.Collection;
+import java.util.TreeMap;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
 import java.util.zip.GZIPInputStream;
@@ -62,7 +68,6 @@ public class NBTIO {
         Item item;
 
         if (tag.containsShort("id")) {
-            int id = (short) tag.getShort("id");
             try {
                 item = Item.get((short) tag.getShort("id"), damage, count);
             } catch (Exception e) {
@@ -91,6 +96,53 @@ public class NBTIO {
         return item;
     }
 
+    public static CompoundTag putBlockHelper(Block block) {
+        return putBlockHelper(block, "Block");
+    }
+
+    public static CompoundTag putBlockHelper(Block block, String nbtName) {
+        BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(ProtocolInfo.CURRENT_PROTOCOL);
+        String[] states = mapping.getKnownBlockStateIdByRuntimeId(block.getRuntimeId()).split(";");
+        CompoundTag result = new CompoundTag(nbtName).putString("name", states[0]);
+        var nbt = new CompoundTag("", new TreeMap<>());
+        /*if (block instanceof CustomBlock) {
+            for (var str : block.getProperties().getNames()) {
+                BlockProperty<?> property = block.getCurrentState().getProperty(str);
+                if (property instanceof BooleanBlockProperty) {
+                    nbt.putBoolean(str, block.getCurrentState().getBooleanValue(str));
+                } else if (property instanceof IntBlockProperty) {
+                    nbt.putInt(str, block.getCurrentState().getIntValue(str));
+                } else if (property instanceof UnsignedIntBlockProperty) {
+                    nbt.putInt(str, block.getCurrentState().getIntValue(str));
+                } else if (property instanceof ArrayBlockProperty<?> arrayBlockProperty) {
+                    if (arrayBlockProperty.isOrdinal()) {
+                        if (property.getBitSize() > 1) {
+                            nbt.putInt(str, Integer.parseInt(block.getCurrentState().getPersistenceValue(str)));
+                        } else {
+                            nbt.putBoolean(str, !block.getCurrentState().getPersistenceValue(str).equals("0"));
+                        }
+                    } else {
+                        nbt.putString(str, block.getCurrentState().getPersistenceValue(str));
+                    }
+                }
+            }
+        } else {*/
+            for (int i = 1, len = states.length; i < len; ++i) {
+                String[] split = states[i].split("=");
+                String propertyTypeString = PropertyTypes.getPropertyTypeString(split[0]);
+                if (propertyTypeString != null) {
+                    switch (propertyTypeString) {
+                        case "BOOLEAN" -> nbt.putBoolean(split[0], Integer.parseInt(split[1]) == 1);
+                        case "ENUM" -> nbt.putString(split[0], split[1]);
+                        case "INTEGER" -> nbt.putInt(split[0], Integer.parseInt(split[1]));
+                    }
+                }
+            }
+        //}
+        result.putCompound("states", nbt);
+        return result.putInt("version", mapping.blockPaletteVersion.get());
+    }
+
     public static CompoundTag read(File file) throws IOException {
         return read(file, ByteOrder.BIG_ENDIAN);
     }
@@ -116,6 +168,17 @@ public class NBTIO {
             }
             throw new IOException("Root tag must be a named compound tag");
         }
+    }
+
+    /**
+     * 和read方法相同，但不使用try自动关闭流
+     */
+    public static CompoundTag readNoClose(InputStream inputStream, ByteOrder endianness, boolean network) throws IOException {
+        Tag tag = Tag.readNamedTag(new NBTInputStream(inputStream, endianness, network));
+        if (tag instanceof CompoundTag) {
+            return (CompoundTag) tag;
+        }
+        throw new IOException("Root tag must be a named compound tag");
     }
 
     public static Tag readNetwork(InputStream inputStream) throws IOException {

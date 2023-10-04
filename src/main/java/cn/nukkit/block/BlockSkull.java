@@ -2,6 +2,8 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemSkull;
@@ -13,11 +15,18 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
+
+import static cn.nukkit.block.blockproperty.CommonBlockProperties.FACING_DIRECTION;
 
 /**
  * @author Justin
  */
 public class BlockSkull extends BlockTransparentMeta implements Faceable {
+
+    public static final BooleanBlockProperty NO_DROP = new BooleanBlockProperty("no_drop_bit", false);
+
+    public static final BlockProperties PROPERTIES = new BlockProperties(FACING_DIRECTION);
 
     public BlockSkull() {
         this(0);
@@ -30,6 +39,12 @@ public class BlockSkull extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return SKULL_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override

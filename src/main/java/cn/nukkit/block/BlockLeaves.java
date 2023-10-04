@@ -2,6 +2,10 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.blockproperty.ArrayBlockProperty;
+import cn.nukkit.block.blockproperty.BlockProperties;
+import cn.nukkit.block.blockproperty.BooleanBlockProperty;
+import cn.nukkit.block.blockproperty.value.WoodType;
 import cn.nukkit.event.block.LeavesDecayEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -14,12 +18,23 @@ import cn.nukkit.utils.Hash;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.longs.LongArraySet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Angelic47
  * Nukkit Project
  */
 public class BlockLeaves extends BlockTransparentMeta {
+
+    public static final ArrayBlockProperty<WoodType> OLD_LEAF_TYPE = new ArrayBlockProperty<>("old_leaf_type", true, new WoodType[]{
+            WoodType.OAK, WoodType.SPRUCE, WoodType.BIRCH, WoodType.JUNGLE
+    });
+
+    public static final BooleanBlockProperty PERSISTENT = new BooleanBlockProperty("persistent_bit", false);
+
+    public static final BooleanBlockProperty UPDATE = new BooleanBlockProperty("update_bit", false);
+
+    public static final BlockProperties OLD_LEAF_PROPERTIES = new BlockProperties(OLD_LEAF_TYPE, PERSISTENT, UPDATE);
 
     public static final int OAK = 0;
     public static final int SPRUCE = 1;
@@ -37,6 +52,12 @@ public class BlockLeaves extends BlockTransparentMeta {
     @Override
     public int getId() {
         return LEAVES;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return OLD_LEAF_PROPERTIES;
     }
 
     @Override

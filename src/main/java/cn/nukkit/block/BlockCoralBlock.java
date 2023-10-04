@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.event.block.BlockFadeEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -8,10 +9,13 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockCoralBlock extends BlockSolidMeta {
+
+    public static final BlockProperties PROPERTIES = BlockCoral.PROPERTIES;
     
     public BlockCoralBlock() {
         this(0);
@@ -24,6 +28,12 @@ public class BlockCoralBlock extends BlockSolidMeta {
     @Override
     public int getId() {
         return CORAL_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
     
     @Override

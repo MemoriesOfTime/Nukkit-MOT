@@ -412,6 +412,8 @@ public interface BlockID {
     int CAMPFIRE_BLOCK = 464;
     int WOOD_BARK = 467;
     int COMPOSTER = 468;
+
+    int WITHER_ROSE = 471;
     int PISTON_HEAD_STICKY = 472;
 
     int LODESTONE = 477;

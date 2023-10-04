@@ -1,13 +1,17 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.blockproperty.BlockProperties;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockPurpur extends BlockSolidMeta {
+
+    public static final BlockProperties PROPERTIES = BlockQuartz.PROPERTIES;
 
     public static final int PURPUR_NORMAL = 0;
     public static final int PURPUR_PILLAR = 2;
@@ -44,6 +48,12 @@ public class BlockPurpur extends BlockSolidMeta {
     @Override
     public int getId() {
         return PURPUR_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public BlockProperties getProperties() {
+        return PROPERTIES;
     }
 
     @Override
