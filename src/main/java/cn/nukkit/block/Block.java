@@ -1345,7 +1345,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public Block clone() {
-        return (Block) super.clone();
+        Block clone = (Block) super.clone();
+        clone.mutableState = mutableState != null ? mutableState.copy() : null;
+        return clone;
     }
 
     public int getWeakPower(BlockFace face) {
@@ -1562,10 +1564,5 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public static boolean usesFakeWater(int id) {
         return usesFakeWater[id];
-    }
-
-    //TODO 完成所有方块的Properties后删除它
-    public boolean useProperties() {
-        return false;
     }
 }

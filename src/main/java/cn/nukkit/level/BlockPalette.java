@@ -2,6 +2,8 @@ package cn.nukkit.level;
 
 import cn.nukkit.Server;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.blockstate.BlockStateRegistry;
+import cn.nukkit.block.blockstate.BlockStateRegistryMapping;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -96,13 +98,23 @@ public class BlockPalette {
         return this.getRuntimeId(id, 0);
     }
 
-    public int getRuntimeId( int id, int meta) {
+    public int getRuntimeId(int id, int meta) {
+        return this.getRuntimeId(id, meta, true);
+    }
+
+    public int getRuntimeId(int id, int meta, boolean findBlockState) {
         int legacyId = protocol >= 388 ? ((id << 6) | meta) : ((id << 4) | meta);
         int runtimeId;
         runtimeId = legacyToRuntimeId.get(legacyId);
         if (runtimeId == -1) {
             runtimeId = legacyToRuntimeId.get(id << 6);
             if (runtimeId == -1) {
+                if (findBlockState) {
+                    BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(protocol);
+                    if (mapping != null) {
+                        return mapping.getRuntimeId(id, meta);
+                    }
+                }
                 log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
                 runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << 6);
             }

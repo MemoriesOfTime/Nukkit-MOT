@@ -273,7 +273,7 @@ public class BlockStateRegistryMapping {
 
         //对于未实现BlockProperties的方块，先加载以前的数据
         try {
-            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(this.protocolId, state.getBlockId(), state.getDataStorage().intValue());
+            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(this.protocolId, state.getBlockId(), state.getDataStorage().intValue(), false);
             if (runtimeId != -1) {
                 return new Registration(state, runtimeId, state.getBlock().computeBlockStateHash(), null);
             }

@@ -433,8 +433,12 @@ public class GlobalBlockPalette {
     }
 
     public static int getOrCreateRuntimeId(int protocol, int id, int meta) {
+        return getOrCreateRuntimeId(protocol, id, meta, true);
+    }
+
+    public static int getOrCreateRuntimeId(int protocol, int id, int meta, boolean findBlockState) {
         if (protocol >= ProtocolInfo.v1_20_30_24) {
-            return getPaletteByProtocol(protocol).getRuntimeId(id, meta);
+            return getPaletteByProtocol(protocol).getRuntimeId(id, meta, findBlockState);
         }
         if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
         int legacyId = protocol >= 388 ? ((id << 6) | meta) : ((id << 4) | meta);
@@ -615,20 +619,22 @@ public class GlobalBlockPalette {
                 }
                 return runtimeId;
             default:
-                return legacyToRuntimeId(protocol, id, meta, legacyId);
+                return legacyToRuntimeId(protocol, id, meta, legacyId, findBlockState);
         }
     }
 
-    private static int legacyToRuntimeId(int protocol, int id, int meta, int legacyId) {
+    private static int legacyToRuntimeId(int protocol, int id, int meta, int legacyId, boolean findBlockState) {
         int runtimeId;
         Int2IntMap legacyToRuntimeIdMap = getLegacyToRuntimeIdMap(protocol);
         runtimeId = legacyToRuntimeIdMap.get(legacyId);
         if (runtimeId == -1) {
             runtimeId = legacyToRuntimeIdMap.get(id << 6);
             if (runtimeId == -1) {
-                BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(protocol);
-                if (mapping != null) {
-                    return mapping.getRuntimeId(id, meta);
+                if (findBlockState) {
+                    BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(protocol);
+                    if (mapping != null) {
+                        return mapping.getRuntimeId(id, meta);
+                    }
                 }
                 log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
                 runtimeId = legacyToRuntimeIdMap.get(BlockID.INFO_UPDATE << 6);
