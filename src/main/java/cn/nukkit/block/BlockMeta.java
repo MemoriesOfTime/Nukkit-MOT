@@ -9,28 +9,24 @@ public abstract class BlockMeta extends Block {
 
     protected BlockMeta(int meta) {
         this.meta = meta;
-        if (meta != 0) {
-            getMutableState().setDataStorageFromInt(meta, true);
-        }
     }
 
     @Override
     public int getFullId() {
-        return (getId() << DATA_BITS) + meta;
+        return (getId() << DATA_BITS) + getDamage();
     }
 
     @Override
     public final int getDamage() {
+        if (!this.isDefaultState()) {
+            return this.getMutableState().getDataStorage().intValue();
+        }
         return this.meta;
     }
 
     @Override
     public void setDamage(int meta) {
         this.meta = meta;
-        if (meta == 0 && isDefaultState()) {
-            return;
-        }
-        getMutableState().setDataStorageFromInt(meta);
     }
 
     @NotNull
