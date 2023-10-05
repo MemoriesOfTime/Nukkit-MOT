@@ -96,7 +96,7 @@ public class ItemMap extends Item {
         pk.offsetX = 0;
         pk.offsetZ = 0;
         pk.image = image;
-        if (p.protocol >= ProtocolInfo.v1_19_50) {
+        if (p.protocol >= ProtocolInfo.v1_19_50_20) {
             pk.eids = new long[]{pk.mapId};
         }
 

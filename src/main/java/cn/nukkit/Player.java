@@ -6617,7 +6617,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.dataPacket(pk0);
         }
 
-        if (this.protocol >= ProtocolInfo.v1_19_50) {
+        if (this.protocol >= ProtocolInfo.v1_19_50_20) {
             this.needDimensionChangeACK = true;
         }
     }
