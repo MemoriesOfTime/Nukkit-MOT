@@ -4675,7 +4675,7 @@ public class Level implements ChunkManager, Metadatable {
             return ProtocolInfo.v1_19_70;
         } else if (protocol >= ProtocolInfo.v1_19_60) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_60;
-        } else if (protocol >= ProtocolInfo.v1_19_50) { //调色板 物品运行时id
+        } else if (protocol >= ProtocolInfo.v1_19_50_20) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_50;
         } else if (protocol >= ProtocolInfo.v1_19_20) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_20;
@@ -4738,7 +4738,8 @@ public class Level implements ChunkManager, Metadatable {
             if (player >= ProtocolInfo.v1_19_0_29) if (player < ProtocolInfo.v1_19_20) return true;
         if (chunk == ProtocolInfo.v1_19_20)
             if (player >= ProtocolInfo.v1_19_20) if (player < ProtocolInfo.v1_19_50) return true;
-        if (chunk == ProtocolInfo.v1_19_50) if (player == ProtocolInfo.v1_19_50) return true;
+        if (chunk == ProtocolInfo.v1_19_50)
+            if (player >= ProtocolInfo.v1_19_50_20) if (player < ProtocolInfo.v1_19_60) return true;
         if (chunk == ProtocolInfo.v1_19_60)
             if (player >= ProtocolInfo.v1_19_60) if (player < ProtocolInfo.v1_19_70) return true;
         if (chunk == ProtocolInfo.v1_19_70)

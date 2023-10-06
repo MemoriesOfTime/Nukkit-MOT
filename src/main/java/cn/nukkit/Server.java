@@ -1261,7 +1261,7 @@ public class Server {
             player.dataPacket(CraftingManager.packet575);
         } else if (player.protocol >= ProtocolInfo.v1_19_60) {
             player.dataPacket(CraftingManager.packet567);
-        } else if (player.protocol >= ProtocolInfo.v1_19_50) {
+        } else if (player.protocol >= ProtocolInfo.v1_19_50_20) {
             player.dataPacket(CraftingManager.packet560);
         } else if (player.protocol >= ProtocolInfo.v1_19_30_23) {
             player.dataPacket(CraftingManager.packet554);
