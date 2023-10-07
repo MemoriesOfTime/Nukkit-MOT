@@ -905,7 +905,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     @Override
     public int getRuntimeId(int protocolId) {
         BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(protocolId);
-        if (mapping == null) {
+        if (mapping == null || !useBlockProperty()) {
             return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getId(), this.getOriginalDamage());
         }
         return getCurrentState().getRuntimeId(protocolId);
