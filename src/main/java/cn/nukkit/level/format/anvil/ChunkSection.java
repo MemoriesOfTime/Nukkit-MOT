@@ -1,7 +1,6 @@
 package cn.nukkit.level.format.anvil;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.level.format.anvil.util.BlockStorage;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.generic.BaseChunk;
@@ -237,11 +236,11 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
     }
 
     @Override
-    public BlockState getBlockState(int x, int y, int z, int layer) {
+    public int[] getBlockState(int x, int y, int z, int layer) {
         sectionLock.readLock().lock();
         try {
             BlockStorage storage = getStorageIfExists(layer);
-            return storage != null? storage.getBlockState(x, y, z) : BlockState.AIR;
+            return storage != null? storage.getBlockState(x, y, z) : new int[]{0,0};
         } finally {
             sectionLock.readLock().unlock();
         }

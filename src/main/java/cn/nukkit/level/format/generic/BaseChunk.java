@@ -2,7 +2,6 @@ package cn.nukkit.level.format.generic;
 
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
-import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.ChunkSection;
@@ -74,7 +73,7 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
     }
 
     @Override
-    public BlockState getBlockState(int x, int y, int z, int layer) {
+    public int[] getBlockState(int x, int y, int z, int layer) {
         return this.sections[y >> 4].getBlockState(x, y & 0x0f, z, layer);
     }
 

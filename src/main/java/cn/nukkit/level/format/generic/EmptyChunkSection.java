@@ -1,7 +1,6 @@
 package cn.nukkit.level.format.generic;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BinaryStream;
@@ -56,8 +55,8 @@ public class EmptyChunkSection implements ChunkSection {
     }
 
     @Override
-    public BlockState getBlockState(int x, int y, int z, int layer) {
-        return BlockState.AIR;
+    public int[] getBlockState(int x, int y, int z, int layer) {
+        return new int[]{0,0};
     }
 
     @Override

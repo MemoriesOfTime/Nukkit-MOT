@@ -1,7 +1,6 @@
 package cn.nukkit.level.format;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
 
@@ -43,16 +42,16 @@ public interface FullChunk extends Cloneable {
 
     default int getBlockRuntimeId(int protocolId, int x, int y, int z, int layer) {
         //return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getBlockId(x, y, z, layer), this.getBlockData(x, y, z, layer));
-        return getBlockState(x, y, z, layer).getRuntimeId(protocolId);
+        return Block.get(this.getBlockId(x, y, z, layer), this.getBlockData(x, y, z, layer)).getRuntimeId(protocolId);
     }
 
-    default BlockState getBlockState(int x, int y, int z) {
+    default int[] getBlockState(int x, int y, int z) {
         return getBlockState(x, y, z, 0);
     }
 
-    default BlockState getBlockState(int x, int y, int z, int layer) {
+    default int[] getBlockState(int x, int y, int z, int layer) {
         int full = getFullBlock(x, y, z, layer);
-        return BlockState.of(full >> Block.DATA_BITS, full & Block.DATA_MASK);
+        return new int[] { full >> Block.DATA_BITS, full & Block.DATA_MASK };
     }
 
     Block getAndSetBlock(int x, int y, int z, Block block);

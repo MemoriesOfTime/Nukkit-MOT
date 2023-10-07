@@ -1,7 +1,6 @@
 package cn.nukkit.level.format.anvil.util;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
@@ -243,11 +242,11 @@ public class BlockStorage {
         return (extra & 0xff) << 14 | ((block & 0xff) << Block.DATA_BITS) | ((dataExtra & 0xF) << 4) | data;
     }
 
-    private BlockState getBlockState(int index) {
+    private int[] getBlockState(int index) {
         if (!hasBlockIds) {
-            return BlockState.AIR;
+            return new int[]{0,0};
         }
-        return BlockState.of(getBlockId(index), getBlockData(index));
+        return new int[]{getBlockId(index), getBlockData(index)};
     }
 
     private void setFullBlock(int index, int value) {
@@ -269,7 +268,7 @@ public class BlockStorage {
         hasBlockIds |= block != 0 || hasBlockIdExtras || hasBlockDataExtras;
     }
 
-    public BlockState getBlockState(int x, int y, int z) {
+    public int[] getBlockState(int x, int y, int z) {
         return this.getBlockState(getIndex(x, y, z));
     }
 
@@ -419,7 +418,7 @@ public class BlockStorage {
 
         for (int i = 0; i < blockStates.length; i++) {
             //int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, ids[i], data[i]);
-            int runtimeId = BlockState.of(ids[i], data[i]).getRuntimeId(protocol);
+            int runtimeId = Block.get(ids[i], data[i]).getRuntimeId(protocol);
             int paletteId = runtime2palette.computeIfAbsent(runtimeId, rid -> {
                 int pid = nextPaletteId.getAndIncrement();
                 palette2runtime.add(rid);

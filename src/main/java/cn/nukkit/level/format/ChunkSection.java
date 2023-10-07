@@ -1,7 +1,6 @@
 package cn.nukkit.level.format;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.blockstate.BlockState;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BinaryStream;
 
@@ -31,12 +30,12 @@ public interface ChunkSection {
 
     int getFullBlock(int x, int y, int z);
 
-    default BlockState getBlockState(int x, int y, int z) {
+    default int[] getBlockState(int x, int y, int z) {
         return getBlockState(x, y, z, 0);
     }
 
-    default BlockState getBlockState(int x, int y, int z, int layer) {
-        return BlockState.of(getBlockId(x, y, z, layer), getBlockData(x, y, z, layer));
+    default int[] getBlockState(int x, int y, int z, int layer) {
+        return new int[] {getBlockId(x, y, z, layer), getBlockData(x, y, z, layer)};
     }
 
     Block getAndSetBlock(int x, int y, int z, int layer, Block block);
