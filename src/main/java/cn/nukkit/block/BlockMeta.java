@@ -18,14 +18,31 @@ public abstract class BlockMeta extends Block {
 
     @Override
     public final int getDamage() {
-        if (!this.isDefaultState()) {
-            return this.getMutableState().getDataStorage().intValue();
+        if (useBlockProperty()) {
+            return isDefaultState() ? 0 : this.getMutableState().getDataStorage().intValue();
         }
+        return this.getOriginalDamage();
+    }
+
+    @Override
+    public int getOriginalDamage() {
         return this.meta;
     }
 
     @Override
     public void setDamage(int meta) {
+        if (useBlockProperty()) {
+            if (meta == 0 && isDefaultState()) {
+                return;
+            }
+            getMutableState().setDataStorageFromInt(meta);
+        } else {
+            this.setOriginalDamage(meta);
+        }
+    }
+
+    @Override
+    public void setOriginalDamage(int meta) {
         this.meta = meta;
     }
 

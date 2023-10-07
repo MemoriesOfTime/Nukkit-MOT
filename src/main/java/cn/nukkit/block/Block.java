@@ -906,7 +906,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public int getRuntimeId(int protocolId) {
         BlockStateRegistryMapping mapping = BlockStateRegistry.getMapping(protocolId);
         if (mapping == null) {
-            return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getId(), this.getDamage());
+            return GlobalBlockPalette.getOrCreateRuntimeId(protocolId, this.getId(), this.getOriginalDamage());
         }
         return getCurrentState().getRuntimeId(protocolId);
     }
@@ -919,7 +919,14 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return 0;
     }
 
+    public int getOriginalDamage() {
+        return 0;
+    }
+
     public void setDamage(int meta) {
+    }
+
+    public void  setOriginalDamage(int meta) {
     }
 
     public final void setDamage(Integer meta) {
@@ -1604,5 +1611,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public static boolean usesFakeWater(int id) {
         return usesFakeWater[id];
+    }
+
+    public boolean useBlockProperty() {
+        return false;
     }
 }
