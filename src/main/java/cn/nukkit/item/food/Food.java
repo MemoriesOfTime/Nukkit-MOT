@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.event.player.PlayerEatFoodEvent;
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 
@@ -124,7 +125,7 @@ public abstract class Food {
 
     public static Food getByRelative(Item item) {
         Objects.requireNonNull(item);
-        return getByRelative(item.getId(), item.getNamespaceId(), item.getDamage());
+        return getByRelative(item.getId(), item.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL), item.getDamage());
     }
 
     public static Food getByRelative(Block block) {
