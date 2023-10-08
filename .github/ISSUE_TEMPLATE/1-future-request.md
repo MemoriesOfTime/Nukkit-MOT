@@ -1,5 +1,5 @@
 ---
-name: "\U0001F41E Bug Feedback | BUG反馈" 
+name: "\U0001F41E Future Request | 特性请求" 
 about: Suggest an idea that we can implement | 提出一个我们可以实施的想法
 title: ''
 labels: 'Type: future request'
