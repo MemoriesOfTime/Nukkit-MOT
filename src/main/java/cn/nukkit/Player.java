@@ -42,7 +42,6 @@ import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
-import cn.nukkit.item.customitem.ItemCustom;
 import cn.nukkit.item.customitem.ItemCustomArmor;
 import cn.nukkit.item.customitem.ItemCustomTool;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -2673,30 +2672,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                         }
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
-                        if (this.server.enableExperimentMode) {
-                            ArrayList<Integer> customItems = RuntimeItems.getMapping(this.protocol).getCustomItems();
-
-                            if (!customItems.isEmpty()) {
-                                itemComponentPacket.entries = new ItemComponentPacket.Entry[customItems.size()];
-
-                                int i = 0;
-                                for (Integer id : customItems) {
-                                    Item item = Item.get(id);
-                                    if (!(item instanceof ItemCustom)) {
-                                        continue;
-                                    }
-
-                                    ItemCustom itemCustom = (ItemCustom) item;
-                                    CompoundTag data = itemCustom.getComponentsData(this.protocol);
+                        if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
+                            Int2ObjectOpenHashMap<ItemComponentPacket.Entry> entries = new Int2ObjectOpenHashMap<>();
+                            int i = 0;
+                            for (var entry : Item.getCustomItemDefinition().entrySet()) {
+                                try {
+                                    CompoundTag data = entry.getValue().getNbt(this.protocol);
                                     data.putShort("minecraft:identifier", i);
-
-                                    itemComponentPacket.entries[i] = new ItemComponentPacket.Entry(("customitem:" + item.getName()).toLowerCase(), data);
-
+                                    entries.put(i, new ItemComponentPacket.Entry(entry.getKey(), data));
                                     i++;
+                                } catch (Exception e) {
+                                    log.error("ItemComponentPacket encoding error", e);
                                 }
-
-                                this.dataPacket(itemComponentPacket);
                             }
+                            itemComponentPacket.setEntries(entries.values().toArray(ItemComponentPacket.Entry.EMPTY_ARRAY));
                         }
                         this.dataPacket(itemComponentPacket);
                     }

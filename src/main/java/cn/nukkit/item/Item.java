@@ -6,8 +6,10 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.inventory.Fuel;
+import cn.nukkit.inventory.ItemTag;
 import cn.nukkit.item.RuntimeItemMapping.RuntimeEntry;
-import cn.nukkit.item.customitem.ItemCustom;
+import cn.nukkit.item.customitem.CustomItem;
+import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
@@ -15,10 +17,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.utils.Binary;
-import cn.nukkit.utils.Config;
-import cn.nukkit.utils.MainLogger;
-import cn.nukkit.utils.Utils;
+import cn.nukkit.utils.*;
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -32,12 +31,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * @author MagicDroidX
@@ -64,9 +65,12 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             //       1:namespace    2:name           3:damage   4:num-id    5:damage
             "^(?:(?:([a-z_]\\w*):)?([a-z._]\\w*)(?::(-?\\d+))?|(-?\\d+)(?::(-?\\d+))?)$");
 
-    protected static final String UNKNOWN_STR = "Unknown";
+    public static final String UNKNOWN_STR = "Unknown";
     public static Class<?>[] list = null;
     public static final Map<String, Supplier<Item>> NAMESPACED_ID_ITEM = new HashMap<>();
+
+    private static final HashMap<String,  Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
+    private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
 
     protected Block block = null;
     protected final int id;
@@ -800,90 +804,112 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         };
     }
 
-    private static final HashMap<Integer, Class<? extends Item>> CUSTOM_ITEMS = new HashMap<>();
-
-    public static boolean registerCustomItem(int id, Class<? extends ItemCustom> c) {
+    public static OK<?> registerCustomItem(Class<? extends CustomItem> clazz) {
         if (!Server.getInstance().enableExperimentMode) {
             Server.getInstance().getLogger().warning("The server does not have the custom item feature enabled. Unable to register the custom item!");
-            return false;
+            return new OK<>(false, "The server does not have the custom item feature enabled. Unable to register the custom item!");
         }
 
-        if (id < 10000 || id > 65535) {
-            //Below 10000 is reserved for vanilla items
-            throw new IllegalArgumentException("Custom item id cannot be less than 10000 or greater than 65535");
+        CustomItem customItem;
+        Supplier<Item> supplier;
+
+        try {
+            var method = clazz.getDeclaredConstructor();
+            method.setAccessible(true);
+            customItem = method.newInstance();
+            supplier = () -> {
+                try {
+                    return (Item) method.newInstance();
+                } catch (ReflectiveOperationException e) {
+                    throw new UnsupportedOperationException(e);
+                }
+            };
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
+                 NoSuchMethodException e) {
+            return new OK<>(false, e);
         }
 
-        CUSTOM_ITEMS.put(id, c);
-        list[id] = c;
+        if (CUSTOM_ITEMS.containsKey(customItem.getNamespaceId())) {
+            return new OK<>(false, "The custom item with the namespace ID \"" + customItem.getNamespaceId() + "\" is already registered!");
+        }
+        CUSTOM_ITEMS.put(customItem.getNamespaceId(), supplier);
+        CustomItemDefinition customDef = customItem.getDefinition();
+        CUSTOM_ITEM_DEFINITIONS.put(customItem.getNamespaceId(), customDef);
+        registerNamespacedIdItem(customItem.getNamespaceId(), supplier);
 
-        ItemCustom item = (ItemCustom) get(id);
+        // 在服务端注册自定义物品的tag
+        if (customDef.getNbt(ProtocolInfo.CURRENT_PROTOCOL).get("components") instanceof CompoundTag componentTag) {
+            var tagList = componentTag.getList("item_tags", StringTag.class);
+            if (tagList.size() != 0) {
+                ItemTag.registerItemTag(customItem.getNamespaceId(), tagList.getAll().stream().map(tag -> tag.data).collect(Collectors.toSet()));
+            }
+        }
 
-        registerCustomItem(item, v1_16_100, v1_16_0);
-        registerCustomItem(item, v1_17_0, v1_17_0);
-        registerCustomItem(item, v1_17_10, v1_17_10, v1_17_30, v1_17_40);
-        registerCustomItem(item, v1_18_0, v1_18_0);
-        registerCustomItem(item, v1_18_10, v1_18_10);
-        registerCustomItem(item, v1_18_30, v1_18_30);
-        registerCustomItem(item, v1_19_0, v1_19_0);
-        registerCustomItem(item, v1_19_10, v1_19_10, v1_19_20);
-        registerCustomItem(item, v1_19_50, v1_19_50);
-        registerCustomItem(item, v1_19_60, v1_19_60);
-        registerCustomItem(item, v1_19_70, v1_19_70);
-        registerCustomItem(item, v1_19_80, v1_19_80);
-        registerCustomItem(item, v1_20_0, v1_20_0);
-        registerCustomItem(item, v1_20_10, v1_20_10);
-        registerCustomItem(item, v1_20_30, v1_20_30);
+        registerCustomItem(customItem, v1_16_100, v1_16_0);
+        registerCustomItem(customItem, v1_17_0, v1_17_0);
+        registerCustomItem(customItem, v1_17_10, v1_17_10, v1_17_30, v1_17_40);
+        registerCustomItem(customItem, v1_18_0, v1_18_0);
+        registerCustomItem(customItem, v1_18_10, v1_18_10);
+        registerCustomItem(customItem, v1_18_30, v1_18_30);
+        registerCustomItem(customItem, v1_19_0, v1_19_0);
+        registerCustomItem(customItem, v1_19_10, v1_19_10, v1_19_20);
+        registerCustomItem(customItem, v1_19_50, v1_19_50);
+        registerCustomItem(customItem, v1_19_60, v1_19_60);
+        registerCustomItem(customItem, v1_19_70, v1_19_70);
+        registerCustomItem(customItem, v1_19_80, v1_19_80);
+        registerCustomItem(customItem, v1_20_0, v1_20_0);
+        registerCustomItem(customItem, v1_20_10, v1_20_10);
+        registerCustomItem(customItem, v1_20_30, v1_20_30);
 
-        return true;
+        return new OK<Void>(true);
     }
 
-    private static void registerCustomItem(ItemCustom item, int protocol, int... creativeProtocols) {
+    private static void registerCustomItem(CustomItem item, int protocol, int... creativeProtocols) {
         if (RuntimeItems.getMapping(protocol).registerCustomItem(item)) {
             for (int creativeProtocol : creativeProtocols) {
-                addCreativeItem(creativeProtocol, item);
+                addCreativeItem(creativeProtocol, (Item) item);
             }
         }
     }
 
-    public static boolean deleteCustomItem(int id) {
-        if (CUSTOM_ITEMS.containsKey(id)) {
-            removeCreativeItem(get(id));
-            CUSTOM_ITEMS.remove(id);
-            list[id] = null;
+    public static void deleteCustomItem(String namespaceId) {
+        if (CUSTOM_ITEMS.containsKey(namespaceId)) {
+            Item customItem = fromString(namespaceId);
+            removeCreativeItem(customItem);
+            CUSTOM_ITEMS.remove(namespaceId);
+            CUSTOM_ITEM_DEFINITIONS.remove(namespaceId);
 
-            ItemCustom item = (ItemCustom) get(id);
-
-            deleteCustomItem(item, v1_16_100, v1_16_0);
-            deleteCustomItem(item, v1_17_0, v1_17_0);
-            deleteCustomItem(item, v1_17_10, v1_17_10, v1_17_30, v1_17_40);
-            deleteCustomItem(item, v1_18_0, v1_18_0);
-            deleteCustomItem(item, v1_18_10, v1_18_10);
-            deleteCustomItem(item, v1_18_30, v1_18_30);
-            deleteCustomItem(item, v1_19_0, v1_19_0);
-            deleteCustomItem(item, v1_19_10, v1_19_10, v1_19_20);
-            deleteCustomItem(item, v1_19_50, v1_19_50);
-            deleteCustomItem(item, v1_19_60, v1_19_60);
-            deleteCustomItem(item, v1_19_70, v1_19_70);
-            deleteCustomItem(item, v1_19_80, v1_19_80);
-            deleteCustomItem(item, v1_20_0, v1_20_0);
-            deleteCustomItem(item, v1_20_10, v1_20_10);
-            deleteCustomItem(item, v1_20_30, v1_20_30);
-
-            return true;
-        }else {
-            return false;
+            deleteCustomItem(customItem, v1_16_100, v1_16_0);
+            deleteCustomItem(customItem, v1_17_0, v1_17_0);
+            deleteCustomItem(customItem, v1_17_10, v1_17_10, v1_17_30, v1_17_40);
+            deleteCustomItem(customItem, v1_18_0, v1_18_0);
+            deleteCustomItem(customItem, v1_18_10, v1_18_10);
+            deleteCustomItem(customItem, v1_18_30, v1_18_30);
+            deleteCustomItem(customItem, v1_19_0, v1_19_0);
+            deleteCustomItem(customItem, v1_19_10, v1_19_10, v1_19_20);
+            deleteCustomItem(customItem, v1_19_50, v1_19_50);
+            deleteCustomItem(customItem, v1_19_60, v1_19_60);
+            deleteCustomItem(customItem, v1_19_70, v1_19_70);
+            deleteCustomItem(customItem, v1_19_80, v1_19_80);
+            deleteCustomItem(customItem, v1_20_0, v1_20_0);
+            deleteCustomItem(customItem, v1_20_10, v1_20_10);
+            deleteCustomItem(customItem, v1_20_30, v1_20_30);
         }
     }
 
-    private static void deleteCustomItem(ItemCustom item, int protocol, int... creativeProtocols) {
-        RuntimeItems.getMapping(protocol).deleteCustomItem(item);
+    private static void deleteCustomItem(Item item, int protocol, int... creativeProtocols) {
+        RuntimeItems.getMapping(protocol).deleteCustomItem((CustomItem) item);
         for (int creativeProtocol : creativeProtocols) {
-            removeCreativeItem(creativeProtocol, item);
+            removeCreativeItem(creativeProtocol, (Item) item);
         }
     }
 
-    public static HashMap<Integer, Class<? extends Item>> getCustomItems() {
-        return CUSTOM_ITEMS;
+    public static HashMap<String, Supplier<? extends Item>> getCustomItems() {
+        return new HashMap<>(CUSTOM_ITEMS);
+    }
+
+    public static HashMap<String, CustomItemDefinition> getCustomItemDefinition() {
+        return new HashMap<>(CUSTOM_ITEM_DEFINITIONS);
     }
 
     public static Item get(int id) {

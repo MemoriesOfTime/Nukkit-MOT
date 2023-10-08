@@ -8,6 +8,7 @@ import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 
 import java.util.*;
+import java.util.function.IntSupplier;
 
 /**
  * Created by Snake1999 on 2016/1/13.
@@ -78,7 +79,7 @@ public abstract class Food {
             .addEffect(Effect.getEffect(Effect.NAUSEA).setAmplifier(1).setDuration(300))
             .addEffect(Effect.getEffect(Effect.POISON).setAmplifier(3).setDuration(1200))
             .addRelative(Item.PUFFERFISH));
-    public static final Food dried_kelp = registerDefaultFood(new FoodNormal(1, 0.6F).addRelative(Item.DRIED_KELP));
+    public static final Food dried_kelp = registerDefaultFood(new FoodNormal(1, 0.6F).addRelative(Item.DRIED_KELP).setEatingTick(16));
     public static final Food sweet_berries = registerDefaultFood(new FoodNormal(2, 0.4F).addRelative(Item.SWEET_BERRIES));
     public static final Food suspicious_stew_night_vision = registerDefaultFood(new FoodEffectiveInBow(6, 7.2F)
             .addEffect(Effect.getEffect(Effect.NIGHT_VISION).setAmplifier(1).setDuration(80)).addRelative(Item.SUSPICIOUS_STEW, 0));
@@ -104,7 +105,15 @@ public abstract class Food {
     public static Food registerFood(Food food, Plugin plugin) {
         Objects.requireNonNull(food);
         Objects.requireNonNull(plugin);
-        food.relativeIDs.forEach(n -> registryCustom.put(new NodeIDMetaPlugin(n.id, n.meta, plugin), food));
+        food.relativeIDs.forEach(n -> {
+            if (n instanceof NodeStringIDMeta nodeStringIDMeta) {
+                registryCustom.put(nodeStringIDMeta, food);
+            } else if (n instanceof NodeIDMetaPlugin nodeIDMetaPlugin) {
+                registryCustom.put(nodeIDMetaPlugin, food);
+            } else {
+                registryCustom.put(new NodeIDMetaPlugin(n.id, n.meta, plugin), food);
+            }
+        });
         return food;
     }
 
@@ -115,7 +124,7 @@ public abstract class Food {
 
     public static Food getByRelative(Item item) {
         Objects.requireNonNull(item);
-        return getByRelative(item.getId(), item.getDamage());
+        return getByRelative(item.getId(), item.getNamespaceId(), item.getDamage());
     }
 
     public static Food getByRelative(Block block) {
@@ -124,9 +133,15 @@ public abstract class Food {
     }
 
     public static Food getByRelative(int relativeID, int meta) {
+        return getByRelative(relativeID, null, meta);
+    }
+
+    public static Food getByRelative(int relativeID, String stringID, int meta) {
         final Food[] result = {null};
         registryCustom.forEach((n, f) -> {
-            if (n.id == relativeID && n.meta == meta && n.plugin.isEnabled()) result[0] = f;
+            if (n.id == relativeID && n.meta == meta && n.plugin.isEnabled() && (n instanceof NodeStringIDMeta ns && ns.stringID.equals(stringID))) {
+                result[0] = f;
+            }
         });
         if (result[0] == null) {
             registryDefault.forEach((n, f) -> {
@@ -139,6 +154,10 @@ public abstract class Food {
     protected int restoreFood = 0;
     protected float restoreSaturation = 0;
     protected final List<NodeIDMeta> relativeIDs = new ArrayList<>();
+
+    protected int eatingTick = 31;
+
+    protected IntSupplier eatingTickSupplier;
 
     public final boolean eatenBy(Player player) {
         PlayerEatFoodEvent event = new PlayerEatFoodEvent(player, this);
@@ -158,6 +177,11 @@ public abstract class Food {
 
     public Food addRelative(int relativeID, int meta) {
         NodeIDMeta node = new NodeIDMeta(relativeID, meta);
+        return addRelative(node);
+    }
+
+    public Food addRelative(String stringID, int meta, Plugin plugin) {
+        NodeStringIDMeta node = new NodeStringIDMeta(stringID, meta, plugin);
         return addRelative(node);
     }
 
@@ -184,6 +208,24 @@ public abstract class Food {
         return this;
     }
 
+    public int getEatingTick() {
+        return eatingTick;
+    }
+
+    public Food setEatingTick(int eatingTick) {
+        this.eatingTick = eatingTick;
+        return this;
+    }
+
+    public IntSupplier getEatingTickSupplier() {
+        return eatingTickSupplier;
+    }
+
+    public Food setEatingTickSupplier(IntSupplier eatingTickSupplier) {
+        this.eatingTickSupplier = eatingTickSupplier;
+        return this;
+    }
+
     static class NodeIDMeta {
         final int id;
         final int meta;
@@ -200,6 +242,15 @@ public abstract class Food {
         NodeIDMetaPlugin(int id, int meta, Plugin plugin) {
             super(id, meta);
             this.plugin = plugin;
+        }
+    }
+
+    static class NodeStringIDMeta extends NodeIDMetaPlugin {
+        final String stringID;
+
+        NodeStringIDMeta(String id, int meta, Plugin plugin) {
+            super(255, meta, plugin);
+            this.stringID = id;
         }
     }
 }
