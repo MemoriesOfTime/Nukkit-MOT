@@ -42,13 +42,15 @@ public abstract class ItemEdible extends Item {
 
     @Override
     public boolean onUse(Player player, int ticksUsed) {
-        if (ticksUsed < 10) { //初步检查
-            return false;
-        }
+
         Food food = Food.getByRelative(this);
         if (food != null) {
             int eatingtick = food.getEatingTickSupplier() == null ? food.getEatingTick() : food.getEatingTickSupplier().getAsInt();
             if (ticksUsed < eatingtick) {
+                return false;
+            }
+        } else {
+            if (ticksUsed < 10) {
                 return false;
             }
         }
