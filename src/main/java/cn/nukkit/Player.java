@@ -1416,10 +1416,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean awardAchievement(String achievementId) {
-        if (!Server.getInstance().achievementsEnabled) {
-            return false;
-        }
-
         Achievement achievement = Achievement.achievements.get(achievementId);
 
         if (achievement == null || hasAchievement(achievementId)) {
@@ -6848,14 +6844,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             return false;
                         }
 
-                        switch (item.getId()) {
-                            case Item.WOOD:
-                            case Item.WOOD2:
-                                this.awardAchievement("mineWood");
-                                break;
-                            case Item.DIAMOND:
-                                this.awardAchievement("diamond");
-                                break;
+                        if (server.achievementsEnabled) {
+                            switch (item.getId()) {
+                                case Item.WOOD, Item.WOOD2 -> this.awardAchievement("mineWood");
+                                case Item.DIAMOND -> this.awardAchievement("diamond");
+                            }
                         }
 
                         TakeItemEntityPacket pk = new TakeItemEntityPacket();
