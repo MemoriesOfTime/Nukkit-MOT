@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
 @Log4j2
 public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
-    public static final Item AIR_ITEM = new Item(0);
+    public static final Item AIR_ITEM = new ItemBlock(Block.get(BlockID.AIR), null, 0);
 
     public static final Item[] EMPTY_ARRAY = new Item[0];
 
@@ -961,7 +961,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         String normalized = str.trim().replace(' ', '_').toLowerCase();
         Matcher matcher = ITEM_STRING_PATTERN.matcher(normalized);
         if (!matcher.matches()) {
-            return AIR_ITEM;
+            return AIR_ITEM.clone();
         }
 
         String name = matcher.group(2);
@@ -986,7 +986,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 namespacedId = "minecraft:" + name;
             }
             if ("minecraft:air".equals(namespacedId)) {
-                return Item.AIR_ITEM;
+                return Item.AIR_ITEM.clone();
             }
 
             Supplier<Item> constructor = NAMESPACED_ID_ITEM.get(namespacedId);
@@ -1003,7 +1003,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             if (id > 0) {
                 return get(id, meta.orElse(0));
             } else if (namespaceGroup != null && !namespaceGroup.equals("minecraft:")) {
-                return Item.AIR_ITEM;
+                return Item.AIR_ITEM.clone();
             }
         } else if (numericIdGroup != null) {
             int id = Integer.parseInt(numericIdGroup);
@@ -1011,7 +1011,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         }
 
         if (name == null) {
-            return Item.AIR_ITEM;
+            return Item.AIR_ITEM.clone();
         }
 
         int id = 0;
