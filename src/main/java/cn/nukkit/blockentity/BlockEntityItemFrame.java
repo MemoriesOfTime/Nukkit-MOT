@@ -1,12 +1,12 @@
 package cn.nukkit.blockentity;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.event.block.ItemFrameDropItemEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
-import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -111,22 +111,33 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
             this.setItem(new ItemBlock(Block.get(BlockID.AIR)), false);
         }
 
-        CompoundTag item = namedTag.getCompound("Item").copy();
-        item.setName("Item");
         CompoundTag tag = new CompoundTag()
                 .putString("id", BlockEntity.ITEM_FRAME)
                 .putInt("x", (int) this.x)
                 .putInt("y", (int) this.y)
                 .putInt("z", (int) this.z);
 
-        int itemId = item.getShort("id");
-        if (itemId != Item.AIR) {
+        Item item = this.getItem();
+        if (!item.isNull()) {
+            CompoundTag itemTag = NBTIO.putItemHelper(item, null, protocol);
             if (protocol >= ProtocolInfo.v1_16_0) {
-                String identifier = RuntimeItems.getMapping(protocol).toRuntime(itemId, item.getShort("Damage")).getIdentifier();
-                item.putString("Name", identifier);
-                item.remove("id");
+                if (!itemTag.contains("Name")) {
+                    itemTag.remove("id");
+                    String namespaceId;
+                    try {
+                        namespaceId = item.getNamespaceId(protocol);
+                    } catch (Exception e) {
+                        namespaceId = "minecraft:unknown";
+                        Server.getInstance().getLogger().error("Failed to get namespaceId of " + item.getId() + ":" + item.getDamage() + " (" + item.getName() + ")", e);
+                    }
+                    itemTag.putString("Name", namespaceId);
+                }
+            } else {
+                if (!itemTag.contains("id")) {
+                    itemTag.putShort("id", Item.INFO_UPDATE);
+                }
             }
-            tag.putCompound("Item", item)
+            tag.putCompound("Item", itemTag)
                     .putByte("ItemRotation", this.getItemRotation());
         }
         return tag;

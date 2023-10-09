@@ -27,7 +27,7 @@ public class WorldCommand extends Command {
             return true;
         }
 
-        if (args.length == 0 && !Server.getInstance().isLowProfileServer()) {
+        if (args.length == 0) {
             sender.sendMessage(new TranslationContainer("nukkit.command.world.list"));
             for (Level level : Server.getInstance().getLevels().values()) {
                 sender.sendMessage(level.getName());

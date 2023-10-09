@@ -17,6 +17,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.ContainerSetDataPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
@@ -249,7 +250,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
         Item fuel = this.inventory.getFuel();
         Item raw = this.inventory.getSmelting();
         Item product = this.inventory.getResult();
-        FurnaceRecipe smelt = this.server.getCraftingManager().matchFurnaceRecipe(raw);
+        FurnaceRecipe smelt = this.server.getCraftingManager().matchFurnaceRecipe(ProtocolInfo.CURRENT_PROTOCOL, raw);
         boolean canSmelt = (smelt != null && raw.getCount() > 0 && ((smelt.getResult().equals(product, true) && product.getCount() < product.getMaxStackSize()) || product.getId() == Item.AIR));
 
         if (burnTime <= 0 && canSmelt && fuel.getFuelTime() != null && fuel.getCount() > 0) {
@@ -268,7 +269,10 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
             if (smelt != null && canSmelt) {
                 cookTime++;
                 if (cookTime >= 200) {
-                    product = Item.get(smelt.getResult().getId(), smelt.getResult().getDamage(), product.getCount() + 1);
+                    Item result = smelt.getResult();
+                    Item newProduct = Item.fromString(result.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL) + ":" + result.getDamage());
+                    newProduct.setCount(product.getCount() + 1);
+                    product = newProduct;
 
                     FurnaceSmeltEvent ev = new FurnaceSmeltEvent(this, raw, product, (float) this.server.getCraftingManager().getRecipeXp(smelt));
                     this.server.getPluginManager().callEvent(ev);

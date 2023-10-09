@@ -8,6 +8,7 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 import cn.nukkit.nbt.stream.PGZIPOutputStream;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.ThreadCache;
 
 import java.io.*;
@@ -29,13 +30,17 @@ public class NBTIO {
     }
 
     public static CompoundTag putItemHelper(Item item, Integer slot) {
+        return putItemHelper(item, slot, ProtocolInfo.CURRENT_PROTOCOL);
+    }
+
+    public static CompoundTag putItemHelper(Item item, Integer slot, int protocol) {
         CompoundTag tag = new CompoundTag((String) null)
                 .putByte("Count", item.getCount())
                 .putShort("Damage", item.getDamage());
 
         int id = item.getId();
         if (id == ItemID.STRING_IDENTIFIED_ITEM) {
-            tag.putString("Name", item.getNamespaceId());
+            tag.putString("Name", item.getNamespaceId(protocol));
         } else {
             tag.putShort("id", item.getId() & 0xFFFF);
         }

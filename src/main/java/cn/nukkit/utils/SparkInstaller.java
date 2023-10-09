@@ -3,8 +3,8 @@ package cn.nukkit.utils;
 import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
 import lombok.extern.log4j.Log4j2;
+import org.jetbrains.annotations.NotNull;
 
-import javax.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,15 +16,19 @@ import java.security.MessageDigest;
 @Log4j2
 public class SparkInstaller {
 
-    public static boolean initSpark(@Nonnull Server server) {
+    public static boolean initSpark(@NotNull Server server) {
         boolean download = false;
 
         Plugin spark = server.getPluginManager().getPlugin("spark");
 
-        File sparkFile = null;
-
+        File sparkFile;
         if (spark != null) {
             sparkFile = spark.getFile();
+        } else {
+            sparkFile = new File(server.getPluginPath() + "/spark.jar");
+        }
+
+        if (sparkFile.exists()) {
             try {
                 String sha1 = getFileSha1(sparkFile);
                 URL url = new URL("https://sparkapi.lucko.me/download/nukkit/sha1");
@@ -33,6 +37,16 @@ public class SparkInstaller {
                     in.read(sha1Remote);
                     if (!sha1.equals(new String(sha1Remote))) {
                         download = true;
+                        try {
+                            if (spark != null) {
+                                server.getPluginManager().disablePlugin(spark);
+                                System.gc();
+                            }
+                            Files.delete(sparkFile.toPath());
+                        } catch (IOException e) {
+                            download = false;
+                            log.warn("Failed to delete spark: " + e.getMessage(), e);
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -44,14 +58,9 @@ public class SparkInstaller {
         }
 
         if (download) {
-            if (spark != null && sparkFile != null) {
-                server.getPluginManager().disablePlugin(spark);
-                sparkFile.delete();
-            }
             try (InputStream in = new URL("https://sparkapi.lucko.me/download/nukkit").openStream()) {
-                File targetPath = new File(server.getPluginPath() + "/spark.jar");
-                Files.copy(in, targetPath.toPath());
-                server.getPluginManager().loadPlugin(targetPath);
+                Files.copy(in, sparkFile.toPath());
+                server.getPluginManager().loadPlugin(sparkFile);
                 log.info("Spark has been installed.");
             } catch (IOException e) {
                 log.warn("Failed to download spark: " + e.getMessage(), e);

@@ -12,10 +12,10 @@ public class RequestAbilityPacket extends DataPacket {
     protected static final PlayerAbility[] ABILITIES = UpdateAbilitiesPacket.VALID_FLAGS;
     protected static final AbilityType[] ABILITY_TYPES = AbilityType.values();
 
-    private PlayerAbility ability;
-    private AbilityType type;
-    private boolean boolValue;
-    private float floatValue;
+    public PlayerAbility ability;
+    public AbilityType type;
+    public boolean boolValue;
+    public float floatValue;
 
     @Override
     public void decode() {

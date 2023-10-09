@@ -8,25 +8,22 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
-import cn.nukkit.utils.Config;
-import cn.nukkit.utils.Utils;
 import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import lombok.extern.log4j.Log4j2;
-import org.jetbrains.annotations.NotNull;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.zip.GZIPInputStream;
 
 @Log4j2
 public class GlobalBlockPalette {
@@ -59,39 +56,23 @@ public class GlobalBlockPalette {
     private static final Int2IntMap legacyToRuntimeId389 = new Int2IntOpenHashMap();
     private static final Int2IntMap legacyToRuntimeId407 = new Int2IntOpenHashMap();
     private static final Int2IntMap legacyToRuntimeId419 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId428 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId440 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId448 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId465 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId471 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId486 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId503 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId527 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId544 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId560 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId567 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId575 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId582 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId589 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId594 = new Int2IntOpenHashMap();
-    private static final Int2IntMap legacyToRuntimeId618 = new Int2IntOpenHashMap();
 
-    private static final Int2IntMap runtimeIdToLegacy428 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy440 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy448 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy465 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy471 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy486 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy503 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy527 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy544 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy560 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy567 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy575 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy582 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy589 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy594 = new Int2IntOpenHashMap();
-    private static final Int2IntMap runtimeIdToLegacy618 = new Int2IntOpenHashMap();
+    private static final BlockPalette blockPalette428;
+    private static final BlockPalette blockPalette440;
+    private static final BlockPalette blockPalette448;
+    private static final BlockPalette blockPalette465;
+    private static final BlockPalette blockPalette471;
+    private static final BlockPalette blockPalette486;
+    private static final BlockPalette blockPalette503;
+    private static final BlockPalette blockPalette527;
+    private static final BlockPalette blockPalette544;
+    private static final BlockPalette blockPalette560;
+    private static final BlockPalette blockPalette567;
+    private static final BlockPalette blockPalette575;
+    private static final BlockPalette blockPalette582;
+    private static final BlockPalette blockPalette589;
+    private static final BlockPalette blockPalette594;
+    private static final BlockPalette blockPalette618;
 
     private static byte[] compiledTable282;
     private static byte[] compiledTable291;
@@ -119,39 +100,23 @@ public class GlobalBlockPalette {
         legacyToRuntimeId389.defaultReturnValue(-1);
         legacyToRuntimeId407.defaultReturnValue(-1);
         legacyToRuntimeId419.defaultReturnValue(-1);
-        legacyToRuntimeId428.defaultReturnValue(-1);
-        legacyToRuntimeId440.defaultReturnValue(-1);
-        legacyToRuntimeId448.defaultReturnValue(-1);
-        legacyToRuntimeId465.defaultReturnValue(-1);
-        legacyToRuntimeId471.defaultReturnValue(-1);
-        legacyToRuntimeId486.defaultReturnValue(-1);
-        legacyToRuntimeId503.defaultReturnValue(-1);
-        legacyToRuntimeId527.defaultReturnValue(-1);
-        legacyToRuntimeId544.defaultReturnValue(-1);
-        legacyToRuntimeId560.defaultReturnValue(-1);
-        legacyToRuntimeId567.defaultReturnValue(-1);
-        legacyToRuntimeId575.defaultReturnValue(-1);
-        legacyToRuntimeId582.defaultReturnValue(-1);
-        legacyToRuntimeId589.defaultReturnValue(-1);
-        legacyToRuntimeId594.defaultReturnValue(-1);
-        legacyToRuntimeId618.defaultReturnValue(-1);
 
-        runtimeIdToLegacy428.defaultReturnValue(-1);
-        runtimeIdToLegacy440.defaultReturnValue(-1);
-        runtimeIdToLegacy448.defaultReturnValue(-1);
-        runtimeIdToLegacy465.defaultReturnValue(-1);
-        runtimeIdToLegacy471.defaultReturnValue(-1);
-        runtimeIdToLegacy486.defaultReturnValue(-1);
-        runtimeIdToLegacy503.defaultReturnValue(-1);
-        runtimeIdToLegacy527.defaultReturnValue(-1);
-        runtimeIdToLegacy544.defaultReturnValue(-1);
-        runtimeIdToLegacy560.defaultReturnValue(-1);
-        runtimeIdToLegacy567.defaultReturnValue(-1);
-        runtimeIdToLegacy575.defaultReturnValue(-1);
-        runtimeIdToLegacy582.defaultReturnValue(-1);
-        runtimeIdToLegacy589.defaultReturnValue(-1);
-        runtimeIdToLegacy594.defaultReturnValue(-1);
-        runtimeIdToLegacy618.defaultReturnValue(-1);
+        blockPalette428 = new BlockPalette(ProtocolInfo.v1_16_210);
+        blockPalette440 = new BlockPalette(ProtocolInfo.v1_17_0);
+        blockPalette448 = new BlockPalette(ProtocolInfo.v1_17_10);
+        blockPalette465 = new BlockPalette(ProtocolInfo.v1_17_30);
+        blockPalette471 = new BlockPalette(ProtocolInfo.v1_17_40);
+        blockPalette486 = new BlockPalette(ProtocolInfo.v1_18_10);
+        blockPalette503 = new BlockPalette(ProtocolInfo.v1_18_30);
+        blockPalette527 = new BlockPalette(ProtocolInfo.v1_19_0);
+        blockPalette544 = new BlockPalette(ProtocolInfo.v1_19_20);
+        blockPalette560 = new BlockPalette(ProtocolInfo.v1_19_50);
+        blockPalette567 = new BlockPalette(ProtocolInfo.v1_19_60);
+        blockPalette575 = new BlockPalette(ProtocolInfo.v1_19_70);
+        blockPalette582 = new BlockPalette(ProtocolInfo.v1_19_80);
+        blockPalette589 = new BlockPalette(ProtocolInfo.v1_20_0);
+        blockPalette594 = new BlockPalette(ProtocolInfo.v1_20_10);
+        blockPalette618 = new BlockPalette(ProtocolInfo.v1_20_30);
     }
 
     public static void init() {
@@ -354,77 +319,52 @@ public class GlobalBlockPalette {
             int legacyId = id << 6 | data;
             legacyToRuntimeId419.put(legacyId, runtimeId);
         }
-
-        loadBlockStates(paletteFor(428), legacyToRuntimeId428, runtimeIdToLegacy428);
-        loadBlockStatesAndExtras(440, legacyToRuntimeId440, runtimeIdToLegacy440);
-        loadBlockStatesAndExtras(448, legacyToRuntimeId448, runtimeIdToLegacy448);
-        loadBlockStatesAndExtras(465, legacyToRuntimeId465, runtimeIdToLegacy465);
-        loadBlockStatesAndExtras(471, legacyToRuntimeId471, runtimeIdToLegacy471);
-        loadBlockStatesAndExtras(486, legacyToRuntimeId486, runtimeIdToLegacy486);
-        loadBlockStatesAndExtras(503, legacyToRuntimeId503, runtimeIdToLegacy503);
-        loadBlockStatesAndExtras(527, legacyToRuntimeId527, runtimeIdToLegacy527);
-        loadBlockStatesAndExtras(544, legacyToRuntimeId544, runtimeIdToLegacy544);
-        loadBlockStatesAndExtras(560, legacyToRuntimeId560, runtimeIdToLegacy560);
-        loadBlockStatesAndExtras(567, legacyToRuntimeId567, runtimeIdToLegacy567);
-        loadBlockStatesAndExtras(575, legacyToRuntimeId575, runtimeIdToLegacy575);
-        loadBlockStatesAndExtras(582, legacyToRuntimeId582, runtimeIdToLegacy582);
-        loadBlockStatesAndExtras(589, legacyToRuntimeId589, runtimeIdToLegacy589);
-        loadBlockStates(paletteFor(594), legacyToRuntimeId594, runtimeIdToLegacy594);
-        loadBlockStatesAndExtras(618, legacyToRuntimeId618, runtimeIdToLegacy618);
     }
 
-    private static void loadBlockStatesAndExtras(int protocol, @NotNull Int2IntMap legacyToRuntime, @NotNull Int2IntMap runtimeIdToLegacy) {
-        loadBlockStates(paletteFor(protocol), legacyToRuntime, runtimeIdToLegacy);
-        loadBlockStatesExtras(protocol, legacyToRuntime, runtimeIdToLegacy);
-    }
+    public static BlockPalette getPaletteByProtocol(int protocol) {
 
-    private static ListTag<CompoundTag> paletteFor(int protocol) {
-        ListTag<CompoundTag> tag;
-        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream("runtime_block_states_" + protocol + ".dat")) {
-            if (stream == null) {
-                throw new AssertionError("Unable to locate block state nbt " + protocol);
-            }
-            //tag = (ListTag<CompoundTag>) NBTIO.readTag(new ByteArrayInputStream(ByteStreams.toByteArray(stream)), ByteOrder.BIG_ENDIAN, false);
-            //noinspection unchecked
-            tag = (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
-        } catch (IOException e) {
-            throw new AssertionError("Unable to load block palette " + protocol, e);
+        if (protocol >= ProtocolInfo.v1_20_30_24) {
+            return blockPalette618;
+        } else if (protocol >= ProtocolInfo.v1_20_10_21) {
+            return blockPalette594;
+        } else if (protocol >= ProtocolInfo.v1_20_0_23) {
+            return blockPalette589;
+        } else if (protocol >= ProtocolInfo.v1_19_80) {
+            return blockPalette582;
+        } else if (protocol >= ProtocolInfo.v1_19_70_24) {
+            return blockPalette575;
+        } else if (protocol >= ProtocolInfo.v1_19_60) {
+            return blockPalette567;
+        } else if (protocol >= ProtocolInfo.v1_19_50_20) {
+            return blockPalette560;
+        } else if (protocol >= ProtocolInfo.v1_19_20) {
+            return blockPalette544;
+        } else if (protocol >= ProtocolInfo.v1_19_0_29) {
+            return blockPalette527;
+        } else if (protocol >= ProtocolInfo.v1_18_30) {
+            return blockPalette503;
+        } else if (protocol >= ProtocolInfo.v1_18_10_26) {
+            return blockPalette486;
+        } else if (protocol >= ProtocolInfo.v1_17_40) {
+            return blockPalette471;
+        } else if (protocol >= ProtocolInfo.v1_17_30) {
+            return blockPalette465;
+        } else if (protocol >= ProtocolInfo.v1_17_10) {
+            return blockPalette448;
+        } else if (protocol >= ProtocolInfo.v1_17_0) {
+            return blockPalette440;
+        } else if (protocol >= ProtocolInfo.v1_16_210) {
+            return blockPalette428;
         }
-        return tag;
-    }
 
-    private static void loadBlockStates(ListTag<CompoundTag> blockStates, Int2IntMap legacyToRuntime, Int2IntMap runtimeIdToLegacy) {
-        for (CompoundTag state : blockStates.getAll()) {
-            int id = state.getInt("id");
-            int data = state.getShort("data");
-            int runtimeId = state.getInt("runtimeId");
-            int legacyId = id << 6 | data;
-            legacyToRuntime.put(legacyId, runtimeId);
-            if (!runtimeIdToLegacy.containsKey(runtimeId)) {
-                runtimeIdToLegacy.put(runtimeId, legacyId);
-            }
-        }
-    }
-
-    /**
-     * 加载扩展数据，用于在不修改runtime_block_states.dat文件的情况下额外增加一些内容
-     */
-    private static void loadBlockStatesExtras(int protocol, @NotNull Int2IntMap legacyToRuntime, @NotNull Int2IntMap runtimeIdToLegacy) {
-        List<Map> extras = new Config().loadFromStream(Server.class.getClassLoader().getResourceAsStream("RuntimeBlockStatesExtras/" + protocol + ".json")).getMapList("extras");
-        //noinspection unchecked
-        for (Map<String, Object> map : extras) {
-            int id = Utils.toInt(map.get("id"));
-            int data = Utils.toInt(map.getOrDefault("data", 0));
-            int runtimeId = Utils.toInt(map.get("runtimeId"));
-            int legacyId = id << 6 | data;
-            legacyToRuntime.put(legacyId, runtimeId);
-            if (!runtimeIdToLegacy.containsKey(runtimeId)) {
-                runtimeIdToLegacy.put(runtimeId, legacyId);
-            }
-        }
+        throw new IllegalArgumentException("Tried to get BlockPalette for unsupported protocol version: " + protocol);
     }
 
     public static int getOrCreateRuntimeId(int protocol, int id, int meta) {
+        if (protocol >= ProtocolInfo.v1_16_210) {
+            return getPaletteByProtocol(protocol).getRuntimeId(id, meta);
+        }
+
         if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
         int legacyId = protocol >= 388 ? ((id << 6) | meta) : ((id << 4) | meta);
         int runtimeId;
@@ -512,144 +452,6 @@ public class GlobalBlockPalette {
                     }
                 }
                 return runtimeId;
-            case ProtocolInfo.v1_16_210:
-            case ProtocolInfo.v1_16_220:
-            case ProtocolInfo.v1_16_230_50:
-            case ProtocolInfo.v1_16_230:
-            case ProtocolInfo.v1_16_230_54:
-                runtimeId = legacyToRuntimeId428.get(legacyId);
-                if (runtimeId == -1) {
-                    runtimeId = legacyToRuntimeId428.get(id << 6);
-                    if (runtimeId == -1) {
-                        log.info("(428) Missing block runtime id mappings for " + id + ':' + meta);
-                        runtimeId = legacyToRuntimeId428.get(BlockID.INFO_UPDATE << 6);
-                    }
-                }
-
-                return runtimeId;
-            case ProtocolInfo.v1_17_0:
-                runtimeId = legacyToRuntimeId440.get(legacyId);
-                if (runtimeId == -1) {
-                    runtimeId = legacyToRuntimeId440.get(id << 6);
-                    if (runtimeId == -1) {
-                        log.info("(440) Missing block runtime id mappings for " + id + ':' + meta);
-                        runtimeId = legacyToRuntimeId440.get(BlockID.INFO_UPDATE << 6);
-                    }
-                }
-                return runtimeId;
-            case ProtocolInfo.v1_17_10:
-            case ProtocolInfo.v1_17_20_20:
-                runtimeId = legacyToRuntimeId448.get(legacyId);
-                if (runtimeId == -1) {
-                    runtimeId = legacyToRuntimeId448.get(id << 6);
-                    if (runtimeId == -1) {
-                        log.info("(448) Missing block runtime id mappings for " + id + ':' + meta);
-                        runtimeId = legacyToRuntimeId448.get(BlockID.INFO_UPDATE << 6);
-                    }
-                }
-                return runtimeId;
-            case ProtocolInfo.v1_17_30:
-                runtimeId = legacyToRuntimeId465.get(legacyId);
-                if (runtimeId == -1) {
-                    runtimeId = legacyToRuntimeId465.get(id << 6);
-                    if (runtimeId == -1) {
-                        log.info("(465) Missing block runtime id mappings for " + id + ':' + meta);
-                        runtimeId = legacyToRuntimeId465.get(BlockID.INFO_UPDATE << 6);
-                    }
-                }
-                return runtimeId;
-            case ProtocolInfo.v1_17_40:
-            case ProtocolInfo.v1_18_0:
-                runtimeId = legacyToRuntimeId471.get(legacyId);
-                if (runtimeId == -1) {
-                    runtimeId = legacyToRuntimeId471.get(id << 6);
-                    if (runtimeId == -1) {
-                        log.info("(471) Missing block runtime id mappings for " + id + ':' + meta);
-                        runtimeId = legacyToRuntimeId471.get(BlockID.INFO_UPDATE << 6);
-                    }
-                }
-                return runtimeId;
-            case ProtocolInfo.v1_18_10_26:
-            case ProtocolInfo.v1_18_10:
-                runtimeId = legacyToRuntimeId486.get(legacyId);
-                if (runtimeId == -1) {
-                    runtimeId = legacyToRuntimeId486.get(id << 6);
-                    if (runtimeId == -1) {
-                        log.info("(486) Missing block runtime id mappings for " + id + ':' + meta);
-                        runtimeId = legacyToRuntimeId486.get(BlockID.INFO_UPDATE << 6);
-                    }
-                }
-                return runtimeId;
-            case ProtocolInfo.v1_18_30:
-                runtimeId = legacyToRuntimeId503.get(legacyId);
-                if (runtimeId == -1) {
-                    runtimeId = legacyToRuntimeId503.get(id << 6);
-                    if (runtimeId == -1) {
-                        log.info("(503) Missing block runtime id mappings for " + id + ':' + meta);
-                        runtimeId = legacyToRuntimeId503.get(BlockID.INFO_UPDATE << 6);
-                    }
-                }
-                return runtimeId;
-            case ProtocolInfo.v1_19_0_29:
-            case ProtocolInfo.v1_19_0_31:
-            case ProtocolInfo.v1_19_0:
-            case ProtocolInfo.v1_19_10:
-                runtimeId = legacyToRuntimeId527.get(legacyId);
-                if (runtimeId == -1) {
-                    runtimeId = legacyToRuntimeId527.get(id << 6);
-                    if (runtimeId == -1) {
-                        log.info("(527) Missing block runtime id mappings for " + id + ':' + meta);
-                        runtimeId = legacyToRuntimeId527.get(BlockID.INFO_UPDATE << 6);
-                    }
-                }
-                return runtimeId;
-            default:
-                return legacyToRuntimeId(protocol, id, meta, legacyId);
-        }
-    }
-
-    private static int legacyToRuntimeId(int protocol, int id, int meta, int legacyId) {
-        int runtimeId;
-        Int2IntMap legacyToRuntimeIdMap = getLegacyToRuntimeIdMap(protocol);
-        runtimeId = legacyToRuntimeIdMap.get(legacyId);
-        if (runtimeId == -1) {
-            runtimeId = legacyToRuntimeIdMap.get(id << 6);
-            if (runtimeId == -1) {
-                log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
-                runtimeId = legacyToRuntimeIdMap.get(BlockID.INFO_UPDATE << 6);
-            }
-        }
-        return runtimeId;
-    }
-
-    private static Int2IntMap getLegacyToRuntimeIdMap(int protocol) {
-        switch (protocol) {
-            case ProtocolInfo.v1_19_20:
-            case ProtocolInfo.v1_19_21:
-            case ProtocolInfo.v1_19_30_23:
-            case ProtocolInfo.v1_19_30:
-            case ProtocolInfo.v1_19_40:
-                return legacyToRuntimeId544;
-            case ProtocolInfo.v1_19_50:
-                return legacyToRuntimeId560;
-            case ProtocolInfo.v1_19_60:
-            case ProtocolInfo.v1_19_63:
-                return legacyToRuntimeId567;
-            case ProtocolInfo.v1_19_70_24:
-            case ProtocolInfo.v1_19_70:
-                return legacyToRuntimeId575;
-            case ProtocolInfo.v1_19_80:
-                return legacyToRuntimeId582;
-            case ProtocolInfo.v1_20_0_23:
-            case ProtocolInfo.v1_20_0:
-                return legacyToRuntimeId589;
-            case ProtocolInfo.v1_20_10_21:
-            case ProtocolInfo.v1_20_10:
-                return legacyToRuntimeId594;
-            case ProtocolInfo.v1_20_30_24:
-            case ProtocolInfo.v1_20_30:
-                return legacyToRuntimeId618;
-            // TODO Multiversion
             default:
                 throw new IllegalArgumentException("Tried to get legacyToRuntimeIdMap for unsupported protocol version: " + protocol);
         }
@@ -741,38 +543,9 @@ public class GlobalBlockPalette {
     }
 
     public static int getLegacyFullId(int protocolId, int runtimeId) {
-        if (protocolId >= ProtocolInfo.v1_20_30_24) {
-            return runtimeIdToLegacy618.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_20_10_21) {
-            return runtimeIdToLegacy594.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_20_0_23) {
-            return runtimeIdToLegacy589.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_19_80) {
-            return runtimeIdToLegacy582.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_19_70_24) {
-            return runtimeIdToLegacy575.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_19_60) {
-            return runtimeIdToLegacy567.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_19_50) {
-            return runtimeIdToLegacy560.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_19_20) {
-            return runtimeIdToLegacy544.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_19_0_29) {
-            return runtimeIdToLegacy527.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_18_30) {
-            return runtimeIdToLegacy503.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_18_10_26) {
-            return runtimeIdToLegacy486.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_17_40) {
-            return runtimeIdToLegacy471.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_17_30) {
-            return runtimeIdToLegacy465.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_17_10) {
-            return runtimeIdToLegacy448.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_17_0) {
-            return runtimeIdToLegacy440.get(runtimeId);
-        } else if (protocolId >= ProtocolInfo.v1_16_210) {
-            return runtimeIdToLegacy428.get(runtimeId);
+        BlockPalette blockPalette = getPaletteByProtocol(protocolId);
+        if (blockPalette != null) {
+            return blockPalette.getLegacyFullId(runtimeId);
         }
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }

@@ -2561,7 +2561,7 @@ public abstract class Entity extends Location implements Metadatable {
                 this.z = pos.z;
 
                 // Dimension change
-                if (this.isPlayer && this.server.dimensionsEnabled && newLevel.getDimension() != oldLevel.getDimension()) {
+                if (this.isPlayer && newLevel.getDimension() != oldLevel.getDimension()) {
                     ((Player) this).setDimension(newLevel.getDimension());
                 }
 

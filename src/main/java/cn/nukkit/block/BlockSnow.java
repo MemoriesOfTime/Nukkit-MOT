@@ -1,7 +1,6 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemSnowball;
 import cn.nukkit.item.ItemTool;
@@ -67,7 +66,7 @@ public class BlockSnow extends BlockSolid {
 
     @Override
     public boolean onActivate(Item item, Player player) {
-        if (item.isShovel() && !Server.getInstance().isLowProfileServer()) {
+        if (item.isShovel()) {
             item.useOn(this);
             this.level.useBreakOn(this, item.clone().clearNamedTag(), null, true);
             return true;

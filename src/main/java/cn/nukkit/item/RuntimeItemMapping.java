@@ -2,7 +2,8 @@ package cn.nukkit.item;
 
 import cn.nukkit.Server;
 import cn.nukkit.item.RuntimeItems.MappingEntry;
-import cn.nukkit.item.customitem.ItemCustom;
+import cn.nukkit.item.customitem.CustomItem;
+import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
@@ -34,10 +35,11 @@ public class RuntimeItemMapping {
     private final Int2ObjectMap<RuntimeEntry> legacy2Runtime = new Int2ObjectOpenHashMap<>();
     private final Map<String, LegacyEntry> identifier2Legacy = new HashMap<>();
 
+    private final List<RuntimeEntry> itemPaletteEntries = new ArrayList<>();
     private final Int2ObjectMap<String> runtimeId2Name = new Int2ObjectOpenHashMap<>();
     private final Object2IntMap<String> name2RuntimeId = new Object2IntOpenHashMap<>();
 
-    private final ArrayList<Integer> customItems = new ArrayList<>();
+    private final ArrayList<String> customItems = new ArrayList<>();
 
     private byte[] itemPalette;
 
@@ -100,47 +102,53 @@ public class RuntimeItemMapping {
             if (!hasDamage && this.legacy2Runtime.containsKey(fullId)) {
                 log.debug("RuntimeItemMapping contains duplicated legacy item state runtimeId=" + runtimeId + " identifier=" + identifier);
             } else {
-                this.legacy2Runtime.put(fullId, new RuntimeEntry(identifier, runtimeId, hasDamage));
+                RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, runtimeId, hasDamage);
+                this.legacy2Runtime.put(fullId, runtimeEntry);
+                this.itemPaletteEntries.add(runtimeEntry);
             }
         }
 
         this.generatePalette();
     }
 
-    synchronized boolean registerCustomItem(ItemCustom itemCustom) {
-        if (!Server.getInstance().enableExperimentMode || this.customItems.contains(itemCustom.getId())) {
+    synchronized boolean registerCustomItem(CustomItem customItem) {
+        int runtimeId = CustomItemDefinition.getRuntimeId(customItem.getNamespaceId());
+        String namespaceId = customItem.getNamespaceId();
+        if (!Server.getInstance().enableExperimentMode || this.customItems.contains(namespaceId)) {
             return false;
         }
-        this.customItems.add(itemCustom.getId());
+        this.customItems.add(namespaceId);
 
-        int fullId = this.getFullId(itemCustom.getId(), 0);
-
-        LegacyEntry legacyEntry = new LegacyEntry(itemCustom.getId(), false, 0);
-        this.runtime2Legacy.put(itemCustom.getId(), legacyEntry);
-        this.identifier2Legacy.put(itemCustom.getName(), legacyEntry);
-        this.legacy2Runtime.put(fullId,
-                new RuntimeEntry(itemCustom.getName(), itemCustom.getId(), false, true));
+        RuntimeEntry entry = new RuntimeEntry(
+                customItem.getNamespaceId(),
+                runtimeId,
+                false,
+                true
+        );
+        this.itemPaletteEntries.add(entry);
+        this.runtimeId2Name.put(runtimeId, namespaceId);
+        this.name2RuntimeId.put(namespaceId, runtimeId);
 
         this.generatePalette();
 
         return true;
     }
 
-    synchronized boolean deleteCustomItem(ItemCustom itemCustom) {
-        if (!Server.getInstance().enableExperimentMode && !this.customItems.contains(itemCustom.getId())) {
-            return false;
+    synchronized void deleteCustomItem(CustomItem customItem) {
+        String namespaceId = customItem.getNamespaceId();
+        if (!Server.getInstance().enableExperimentMode && !this.customItems.contains(namespaceId)) {
+            return;
         }
+        this.customItems.remove(namespaceId);
 
-        this.runtime2Legacy.remove(itemCustom.getId());
-        this.identifier2Legacy.remove(itemCustom.getName());
-        this.legacy2Runtime.remove(this.getFullId(itemCustom.getId(), 0));
+        this.runtimeId2Name.remove(customItem.getId());
+        this.name2RuntimeId.removeInt(customItem.getNamespaceId());
+        this.itemPaletteEntries.removeIf(next -> next.getIdentifier().equals(customItem.getNamespaceId()));
 
         this.generatePalette();
-
-        return true;
     }
 
-    public ArrayList<Integer> getCustomItems() {
+    public ArrayList<String> getCustomItems() {
         return new ArrayList<>(customItems);
     }
 
@@ -156,21 +164,21 @@ public class RuntimeItemMapping {
     private void generatePalette() {
         BinaryStream paletteBuffer = new BinaryStream();
         int size = 0;
-        for (RuntimeEntry entry : this.legacy2Runtime.values()) {
+        for (RuntimeEntry entry : this.itemPaletteEntries) {
             if (entry.isCustomItem() && (!Server.getInstance().enableExperimentMode || protocolId < ProtocolInfo.v1_16_100)) {
                 break;
             }
             size++;
         }
         paletteBuffer.putUnsignedVarInt(size);
-        for (RuntimeEntry entry : this.legacy2Runtime.values()) {
+        for (RuntimeEntry entry : this.itemPaletteEntries) {
             if (entry.isCustomItem()) {
                 if (Server.getInstance().enableExperimentMode && protocolId >= ProtocolInfo.v1_16_100) {
-                    paletteBuffer.putString(("customitem:" + entry.getIdentifier()).toLowerCase());
+                    paletteBuffer.putString(entry.getIdentifier());
                     paletteBuffer.putLShort(entry.getRuntimeId());
                     paletteBuffer.putBoolean(true); // Component item
                 }
-            }else {
+            } else {
                 paletteBuffer.putString(entry.getIdentifier());
                 paletteBuffer.putLShort(entry.getRuntimeId());
                 if (this.protocolId >= ProtocolInfo.v1_16_100) {

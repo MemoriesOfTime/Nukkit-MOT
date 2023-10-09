@@ -315,6 +315,15 @@ public class Utils {
         return (int) Math.round((double) number);
     }
 
+    public static double toDouble(Object number) {
+        if (number instanceof Double doubleNumber) {
+            return doubleNumber;
+        } else if (number instanceof String) {
+            return new BigDecimal(number.toString()).doubleValue();
+        }
+        return (double) number;
+    }
+
     public static byte[] parseHexBinary(String s) {
         final int len = s.length();
 
@@ -443,7 +452,7 @@ public class Utils {
             case ProtocolInfo.v1_19_21 -> "1.19.21";
             case ProtocolInfo.v1_19_30_23, ProtocolInfo.v1_19_30 -> "1.19.30";
             case ProtocolInfo.v1_19_40 -> "1.19.40";
-            case ProtocolInfo.v1_19_50 -> "1.19.50";
+            case ProtocolInfo.v1_19_50_20, ProtocolInfo.v1_19_50 -> "1.19.50";
             case ProtocolInfo.v1_19_60 -> "1.19.60";
             case ProtocolInfo.v1_19_63 -> "1.19.63";
             case ProtocolInfo.v1_19_70_24, ProtocolInfo.v1_19_70 -> "1.19.70";

@@ -455,4 +455,12 @@ public interface BlockID {
     int NETHER_GOLD_ORE = 543;
     int CRYING_OBSIDIAN = 544;
     int SOUL_CAMPFIRE_BLOCK = 545;
+
+    int COPPER_ORE = 566;
+
+    int RAW_IRON_BLOCK = 706;
+
+    int RAW_COPPER_BLOCK = 707;
+
+    int RAW_GOLD_BLOCK = 708;
 }

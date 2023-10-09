@@ -1,6 +1,5 @@
 package cn.nukkit.network.encryption;
 
-import cn.nukkit.Server;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -44,6 +43,7 @@ public class EncryptionUtils {
 
     private static final AesFactory AES_FACTORY;
     public static final ECPublicKey MOJANG_PUBLIC_KEY;
+    @Deprecated
     public static final ECPublicKey OLD_MOJANG_PUBLIC_KEY;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String MOJANG_PUBLIC_KEY_BASE64 =
@@ -161,8 +161,7 @@ public class EncryptionUtils {
                 return !iterator.hasNext();
             }
 
-            if (lastKey.equals(EncryptionUtils.MOJANG_PUBLIC_KEY)
-                    || (!Server.getInstance().ignoreOldMojangPublicKey && lastKey.equals(EncryptionUtils.OLD_MOJANG_PUBLIC_KEY))) {
+            if (lastKey.equals(EncryptionUtils.MOJANG_PUBLIC_KEY)) {
                 validChain = true;
             }
 
@@ -263,6 +262,7 @@ public class EncryptionUtils {
         return MOJANG_PUBLIC_KEY;
     }
 
+    @Deprecated
     public static ECPublicKey getOldMojangPublicKey() {
         return OLD_MOJANG_PUBLIC_KEY;
     }

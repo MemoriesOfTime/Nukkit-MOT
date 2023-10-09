@@ -124,8 +124,8 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.LEAVES2] = true;
         randomTickBlocks[Block.SNOW_LAYER] = true;
         randomTickBlocks[Block.ICE] = true;
-        if (!Server.getInstance().isLowProfileServer()) randomTickBlocks[Block.LAVA] = true;
-        if (!Server.getInstance().isLowProfileServer()) randomTickBlocks[Block.STILL_LAVA] = true;
+        randomTickBlocks[Block.LAVA] = true;
+        randomTickBlocks[Block.STILL_LAVA] = true;
         randomTickBlocks[Block.CACTUS] = true;
         randomTickBlocks[Block.BEETROOT_BLOCK] = true;
         randomTickBlocks[Block.CARROT_BLOCK] = true;
@@ -135,7 +135,7 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.WHEAT_BLOCK] = true;
         randomTickBlocks[Block.SUGARCANE_BLOCK] = true;
         randomTickBlocks[Block.NETHER_WART_BLOCK] = true;
-        if (!Server.getInstance().isLowProfileServer()) randomTickBlocks[Block.FIRE] = true;
+        randomTickBlocks[Block.FIRE] = true;
         randomTickBlocks[Block.GLOWING_REDSTONE_ORE] = true;
         randomTickBlocks[Block.COCOA_BLOCK] = true;
         randomTickBlocks[Block.ICE_FROSTED] = true;
@@ -1331,8 +1331,9 @@ public class Level implements ChunkManager, Metadatable {
                                     int z = lcg >>> 16 & 0x0f;
 
                                     int[] state = section.getBlockState(x, y, z);
-                                    if (randomTickBlocks[state[0]]) {
-                                        Block block = Block.get(state[0], state[1], this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
+                                    int blockId = state[0];
+                                    if (blockId <= Block.MAX_BLOCK_ID && randomTickBlocks[blockId]) {
+                                        Block block = Block.get(blockId, state[1], this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
                                         block.onUpdate(BLOCK_UPDATE_RANDOM);
                                     }
                                 }
@@ -1350,7 +1351,7 @@ public class Level implements ChunkManager, Metadatable {
                                 int[] state = chunk.getBlockState(x, y + (Y << 4), z);
                                 int blockId = state[0];
                                 blockTest |= state[0] != 0 && state[1] != 0;
-                                if (Level.randomTickBlocks[blockId]) {
+                                if (blockId <= Block.MAX_BLOCK_ID && Level.randomTickBlocks[blockId]) {
                                     Block block = Block.get(state[0], state[1], this, x, y + (Y << 4), z);
                                     block.onUpdate(BLOCK_UPDATE_RANDOM);
                                 }
@@ -2343,29 +2344,15 @@ public class Level implements ChunkManager, Metadatable {
 
     public void dropExpOrb(Vector3 source, int exp, Vector3 motion, int delay) {
         Random rand = ThreadLocalRandom.current();
-        if (server.isLowProfileServer()) {
+        for (int split : EntityXPOrb.splitIntoOrbSizes(exp)) {
             CompoundTag nbt = Entity.getDefaultNBT(source, motion == null ? new Vector3(
                             (rand.nextDouble() * 0.2 - 0.1) * 2,
                             rand.nextDouble() * 0.4,
                             (rand.nextDouble() * 0.2 - 0.1) * 2) : motion,
                     rand.nextFloat() * 360f, 0);
-            nbt.putShort("Value", exp);
+            nbt.putShort("Value", split);
             nbt.putShort("PickupDelay", delay);
-            Entity entity = Entity.createEntity("XpOrb", this.getChunk(source.getChunkX(), source.getChunkZ()), nbt);
-            if (entity != null) {
-                entity.spawnToAll();
-            }
-        } else {
-            for (int split : EntityXPOrb.splitIntoOrbSizes(exp)) {
-                CompoundTag nbt = Entity.getDefaultNBT(source, motion == null ? new Vector3(
-                                (rand.nextDouble() * 0.2 - 0.1) * 2,
-                                rand.nextDouble() * 0.4,
-                                (rand.nextDouble() * 0.2 - 0.1) * 2) : motion,
-                        rand.nextFloat() * 360f, 0);
-                nbt.putShort("Value", split);
-                nbt.putShort("PickupDelay", delay);
-                Entity.createEntity("XpOrb", this.getChunk(source.getChunkX(), source.getChunkZ()), nbt).spawnToAll();
-            }
+            Entity.createEntity("XpOrb", this.getChunk(source.getChunkX(), source.getChunkZ()), nbt).spawnToAll();
         }
     }
 
@@ -3709,15 +3696,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public boolean isSpawnChunk(int X, int Z) {
         Vector3 spawn = this.getSpawnLocation();
-
-        if (this.server.isLowProfileServer() && !this.randomTickingEnabled()) {
-            if (this.equals(this.getServer().getDefaultLevel())) {
-                return Math.abs(X - (spawn.getFloorX() >> 4)) <= 9 && Math.abs(Z - (spawn.getFloorZ() >> 4)) <= 9;
-            }
-            return Math.abs(X - (spawn.getFloorX() >> 4)) <= 5 && Math.abs(Z - (spawn.getFloorZ() >> 4)) <= 5;
-        } else {
-            return Math.abs(X - (spawn.getFloorX() >> 4)) <= 1 && Math.abs(Z - (spawn.getFloorZ() >> 4)) <= 1;
-        }
+        return Math.abs(X - (spawn.getFloorX() >> 4)) <= 1 && Math.abs(Z - (spawn.getFloorZ() >> 4)) <= 1;
     }
 
     public Position getSafeSpawn() {
@@ -4085,12 +4064,6 @@ public class Level implements ChunkManager, Metadatable {
         pk.pitch = pitch;
         pk.onGround = entity.onGround;
 
-        if (this.server.isLowProfileServer()) {
-            for (Player p : entity.getViewers().values()) {
-                p.dataPacket(pk);
-            }
-            return;
-        }
         entity.getViewers().values().stream().filter(p -> p.protocol < ProtocolInfo.v1_16_100).forEach(p -> p.dataPacket(pk));
 
         MoveEntityDeltaPacket pk2 = new MoveEntityDeltaPacket();
@@ -4707,7 +4680,7 @@ public class Level implements ChunkManager, Metadatable {
             return ProtocolInfo.v1_19_70;
         } else if (protocol >= ProtocolInfo.v1_19_60) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_60;
-        } else if (protocol >= ProtocolInfo.v1_19_50) { //调色板 物品运行时id
+        } else if (protocol >= ProtocolInfo.v1_19_50_20) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_50;
         } else if (protocol >= ProtocolInfo.v1_19_20) { //调色板 物品运行时id
             return ProtocolInfo.v1_19_20;
@@ -4770,7 +4743,8 @@ public class Level implements ChunkManager, Metadatable {
             if (player >= ProtocolInfo.v1_19_0_29) if (player < ProtocolInfo.v1_19_20) return true;
         if (chunk == ProtocolInfo.v1_19_20)
             if (player >= ProtocolInfo.v1_19_20) if (player < ProtocolInfo.v1_19_50) return true;
-        if (chunk == ProtocolInfo.v1_19_50) if (player == ProtocolInfo.v1_19_50) return true;
+        if (chunk == ProtocolInfo.v1_19_50)
+            if (player >= ProtocolInfo.v1_19_50_20) if (player < ProtocolInfo.v1_19_60) return true;
         if (chunk == ProtocolInfo.v1_19_60)
             if (player >= ProtocolInfo.v1_19_60) if (player < ProtocolInfo.v1_19_70) return true;
         if (chunk == ProtocolInfo.v1_19_70)

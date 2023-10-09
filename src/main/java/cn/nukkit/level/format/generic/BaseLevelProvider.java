@@ -106,9 +106,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
     public abstract BaseFullChunk loadChunk(long index, int chunkX, int chunkZ, boolean create);
 
     public int size() {
-        synchronized (chunks) {
-            return this.chunks.size();
-        }
+        return this.chunks.size();
     }
 
     @Override
@@ -136,9 +134,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        synchronized (chunks) {
-            return ImmutableMap.copyOf(chunks);
-        }
+        return ImmutableMap.copyOf(chunks);
     }
 
     @Override
@@ -147,16 +143,12 @@ public abstract class BaseLevelProvider implements LevelProvider {
     }
 
     public void putChunk(long index, BaseFullChunk chunk) {
-        synchronized (chunks) {
-            chunks.put(index, chunk);
-        }
+        chunks.put(index, chunk);
     }
 
     @Override
     public boolean isChunkLoaded(long hash) {
-        synchronized (chunks) {
-            return this.chunks.containsKey(hash);
-        }
+        return this.chunks.containsKey(hash);
     }
 
     public BaseRegionLoader getRegion(int x, int z) {
@@ -318,12 +310,10 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Override
     public void saveChunks() {
-        synchronized (chunks) {
-            for (BaseFullChunk chunk : this.chunks.values()) {
-                if (chunk.getChanges() != 0) {
-                    chunk.setChanged(false);
-                    this.saveChunk(chunk.getX(), chunk.getZ());
-                }
+        for (BaseFullChunk chunk : this.chunks.values()) {
+            if (chunk.getChanges() != 0) {
+                chunk.setChanged(false);
+                this.saveChunk(chunk.getX(), chunk.getZ());
             }
         }
     }
@@ -364,10 +354,8 @@ public abstract class BaseLevelProvider implements LevelProvider {
     @Override
     public boolean loadChunk(int chunkX, int chunkZ, boolean create) {
         long index = Level.chunkHash(chunkX, chunkZ);
-        synchronized (chunks) {
-            if (this.chunks.containsKey(index)) {
-                return true;
-            }
+        if (this.chunks.containsKey(index)) {
+            return true;
         }
         return loadChunk(index, chunkX, chunkZ, create) != null;
     }
@@ -380,13 +368,11 @@ public abstract class BaseLevelProvider implements LevelProvider {
     @Override
     public boolean unloadChunk(int X, int Z, boolean safe) {
         long index = Level.chunkHash(X, Z);
-        synchronized (chunks) {
-            BaseFullChunk chunk = this.chunks.get(index);
-            if (chunk != null && chunk.unload(false, safe)) {
-                lastChunk.set(null);
-                this.chunks.remove(index, chunk);
-                return true;
-            }
+        BaseFullChunk chunk = this.chunks.get(index);
+        if (chunk != null && chunk.unload(false, safe)) {
+            lastChunk.set(null);
+            this.chunks.remove(index, chunk);
+            return true;
         }
         return false;
     }
@@ -449,12 +435,10 @@ public abstract class BaseLevelProvider implements LevelProvider {
         chunk.setProvider(this);
         chunk.setPosition(chunkX, chunkZ);
         long index = Level.chunkHash(chunkX, chunkZ);
-        synchronized (chunks) {
-            if (this.chunks.containsKey(index) && !this.chunks.get(index).equals(chunk)) {
-                this.unloadChunk(chunkX, chunkZ, false);
-            }
-            this.chunks.put(index, (BaseFullChunk) chunk);
+        if (this.chunks.containsKey(index) && !this.chunks.get(index).equals(chunk)) {
+            this.unloadChunk(chunkX, chunkZ, false);
         }
+        this.chunks.put(index, (BaseFullChunk) chunk);
     }
 
     @Override

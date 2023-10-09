@@ -190,7 +190,7 @@ public class Binary {
                     stream.putVarInt(pos.z);
                     break;
                 case Entity.DATA_TYPE_LONG:
-                    if (protocol < ProtocolInfo.v1_19_50) {
+                    if (protocol < ProtocolInfo.v1_19_50_20) {
                         long[] dataVersions;
                         if (id == Entity.DATA_FLAGS) {
                             dataVersions = ((LongEntityData) d).dataVersions;
