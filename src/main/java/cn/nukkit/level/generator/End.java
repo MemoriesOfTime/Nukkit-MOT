@@ -103,9 +103,11 @@ public class End extends Generator {
     }
 
     @Override
+    public void populateStructure(final int chunkX, final int chunkZ) {
+    }
+
+    @Override
     public void generateChunk(int chunkX, int chunkZ) {
-        int baseX = chunkX << 4;
-        int baseZ = chunkZ << 4;
         this.nukkitRandom.setSeed(chunkX * localSeed1 ^ chunkZ * localSeed2 ^ this.level.getSeed());
 
         BaseFullChunk chunk = level.getChunk(chunkX, chunkZ);

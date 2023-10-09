@@ -7,8 +7,8 @@ import lombok.Getter;
 
 public class TradeInventoryRecipe {
 
-    public static int A_ITEM = 0;
-    public static int B_ITEM = 1;
+    public static final int A_ITEM = 0;
+    public static final int B_ITEM = 1;
     @Getter
     private Item sellItem;
     @Getter
@@ -49,14 +49,9 @@ public class TradeInventoryRecipe {
 
     public TradeInventoryRecipe setBuyCount(int count, int type) {
         switch (type) {
-            case 0:
-                this.buyCountA = count;
-                break;
-            case 1:
-                this.buyCountB = count;
-                break;
+            case A_ITEM -> this.buyCountA = count;
+            case B_ITEM -> this.buyCountB = count;
         }
-        this.buyCountA = count;
         return this;
     }
 
@@ -81,12 +76,12 @@ public class TradeInventoryRecipe {
         this.rewardsExp = reward;
         return this;
     }
-    
+
     public TradeInventoryRecipe setTraderExp(int traderExp) {
         this.traderExp = traderExp;
         return this;
     }
-    
+
     public CompoundTag toNBT() {
         CompoundTag nbt = new CompoundTag();
         nbt.putCompound("buyA", NBTIO.putItemHelper(buyItem, -1));

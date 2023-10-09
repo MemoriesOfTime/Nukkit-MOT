@@ -67,15 +67,12 @@ public class SmithingTransaction extends InventoryTransaction {
         super.addAction(action);
         if (action instanceof SmithingItemAction) {
             switch (((SmithingItemAction) action).getType()) {
-                case 0: // input
+                case 0 -> // input
                     this.equipmentItem = action.getTargetItem();
-                    break;
-                case 2: // result
+                case 2 -> // result
                     this.outputItem = action.getSourceItem();
-                    break;
-                case 1: // ingredient
+                case 1 -> // ingredient
                     this.ingredientItem = action.getTargetItem();
-                    break;
             }
         } else if (action instanceof CreativeInventoryAction creativeAction) {
             if (creativeAction.getActionType() == 0
