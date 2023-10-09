@@ -41,7 +41,7 @@ For a clearer understanding of your issues, it's recommended to provide screensh
 为了更好地理解您的问题，请附带截图或视频。如果没有图像辅助，您的问题可能无法得到解决。
 -->
 
-## 💻 OS and versions | 操作系统和PNX版本
+## 💻 OS and versions | 操作系统和核心版本
 
 <!--
 Execute the `version` command in your game or on the server console; this command will provide the necessary information.
