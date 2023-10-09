@@ -47,14 +47,14 @@ public class SmithingRecipe extends ShapelessRecipe {
         if (ingredients.size() >= 3) {
             this.template = (Item) ingredients.toArray()[2];
         } else {
-            this.template = Item.AIR_ITEM;
+            this.template = Item.AIR_ITEM.clone();
         }
         this.result = result;
 
-        ArrayList<Item> aggregation = new ArrayList<>(2);
+        ArrayList<Item> aggregation = new ArrayList<>(3);
 
-        for (Item item : new Item[]{equipment, ingredient}) {
-            if (item.getCount() < 1) {
+        for (Item item : new Item[]{equipment, ingredient, template}) {
+            if (item.getId() != 0 && item.getCount() < 1) {
                 throw new IllegalArgumentException("Recipe Ingredient amount was not 1 (value: " + item.getCount() + ")");
             }
             boolean found = false;
@@ -117,9 +117,7 @@ public class SmithingRecipe extends ShapelessRecipe {
     }
 
     public Item getTemplate() {
-        return Item.fromString("minecraft:netherite_upgrade_smithing_template");
-
-        //return template;
+        return template;
     }
 
     public Item getEquipment() {

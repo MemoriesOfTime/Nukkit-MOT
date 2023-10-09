@@ -25,9 +25,10 @@ import cn.nukkit.item.ItemArmor;
 import cn.nukkit.item.ItemTrimMaterial;
 import cn.nukkit.item.ItemTrimPattern;
 import cn.nukkit.level.Position;
-import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 import javax.annotation.Nullable;
+import java.util.Arrays;
 
 /**
  * @author joserobjr
@@ -52,7 +53,7 @@ public class SmithingInventory extends FakeBlockUIComponent {
 
     @Nullable
     public SmithingRecipe matchRecipe() {
-        return Server.getInstance().getCraftingManager().matchSmithingRecipe(getEquipment(), getIngredient(), getTemplate());
+        return Server.getInstance().getCraftingManager().matchSmithingRecipe(ProtocolInfo.CURRENT_PROTOCOL, Arrays.asList(getEquipment(), getIngredient(), getTemplate()));
     }
 
     @Override

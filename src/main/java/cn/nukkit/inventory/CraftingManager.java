@@ -13,7 +13,9 @@ import cn.nukkit.utils.*;
 import io.netty.util.collection.CharObjectHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.zip.Deflater;
 
@@ -78,7 +80,7 @@ public class CraftingManager {
     public final Map<Integer, ContainerRecipe> containerRecipes = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, ContainerRecipe> containerRecipesOld = new Int2ObjectOpenHashMap<>();
     public final Map<Integer, CampfireRecipe> campfireRecipes = new Int2ObjectOpenHashMap<>();
-    private final Map<Integer, SmithingRecipe> smithingRecipeMap = new Int2ObjectOpenHashMap<>(); //567
+    private final Map<UUID, SmithingRecipe> smithingRecipeMap = new Object2ObjectOpenHashMap<>(); //567
 
     private final Object2DoubleOpenHashMap<Recipe> recipeXpMap = new Object2DoubleOpenHashMap<>();
 
@@ -587,7 +589,7 @@ public class CraftingManager {
         packet313 = packetFor(313).compress(Deflater.BEST_COMPRESSION);
     }
 
-    public Map<Integer, SmithingRecipe> getSmithingRecipeMap() {
+    public Map<UUID, SmithingRecipe> getSmithingRecipeMap() {
         return smithingRecipeMap;
     }
 
@@ -684,7 +686,7 @@ public class CraftingManager {
         return recipe;
     }
 
-    private static UUID getMultiItemHash(Collection<Item> items) {
+    public static UUID getMultiItemHash(Collection<Item> items) {
         BinaryStream stream = new BinaryStream();
         for (Item item : items) {
             stream.putVarInt(getFullItemHash(item));
@@ -886,8 +888,9 @@ public class CraftingManager {
 
     public void registerSmithingRecipe(SmithingRecipe recipe) {
         Item input = recipe.getIngredient();
-        Item potion = recipe.getEquipment();
-        this.smithingRecipeMap.put(getContainerHash(input.getId(), potion.getId()), recipe);
+        Item equipment = recipe.getEquipment();
+        Item template = recipe.getTemplate();
+        this.smithingRecipeMap.put(getMultiItemHash(recipe.getIngredientsAggregate()), recipe);
     }
 
     public void registerBrewingRecipe(BrewingRecipe recipe) {
@@ -997,13 +1000,31 @@ public class CraftingManager {
         this.multiRecipes.put(recipe.getId(), recipe);
     }
 
-    public SmithingRecipe matchSmithingRecipe(Item equipment, Item ingredient, Item template) {
-        //TODO template
-        return matchSmithingRecipe(equipment, ingredient);
+    @Deprecated
+    public SmithingRecipe matchSmithingRecipe(Item equipment, Item ingredient) {
+        return matchSmithingRecipe(ProtocolInfo.CURRENT_PROTOCOL, Arrays.asList(equipment, ingredient));
     }
 
-    public SmithingRecipe matchSmithingRecipe(Item equipment, Item ingredient) {
-        return this.getSmithingRecipeMap().get(getContainerHash(ingredient.getId(), equipment.getId()));
+    @Nullable
+    public SmithingRecipe matchSmithingRecipe(int protocol, List<Item> inputList) {
+        UUID inputHash = getMultiItemHash(inputList);
+
+        Map<UUID, SmithingRecipe> recipeMap = this.getSmithingRecipeMap(/*protocol*/);
+
+        if (recipeMap != null) {
+            SmithingRecipe recipe = recipeMap.get(inputHash);
+
+            if (recipe != null && recipe.matchItems(inputList)) {
+                return recipe;
+            }
+
+            for (SmithingRecipe smithingRecipe : recipeMap.values()) {
+                if (smithingRecipe.matchItems(inputList)) {
+                    return smithingRecipe;
+                }
+            }
+        }
+        return null;
     }
 
     public static class Entry {
