@@ -82,7 +82,7 @@ public class SmithingInventory extends FakeBlockUIComponent {
     public Item getResult() {
         SmithingRecipe recipe = matchRecipe();
         if (recipe == null) {
-            return Item.get(0);
+            return this.getTrimOutPutItem();
         }
         return recipe.getFinalResult(getEquipment(), getTemplate());
     }
@@ -122,10 +122,11 @@ public class SmithingInventory extends FakeBlockUIComponent {
         super.onClose(who);
         who.craftingType = Player.CRAFTING_SMALL;
 
-        who.giveItem(getItem(EQUIPMENT), getItem(INGREDIENT));
+        who.giveItem(getItem(EQUIPMENT), getItem(INGREDIENT), getItem(TEMPLATE));
 
         this.clear(EQUIPMENT);
         this.clear(INGREDIENT);
+        this.clear(TEMPLATE);
         this.getHolder().getInventory().clear(CREATED_ITEM_OUTPUT_UI_SLOT);
     }
 
@@ -133,10 +134,10 @@ public class SmithingInventory extends FakeBlockUIComponent {
         return currentResult;
     }
 
-    public Item getTrimOutPutItem(){
+    public Item getTrimOutPutItem() {
         Item input = this.getEquipment().clone();
-        if(this.getIngredient() instanceof ItemTrimMaterial && this.getTemplate() instanceof ItemTrimPattern){
-            if(!input.isNull() && input instanceof ItemArmor) {
+        if (this.getIngredient() instanceof ItemTrimMaterial && this.getTemplate() instanceof ItemTrimPattern) {
+            if (!input.isNull() && input instanceof ItemArmor) {
                 ItemArmor trimmedArmor = (ItemArmor) input.clone();
                 ItemTrimMaterial material = (ItemTrimMaterial) this.getIngredient();
                 ItemTrimPattern pattern = (ItemTrimPattern) this.getTemplate();
@@ -144,6 +145,6 @@ public class SmithingInventory extends FakeBlockUIComponent {
                 return trimmedArmor;
             }
         }
-        return Item.AIR_ITEM;
+        return Item.AIR_ITEM.clone();
     }
 }

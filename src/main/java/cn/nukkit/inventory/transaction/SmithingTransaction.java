@@ -40,6 +40,7 @@ public class SmithingTransaction extends InventoryTransaction {
 
     private Item equipmentItem;
     private Item ingredientItem;
+    private Item templateItem;
     private Item outputItem;
 
     private boolean isError = false;
@@ -73,6 +74,8 @@ public class SmithingTransaction extends InventoryTransaction {
                     this.outputItem = action.getSourceItem();
                 case 1 -> // ingredient
                     this.ingredientItem = action.getTargetItem();
+                case 3 -> // template
+                    this.templateItem = action.getTargetItem();
             }
         } else if (action instanceof CreativeInventoryAction creativeAction) {
             if (creativeAction.getActionType() == 0
@@ -101,9 +104,11 @@ public class SmithingTransaction extends InventoryTransaction {
         Item air = Item.get(0);
         Item equipment = equipmentItem != null? equipmentItem : air;
         Item ingredient = ingredientItem != null? ingredientItem : air;
+        Item template = templateItem != null? templateItem : air;
 
         return equipment.equals(smithingInventory.getEquipment(), true, true)
                 && ingredient.equals(smithingInventory.getIngredient(), true, true)
+                && template.equals(smithingInventory.getTemplate(), true, true)
                 && outputItem.equals(smithingInventory.getResult(), true, true);
     }
 
@@ -118,7 +123,8 @@ public class SmithingTransaction extends InventoryTransaction {
         Item air = Item.get(0);
         Item equipment = equipmentItem != null? equipmentItem : air;
         Item ingredient = ingredientItem != null? ingredientItem : air;
-        SmithingTableEvent event = new SmithingTableEvent(inventory, equipment, outputItem, ingredient, source);
+        Item template = templateItem != null? templateItem : air;
+        SmithingTableEvent event = new SmithingTableEvent(inventory, equipment, outputItem, ingredient, templateItem, source);
         this.source.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
             this.source.removeAllWindows(false);

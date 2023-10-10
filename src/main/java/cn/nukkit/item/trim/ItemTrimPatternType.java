@@ -1,5 +1,8 @@
 package cn.nukkit.item.trim;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
 /**
  * @author glorydark
  * @date {2023/8/9} {18:23}
@@ -23,12 +26,23 @@ public enum ItemTrimPatternType {
     SILENCE_ARMOR_TRIM("silence"),
     WAYFINDER_ARMOR_TRIM("wayfinder");
 
+    @Nullable
+    public static ItemTrimMaterialType fromTrimPattern(@NotNull String trimPattern) {
+        for (ItemTrimMaterialType value : ItemTrimMaterialType.values()) {
+            if (value.getMaterialName().equals(trimPattern)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
     private final String trimPattern;
 
-    ItemTrimPatternType(String name) {
+    ItemTrimPatternType(@NotNull String name) {
         this.trimPattern = name;
     }
 
+    @NotNull
     public String getTrimPattern() {
         return trimPattern;
     }
