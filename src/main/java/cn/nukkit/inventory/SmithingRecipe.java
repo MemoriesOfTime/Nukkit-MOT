@@ -81,8 +81,10 @@ public class SmithingRecipe extends ShapelessRecipe {
     }
 
     public Item getFinalResult(Item equip, Item template) {
-        //TODO template
-        return this.getFinalResult(equip);
+        if (template.getId() == 0) { //We do not use the recipe check template for the time being
+            return this.getFinalResult(equip);
+        }
+        return Item.AIR_ITEM.clone();
     }
 
     public Item getFinalResult(Item equip) {
