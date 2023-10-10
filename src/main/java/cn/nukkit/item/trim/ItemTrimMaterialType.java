@@ -22,4 +22,7 @@ public enum ItemTrimMaterialType {
         this.materialName = input;
     }
 
+    public String getMaterialName() {
+        return materialName;
+    }
 }

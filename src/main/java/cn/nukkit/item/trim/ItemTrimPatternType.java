@@ -25,10 +25,11 @@ public enum ItemTrimPatternType {
 
     private final String trimPattern;
 
-    ItemTrimPatternType(String name)
-    {
+    ItemTrimPatternType(String name) {
         this.trimPattern = name;
     }
 
-
+    public String getTrimPattern() {
+        return trimPattern;
+    }
 }
