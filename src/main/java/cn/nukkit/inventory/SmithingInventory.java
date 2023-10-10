@@ -65,14 +65,7 @@ public class SmithingInventory extends FakeBlockUIComponent {
     }
 
     public void updateResult() {
-        Item result;
-        SmithingRecipe recipe = matchRecipe();
-        if (recipe == null) {
-            result = Item.get(0);
-        } else {
-            result = recipe.getFinalResult(getEquipment(), getTemplate());
-        }
-        setResult(result);
+        setResult(this.getResult());
     }
 
     private void setResult(Item result) {
@@ -80,9 +73,13 @@ public class SmithingInventory extends FakeBlockUIComponent {
     }
 
     public Item getResult() {
+        Item trimOutPutItem = this.getTrimOutPutItem();
+        if (!trimOutPutItem.isNull()) {
+            return trimOutPutItem;
+        }
         SmithingRecipe recipe = matchRecipe();
         if (recipe == null) {
-            return this.getTrimOutPutItem();
+            return Item.AIR_ITEM.clone();
         }
         return recipe.getFinalResult(getEquipment(), getTemplate());
     }
