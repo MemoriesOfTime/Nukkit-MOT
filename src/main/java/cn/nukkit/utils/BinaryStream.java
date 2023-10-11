@@ -1153,7 +1153,9 @@ public class BinaryStream {
 
         if (protocolId >= ProtocolInfo.v1_16_100) {
             RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
-            if (!item.hasMeta()) {
+            if (item instanceof StringItem) {
+                runtimeId = mapping.getNetworkId(item);
+            } else if (!item.hasMeta()) {
                 RuntimeEntry runtimeEntry = mapping.toRuntime(item.getId(), 0);
                 runtimeId = runtimeEntry.getRuntimeId();
                 damage = Short.MAX_VALUE;

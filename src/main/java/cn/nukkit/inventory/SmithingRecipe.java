@@ -19,6 +19,7 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.ToString;
 
 import java.util.ArrayList;
@@ -81,7 +82,7 @@ public class SmithingRecipe extends ShapelessRecipe {
     }
 
     public Item getFinalResult(Item equip, Item template) {
-        if (template.getId() == 0) { //We do not use the recipe check template for the time being
+        if (template.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL).equals("minecraft:netherite_upgrade_smithing_template")) { //We do not use the recipe check template for the time being
             return this.getFinalResult(equip);
         }
         return Item.AIR_ITEM.clone();
@@ -110,7 +111,7 @@ public class SmithingRecipe extends ShapelessRecipe {
 
     @Override
     public void registerToCraftingManager(CraftingManager manager) {
-        manager.registerSmithingRecipe(this);
+        manager.registerSmithingRecipe(ProtocolInfo.CURRENT_PROTOCOL, this);
     }
 
     @Override
