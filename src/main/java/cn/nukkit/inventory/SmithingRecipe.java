@@ -83,30 +83,31 @@ public class SmithingRecipe extends ShapelessRecipe {
 
     public Item getFinalResult(Item equip, Item template) {
         if (template.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL).equals("minecraft:netherite_upgrade_smithing_template")) { //We do not use the recipe check template for the time being
-            return this.getFinalResult(equip);
+            Item finalResult = getResult().clone();
+
+            if (equip.hasCompoundTag()) {
+                finalResult.setCompoundTag(equip.getCompoundTag());
+            }
+
+            int maxDurability = finalResult.getMaxDurability();
+            if (maxDurability <= 0 || equip.getMaxDurability() <= 0) {
+                return finalResult;
+            }
+
+            int damage = equip.getDamage();
+            if (damage <= 0) {
+                return finalResult;
+            }
+
+            finalResult.setDamage(Math.min(maxDurability, damage));
+            return finalResult;
         }
         return Item.AIR_ITEM.clone();
     }
 
+    @Deprecated
     public Item getFinalResult(Item equip) {
-        Item finalResult = getResult().clone();
-
-        if (equip.hasCompoundTag()) {
-            finalResult.setCompoundTag(equip.getCompoundTag());
-        }
-
-        int maxDurability = finalResult.getMaxDurability();
-        if (maxDurability <= 0 || equip.getMaxDurability() <= 0) {
-            return finalResult;
-        }
-
-        int damage = equip.getDamage();
-        if (damage <= 0) {
-            return finalResult;
-        }
-
-        finalResult.setDamage(Math.min(maxDurability, damage));
-        return finalResult;
+        return getFinalResult(equip, template);
     }
 
     @Override

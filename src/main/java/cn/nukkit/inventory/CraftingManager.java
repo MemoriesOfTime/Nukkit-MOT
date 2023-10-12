@@ -1010,6 +1010,20 @@ public class CraftingManager {
                 return recipe;
             }
 
+            int index = 0;
+            Item clone = null;
+            for (Item item : inputList) {
+                if (item.isTool() && item.getDamage() > 0) {
+                    clone = item.clone();
+                    clone.setDamage(0);
+                    break;
+                }
+                index++;
+            }
+            if (clone != null) {
+                inputList.set(index, clone);
+            }
+
             for (SmithingRecipe smithingRecipe : recipeMap.values()) {
                 if (smithingRecipe.matchItems(inputList)) {
                     return smithingRecipe;
