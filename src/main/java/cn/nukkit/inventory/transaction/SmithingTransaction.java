@@ -97,7 +97,7 @@ public class SmithingTransaction extends InventoryTransaction {
         }
         SmithingInventory smithingInventory = (SmithingInventory) inventory;
         if (outputItem == null || outputItem.isNull() ||
-                ((equipmentItem == null || equipmentItem.isNull()) && (ingredientItem == null || ingredientItem.isNull()))) {
+                ((equipmentItem == null || equipmentItem.isNull()) && (ingredientItem == null || ingredientItem.isNull()) && (templateItem == null || templateItem.isNull()))) {
             return false;
         }
 
