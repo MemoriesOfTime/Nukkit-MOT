@@ -369,6 +369,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[WARPED_DOOR] = ItemDoorWarped.class; //756
             list[WARPED_FUNGUS_ON_A_STICK] = ItemWarpedFungusOnAStick.class; //757
             list[RECORD_PIGSTEP] = ItemRecordPigstep.class; //759
+
+            list[AMETHYST_SHARD] = ItemAmethystShard.class; //771
             list[SPYGLASS] = ItemSpyglass.class; //772
             list[RECORD_OTHERSIDE] = ItemRecordOtherside.class; //773
 
@@ -384,6 +386,24 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             registerNamespacedIdItem(ItemRawIron.class);
             registerNamespacedIdItem(ItemRawGold.class);
             registerNamespacedIdItem(ItemRawCopper.class);
+            registerNamespacedIdItem(ItemCopperIngot.class);
+            registerNamespacedIdItem(ItemNetheriteUpgradeSmithingTemplate.class);
+            registerNamespacedIdItem(ItemSentryArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemDuneArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemCoastArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemWildArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemWardArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemEyeArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemVexArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemTideArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemSnoutArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemRibArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemSpireArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemSilenceArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemWayfinderArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemRaiserArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemShaperArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemHostArmorTrimSmithingTemplate.class);
         }
 
         initCreativeItems();

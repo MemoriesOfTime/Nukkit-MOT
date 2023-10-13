@@ -16,6 +16,11 @@
           "count": 1,
           "id": "minecraft:netherite_ingot",
           "auxValue": 32767
+        },
+        {
+          "type": "default",
+          "count": 1,
+          "id": "minecraft:netherite_upgrade_smithing_template"
         }
       ],
       "output": [
@@ -42,6 +47,11 @@
           "count": 1,
           "id": "minecraft:netherite_ingot",
           "auxValue": 32767
+        },
+        {
+          "type": "default",
+          "count": 1,
+          "id": "minecraft:netherite_upgrade_smithing_template"
         }
       ],
       "output": [
@@ -68,6 +78,11 @@
           "count": 1,
           "id": "minecraft:netherite_ingot",
           "auxValue": 32767
+        },
+        {
+          "type": "default",
+          "count": 1,
+          "id": "minecraft:netherite_upgrade_smithing_template"
         }
       ],
       "output": [
@@ -94,6 +109,11 @@
           "count": 1,
           "id": "minecraft:netherite_ingot",
           "auxValue": 32767
+        },
+        {
+          "type": "default",
+          "count": 1,
+          "id": "minecraft:netherite_upgrade_smithing_template"
         }
       ],
       "output": [
@@ -120,6 +140,11 @@
           "count": 1,
           "id": "minecraft:netherite_ingot",
           "auxValue": 32767
+        },
+        {
+          "type": "default",
+          "count": 1,
+          "id": "minecraft:netherite_upgrade_smithing_template"
         }
       ],
       "output": [
@@ -146,6 +171,11 @@
           "count": 1,
           "id": "minecraft:netherite_ingot",
           "auxValue": 32767
+        },
+        {
+          "type": "default",
+          "count": 1,
+          "id": "minecraft:netherite_upgrade_smithing_template"
         }
       ],
       "output": [
@@ -172,6 +202,11 @@
           "count": 1,
           "id": "minecraft:netherite_ingot",
           "auxValue": 32767
+        },
+        {
+          "type": "default",
+          "count": 1,
+          "id": "minecraft:netherite_upgrade_smithing_template"
         }
       ],
       "output": [
@@ -198,6 +233,11 @@
           "count": 1,
           "id": "minecraft:netherite_ingot",
           "auxValue": 32767
+        },
+        {
+          "type": "default",
+          "count": 1,
+          "id": "minecraft:netherite_upgrade_smithing_template"
         }
       ],
       "output": [
@@ -224,6 +264,11 @@
           "count": 1,
           "id": "minecraft:netherite_ingot",
           "auxValue": 32767
+        },
+        {
+          "type": "default",
+          "count": 1,
+          "id": "minecraft:netherite_upgrade_smithing_template"
         }
       ],
       "output": [

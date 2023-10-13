@@ -104,7 +104,7 @@ public class CraftingTransaction extends InventoryTransaction {
                 if (inventory instanceof SmithingInventory smithingInventory) {
                     addInventory(inventory);
                     SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
-                    if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment()), true, true)) {
+                    if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment(), smithingInventory.getTemplate()), true, true)) {
                         setTransactionRecipe(smithingRecipe);
                     }
                 }

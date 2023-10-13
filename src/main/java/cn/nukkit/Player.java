@@ -44,6 +44,7 @@ import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.food.Food;
+import cn.nukkit.item.trim.TrimFactory;
 import cn.nukkit.lang.LangCode;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
@@ -2719,6 +2720,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
             this.sendAllInventories();
             this.inventory.sendHeldItemIfNotAir(this);
+
+            // BDS sends armor trim templates and materials before the CraftingDataPacket
+            TrimDataPacket trimDataPacket = new TrimDataPacket();
+            trimDataPacket.getMaterials().addAll(TrimFactory.trimMaterials);
+            trimDataPacket.getPatterns().addAll(TrimFactory.trimPatterns);
+            this.dataPacket(trimDataPacket);
+
             this.server.sendRecipeList(this);
 
             if (this.isEnableClientCommand()) {
@@ -4037,13 +4045,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (!smithingInventory.getResult().isNull()) {
                             InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
                             fixedPacket.isRepairItemPart = true;
-                            fixedPacket.actions = new NetworkInventoryAction[6];
+                            fixedPacket.actions = new NetworkInventoryAction[8];
 
                             Item fromIngredient = smithingInventory.getIngredient().clone();
                             Item toIngredient = fromIngredient.decrement(1);
 
                             Item fromEquipment = smithingInventory.getEquipment().clone();
                             Item toEquipment = fromEquipment.decrement(1);
+
+                            Item fromTemplate = smithingInventory.getTemplate().clone();
+                            Item toTemplate = fromTemplate.decrement(1);
 
                             Item fromResult = Item.get(Item.AIR);
                             Item toResult = smithingInventory.getResult().clone();
@@ -4062,6 +4073,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             action.newItem = toEquipment.clone();
                             fixedPacket.actions[1] = action;
 
+
+                            action = new NetworkInventoryAction();
+                            action.windowId = ContainerIds.UI;
+                            action.inventorySlot = SmithingInventory.SMITHING_TEMPLATE_UI_SLOT;
+                            action.oldItem = fromTemplate.clone();
+                            action.newItem = toTemplate.clone();
+                            fixedPacket.actions[2] = action;
+
                             int emptyPlayerSlot = -1;
                             for (int slot = 0; slot < inventory.getSize(); slot++) {
                                 if (inventory.getItem(slot).isNull()) {
@@ -4078,7 +4097,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 action.inventorySlot = emptyPlayerSlot; // Cursor
                                 action.oldItem = Item.get(Item.AIR);
                                 action.newItem = toResult.clone();
-                                fixedPacket.actions[2] = action;
+                                fixedPacket.actions[3] = action;
 
                                 action = new NetworkInventoryAction();
                                 action.sourceType = NetworkInventoryAction.SOURCE_TODO;
@@ -4086,7 +4105,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 action.inventorySlot = 2; // result
                                 action.oldItem = toResult.clone();
                                 action.newItem = fromResult.clone();
-                                fixedPacket.actions[3] = action;
+                                fixedPacket.actions[4] = action;
 
                                 action = new NetworkInventoryAction();
                                 action.sourceType = NetworkInventoryAction.SOURCE_TODO;
@@ -4094,7 +4113,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 action.inventorySlot = 0; // equipment
                                 action.oldItem = toEquipment.clone();
                                 action.newItem = fromEquipment.clone();
-                                fixedPacket.actions[4] = action;
+                                fixedPacket.actions[5] = action;
 
                                 action = new NetworkInventoryAction();
                                 action.sourceType = NetworkInventoryAction.SOURCE_TODO;
@@ -4102,7 +4121,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 action.inventorySlot = 1; // material
                                 action.oldItem = toIngredient.clone();
                                 action.newItem = fromIngredient.clone();
-                                fixedPacket.actions[5] = action;
+                                fixedPacket.actions[6] = action;
+
+                                action = new NetworkInventoryAction();
+                                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL;
+                                action.inventorySlot = 3; // template
+                                action.oldItem = toTemplate.clone();
+                                action.newItem = fromTemplate.clone();
+                                fixedPacket.actions[7] = action;
 
                                 transactionPacket = fixedPacket;
                             }
