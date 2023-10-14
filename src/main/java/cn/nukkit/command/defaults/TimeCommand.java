@@ -51,7 +51,7 @@ public class TimeCommand extends VanillaCommand {
                 level.startTime();
                 level.checkTime();
             }
-            Command.broadcastCommandMessage(sender, "Restarted the time");
+            broadcastCommandMessage(sender, "Restarted the time");
             return true;
         } else if ("stop".equals(args[0])) {
             if (!sender.hasPermission("nukkit.command.time.stop")) {
@@ -64,9 +64,10 @@ public class TimeCommand extends VanillaCommand {
                 level.stopTime();
                 level.checkTime();
             }
-            Command.broadcastCommandMessage(sender, "Stopped the time");
+            broadcastCommandMessage(sender, "Stopped the time");
             return true;
-        } else if ("query".equals(args[0])) {
+        }
+        if ("query".equals(args[0])) {
             if (!sender.hasPermission("nukkit.command.time.query")) {
                 sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.permission"));
 
@@ -123,7 +124,7 @@ public class TimeCommand extends VanillaCommand {
                 level.setTime(value);
                 level.checkTime();
             }
-            Command.broadcastCommandMessage(sender, new TranslationContainer("commands.time.set", String.valueOf(value)));
+            broadcastCommandMessage(sender, new TranslationContainer("commands.time.set", String.valueOf(value)));
         } else if ("add".equals(args[0])) {
             if (!sender.hasPermission("nukkit.command.time.add")) {
                 sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.permission"));
@@ -144,7 +145,7 @@ public class TimeCommand extends VanillaCommand {
                 level.setTime(level.getTime() + value);
                 level.checkTime();
             }
-            Command.broadcastCommandMessage(sender, new TranslationContainer("commands.time.added", String.valueOf(value)));
+            broadcastCommandMessage(sender, new TranslationContainer("commands.time.added", String.valueOf(value)));
         } else {
             sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
         }

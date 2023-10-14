@@ -49,7 +49,7 @@ public class PardonIpCommand extends VanillaCommand {
                 return true;
             }
 
-            Command.broadcastCommandMessage(sender, new TranslationContainer("commands.unbanip.success", value));
+            broadcastCommandMessage(sender, new TranslationContainer("commands.unbanip.success", value));
         } else {
 
             sender.sendMessage(new TranslationContainer("commands.unbanip.invalid"));

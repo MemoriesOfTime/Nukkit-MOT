@@ -83,7 +83,7 @@ public class GiveCommand extends VanillaCommand {
             return true;
         }
 
-        Command.broadcastCommandMessage(sender, new TranslationContainer(
+        broadcastCommandMessage(sender, new TranslationContainer(
                 "%commands.give.success",
                 item.getName() + " (" + item.getId() + ':' + item.getDamage() + ')',
                 String.valueOf(item.getCount()),
