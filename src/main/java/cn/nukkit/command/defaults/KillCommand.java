@@ -60,7 +60,7 @@ public class KillCommand extends VanillaCommand {
                 }
                 player.setLastDamageCause(ev);
                 player.setHealth(0);
-                Command.broadcastCommandMessage(sender, new TranslationContainer("commands.kill.successful", player.getName()));
+                broadcastCommandMessage(sender, new TranslationContainer("commands.kill.successful", player.getName()));
             } else if (args[0].equals("@e")) {
                 StringJoiner joiner = new StringJoiner(", ");
                 for (Level level : Server.getInstance().getLevels().values()) {

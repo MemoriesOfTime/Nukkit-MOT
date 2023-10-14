@@ -22,7 +22,7 @@ public class SaveOnCommand extends VanillaCommand {
             return true;
         }
         sender.getServer().setAutoSave(true);
-        Command.broadcastCommandMessage(sender, new TranslationContainer("commands.save.enabled"));
+        broadcastCommandMessage(sender, new TranslationContainer("commands.save.enabled"));
         return true;
     }
 }

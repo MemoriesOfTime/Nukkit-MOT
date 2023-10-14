@@ -1,7 +1,6 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
@@ -73,7 +72,7 @@ public class EnchantCommand extends VanillaCommand {
         }
         item.addEnchantment(enchantment);
         player.getInventory().setItemInHand(item);
-        Command.broadcastCommandMessage(sender, new TranslationContainer("%commands.enchant.success"));
+        broadcastCommandMessage(sender, new TranslationContainer("%commands.enchant.success"));
         return true;
     }
 

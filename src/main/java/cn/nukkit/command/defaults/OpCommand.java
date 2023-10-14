@@ -44,7 +44,7 @@ public class OpCommand extends VanillaCommand {
         String name = args[0];
         IPlayer player = sender.getServer().getOfflinePlayer(name);
 
-        Command.broadcastCommandMessage(sender, new TranslationContainer("commands.op.success", player.getName()));
+        broadcastCommandMessage(sender, new TranslationContainer("commands.op.success", player.getName()));
         if (player instanceof Player) {
             ((Player) player).sendMessage(new TranslationContainer(TextFormat.GRAY + "%commands.op.message"));
         }
