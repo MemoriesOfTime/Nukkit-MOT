@@ -34,68 +34,69 @@ public class VersionCommand extends VanillaCommand {
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
         if (args.length == 0 || !sender.hasPermission("nukkit.command.version.plugins")) {
-            sender.sendMessage("§e#########################################\n§cNukkit§3-§dMOT\n§6Build: §b" + Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4) + "\n§6Multiversion: §bUp to version " + ProtocolInfo.MINECRAFT_VERSION_NETWORK + "\n§e#########################################");
+            final String branch = Nukkit.getBranch();
 
-            if (Nukkit.getBranch().equals("master") && sender.isOp()) {
+            sender.sendMessage("§e#########################################\n§cNukkit§3-§dMOT\n§6Build: §b" + branch + '/' + Nukkit.VERSION.substring(4) + "\n§6Multiversion: §bUp to version " + ProtocolInfo.MINECRAFT_VERSION_NETWORK + "\n§e#########################################");
+
+            if (sender.isOp()) {
+                if (!branch.equals("master") || Nukkit.VERSION.equals("git-null")) {
+                    sender.sendMessage("§c[Nukkit-MOT] §aYou are using a development build, consider updating");
+                    return true;
+                }
+
                 CompletableFuture.runAsync(() -> {
                     try {
-                        String version = sender.getServer().getNukkitVersion();
-
-                        if (version.equals("git-null")) {
-                            sender.sendMessage("§c[Nukkit-MOT] §aYou are using a development build, consider updating");
-                            return;
-                        }
-
                         URLConnection request = new URL(Nukkit.BRANCH).openConnection();
                         request.connect();
                         InputStreamReader content = new InputStreamReader((InputStream) request.getContent());
                         String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
                         content.close();
 
-                        if (version.equals(latest)) {
+                        if (Nukkit.VERSION.equals(latest)) {
                             sender.sendMessage("§c[Nukkit-MOT] §aYou are running the latest version.");
                         } else {
-                            sender.sendMessage("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + version + ", latest: " + latest);
+                            sender.sendMessage("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + Nukkit.VERSION + ", latest: " + latest);
                         }
                     } catch (Exception ignore) {
                     }
                 });
             }
+            return true;
+        }
+
+        final String pluginName = String.join(" ", args);
+        Plugin exactPlugin = sender.getServer().getPluginManager().getPlugin(pluginName);
+        boolean found = false;
+
+        if (exactPlugin == null) {
+            final String lowerName = pluginName.toLowerCase();
+            for (Plugin p : sender.getServer().getPluginManager().getPlugins().values()) {
+                if (p.getName().toLowerCase().contains(lowerName)) {
+                    exactPlugin = p;
+                    found = true;
+                }
+            }
         } else {
-            final String pluginName = String.join(" ", args);
-            Plugin exactPlugin = sender.getServer().getPluginManager().getPlugin(pluginName);
-            boolean found = false;
+            found = true;
+        }
 
-            if (exactPlugin == null) {
-                final String lowerName = pluginName.toLowerCase();
-                for (Plugin p : sender.getServer().getPluginManager().getPlugins().values()) {
-                    if (p.getName().toLowerCase().contains(lowerName)) {
-                        exactPlugin = p;
-                        found = true;
-                    }
-                }
-            } else {
-                found = true;
+        if (found) {
+            PluginDescription desc = exactPlugin.getDescription();
+            sender.sendMessage(TextFormat.DARK_GREEN + desc.getName() + TextFormat.WHITE + " version " + TextFormat.DARK_GREEN + desc.getVersion());
+            if (desc.getDescription() != null) {
+                sender.sendMessage(desc.getDescription());
             }
-
-            if (found) {
-                PluginDescription desc = exactPlugin.getDescription();
-                sender.sendMessage(TextFormat.DARK_GREEN + desc.getName() + TextFormat.WHITE + " version " + TextFormat.DARK_GREEN + desc.getVersion());
-                if (desc.getDescription() != null) {
-                    sender.sendMessage(desc.getDescription());
-                }
-                if (desc.getWebsite() != null) {
-                    sender.sendMessage("Website: " + desc.getWebsite());
-                }
-                List<String> authors = desc.getAuthors();
-                if (authors.size() == 1) {
-                    sender.sendMessage("Author: " + authors.get(0));
-                } else if (authors.size() >= 2) {
-                    sender.sendMessage("Authors: " + String.join(", ", authors));
-                }
-            } else {
-                sender.sendMessage(new TranslationContainer("nukkit.command.version.noSuchPlugin"));
+            if (desc.getWebsite() != null) {
+                sender.sendMessage("Website: " + desc.getWebsite());
             }
+            List<String> authors = desc.getAuthors();
+            if (authors.size() == 1) {
+                sender.sendMessage("Author: " + authors.get(0));
+            } else if (authors.size() >= 2) {
+                sender.sendMessage("Authors: " + String.join(", ", authors));
+            }
+        } else {
+            sender.sendMessage(new TranslationContainer("nukkit.command.version.noSuchPlugin"));
         }
         return true;
     }
