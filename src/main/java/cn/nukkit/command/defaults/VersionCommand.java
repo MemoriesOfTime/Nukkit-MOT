@@ -42,7 +42,7 @@ public class VersionCommand extends VanillaCommand {
                         String version = sender.getServer().getNukkitVersion();
 
                         if (version.equals("git-null")) {
-                            sender.sendMessage("§c[Nukkit-MOT] §aYou are running the dev build.");
+                            sender.sendMessage("§c[Nukkit-MOT] §aYou are using a development build, consider updating");
                             return;
                         }
 
