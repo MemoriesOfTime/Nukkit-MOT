@@ -52,7 +52,7 @@ public class BanIpCommand extends VanillaCommand {
             reason.append(args[i]).append(' ');
         }
 
-        if (reason.length() > 0) {
+        if (!reason.isEmpty()) {
             reason = new StringBuilder(reason.substring(0, reason.length() - 1));
         }
 
@@ -96,7 +96,7 @@ public class BanIpCommand extends VanillaCommand {
     private static void processIPBan(String ip, CommandSender sender, String reason) {
         sender.getServer().getIPBans().addBan(ip, reason, null, sender.getName());
 
-        for (Player player : /*new ArrayList<>(*/sender.getServer().getOnlinePlayers().values()/*)*/) {
+        for (Player player : sender.getServer().getOnlinePlayers().values()) {
             if (player.getAddress().equals(ip)) {
                 player.kick(PlayerKickEvent.Reason.IP_BANNED, !reason.isEmpty() ? reason : "IP banned", true, "source=" + sender.getName() + ", reason=" + reason);
             }
