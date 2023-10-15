@@ -18,8 +18,14 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 3. Download the .jar file from the links below
 4. Write a command to run: `java -jar file.jar` (change `file` to the name of the file you downloaded)
 
-## Creating Plugins
-1. Add our Maven repository
+## Links
+- __🌐 Download: [Jenkins](https://ci.lanink.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
+- __💬 [Discord](https://discord.gg/pJjQDQC)__
+- __🔌 [Nukkit Plugins](https://cloudburstmc.org/resources/categories/nukkit-plugins.1/)__
+- __🐞 [Report a Bug](https://github.com/MemoriesOfTime/Nukkit-MOT/issues/new/choose)__
+
+## Maven
+#### Repository:
 ```xml
 <repositories>
     <repository>
@@ -29,7 +35,7 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 </repositories>
 ```
 
-2. Add Nukkit-MOT to your dependencies
+#### Dependencies:
 ```xml
 <dependencies>
     <dependency>
@@ -40,14 +46,6 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
     </dependency>
 </dependencies>
 ```
-
-* __[Click here to see an example plugin for Nukkit](https://github.com/Nukkit/ExamplePlugin)__
-
-## Links
-- __🌐 Download: [Jenkins](https://ci.lanink.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
-- __💬 [Discord](https://discord.gg/pJjQDQC)__
-- __🔌 [Nukkit Plugins](https://cloudburstmc.org/resources/categories/nukkit-plugins.1/)__
-- __🐞 [Report a Bug](https://github.com/MemoriesOfTime/Nukkit-MOT/issues/new/choose)__
 
 ## Credits
 [Nukkit](https://github.com/CloudburstMC/Nukkit)  
