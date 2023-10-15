@@ -14,7 +14,7 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 3. Support for the nether world and The Еnd
 4. Generation of dungeons and caves
 5. Support for vanilla commands
-
+https://repo.lanink.cn/repository/maven-public/
 ### How to use?
 1. Install java 17 or higher
 3. Download the .jar file from the links below
@@ -25,6 +25,7 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 - __💬 [Discord](https://discord.gg/pJjQDQC)__
 - __🔌 [Nukkit Plugins](https://cloudburstmc.org/resources/categories/nukkit-plugins.1/)__
 - __🐞 [Report a bug](https://github.com/MemoriesOfTime/Nukkit-MOT/issues/new/choose)__
+- __👩🏽‍💻 [Maven Repository](https://repo.lanink.cn/repository/maven-public/)__
 
 ### License
 This project is based on [Nukkit](https://github.com/CloudburstMC/Nukkit), so you should abide by [Nukkit](https://github.com/CloudburstMC/Nukkit)'s License
