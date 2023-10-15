@@ -14,7 +14,6 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 3. Support for the nether world and The Еnd
 4. Generation of dungeons and caves
 5. Support for vanilla commands
-8. Support custom blocks, items and entities
 
 ### How to use?
 1. Install java 17 or higher
@@ -25,6 +24,7 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 - __🌐 Download: [Jenkins](https://ci.lanink.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
 - __💬 [Discord](https://discord.gg/pJjQDQC)__
 - __🔌 [Nukkit Plugins](https://cloudburstmc.org/resources/categories/nukkit-plugins.1/)__
+- __🐞 [Report a bug](https://github.com/MemoriesOfTime/Nukkit-MOT/issues/new/choose)__
 
 ### License
 This project is based on [Nukkit](https://github.com/CloudburstMC/Nukkit), so you should abide by [Nukkit](https://github.com/CloudburstMC/Nukkit)'s License
