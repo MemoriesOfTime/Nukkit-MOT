@@ -4350,14 +4350,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                         switch (type) {
                             case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK:
+                                boolean spamming = !server.doNotLimitInteractions
+                                        && lastRightClickPos != null
+                                        && System.currentTimeMillis() - lastRightClickTime < 100.0
+                                        && blockVector.distanceSquared(lastRightClickPos) < 0.00001;
+
                                 lastRightClickPos = blockVector.asVector3();
                                 lastRightClickTime = System.currentTimeMillis();
 
                                 // Hack: Fix client spamming right clicks
-                                if (!server.doNotLimitInteractions && (lastRightClickPos != null
-                                        && this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR
-                                        && System.currentTimeMillis() - lastRightClickTime < 100.0
-                                        && blockVector.distanceSquared(lastRightClickPos) < 0.00001)) {
+                                if (spamming && this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR) {
                                     return;
                                 }
 
