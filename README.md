@@ -24,7 +24,7 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 - __🌐 Download: [Jenkins](https://ci.lanink.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
 - __💬 [Discord](https://discord.gg/pJjQDQC)__
 - __🔌 [Nukkit Plugins](https://cloudburstmc.org/resources/categories/nukkit-plugins.1/)__
-- __🐞 [Report a bug](https://github.com/MemoriesOfTime/Nukkit-MOT/issues/new/choose)__
+- __🐞 [Report a Bug](https://github.com/MemoriesOfTime/Nukkit-MOT/issues/new/choose)__
 - __👩🏽‍💻 [Maven Repository](https://repo.lanink.cn/repository/maven-public/)__
 
 ### License
