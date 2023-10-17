@@ -4384,10 +4384,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                             }
                                             break packetswitch;
                                         }
+                                    } else {
+                                        inventory.sendHeldItem(this);
                                     }
                                 }
-
-                                inventory.sendHeldItem(this);
 
                                 if (blockVector.distanceSquared(this) > 10000) {
                                     break packetswitch;
