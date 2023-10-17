@@ -52,17 +52,17 @@ public class WhitelistCommand extends VanillaCommand {
             switch (args[0].toLowerCase()) {
                 case "reload":
                     sender.getServer().reloadWhitelist();
-                    Command.broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.reloaded"));
+                    broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.reloaded"));
                     return true;
                 case "on":
                     sender.getServer().setPropertyBoolean("white-list", true);
                     sender.getServer().whitelistEnabled = true;
-                    Command.broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.enabled"));
+                    broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.enabled"));
                     return true;
                 case "off":
                     sender.getServer().setPropertyBoolean("white-list", false);
                     sender.getServer().whitelistEnabled = false;
-                    Command.broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.disabled"));
+                    broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.disabled"));
                     return true;
                 case "list":
                     StringBuilder result = new StringBuilder();
@@ -91,12 +91,12 @@ public class WhitelistCommand extends VanillaCommand {
             switch (args[0].toLowerCase()) {
                 case "add":
                     sender.getServer().getOfflinePlayer(args[1]).setWhitelisted(true);
-                    Command.broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.add.success", args[1]));
+                    broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.add.success", args[1]));
 
                     return true;
                 case "remove":
                     sender.getServer().getOfflinePlayer(args[1]).setWhitelisted(false);
-                    Command.broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.remove.success", args[1]));
+                    broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.remove.success", args[1]));
 
                     return true;
             }

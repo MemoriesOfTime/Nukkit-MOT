@@ -2,6 +2,7 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.ToString;
 
 import java.util.ArrayList;
@@ -15,6 +16,8 @@ import java.util.List;
  */
 @ToString
 public class SmithingRecipe extends ShapelessRecipe {
+
+    private final Item template;
     private final Item equipment;
     private final Item ingredient;
     private final Item result;
@@ -25,12 +28,17 @@ public class SmithingRecipe extends ShapelessRecipe {
         super(recipeId, priority, result, ingredients);
         this.equipment = (Item) ingredients.toArray()[0];
         this.ingredient = (Item) ingredients.toArray()[1];
+        if (ingredients.size() >= 3) {
+            this.template = (Item) ingredients.toArray()[2];
+        } else {
+            this.template = Item.AIR_ITEM.clone();
+        }
         this.result = result;
 
-        ArrayList<Item> aggregation = new ArrayList<>(2);
+        ArrayList<Item> aggregation = new ArrayList<>(3);
 
-        for (Item item : new Item[]{equipment, ingredient}) {
-            if (item.getCount() < 1) {
+        for (Item item : new Item[]{equipment, ingredient, template}) {
+            if (item.getId() != 0 && item.getCount() < 1) {
                 throw new IllegalArgumentException("Recipe Ingredient amount was not 1 (value: " + item.getCount() + ")");
             }
             boolean found = false;
@@ -56,35 +64,47 @@ public class SmithingRecipe extends ShapelessRecipe {
         return result;
     }
 
+    public Item getFinalResult(Item equip, Item template) {
+        if (template.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL).equals("minecraft:netherite_upgrade_smithing_template")) { //We do not use the recipe check template for the time being
+            Item finalResult = getResult().clone();
+
+            if (equip.hasCompoundTag()) {
+                finalResult.setCompoundTag(equip.getCompoundTag());
+            }
+
+            int maxDurability = finalResult.getMaxDurability();
+            if (maxDurability <= 0 || equip.getMaxDurability() <= 0) {
+                return finalResult;
+            }
+
+            int damage = equip.getDamage();
+            if (damage <= 0) {
+                return finalResult;
+            }
+
+            finalResult.setDamage(Math.min(maxDurability, damage));
+            return finalResult;
+        }
+        return Item.AIR_ITEM.clone();
+    }
+
+    @Deprecated
     public Item getFinalResult(Item equip) {
-        Item finalResult = getResult().clone();
-
-        if (equip.hasCompoundTag()) {
-            finalResult.setCompoundTag(equip.getCompoundTag());
-        }
-
-        int maxDurability = finalResult.getMaxDurability();
-        if (maxDurability <= 0 || equip.getMaxDurability() <= 0) {
-            return finalResult;
-        }
-
-        int damage = equip.getDamage();
-        if (damage <= 0) {
-            return finalResult;
-        }
-
-        finalResult.setDamage(Math.min(maxDurability, damage));
-        return finalResult;
+        return getFinalResult(equip, template);
     }
 
     @Override
     public void registerToCraftingManager(CraftingManager manager) {
-        manager.registerSmithingRecipe(this);
+        manager.registerSmithingRecipe(ProtocolInfo.CURRENT_PROTOCOL, this);
     }
 
     @Override
     public RecipeType getType() {
         return RecipeType.SMITHING_TRANSFORM;
+    }
+
+    public Item getTemplate() {
+        return template;
     }
 
     public Item getEquipment() {

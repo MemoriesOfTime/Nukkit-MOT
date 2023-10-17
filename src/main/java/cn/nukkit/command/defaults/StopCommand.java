@@ -29,7 +29,7 @@ public class StopCommand extends VanillaCommand {
             return true;
         }
 
-        Command.broadcastCommandMessage(sender, new TranslationContainer("commands.stop.start"));
+        broadcastCommandMessage(sender, new TranslationContainer("commands.stop.start"));
 
         sender.getServer().shutdown();
 

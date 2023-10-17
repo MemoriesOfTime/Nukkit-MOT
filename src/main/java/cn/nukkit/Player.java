@@ -42,11 +42,9 @@ import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
-import cn.nukkit.item.customitem.ItemCustom;
-import cn.nukkit.item.customitem.ItemCustomArmor;
-import cn.nukkit.item.customitem.ItemCustomTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.food.Food;
+import cn.nukkit.item.trim.TrimFactory;
 import cn.nukkit.lang.LangCode;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
@@ -1419,10 +1417,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean awardAchievement(String achievementId) {
-        if (!Server.getInstance().achievementsEnabled) {
-            return false;
-        }
-
         Achievement achievement = Achievement.achievements.get(achievementId);
 
         if (achievement == null || hasAchievement(achievementId)) {
@@ -2673,30 +2667,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                         }
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
-                        if (this.server.enableExperimentMode) {
-                            ArrayList<Integer> customItems = RuntimeItems.getMapping(this.protocol).getCustomItems();
-
-                            if (!customItems.isEmpty()) {
-                                itemComponentPacket.entries = new ItemComponentPacket.Entry[customItems.size()];
-
-                                int i = 0;
-                                for (Integer id : customItems) {
-                                    Item item = Item.get(id);
-                                    if (!(item instanceof ItemCustom)) {
-                                        continue;
-                                    }
-
-                                    ItemCustom itemCustom = (ItemCustom) item;
-                                    CompoundTag data = itemCustom.getComponentsData(this.protocol);
+                        if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
+                            Int2ObjectOpenHashMap<ItemComponentPacket.Entry> entries = new Int2ObjectOpenHashMap<>();
+                            int i = 0;
+                            for (var entry : Item.getCustomItemDefinition().entrySet()) {
+                                try {
+                                    CompoundTag data = entry.getValue().getNbt(this.protocol);
                                     data.putShort("minecraft:identifier", i);
-
-                                    itemComponentPacket.entries[i] = new ItemComponentPacket.Entry(("customitem:" + item.getName()).toLowerCase(), data);
-
+                                    entries.put(i, new ItemComponentPacket.Entry(entry.getKey(), data));
                                     i++;
+                                } catch (Exception e) {
+                                    log.error("ItemComponentPacket encoding error", e);
                                 }
-
-                                this.dataPacket(itemComponentPacket);
                             }
+                            itemComponentPacket.setEntries(entries.values().toArray(ItemComponentPacket.Entry.EMPTY_ARRAY));
                         }
                         this.dataPacket(itemComponentPacket);
                     }
@@ -2736,6 +2720,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
             this.sendAllInventories();
             this.inventory.sendHeldItemIfNotAir(this);
+
+            // BDS sends armor trim templates and materials before the CraftingDataPacket
+            TrimDataPacket trimDataPacket = new TrimDataPacket();
+            trimDataPacket.getMaterials().addAll(TrimFactory.trimMaterials);
+            trimDataPacket.getPatterns().addAll(TrimFactory.trimPatterns);
+            this.dataPacket(trimDataPacket);
+
             this.server.sendRecipeList(this);
 
             if (this.isEnableClientCommand()) {
@@ -4054,13 +4045,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         if (!smithingInventory.getResult().isNull()) {
                             InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
                             fixedPacket.isRepairItemPart = true;
-                            fixedPacket.actions = new NetworkInventoryAction[6];
+                            fixedPacket.actions = new NetworkInventoryAction[8];
 
                             Item fromIngredient = smithingInventory.getIngredient().clone();
                             Item toIngredient = fromIngredient.decrement(1);
 
                             Item fromEquipment = smithingInventory.getEquipment().clone();
                             Item toEquipment = fromEquipment.decrement(1);
+
+                            Item fromTemplate = smithingInventory.getTemplate().clone();
+                            Item toTemplate = fromTemplate.decrement(1);
 
                             Item fromResult = Item.get(Item.AIR);
                             Item toResult = smithingInventory.getResult().clone();
@@ -4079,6 +4073,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             action.newItem = toEquipment.clone();
                             fixedPacket.actions[1] = action;
 
+
+                            action = new NetworkInventoryAction();
+                            action.windowId = ContainerIds.UI;
+                            action.inventorySlot = SmithingInventory.SMITHING_TEMPLATE_UI_SLOT;
+                            action.oldItem = fromTemplate.clone();
+                            action.newItem = toTemplate.clone();
+                            fixedPacket.actions[2] = action;
+
                             int emptyPlayerSlot = -1;
                             for (int slot = 0; slot < inventory.getSize(); slot++) {
                                 if (inventory.getItem(slot).isNull()) {
@@ -4095,7 +4097,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 action.inventorySlot = emptyPlayerSlot; // Cursor
                                 action.oldItem = Item.get(Item.AIR);
                                 action.newItem = toResult.clone();
-                                fixedPacket.actions[2] = action;
+                                fixedPacket.actions[3] = action;
 
                                 action = new NetworkInventoryAction();
                                 action.sourceType = NetworkInventoryAction.SOURCE_TODO;
@@ -4103,7 +4105,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 action.inventorySlot = 2; // result
                                 action.oldItem = toResult.clone();
                                 action.newItem = fromResult.clone();
-                                fixedPacket.actions[3] = action;
+                                fixedPacket.actions[4] = action;
 
                                 action = new NetworkInventoryAction();
                                 action.sourceType = NetworkInventoryAction.SOURCE_TODO;
@@ -4111,7 +4113,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 action.inventorySlot = 0; // equipment
                                 action.oldItem = toEquipment.clone();
                                 action.newItem = fromEquipment.clone();
-                                fixedPacket.actions[4] = action;
+                                fixedPacket.actions[5] = action;
 
                                 action = new NetworkInventoryAction();
                                 action.sourceType = NetworkInventoryAction.SOURCE_TODO;
@@ -4119,7 +4121,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 action.inventorySlot = 1; // material
                                 action.oldItem = toIngredient.clone();
                                 action.newItem = fromIngredient.clone();
-                                fixedPacket.actions[5] = action;
+                                fixedPacket.actions[6] = action;
+
+                                action = new NetworkInventoryAction();
+                                action.sourceType = NetworkInventoryAction.SOURCE_TODO;
+                                action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL;
+                                action.inventorySlot = 3; // template
+                                action.oldItem = toTemplate.clone();
+                                action.newItem = fromTemplate.clone();
+                                fixedPacket.actions[7] = action;
 
                                 transactionPacket = fixedPacket;
                             }
@@ -4340,13 +4350,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                         switch (type) {
                             case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK:
-                                // Hack: Fix client spamming right clicks
-                                if (!server.doNotLimitInteractions && (lastRightClickPos != null && this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR && System.currentTimeMillis() - lastRightClickTime < 200.0 && blockVector.distanceSquared(lastRightClickPos) < 0.00001)) {
-                                    return;
-                                }
+                                boolean spamming = !server.doNotLimitInteractions
+                                        && lastRightClickPos != null
+                                        && System.currentTimeMillis() - lastRightClickTime < 100.0
+                                        && blockVector.distanceSquared(lastRightClickPos) < 0.00001;
 
                                 lastRightClickPos = blockVector.asVector3();
                                 lastRightClickTime = System.currentTimeMillis();
+
+                                // Hack: Fix client spamming right clicks
+                                if (spamming && this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR) {
+                                    return;
+                                }
 
                                 this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
 
@@ -4369,10 +4384,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                             }
                                             break packetswitch;
                                         }
+                                    } else {
+                                        inventory.sendHeldItem(this);
                                     }
                                 }
-
-                                inventory.sendHeldItem(this);
 
                                 if (blockVector.distanceSquared(this) > 10000) {
                                     break packetswitch;
@@ -6796,7 +6811,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
                 entity.close();
                 return true;
-            } else if (entity instanceof EntityThrownTrident) {
+            }
+            if (entity instanceof EntityThrownTrident) {
                 // Check Trident is returning to shooter
                 if (!((EntityThrownTrident) entity).hadCollision) {
                     if (entity.isNoClip()) {
@@ -6844,7 +6860,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
                 entity.close();
                 return true;
-            } else if (entity instanceof EntityItem) {
+            }
+            if (entity instanceof EntityItem) {
                 if (((EntityItem) entity).getPickupDelay() <= 0) {
                     Item item = ((EntityItem) entity).getItem();
 
@@ -6859,14 +6876,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             return false;
                         }
 
-                        switch (item.getId()) {
-                            case Item.WOOD:
-                            case Item.WOOD2:
-                                this.awardAchievement("mineWood");
-                                break;
-                            case Item.DIAMOND:
-                                this.awardAchievement("diamond");
-                                break;
+                        if (server.achievementsEnabled) {
+                            switch (item.getId()) {
+                                case Item.WOOD, Item.WOOD2 -> this.awardAchievement("mineWood");
+                                case Item.DIAMOND -> this.awardAchievement("diamond");
+                            }
                         }
 
                         TakeItemEntityPacket pk = new TakeItemEntityPacket();
@@ -6883,8 +6897,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        if (pickedXPOrb < server.getTick() && entity instanceof EntityXPOrb && this.boundingBox.isVectorInside(entity)) {
-            EntityXPOrb xpOrb = (EntityXPOrb) entity;
+        if (pickedXPOrb < server.getTick() && entity instanceof EntityXPOrb xpOrb && this.boundingBox.isVectorInside(entity)) {
             if (xpOrb.getPickupDelay() <= 0) {
                 int exp = xpOrb.getExp();
                 entity.close();
@@ -6903,8 +6916,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (!itemsWithMending.isEmpty()) {
                     int itemToRepair = itemsWithMending.get(Utils.random.nextInt(itemsWithMending.size()));
                     Item toRepair = inventory.getItem(itemToRepair);
-                    if (toRepair instanceof ItemTool || toRepair instanceof ItemArmor ||
-                            toRepair instanceof ItemCustomTool || toRepair instanceof ItemCustomArmor) {
+                    if (toRepair instanceof ItemTool || toRepair instanceof ItemArmor) {
                         if (toRepair.getDamage() > 0) {
                             int dmg = toRepair.getDamage() - 2;
                             if (dmg < 0) {

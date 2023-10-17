@@ -1116,10 +1116,14 @@ public abstract class Entity extends Location implements Metadatable {
     @Nullable
     public static Identifier getIdentifier(int networkID) {
         String str = getEntityRuntimeMapping().get(networkID);
-        if (str == null) {
-            return null;
+        if (str != null) {
+            return new Identifier(str);
         }
-        return new Identifier(str);
+        EntityDefinition definition = EntityManager.get().getDefinition(networkID);
+        if (definition != null) {
+            return new Identifier(definition.getIdentifier());
+        }
+        return null;
     }
 
     public static CompoundTag getDefaultNBT(Vector3 pos) {

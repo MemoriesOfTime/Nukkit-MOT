@@ -52,7 +52,7 @@ public class ClearCommand extends VanillaCommand {
                     }
                 }
 
-                item = Item.fromString(id + ":" + meta);
+                item = Item.fromString(id + ':' + meta);
             }
         } else if (sender.isPlayer()) {
             target = (Player) sender;

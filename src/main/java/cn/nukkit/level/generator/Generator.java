@@ -109,6 +109,8 @@ public abstract class Generator implements BlockID {
 
     public abstract void init(ChunkManager level, NukkitRandom random);
 
+    public abstract void populateStructure(final int chunkX, final int chunkZ);
+
     public abstract void generateChunk(int chunkX, int chunkZ);
 
     public abstract void populateChunk(int chunkX, int chunkZ);

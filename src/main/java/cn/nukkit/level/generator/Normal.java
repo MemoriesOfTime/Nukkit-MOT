@@ -1,5 +1,6 @@
 package cn.nukkit.level.generator;
 
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockStone;
@@ -16,6 +17,7 @@ import cn.nukkit.level.generator.populator.impl.PopulatorGroundCover;
 import cn.nukkit.level.generator.populator.impl.PopulatorOre;
 import cn.nukkit.level.generator.populator.overworld.*;
 import cn.nukkit.level.generator.populator.type.Populator;
+import cn.nukkit.level.generator.task.ChunkPopulationTask;
 import cn.nukkit.math.MathHelper;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
@@ -46,8 +48,41 @@ public class Normal extends Generator {
         }
     }
 
-    private List<Populator> populators = Collections.emptyList();
-    private List<Populator> generationPopulators = Collections.emptyList();
+    private List<Populator> generationPopulators = ImmutableList.of(
+        new PopulatorBedrock(),
+        new PopulatorGroundCover()
+    );
+    private List<Populator> populators = ImmutableList.of(
+        new PopulatorOre(STONE, new OreType[]{
+            new OreType(Block.get(BlockID.COAL_ORE), 20, 17, 0, 128),
+            new OreType(Block.get(BlockID.IRON_ORE), 20, 9, 0, 64),
+            new OreType(Block.get(BlockID.REDSTONE_ORE), 8, 8, 0, 16),
+            new OreType(Block.get(BlockID.LAPIS_ORE), 1, 7, 0, 30),
+            new OreType(Block.get(BlockID.GOLD_ORE), 2, 9, 0, 32),
+            new OreType(Block.get(BlockID.DIAMOND_ORE), 1, 8, 0, 16),
+            new OreType(Block.get(BlockID.DIRT), 10, 33, 0, 128),
+            new OreType(Block.get(BlockID.GRAVEL), 8, 33, 0, 128),
+            new OreType(Block.get(BlockID.STONE, BlockStone.GRANITE), 10, 33, 0, 80),
+            new OreType(Block.get(BlockID.STONE, BlockStone.DIORITE), 10, 33, 0, 80),
+            new OreType(Block.get(BlockID.STONE, BlockStone.ANDESITE), 10, 33, 0, 80)
+        }),
+        new PopulatorCaves()
+    );
+    private List<Populator> structurePopulators = ImmutableList.of(
+        new PopulatorFossil(),
+        new PopulatorShipwreck(),
+        new PopulatorSwampHut(),
+        new PopulatorDesertPyramid(),
+        new PopulatorJungleTemple(),
+        new PopulatorIgloo(),
+        new PopulatorPillagerOutpost(),
+        new PopulatorOceanRuin(),
+        new PopulatorVillage(),
+        new PopulatorStronghold(),
+        new PopulatorMineshaft(),
+        new PopulatorDesertWell(),
+        new PopulatorDungeon()
+    );
     public static final int seaHeight = 64; // should be 62
     public NoiseGeneratorOctavesF scaleNoise;
     public NoiseGeneratorOctavesF depthNoise;
@@ -112,42 +147,14 @@ public class Normal extends Generator {
         this.mainPerlinNoise = new NoiseGeneratorOctavesF(random, 8);
         this.scaleNoise = new NoiseGeneratorOctavesF(random, 10);
         this.depthNoise = new NoiseGeneratorOctavesF(random, 16);
+    }
 
-        //this should run before all other populators so that we don't do things like generate ground cover on bedrock or something
-        this.generationPopulators = ImmutableList.of(
-            new PopulatorBedrock(),
-            new PopulatorGroundCover()
-        );
-
-        this.populators = ImmutableList.of(
-            new PopulatorOre(STONE, new OreType[]{
-                new OreType(Block.get(BlockID.COAL_ORE), 20, 17, 0, 128),
-                new OreType(Block.get(BlockID.IRON_ORE), 20, 9, 0, 64),
-                new OreType(Block.get(BlockID.REDSTONE_ORE), 8, 8, 0, 16),
-                new OreType(Block.get(BlockID.LAPIS_ORE), 1, 7, 0, 30),
-                new OreType(Block.get(BlockID.GOLD_ORE), 2, 9, 0, 32),
-                new OreType(Block.get(BlockID.DIAMOND_ORE), 1, 8, 0, 16),
-                new OreType(Block.get(BlockID.DIRT), 10, 33, 0, 128),
-                new OreType(Block.get(BlockID.GRAVEL), 8, 33, 0, 128),
-                new OreType(Block.get(BlockID.STONE, BlockStone.GRANITE), 10, 33, 0, 80),
-                new OreType(Block.get(BlockID.STONE, BlockStone.DIORITE), 10, 33, 0, 80),
-                new OreType(Block.get(BlockID.STONE, BlockStone.ANDESITE), 10, 33, 0, 80)
-            }),
-            new PopulatorCaves(),
-            new PopulatorFossil(),
-            new PopulatorShipwreck(),
-            new PopulatorSwampHut(),
-            new PopulatorDesertPyramid(),
-            new PopulatorJungleTemple(),
-            new PopulatorIgloo(),
-            new PopulatorPillagerOutpost(),
-            new PopulatorOceanRuin(),
-            new PopulatorVillage(),
-            new PopulatorStronghold(),
-            new PopulatorMineshaft(),
-            new PopulatorDesertWell(),
-            new PopulatorDungeon()
-        );
+    @Override
+    public void populateStructure(final int chunkX, final int chunkZ) {
+        final BaseFullChunk chunk = level.getChunk(chunkX, chunkZ);
+        for (final Populator populator : structurePopulators) {
+            Server.getInstance().computeThreadPool.submit(new ChunkPopulationTask(level, chunk, populator));
+        }
     }
 
     @Override

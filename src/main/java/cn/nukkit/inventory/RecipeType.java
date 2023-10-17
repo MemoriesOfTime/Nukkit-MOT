@@ -13,6 +13,10 @@ public enum RecipeType {
     SHAPELESS_CHEMISTRY(6),
     SHAPED_CHEMISTRY(7),
     SMITHING_TRANSFORM(8),
+    /**
+     * @since v582
+     */
+    SMITHING_TRIM(9),
     REPAIR(-1),
     CAMPFIRE(2),
     CAMPFIRE_DATA(3);
@@ -24,9 +28,10 @@ public enum RecipeType {
     }
 
     public int getNetworkType(int protocol) {
-        if (this == SMITHING_TRANSFORM) {
-            return protocol >= ProtocolInfo.v1_19_60 ? networkType : 0;
-        }
-        return networkType;
+        return switch (this) {
+            case SMITHING_TRANSFORM -> protocol >= ProtocolInfo.v1_19_60 ? networkType : 0;
+            case SMITHING_TRIM -> protocol >= ProtocolInfo.v1_19_80 ? networkType : 0;
+            default -> networkType;
+        };
     }
 }

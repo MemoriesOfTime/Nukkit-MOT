@@ -1,12 +1,13 @@
 package cn.nukkit.item;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.item.trim.ItemTrimMaterialType;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
-public class ItemRedstone extends Item {
+public class ItemRedstone extends Item implements ItemTrimMaterial {
 
     public ItemRedstone() {
         this(0, 1);
@@ -19,5 +20,10 @@ public class ItemRedstone extends Item {
     public ItemRedstone(Integer meta, int count) {
         super(REDSTONE, meta, count, "Redstone Dust");
         this.block = Block.get(REDSTONE_WIRE);
+    }
+
+    @Override
+    public ItemTrimMaterialType getMaterial() {
+        return ItemTrimMaterialType.MATERIAL_REDSTONE;
     }
 }

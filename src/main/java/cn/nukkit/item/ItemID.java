@@ -335,6 +335,7 @@ public interface ItemID {
     //
     int RECORD_PIGSTEP = 759;
     //
+    int AMETHYST_SHARD = 771;
     int SPYGLASS = 772;
     int RECORD_OTHERSIDE = 773;
 

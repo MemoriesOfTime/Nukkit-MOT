@@ -38,13 +38,15 @@ public class SmithingTableEvent extends InventoryEvent implements Cancellable {
     private final Item equipmentItem;
     private final Item resultItem;
     private final Item ingredientItem;
+    private final Item templateItem;
     private final Player player;
 
-    public SmithingTableEvent(SmithingInventory inventory, Item equipmentItem, Item resultItem, Item ingredientItem, Player player) {
+    public SmithingTableEvent(SmithingInventory inventory, Item equipmentItem, Item resultItem, Item ingredientItem, Item templateItem, Player player) {
         super(inventory);
         this.equipmentItem = equipmentItem;
         this.resultItem = resultItem;
         this.ingredientItem = ingredientItem;
+        this.templateItem = templateItem;
         this.player = player;
     }
 
@@ -58,6 +60,10 @@ public class SmithingTableEvent extends InventoryEvent implements Cancellable {
 
     public Item getIngredientItem() {
         return this.ingredientItem;
+    }
+
+    public Item getTemplateItem() {
+        return templateItem;
     }
 
     public Player getPlayer() {

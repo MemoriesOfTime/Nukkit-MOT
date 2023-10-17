@@ -460,6 +460,7 @@ public class Network {
         this.registerPacket(ProtocolInfo.CAMERA_PRESETS_PACKET, CameraPresetsPacket.class);
 
         this.registerPacketNew(ProtocolInfo.CAMERA_INSTRUCTION_PACKET, CameraInstructionPacket.class);
+        this.registerPacketNew(ProtocolInfo.TRIM_DATA, TrimDataPacket.class);
         this.registerPacketNew(ProtocolInfo.OPEN_SIGN, OpenSignPacket.class);
         this.registerPacketNew(ProtocolInfo.AGENT_ANIMATION, AgentAnimationPacket.class);
     }

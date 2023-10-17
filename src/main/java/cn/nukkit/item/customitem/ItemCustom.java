@@ -1,74 +1,47 @@
 package cn.nukkit.item.customitem;
 
-import cn.nukkit.Server;
 import cn.nukkit.item.Item;
-import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
-import lombok.Getter;
-import lombok.Setter;
+import cn.nukkit.item.StringItem;
+import cn.nukkit.item.StringItemBase;
+import org.jetbrains.annotations.NotNull;
+
+import javax.annotation.Nullable;
 
 /**
+ * 继承这个类实现自定义物品,重写{@link Item}中的方法控制方块属性
+ * <p>
+ * Inherit this class to implement a custom item, override the methods in the {@link Item} to control the feature of the item.
+ *
  * @author lt_name
  */
-public abstract class ItemCustom extends Item {
+public abstract class ItemCustom extends StringItemBase implements CustomItem {
+    private final String textureName;
 
-    @Setter
-    @Getter
-    private String textureName;
-
-    public ItemCustom(int id) {
-        this(id, 0, 1, UNKNOWN_STR);
+    public ItemCustom(@NotNull String id, @Nullable String name) {
+        super(id, StringItem.notEmpty(name));
+        this.textureName = name;
     }
 
-    public ItemCustom(int id, Integer meta) {
-        this(id, meta, 1, UNKNOWN_STR);
-    }
-
-    public ItemCustom(int id, Integer meta, int count) {
-        this(id, meta, count, UNKNOWN_STR);
-    }
-
-    public ItemCustom(int id, Integer meta, int count, String name) {
-        this(id, meta, count, name, name);
-    }
-
-    public ItemCustom(int id, Integer meta, int count, String name, String textureName) {
-        super(id, meta, count, name);
+    public ItemCustom(@NotNull String id, @Nullable String name, @NotNull String textureName) {
+        super(id, StringItem.notEmpty(name));
         this.textureName = textureName;
     }
 
-    public boolean allowOffHand() {
-        return false;
+    @Override
+    public String getTextureName() {
+        return textureName;
     }
 
-    public int getCreativeCategory() {
-        return 4;
+    /**
+     * 该方法设置自定义物品的定义
+     * <p>
+     * This method sets the definition of custom item
+     */
+    @Override
+    public abstract CustomItemDefinition getDefinition();
+
+    @Override
+    public ItemCustom clone() {
+        return (ItemCustom) super.clone();
     }
-
-    public CompoundTag getComponentsData() {
-        Server.mvw("ItemCustom#getComponentsData()");
-        return this.getComponentsData(ProtocolInfo.CURRENT_PROTOCOL);
-
-    }
-
-    public CompoundTag getComponentsData(int protocol) {
-        CompoundTag data = new CompoundTag();
-        data.putCompound("components", new CompoundTag()
-                .putCompound("item_properties", new CompoundTag()
-                        .putBoolean("allow_off_hand", this.allowOffHand())
-                        .putBoolean("hand_equipped", this.isTool())
-                        .putInt("creative_category", this.getCreativeCategory())
-                        .putInt("max_stack_size", this.getMaxStackSize())));
-        if (protocol >= ProtocolInfo.v1_17_30) {
-            data.getCompound("components").getCompound("item_properties")
-                    .putCompound("minecraft:icon", new CompoundTag()
-                            .putString("texture", this.getTextureName() != null ? this.getTextureName() : this.name));
-        }else {
-            data.getCompound("components")
-                    .putCompound("minecraft:icon", new CompoundTag()
-                            .putString("texture", this.getTextureName() != null ? this.getTextureName() : this.name));
-        }
-        return data;
-    }
-
 }

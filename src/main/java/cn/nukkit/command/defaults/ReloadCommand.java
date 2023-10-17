@@ -24,11 +24,11 @@ public class ReloadCommand extends VanillaCommand {
         }
 
         if (args.length > 0 && "true".equals(args[0])) {
-            Command.broadcastCommandMessage(sender, new TranslationContainer(TextFormat.YELLOW + "%nukkit.command.reload.reloading" + TextFormat.WHITE));
+            broadcastCommandMessage(sender, new TranslationContainer(TextFormat.YELLOW + "%nukkit.command.reload.reloading" + TextFormat.WHITE));
 
             sender.getServer().reload();
 
-            Command.broadcastCommandMessage(sender, new TranslationContainer(TextFormat.YELLOW + "%nukkit.command.reload.reloaded" + TextFormat.WHITE));
+            broadcastCommandMessage(sender, new TranslationContainer(TextFormat.YELLOW + "%nukkit.command.reload.reloaded" + TextFormat.WHITE));
         } else {
             sender.sendMessage(new TranslationContainer("nukkit.command.reload.confirm"));
         }
