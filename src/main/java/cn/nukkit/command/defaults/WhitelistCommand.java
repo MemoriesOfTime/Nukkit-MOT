@@ -1,7 +1,7 @@
 package cn.nukkit.command.defaults;
 
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
+import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.lang.TranslationContainer;
@@ -15,21 +15,20 @@ public class WhitelistCommand extends VanillaCommand {
 
     public WhitelistCommand(String name) {
         super(name, "%nukkit.command.whitelist.description", "%commands.whitelist.usage");
-        this.setPermission(
-                "nukkit.command.whitelist.reload;" +
-                        "nukkit.command.whitelist.enable;" +
-                        "nukkit.command.whitelist.disable;" +
-                        "nukkit.command.whitelist.list;" +
-                        "nukkit.command.whitelist.add;" +
-                        "nukkit.command.whitelist.remove"
+        this.setPermission("nukkit.command.whitelist.reload;" +
+                "nukkit.command.whitelist.enable;" +
+                "nukkit.command.whitelist.disable;" +
+                "nukkit.command.whitelist.list;" +
+                "nukkit.command.whitelist.add;" +
+                "nukkit.command.whitelist.remove"
         );
         this.commandParameters.clear();
         this.commandParameters.put("1arg", new CommandParameter[]{
-                new CommandParameter("on|off|list|reload", CommandParamType.STRING, false)
+                CommandParameter.newEnum("action", new CommandEnum("AllowlistAction", "on", "off", "list", "reload"))
         });
         this.commandParameters.put("2args", new CommandParameter[]{
-                new CommandParameter("add|remove", CommandParamType.STRING, false),
-                new CommandParameter("player", CommandParamType.TARGET, false)
+                CommandParameter.newEnum("action", new CommandEnum("AllowlistPlayerAction", "add", "remove")),
+                CommandParameter.newType("player", CommandParamType.TARGET)
         });
     }
 
@@ -50,39 +49,47 @@ public class WhitelistCommand extends VanillaCommand {
                 return false;
             }
             switch (args[0].toLowerCase()) {
-                case "reload":
+                case "reload" -> {
                     sender.getServer().reloadWhitelist();
                     broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.reloaded"));
                     return true;
-                case "on":
+                }
+                case "on" -> {
                     sender.getServer().setPropertyBoolean("white-list", true);
                     sender.getServer().whitelistEnabled = true;
                     broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.enabled"));
                     return true;
-                case "off":
+                }
+                case "off" -> {
                     sender.getServer().setPropertyBoolean("white-list", false);
                     sender.getServer().whitelistEnabled = false;
                     broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.disabled"));
                     return true;
-                case "list":
+                }
+                case "list" -> {
                     StringBuilder result = new StringBuilder();
                     int count = 0;
                     for (String player : sender.getServer().getWhitelist().getAll().keySet()) {
                         result.append(player).append(", ");
                         ++count;
                     }
+
                     sender.sendMessage(new TranslationContainer("commands.whitelist.list", String.valueOf(count), String.valueOf(count)));
-                    sender.sendMessage(result.length() > 0 ? result.substring(0, result.length() - 2) : "");
+
+                    if (!result.isEmpty()) {
+                        sender.sendMessage(result.substring(0, result.length() - 2));
+                    }
 
                     return true;
-
-                case "add":
+                }
+                case "add" -> {
                     sender.sendMessage(new TranslationContainer("commands.generic.usage", "%commands.whitelist.add.usage"));
                     return true;
-
-                case "remove":
+                }
+                case "remove" -> {
                     sender.sendMessage(new TranslationContainer("commands.generic.usage", "%commands.whitelist.remove.usage"));
                     return true;
+                }
             }
         } else {
             if (badPerm(sender, args[0].toLowerCase())) {

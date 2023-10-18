@@ -54,9 +54,7 @@ public class StatusCommand extends VanillaCommand {
         vmVendor.put("XenVM", "Xen HVM");
         vmVendor.put("ACRN", "Project ACRN");
         vmVendor.put("QNXQVMBSQG", "QNX Hypervisor");
-    }
 
-    static {
         vmMac.put("00:50:56", "VMware ESX 3");
         vmMac.put("00:0C:29", "VMware ESX 3");
         vmMac.put("00:05:69", "VMware ESX 3");
@@ -98,13 +96,14 @@ public class StatusCommand extends VanillaCommand {
     private static String formatFreq(long hz) {
         if (hz >= 1000000000) {
             return String.format("%.2fGHz", hz / 1000000000.0);
-        } else if (hz >= 1000 * 1000) {
-            return String.format("%.2fMHz", hz / 1000000.0);
-        } else if (hz >= 1000) {
-            return String.format("%.2fKHz", hz / 1000.0);
-        } else {
-            return String.format("%dHz", hz);
         }
+        if (hz >= 1000 * 1000) {
+            return String.format("%.2fMHz", hz / 1000000.0);
+        }
+        if (hz >= 1000) {
+            return String.format("%.2fKHz", hz / 1000.0);
+        }
+        return String.format("%dHz", hz);
     }
 
     public static String formatUptime(long uptime) {
