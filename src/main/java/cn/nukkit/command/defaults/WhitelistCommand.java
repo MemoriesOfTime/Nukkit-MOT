@@ -14,13 +14,13 @@ import cn.nukkit.utils.TextFormat;
 public class WhitelistCommand extends VanillaCommand {
 
     public WhitelistCommand(String name) {
-        super(name, "%nukkit.command.whitelist.description", "%commands.whitelist.usage");
-        this.setPermission("nukkit.command.whitelist.reload;" +
-                "nukkit.command.whitelist.enable;" +
-                "nukkit.command.whitelist.disable;" +
-                "nukkit.command.whitelist.list;" +
-                "nukkit.command.whitelist.add;" +
-                "nukkit.command.whitelist.remove"
+        super(name, "%nukkit.command.allowlist.description", "%commands.allowlist.usage", new String[]{"allowlist"});
+        this.setPermission("nukkit.command.allowlist.reload;" +
+                "nukkit.command.allowlist.enable;" +
+                "nukkit.command.allowlist.disable;" +
+                "nukkit.command.allowlist.list;" +
+                "nukkit.command.allowlist.add;" +
+                "nukkit.command.allowlist.remove"
         );
         this.commandParameters.clear();
         this.commandParameters.put("1arg", new CommandParameter[]{
@@ -52,17 +52,17 @@ public class WhitelistCommand extends VanillaCommand {
             switch (args[0].toLowerCase()) {
                 case "reload" -> {
                     sender.getServer().reloadWhitelist();
-                    broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.reloaded"));
+                    broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.reloaded"));
                 }
                 case "on" -> {
                     sender.getServer().setPropertyBoolean("white-list", true);
-                    sender.getServer().whitelistEnabled = true;
-                    broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.enabled"));
+                    sender.getServer().setWhitelisted(true);
+                    broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.enabled"));
                 }
                 case "off" -> {
                     sender.getServer().setPropertyBoolean("white-list", false);
-                    sender.getServer().whitelistEnabled = false;
-                    broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.disabled"));
+                    sender.getServer().setWhitelisted(false);
+                    broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.disabled"));
                 }
                 case "list" -> {
                     StringBuilder result = new StringBuilder();
@@ -72,16 +72,14 @@ public class WhitelistCommand extends VanillaCommand {
                         ++count;
                     }
 
-                    sender.sendMessage(new TranslationContainer("commands.whitelist.list", String.valueOf(count), String.valueOf(count)));
+                    sender.sendMessage(new TranslationContainer("commands.allowlist.list", String.valueOf(count), String.valueOf(count)));
 
                     if (!result.isEmpty()) {
                         sender.sendMessage(result.substring(0, result.length() - 2));
                     }
                 }
-                case "add" ->
-                        sender.sendMessage(new TranslationContainer("commands.generic.usage", "%commands.whitelist.add.usage"));
-                case "remove" ->
-                        sender.sendMessage(new TranslationContainer("commands.generic.usage", "%commands.whitelist.remove.usage"));
+                case "add" -> sender.sendMessage(new TranslationContainer("commands.generic.usage", "%commands.allowlist.add.usage"));
+                case "remove" -> sender.sendMessage(new TranslationContainer("commands.generic.usage", "%commands.allowlist.remove.usage"));
             }
             return true;
         }
@@ -93,11 +91,11 @@ public class WhitelistCommand extends VanillaCommand {
         switch (args[0].toLowerCase()) {
             case "add" -> {
                 sender.getServer().getOfflinePlayer(args[1]).setWhitelisted(true);
-                broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.add.success", args[1]));
+                broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.add.success", args[1]));
             }
             case "remove" -> {
                 sender.getServer().getOfflinePlayer(args[1]).setWhitelisted(false);
-                broadcastCommandMessage(sender, new TranslationContainer("commands.whitelist.remove.success", args[1]));
+                broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.remove.success", args[1]));
             }
         }
 
@@ -105,9 +103,8 @@ public class WhitelistCommand extends VanillaCommand {
     }
 
     private static boolean badPerm(CommandSender sender, String perm) {
-        if (!sender.hasPermission("nukkit.command.whitelist." + perm)) {
+        if (!sender.hasPermission("nukkit.command.allowlist." + perm)) {
             sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.permission"));
-
             return true;
         }
 
