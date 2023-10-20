@@ -1,7 +1,13 @@
 package cn.nukkit;
 
 import cn.nukkit.AdventureSettings.Type;
-import cn.nukkit.block.*;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockBed;
+import cn.nukkit.block.BlockDoor;
+import cn.nukkit.block.BlockEnderChest;
+import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockNetherPortal;
+import cn.nukkit.block.BlockRespawnAnchor;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityCampfire;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
@@ -10,59 +16,249 @@ import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandDataVersions;
 import cn.nukkit.command.defaults.HelpCommand;
-import cn.nukkit.entity.*;
-import cn.nukkit.entity.data.*;
+import cn.nukkit.entity.Attribute;
+import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityControllable;
+import cn.nukkit.entity.EntityHuman;
+import cn.nukkit.entity.EntityInteractable;
+import cn.nukkit.entity.EntityLiving;
+import cn.nukkit.entity.EntityRideable;
+import cn.nukkit.entity.data.ByteEntityData;
+import cn.nukkit.entity.data.IntPositionEntityData;
+import cn.nukkit.entity.data.ShortEntityData;
+import cn.nukkit.entity.data.Skin;
+import cn.nukkit.entity.data.StringEntityData;
 import cn.nukkit.entity.data.property.EntityProperty;
-import cn.nukkit.entity.item.*;
+import cn.nukkit.entity.item.EntityBoat;
+import cn.nukkit.entity.item.EntityChestBoat;
+import cn.nukkit.entity.item.EntityFishingHook;
+import cn.nukkit.entity.item.EntityItem;
+import cn.nukkit.entity.item.EntityMinecartAbstract;
+import cn.nukkit.entity.item.EntityXPOrb;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
-import cn.nukkit.event.entity.*;
+import cn.nukkit.event.entity.EntityDamageByBlockEvent;
+import cn.nukkit.event.entity.EntityDamageByEntityEvent;
+import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageModifier;
+import cn.nukkit.event.entity.EntityPortalEnterEvent;
+import cn.nukkit.event.entity.ProjectileLaunchEvent;
 import cn.nukkit.event.inventory.InventoryCloseEvent;
 import cn.nukkit.event.inventory.InventoryPickupArrowEvent;
 import cn.nukkit.event.inventory.InventoryPickupItemEvent;
 import cn.nukkit.event.inventory.InventoryPickupTridentEvent;
-import cn.nukkit.event.player.*;
+import cn.nukkit.event.player.PlayerAchievementAwardedEvent;
+import cn.nukkit.event.player.PlayerAnimationEvent;
+import cn.nukkit.event.player.PlayerAsyncPreLoginEvent;
+import cn.nukkit.event.player.PlayerBedEnterEvent;
+import cn.nukkit.event.player.PlayerBedLeaveEvent;
+import cn.nukkit.event.player.PlayerBlockPickEvent;
+import cn.nukkit.event.player.PlayerChangeSkinEvent;
+import cn.nukkit.event.player.PlayerChatEvent;
+import cn.nukkit.event.player.PlayerChunkRequestEvent;
+import cn.nukkit.event.player.PlayerCommandPreprocessEvent;
+import cn.nukkit.event.player.PlayerDeathEvent;
+import cn.nukkit.event.player.PlayerEditBookEvent;
+import cn.nukkit.event.player.PlayerExperienceChangeEvent;
+import cn.nukkit.event.player.PlayerFormRespondedEvent;
+import cn.nukkit.event.player.PlayerGameModeChangeEvent;
+import cn.nukkit.event.player.PlayerInteractEntityEvent;
+import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.event.player.PlayerInteractEvent.Action;
+import cn.nukkit.event.player.PlayerInvalidMoveEvent;
+import cn.nukkit.event.player.PlayerItemConsumeEvent;
+import cn.nukkit.event.player.PlayerJoinEvent;
+import cn.nukkit.event.player.PlayerJumpEvent;
+import cn.nukkit.event.player.PlayerKickEvent;
+import cn.nukkit.event.player.PlayerLocallyInitializedEvent;
+import cn.nukkit.event.player.PlayerLoginEvent;
+import cn.nukkit.event.player.PlayerMapInfoRequestEvent;
+import cn.nukkit.event.player.PlayerMissedSwingEvent;
+import cn.nukkit.event.player.PlayerMouseOverEntityEvent;
+import cn.nukkit.event.player.PlayerMoveEvent;
+import cn.nukkit.event.player.PlayerPreLoginEvent;
+import cn.nukkit.event.player.PlayerQuitEvent;
+import cn.nukkit.event.player.PlayerRespawnEvent;
+import cn.nukkit.event.player.PlayerServerSettingsRequestEvent;
+import cn.nukkit.event.player.PlayerSettingsRespondedEvent;
+import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.event.player.PlayerTeleportEvent.TeleportCause;
+import cn.nukkit.event.player.PlayerToggleCrawlEvent;
+import cn.nukkit.event.player.PlayerToggleFlightEvent;
+import cn.nukkit.event.player.PlayerToggleGlideEvent;
+import cn.nukkit.event.player.PlayerToggleSneakEvent;
+import cn.nukkit.event.player.PlayerToggleSprintEvent;
+import cn.nukkit.event.player.PlayerToggleSwimEvent;
 import cn.nukkit.event.server.DataPacketReceiveEvent;
 import cn.nukkit.event.server.DataPacketSendEvent;
 import cn.nukkit.form.handler.FormResponseHandler;
 import cn.nukkit.form.window.FormWindow;
 import cn.nukkit.form.window.FormWindowCustom;
-import cn.nukkit.inventory.*;
-import cn.nukkit.inventory.transaction.*;
+import cn.nukkit.inventory.AnvilInventory;
+import cn.nukkit.inventory.BigCraftingGrid;
+import cn.nukkit.inventory.CraftingGrid;
+import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.InventoryHolder;
+import cn.nukkit.inventory.PlayerCursorInventory;
+import cn.nukkit.inventory.PlayerInventory;
+import cn.nukkit.inventory.PlayerUIInventory;
+import cn.nukkit.inventory.SmithingInventory;
+import cn.nukkit.inventory.TradeInventory;
+import cn.nukkit.inventory.transaction.CraftingTransaction;
+import cn.nukkit.inventory.transaction.EnchantTransaction;
+import cn.nukkit.inventory.transaction.InventoryTransaction;
+import cn.nukkit.inventory.transaction.RepairItemTransaction;
+import cn.nukkit.inventory.transaction.SmithingTransaction;
+import cn.nukkit.inventory.transaction.TradingTransaction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
-import cn.nukkit.item.*;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemArmor;
+import cn.nukkit.item.ItemArrow;
+import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.ItemBookAndQuill;
+import cn.nukkit.item.ItemBookWritten;
+import cn.nukkit.item.ItemCrossbow;
+import cn.nukkit.item.ItemGlassBottle;
+import cn.nukkit.item.ItemID;
+import cn.nukkit.item.ItemMap;
+import cn.nukkit.item.ItemShield;
+import cn.nukkit.item.ItemTool;
+import cn.nukkit.item.ItemTotem;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.item.trim.TrimFactory;
 import cn.nukkit.lang.LangCode;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
-import cn.nukkit.level.*;
+import cn.nukkit.level.ChunkLoader;
+import cn.nukkit.level.GameRule;
+import cn.nukkit.level.Level;
+import cn.nukkit.level.Location;
+import cn.nukkit.level.Position;
+import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.PunchBlockParticle;
 import cn.nukkit.level.sound.ExperienceOrbSound;
-import cn.nukkit.math.*;
+import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.BlockVector3;
+import cn.nukkit.math.MathHelper;
+import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.math.Vector2;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.nbt.NBTIO;
-import cn.nukkit.nbt.tag.*;
+import cn.nukkit.nbt.tag.ByteTag;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.DoubleTag;
+import cn.nukkit.nbt.tag.FloatTag;
+import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.StringTag;
+import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
-import cn.nukkit.network.protocol.*;
-import cn.nukkit.network.protocol.types.*;
+import cn.nukkit.network.protocol.AdventureSettingsPacket;
+import cn.nukkit.network.protocol.AnimatePacket;
+import cn.nukkit.network.protocol.AvailableCommandsPacket;
+import cn.nukkit.network.protocol.AvailableEntityIdentifiersPacket;
+import cn.nukkit.network.protocol.BatchPacket;
+import cn.nukkit.network.protocol.BiomeDefinitionListPacket;
+import cn.nukkit.network.protocol.BlockEntityDataPacket;
+import cn.nukkit.network.protocol.BlockPickRequestPacket;
+import cn.nukkit.network.protocol.BookEditPacket;
+import cn.nukkit.network.protocol.CameraPresetsPacket;
+import cn.nukkit.network.protocol.ChangeDimensionPacket;
+import cn.nukkit.network.protocol.ChunkRadiusUpdatedPacket;
+import cn.nukkit.network.protocol.CommandRequestPacket;
+import cn.nukkit.network.protocol.ContainerClosePacket;
+import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.DeathInfoPacket;
+import cn.nukkit.network.protocol.DisconnectPacket;
+import cn.nukkit.network.protocol.EmotePacket;
+import cn.nukkit.network.protocol.EntityEventPacket;
+import cn.nukkit.network.protocol.FilterTextPacket;
+import cn.nukkit.network.protocol.GameRulesChangedPacket;
+import cn.nukkit.network.protocol.InteractPacket;
+import cn.nukkit.network.protocol.InventoryContentPacket;
+import cn.nukkit.network.protocol.InventorySlotPacket;
+import cn.nukkit.network.protocol.InventoryTransactionPacket;
+import cn.nukkit.network.protocol.ItemComponentPacket;
+import cn.nukkit.network.protocol.ItemFrameDropItemPacket;
+import cn.nukkit.network.protocol.LevelChunkPacket;
+import cn.nukkit.network.protocol.LevelEventPacket;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.LoginPacket;
+import cn.nukkit.network.protocol.MapInfoRequestPacket;
+import cn.nukkit.network.protocol.MobEquipmentPacket;
+import cn.nukkit.network.protocol.ModalFormRequestPacket;
+import cn.nukkit.network.protocol.ModalFormResponsePacket;
+import cn.nukkit.network.protocol.MoveEntityAbsolutePacket;
+import cn.nukkit.network.protocol.MovePlayerPacket;
+import cn.nukkit.network.protocol.NetworkChunkPublisherUpdatePacket;
+import cn.nukkit.network.protocol.NetworkSettingsPacket;
+import cn.nukkit.network.protocol.NetworkStackLatencyPacket;
+import cn.nukkit.network.protocol.PacketViolationWarningPacket;
+import cn.nukkit.network.protocol.PlayStatusPacket;
+import cn.nukkit.network.protocol.PlayerActionPacket;
+import cn.nukkit.network.protocol.PlayerAuthInputPacket;
+import cn.nukkit.network.protocol.PlayerFogPacket;
+import cn.nukkit.network.protocol.PlayerHotbarPacket;
+import cn.nukkit.network.protocol.PlayerInputPacket;
+import cn.nukkit.network.protocol.PlayerSkinPacket;
+import cn.nukkit.network.protocol.PlayerStartItemCoolDownPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.protocol.RemoveObjectivePacket;
+import cn.nukkit.network.protocol.RequestChunkRadiusPacket;
+import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
+import cn.nukkit.network.protocol.ResourcePackChunkDataPacket;
+import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
+import cn.nukkit.network.protocol.ResourcePackClientResponsePacket;
+import cn.nukkit.network.protocol.ResourcePackDataInfoPacket;
+import cn.nukkit.network.protocol.ResourcePackStackPacket;
+import cn.nukkit.network.protocol.ResourcePacksInfoPacket;
+import cn.nukkit.network.protocol.RespawnPacket;
+import cn.nukkit.network.protocol.ServerSettingsResponsePacket;
+import cn.nukkit.network.protocol.ServerToClientHandshakePacket;
+import cn.nukkit.network.protocol.SetCommandsEnabledPacket;
+import cn.nukkit.network.protocol.SetDifficultyPacket;
+import cn.nukkit.network.protocol.SetDisplayObjectivePacket;
+import cn.nukkit.network.protocol.SetEntityMotionPacket;
+import cn.nukkit.network.protocol.SetHealthPacket;
+import cn.nukkit.network.protocol.SetPlayerGameTypePacket;
+import cn.nukkit.network.protocol.SetScorePacket;
+import cn.nukkit.network.protocol.SetSpawnPositionPacket;
+import cn.nukkit.network.protocol.SetTitlePacket;
+import cn.nukkit.network.protocol.ShowProfilePacket;
+import cn.nukkit.network.protocol.StartGamePacket;
+import cn.nukkit.network.protocol.SyncEntityPropertyPacket;
+import cn.nukkit.network.protocol.TakeItemEntityPacket;
+import cn.nukkit.network.protocol.TextPacket;
+import cn.nukkit.network.protocol.ToastRequestPacket;
+import cn.nukkit.network.protocol.TransferPacket;
+import cn.nukkit.network.protocol.TrimDataPacket;
+import cn.nukkit.network.protocol.UpdateAttributesPacket;
+import cn.nukkit.network.protocol.UpdateBlockPacket;
+import cn.nukkit.network.protocol.UpdatePlayerGameTypePacket;
+import cn.nukkit.network.protocol.types.AuthInputAction;
+import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.ExperimentData;
+import cn.nukkit.network.protocol.types.GameType;
+import cn.nukkit.network.protocol.types.NetworkInventoryAction;
+import cn.nukkit.network.protocol.types.PacketCompressionAlgorithm;
+import cn.nukkit.network.protocol.types.PlayerActionType;
+import cn.nukkit.network.protocol.types.PlayerBlockActionData;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.permission.Permission;
@@ -74,7 +270,24 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
 import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.scheduler.AsyncTask;
-import cn.nukkit.utils.*;
+import cn.nukkit.scoreboard.data.DisplaySlot;
+import cn.nukkit.scoreboard.data.SortOrder;
+import cn.nukkit.scoreboard.displayer.IScoreboardViewer;
+import cn.nukkit.scoreboard.scoreboard.IScoreboard;
+import cn.nukkit.scoreboard.scoreboard.IScoreboardLine;
+import cn.nukkit.scoreboard.scorer.PlayerScorer;
+import cn.nukkit.utils.Binary;
+import cn.nukkit.utils.BlockIterator;
+import cn.nukkit.utils.BossBarColor;
+import cn.nukkit.utils.CameraPresetManager;
+import cn.nukkit.utils.ClientChainData;
+import cn.nukkit.utils.DummyBossBar;
+import cn.nukkit.utils.Identifier;
+import cn.nukkit.utils.LoginChainData;
+import cn.nukkit.utils.SnappyCompression;
+import cn.nukkit.utils.TextFormat;
+import cn.nukkit.utils.Utils;
+import cn.nukkit.utils.Zlib;
 import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -104,8 +317,21 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.ByteOrder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -120,7 +346,7 @@ import java.util.stream.Stream;
  * Nukkit Project
  */
 @Log4j2
-public class Player extends EntityHuman implements CommandSender, InventoryHolder, ChunkLoader, IPlayer {
+public class Player extends EntityHuman implements CommandSender, InventoryHolder, ChunkLoader, IPlayer, IScoreboardViewer {
 
     public static final int SURVIVAL = 0;
     public static final int CREATIVE = 1;
@@ -2615,7 +2841,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         StartGamePacket startGamePacket = new StartGamePacket();
         startGamePacket.entityUniqueId = this.id;
         startGamePacket.entityRuntimeId = this.id;
-        startGamePacket.playerGamemode = getClientFriendlyGamemode(this.gamemode);
+        startGamePacket.playerGamemode = this.getClientFriendlyGamemode(this.gamemode);
         startGamePacket.x = (float) this.x;
         startGamePacket.y = (float) this.y;
         startGamePacket.z = (float) this.z;
@@ -2623,7 +2849,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         startGamePacket.pitch = (float) this.pitch;
         startGamePacket.dimension = (byte) (this.level.getDimension() & 0xff);
         startGamePacket.generator = (byte) ((this.level.getDimension() + 1) & 0xff); //0 旧世界, 1 主世界, 2 下界, 3末地
-        startGamePacket.worldGamemode = getClientFriendlyGamemode(this.gamemode);
+        startGamePacket.worldGamemode = this.getClientFriendlyGamemode(this.gamemode);
         startGamePacket.difficulty = this.server.getDifficulty();
         startGamePacket.spawnX = (int) this.x;
         startGamePacket.spawnY = (int) this.y;
@@ -2662,7 +2888,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (this.protocol >= ProtocolInfo.v1_16_100) {
                         if (this.protocol >= ProtocolInfo.v1_17_0) {
                             //注册实体属性
-                            for(SyncEntityPropertyPacket pk : EntityProperty.getPacketCache()) {
+                            for (SyncEntityPropertyPacket pk : EntityProperty.getPacketCache()) {
                                 this.dataPacket(pk);
                             }
                         }
@@ -2887,7 +3113,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.version = loginChainData.getGameVersion();
 
-                getServer().getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
+                this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
 
                 this.randomClientId = loginPacket.clientId;
 
@@ -3107,20 +3333,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
 
                         switch (action.getAction()) {
-                            case START_DESTROY_BLOCK:
-                                this.onBlockBreakStart(blockPos.asVector3(), blockFace);
-                                break;
-                            case ABORT_DESTROY_BLOCK:
-                            case STOP_DESTROY_BLOCK:
-                                this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
-                                break;
-                            case CONTINUE_DESTROY_BLOCK:
-                                this.onBlockBreakContinue(blockPos.asVector3(), blockFace);
-                                break;
-                            case PREDICT_DESTROY_BLOCK:
+                            case START_DESTROY_BLOCK -> this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                            case ABORT_DESTROY_BLOCK, STOP_DESTROY_BLOCK -> this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
+                            case CONTINUE_DESTROY_BLOCK -> this.onBlockBreakContinue(blockPos.asVector3(), blockFace);
+                            case PREDICT_DESTROY_BLOCK -> {
                                 this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
                                 this.onBlockBreakComplete(blockPos, blockFace);
-                                break;
+                            }
                         }
                         this.lastBlockAction = action;
                     }
@@ -7183,5 +7402,83 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
         return experiments;
+    }
+
+    @Override
+    public void display(IScoreboard scoreboard, DisplaySlot slot) {
+        SetDisplayObjectivePacket pk = new SetDisplayObjectivePacket();
+        pk.displaySlot = slot;
+        pk.objectiveName = scoreboard.getObjectiveName();
+        pk.displayName = scoreboard.getDisplayName();
+        pk.criteriaName = scoreboard.getCriteriaName();
+        pk.sortOrder = scoreboard.getSortOrder();
+        this.dataPacket(pk);
+
+        SetScorePacket pk2 = new SetScorePacket();
+        pk2.infos = scoreboard.getLines().values().stream()
+                .map(IScoreboardLine::toNetworkInfo)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        pk2.action = SetScorePacket.Action.SET;
+        this.dataPacket(pk2);
+
+        PlayerScorer scorer = new PlayerScorer(this);
+        IScoreboardLine line = scoreboard.getLine(scorer);
+        if (slot == DisplaySlot.BELOW_NAME && line != null) {
+            this.setScoreTag(line.getScore() + " " + scoreboard.getDisplayName());
+        }
+    }
+
+    @Override
+    public void hide(DisplaySlot slot) {
+        SetDisplayObjectivePacket pk = new SetDisplayObjectivePacket();
+        pk.displaySlot = slot;
+        pk.objectiveName = "";
+        pk.displayName = "";
+        pk.criteriaName = "";
+        pk.sortOrder = SortOrder.ASCENDING;
+        this.dataPacket(pk);
+
+        if (slot == DisplaySlot.BELOW_NAME) {
+            this.setScoreTag("");
+        }
+    }
+
+
+    @Override
+    public void removeScoreboard(IScoreboard scoreboard) {
+        RemoveObjectivePacket pk = new RemoveObjectivePacket();
+        pk.objectiveName = scoreboard.getObjectiveName();
+
+        this.dataPacket(pk);
+    }
+
+    @Override
+    public void removeLine(IScoreboardLine line) {
+        SetScorePacket packet = new SetScorePacket();
+        packet.action = SetScorePacket.Action.REMOVE;
+        SetScorePacket.ScoreInfo networkInfo = line.toNetworkInfo();
+        if (networkInfo != null)
+            packet.infos.add(networkInfo);
+        this.dataPacket(packet);
+
+        PlayerScorer scorer = new PlayerScorer(this);
+        if (line.getScorer().equals(scorer) && line.getScoreboard().getViewers(DisplaySlot.BELOW_NAME).contains(this)) {
+            this.setScoreTag("");
+        }
+    }
+
+    @Override
+    public void updateScore(IScoreboardLine line) {
+        SetScorePacket packet = new SetScorePacket();
+        packet.action = SetScorePacket.Action.SET;
+        SetScorePacket.ScoreInfo networkInfo = line.toNetworkInfo();
+        if (networkInfo != null) packet.infos.add(networkInfo);
+        this.dataPacket(packet);
+
+        PlayerScorer scorer = new PlayerScorer(this);
+        if (line.getScorer().equals(scorer) && line.getScoreboard().getViewers(DisplaySlot.BELOW_NAME).contains(this)) {
+            this.setScoreTag(line.getScore() + " " + line.getScoreboard().getDisplayName());
+        }
     }
 }
