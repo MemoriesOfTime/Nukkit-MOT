@@ -14,7 +14,7 @@ import cn.nukkit.utils.TextFormat;
 public class WhitelistCommand extends VanillaCommand {
 
     public WhitelistCommand(String name) {
-        super(name, "%nukkit.command.allowlist.description", "%commands.allowlist.usage", new String[]{"allowlist"});
+        super(name, "%nukkit.command.allowlist.description", "nukkit.commands.allowlist.usage", new String[]{"allowlist"});
         this.setPermission("nukkit.command.allowlist.reload;" +
                 "nukkit.command.allowlist.enable;" +
                 "nukkit.command.allowlist.disable;" +
