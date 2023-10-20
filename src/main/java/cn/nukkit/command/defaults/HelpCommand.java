@@ -31,9 +31,11 @@ public class HelpCommand extends VanillaCommand {
         if (!this.testPermission(sender)) {
             return true;
         }
+
         StringBuilder command = new StringBuilder();
         int pageNumber = 1;
         int pageHeight = 5;
+
         if (args.length != 0) {
             try {
                 pageNumber = Integer.parseInt(args[args.length - 1]);
@@ -44,13 +46,8 @@ public class HelpCommand extends VanillaCommand {
                 String[] newargs = new String[args.length - 1];
                 System.arraycopy(args, 0, newargs, 0, newargs.length);
                 args = newargs;
-                /*if (args.length > 1) {
-                    args = Arrays.copyOfRange(args, 0, args.length - 2);
-                } else {
-                    args = new String[0];
-                }*/
                 for (String arg : args) {
-                    if (command.length() > 0) {
+                    if (!command.isEmpty()) {
                         command.append(' ');
                     }
                     command.append(arg);
@@ -58,7 +55,7 @@ public class HelpCommand extends VanillaCommand {
             } catch (NumberFormatException e) {
                 pageNumber = 1;
                 for (String arg : args) {
-                    if (command.length() > 0) {
+                    if (!command.isEmpty()) {
                         command.append(' ');
                     }
                     command.append(arg);
@@ -70,13 +67,14 @@ public class HelpCommand extends VanillaCommand {
             pageHeight = Integer.MAX_VALUE;
         }
 
-        if (command.length() == 0) {
+        if (command.isEmpty()) {
             Map<String, Command> commands = new TreeMap<>();
             for (Command cmd : sender.getServer().getCommandMap().getCommands().values()) {
                 if (cmd.testPermissionSilent(sender)) {
                     commands.put(cmd.getName(), cmd);
                 }
             }
+
             int totalPage = commands.size() % pageHeight == 0 ? commands.size() / pageHeight : commands.size() / pageHeight + 1;
             pageNumber = Math.min(pageNumber, totalPage);
             if (pageNumber < 1) {
@@ -96,22 +94,19 @@ public class HelpCommand extends VanillaCommand {
         }
 
         Command cmd = sender.getServer().getCommandMap().getCommand(command.toString().toLowerCase());
-        if (cmd != null) {
-            if (cmd.testPermissionSilent(sender)) {
-                String message = TextFormat.YELLOW + "--------- " + TextFormat.WHITE + " Help: /" + cmd.getName() + TextFormat.YELLOW + " ---------\n";
-                message += TextFormat.GOLD + "Description: " + TextFormat.WHITE + cmd.getDescription() + '\n';
-                StringBuilder usage = new StringBuilder();
-                String[] usages = cmd.getUsage().split("\n");
-                for (String u : usages) {
-                    if (usage.length() > 0) {
-                        usage.append("\n" + TextFormat.WHITE);
-                    }
-                    usage.append(u);
+        if (cmd != null && cmd.testPermissionSilent(sender)) {
+            String message = TextFormat.YELLOW + "--------- " + TextFormat.WHITE + " Help: /" + cmd.getName() + TextFormat.YELLOW + " ---------\n";
+            message += TextFormat.GOLD + "Description: " + TextFormat.WHITE + cmd.getDescription() + '\n';
+            StringBuilder usage = new StringBuilder();
+            for (String u : cmd.getUsage().split("\n")) {
+                if (!usage.isEmpty()) {
+                    usage.append('\n').append(TextFormat.WHITE);
                 }
-                message += TextFormat.GOLD + "Usage: " + TextFormat.WHITE + usage + '\n';
-                sender.sendMessage(message);
-                return true;
+                usage.append(u);
             }
+            message += TextFormat.GOLD + "Usage: " + TextFormat.WHITE + usage + '\n';
+            sender.sendMessage(message);
+            return true;
         }
 
         sender.sendMessage(TextFormat.RED + "No help for " + command.toString().toLowerCase());

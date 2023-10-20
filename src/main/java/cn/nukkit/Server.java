@@ -1581,55 +1581,23 @@ public class Server {
     }
 
     public static int getGamemodeFromString(String str) {
-        switch (str.trim().toLowerCase()) {
-            case "0":
-            case "survival":
-            case "s":
-                return Player.SURVIVAL;
-
-            case "1":
-            case "creative":
-            case "c":
-                return Player.CREATIVE;
-
-            case "2":
-            case "adventure":
-            case "a":
-                return Player.ADVENTURE;
-
-            case "3":
-            case "spectator":
-            case "spc":
-            case "view":
-            case "v":
-                return Player.SPECTATOR;
-        }
-        return -1;
+        return switch (str.trim().toLowerCase()) {
+            case "0", "survival", "s" -> Player.SURVIVAL;
+            case "1", "creative", "c" -> Player.CREATIVE;
+            case "2", "adventure", "a" -> Player.ADVENTURE;
+            case "3", "spectator", "spc", "view", "v" -> Player.SPECTATOR;
+            default -> -1;
+        };
     }
 
     public static int getDifficultyFromString(String str) {
-        switch (str.trim().toLowerCase()) {
-            case "0":
-            case "peaceful":
-            case "p":
-                return 0;
-
-            case "1":
-            case "easy":
-            case "e":
-                return 1;
-
-            case "2":
-            case "normal":
-            case "n":
-                return 2;
-
-            case "3":
-            case "hard":
-            case "h":
-                return 3;
-        }
-        return -1;
+        return switch (str.trim().toLowerCase()) {
+            case "0", "peaceful", "p" -> 0;
+            case "1", "easy", "e" -> 1;
+            case "2", "normal", "n" -> 2;
+            case "3", "hard", "h" -> 3;
+            default -> -1;
+        };
     }
 
     public int getDifficulty() {
@@ -2637,6 +2605,10 @@ public class Server {
      */
     public boolean isWhitelisted(String name) {
         return !this.hasWhitelist() || this.operators.exists(name, true) || this.whitelist.exists(name, true);
+    }
+
+    public void setWhitelisted(boolean value) {
+        whitelistEnabled = value;
     }
 
     /**
