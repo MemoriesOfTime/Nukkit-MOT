@@ -2267,10 +2267,10 @@ public abstract class Entity extends Location implements Metadatable {
         this.checkChunks();
 
         if ((!this.onGround || dy != 0) && !this.noClip) {
-            AxisAlignedBB bb = this.boundingBox.growNoUp(0.1, 0.1, 0.1);
+            AxisAlignedBB bb = this.boundingBox.clone();
             bb.setMinY(bb.getMinY() - 0.75);
 
-            this.onGround = this.level.hasCollisionBlocks(bb);
+            this.onGround = this.level.hasCollisionBlocks(this, bb);
         }
         this.isCollided = this.onGround;
         this.updateFallState(this.onGround);
@@ -2279,6 +2279,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     public boolean move(double dx, double dy, double dz) {
         if (dx == 0 && dz == 0 && dy == 0) {
+            this.onGround = !this.getPosition().setComponents(this.down()).getLevelBlock().canPassThrough();
             return false;
         }
 
