@@ -1,4 +1,4 @@
-package cn.nukkit.scoreboard.data;
+package cn.nukkit.network.protocol.types;
 
 import lombok.Getter;
 

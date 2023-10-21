@@ -2,7 +2,7 @@ package cn.nukkit.scoreboard.manager;
 
 import cn.nukkit.Player;
 import cn.nukkit.entity.EntityLiving;
-import cn.nukkit.scoreboard.data.DisplaySlot;
+import cn.nukkit.network.protocol.types.DisplaySlot;
 import cn.nukkit.scoreboard.displayer.IScoreboardViewer;
 import cn.nukkit.scoreboard.scoreboard.IScoreboard;
 import cn.nukkit.scoreboard.storage.IScoreboardStorage;

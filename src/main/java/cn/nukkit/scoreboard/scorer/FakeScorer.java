@@ -1,7 +1,7 @@
 package cn.nukkit.scoreboard.scorer;
 
 import cn.nukkit.network.protocol.SetScorePacket;
-import cn.nukkit.scoreboard.data.ScorerType;
+import cn.nukkit.network.protocol.types.ScorerType;
 import cn.nukkit.scoreboard.scoreboard.IScoreboard;
 import cn.nukkit.scoreboard.scoreboard.IScoreboardLine;
 import lombok.Getter;

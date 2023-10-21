@@ -1,6 +1,6 @@
 package cn.nukkit.scoreboard.displayer;
 
-import cn.nukkit.scoreboard.data.DisplaySlot;
+import cn.nukkit.network.protocol.types.DisplaySlot;
 import cn.nukkit.scoreboard.scoreboard.IScoreboard;
 import cn.nukkit.scoreboard.scoreboard.IScoreboardLine;
 

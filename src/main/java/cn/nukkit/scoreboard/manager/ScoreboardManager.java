@@ -4,7 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.entity.EntityLiving;
 import cn.nukkit.network.protocol.UpdateSoftEnumPacket;
-import cn.nukkit.scoreboard.data.DisplaySlot;
+import cn.nukkit.network.protocol.types.DisplaySlot;
 import cn.nukkit.scoreboard.displayer.IScoreboardViewer;
 import cn.nukkit.scoreboard.scoreboard.IScoreboard;
 import cn.nukkit.scoreboard.scorer.EntityScorer;
