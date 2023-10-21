@@ -42,6 +42,10 @@ import cn.nukkit.utils.Utils;
 import com.google.common.collect.Iterables;
 import org.apache.commons.math3.util.FastMath;
 
+import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_PASSENGER;
+import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_REMOVE;
+import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
+
 import javax.annotation.Nullable;
 
 import java.io.ByteArrayInputStream;
