@@ -1,5 +1,7 @@
 package cn.nukkit.math;
 
+import org.jetbrains.annotations.NotNull;
+
 /**
  * @author MagicDroidX
  * Nukkit Project
@@ -373,6 +375,14 @@ public class Vector3 implements Cloneable {
         this.x = x;
         this.y = y;
         this.z = z;
+        return this;
+    }
+
+    @NotNull
+    public Vector3 setComponents(@NotNull Vector3 pos) {
+        this.x = pos.x;
+        this.y = pos.y;
+        this.z = pos.z;
         return this;
     }
 

@@ -1610,6 +1610,10 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean hasCollisionBlocks(AxisAlignedBB bb) {
+        return this.hasCollisionBlocks(null, bb);
+    }
+
+    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB bb) {
         int minX = NukkitMath.floorDouble(bb.getMinX());
         int minY = NukkitMath.floorDouble(bb.getMinY());
         int minZ = NukkitMath.floorDouble(bb.getMinZ());
@@ -1620,7 +1624,7 @@ public class Level implements ChunkManager, Metadatable {
         for (int z = minZ; z <= maxZ; ++z) {
             for (int x = minX; x <= maxX; ++x) {
                 for (int y = minY; y <= maxY; ++y) {
-                    Block block = this.getBlock(x, y, z, false);
+                    Block block = this.getBlock(entity != null ? entity.chunk : null, x, y, z, 0, false);
                     if (block != null && block.getId() != 0 && block.collidesWithBB(bb)) {
                         return true;
                     }
