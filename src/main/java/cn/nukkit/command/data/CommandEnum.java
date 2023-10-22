@@ -23,6 +23,10 @@ public class CommandEnum {
      * @since 589
      */
     public static final CommandEnum CAMERA_PRESETS = new CommandEnum("preset", () -> CameraPresetManager.getPresets().keySet());
+    /**
+     * @since 618
+     */
+    public static final CommandEnum SCOREBOARD_OBJECTIVES = new CommandEnum("ScoreboardObjectives", () -> Server.getInstance().getScoreboardManager().getScoreboards().keySet());
     public static final CommandEnum ENUM_BLOCK;
     public static final CommandEnum ENUM_ITEM;
 
@@ -44,7 +48,7 @@ public class CommandEnum {
     private final String name;
     private final List<String> values;
 
-    private final boolean isSoft;//softEnum
+    private final boolean isSoft;
     private final Supplier<Collection<String>> strListSupplier;
 
     public CommandEnum(String name, String... values) {

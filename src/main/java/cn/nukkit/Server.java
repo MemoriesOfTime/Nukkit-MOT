@@ -76,6 +76,9 @@ import cn.nukkit.resourcepacks.loader.JarPluginResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
 import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.scheduler.Task;
+import cn.nukkit.scoreboard.manager.IScoreboardManager;
+import cn.nukkit.scoreboard.manager.ScoreboardManager;
+import cn.nukkit.scoreboard.storage.JSONScoreboardStorage;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.bugreport.ExceptionHandler;
 import com.google.common.base.Preconditions;
@@ -148,6 +151,7 @@ public class Server {
     private final CraftingManager craftingManager;
     private final ResourcePackManager resourcePackManager;
     private final ConsoleCommandSender consoleSender;
+    private IScoreboardManager scoreboardManager;
 
     private int maxPlayers;
     private boolean autoSave = true;
@@ -599,6 +603,7 @@ public class Server {
         this.entityMetadata = new EntityMetadataStore();
         this.playerMetadata = new PlayerMetadataStore();
         this.levelMetadata = new LevelMetadataStore();
+        this.scoreboardManager = new ScoreboardManager(new JSONScoreboardStorage(this.dataPath + "scoreboard.json"));
 
         this.operators = new Config(this.dataPath + "ops.txt", Config.ENUM);
         this.whitelist = new Config(this.dataPath + "white-list.txt", Config.ENUM);
@@ -958,6 +963,10 @@ public class Server {
 
     public ConsoleCommandSender getConsoleSender() {
         return consoleSender;
+    }
+
+    public IScoreboardManager getScoreboardManager() {
+        return scoreboardManager;
     }
 
     public void reload() {

@@ -42,15 +42,18 @@ import cn.nukkit.utils.Utils;
 import com.google.common.collect.Iterables;
 import org.apache.commons.math3.util.FastMath;
 
+import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_PASSENGER;
+import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_REMOVE;
+import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
+
 import javax.annotation.Nullable;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-
-import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
 
 /**
  * @author MagicDroidX
@@ -352,6 +355,8 @@ public abstract class Entity extends Location implements Metadatable {
 
     protected final Map<Integer, Effect> effects = new ConcurrentHashMap<>();
 
+    protected UUID entityUniqueId;
+
     protected long id;
 
     protected final EntityMetadata dataProperties = new EntityMetadata()
@@ -552,11 +557,17 @@ public abstract class Entity extends Location implements Metadatable {
 
         if (this.isPlayer) {
             this.sendData((Player) this);
+        } else {
+            if (this.namedTag.contains("uuid")) {
+                this.entityUniqueId = UUID.fromString(this.namedTag.getString("uuid"));
+            } else {
+                this.entityUniqueId = UUID.randomUUID();
+            }
         }
     }
 
     protected final void init(FullChunk chunk, CompoundTag nbt) {
-        if ((chunk == null || chunk.getProvider() == null)) {
+        if (chunk == null || chunk.getProvider() == null) {
             throw new ChunkException("Invalid garbage Chunk given to Entity");
         }
 
@@ -1167,6 +1178,10 @@ public abstract class Entity extends Location implements Metadatable {
                 this.namedTag.remove("CustomNameVisible");
                 this.namedTag.remove("CustomNameAlwaysVisible");
             }
+            if (this.entityUniqueId == null) {
+                this.entityUniqueId = UUID.randomUUID();
+            }
+            this.namedTag.putString("uuid", this.entityUniqueId.toString());
         }
 
         this.namedTag.putList(new ListTag<DoubleTag>("Pos")
@@ -2687,6 +2702,10 @@ public abstract class Entity extends Location implements Metadatable {
         }
 
         return false;
+    }
+
+    public UUID getUniqueId() {
+        return this.entityUniqueId;
     }
 
     public long getId() {
