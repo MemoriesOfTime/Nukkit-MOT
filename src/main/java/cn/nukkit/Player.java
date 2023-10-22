@@ -64,7 +64,10 @@ import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.*;
 import cn.nukkit.network.session.NetworkPlayerSession;
-import cn.nukkit.permission.*;
+import cn.nukkit.permission.PermissibleBase;
+import cn.nukkit.permission.Permission;
+import cn.nukkit.permission.PermissionAttachment;
+import cn.nukkit.permission.PermissionAttachmentInfo;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
@@ -3230,6 +3233,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
+                        if (this.isSpectator()) {
+                            playerToggleFlightEvent.setCancelled();
+                        }
                         this.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
                         if (playerToggleFlightEvent.isCancelled()) {
                             this.getAdventureSettings().update();
@@ -3240,6 +3246,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     if (authPacket.getInputData().contains(AuthInputAction.STOP_FLYING)) {
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, false);
+                        if (this.isSpectator()) {
+                            playerToggleFlightEvent.setCancelled();
+                        }
                         this.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
                         if (playerToggleFlightEvent.isCancelled()) {
                             this.getAdventureSettings().update();
