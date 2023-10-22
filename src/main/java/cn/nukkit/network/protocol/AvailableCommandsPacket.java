@@ -508,7 +508,15 @@ public class AvailableCommandsPacket extends DataPacket {
                     putLInt(type);
                     putBoolean(parameter.optional);
                     if (protocol >= 340) {
-                        putByte(parameter.options);
+                        byte options = 0;
+                        if (parameter.paramOptions != null) {
+                            for (CommandParamOption option : parameter.paramOptions) {
+                                options |= (byte) (1 << option.ordinal());
+                            }
+                        } else {
+                            options = parameter.options;
+                        }
+                        this.putByte(options);
                     }
                 }
             }
