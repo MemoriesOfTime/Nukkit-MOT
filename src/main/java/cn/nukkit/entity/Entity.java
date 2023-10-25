@@ -26,10 +26,7 @@ import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.metadata.Metadatable;
 import cn.nukkit.nbt.NBTIO;
-import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.nbt.tag.DoubleTag;
-import cn.nukkit.nbt.tag.FloatTag;
-import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.EntityLink;
 import cn.nukkit.network.protocol.types.PropertySyncData;
@@ -42,18 +39,15 @@ import cn.nukkit.utils.Utils;
 import com.google.common.collect.Iterables;
 import org.apache.commons.math3.util.FastMath;
 
-import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_PASSENGER;
-import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_REMOVE;
-import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
-
 import javax.annotation.Nullable;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+
+import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
 
 /**
  * @author MagicDroidX
@@ -3041,6 +3035,10 @@ public abstract class Entity extends Location implements Metadatable {
     public void setNoClip(boolean noClip) {
         this.noClip = noClip;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_HAS_COLLISION, noClip);
+    }
+
+    public boolean containTag(String tag) {
+        return this.namedTag.getList("Tags", StringTag.class).getAll().stream().anyMatch(t -> t.data.equals(tag));
     }
 
     private boolean validateAndSetIntProperty(String identifier, int value) {

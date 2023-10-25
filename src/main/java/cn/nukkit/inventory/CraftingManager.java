@@ -55,6 +55,7 @@ public class CraftingManager {
     public static DataPacket packet589;
     public static DataPacket packet594;
     public static DataPacket packet618;
+    public static DataPacket packet622;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -569,6 +570,7 @@ public class CraftingManager {
     }
 
     public void rebuildPacket() {
+        packet622 = packetFor(ProtocolInfo.v1_20_40);
         packet618 = packetFor(ProtocolInfo.v1_20_30);
         packet594 = packetFor(ProtocolInfo.v1_20_10);
         packet589 = packetFor(ProtocolInfo.v1_20_0);

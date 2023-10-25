@@ -78,10 +78,9 @@ public interface ProtocolInfo {
     int v1_20_10 = 594;
     int v1_20_30_24 = 617;
     int v1_20_30 = 618;
-    int v1_20_40_21 = 622;
-    int v1_20_40 = 623; //TODO
+    int v1_20_40 = 622;
 
-    int CURRENT_PROTOCOL = Utils.dynamic(v1_20_40_21);
+    int CURRENT_PROTOCOL = Utils.dynamic(v1_20_40);
 
     List<Integer> SUPPORTED_PROTOCOLS = Ints.asList(
             v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
@@ -89,7 +88,7 @@ public interface ProtocolInfo {
             v1_16_100_52, v1_16_100, v1_16_200_51, v1_16_200, v1_16_210_50, v1_16_210_53, v1_16_210, v1_16_220, v1_16_230_50, v1_16_230,
             v1_16_230_54, v1_17_0, v1_17_10, v1_17_20_20, v1_17_30, v1_17_40, v1_18_0, v1_18_10, v1_18_30, v1_19_0_29, v1_19_0_31, v1_19_0,
             v1_19_10, v1_19_20, v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50_20, v1_19_50, v1_19_60, v1_19_63, v1_19_70_24, v1_19_70,
-            v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40_21
+            v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40
     );
 
     String MINECRAFT_VERSION_NETWORK = Utils.getVersionByProtocol(CURRENT_PROTOCOL);
