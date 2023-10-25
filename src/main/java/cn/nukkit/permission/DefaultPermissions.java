@@ -35,14 +35,14 @@ public abstract class DefaultPermissions {
 
         Permission commands = registerPermission(new Permission("nukkit.command", "Allows using all Nukkit commands"), parent);
 
-        Permission whitelist = registerPermission(new Permission("nukkit.command.whitelist", "Allows the user to modify the server whitelist", Permission.DEFAULT_OP), commands);
-        registerPermission(new Permission("nukkit.command.whitelist.add", "Allows the user to add a player to the server whitelist"), whitelist);
-        registerPermission(new Permission("nukkit.command.whitelist.remove", "Allows the user to remove a player to the server whitelist"), whitelist);
-        registerPermission(new Permission("nukkit.command.whitelist.reload", "Allows the user to reload the server whitelist"), whitelist);
-        registerPermission(new Permission("nukkit.command.whitelist.enable", "Allows the user to enable the server whitelist"), whitelist);
-        registerPermission(new Permission("nukkit.command.whitelist.disable", "Allows the user to disable the server whitelist"), whitelist);
-        registerPermission(new Permission("nukkit.command.whitelist.list", "Allows the user to list all the players on the server whitelist"), whitelist);
-        whitelist.recalculatePermissibles();
+        Permission allowList = registerPermission(new Permission("nukkit.command.allowlist", "Allows the user to modify the server allowlist", Permission.DEFAULT_OP), commands);
+        registerPermission(new Permission("nukkit.command.allowlist.add", "Allows the user to add a player to the server allowlist"), allowList);
+        registerPermission(new Permission("nukkit.command.allowlist.remove", "Allows the user to remove a player to the server allowlist"), allowList);
+        registerPermission(new Permission("nukkit.command.allowlist.reload", "Allows the user to reload the server allowlist"), allowList);
+        registerPermission(new Permission("nukkit.command.allowlist.enable", "Allows the user to enable the server allowlist"), allowList);
+        registerPermission(new Permission("nukkit.command.allowlist.disable", "Allows the user to disable the server allowlist"), allowList);
+        registerPermission(new Permission("nukkit.command.allowlist.list", "Allows the user to list all the players on the server allowlist"), allowList);
+        allowList.recalculatePermissibles();
 
         Permission ban = registerPermission(new Permission("nukkit.command.ban", "Allows the user to ban people", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.ban.player", "Allows the user to ban players"), ban);

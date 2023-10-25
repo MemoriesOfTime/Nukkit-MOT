@@ -20,6 +20,7 @@ public class DebugPasteCommand extends VanillaCommand {
     public DebugPasteCommand(String name) {
         super(name, "%nukkit.command.debug.description", "%commands.debug.usage");
         this.setPermission("nukkit.command.debug.perform");
+        this.commandParameters.clear();
     }
 
     @Override
@@ -47,7 +48,7 @@ public class DebugPasteCommand extends VanillaCommand {
         @Override
         public void onRun() {
             try {
-                new StatusCommand("status").execute(server.getConsoleSender(), "status", new String[]{});
+                server.dispatchCommand(sender, "status");
                 String dataPath = server.getDataPath();
                 String serverProperties = HastebinUtility.upload(new File(dataPath, "server.properties"));
                 String latestLog = HastebinUtility.upload(new File(dataPath, "/logs/server.log"));

@@ -76,6 +76,9 @@ import cn.nukkit.resourcepacks.loader.JarPluginResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
 import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.scheduler.Task;
+import cn.nukkit.scoreboard.manager.IScoreboardManager;
+import cn.nukkit.scoreboard.manager.ScoreboardManager;
+import cn.nukkit.scoreboard.storage.JSONScoreboardStorage;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.bugreport.ExceptionHandler;
 import com.google.common.base.Preconditions;
@@ -148,6 +151,7 @@ public class Server {
     private final CraftingManager craftingManager;
     private final ResourcePackManager resourcePackManager;
     private final ConsoleCommandSender consoleSender;
+    private IScoreboardManager scoreboardManager;
 
     private int maxPlayers;
     private boolean autoSave = true;
@@ -599,6 +603,7 @@ public class Server {
         this.entityMetadata = new EntityMetadataStore();
         this.playerMetadata = new PlayerMetadataStore();
         this.levelMetadata = new LevelMetadataStore();
+        this.scoreboardManager = new ScoreboardManager(new JSONScoreboardStorage(this.dataPath + "scoreboard.json"));
 
         this.operators = new Config(this.dataPath + "ops.txt", Config.ENUM);
         this.whitelist = new Config(this.dataPath + "white-list.txt", Config.ENUM);
@@ -958,6 +963,10 @@ public class Server {
 
     public ConsoleCommandSender getConsoleSender() {
         return consoleSender;
+    }
+
+    public IScoreboardManager getScoreboardManager() {
+        return scoreboardManager;
     }
 
     public void reload() {
@@ -1581,55 +1590,23 @@ public class Server {
     }
 
     public static int getGamemodeFromString(String str) {
-        switch (str.trim().toLowerCase()) {
-            case "0":
-            case "survival":
-            case "s":
-                return Player.SURVIVAL;
-
-            case "1":
-            case "creative":
-            case "c":
-                return Player.CREATIVE;
-
-            case "2":
-            case "adventure":
-            case "a":
-                return Player.ADVENTURE;
-
-            case "3":
-            case "spectator":
-            case "spc":
-            case "view":
-            case "v":
-                return Player.SPECTATOR;
-        }
-        return -1;
+        return switch (str.trim().toLowerCase()) {
+            case "0", "survival", "s" -> Player.SURVIVAL;
+            case "1", "creative", "c" -> Player.CREATIVE;
+            case "2", "adventure", "a" -> Player.ADVENTURE;
+            case "3", "spectator", "spc", "view", "v" -> Player.SPECTATOR;
+            default -> -1;
+        };
     }
 
     public static int getDifficultyFromString(String str) {
-        switch (str.trim().toLowerCase()) {
-            case "0":
-            case "peaceful":
-            case "p":
-                return 0;
-
-            case "1":
-            case "easy":
-            case "e":
-                return 1;
-
-            case "2":
-            case "normal":
-            case "n":
-                return 2;
-
-            case "3":
-            case "hard":
-            case "h":
-                return 3;
-        }
-        return -1;
+        return switch (str.trim().toLowerCase()) {
+            case "0", "peaceful", "p" -> 0;
+            case "1", "easy", "e" -> 1;
+            case "2", "normal", "n" -> 2;
+            case "3", "hard", "h" -> 3;
+            default -> -1;
+        };
     }
 
     public int getDifficulty() {
@@ -2637,6 +2614,10 @@ public class Server {
      */
     public boolean isWhitelisted(String name) {
         return !this.hasWhitelist() || this.operators.exists(name, true) || this.whitelist.exists(name, true);
+    }
+
+    public void setWhitelisted(boolean value) {
+        whitelistEnabled = value;
     }
 
     /**

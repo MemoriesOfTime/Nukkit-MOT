@@ -74,6 +74,10 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
 import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.scheduler.AsyncTask;
+import cn.nukkit.scoreboard.displayer.IScoreboardViewer;
+import cn.nukkit.scoreboard.scoreboard.IScoreboard;
+import cn.nukkit.scoreboard.scoreboard.IScoreboardLine;
+import cn.nukkit.scoreboard.scorer.PlayerScorer;
 import cn.nukkit.utils.*;
 import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
@@ -120,7 +124,7 @@ import java.util.stream.Stream;
  * Nukkit Project
  */
 @Log4j2
-public class Player extends EntityHuman implements CommandSender, InventoryHolder, ChunkLoader, IPlayer {
+public class Player extends EntityHuman implements CommandSender, InventoryHolder, ChunkLoader, IPlayer, IScoreboardViewer {
 
     public static final int SURVIVAL = 0;
     public static final int CREATIVE = 1;
@@ -2615,7 +2619,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         StartGamePacket startGamePacket = new StartGamePacket();
         startGamePacket.entityUniqueId = this.id;
         startGamePacket.entityRuntimeId = this.id;
-        startGamePacket.playerGamemode = getClientFriendlyGamemode(this.gamemode);
+        startGamePacket.playerGamemode = this.getClientFriendlyGamemode(this.gamemode);
         startGamePacket.x = (float) this.x;
         startGamePacket.y = (float) this.y;
         startGamePacket.z = (float) this.z;
@@ -2623,7 +2627,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         startGamePacket.pitch = (float) this.pitch;
         startGamePacket.dimension = (byte) (this.level.getDimension() & 0xff);
         startGamePacket.generator = (byte) ((this.level.getDimension() + 1) & 0xff); //0 旧世界, 1 主世界, 2 下界, 3末地
-        startGamePacket.worldGamemode = getClientFriendlyGamemode(this.gamemode);
+        startGamePacket.worldGamemode = this.getClientFriendlyGamemode(this.gamemode);
         startGamePacket.difficulty = this.server.getDifficulty();
         startGamePacket.spawnX = (int) this.x;
         startGamePacket.spawnY = (int) this.y;
@@ -2662,7 +2666,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (this.protocol >= ProtocolInfo.v1_16_100) {
                         if (this.protocol >= ProtocolInfo.v1_17_0) {
                             //注册实体属性
-                            for(SyncEntityPropertyPacket pk : EntityProperty.getPacketCache()) {
+                            for (SyncEntityPropertyPacket pk : EntityProperty.getPacketCache()) {
                                 this.dataPacket(pk);
                             }
                         }
@@ -2887,7 +2891,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.version = loginChainData.getGameVersion();
 
-                getServer().getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
+                this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
 
                 this.randomClientId = loginPacket.clientId;
 
@@ -3107,20 +3111,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
 
                         switch (action.getAction()) {
-                            case START_DESTROY_BLOCK:
-                                this.onBlockBreakStart(blockPos.asVector3(), blockFace);
-                                break;
-                            case ABORT_DESTROY_BLOCK:
-                            case STOP_DESTROY_BLOCK:
-                                this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
-                                break;
-                            case CONTINUE_DESTROY_BLOCK:
-                                this.onBlockBreakContinue(blockPos.asVector3(), blockFace);
-                                break;
-                            case PREDICT_DESTROY_BLOCK:
+                            case START_DESTROY_BLOCK -> this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                            case ABORT_DESTROY_BLOCK, STOP_DESTROY_BLOCK -> this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
+                            case CONTINUE_DESTROY_BLOCK -> this.onBlockBreakContinue(blockPos.asVector3(), blockFace);
+                            case PREDICT_DESTROY_BLOCK -> {
                                 this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
                                 this.onBlockBreakComplete(blockPos, blockFace);
-                                break;
+                            }
                         }
                         this.lastBlockAction = action;
                     }
@@ -3236,6 +3233,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             break;
                         }
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
+                        if (this.isSpectator()) {
+                            playerToggleFlightEvent.setCancelled();
+                        }
                         this.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
                         if (playerToggleFlightEvent.isCancelled()) {
                             this.getAdventureSettings().update();
@@ -3246,6 +3246,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     if (authPacket.getInputData().contains(AuthInputAction.STOP_FLYING)) {
                         PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, false);
+                        if (this.isSpectator()) {
+                            playerToggleFlightEvent.setCancelled();
+                        }
                         this.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
                         if (playerToggleFlightEvent.isCancelled()) {
                             this.getAdventureSettings().update();
@@ -7183,5 +7186,83 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
         return experiments;
+    }
+
+    @Override
+    public void display(IScoreboard scoreboard, DisplaySlot slot) {
+        SetDisplayObjectivePacket pk = new SetDisplayObjectivePacket();
+        pk.displaySlot = slot;
+        pk.objectiveName = scoreboard.getObjectiveName();
+        pk.displayName = scoreboard.getDisplayName();
+        pk.criteriaName = scoreboard.getCriteriaName();
+        pk.sortOrder = scoreboard.getSortOrder();
+        this.dataPacket(pk);
+
+        SetScorePacket pk2 = new SetScorePacket();
+        pk2.infos = scoreboard.getLines().values().stream()
+                .map(IScoreboardLine::toNetworkInfo)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        pk2.action = SetScorePacket.Action.SET;
+        this.dataPacket(pk2);
+
+        PlayerScorer scorer = new PlayerScorer(this);
+        IScoreboardLine line = scoreboard.getLine(scorer);
+        if (slot == DisplaySlot.BELOW_NAME && line != null) {
+            this.setScoreTag(line.getScore() + " " + scoreboard.getDisplayName());
+        }
+    }
+
+    @Override
+    public void hide(DisplaySlot slot) {
+        SetDisplayObjectivePacket pk = new SetDisplayObjectivePacket();
+        pk.displaySlot = slot;
+        pk.objectiveName = "";
+        pk.displayName = "";
+        pk.criteriaName = "";
+        pk.sortOrder = SortOrder.ASCENDING;
+        this.dataPacket(pk);
+
+        if (slot == DisplaySlot.BELOW_NAME) {
+            this.setScoreTag("");
+        }
+    }
+
+
+    @Override
+    public void removeScoreboard(IScoreboard scoreboard) {
+        RemoveObjectivePacket pk = new RemoveObjectivePacket();
+        pk.objectiveName = scoreboard.getObjectiveName();
+
+        this.dataPacket(pk);
+    }
+
+    @Override
+    public void removeLine(IScoreboardLine line) {
+        SetScorePacket packet = new SetScorePacket();
+        packet.action = SetScorePacket.Action.REMOVE;
+        SetScorePacket.ScoreInfo networkInfo = line.toNetworkInfo();
+        if (networkInfo != null)
+            packet.infos.add(networkInfo);
+        this.dataPacket(packet);
+
+        PlayerScorer scorer = new PlayerScorer(this);
+        if (line.getScorer().equals(scorer) && line.getScoreboard().getViewers(DisplaySlot.BELOW_NAME).contains(this)) {
+            this.setScoreTag("");
+        }
+    }
+
+    @Override
+    public void updateScore(IScoreboardLine line) {
+        SetScorePacket packet = new SetScorePacket();
+        packet.action = SetScorePacket.Action.SET;
+        SetScorePacket.ScoreInfo networkInfo = line.toNetworkInfo();
+        if (networkInfo != null) packet.infos.add(networkInfo);
+        this.dataPacket(packet);
+
+        PlayerScorer scorer = new PlayerScorer(this);
+        if (line.getScorer().equals(scorer) && line.getScoreboard().getViewers(DisplaySlot.BELOW_NAME).contains(this)) {
+            this.setScoreTag(line.getScore() + " " + line.getScoreboard().getDisplayName());
+        }
     }
 }

@@ -96,10 +96,10 @@ public class Level implements ChunkManager, Metadatable {
     public static final int BLOCK_UPDATE_REDSTONE = 6;
     public static final int BLOCK_UPDATE_TICK = 7;
 
-    public static final int TIME_DAY = 0;
+    public static final int TIME_DAY = 1000;
     public static final int TIME_NOON = 6000;
     public static final int TIME_SUNSET = 12000;
-    public static final int TIME_NIGHT = 14000;
+    public static final int TIME_NIGHT = 13000;
     public static final int TIME_MIDNIGHT = 18000;
     public static final int TIME_SUNRISE = 23000;
 
@@ -1269,7 +1269,7 @@ public class Level implements ChunkManager, Metadatable {
             return;
         }
 
-        int chunksPerLoader = Math.min(200, Math.max(1, (int) (((double) (this.chunksPerTicks - this.loaders.size()) / this.loaders.size() + 0.5))));
+        int chunksPerLoader = Math.min(200, Math.max(1, (int) ((double) (this.chunksPerTicks - this.loaders.size()) / this.loaders.size() + 0.5)));
         int randRange = 3 + chunksPerLoader / 30;
         randRange = Math.min(randRange, this.chunkTickRadius);
 
@@ -1311,7 +1311,8 @@ public class Level implements ChunkManager, Metadatable {
                 if ((chunk = this.getChunk(chunkX, chunkZ, false)) == null) {
                     iter.remove();
                     continue;
-                } else if (loaders <= 0) {
+                }
+                if (loaders <= 0) {
                     iter.remove();
                 }
 
@@ -1320,20 +1321,20 @@ public class Level implements ChunkManager, Metadatable {
                 }
 
                 if (this.randomTickingEnabled()) {
+                    final int randomTickSpeed = gameRules.getInteger(GameRule.RANDOM_TICK_SPEED);
                     if (this.useSections) {
                         for (ChunkSection section : ((Chunk) chunk).getSections()) {
                             if (!(section instanceof EmptyChunkSection)) {
                                 int Y = section.getY();
-                                for (int i = 0; i < gameRules.getInteger(GameRule.RANDOM_TICK_SPEED); ++i) {
+                                for (int i = 0; i < randomTickSpeed; ++i) {
                                     int lcg = this.getUpdateLCG();
                                     int x = lcg & 0x0f;
                                     int y = lcg >>> 8 & 0x0f;
                                     int z = lcg >>> 16 & 0x0f;
 
-                                    int[] state = section.getBlockState(x, y, z);
-                                    int blockId = state[0];
+                                    int blockId = section.getBlockId(x, y, z);
                                     if (blockId <= Block.MAX_BLOCK_ID && randomTickBlocks[blockId]) {
-                                        Block block = Block.get(blockId, state[1], this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
+                                        Block block = Block.get(blockId, section.getBlockData(x, y, z), this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
                                         block.onUpdate(BLOCK_UPDATE_RANDOM);
                                     }
                                 }
@@ -1342,7 +1343,7 @@ public class Level implements ChunkManager, Metadatable {
                     } else {
                         for (int Y = 0; Y < 8 && (Y < 3 || blockTest); ++Y) {
                             blockTest = false;
-                            for (int i = 0; i < gameRules.getInteger(GameRule.RANDOM_TICK_SPEED); ++i) {
+                            for (int i = 0; i < randomTickSpeed; ++i) {
                                 int lcg = this.getUpdateLCG();
                                 int x = lcg & 0x0f;
                                 int y = lcg >>> 8 & 0x0f;
@@ -1350,9 +1351,9 @@ public class Level implements ChunkManager, Metadatable {
 
                                 int[] state = chunk.getBlockState(x, y + (Y << 4), z);
                                 int blockId = state[0];
-                                blockTest |= state[0] != 0 && state[1] != 0;
+                                blockTest |= blockId != 0 && state[1] != 0;
                                 if (blockId <= Block.MAX_BLOCK_ID && Level.randomTickBlocks[blockId]) {
-                                    Block block = Block.get(state[0], state[1], this, x, y + (Y << 4), z);
+                                    Block block = Block.get(blockId, state[1], this, x, y + (Y << 4), z);
                                     block.onUpdate(BLOCK_UPDATE_RANDOM);
                                 }
                             }
@@ -1609,6 +1610,10 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean hasCollisionBlocks(AxisAlignedBB bb) {
+        return this.hasCollisionBlocks(null, bb);
+    }
+
+    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB bb) {
         int minX = NukkitMath.floorDouble(bb.getMinX());
         int minY = NukkitMath.floorDouble(bb.getMinY());
         int minZ = NukkitMath.floorDouble(bb.getMinZ());
@@ -1619,7 +1624,7 @@ public class Level implements ChunkManager, Metadatable {
         for (int z = minZ; z <= maxZ; ++z) {
             for (int x = minX; x <= maxX; ++x) {
                 for (int y = minY; y <= maxY; ++y) {
-                    Block block = this.getBlock(x, y, z, false);
+                    Block block = this.getBlock(entity != null ? entity.chunk : null, x, y, z, 0, false);
                     if (block != null && block.getId() != 0 && block.collidesWithBB(bb)) {
                         return true;
                     }

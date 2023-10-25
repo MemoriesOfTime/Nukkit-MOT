@@ -2,6 +2,8 @@ package cn.nukkit.command.defaults;
 
 import cn.nukkit.Nukkit;
 import cn.nukkit.command.CommandSender;
+import cn.nukkit.command.data.CommandParamType;
+import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.plugin.Plugin;
@@ -29,6 +31,9 @@ public class VersionCommand extends VanillaCommand {
                 new String[]{"ver", "about"}
         );
         this.commandParameters.clear();
+        this.commandParameters.put("default", new CommandParameter[]{
+                CommandParameter.newType("pluginName", true, CommandParamType.STRING)
+        });
     }
 
     @Override
