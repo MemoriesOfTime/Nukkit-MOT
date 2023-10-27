@@ -67,10 +67,18 @@ public class Skin {
     private boolean overridingPlayerAppearance = true;
 
     public boolean isValid() {
-        return isValidSkin() && isValidResourcePatch();
+        return isValid(Server.getInstance().doNotLimitSkinGeometry);
+    }
+
+    public boolean isValid(boolean doNotLimitSkinGeometry) {
+        return isValidSkin(doNotLimitSkinGeometry) && isValidResourcePatch();
     }
 
     private boolean isValidSkin() {
+        return isValidSkin(Server.getInstance().doNotLimitSkinGeometry);
+    }
+
+    private boolean isValidSkin(boolean doNotLimitSkinGeometry) {
         return skinId != null && !skinId.trim().isEmpty() && skinId.length() < 100 &&
                 skinData != null && skinData.width >= 64 && skinData.height >= 32 &&
                 skinData.data.length >= SINGLE_SKIN_SIZE &&
@@ -79,7 +87,7 @@ public class Skin {
                 (skinColor == null || skinColor.length() < 100) &&
                 (armSize == null || armSize.length() < 100) &&
                 (geometryDataEngineVersion == null || geometryDataEngineVersion.length() < 100) &&
-                (Server.getInstance().doNotLimitSkinGeometry || skinData.data.length <= MAX_DATA_SIZE);
+                (doNotLimitSkinGeometry || skinData.data.length <= MAX_DATA_SIZE);
     }
 
     private boolean isValidResourcePatch() {
