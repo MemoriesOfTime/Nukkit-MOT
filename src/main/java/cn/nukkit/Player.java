@@ -35,6 +35,7 @@ import cn.nukkit.event.server.DataPacketSendEvent;
 import cn.nukkit.form.handler.FormResponseHandler;
 import cn.nukkit.form.window.FormWindow;
 import cn.nukkit.form.window.FormWindowCustom;
+import cn.nukkit.form.window.FormWindowDialog;
 import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.transaction.*;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
@@ -80,6 +81,8 @@ import cn.nukkit.scoreboard.scoreboard.IScoreboardLine;
 import cn.nukkit.scoreboard.scorer.PlayerScorer;
 import cn.nukkit.utils.*;
 import com.google.common.base.Strings;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.gson.JsonParser;
@@ -298,6 +301,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected Map<Integer, FormWindow> serverSettings = new Int2ObjectOpenHashMap<>();
 
     protected Map<Long, DummyBossBar> dummyBossBars = new Long2ObjectLinkedOpenHashMap<>();
+
+    protected Cache<String, FormWindowDialog> dialogWindows = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
     protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
@@ -6231,6 +6236,38 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.dataPacket(packet);
         this.formOpen = true;
         return id;
+    }
+
+    public void showDialogWindow(FormWindowDialog dialog) {
+        showDialogWindow(dialog, true);
+    }
+
+    /**
+     * 向玩家展示一个NPC对话框.
+     * <p>
+     * Show dialog window to the player.
+     *
+     * @param dialog NPC对话框<br>the dialog
+     * @param book   如果为true,将会立即更新该{@link FormWindowDialog#getSceneName()}<br>If true, the {@link FormWindowDialog#getSceneName()} will be updated immediately.
+     */
+    public void showDialogWindow(FormWindowDialog dialog, boolean book) {
+        String actionJson = dialog.getButtonJSONData();
+
+        if (book && dialogWindows.getIfPresent(dialog.getSceneName()) != null) dialog.updateSceneName();
+        dialog.getBindEntity().setDataProperty(new ByteEntityData(Entity.DATA_HAS_NPC_COMPONENT, 1));
+        dialog.getBindEntity().setDataProperty(new StringEntityData(Entity.DATA_NPC_SKIN_DATA, dialog.getSkinData()));
+        dialog.getBindEntity().setDataProperty(new StringEntityData(Entity.DATA_NPC_ACTIONS, actionJson));
+        dialog.getBindEntity().setDataProperty(new StringEntityData(Entity.DATA_INTERACTIVE_TAG, dialog.getContent()));
+
+        NPCDialoguePacket packet = new NPCDialoguePacket();
+        packet.setUniqueEntityId(dialog.getEntityId());
+        packet.setAction(NPCDialoguePacket.Action.OPEN);
+        packet.setDialogue(dialog.getContent());
+        packet.setNpcName(dialog.getTitle());
+        if (book) packet.setSceneName(dialog.getSceneName());
+        packet.setActionJson(dialog.getButtonJSONData());
+        if (book) this.dialogWindows.put(dialog.getSceneName(), dialog);
+        this.dataPacket(packet);
     }
 
     /**

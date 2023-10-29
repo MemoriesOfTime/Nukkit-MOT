@@ -1,10 +1,7 @@
 package cn.nukkit.network.process;
 
 import cn.nukkit.PlayerHandle;
-import cn.nukkit.network.process.processor.ClientToServerHandshakeProcessor;
-import cn.nukkit.network.process.processor.LecternUpdateProcessor;
-import cn.nukkit.network.process.processor.RequestAbilityProcessor;
-import cn.nukkit.network.process.processor.SetLocalPlayerAsInitializedProcessor;
+import cn.nukkit.network.process.processor.*;
 import cn.nukkit.network.protocol.DataPacket;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.jetbrains.annotations.NotNull;
@@ -42,7 +39,8 @@ public final class DataPacketManager {
                 new ClientToServerHandshakeProcessor(),
                 new LecternUpdateProcessor(),
                 new SetLocalPlayerAsInitializedProcessor(),
-                new RequestAbilityProcessor()
+                new RequestAbilityProcessor(),
+                new NPCRequestProcessor()
         );
     }
 }
