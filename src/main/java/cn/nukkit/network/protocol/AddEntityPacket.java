@@ -254,42 +254,48 @@ public class AddEntityPacket extends DataPacket {
             return this.id;
         }
 
-        if (this.protocol < ProtocolInfo.v1_19_0) {
-            if (this.type == EntityChestBoat.NETWORK_ID) {
-                return "minecraft:boat";
-            }else if (this.type == EntityAllay.NETWORK_ID) {
-                return "minecraft:bat";
-            }else if (this.type == EntityWarden.NETWORK_ID) {
-                return "minecraft:iron_golem";
-            }else if (this.type == EntityTadpole.NETWORK_ID) {
-                return "minecraft:salmon";
-            }else if (this.type == EntityFrog.NETWORK_ID) {
-                return "minecraft:rabbit";
+        if (this.protocol < ProtocolInfo.v1_20_0_23) {
+            if (this.type == EntityCamel.NETWORK_ID) {
+                return "minecraft:horse";
             }
 
-            if (this.protocol < ProtocolInfo.v1_17_0) {
-                if (this.type == EntityGoat.NETWORK_ID) {
-                    return "minecraft:sheep";
-                }
-                if (this.type == EntityAxolotl.NETWORK_ID) {
-                    return "minecraft:tropicalfish";
-                }
-                if (this.type == EntityGlowSquid.NETWORK_ID) {
-                    return "minecraft:squid";
+            if (this.protocol < ProtocolInfo.v1_19_0) {
+                if (this.type == EntityChestBoat.NETWORK_ID) {
+                    return "minecraft:boat";
+                } else if (this.type == EntityAllay.NETWORK_ID) {
+                    return "minecraft:bat";
+                } else if (this.type == EntityWarden.NETWORK_ID) {
+                    return "minecraft:iron_golem";
+                } else if (this.type == EntityTadpole.NETWORK_ID) {
+                    return "minecraft:salmon";
+                } else if (this.type == EntityFrog.NETWORK_ID) {
+                    return "minecraft:rabbit";
                 }
 
-                if (this.protocol < ProtocolInfo.v1_16_0) {
-                    if (this.type == EntityPiglin.NETWORK_ID || this.type == EntityPiglinBrute.NETWORK_ID) {
-                        return "minecraft:zombie_pigman";
-                    }else if (this.type == EntityHoglin.NETWORK_ID || this.type == EntityStrider.NETWORK_ID || this.type == EntityZoglin.NETWORK_ID) {
-                        return "minecraft:pig";
+                if (this.protocol < ProtocolInfo.v1_17_0) {
+                    if (this.type == EntityGoat.NETWORK_ID) {
+                        return "minecraft:sheep";
+                    }
+                    if (this.type == EntityAxolotl.NETWORK_ID) {
+                        return "minecraft:tropicalfish";
+                    }
+                    if (this.type == EntityGlowSquid.NETWORK_ID) {
+                        return "minecraft:squid";
                     }
 
-                    if (this.protocol < ProtocolInfo.v1_14_0 && this.type == EntityBee.NETWORK_ID) {
-                        return "minecraft:bat";
-                    }
-                    if (this.protocol < ProtocolInfo.v1_13_0 && this.type == EntityFox.NETWORK_ID) {
-                        return "minecraft:wolf";
+                    if (this.protocol < ProtocolInfo.v1_16_0) {
+                        if (this.type == EntityPiglin.NETWORK_ID || this.type == EntityPiglinBrute.NETWORK_ID) {
+                            return "minecraft:zombie_pigman";
+                        } else if (this.type == EntityHoglin.NETWORK_ID || this.type == EntityStrider.NETWORK_ID || this.type == EntityZoglin.NETWORK_ID) {
+                            return "minecraft:pig";
+                        }
+
+                        if (this.protocol < ProtocolInfo.v1_14_0 && this.type == EntityBee.NETWORK_ID) {
+                            return "minecraft:bat";
+                        }
+                        if (this.protocol < ProtocolInfo.v1_13_0 && this.type == EntityFox.NETWORK_ID) {
+                            return "minecraft:wolf";
+                        }
                     }
                 }
             }
