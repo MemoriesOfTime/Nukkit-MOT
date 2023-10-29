@@ -21,34 +21,18 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
     public static final byte[] TAG; //582
 
     static {
-        try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_419.dat")) {
-            NBT419 = ByteStreams.toByteArray(stream);
-        } catch (Exception e) {
-            throw new AssertionError("Error whilst loading entity identifiers 419", e);
-        }
+        NBT419 = loadEntityIdentifiers(419);
+        NBT440 = loadEntityIdentifiers(440);
+        NBT527 = loadEntityIdentifiers(527);
+        NBT544 = loadEntityIdentifiers(544);
+        TAG = loadEntityIdentifiers(582);
+    }
 
-        try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_440.dat")) {
-            NBT440 = ByteStreams.toByteArray(stream);
+    private static byte[] loadEntityIdentifiers(int protocol) {
+        try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_" + protocol + ".dat")) {
+            return ByteStreams.toByteArray(stream);
         } catch (Exception e) {
-            throw new AssertionError("Error whilst loading entity identifiers 440", e);
-        }
-
-        try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_527.dat")) {
-            NBT527 = ByteStreams.toByteArray(stream);
-        } catch (Exception e) {
-            throw new AssertionError("Error whilst loading entity identifiers 527", e);
-        }
-
-        try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_544.dat")) {
-            NBT544 = ByteStreams.toByteArray(stream);
-        } catch (Exception e) {
-            throw new AssertionError("Error whilst loading entity identifiers 544", e);
-        }
-
-        try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_582.dat")) {
-            TAG = ByteStreams.toByteArray(stream);
-        } catch (Exception e) {
-            throw new AssertionError("Error whilst loading entity identifiers 582", e);
+            throw new AssertionError("Error whilst loading entity identifiers " + protocol, e);
         }
     }
 
