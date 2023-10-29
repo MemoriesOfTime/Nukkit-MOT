@@ -2,12 +2,8 @@ package cn.nukkit.form.window;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.api.PowerNukkitXOnly;
-import cn.nukkit.api.Since;
 import cn.nukkit.scheduler.Task;
 
-@PowerNukkitXOnly
-@Since("1.6.0.0-PNX")
 public class ScrollingTextDialog implements Dialog{
 
     private Player player;
@@ -102,10 +98,11 @@ public class ScrollingTextDialog implements Dialog{
             }
             clone.setContent(dialog.getContent().substring(0,cursor));
             player.showDialogWindow(clone);
-            if (dialog.getContent().length() - (cursor+1) >= 2 && dialog.getContent().charAt(cursor) == '§')
-                cursor+=2;
-            else
+            if (dialog.getContent().length() - (cursor+1) >= 2 && dialog.getContent().charAt(cursor) == '§') {
+                cursor += 2;
+            } else {
                 cursor++;
+            }
         }
     }
 }
