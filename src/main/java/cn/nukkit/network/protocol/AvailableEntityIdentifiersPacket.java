@@ -17,7 +17,8 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
     public static final byte[] NBT419;
     public static final byte[] NBT440;
     public static final byte[] NBT527;
-    public static final byte[] TAG; //544
+    public static final byte[] NBT544;
+    public static final byte[] TAG; //582
 
     static {
         try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_419.dat")) {
@@ -39,9 +40,15 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
         }
 
         try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_544.dat")) {
-            TAG = ByteStreams.toByteArray(stream);
+            NBT544 = ByteStreams.toByteArray(stream);
         } catch (Exception e) {
             throw new AssertionError("Error whilst loading entity identifiers 544", e);
+        }
+
+        try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_582.dat")) {
+            TAG = ByteStreams.toByteArray(stream);
+        } catch (Exception e) {
+            throw new AssertionError("Error whilst loading entity identifiers 582", e);
         }
     }
 

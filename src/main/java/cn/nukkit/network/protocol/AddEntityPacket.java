@@ -181,12 +181,11 @@ public class AddEntityPacket extends DataPacket {
             mapping.put(EntityChestBoat.NETWORK_ID, "minecraft:chest_boat");
         }
 
-        //TODO 骆驼正式加入时取消注释此段代码
-        /*if (protocolId < ProtocolInfo.???) {
+        if (protocolId < ProtocolInfo.v1_20_0_23) {
             mapping.put(EntityCamel.NETWORK_ID, mapping.get(EntityHorse.NETWORK_ID));
         } else {
             mapping.put(EntityCamel.NETWORK_ID, "minecraft:camel");
-        }*/
+        }
     }
 
     @Override
