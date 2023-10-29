@@ -2,7 +2,6 @@ package cn.nukkit.network.process.processor;
 
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
-import cn.nukkit.entity.passive.EntityNPCEntity;
 import cn.nukkit.event.player.PlayerDialogRespondedEvent;
 import cn.nukkit.form.handler.FormDialogHandler;
 import cn.nukkit.form.response.FormResponseDialog;
@@ -18,7 +17,8 @@ public class NPCRequestProcessor extends DataPacketProcessor<NPCRequestPacket> {
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull NPCRequestPacket pk) {
         Player player = playerHandle.player;
         //若sceneName字段为空，则为玩家在编辑NPC，我们并不需要记录对话框，直接通过entityRuntimeId获取实体即可
-        if (pk.sceneName.isEmpty() && player.level.getEntity(pk.entityRuntimeId) instanceof EntityNPCEntity npcEntity) {
+        //TODO EntityNPCEntity
+        /*if (pk.sceneName.isEmpty() && player.level.getEntity(pk.entityRuntimeId) instanceof EntityNPCEntity npcEntity) {
             FormWindowDialog dialog = npcEntity.getDialog();
 
             FormResponseDialog response = new FormResponseDialog(pk, dialog);
@@ -29,7 +29,7 @@ public class NPCRequestProcessor extends DataPacketProcessor<NPCRequestPacket> {
             PlayerDialogRespondedEvent event = new PlayerDialogRespondedEvent(player, dialog, response);
             player.getServer().getPluginManager().callEvent(event);
             return;
-        }
+        }*/
         if (playerHandle.getDialogWindows().getIfPresent(pk.sceneName) != null) {
             //remove the window from the map only if the requestType is EXECUTE_CLOSING_COMMANDS
             FormWindowDialog dialog;
