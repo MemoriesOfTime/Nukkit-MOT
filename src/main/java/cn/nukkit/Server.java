@@ -2856,7 +2856,7 @@ public class Server {
         Entity.registerEntity("Axolotl", EntityAxolotl.class);
         Entity.registerEntity("GlowSquid", EntityGlowSquid.class);
         Entity.registerEntity("Allay", EntityAllay.class);
-        Entity.registerEntity("NPC", EntityNPCEntity.class);
+        Entity.registerEntity("Npc", EntityNPCEntity.class);
         Entity.registerEntity("Camel", EntityCamel.class);
         //Vehicles
         Entity.registerEntity("MinecartRideable", EntityMinecartEmpty.class);
