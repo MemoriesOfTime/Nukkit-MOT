@@ -29,9 +29,13 @@ public enum GameRule {
     SEND_COMMAND_FEEDBACK("sendCommandFeedback"),
     SHOW_COORDINATES("showCoordinates"),
     SHOW_DEATH_MESSAGES("showDeathMessages"),
+    SHOW_TAGS("showTags"),
     SPAWN_RADIUS("spawnRadius"),
     TNT_EXPLODES("tntExplodes"),
-    SHOW_TAGS("showTags");
+    SHOW_BORDER_EFFECT("showBorderEffect"),
+    PLAYERS_SLEEPING_PERCENTAGE("playersSleepingPercentage"),
+    RECIPES_UNLOCK("recipesUnlock"),
+    DO_LIMITED_CRAFTING("doLimitedCrafting");
 
     private final String name;
 

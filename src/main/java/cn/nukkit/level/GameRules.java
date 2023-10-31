@@ -48,9 +48,13 @@ public class GameRules {
         gameRules.gameRules.put(SEND_COMMAND_FEEDBACK, new Value<>(Type.BOOLEAN, true, 361));
         gameRules.gameRules.put(SHOW_COORDINATES, new Value<>(Type.BOOLEAN, false));
         gameRules.gameRules.put(SHOW_DEATH_MESSAGES, new Value<>(Type.BOOLEAN, true, 332));
+        gameRules.gameRules.put(SHOW_TAGS, new Value<>(Type.BOOLEAN, true, 389));
         gameRules.gameRules.put(SPAWN_RADIUS, new Value<>(Type.INTEGER, 5, 361));
         gameRules.gameRules.put(TNT_EXPLODES, new Value<>(Type.BOOLEAN, true));
-        gameRules.gameRules.put(SHOW_TAGS, new Value<>(Type.BOOLEAN, true, 389));
+        gameRules.gameRules.put(SHOW_BORDER_EFFECT, new Value<>(Type.BOOLEAN, true, 618));
+        gameRules.gameRules.put(PLAYERS_SLEEPING_PERCENTAGE, new Value<>(Type.INTEGER, 100, 618));
+        gameRules.gameRules.put(RECIPES_UNLOCK, new Value<>(Type.BOOLEAN, false, 618));
+        gameRules.gameRules.put(DO_LIMITED_CRAFTING, new Value<>(Type.BOOLEAN, false, 618));
 
         return gameRules;
     }
