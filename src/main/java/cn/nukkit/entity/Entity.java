@@ -715,6 +715,14 @@ public abstract class Entity extends Location implements Metadatable {
         return this.sneaking;
     }
 
+    public boolean isShortSneaking() {
+        return this.sneaking && canShortSneak();
+    }
+
+    protected boolean canShortSneak() {
+        return true;
+    }
+
     public void setSneaking() {
         this.setSneaking(true);
     }
@@ -722,7 +730,9 @@ public abstract class Entity extends Location implements Metadatable {
     public void setSneaking(boolean value) {
         this.sneaking = value;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_SNEAKING, value);
-        this.recalculateBoundingBox(true);
+        if (this.canShortSneak()) {
+            this.recalculateBoundingBox(true);
+        }
     }
 
     public boolean isSwimming() {

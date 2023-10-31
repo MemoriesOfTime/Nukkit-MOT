@@ -6764,6 +6764,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     @Override
+    protected boolean canShortSneak() {
+        return this.protocol >= ProtocolInfo.v1_20_10_21;
+    }
+
+    @Override
     public void setSneaking(boolean value) {
         if (isSneaking() != value) {
             super.setSneaking(value);
