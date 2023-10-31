@@ -38,6 +38,7 @@ import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.Utils;
 import com.google.common.collect.Iterables;
 import org.apache.commons.math3.util.FastMath;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import java.io.ByteArrayInputStream;
@@ -48,6 +49,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
+import static cn.nukkit.utils.Utils.dynamic;
 
 /**
  * @author MagicDroidX
@@ -108,8 +110,12 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_LEAD_HOLDER_EID = 37; //long
     public static final int DATA_SCALE = 38; //float
     public static final int DATA_HAS_NPC_COMPONENT = 39; //byte
-    public static final int DATA_NPC_SKIN_ID = 40; //string
-    public static final int DATA_URL_TAG = 41; //string
+    public static final int DATA_NPC_SKIN_DATA = dynamic(40); //string
+    @Deprecated
+    public static final int DATA_NPC_SKIN_ID = DATA_NPC_SKIN_DATA; //string
+    public static final int DATA_NPC_ACTIONS = dynamic(41); //string
+    @Deprecated
+    public static final int DATA_URL_TAG = DATA_NPC_ACTIONS; //string
     public static final int DATA_MAX_AIR = 42; //short
     public static final int DATA_MARK_VARIANT = 43; //int
     public static final int DATA_CONTAINER_TYPE = 44; //byte
@@ -2192,10 +2198,13 @@ public abstract class Entity extends Location implements Metadatable {
         // Override in Player
     }
 
+    @NotNull
     public Position getPosition() {
         return new Position(this.x, this.y, this.z, this.level);
     }
 
+    @Override
+    @NotNull
     public Location getLocation() {
         return new Location(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw, this.level);
     }

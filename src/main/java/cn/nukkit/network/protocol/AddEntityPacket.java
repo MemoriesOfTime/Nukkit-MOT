@@ -149,12 +149,14 @@ public class AddEntityPacket extends DataPacket {
             mapping.put(EntityStrider.NETWORK_ID, mapping.get(EntityPig.NETWORK_ID));
             mapping.put(EntityZoglin.NETWORK_ID, mapping.get(EntityPig.NETWORK_ID));
             mapping.put(EntityPiglinBrute.NETWORK_ID, mapping.get(EntityZombiePigman.NETWORK_ID));
+            mapping.put(EntityNPCEntity.NETWORK_ID, mapping.get(EntityVillager.NETWORK_ID));
         } else {
             mapping.put(EntityPiglin.NETWORK_ID, "minecraft:piglin");
             mapping.put(EntityHoglin.NETWORK_ID, "minecraft:hoglin");
             mapping.put(EntityStrider.NETWORK_ID, "minecraft:strider");
             mapping.put(EntityZoglin.NETWORK_ID, "minecraft:zoglin");
             mapping.put(EntityPiglinBrute.NETWORK_ID, "minecraft:piglin_brute");
+            mapping.put(EntityNPCEntity.NETWORK_ID, "minecraft:npc");
         }
 
         if (protocolId < ProtocolInfo.v1_17_0 ) {

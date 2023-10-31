@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.form.window.FormWindow;
+import cn.nukkit.form.window.FormWindowDialog;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerUIInventory;
 import cn.nukkit.inventory.transaction.*;
@@ -12,6 +13,7 @@ import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.LoginChainData;
+import com.google.common.cache.Cache;
 import com.google.common.collect.BiMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import org.jetbrains.annotations.NotNull;
@@ -357,13 +359,13 @@ public final class PlayerHandle {
         player.serverSettings = serverSettings;
     }
 
-    /*public Cache<String, FormWindowDialog> getDialogWindows() {
+    public Cache<String, FormWindowDialog> getDialogWindows() {
         return player.dialogWindows;
     }
 
     public void setDialogWindows(Cache<String, FormWindowDialog> dialogWindows) {
         player.dialogWindows = dialogWindows;
-    }*/
+    }
 
     public void setDummyBossBars(Map<Long, DummyBossBar> dummyBossBars) {
         player.dummyBossBars = dummyBossBars;
