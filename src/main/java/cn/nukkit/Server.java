@@ -383,6 +383,10 @@ public class Server {
      */
     public int minimumProtocol;
     /**
+     * Maximum allowed protocol version.
+     */
+    public int maximumProtocol;
+    /**
      * Do not limit the maximum size of player skins.
      */
     public boolean doNotLimitSkinGeometry;
@@ -3018,6 +3022,7 @@ public class Server {
         this.callEntityMotionEv = this.getPropertyBoolean("call-entity-motion-event", true);
         this.updateChecks = this.getPropertyBoolean("update-notifications", false);
         this.minimumProtocol = this.getPropertyInt("multiversion-min-protocol", 0);
+        this.maximumProtocol = this.getPropertyInt("multiversion-max-protocol", ProtocolInfo.CURRENT_PROTOCOL);
         this.whitelistReason = this.getPropertyString("whitelist-reason", "§cServer is white-listed").replace("§n", "\n");
         this.enableExperimentMode = this.getPropertyBoolean("enable-experiment-mode", true);
         this.asyncChunkSending = this.getPropertyBoolean("async-chunks", true);
@@ -3158,6 +3163,7 @@ public class Server {
             put("block-listener", true);
             put("allow-flight", false);
             put("multiversion-min-protocol", 0);
+            put("multiversion-max-protocol", -1);
             put("vanilla-bossbars", false);
             put("strong-ip-bans", false);
             put("worlds-level-auto-save-disabled", "");

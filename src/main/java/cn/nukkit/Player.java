@@ -2846,12 +2846,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
                     this.close("", "You are running unsupported Minecraft version");
-                    this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol " + this.protocol);
+                    this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol (SupportedProtocols) " + this.protocol);
                     return;
                 }
                 if (this.protocol < this.server.minimumProtocol) {
                     this.close("", "Support for this Minecraft version is not enabled");
-                    this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol " + this.protocol);
+                    this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol (minimumProtocol) " + this.protocol);
+                    return;
+                } else if (this.server.maximumProtocol >= Math.max(0, this.server.minimumProtocol) && this.protocol > this.server.maximumProtocol) {
+                    this.close("", "Support for this Minecraft version is not enabled");
+                    this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol (maximumProtocol) " + this.protocol);
                     return;
                 }
                 break;
@@ -2871,13 +2875,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
                     this.close("", "You are running unsupported Minecraft version");
-                    this.server.getLogger().debug(this.username + " disconnected with protocol " + this.protocol);
+                    this.server.getLogger().debug(this.username + " disconnected with protocol (SupportedProtocols) " + this.protocol);
                     break;
                 }
 
                 if (this.protocol < server.minimumProtocol) {
                     this.close("", "Multiversion support for this Minecraft version is disabled");
-                    this.server.getLogger().debug(this.username + " disconnected with protocol " + this.protocol);
+                    this.server.getLogger().debug(this.username + " disconnected with protocol (minimumProtocol) " + this.protocol);
+                    break;
+                } else if (this.server.maximumProtocol >= Math.max(0, this.server.minimumProtocol) && this.protocol > this.server.maximumProtocol) {
+                    this.close("", "Support for this Minecraft version is not enabled");
+                    this.server.getLogger().debug(this.username + " disconnected with unsupported protocol (maximumProtocol) " + this.protocol);
                     break;
                 }
 
