@@ -52,12 +52,19 @@ public class Utils {
      */
     public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(10, 11, 12, 26, 30, 31, 140, 158));
 
+    /**
+     * 检查物品或方块是否已在nk中实现
+     * Check if the item or block id is implemented in Nukkit.
+     *
+     * @param id 物品或方块id
+     * @return 是否已实现
+     */
     public static boolean hasItemOrBlock(int id) {
         if (id < 0) {
             int blockId = 255 - id;
             return blockId < Block.MAX_BLOCK_ID && Block.list[blockId] != null;
         } else {
-            return id < 65535 && Item.list[id] != null;
+            return id < Item.list.length && Item.list[id] != null;
         }
     }
 
