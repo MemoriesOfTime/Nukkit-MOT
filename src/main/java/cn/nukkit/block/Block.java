@@ -428,6 +428,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[WARPED_NYLIUM] = BlockNyliumWarped.class; //488
             list[BASALT] = BlockBasalt.class; //489
 
+            list[SOUL_SOIL] = BlockSoulSoil.class; //491
+
             list[STRIPPED_CRIMSON_STEM] = BlockStemStrippedCrimson.class; //495
             list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
             list[CRIMSON_PLANKS] = BlockPlanksCrimson.class; //497
@@ -721,6 +723,13 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public boolean onActivate(Item item, Player player) {
+        return false;
+    }
+
+    /**
+     * @return 是否可以被灵魂疾行附魔加速<br>Whether it can be accelerated by the soul speed enchantment
+     */
+    public boolean isSoulSpeedCompatible() {
         return false;
     }
 
