@@ -253,7 +253,7 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
     public void fall(float fallDistance) {
         super.fall(fallDistance);
 
-        this.level.addLevelSoundEvent(this, LevelEventPacket.EVENT_SOUND_ARMOR_STAND_FALL);
+        this.level.addLevelEvent(this, LevelEventPacket.EVENT_SOUND_ARMOR_STAND_FALL);
     }
 
     @Override
@@ -328,8 +328,6 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
             return false;
         }
 
-        if (this.timing != null) this.timing.startTiming();
-
         boolean hasUpdate = super.onUpdate(currentTick);
 
         if (!this.isOnGround()) {
@@ -341,8 +339,6 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
         if (this.move(this.motionX, this.motionY, this.motionZ)) {
             this.updateMovement();
         }
-
-        if (this.timing != null) this.timing.stopTiming();
 
         return hasUpdate;
     }

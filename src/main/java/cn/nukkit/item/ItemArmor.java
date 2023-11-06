@@ -1,8 +1,11 @@
 package cn.nukkit.item;
 
 import cn.nukkit.Player;
+import cn.nukkit.item.trim.ItemTrimMaterialType;
+import cn.nukkit.item.trim.ItemTrimPatternType;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.ByteTag;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 
@@ -130,5 +133,16 @@ abstract public class ItemArmor extends Item implements ItemDurable {
     @Override
     public boolean canBePutInHelmetSlot() {
         return this.isHelmet();
+    }
+
+    public void setTrim(ItemTrimPatternType pattern, ItemTrimMaterialType material) {
+        CompoundTag tag = new CompoundTag();
+        if (this.hasCompoundTag()) {
+            tag = this.getNamedTag();
+        }
+        tag = tag.putCompound("Trim", new CompoundTag()
+                .putString("Pattern", pattern.getTrimPattern())
+                .putString("Material", material.getMaterialName()));
+        this.setCompoundTag(tag);
     }
 }

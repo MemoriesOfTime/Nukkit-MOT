@@ -29,10 +29,11 @@ public class PopulatorCactus extends PopulatorSurfaceBlock {
         }
         if (y > 0) {
             for (int i = 0; i < height; i++) {
-                y += i;
-                if (canStay(x, y, z, chunk)) {
-                    placeBlock(x, y, z, getBlockId(x, z, random, chunk), chunk, random);
+                if (!canStay(x, y, z, chunk)) {
+                    break;
                 }
+                placeBlock(x, y, z, getBlockId(x, z, random, chunk), chunk, random);
+                y++;
             }
         }
     }

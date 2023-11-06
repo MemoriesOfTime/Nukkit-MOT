@@ -25,7 +25,7 @@ public class Skin {
     public static final int DOUBLE_SKIN_SIZE = 16384;
     public static final int SKIN_128_64_SIZE = 32768;
     public static final int SKIN_128_128_SIZE = 65536;
-    
+
     private static final int MAX_DATA_SIZE = 262144;
 
     public static final String GEOMETRY_CUSTOM = convertLegacyGeometryName("geometry.humanoid.custom");
@@ -67,10 +67,18 @@ public class Skin {
     private boolean overridingPlayerAppearance = true;
 
     public boolean isValid() {
-        return isValidSkin() && isValidResourcePatch();
+        return isValid(Server.getInstance().doNotLimitSkinGeometry);
+    }
+
+    public boolean isValid(boolean doNotLimitSkinGeometry) {
+        return isValidSkin(doNotLimitSkinGeometry) && isValidResourcePatch();
     }
 
     private boolean isValidSkin() {
+        return isValidSkin(Server.getInstance().doNotLimitSkinGeometry);
+    }
+
+    private boolean isValidSkin(boolean doNotLimitSkinGeometry) {
         return skinId != null && !skinId.trim().isEmpty() && skinId.length() < 100 &&
                 skinData != null && skinData.width >= 64 && skinData.height >= 32 &&
                 skinData.data.length >= SINGLE_SKIN_SIZE &&
@@ -79,7 +87,7 @@ public class Skin {
                 (skinColor == null || skinColor.length() < 100) &&
                 (armSize == null || armSize.length() < 100) &&
                 (geometryDataEngineVersion == null || geometryDataEngineVersion.length() < 100) &&
-                (Server.getInstance().doNotLimitSkinGeometry || skinData.data.length <= MAX_DATA_SIZE);
+                (doNotLimitSkinGeometry || skinData.data.length <= MAX_DATA_SIZE);
     }
 
     private boolean isValidResourcePatch() {

@@ -181,6 +181,8 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
                 this.movable = true;
             }
 
+            this.level.updateAroundObserver(this);
+
             this.level.scheduleUpdate(this.getLevelBlock(), 1);
             this.attachedBlocks.clear();
             hasUpdate = false;

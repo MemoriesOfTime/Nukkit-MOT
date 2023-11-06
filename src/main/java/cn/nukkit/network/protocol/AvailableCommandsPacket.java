@@ -3,11 +3,14 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.command.data.*;
 import cn.nukkit.network.protocol.types.CommandParam;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.SequencedHashSet;
 import cn.nukkit.utils.TypeMap;
 import lombok.ToString;
 
 import java.util.*;
 import java.util.function.ObjIntConsumer;
+
+import static com.nukkitx.network.util.Preconditions.checkArgument;
 
 /**
  * @author MagicDroidX
@@ -84,9 +87,9 @@ public class AvailableCommandsPacket extends DataPacket {
     private static final TypeMap<CommandParam> COMMAND_PARAMS_575 = TypeMap.builder(CommandParam.class)
             .insert(0, CommandParam.UNKNOWN)
             .insert(1, CommandParam.INT)
-            .insert(2, CommandParam.FLOAT)
-            .insert(3, CommandParam.VALUE)
-            .insert(4, CommandParam.R_VALUE)
+            //.insert(2, CommandParam.FLOAT)
+            .insert(3, CommandParam.FLOAT) // FLOAT is actually VALUE
+            .insert(4, CommandParam.VALUE) // and VALUE is actually R_VALUE
             .insert(5, CommandParam.WILDCARD_INT)
             .insert(6, CommandParam.OPERATOR)
             .insert(7, CommandParam.COMPARE_OPERATOR)
@@ -197,7 +200,7 @@ public class AvailableCommandsPacket extends DataPacket {
             return COMMAND_PARAMS_582;
         } else if (protocol >= ProtocolInfo.v1_19_70_24) {
             return COMMAND_PARAMS_575;
-        } else if (protocol >= ProtocolInfo.v1_19_0) {
+        } else if (protocol >= ProtocolInfo.v1_19_0_29) {
             return COMMAND_PARAMS_527;
         } else if (protocol >= ProtocolInfo.v1_18_30) {
             return COMMAND_PARAMS_503;
@@ -342,7 +345,9 @@ public class AvailableCommandsPacket extends DataPacket {
         this.reset();
 
         LinkedHashSet<String> enumValuesSet = new LinkedHashSet<>();
+        SequencedHashSet<String> subCommandValues = new SequencedHashSet<>();
         LinkedHashSet<String> postFixesSet = new LinkedHashSet<>();
+        SequencedHashSet<ChainedSubCommandData> subCommandData = new SequencedHashSet<>();
         LinkedHashSet<CommandEnum> enumsSet = new LinkedHashSet<>();
 
         commands.forEach((name, data) -> {
@@ -352,6 +357,23 @@ public class AvailableCommandsPacket extends DataPacket {
                 enumsSet.add(cmdData.aliases);
 
                 enumValuesSet.addAll(cmdData.aliases.getValues());
+            }
+
+            for (ChainedSubCommandData subcommand : cmdData.subcommands) {
+                if (subCommandData.contains(subcommand)) {
+                    continue;
+                }
+
+                subCommandData.add(subcommand);
+                for (ChainedSubCommandData.Value value : subcommand.getValues()) {
+                    if (subCommandValues.contains(value.getFirst())) {
+                        subCommandValues.add(value.getFirst());
+                    }
+
+                    if (subCommandValues.contains(value.getSecond())) {
+                        subCommandValues.add(value.getSecond());
+                    }
+                }
             }
 
             for (CommandOverload overload : cmdData.overloads.values()) {
@@ -376,13 +398,18 @@ public class AvailableCommandsPacket extends DataPacket {
         this.putUnsignedVarInt(enumValues.size());
         enumValues.forEach(this::putString);
 
+        if (this.protocol >= ProtocolInfo.v1_20_10_21) {
+            this.putUnsignedVarInt(subCommandValues.size());
+            subCommandValues.forEach(this::putString);
+        }
+
         this.putUnsignedVarInt(postFixes.size());
         postFixes.forEach(this::putString);
 
         ObjIntConsumer<BinaryStream> indexWriter;
-        if (enumValues.size() < 256) {
+        if (enumValues.size() <= 256) {
             indexWriter = WRITE_BYTE;
-        } else if (enumValues.size() < 65536) {
+        } else if (enumValues.size() <= 65536) {
             indexWriter = WRITE_SHORT;
         } else {
             indexWriter = WRITE_INT;
@@ -406,6 +433,24 @@ public class AvailableCommandsPacket extends DataPacket {
             }
         });
 
+        if (this.protocol >= ProtocolInfo.v1_20_10_21) {
+            this.putUnsignedVarInt(subCommandData.size());
+            for (ChainedSubCommandData chainedSubCommandData : subCommandData) {
+                this.putString(chainedSubCommandData.getName());
+                this.putUnsignedVarInt(chainedSubCommandData.getValues().size());
+                for (ChainedSubCommandData.Value value : chainedSubCommandData.getValues()) {
+                    int first = subCommandValues.indexOf(value.getFirst());
+                    checkArgument(first > -1, "Invalid enum value detected: " + value.getFirst());
+
+                    int second = subCommandValues.indexOf(value.getSecond());
+                    checkArgument(second > -1, "Invalid enum value detected: " + value.getSecond());
+
+                    this.putLShort(first);
+                    this.putLShort(second);
+                }
+            }
+        }
+
         putUnsignedVarInt(commands.size());
 
         commands.forEach((name, cmdData) -> {
@@ -422,8 +467,20 @@ public class AvailableCommandsPacket extends DataPacket {
 
             putLInt(data.aliases == null ? -1 : enums.indexOf(data.aliases));
 
+            if (this.protocol >= ProtocolInfo.v1_20_10_21) {
+                this.putUnsignedVarInt(data.subcommands.size());
+                for (ChainedSubCommandData subcommand : data.subcommands) {
+                    int index = subCommandData.indexOf(subcommand);
+                    checkArgument(index > -1, "Invalid subcommand index: " + subcommand);
+                    this.putLShort(index);
+                }
+            }
+
             putUnsignedVarInt(data.overloads.size());
             for (CommandOverload overload : data.overloads.values()) {
+                if (this.protocol >= ProtocolInfo.v1_20_10_21) {
+                    this.putBoolean(overload.chaining);
+                }
                 putUnsignedVarInt(overload.input.parameters.length);
 
                 for (CommandParameter parameter : overload.input.parameters) {
@@ -444,105 +501,6 @@ public class AvailableCommandsPacket extends DataPacket {
                         } else {
                             CommandParam commandParam = COMMAND_PARAMS.getType(parameter.type.getId()); //正常来说应该传入最新版的数字id
                             int id = getCommandParams(protocol).getId(commandParam);
-
-                            /*if (protocol < ProtocolInfo.v1_8_0) {
-                                switch (parameter.type) {
-                                    case STRING:
-                                        id = 0x0f;
-                                        break;
-                                    case POSITION:
-                                    case BLOCK_POSITION:
-                                        id = 0x10;
-                                        break;
-                                    case MESSAGE:
-                                        id = 0x13;
-                                        break;
-                                    case RAWTEXT:
-                                        id = 0x15;
-                                        break;
-                                    case JSON:
-                                        id = 0x18;
-                                        break;
-                                    case COMMAND:
-                                        id = 0x1f;
-                                        break;
-                                }
-                            } else if (protocol < ProtocolInfo.v1_13_0) {
-                                switch (parameter.type) {
-                                    case STRING:
-                                        id = 27;
-                                        break;
-                                    case POSITION:
-                                    case BLOCK_POSITION:
-                                        id = 29;
-                                        break;
-                                    case MESSAGE:
-                                        id = 32;
-                                        break;
-                                    case RAWTEXT:
-                                        id = 34;
-                                        break;
-                                    case JSON:
-                                        id = 37;
-                                        break;
-                                    case COMMAND:
-                                        id = 44;
-                                        break;
-                                }
-                            } else if (protocol >= ProtocolInfo.v1_19_0) {
-                                if (id == ARG_TYPE_TARGET) {
-                                    id = 8;
-                                }else if (id == ARG_TYPE_WILDCARD_TARGET) {
-                                    id = 10;
-                                }else if (id == ARG_TYPE_FILE_PATH) {
-                                    id = 17;
-                                }else if (id == ARG_TYPE_EQUIPMENT_SLOT) {
-                                    id = 38;
-                                }else if (id >= ARG_TYPE_STRING && id <= ARG_TYPE_JSON) { //29-47
-                                    id = id + 10;
-                                }else if (id == ARG_TYPE_COMMAND) {
-                                    id = 70;
-                                }else if (id == ARG_TYPE_COMPARE_OPERATOR) {
-                                    id = 7;
-                                }
-                            } else if (protocol >= ProtocolInfo.v1_18_30) {
-                                if (id == ARG_TYPE_WILDCARD_TARGET ) {
-                                    id = 9;
-                                } else if (id == ARG_TYPE_STRING) {
-                                    id = 38;
-                                } else if (id == ARG_TYPE_BLOCK_POSITION) {
-                                    id = 46;
-                                } else if (id == ARG_TYPE_POSITION) {
-                                    id = 47;
-                                } else if (id == ARG_TYPE_MESSAGE) {
-                                    id = 50;
-                                } else if (id == ARG_TYPE_RAWTEXT) {
-                                    id = 52;
-                                } else if (id == ARG_TYPE_JSON) {
-                                    id = 56;
-                                } else if (id == ARG_TYPE_COMMAND) {
-                                    id = 69;
-                                }else if (id == ARG_TYPE_EQUIPMENT_SLOT) {
-                                    id = 37;
-                                }
-                            } else if (protocol >= ProtocolInfo.v1_16_210) { //TODO: proper implementation for 1.16.210 command params
-                                if (id == ARG_TYPE_COMMAND) {
-                                    id = 63;
-                                } else if (id == ARG_TYPE_FILE_PATH) {
-                                    id = id + 2; // +1 from .100 and +1 from .210
-                                } else if (id >= ARG_TYPE_STRING) {
-                                    id = id + 3; // +2 from .100 and +1 from .210
-                                } else if (id >= ARG_TYPE_FLOAT) {
-                                    id++;
-                                }
-                            } else if (protocol >= ProtocolInfo.v1_16_100) { //TODO: proper implementation for 1.16.100 command params
-                                if (id == ARG_TYPE_FILE_PATH) {
-                                    id++;
-                                } else if (id >= ARG_TYPE_STRING) {
-                                    id = id + 2;
-                                }
-                            }*/
-
                             type |= id;
                         }
                     }
@@ -550,7 +508,15 @@ public class AvailableCommandsPacket extends DataPacket {
                     putLInt(type);
                     putBoolean(parameter.optional);
                     if (protocol >= 340) {
-                        putByte(parameter.options);
+                        byte options = 0;
+                        if (parameter.paramOptions != null) {
+                            for (CommandParamOption option : parameter.paramOptions) {
+                                options |= (byte) (1 << option.ordinal());
+                            }
+                        } else {
+                            options = parameter.options;
+                        }
+                        this.putByte(options);
                     }
                 }
             }
@@ -567,7 +533,7 @@ public class AvailableCommandsPacket extends DataPacket {
         }
 
         if (protocol >= 407) {
-            this.putUnsignedVarInt(0);
+            this.putUnsignedVarInt(0); //enumConstraints
         }
     }
 }

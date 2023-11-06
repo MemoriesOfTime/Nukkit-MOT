@@ -48,7 +48,6 @@ public class GiveCommand extends VanillaCommand {
 
         if (args.length < 2) {
             sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-
             return true;
         }
 
@@ -81,10 +80,10 @@ public class GiveCommand extends VanillaCommand {
             player.getInventory().addItem(item.clone());
         } else {
             sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.player.notFound"));
-
             return true;
         }
-        Command.broadcastCommandMessage(sender, new TranslationContainer(
+
+        broadcastCommandMessage(sender, new TranslationContainer(
                 "%commands.give.success",
                 item.getName() + " (" + item.getId() + ':' + item.getDamage() + ')',
                 String.valueOf(item.getCount()),

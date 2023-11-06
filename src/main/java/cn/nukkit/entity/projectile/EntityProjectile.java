@@ -96,13 +96,14 @@ public abstract class EntityProjectile extends Entity {
 
     @Override
     protected void initEntity() {
-        super.initEntity();
-
         this.setMaxHealth(1);
+        super.initEntity();
         this.setHealth(1);
         if (this.namedTag.contains("Age")) {
             this.age = this.namedTag.getShort("Age");
         }
+
+        this.updateRotation();
     }
 
     @Override
@@ -168,13 +169,11 @@ public abstract class EntityProjectile extends Entity {
                 movingObjectPosition = MovingObjectPosition.fromEntity(nearEntity);
             }
 
-            if (movingObjectPosition != null) {
-                if (movingObjectPosition.entityHit != null) {
-                    onCollideWithEntity(movingObjectPosition.entityHit);
-                    hasUpdate = true;
-                    if (this.hadCollision) {
-                        return true;
-                    }
+            if (movingObjectPosition != null && movingObjectPosition.entityHit != null) {
+                onCollideWithEntity(movingObjectPosition.entityHit);
+                hasUpdate = true;
+                if (this.closed) {
+                    return true;
                 }
             }
 

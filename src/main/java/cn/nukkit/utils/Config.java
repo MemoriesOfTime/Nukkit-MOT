@@ -5,8 +5,11 @@ import cn.nukkit.scheduler.FileWriteTask;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
+import org.snakeyaml.engine.v2.api.Dump;
+import org.snakeyaml.engine.v2.api.DumpSettings;
+import org.snakeyaml.engine.v2.api.Load;
+import org.snakeyaml.engine.v2.api.LoadSettings;
+import org.snakeyaml.engine.v2.common.FlowStyle;
 
 import java.io.File;
 import java.io.IOException;
@@ -301,10 +304,13 @@ public class Config {
                     content = new StringBuilder(new GsonBuilder().setPrettyPrinting().create().toJson(this.config));
                     break;
                 case Config.YAML:
-                    DumperOptions dumperOptions = new DumperOptions();
-                    dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-                    Yaml yaml = new Yaml(dumperOptions);
-                    content = new StringBuilder(yaml.dump(this.config));
+                    DumpSettings dumperOptions = DumpSettings.builder()
+                            .setDefaultFlowStyle(FlowStyle.BLOCK)
+                            .setSplitLines(false)
+                            .setDumpComments(false)
+                            .build();
+                    Dump yaml = new Dump(dumperOptions);
+                    content = new StringBuilder(yaml.dumpToString(this.config));
                     break;
                 case Config.ENUM:
                     for (Object o : this.config.entrySet()) {
@@ -617,10 +623,11 @@ public class Config {
                 this.config = new ConfigSection(gson.fromJson(content, new LinkedHashMapTypeToken().getType()));
                 break;
             case Config.YAML:
-                DumperOptions dumperOptions = new DumperOptions();
-                dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-                Yaml yaml = new Yaml(dumperOptions);
-                this.config = new ConfigSection(yaml.loadAs(content, LinkedHashMap.class));
+                LoadSettings settings = LoadSettings.builder()
+                        .setParseComments(false)
+                        .build();
+                Load yaml = new Load(settings);
+                this.config = new ConfigSection((LinkedHashMap<String, Object>) yaml.loadFromString(content));
                 break;
             case Config.ENUM:
                 this.parseList(content);

@@ -1,7 +1,9 @@
 package cn.nukkit.utils;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
 import cn.nukkit.entity.mob.*;
+import cn.nukkit.item.Item;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -39,6 +41,7 @@ public class Utils {
     /**
      * An empty damage array used when mobs have no attack damage.
      */
+    @Deprecated
     public static final int[] emptyDamageArray = new int[] { 0, 0, 0, 0 };
     /**
      * List of network ids of monsters. Currently used for example to check which entities will make players unable to sleep when nearby the bed.
@@ -49,6 +52,26 @@ public class Utils {
      */
     public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(10, 11, 12, 26, 30, 31, 140, 158));
 
+    /**
+     * 检查物品或方块是否已在nk中实现
+     * Check if the item or block id is implemented in Nukkit.
+     *
+     * @param id 物品或方块id
+     * @return 是否已实现
+     */
+    public static boolean hasItemOrBlock(int id) {
+        if (id < 0) {
+            int blockId = 255 - id;
+            return blockId < Block.MAX_BLOCK_ID && Block.list[blockId] != null;
+        } else {
+            return id < Item.list.length && Item.list[id] != null;
+        }
+    }
+
+    public static int[] getEmptyDamageArray() {
+        return new int[] { 0, 0, 0, 0 };
+    }
+    
     public static void writeFile(String fileName, String content) throws IOException {
         writeFile(fileName, new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
     }
@@ -292,9 +315,20 @@ public class Utils {
     public static int toInt(Object number) {
         if (number instanceof Integer) {
             return (Integer) number;
+        } else if (number instanceof String) {
+            return new BigDecimal(number.toString()).intValue();
         }
 
         return (int) Math.round((double) number);
+    }
+
+    public static double toDouble(Object number) {
+        if (number instanceof Double doubleNumber) {
+            return doubleNumber;
+        } else if (number instanceof String) {
+            return new BigDecimal(number.toString()).doubleValue();
+        }
+        return (double) number;
     }
 
     public static byte[] parseHexBinary(String s) {
@@ -372,6 +406,10 @@ public class Utils {
         return value;
     }
 
+    public static <T> T dynamic(T value) {
+        return value;
+    }
+
     /**
      * Get game version string by protocol version.
      * For internal usage!
@@ -415,17 +453,21 @@ public class Utils {
             case ProtocolInfo.v1_18_0 -> "1.18.0";
             case ProtocolInfo.v1_18_10_26, ProtocolInfo.v1_18_10 -> "1.18.10";
             case ProtocolInfo.v1_18_30 -> "1.18.30";
-            case ProtocolInfo.v1_19_0 -> "1.19.0";
+            case ProtocolInfo.v1_19_0_29, ProtocolInfo.v1_19_0_31, ProtocolInfo.v1_19_0 -> "1.19.0";
             case ProtocolInfo.v1_19_10 -> "1.19.10";
             case ProtocolInfo.v1_19_20 -> "1.19.20";
             case ProtocolInfo.v1_19_21 -> "1.19.21";
             case ProtocolInfo.v1_19_30_23, ProtocolInfo.v1_19_30 -> "1.19.30";
             case ProtocolInfo.v1_19_40 -> "1.19.40";
-            case ProtocolInfo.v1_19_50 -> "1.19.50";
+            case ProtocolInfo.v1_19_50_20, ProtocolInfo.v1_19_50 -> "1.19.50";
             case ProtocolInfo.v1_19_60 -> "1.19.60";
             case ProtocolInfo.v1_19_63 -> "1.19.63";
             case ProtocolInfo.v1_19_70_24, ProtocolInfo.v1_19_70 -> "1.19.70";
             case ProtocolInfo.v1_19_80 -> "1.19.80";
+            case ProtocolInfo.v1_20_0_23, ProtocolInfo.v1_20_0 -> "1.20.0";
+            case ProtocolInfo.v1_20_10_21, ProtocolInfo.v1_20_10 -> "1.20.10";
+            case ProtocolInfo.v1_20_30_24, ProtocolInfo.v1_20_30 -> "1.20.30";
+            case ProtocolInfo.v1_20_40 -> "1.20.40";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };

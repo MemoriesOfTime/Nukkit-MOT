@@ -23,10 +23,10 @@
  */
 package co.aikar.timings;
 
+import cn.nukkit.utils.JsonUtil;
 import com.google.gson.JsonArray;
 
-import cn.nukkit.utils.JsonUtil;
-
+@Deprecated
 class TimingData {
 
     private int id;

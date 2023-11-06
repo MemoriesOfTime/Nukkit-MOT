@@ -5,6 +5,14 @@ public class EmotePacket extends DataPacket {
     public static final byte NETWORK_ID = ProtocolInfo.EMOTE_PACKET;
 
     public long runtimeId;
+    /**
+     * @since v588
+     */
+    public String xuid;
+    /**
+     * @since 588
+     */
+    public String platformId;
     public String emoteID;
     public byte flags;
 
@@ -17,6 +25,10 @@ public class EmotePacket extends DataPacket {
     public void decode() {
         this.runtimeId = this.getEntityRuntimeId();
         this.emoteID = this.getString();
+        if (this.protocol >= ProtocolInfo.v1_20_0_23) {
+            this.xuid = this.getString();
+            this.platformId = this.getString();
+        }
         this.flags = (byte) this.getByte();
     }
 
@@ -25,6 +37,10 @@ public class EmotePacket extends DataPacket {
         this.reset();
         this.putEntityRuntimeId(this.runtimeId);
         this.putString(this.emoteID);
+        if (this.protocol >= ProtocolInfo.v1_20_0_23) {
+            this.putString(this.xuid != null ? this.xuid : "");
+            this.putString(this.platformId != null ? this.platformId : "");
+        }
         this.putByte(flags);
     }
 }

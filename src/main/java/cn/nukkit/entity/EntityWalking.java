@@ -36,7 +36,7 @@ public abstract class EntityWalking extends BaseEntity {
                     continue;
                 }
 
-                if (creature instanceof BaseEntity && ((BaseEntity) creature).isFriendly() == this.isFriendly()) {
+                if (creature instanceof BaseEntity baseEntity && baseEntity.isFriendly() == this.isFriendly() && !this.isInLove()) {
                     continue;
                 }
 

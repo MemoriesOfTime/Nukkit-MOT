@@ -20,7 +20,6 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.utils.Utils;
-import co.aikar.timings.Timings;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.apache.commons.math3.util.FastMath;
@@ -198,15 +197,8 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        if (Timings.entityBaseTickTimer != null) {
-            Timings.entityBaseTickTimer.startTiming();
-        }
-
         if (this.canDespawn() && this.age > Server.getInstance().mobDespawnTicks && !this.hasCustomName() && !(this instanceof EntityBoss)) {
             this.close();
-            if (Timings.entityBaseTickTimer != null) {
-                Timings.entityBaseTickTimer.stopTiming();
-            }
             return true;
         }
 
@@ -241,15 +233,11 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             this.inLoveCooldown -= tickDiff;
         }
 
-        if (Timings.entityBaseTickTimer != null) {
-            Timings.entityBaseTickTimer.stopTiming();
-        }
-
         return hasUpdate;
     }
 
     protected boolean checkSpawnBaby(Entity entity) {
-        if (!(entity instanceof BaseEntity baseEntity) || entity.getNetworkId() != this.getNetworkId()) {
+        if (!(entity instanceof BaseEntity baseEntity) || entity == this || entity.getNetworkId() != this.getNetworkId()) {
             return false;
         }
         if (!baseEntity.isInLove() || baseEntity.isBaby() || baseEntity.age <= 0) {
@@ -278,6 +266,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         BaseEntity newEntity = (BaseEntity) Entity.createEntity(getNetworkId(), this, new Object[0]);
         newEntity.setBaby(true);
         newEntity.spawnToAll();
+        this.level.dropExpOrb(this, Utils.rand(1, 7));
         return true;
     }
 
@@ -323,10 +312,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             return false;
         }
 
-        if (Timings.entityMoveTimer != null) {
-            Timings.entityMoveTimer.startTiming();
-        }
-
         this.blocksAround = null;
 
         double movX = dx * moveMultiplier;
@@ -356,9 +341,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.checkGroundState(movX, movY, movZ, dx, dy, dz);
         this.updateFallState(this.onGround);
 
-        if (Timings.entityMoveTimer != null) {
-            Timings.entityMoveTimer.stopTiming();
-        }
         return true;
     }
 
@@ -423,128 +405,128 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         Item boots = Item.get(0);
 
         switch (Utils.rand(1, 5)) {
-			case 1 -> {
-				if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
-					helmet = Item.get(Item.LEATHER_HELMET, Utils.rand(30, 48), 1);
-				}
-			}
-			case 2 -> {
-				if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
-					helmet = Item.get(Item.GOLD_HELMET, Utils.rand(40, 70), 1);
-				}
-			}
-			case 3 -> {
-				if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
-					helmet = Item.get(Item.CHAIN_HELMET, Utils.rand(100, 160), 1);
-				}
-			}
-			case 4 -> {
-				if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
-					helmet = Item.get(Item.IRON_HELMET, Utils.rand(100, 160), 1);
-				}
-			}
-			case 5 -> {
-				if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
-					helmet = Item.get(Item.DIAMOND_HELMET, Utils.rand(190, 256), 1);
-				}
-			}
-		}
+            case 1 -> {
+                if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
+                    helmet = Item.get(Item.LEATHER_HELMET, Utils.rand(30, 48), 1);
+                }
+            }
+            case 2 -> {
+                if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
+                    helmet = Item.get(Item.GOLD_HELMET, Utils.rand(40, 70), 1);
+                }
+            }
+            case 3 -> {
+                if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
+                    helmet = Item.get(Item.CHAIN_HELMET, Utils.rand(100, 160), 1);
+                }
+            }
+            case 4 -> {
+                if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
+                    helmet = Item.get(Item.IRON_HELMET, Utils.rand(100, 160), 1);
+                }
+            }
+            case 5 -> {
+                if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
+                    helmet = Item.get(Item.DIAMOND_HELMET, Utils.rand(190, 256), 1);
+                }
+            }
+        }
 
-		slots[0] = helmet;
+        slots[0] = helmet;
 
-		if (Utils.rand(1, 4) != 1) {
-			switch (Utils.rand(1, 5)) {
-				case 1 -> {
-					if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
-						chestplate = Item.get(Item.LEATHER_CHESTPLATE, Utils.rand(60, 73), 1);
-					}
-				}
-				case 2 -> {
-					if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
-						chestplate = Item.get(Item.GOLD_CHESTPLATE, Utils.rand(65, 105), 1);
-					}
-				}
-				case 3 -> {
-					if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
-						chestplate = Item.get(Item.CHAIN_CHESTPLATE, Utils.rand(170, 233), 1);
-					}
-				}
-				case 4 -> {
-					if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
-						chestplate = Item.get(Item.IRON_CHESTPLATE, Utils.rand(170, 233), 1);
-					}
-				}
-				case 5 -> {
-					if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
-						chestplate = Item.get(Item.DIAMOND_CHESTPLATE, Utils.rand(421, 521), 1);
-					}
-				}
-			}
-		}
+        if (Utils.rand(1, 4) != 1) {
+            switch (Utils.rand(1, 5)) {
+                case 1 -> {
+                    if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
+                        chestplate = Item.get(Item.LEATHER_CHESTPLATE, Utils.rand(60, 73), 1);
+                    }
+                }
+                case 2 -> {
+                    if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
+                        chestplate = Item.get(Item.GOLD_CHESTPLATE, Utils.rand(65, 105), 1);
+                    }
+                }
+                case 3 -> {
+                    if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
+                        chestplate = Item.get(Item.CHAIN_CHESTPLATE, Utils.rand(170, 233), 1);
+                    }
+                }
+                case 4 -> {
+                    if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
+                        chestplate = Item.get(Item.IRON_CHESTPLATE, Utils.rand(170, 233), 1);
+                    }
+                }
+                case 5 -> {
+                    if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
+                        chestplate = Item.get(Item.DIAMOND_CHESTPLATE, Utils.rand(421, 521), 1);
+                    }
+                }
+            }
+        }
 
-		slots[1] = chestplate;
+        slots[1] = chestplate;
 
-		if (Utils.rand(1, 2) == 2) {
-			switch (Utils.rand(1, 5)) {
-				case 1 -> {
-					if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
-						leggings = Item.get(Item.LEATHER_LEGGINGS, Utils.rand(35, 68), 1);
-					}
-				}
-				case 2 -> {
-					if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
-						leggings = Item.get(Item.GOLD_LEGGINGS, Utils.rand(50, 98), 1);
-					}
-				}
-				case 3 -> {
-					if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
-						leggings = Item.get(Item.CHAIN_LEGGINGS, Utils.rand(170, 218), 1);
-					}
-				}
-				case 4 -> {
-					if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
-						leggings = Item.get(Item.IRON_LEGGINGS, Utils.rand(170, 218), 1);
-					}
-				}
-				case 5 -> {
-					if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
-						leggings = Item.get(Item.DIAMOND_LEGGINGS, Utils.rand(388, 488), 1);
-					}
-				}
-			}
-		}
+        if (Utils.rand(1, 2) == 2) {
+            switch (Utils.rand(1, 5)) {
+                case 1 -> {
+                    if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
+                        leggings = Item.get(Item.LEATHER_LEGGINGS, Utils.rand(35, 68), 1);
+                    }
+                }
+                case 2 -> {
+                    if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
+                        leggings = Item.get(Item.GOLD_LEGGINGS, Utils.rand(50, 98), 1);
+                    }
+                }
+                case 3 -> {
+                    if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
+                        leggings = Item.get(Item.CHAIN_LEGGINGS, Utils.rand(170, 218), 1);
+                    }
+                }
+                case 4 -> {
+                    if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
+                        leggings = Item.get(Item.IRON_LEGGINGS, Utils.rand(170, 218), 1);
+                    }
+                }
+                case 5 -> {
+                    if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
+                        leggings = Item.get(Item.DIAMOND_LEGGINGS, Utils.rand(388, 488), 1);
+                    }
+                }
+            }
+        }
 
-		slots[2] = leggings;
+        slots[2] = leggings;
 
-		if (Utils.rand(1, 5) < 3) {
-			switch (Utils.rand(1, 5)) {
-				case 1 -> {
-					if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
-						boots = Item.get(Item.LEATHER_BOOTS, Utils.rand(35, 58), 1);
-					}
-				}
-				case 2 -> {
-					if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
-						boots = Item.get(Item.GOLD_BOOTS, Utils.rand(50, 86), 1);
-					}
-				}
-				case 3 -> {
-					if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
-						boots = Item.get(Item.CHAIN_BOOTS, Utils.rand(100, 188), 1);
-					}
-				}
-				case 4 -> {
-					if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
-						boots = Item.get(Item.IRON_BOOTS, Utils.rand(100, 188), 1);
-					}
-				}
-				case 5 -> {
-					if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
-						boots = Item.get(Item.DIAMOND_BOOTS, Utils.rand(350, 428), 1);
-					}
-				}
-			}
-		}
+        if (Utils.rand(1, 5) < 3) {
+            switch (Utils.rand(1, 5)) {
+                case 1 -> {
+                    if (Utils.rand(1, 100) < 39 && Utils.rand(0, 1) == 0) {
+                        boots = Item.get(Item.LEATHER_BOOTS, Utils.rand(35, 58), 1);
+                    }
+                }
+                case 2 -> {
+                    if (Utils.rand(1, 100) < 50 && Utils.rand(0, 1) == 0) {
+                        boots = Item.get(Item.GOLD_BOOTS, Utils.rand(50, 86), 1);
+                    }
+                }
+                case 3 -> {
+                    if (Utils.rand(1, 100) < 14 && Utils.rand(0, 1) == 0) {
+                        boots = Item.get(Item.CHAIN_BOOTS, Utils.rand(100, 188), 1);
+                    }
+                }
+                case 4 -> {
+                    if (Utils.rand(1, 100) < 3 && Utils.rand(0, 1) == 0) {
+                        boots = Item.get(Item.IRON_BOOTS, Utils.rand(100, 188), 1);
+                    }
+                }
+                case 5 -> {
+                    if (Utils.rand(1, 100) == 100 && Utils.rand(0, 1) == 0) {
+                        boots = Item.get(Item.DIAMOND_BOOTS, Utils.rand(350, 428), 1);
+                    }
+                }
+            }
+        }
 
         slots[3] = boots;
 
@@ -701,31 +683,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return null;
     }
 
-    protected void lookAt(Vector3 target) {
-        double dx = this.x - target.x;
-        double dy = this.y - target.y;
-        double dz = this.z - target.z;
-        double yaw = Math.asin(dx / Math.sqrt(dx * dx + dz * dz)) / Math.PI * 180.0d;
-        double asin = Math.asin(dy / Math.sqrt(dx * dx + dz * dz + dy * dy)) / Math.PI * 180.0d;
-        long pitch = Math.round(asin);
-        if (dz > 0.0d) {
-            yaw = -yaw + 180.0d;
-        }
-        this.setRotation(yaw, pitch);
-    }
-
-    protected EntityHuman getNearbyHuman() {
-        AxisAlignedBB bb = this.boundingBox.clone().expand(2.5, 2.5, 2.5);
-        EntityHuman human = null;
-        for (Entity collidingEntity : this.level.getCollidingEntities(bb)) {
-            if (collidingEntity instanceof EntityHuman) {
-                human = (EntityHuman) collidingEntity;
-                break;
-            }
-        }
-        return human;
-    }
-
     protected boolean isInTickingRange() {
         for (Player player : this.level.getPlayers().values()) {
             if (player.distanceSquared(this) < 6400) { // 80 blocks
@@ -734,5 +691,4 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         }
         return false;
     }
-
 }

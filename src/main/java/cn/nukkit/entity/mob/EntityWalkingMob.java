@@ -3,6 +3,7 @@ package cn.nukkit.entity.mob;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntityWalking;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
@@ -86,11 +87,11 @@ public abstract class EntityWalkingMob extends EntityWalking implements EntityMo
         }
 
         if (minDamage == null || minDamage.length < 4) {
-            minDamage = Utils.emptyDamageArray;
+            minDamage = Utils.getEmptyDamageArray();
         }
 
         if (maxDamage == null || maxDamage.length < 4) {
-            maxDamage = Utils.emptyDamageArray;
+            maxDamage = Utils.getEmptyDamageArray();
         }
 
         for (int i = 0; i < 4; i++) {
@@ -183,7 +184,7 @@ public abstract class EntityWalkingMob extends EntityWalking implements EntityMo
     @Override
     public boolean isMeetAttackConditions(Vector3 target) {
         return this.getServer().getMobAiEnabled() &&
-                target instanceof Entity &&
+                target instanceof EntityCreature &&
                 (!this.isFriendly() || !(target instanceof Player) || ((Entity) target).getId() == this.isAngryTo);
     }
 }

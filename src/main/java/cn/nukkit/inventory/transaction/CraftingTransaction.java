@@ -3,9 +3,7 @@ package cn.nukkit.inventory.transaction;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
-import cn.nukkit.inventory.BigCraftingGrid;
-import cn.nukkit.inventory.CraftingRecipe;
-import cn.nukkit.inventory.InventoryType;
+import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -31,13 +29,16 @@ public class CraftingTransaction extends InventoryTransaction {
 
     protected CraftingRecipe recipe;
 
+    private Recipe transactionRecipe;
+
+    protected int craftingType;
+
     public CraftingTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions, false);
 
+        this.craftingType = source.craftingType;
         this.gridSize = (source.getCraftingGrid() instanceof BigCraftingGrid) ? 3 : 2;
-
         this.inputs = new ArrayList<>();
-
         this.secondaryOutputs = new ArrayList<>();
 
         init(source, actions);
@@ -53,7 +54,7 @@ public class CraftingTransaction extends InventoryTransaction {
             }
             inputs.add(item.clone());
         } else {
-            if (!Server.getInstance().isLowProfileServer()) throw new RuntimeException("Input list is full can't add " + item);
+            throw new RuntimeException("Input list is full can't add " + item);
         }
     }
 
@@ -65,7 +66,7 @@ public class CraftingTransaction extends InventoryTransaction {
         if (secondaryOutputs.size() < gridSize * gridSize) {
             secondaryOutputs.add(item.clone());
         } else {
-            if (!Server.getInstance().isLowProfileServer()) throw new RuntimeException("Output list is full can't add " + item);
+            throw new RuntimeException("Output list is full can't add " + item);
         }
     }
 
@@ -77,7 +78,7 @@ public class CraftingTransaction extends InventoryTransaction {
         if (primaryOutput == null) {
             primaryOutput = item.clone();
         } else if (!primaryOutput.equals(item)) {
-            if (!Server.getInstance().isLowProfileServer()) throw new RuntimeException("Primary result item has already been set and does not match the current item (expected " + primaryOutput + ", got " + item + ')');
+            throw new RuntimeException("Primary result item has already been set and does not match the current item (expected " + primaryOutput + ", got " + item + ')');
         }
     }
 
@@ -85,9 +86,33 @@ public class CraftingTransaction extends InventoryTransaction {
         return recipe;
     }
 
+    public Recipe getTransactionRecipe() {
+        return this.transactionRecipe;
+    }
+
+    protected void setTransactionRecipe(Recipe recipe) {
+        this.transactionRecipe = recipe;
+        this.recipe = recipe instanceof CraftingRecipe ? (CraftingRecipe) recipe : null;
+    }
+
     public boolean canExecute() {
-        recipe = source.getServer().getCraftingManager().matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs);
-        return this.recipe != null && super.canExecute();
+        CraftingManager craftingManager = source.getServer().getCraftingManager();
+        Inventory inventory;
+        switch (craftingType) {
+            case Player.CRAFTING_SMITHING -> {
+                inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
+                if (inventory instanceof SmithingInventory smithingInventory) {
+                    addInventory(inventory);
+                    SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
+                    if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment(), smithingInventory.getTemplate()), true, true)) {
+                        setTransactionRecipe(smithingRecipe);
+                    }
+                }
+            }
+            default ->
+                setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
+        }
+        return this.getTransactionRecipe() != null && super.canExecute();
     }
 
     protected boolean callExecuteEvent() {
@@ -121,37 +146,19 @@ public class CraftingTransaction extends InventoryTransaction {
 
     public boolean execute() {
         if (super.execute()) {
-            switch (this.primaryOutput.getId()) {
-                case Item.CRAFTING_TABLE:
-                    source.awardAchievement("buildWorkBench");
-                    break;
-                case Item.WOODEN_PICKAXE:
-                    source.awardAchievement("buildPickaxe");
-                    break;
-                case Item.FURNACE:
-                    source.awardAchievement("buildFurnace");
-                    break;
-                case Item.WOODEN_HOE:
-                    source.awardAchievement("buildHoe");
-                    break;
-                case Item.BREAD:
-                    source.awardAchievement("makeBread");
-                    break;
-                case Item.CAKE:
-                    source.awardAchievement("bakeCake");
-                    break;
-                case Item.STONE_PICKAXE:
-                case Item.GOLDEN_PICKAXE:
-                case Item.IRON_PICKAXE:
-                case Item.DIAMOND_PICKAXE:
-                    source.awardAchievement("buildBetterPickaxe");
-                    break;
-                case Item.WOODEN_SWORD:
-                    source.awardAchievement("buildSword");
-                    break;
-                case Item.DIAMOND:
-                    source.awardAchievement("diamond");
-                    break;
+            if (Server.getInstance().achievementsEnabled) {
+                switch (this.primaryOutput.getId()) {
+                    case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
+                    case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
+                    case Item.FURNACE -> source.awardAchievement("buildFurnace");
+                    case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
+                    case Item.BREAD -> source.awardAchievement("makeBread");
+                    case Item.CAKE -> source.awardAchievement("bakeCake");
+                    case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
+                        Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
+                    case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
+                    case Item.DIAMOND -> source.awardAchievement("diamond");
+                }
             }
 
             return true;

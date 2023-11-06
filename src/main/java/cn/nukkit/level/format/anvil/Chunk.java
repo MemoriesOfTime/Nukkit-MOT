@@ -297,7 +297,7 @@ public class Chunk extends BaseChunk {
 
         ArrayList<CompoundTag> entities = new ArrayList<>();
         for (Entity entity : this.getEntities().values()) {
-            if (!(entity instanceof Player) && !entity.closed) {
+            if (!(entity instanceof Player) && !entity.closed && entity.canBeSavedWithChunk()) {
                 entity.saveNBT();
                 entities.add(entity.namedTag);
             }
@@ -383,7 +383,7 @@ public class Chunk extends BaseChunk {
 
         ArrayList<CompoundTag> entities = new ArrayList<>();
         for (Entity entity : this.getEntities().values()) {
-            if (!(entity instanceof Player) && !entity.closed) {
+            if (!(entity instanceof Player) && !entity.closed && entity.canBeSavedWithChunk()) {
                 entity.saveNBT();
                 entities.add(entity.namedTag);
             }
@@ -512,8 +512,7 @@ public class Chunk extends BaseChunk {
         super.compress();
         boolean result = false;
         for (cn.nukkit.level.format.ChunkSection section : getSections()) {
-            if (section instanceof ChunkSection) {
-                ChunkSection anvilSection = (ChunkSection) section;
+            if (section instanceof ChunkSection anvilSection) {
                 if (!anvilSection.isEmpty()) {
                     result |= anvilSection.compress();
                 }

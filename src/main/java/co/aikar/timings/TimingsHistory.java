@@ -33,6 +33,7 @@ import cn.nukkit.utils.JsonUtil;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+
 import java.lang.management.ManagementFactory;
 import java.util.Collection;
 import java.util.HashMap;
@@ -42,6 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static co.aikar.timings.Timings.fullServerTickTimer;
 import static co.aikar.timings.TimingsManager.MINUTE_REPORTS;
 
+@Deprecated
 public class TimingsHistory {
 
     public static long lastMinuteTime;

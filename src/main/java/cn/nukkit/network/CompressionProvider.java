@@ -2,18 +2,19 @@ package cn.nukkit.network;
 
 import cn.nukkit.network.protocol.types.PacketCompressionAlgorithm;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.SnappyCompression;
 import cn.nukkit.utils.Zlib;
 
 public interface CompressionProvider {
 
     CompressionProvider NONE = new CompressionProvider() {
         @Override
-        public byte[] compress(BinaryStream packet, int level) throws Exception {
+        public byte[] compress(BinaryStream packet, int level) {
             return packet.getBuffer();
         }
 
         @Override
-        public byte[] decompress(byte[] compressed) throws Exception {
+        public byte[] decompress(byte[] compressed) {
             return compressed;
         }
     };
@@ -21,12 +22,17 @@ public interface CompressionProvider {
     CompressionProvider ZLIB = new CompressionProvider() {
         @Override
         public byte[] compress(BinaryStream packet, int level) throws Exception {
-            return Zlib.deflate(packet.getBuffer(), level);
+            return Zlib.deflatePre16Packet(packet.getBuffer(), level);
         }
 
         @Override
         public byte[] decompress(byte[] compressed) throws Exception {
-            return Zlib.inflate(compressed, 2097152); // 2 * 1024 * 1024
+            return Zlib.inflate(compressed, 3145728); // 3 * 1024 * 1024
+        }
+
+        @Override
+        public byte[] decompress(byte[] compressed, int maxSize) throws Exception {
+            return Zlib.inflate(compressed, maxSize);
         }
     };
 
@@ -38,7 +44,29 @@ public interface CompressionProvider {
 
         @Override
         public byte[] decompress(byte[] compressed) throws Exception {
-            return Zlib.inflateRaw(compressed, 2097152); // 2 * 1024 * 1024
+            return Zlib.inflateRaw(compressed, 3145728); // 3 * 1024 * 1024
+        }
+
+        @Override
+        public byte[] decompress(byte[] compressed, int maxSize) throws Exception {
+            return Zlib.inflateRaw(compressed, maxSize);
+        }
+    };
+
+    CompressionProvider SNAPPY = new CompressionProvider() {
+        @Override
+        public byte[] compress(BinaryStream packet, int level) throws Exception {
+            return SnappyCompression.compress(packet.getBuffer());
+        }
+
+        @Override
+        public byte[] decompress(byte[] compressed) throws Exception {
+            return SnappyCompression.decompress(compressed, 3145728); // 3 * 1024 * 1024
+        }
+
+        @Override
+        public byte[] decompress(byte[] compressed, int maxSize) throws Exception {
+            return SnappyCompression.decompress(compressed, maxSize);
         }
     };
 
@@ -46,11 +74,17 @@ public interface CompressionProvider {
     byte[] compress(BinaryStream packet, int level) throws Exception;
     byte[] decompress(byte[] compressed) throws Exception;
 
+    default byte[] decompress(byte[] compressed, int maxSize) throws Exception {
+        return this.decompress(compressed);
+    }
+
     static CompressionProvider from(PacketCompressionAlgorithm algorithm, int raknetProtocol) {
         if (algorithm == null) {
             return NONE;
         } else if (algorithm == PacketCompressionAlgorithm.ZLIB) {
             return raknetProtocol < 10 ? ZLIB : ZLIB_RAW;
+        } else if (algorithm == PacketCompressionAlgorithm.SNAPPY) {
+            return SNAPPY;
         }
         throw new UnsupportedOperationException();
     }

@@ -5,6 +5,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityPotion;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.event.block.BlockBurnEvent;
+import cn.nukkit.event.block.BlockFadeEvent;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.event.entity.EntityCombustByBlockEvent;
 import cn.nukkit.event.entity.EntityDamageByBlockEvent;
@@ -70,7 +71,11 @@ public class BlockFire extends BlockFlowable {
     public void onEntityCollide(Entity entity) {
         if (entity instanceof EntityPotion) {
             if (((EntityPotion) entity).potionId == Potion.WATER) {
-                this.level.setBlock(this, Block.get(AIR));
+                BlockFadeEvent event = new BlockFadeEvent(this, Block.get(AIR));
+                this.level.getServer().getPluginManager().callEvent(event);
+                if (!event.isCancelled()) {
+                    this.level.setBlock(this, event.getNewState(), true);
+                }
             }
             return;
         }
@@ -99,7 +104,7 @@ public class BlockFire extends BlockFlowable {
         if (type == Level.BLOCK_UPDATE_NORMAL || type == Level.BLOCK_UPDATE_RANDOM) {
             if (!this.isBlockTopFacingSurfaceSolid(this.down()) && !this.canNeighborBurn()) {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
-            } else if (!Server.getInstance().isLowProfileServer() && this.level.gameRules.getBoolean(GameRule.DO_FIRE_TICK) && !level.isUpdateScheduled(this, this)) {
+            } else if (this.level.gameRules.getBoolean(GameRule.DO_FIRE_TICK) && !level.isUpdateScheduled(this, this)) {
                 level.scheduleUpdate(this, tickRate());
             }
 
@@ -116,14 +121,6 @@ public class BlockFire extends BlockFlowable {
 
             if (!forever && this.getLevel().isRaining() && canBlockSeeSky) {
                 this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
-            }
-
-            if (Server.getInstance().isLowProfileServer()) {
-                if (forever) {
-                    return 0;
-                }
-                this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
-                return 0;
             }
 
             if (!this.isBlockTopFacingSurfaceSolid(down) && !this.canNeighborBurn()) {

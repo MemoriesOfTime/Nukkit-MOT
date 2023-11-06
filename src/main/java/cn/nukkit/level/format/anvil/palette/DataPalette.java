@@ -1,6 +1,7 @@
 package cn.nukkit.level.format.anvil.palette;
 
 import cn.nukkit.math.MathHelper;
+
 import java.util.Arrays;
 
 /**

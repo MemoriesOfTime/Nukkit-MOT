@@ -4,6 +4,8 @@ import cn.nukkit.Player;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.item.Item;
 import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.UpdateTradePacket;
 
 import java.io.IOException;
@@ -11,13 +13,8 @@ import java.nio.ByteOrder;
 
 public class TradeInventory extends BaseInventory {
     
-    public static final int TRADE_INPUT_A = 4;
-    public static final int TRADE_INPUT_B = 5;
-    public static final int TRADE_OUTPUT = 51;
-    
-    // mojang, what the heck??
-    public static final int FAKE_TRADE_INPUT = -30; // moves from fake ui (villager inventory) to player inventory
-    public static final int FAKE_TRADE_OUTPUT = -31; // item is sent from player inventory to villager fake inv
+    public static final int TRADE_INPUT1_UI_SLOT = 4;
+    public static final int TRADE_INPUT2_UI_SLOT = 5;
     
     public TradeInventory(InventoryHolder holder) {
         super(holder, InventoryType.TRADING);
@@ -25,27 +22,36 @@ public class TradeInventory extends BaseInventory {
     
     public void onOpen(Player who) {
         super.onOpen(who);
+        EntityVillager villager = this.getHolder();
         
         UpdateTradePacket pk = new UpdateTradePacket();
         pk.windowId = (byte) who.getWindowId(this);
         pk.windowType = (byte) InventoryType.TRADING.getNetworkType();
-        pk.unknownVarInt1 = 0;
-        pk.isWilling = this.getHolder().isWilling();
-        pk.screen2 = true;
-        pk.trader = this.getHolder().getId();
+        pk.size = 0;
         pk.tradeTier = this.getHolder().getTradeTier();
-        pk.player = who.getId();
+        pk.traderUniqueEntityId = this.getHolder().getId();
+        pk.playerUniqueEntityId = who.getId();
         pk.displayName = this.getHolder().getNameTag();
-        try {
-            pk.offers = NBTIO.write(this.getHolder().getOffers(), ByteOrder.LITTLE_ENDIAN, true);
-        } catch (IOException ignored) {
+
+        ListTag<CompoundTag> tierExpRequirements = new ListTag<>("TierExpRequirements");
+        for (int i = 0, len = villager.tierExpRequirement.length; i < len; ++i) {
+            tierExpRequirements.add(i, new CompoundTag().putInt(String.valueOf(i), villager.tierExpRequirement[i]));
         }
+
+        try {
+            pk.offers = NBTIO.write(new CompoundTag()
+                    .putList(villager.getRecipes())
+                    .putList(tierExpRequirements), ByteOrder.LITTLE_ENDIAN, true);
+        } catch (IOException ignored) {
+
+        }
+
+        pk.newTradingUi = true;
+        pk.usingEconomyTrade = true;
         
         who.dataPacket(pk);
         
         this.sendContents(who);
-        
-        this.getHolder().setTradingWith(who.getId());
     }
     
     public void onClose(Player who) {
@@ -60,8 +66,8 @@ public class TradeInventory extends BaseInventory {
         }
         
         super.onClose(who);
-        
-        this.getHolder().cancelTradingWithPlayer();
+
+        this.getHolder().setTradingPlayer(0L);
     }
     
     public EntityVillager getHolder() {

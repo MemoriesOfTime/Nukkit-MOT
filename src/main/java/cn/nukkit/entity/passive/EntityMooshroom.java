@@ -2,7 +2,6 @@ package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Sound;
@@ -57,11 +56,8 @@ public class EntityMooshroom extends EntityWalkingAnimal {
     }
 
     @Override
-    public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player player) {
-            return player.spawned && player.isAlive() && !player.closed && player.getInventory().getItemInHandFast().getId() == Item.WHEAT && distance <= 49;
-        }
-        return super.targetOption(creature, distance);
+    public boolean isFeedItem(Item item) {
+        return item.getId() == Item.WHEAT;
     }
 
     @Override

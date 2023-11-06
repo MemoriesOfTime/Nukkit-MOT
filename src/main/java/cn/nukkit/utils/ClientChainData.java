@@ -1,17 +1,19 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.Server;
+import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.LoginPacket;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import com.nimbusds.jose.JWSObject;
 import com.nimbusds.jose.crypto.ECDSAVerifier;
+import org.jetbrains.annotations.Nullable;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
-import java.security.PublicKey;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
@@ -33,18 +35,7 @@ import java.util.*;
  */
 public final class ClientChainData implements LoginChainData {
 
-    private static final String MOJANG_PUBLIC_KEY_BASE64 = "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE8ELkixyLcwlZryUQcu1TvPOmI2B7vX83ndnWRUaXm74wFfa5f/lwQNTfrLVHa2PmenpGI6JhIMUJaWZrjmMj90NoKNFSNBuKdm8rYiXsfaz3K36x/1U26HpG0ZxK/V1V";
-    private static final PublicKey MOJANG_PUBLIC_KEY;
-
     private static final Gson GSON = new Gson();
-
-    static {
-        try {
-            MOJANG_PUBLIC_KEY = generateKey(MOJANG_PUBLIC_KEY_BASE64);
-        } catch (InvalidKeySpecException | NoSuchAlgorithmException e) {
-            throw new AssertionError(e);
-        }
-    }
 
     public static ClientChainData of(byte[] buffer) {
         return new ClientChainData(buffer);
@@ -111,7 +102,11 @@ public final class ClientChainData implements LoginChainData {
 
     @Override
     public String getXUID() {
-        return xuid;
+        if (this.isWaterdog()) {
+            return waterdogXUID;
+        } else {
+            return xuid;
+        }
     }
 
     private boolean xboxAuthed;
@@ -140,8 +135,28 @@ public final class ClientChainData implements LoginChainData {
     }
 
     @Override
+    @Nullable
+    public String getWaterdogXUID() {
+        return waterdogXUID;
+    }
+
+    @Override
+    @Nullable
+    public String getWaterdogIP() {
+        return waterdogIP;
+    }
+
+    @Override
     public JsonObject getRawData() {
         return rawData;
+    }
+
+    private boolean isWaterdog() {
+        if (waterdogXUID == null || Server.getInstance() == null) {
+            return false;
+        }
+
+        return Server.getInstance().isWaterdogCapable();
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -182,6 +197,8 @@ public final class ClientChainData implements LoginChainData {
     private String languageCode;
     private int currentInputMode;
     private int defaultInputMode;
+    private String waterdogIP;
+    private String waterdogXUID;
 
     private int UIProfile;
 
@@ -221,6 +238,12 @@ public final class ClientChainData implements LoginChainData {
         if (skinToken.has("DefaultInputMode")) this.defaultInputMode = skinToken.get("DefaultInputMode").getAsInt();
         if (skinToken.has("UIProfile")) this.UIProfile = skinToken.get("UIProfile").getAsInt();
         if (skinToken.has("CapeData")) this.capeData = skinToken.get("CapeData").getAsString();
+        if (skinToken.has("Waterdog_IP")) this.waterdogIP = skinToken.get("Waterdog_IP").getAsString();
+        if (skinToken.has("Waterdog_XUID")) this.waterdogXUID = skinToken.get("Waterdog_XUID").getAsString();
+
+        if (this.isWaterdog()) {
+            xboxAuthed = true;
+        }
         this.rawData = skinToken;
     }
 
@@ -294,7 +317,7 @@ public final class ClientChainData implements LoginChainData {
                 return !iterator.hasNext();
             }
 
-            if (lastKey.equals(MOJANG_PUBLIC_KEY)) {
+            if (lastKey.equals(EncryptionUtils.getMojangPublicKey())) {
                 mojangKeyVerified = true;
             }
 

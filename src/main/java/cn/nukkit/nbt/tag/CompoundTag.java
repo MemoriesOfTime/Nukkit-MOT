@@ -114,6 +114,16 @@ public class CompoundTag extends Tag implements Cloneable {
         return this;
     }
 
+    public CompoundTag putList(String name, ListTag<? extends Tag> listTag) {
+        tags.put(name, listTag.setName(name));
+        return this;
+    }
+
+    public CompoundTag putCompound(CompoundTag value) {
+        tags.put(value.getName(), value);
+        return this;
+    }
+
     public CompoundTag putCompound(String name, CompoundTag value) {
         tags.put(name, value.setName(name));
         return this;
@@ -130,6 +140,18 @@ public class CompoundTag extends Tag implements Cloneable {
 
     public boolean contains(String name) {
         return tags.containsKey(name);
+    }
+
+    public boolean contains(String name, Class<? extends Tag> clazz) {
+        return clazz.isInstance(tags.get(name));
+    }
+
+    public boolean containsCompound(String name) {
+        return tags.get(name) instanceof CompoundTag;
+    }
+
+    public boolean containsShort(String name) {
+        return tags.get(name) instanceof ShortTag;
     }
 
     public CompoundTag remove(String name) {

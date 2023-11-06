@@ -33,7 +33,6 @@ public class BanCommand extends VanillaCommand {
 
         if (args.length == 0) {
             sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-
             return false;
         }
 
@@ -54,7 +53,7 @@ public class BanCommand extends VanillaCommand {
             player.kick(PlayerKickEvent.Reason.NAME_BANNED, (reason.length() > 0) ? "You are banned! Reason: " + reason : "You are banned!", true, "source=" + sender.getName() + ", reason=" + reason);
         }
 
-        Command.broadcastCommandMessage(sender, new TranslationContainer("%commands.ban.success", player != null ? player.getName() : name));
+        broadcastCommandMessage(sender, new TranslationContainer("%commands.ban.success", player != null ? player.getName() : name));
 
         return true;
     }

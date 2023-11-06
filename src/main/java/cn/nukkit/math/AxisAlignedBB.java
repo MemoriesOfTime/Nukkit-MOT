@@ -5,7 +5,6 @@ import cn.nukkit.level.MovingObjectPosition;
 import java.util.List;
 
 public interface AxisAlignedBB extends Cloneable {
-
     AxisAlignedBB[] EMPTY_ARRAY = new AxisAlignedBB[0];
     List<AxisAlignedBB> EMPTY_LIST = List.of();
 
@@ -180,8 +179,11 @@ public interface AxisAlignedBB extends Cloneable {
     }
 
     default boolean isVectorInside(Vector3 vector) {
-        return vector.x >= this.getMinX() && vector.x <= this.getMaxX() && vector.y >= this.getMinY() && vector.y <= this.getMaxY() && vector.z >= this.getMinZ() && vector.z <= this.getMaxZ();
+        return this.isVectorInside(vector.x, vector.y, vector.z);
+    }
 
+    default boolean isVectorInside(double x, double y, double z) {
+        return x >= this.getMinX() && x <= this.getMaxX() && y >= this.getMinY() && y <= this.getMaxY() && z >= this.getMinZ() && z <= this.getMaxZ();
     }
 
     default double getAverageEdgeLength() {
@@ -275,7 +277,7 @@ public interface AxisAlignedBB extends Cloneable {
             face = 1;
         } else if (vector == v5) {
             face = 2;
-        } else if (vector == v6) {
+        } else {
             face = 3;
         }
 

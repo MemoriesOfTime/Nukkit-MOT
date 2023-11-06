@@ -30,6 +30,11 @@ public class EventPacket extends DataPacket {
     public static final int TYPE_COMPOSTER_BLOCK_USED = 16;
     public static final int TYPE_BELL_BLOCK_USED = 17;
 
+    /**
+     * @since v588
+     */
+    public static final int TYPE_CAREFUL_RESTORATION = 30;
+
     @Override
     public byte pid() {
         return NETWORK_ID;

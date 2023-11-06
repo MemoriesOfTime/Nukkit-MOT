@@ -809,6 +809,7 @@
   "minecraft:redstone": 331,
   "minecraft:snowball": 332,
   "minecraft:boat": 333,
+  "minecraft:oak_boat": 333,
   "minecraft:leather": 334,
   "minecraft:kelp": 335,
   "minecraft:brick": 336,
@@ -822,6 +823,7 @@
   "minecraft:fishing_rod": 346,
   "minecraft:clock": 347,
   "minecraft:glowstone_dust": 348,
+  "minecraft:ink_sac": 351,
   "minecraft:dye": 351,
   "minecraft:bone": 352,
   "minecraft:sugar": 353,
@@ -890,6 +892,7 @@
   "minecraft:dark_oak_door": 431,
   "minecraft:chorus_fruit": 432,
   "minecraft:banner_pattern": 434,
+  "minecraft:creeper_banner_pattern": 434,
   "minecraft:dragon_breath": 437,
   "minecraft:splash_potion": 438,
   "minecraft:lingering_potion": 441,
@@ -1022,5 +1025,7 @@
   "minecraft:mangrove_chest_boat": 644,
   "minecraft:chest_boat": 645,
   "minecraft:music_disc_5": 636,
-  "minecraft:disc_fragment_5": 637
+  "minecraft:disc_fragment_5": 637,
+  "minecraft:glow_berries": 654,
+  "minecraft:music_disc_relic": 701
 }

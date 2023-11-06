@@ -1,11 +1,20 @@
 pipeline {
     agent any
     tools {
-        maven 'Maven 3'
-        jdk 'Java 8'
+        maven 'maven-3.8.1'
+        jdk 'java17'
     }
     options {
         buildDiscarder(logRotator(artifactNumToKeepStr: '5'))
+    }
+    triggers {
+        GenericTrigger (
+            causeString: 'Triggered by develop',
+            genericVariables: [[key: 'ref', value: '$.ref']],
+            printContributedVariables: true,
+            printPostContent: true,
+            token: 'nkmotmaster'
+        )
     }
     stages {
         stage ('Build') {
@@ -14,12 +23,12 @@ pipeline {
             }
             post {
                 success {
-                    archiveArtifacts artifacts: 'target/nukkit.jar', fingerprint: true
+                    archiveArtifacts artifacts: 'target/Nukkit-*.jar', fingerprint: true
                 }
             }
         }
 
-        stage ('Deploy') {
+        /* stage ('Deploy') {
             when {
                 branch "master"
             }
@@ -29,7 +38,7 @@ pipeline {
                         javadocDir: 'target/site/apidocs',
                         keepAll: false])
             }
-        }
+        } */
     }
 
     post {

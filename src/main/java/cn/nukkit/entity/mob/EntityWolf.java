@@ -2,6 +2,7 @@ package cn.nukkit.entity.mob;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.data.ByteEntityData;
@@ -16,7 +17,6 @@ import cn.nukkit.item.ItemDye;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.particle.HeartParticle;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -31,20 +31,13 @@ public class EntityWolf extends EntityTameableMob {
     public static final int NETWORK_ID = 14;
 
     private static final String NBT_KEY_ANGRY = "Angry";
-
     private static final String NBT_KEY_COLLAR_COLOR = "CollarColor";
 
-    private boolean angry;
-
-    private int angryDuration;
-
-    protected int inLoveTicks = 0;
-
-    private DyeColor collarColor = DyeColor.RED;
-
-    private int afterInWater = -1;
-
     private final Vector3 tempVector = new Vector3();
+    private DyeColor collarColor = DyeColor.RED;
+    private boolean angry;
+    private int angryDuration;
+    private int afterInWater = -1;
 
     public EntityWolf(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -78,10 +71,8 @@ public class EntityWolf extends EntityTameableMob {
 
         this.setFriendly(true);
 
-        if (this.namedTag.contains(NBT_KEY_ANGRY)) {
-            if (this.namedTag.getByte(NBT_KEY_ANGRY) == 1) {
-                this.setAngry(true);
-            }
+        if (this.namedTag.contains(NBT_KEY_ANGRY) && this.namedTag.getByte(NBT_KEY_ANGRY) == 1) {
+            this.setAngry(true);
         }
 
         if (this.namedTag.contains(NBT_KEY_COLLAR_COLOR)) {
@@ -89,9 +80,11 @@ public class EntityWolf extends EntityTameableMob {
             if (this.collarColor == null) {
                 this.collarColor = DyeColor.RED;
             }
+
+            this.setDataProperty(new ByteEntityData(DATA_COLOUR, collarColor.getWoolData()));
         }
 
-        this.setDamage(new int[] { 0, 3, 4, 6 });
+        this.setDamage(new int[]{0, 3, 4, 6});
     }
 
     @Override
@@ -112,36 +105,46 @@ public class EntityWolf extends EntityTameableMob {
             return true;
         }
 
-        if (creature instanceof Player) {
+        if (creature instanceof Player && !this.isInLove()) {
             if (distance <= 64 && this.isBeggingItem(((Player) creature).getInventory().getItemInHandFast())) {
                 // TODO: Begging
                 if (distance <= 9) {
                     stayTime = 40;
                 }
                 return true;
-            } else if (this.hasOwner() && creature.equals(this.getOwner())) {
+            }
+
+            if (this.hasOwner() && creature.equals(this.getOwner())) {
                 if (distance <= 4) {
                     return false;
-                } else if (distance <= 100) {
+                }
+
+                if (distance <= 100) {
                     return true;
                 }
             }
         }
 
         if (!this.hasOwner() && distance <= 256 && (
-                (creature instanceof EntitySkeleton && !creature.isInsideOfWater()) ||
-                        creature instanceof EntitySheep ||
-                        creature instanceof EntityRabbit ||
-                        creature instanceof EntityFox ||
-                        (creature instanceof EntityTurtle && ((EntityTurtle) creature).isBaby() && !creature.isInsideOfWater())
+            creature instanceof EntitySkeleton && !creature.isInsideOfWater() ||
+                creature instanceof EntitySheep ||
+                creature instanceof EntityRabbit ||
+                creature instanceof EntityFox ||
+                creature instanceof EntityTurtle && ((EntityTurtle) creature).isBaby() && !creature.isInsideOfWater()
         )) {
             this.isAngryTo = creature.getId();
             this.setAngry(true);
             return true;
-        } else if (this.hasOwner() && distance <= 256 && creature instanceof EntitySkeleton) {
+        }
+
+        if (this.hasOwner() && distance <= 256 && creature instanceof EntitySkeleton) {
             this.isAngryTo = creature.getId();
             this.setAngry(true);
             return true;
+        }
+
+        if (this.isInLove()) {
+            return creature instanceof BaseEntity && ((BaseEntity) creature).isInLove() && creature.isAlive() && !creature.closed && creature.getNetworkId() == this.getNetworkId() && distance <= 100;
         }
 
         return false;
@@ -162,47 +165,48 @@ public class EntityWolf extends EntityTameableMob {
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
         int healable = this.getHealableItem(item);
 
-        if (item.getId() == ItemID.BONE) {
-            if (!this.hasOwner() && !this.isAngry()) {
-                player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-                if (Utils.rand(1, 3) == 3) {
-                    EntityEventPacket packet = new EntityEventPacket();
-                    packet.eid = this.getId();
-                    packet.event = EntityEventPacket.TAME_SUCCESS;
-                    player.dataPacket(packet);
+        if (item.getId() == ItemID.BONE && !this.hasOwner() && !this.isAngry()) {
+            if (Utils.rand(1, 3) == 3) {
+                EntityEventPacket packet = new EntityEventPacket();
+                packet.eid = this.getId();
+                packet.event = EntityEventPacket.TAME_SUCCESS;
+                player.dataPacket(packet);
 
-                    this.setMaxHealth(20);
-                    this.setHealth(20);
-                    this.setOwner(player);
-                    this.setCollarColor(DyeColor.RED);
-
-                    this.getLevel().dropExpOrb(this, Utils.rand(1, 7));
-
-                    return true;
-                } else {
-                    EntityEventPacket packet = new EntityEventPacket();
-                    packet.eid = this.getId();
-                    packet.event = EntityEventPacket.TAME_FAIL;
-                    player.dataPacket(packet);
-                }
+                this.setMaxHealth(20);
+                this.setHealth(20);
+                this.setOwner(player);
+                this.setCollarColor(DyeColor.RED);
+                this.getLevel().dropExpOrb(this, Utils.rand(1, 7));
             }
-        } else if (item.getId() == Item.DYE) {
+
+            EntityEventPacket packet = new EntityEventPacket();
+            packet.eid = this.getId();
+            packet.event = EntityEventPacket.TAME_FAIL;
+            player.dataPacket(packet);
+
+            return true;
+        }
+
+        if (item.getId() == Item.DYE) {
             if (this.hasOwner() && player.equals(this.getOwner())) {
                 this.setCollarColor(((ItemDye) item).getDyeColor());
                 return true;
             }
-        } else if (this.isBreedingItem(item) || healable != 0) {
-            this.getLevel().addSound(this, Sound.RANDOM_EAT);
-            this.getLevel().addParticle(new ItemBreakParticle(this.add(0, this.getMountedYOffset(), 0), Item.get(item.getId(), 0, 1)));
-            this.setInLove();
+        } else if (this.isBreedingItem(item)) {
+            if (!this.isInLove() || healable != 0 && this.getHealth() < this.getMaxHealth()) {
+                this.getLevel().addSound(this, Sound.RANDOM_EAT);
+                this.getLevel().addParticle(new ItemBreakParticle(this.add(0, this.getHeight() * 0.75F, 0), Item.get(item.getId(), 0, 1)));
+                this.setInLove();
 
-            if (healable != 0) {
-                this.setHealth(Math.max(this.getMaxHealth(), this.getHealth() + healable));
+                if (healable != 0) {
+                    this.setHealth(Math.max(this.getMaxHealth(), this.getHealth() + healable));
+                }
+
+                return true;
             }
-
-            return true;
-        } else if (this.hasOwner() && player.equals(this.getOwner()) && !this.isAngry()) {
+        } else if (this.hasOwner() && player.equals(this.getOwner()) && !this.isInsideOfWater()) {
             this.setSitting(!this.isSitting());
+            return false;
         }
 
         return super.onInteract(player, item, clickedPos);
@@ -230,8 +234,8 @@ public class EntityWolf extends EntityTameableMob {
     @Override
     public void attackEntity(Entity entity) {
         if (entity instanceof Player && (
-                (!this.isAngry() && this.isBeggingItem(((Player) entity).getInventory().getItemInHandFast())) ||
-                        (this.hasOwner() && entity.equals(this.getOwner()))
+            !this.isAngry() && this.isBeggingItem(((Player) entity).getInventory().getItemInHandFast()) ||
+                this.hasOwner() && entity.equals(this.getOwner())
         )) return;
 
         if (this.attackDelay > 23 && this.distanceSquared(entity) < 1.5) {
@@ -246,7 +250,7 @@ public class EntityWolf extends EntityTameableMob {
                 }
 
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR,
-                        (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));
+                    (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));
             }
 
             this.setMotion(tempVector.setComponents(0, this.getGravity() * 6, 0)); // TODO: Jump before attack
@@ -263,15 +267,6 @@ public class EntityWolf extends EntityTameableMob {
             this.setAngry(false);
         } else if (this.angryDuration > 0) {
             this.angryDuration--;
-        }
-
-        if (this.isInLove()) {
-            this.inLoveTicks -= tickDiff;
-            if (this.age % 20 == 0) {
-                for (int i = 0; i < 3; i++) {
-                    this.getLevel().addParticle(new HeartParticle(this.add(Utils.rand(-1.0,1.0), this.getMountedYOffset() + Utils.rand(-1.0,1.0), Utils.rand(-1.0, 1.0))));
-                }
-            }
         }
 
         if (this.isInsideOfWater()) {
@@ -292,15 +287,6 @@ public class EntityWolf extends EntityTameableMob {
         }
 
         return hasUpdate;
-    }
-
-    public void setInLove() {
-        this.inLoveTicks = 600;
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE);
-    }
-
-    public boolean isInLove() {
-        return inLoveTicks > 0;
     }
 
     @Override
@@ -335,31 +321,31 @@ public class EntityWolf extends EntityTameableMob {
 
     public boolean isBeggingItem(Item item) {
         return item.getId() == ItemID.BONE ||
-                item.getId() == ItemID.RAW_CHICKEN ||
-                item.getId() == ItemID.COOKED_CHICKEN ||
-                item.getId() == ItemID.RAW_BEEF ||
-                item.getId() == ItemID.COOKED_BEEF ||
-                item.getId() == ItemID.RAW_MUTTON ||
-                item.getId() == ItemID.COOKED_MUTTON ||
-                item.getId() == ItemID.RAW_PORKCHOP ||
-                item.getId() == ItemID.COOKED_PORKCHOP ||
-                item.getId() == ItemID.RAW_RABBIT ||
-                item.getId() == ItemID.COOKED_RABBIT ||
-                item.getId() == ItemID.ROTTEN_FLESH;
+            item.getId() == ItemID.RAW_CHICKEN ||
+            item.getId() == ItemID.COOKED_CHICKEN ||
+            item.getId() == ItemID.RAW_BEEF ||
+            item.getId() == ItemID.COOKED_BEEF ||
+            item.getId() == ItemID.RAW_MUTTON ||
+            item.getId() == ItemID.COOKED_MUTTON ||
+            item.getId() == ItemID.RAW_PORKCHOP ||
+            item.getId() == ItemID.COOKED_PORKCHOP ||
+            item.getId() == ItemID.RAW_RABBIT ||
+            item.getId() == ItemID.COOKED_RABBIT ||
+            item.getId() == ItemID.ROTTEN_FLESH;
     }
 
     public boolean isBreedingItem(Item item) {
         return item.getId() == ItemID.RAW_CHICKEN ||
-                item.getId() == ItemID.COOKED_CHICKEN ||
-                item.getId() == ItemID.RAW_BEEF ||
-                item.getId() == ItemID.COOKED_BEEF ||
-                item.getId() == ItemID.RAW_MUTTON ||
-                item.getId() == ItemID.COOKED_MUTTON ||
-                item.getId() == ItemID.RAW_PORKCHOP ||
-                item.getId() == ItemID.COOKED_PORKCHOP ||
-                item.getId() == ItemID.RAW_RABBIT ||
-                item.getId() == ItemID.COOKED_RABBIT ||
-                item.getId() == ItemID.ROTTEN_FLESH;
+            item.getId() == ItemID.COOKED_CHICKEN ||
+            item.getId() == ItemID.RAW_BEEF ||
+            item.getId() == ItemID.COOKED_BEEF ||
+            item.getId() == ItemID.RAW_MUTTON ||
+            item.getId() == ItemID.COOKED_MUTTON ||
+            item.getId() == ItemID.RAW_PORKCHOP ||
+            item.getId() == ItemID.COOKED_PORKCHOP ||
+            item.getId() == ItemID.RAW_RABBIT ||
+            item.getId() == ItemID.COOKED_RABBIT ||
+            item.getId() == ItemID.ROTTEN_FLESH;
     }
 
     public int getHealableItem(Item item) {
@@ -403,5 +389,15 @@ public class EntityWolf extends EntityTameableMob {
     @Override
     public boolean canTarget(Entity entity) {
         return entity.canBeFollowed();
+    }
+
+    @Override
+    public boolean isMeetAttackConditions(Vector3 target) {
+        if (target instanceof BaseEntity baseEntity) {
+            if (this.isInLove() && baseEntity.getNetworkId() == this.getNetworkId() && baseEntity.isFriendly() == this.isFriendly()) {
+                return false;
+            }
+        }
+        return super.isMeetAttackConditions(target);
     }
 }

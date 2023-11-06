@@ -1,7 +1,6 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
@@ -52,20 +51,20 @@ public class BanIpCommand extends VanillaCommand {
             reason.append(args[i]).append(' ');
         }
 
-        if (reason.length() > 0) {
+        if (!reason.isEmpty()) {
             reason = new StringBuilder(reason.substring(0, reason.length() - 1));
         }
 
         if (Pattern.matches("^(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9])\\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[0-9])$", value)) {
             processIPBan(value, sender, reason.toString());
 
-            Command.broadcastCommandMessage(sender, new TranslationContainer("commands.banip.success", value));
+            broadcastCommandMessage(sender, new TranslationContainer("commands.banip.success", value));
         } else {
             Player player = sender.getServer().getPlayer(value);
             if (player != null) {
                 processIPBan(player.getAddress(), sender, reason.toString());
 
-                Command.broadcastCommandMessage(sender, new TranslationContainer("commands.banip.success.players", player.getAddress(), player.getName()));
+                broadcastCommandMessage(sender, new TranslationContainer("commands.banip.success.players", player.getAddress(), player.getName()));
             } else {
                 String name = value.toLowerCase();
                 String path = sender.getServer().getDataPath() + "players/";
@@ -82,7 +81,7 @@ public class BanIpCommand extends VanillaCommand {
                 if (nbt != null && nbt.contains("lastIP") && Pattern.matches("^(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9])\\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[1-9]|0)\\.(25[0-5]|2[0-4][0-9]|[0-1]{1}[0-9]{2}|[1-9]{1}[0-9]{1}|[0-9])$", (value = nbt.getString("lastIP")))) {
                     processIPBan(value, sender, reason.toString());
 
-                    Command.broadcastCommandMessage(sender, new TranslationContainer("commands.banip.success", value));
+                    broadcastCommandMessage(sender, new TranslationContainer("commands.banip.success", value));
                 } else {
                     sender.sendMessage(new TranslationContainer("commands.banip.invalid"));
                     return false;
@@ -96,7 +95,7 @@ public class BanIpCommand extends VanillaCommand {
     private static void processIPBan(String ip, CommandSender sender, String reason) {
         sender.getServer().getIPBans().addBan(ip, reason, null, sender.getName());
 
-        for (Player player : /*new ArrayList<>(*/sender.getServer().getOnlinePlayers().values()/*)*/) {
+        for (Player player : sender.getServer().getOnlinePlayers().values()) {
             if (player.getAddress().equals(ip)) {
                 player.kick(PlayerKickEvent.Reason.IP_BANNED, !reason.isEmpty() ? reason : "IP banned", true, "source=" + sender.getName() + ", reason=" + reason);
             }

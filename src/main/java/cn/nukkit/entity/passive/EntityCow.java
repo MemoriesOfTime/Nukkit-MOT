@@ -1,7 +1,6 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
-import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
@@ -80,11 +79,8 @@ public class EntityCow extends EntityWalkingAnimal {
     }
 
     @Override
-    public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player player) {
-            return player.isAlive() && !player.closed && player.getInventory().getItemInHandFast().getId() == Item.WHEAT && distance <= 49;
-        }
-        return super.targetOption(creature, distance);
+    public boolean isFeedItem(Item item) {
+        return item.getId() == Item.WHEAT;
     }
 
     @Override

@@ -8,8 +8,10 @@ import cn.nukkit.event.inventory.RepairItemEvent;
 import cn.nukkit.inventory.AnvilInventory;
 import cn.nukkit.inventory.FakeBlockMenu;
 import cn.nukkit.inventory.Inventory;
-import cn.nukkit.inventory.transaction.action.RepairItemAction;
+import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.RepairItemAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.network.protocol.LevelEventPacket;
@@ -28,8 +30,24 @@ public class RepairItemTransaction extends InventoryTransaction {
 
     private int cost;
 
+    private boolean isError = false;
+
     public RepairItemTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions);
+        //额外检查 保证在所有action处理完成后再检查
+        boolean hasSlotChangeAction = false;
+        for (InventoryAction action : actions) {
+            if (action instanceof SlotChangeAction slotChangeAction) {
+                if (slotChangeAction.getInventory() instanceof PlayerInventory) { //真正给玩家背包物品的操作
+                    if (hasSlotChangeAction) {
+                        this.isError = true;
+                        return;
+                    }
+                    hasSlotChangeAction = true;
+                    this.outputItem = slotChangeAction.getTargetItem();
+                }
+            }
+        }
     }
 
     @Override
@@ -39,8 +57,11 @@ public class RepairItemTransaction extends InventoryTransaction {
             return false;
         }
         AnvilInventory anvilInventory = (AnvilInventory) inventory;
-        return this.inputItem != null && this.outputItem != null && this.inputItem.equals(anvilInventory.getInputSlot(), true, true)
+        return !this.isError
+                && this.inputItem != null && this.outputItem != null
+                && this.inputItem.equals(anvilInventory.getInputSlot(), true, true)
                 && (!this.hasMaterial() || this.materialItem.equals(anvilInventory.getMaterialSlot(), true, true))
+                && this.inputItem.getCount() == this.outputItem.getCount()
                 && this.checkRecipeValid();
     }
 
@@ -243,6 +264,12 @@ public class RepairItemTransaction extends InventoryTransaction {
                     }
                 }
             }
+        }
+
+        //通查情况下输出物品应该和输入物品是同一个id，特殊情况需要在这里添加额外判断
+        if (this.outputItem.getId() != this.inputItem.getId()
+                || (this.inputItem.getId() == Item.STRING_IDENTIFIED_ITEM && !this.inputItem.getNamespaceId().equalsIgnoreCase(this.outputItem.getNamespaceId()))) {
+            return false;
         }
 
         int renameCost = 0;

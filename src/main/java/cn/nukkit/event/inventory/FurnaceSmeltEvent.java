@@ -22,12 +22,15 @@ public class FurnaceSmeltEvent extends BlockEvent implements Cancellable {
     private final Item source;
     private Item result;
 
-    public FurnaceSmeltEvent(BlockEntityFurnace furnace, Item source, Item result) {
+    private float xp;
+
+    public FurnaceSmeltEvent(BlockEntityFurnace furnace, Item source, Item result, float xp) {
         super(furnace.getBlock());
         this.source = source.clone();
         this.source.setCount(1);
         this.result = result;
         this.furnace = furnace;
+        this.xp = xp;
     }
 
     public BlockEntityFurnace getFurnace() {
@@ -44,5 +47,13 @@ public class FurnaceSmeltEvent extends BlockEvent implements Cancellable {
 
     public void setResult(Item result) {
         this.result = result;
+    }
+
+    public float getXp() {
+        return xp;
+    }
+
+    public void setXp(float xp) {
+        this.xp = xp;
     }
 }

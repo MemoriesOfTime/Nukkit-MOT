@@ -48,6 +48,7 @@ import java.util.zip.Deflater;
 
 import static co.aikar.timings.TimingsManager.HISTORY;
 
+@Deprecated
 public class TimingsExport extends Thread {
 
     private final CommandSender sender;

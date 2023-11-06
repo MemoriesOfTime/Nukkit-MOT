@@ -248,7 +248,11 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
         /**
          * Damage caused by thorns enchantment
          */
-        THORNS
+        THORNS,
+        /**
+         * Damage caused by standing on BlockMagma
+         */
+        HOT_FLOOR
     }
 
     private static class DamageModifierFloatEnumMap extends EnumMap<DamageModifier, Float> {

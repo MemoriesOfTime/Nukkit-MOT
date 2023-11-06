@@ -56,6 +56,8 @@ public interface ProtocolInfo {
     int v1_18_10_26 = 485;
     int v1_18_10 = 486;
     int v1_18_30 = 503;
+    int v1_19_0_29 = 524;
+    int v1_19_0_31 = 526;
     int v1_19_0 = 527;
     int v1_19_10 = 534;
     int v1_19_20 = 544;
@@ -63,21 +65,30 @@ public interface ProtocolInfo {
     int v1_19_30_23 = 553;
     int v1_19_30 = 554;
     int v1_19_40 = 557;
+    int v1_19_50_20 = 558;
     int v1_19_50 = 560;
     int v1_19_60 = 567;
     int v1_19_63 = 568;
     int v1_19_70_24 = 574;
     int v1_19_70 = 575;
     int v1_19_80 = 582;
+    int v1_20_0_23 = 588;
+    int v1_20_0 = 589;
+    int v1_20_10_21 = 593;
+    int v1_20_10 = 594;
+    int v1_20_30_24 = 617;
+    int v1_20_30 = 618;
+    int v1_20_40 = 622;
 
-    int CURRENT_PROTOCOL = Utils.dynamic(v1_19_80);
+    int CURRENT_PROTOCOL = Utils.dynamic(v1_20_40);
 
     List<Integer> SUPPORTED_PROTOCOLS = Ints.asList(
             v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
             v1_8_0, v1_9_0, v1_10_0, v1_11_0, v1_12_0, v1_13_0, v1_14_0, v1_14_60, v1_16_0, v1_16_20, v1_16_100_0, v1_16_100_51,
             v1_16_100_52, v1_16_100, v1_16_200_51, v1_16_200, v1_16_210_50, v1_16_210_53, v1_16_210, v1_16_220, v1_16_230_50, v1_16_230,
-            v1_16_230_54, v1_17_0, v1_17_10, v1_17_20_20, v1_17_30, v1_17_40, v1_18_0, v1_18_10, v1_18_30, v1_19_0, v1_19_10, v1_19_20,
-            v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50, v1_19_60, v1_19_63, v1_19_70_24, v1_19_70, v1_19_80
+            v1_16_230_54, v1_17_0, v1_17_10, v1_17_20_20, v1_17_30, v1_17_40, v1_18_0, v1_18_10, v1_18_30, v1_19_0_29, v1_19_0_31, v1_19_0,
+            v1_19_10, v1_19_20, v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50_20, v1_19_50, v1_19_60, v1_19_63, v1_19_70_24, v1_19_70,
+            v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40
     );
 
     String MINECRAFT_VERSION_NETWORK = Utils.getVersionByProtocol(CURRENT_PROTOCOL);
@@ -268,22 +279,34 @@ public interface ProtocolInfo {
     byte TOAST_REQUEST_PACKET = (byte) 0xba;
     byte UPDATE_ABILITIES_PACKET = (byte) 0xbb;
     byte UPDATE_ADVENTURE_SETTINGS_PACKET = (byte) 0xbc;
+    byte DEATH_INFO_PACKET = (byte) 0xbd;
     byte REQUEST_NETWORK_SETTINGS_PACKET = (byte) 0xc1;
     byte GAME_TEST_RESULTS_PACKET = (byte) 0xc3;
     byte UPDATE_CLIENT_INPUT_LOCKS = (byte) 0xc4;
     byte CLIENT_CHEAT_ABILITY_PACKET = (byte) 0xc5;
+    byte CAMERA_PRESETS_PACKET = (byte) 0xc6;
+    byte UNLOCKED_RECIPES_PACKET = (byte) 0xc7;
 
     int CAMERA_INSTRUCTION_PACKET = 300;
     int COMPRESSED_BIOME_DEFINITIONS_LIST = 301;
     int TRIM_DATA = 302;
     int OPEN_SIGN = 303;
+    int AGENT_ANIMATION = 304;
+    int REFRESH_ENTITLEMENTS = 305;
 
     static int toNewProtocolID(byte oldProtocolID) {
+        if (oldProtocolID < 0 && oldProtocolID >= -56) { // Hack: (byte) 200+ --> (int) 300+
+            return oldProtocolID + 356;
+        }
         return oldProtocolID & 0xff;
     }
 
     // 这是为了兼容nkx
     // MC packet IDs continue from 300 (0x12c)
     // Hack: 100 is added to the IDs below on encode
+    byte __INTERNAL__CAMERA_INSTRUCTION_PACKET = (byte) 200; // 300
+    byte __INTERNAL__TRIM_DATA = (byte) 202; // 302
     byte __INTERNAL__OPEN_SIGN_PACKET = (byte) 203; // 303
+    byte __INTERNAL__AGENT_ANIMATION = (byte) 204; // 304
+    byte __INTERNAL__REFRESH_ENTITLEMENTS = (byte) 205; // 305
 }

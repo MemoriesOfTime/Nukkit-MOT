@@ -101,8 +101,6 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 
 	@Override
 	public boolean onUpdate(int currentTick) {
-		if (this.timing != null) this.timing.startTiming();
-
 		if (this.target != 0) {
 			Entity ent = this.level.getEntity(this.target);
 			if (ent == null || !ent.isAlive()) {
@@ -167,8 +165,6 @@ public class EntityFishingHook extends EntitySlenderProjectile {
 				}
 			}
 		}
-
-		if (this.timing != null) this.timing.stopTiming();
 
 		return hasUpdate;
 	}

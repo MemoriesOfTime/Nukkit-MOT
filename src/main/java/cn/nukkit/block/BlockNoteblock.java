@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityMusic;
+import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
@@ -11,6 +12,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.network.protocol.BlockEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Created by Snake1999 on 2016/1/17.
@@ -217,9 +219,19 @@ public class BlockNoteblock extends BlockSolid {
         pk.x = this.getFloorX();
         pk.y = this.getFloorY();
         pk.z = this.getFloorZ();
-        pk.case1 = instrument.ordinal();
-        pk.case2 = this.getStrength();
+        pk.eventType = instrument.ordinal();
+        pk.eventData = this.getStrength();
         this.getLevel().addChunkPacket(this.getFloorX() >> 4, this.getFloorZ() >> 4, pk);
+    }
+
+    @Override
+    public int onTouch(@Nullable Player player, PlayerInteractEvent.Action action) {
+        this.onUpdate(Level.BLOCK_UPDATE_TOUCH);
+        if (player != null && action == PlayerInteractEvent.Action.LEFT_CLICK_BLOCK && player.isSurvival()) {
+            this.emitSound();
+            return 1;
+        }
+        return 0;
     }
 
     @Override

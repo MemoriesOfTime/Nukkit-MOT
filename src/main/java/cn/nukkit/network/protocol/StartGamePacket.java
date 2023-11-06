@@ -6,10 +6,14 @@ import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.types.ExperimentData;
+import cn.nukkit.network.protocol.types.NetworkPermissions;
 import cn.nukkit.utils.Utils;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @ToString
@@ -62,6 +66,7 @@ public class StartGamePacket extends DataPacket {
     public int platformBroadcastIntent = GAME_PUBLISH_SETTING_PUBLIC;
     public boolean commandsEnabled;
     public boolean isTexturePacksRequired = false;
+    public final List<ExperimentData> experiments = new ObjectArrayList<>();
     public GameRules gameRules;
     public boolean bonusChest = false;
     public boolean hasStartWithMapEnabled = false;
@@ -91,6 +96,10 @@ public class StartGamePacket extends DataPacket {
     public String multiplayerCorrelationId = "";
     public boolean isDisablingPersonas;
     public boolean isDisablingCustomSkins;
+    /**
+     * @since v527
+     */
+    public CompoundTag playerPropertyData = new CompoundTag("");
     public boolean clientSideGenerationEnabled;
     public byte chatRestrictionLevel;
     public boolean disablePlayerInteractions;
@@ -104,15 +113,19 @@ public class StartGamePacket extends DataPacket {
      *
      * @since v582
      */
-    private boolean blockNetworkIdsHashed;
+    public boolean blockNetworkIdsHashed;
     /**
      * @since v582
      */
-    private boolean createdInEditor;
+    public boolean createdInEditor;
     /**
      * @since v582
      */
-    private boolean exportedFromEditor;
+    public boolean exportedFromEditor;
+    /**
+     * @since v588
+     */
+    public NetworkPermissions networkPermissions = NetworkPermissions.DEFAULT;
 
     @Override
     public void decode() {
@@ -180,19 +193,15 @@ public class StartGamePacket extends DataPacket {
         this.putBoolean(this.isTexturePacksRequired);
         this.putGameRules(protocol, gameRules);
         if (protocol >= ProtocolInfo.v1_16_100) {
-            if (Server.getInstance().enableExperimentMode) {
-                this.putLInt(3); // Experiment count
-                {
-                    this.putString("data_driven_items");
-                    this.putBoolean(true);
-                    this.putString("upcoming_creator_features");
-                    this.putBoolean(true);
-                    this.putString("experimental_molang_features");
-                    this.putBoolean(true);
+            if (Server.getInstance().enableExperimentMode && !this.experiments.isEmpty()) {
+                this.putLInt(this.experiments.size()); // Experiment count
+                for (ExperimentData experiment : this.experiments) {
+                    this.putString(experiment.getName());
+                    this.putBoolean(experiment.isEnabled());
                 }
                 this.putBoolean(true); // Were experiments previously toggled
             } else {
-                this.putLInt(0);
+                this.putLInt(0); // Experiment count
                 this.putBoolean(false); // Were experiments previously toggled
             }
         }
@@ -247,7 +256,7 @@ public class StartGamePacket extends DataPacket {
                     this.putString(""); // buttonName
                     this.putString(""); // linkUri
                 }
-                this.putBoolean(Server.getInstance().enableExperimentMode); // Experimental Gameplay
+                this.putBoolean(/*Server.getInstance().enableExperimentMode*/ false); //Force Experimental Gameplay (exclusive to debug clients)
                 if (protocol >= ProtocolInfo.v1_19_20) {
                     this.putByte(this.chatRestrictionLevel);
                     this.putBoolean(this.disablePlayerInteractions);
@@ -292,20 +301,23 @@ public class StartGamePacket extends DataPacket {
                 if (protocol >= ProtocolInfo.v1_16_230_50) {
                     this.putString(""); // serverEngine
                     if (protocol >= ProtocolInfo.v1_18_0) {
-                        if (protocol >= ProtocolInfo.v1_19_0) {
+                        if (protocol >= ProtocolInfo.v1_19_0_29) {
                             try {
-                                this.put(NBTIO.writeNetwork(new CompoundTag(""))); // playerPropertyData
+                                this.put(NBTIO.writeNetwork(this.playerPropertyData));
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
                         }
                         this.putLLong(0L); // BlockRegistryChecksum
-                        if (protocol >= ProtocolInfo.v1_19_0) {
+                        if (protocol >= ProtocolInfo.v1_19_0_29) {
                             this.putUUID(new UUID(0, 0)); // worldTemplateId
                             if (protocol >= ProtocolInfo.v1_19_20) {
                                 this.putBoolean(this.clientSideGenerationEnabled);
                                 if (protocol >= ProtocolInfo.v1_19_80) {
                                     this.putBoolean(this.blockNetworkIdsHashed);
+                                    if (protocol >= ProtocolInfo.v1_20_0_23) {
+                                        this.putBoolean(this.networkPermissions.isServerAuthSounds());
+                                    }
                                 }
                             }
                         }

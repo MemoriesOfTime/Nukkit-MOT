@@ -17,19 +17,17 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
-import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
 
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockCampfire extends BlockTransparentMeta implements Faceable {
-
     public BlockCampfire() {
-        this(0);
+        super(0);
     }
 
-    public BlockCampfire(int meta) {
+    public BlockCampfire(final int meta) {
         super(meta);
     }
 
@@ -40,7 +38,7 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
 
     @Override
     public int getLightLevel() {
-        return isExtinguished()? 0 : 15;
+        return isExtinguished() ? 0 : 15;
     }
 
     @Override
@@ -59,13 +57,8 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public boolean canHarvestWithHand() {
-        return true;
-    }
-
-    @Override
-    public Item[] getDrops(Item item) {
-        return new Item[] { new ItemCoal(0, 1 + ThreadLocalRandom.current().nextInt(1)) };
+    public Item[] getDrops(final Item item) {
+        return new Item[]{new ItemCoal(0, 1 + ThreadLocalRandom.current().nextInt(1))};
     }
 
     @Override
@@ -79,44 +72,44 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        if (this.down().getId() == CAMPFIRE_BLOCK) {
+    public boolean place(final Item item, final Block block, final Block target, final BlockFace face, final double fx, final double fy, final double fz, final Player player) {
+        if (down().getId() == CAMPFIRE_BLOCK) {
             return false;
         }
 
-        this.setDamage(player != null ? player.getDirection().getOpposite().getHorizontalIndex() : 0);
-        Block layer1 = block.getLevelBlockAtLayer(1);
-        boolean defaultLayerCheck = (block instanceof BlockWater && block.getDamage() == 0 || block.getDamage() >= 8) || block instanceof BlockIceFrosted;
-        boolean layer1Check = (layer1 instanceof BlockWater && layer1.getDamage() == 0 || layer1.getDamage() >= 8) || layer1 instanceof BlockIceFrosted;
+        setDamage(player != null ? player.getDirection().getOpposite().getHorizontalIndex() : 0);
+        final Block layer1 = block.getLevelBlockAtLayer(1);
+        final boolean defaultLayerCheck = block instanceof BlockWater && block.getDamage() == 0 || block.getDamage() >= 8 || block instanceof BlockIceFrosted;
+        final boolean layer1Check = layer1 instanceof BlockWater && layer1.getDamage() == 0 || layer1.getDamage() >= 8 || layer1 instanceof BlockIceFrosted;
         if (defaultLayerCheck || layer1Check) {
-            this.setExtinguished(true);
-            this.level.addSound(this, Sound.RANDOM_FIZZ, 0.5f, 2.2f);
-            this.level.setBlock(this, 1, defaultLayerCheck ? block : layer1, false, false);
+            setExtinguished(true);
+            level.addSound(this, Sound.RANDOM_FIZZ, 0.5f, 2.2f);
+            level.setBlock(this, 1, defaultLayerCheck ? block : layer1, false, false);
         } else {
-            this.level.setBlock(this, 1, Block.get(Block.AIR), false, false);
+            level.setBlock(this, 1, Block.get(Block.AIR), false, false);
         }
 
-        this.level.setBlock(block, this, true, false);
-        this.createBlockEntity(item);
-        this.level.updateAround(this);
+        level.setBlock(block, this, true, false);
+        createBlockEntity(item);
+        level.updateAround(this);
         return true;
     }
 
-    private BlockEntityCampfire createBlockEntity(Item item) {
-        CompoundTag nbt = new CompoundTag()
+    private BlockEntityCampfire createBlockEntity(final Item item) {
+        final CompoundTag nbt = new CompoundTag()
                 .putString("id", BlockEntity.CAMPFIRE)
-                .putInt("x", (int) this.x)
-                .putInt("y", (int) this.y)
-                .putInt("z", (int) this.z);
+                .putInt("x", (int) x)
+                .putInt("y", (int) y)
+                .putInt("z", (int) z);
 
         if (item.hasCustomBlockData()) {
-            Map<String, Tag> customData = item.getCustomBlockData().getTags();
-            for (Map.Entry<String, Tag> tag : customData.entrySet()) {
+            final Map<String, Tag> customData = item.getCustomBlockData().getTags();
+            for (final Map.Entry<String, Tag> tag : customData.entrySet()) {
                 nbt.put(tag.getKey(), tag.getValue());
             }
         }
 
-        return (BlockEntityCampfire) BlockEntity.createBlockEntity(BlockEntity.CAMPFIRE, this.getLevel().getChunk((int) (this.x) >> 4, (int) (this.z) >> 4), nbt);
+        return (BlockEntityCampfire) BlockEntity.createBlockEntity(BlockEntity.CAMPFIRE, level.getChunk((int) x >> 4, (int) z >> 4), nbt);
     }
 
     @Override
@@ -125,8 +118,8 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public void onEntityCollide(Entity entity) {
-        if (!this.isExtinguished() && !entity.isSneaking()) {
+    public void onEntityCollide(final Entity entity) {
+        if (!isExtinguished() && !entity.isSneaking()) {
             entity.attack(new EntityDamageByBlockEvent(this, entity, EntityDamageEvent.DamageCause.FIRE, 1));
         }
     }
@@ -137,14 +130,14 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public int onUpdate(int type) {
+    public int onUpdate(final int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            if (!this.isExtinguished()) {
-                Block layer1 = this.getLevelBlockAtLayer(1);
+            if (!isExtinguished()) {
+                final Block layer1 = getLevelBlockAtLayer(1);
                 if (layer1 instanceof BlockWater || layer1 instanceof BlockIceFrosted) {
-                    this.setExtinguished(true);
-                    this.level.setBlock(this, this, true, true);
-                    this.level.addSound(this, Sound.RANDOM_FIZZ, 0.5f, 2.2f);
+                    setExtinguished(true);
+                    level.setBlock(this, this, true, true);
+                    level.addSound(this, Sound.RANDOM_FIZZ, 0.5f, 2.2f);
                 }
             }
             return type;
@@ -153,30 +146,30 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public boolean onActivate(Item item, Player player) {
-        if (item.getId() == BlockID.AIR || item.getCount() <= 0) {
+    public boolean onActivate(final Item item, final Player player) {
+        if (item.getId() == AIR || item.getCount() <= 0) {
             return false;
         }
 
-        BlockEntity entity = this.level.getBlockEntity(this);
+        BlockEntity entity = level.getBlockEntity(this);
         if (!(entity instanceof BlockEntityCampfire)) {
-            entity = this.createBlockEntity(Item.get(0));
+            entity = createBlockEntity(Item.get(BlockID.AIR));
         }
 
         boolean itemUsed = false;
-        if (item.isShovel() && !this.isExtinguished()) {
-            this.setExtinguished(true);
-            this.level.setBlock(this, this, true, true);
-            this.level.addSound(this, Sound.RANDOM_FIZZ, 0.5f, 2.2f);
+        if (item.isShovel() && !isExtinguished()) {
+            setExtinguished(true);
+            level.setBlock(this, this, true, true);
+            level.addSound(this, Sound.RANDOM_FIZZ, 0.5f, 2.2f);
             itemUsed = true;
         } else if (item.getId() == ItemID.FLINT_AND_STEEL) {
             item.useOn(this);
-            this.setExtinguished(false);
-            this.level.setBlock(this, this, true, true);
+            setExtinguished(false);
+            level.setBlock(this, this, true, true);
             if (entity != null) {
                 entity.scheduleUpdate();
             }
-            this.level.addSound(this, Sound.FIRE_IGNITE);
+            level.addSound(this, Sound.FIRE_IGNITE);
             itemUsed = true;
         }
 
@@ -184,12 +177,12 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
             return itemUsed;
         }
 
-        BlockEntityCampfire campfire = (BlockEntityCampfire) entity;
-        Item cloned = item.clone();
+        final BlockEntityCampfire campfire = (BlockEntityCampfire) entity;
+        final Item cloned = item.clone();
         cloned.setCount(1);
-        CampfireInventory inventory = campfire.getInventory();
-        if(inventory.canAddItem(cloned)) {
-            CampfireRecipe recipe = this.level.getServer().getCraftingManager().matchCampfireRecipe(cloned);
+        final CampfireInventory inventory = campfire.getInventory();
+        if (inventory.canAddItem(cloned)) {
+            final CampfireRecipe recipe = level.getServer().getCraftingManager().matchCampfireRecipe(cloned);
             if (recipe != null) {
                 inventory.addItem(cloned);
                 item.setCount(item.getCount() - 1);
@@ -207,20 +200,15 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
 
     @Override
     protected AxisAlignedBB recalculateCollisionBoundingBox() {
-        return new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x + 1, this.y + 1, this.z + 1);
+        return new SimpleAxisAlignedBB(x, y, z, x + 1, y + 1, z + 1);
     }
 
-    @Override
-    public BlockColor getColor() {
-        return BlockColor.SPRUCE_BLOCK_COLOR;
+    public final boolean isExtinguished() {
+        return (getDamage() & 0x4) == 0x4;
     }
 
-    public boolean isExtinguished() {
-        return (this.getDamage() & 0x4) == 0x4;
-    }
-
-    public void setExtinguished(boolean extinguished) {
-        this.setDamage((this.getDamage() & 0x3) | (extinguished? 0x4 : 0x0));
+    public final void setExtinguished(final boolean extinguished) {
+        setDamage(getDamage() & 0x3 | (extinguished ? 0x4 : 0x0));
     }
 
     @Override
@@ -228,12 +216,12 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
         return BlockFace.fromHorizontalIndex(getDamage() & 0x3);
     }
 
-    public void setBlockFace(BlockFace face) {
+    public void setBlockFace(final BlockFace face) {
         if (face == BlockFace.UP || face == BlockFace.DOWN) {
             return;
         }
 
-        this.setDamage((this.getDamage() & 0x4) | face.getHorizontalIndex());
+        setDamage(getDamage() & 0x4 | face.getHorizontalIndex());
     }
 
     @Override
@@ -252,17 +240,12 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
 
     @Override
     public int getComparatorInputOverride() {
-        BlockEntity blockEntity = this.level.getBlockEntity(this);
+        final BlockEntity tile = level.getBlockEntity(this);
 
-        if (blockEntity instanceof BlockEntityCampfire) {
-            return ContainerInventory.calculateRedstone(((BlockEntityCampfire) blockEntity).getInventory());
+        if (tile instanceof BlockEntityCampfire) {
+            return ContainerInventory.calculateRedstone(((BlockEntityCampfire) tile).getInventory());
         }
 
         return super.getComparatorInputOverride();
-    }
-
-    @Override
-    public boolean canBePushed() {
-        return true;
     }
 }

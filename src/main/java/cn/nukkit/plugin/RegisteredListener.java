@@ -23,15 +23,17 @@ public class RegisteredListener {
 
     private final boolean ignoreCancelled;
 
-    private final Timing timing;
-
-    public RegisteredListener(Listener listener, EventExecutor executor, EventPriority priority, Plugin plugin, boolean ignoreCancelled, Timing timing) {
+    public RegisteredListener(Listener listener, EventExecutor executor, EventPriority priority, Plugin plugin, boolean ignoreCancelled) {
         this.listener = listener;
         this.priority = priority;
         this.plugin = plugin;
         this.executor = executor;
         this.ignoreCancelled = ignoreCancelled;
-        this.timing = timing;
+    }
+
+    @Deprecated
+    public RegisteredListener(Listener listener, EventExecutor executor, EventPriority priority, Plugin plugin, boolean ignoreCancelled, Timing timing) {
+        this(listener, executor, priority, plugin, ignoreCancelled);
     }
 
     public Listener getListener() {
@@ -52,9 +54,7 @@ public class RegisteredListener {
                 return;
             }
         }
-        if (this.timing != null) this.timing.startTiming();
         executor.execute(listener, event);
-        if (this.timing != null) this.timing.stopTiming();
     }
 
     public boolean isIgnoringCancelled() {

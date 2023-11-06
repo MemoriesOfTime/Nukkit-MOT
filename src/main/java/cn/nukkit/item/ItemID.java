@@ -1,10 +1,13 @@
 package cn.nukkit.item;
 
+import static cn.nukkit.utils.Utils.dynamic;
+
 /**
  * List of item IDs
  */
 public interface ItemID {
 
+    int STRING_IDENTIFIED_ITEM = dynamic(255);
     int IRON_SHOVEL = 256;
     int IRON_PICKAXE = 257;
     int IRON_AXE = 258;
@@ -109,6 +112,7 @@ public interface ItemID {
     int PAPER = 339;
     int BOOK = 340;
     int SLIMEBALL = 341;
+    int SLIME_BALL = 341;
     int CHEST_MINECART = 342;
     int MINECART_WITH_CHEST = 342;
     // 343 not yet in Minecraft
@@ -132,10 +136,12 @@ public interface ItemID {
     int MELON_SLICE = 360;
     int PUMPKIN_SEEDS = 361;
     int MELON_SEEDS = 362;
+    int BEEF = 363;
     int RAW_BEEF = 363;
     int STEAK = 364;
     int COOKED_BEEF = 364;
     int RAW_CHICKEN = 365;
+    int CHICKEN = 365;
     int COOKED_CHICKEN = 366;
     int ROTTEN_FLESH = 367;
     int ENDER_PEARL = 368;
@@ -156,6 +162,7 @@ public interface ItemID {
     int CAULDRON = 380;
     int ENDER_EYE = 381;
     int GLISTERING_MELON = 382;
+    int GLISTERING_MELON_SLICE = 382;
     int SPAWN_EGG = 383;
     int EXPERIENCE_BOTTLE = 384;
     int FIRE_CHARGE = 385;
@@ -206,8 +213,10 @@ public interface ItemID {
     int DIAMOND_HORSE_ARMOR = 419;
     int LEAD = 420;
     int NAME_TAG = 421;
+    int NAMETAG = 421;
     int PRISMARINE_CRYSTALS = 422;
     int RAW_MUTTON = 423;
+    int MUTTONRAW = 423;
     int COOKED_MUTTON = 424;
     int ARMOR_STAND = 425;
     int END_CRYSTAL = 426;
@@ -250,6 +259,8 @@ public interface ItemID {
     int DRIED_KELP = 464;
     int NAUTILUS_SHELL = 465;
     int GOLDEN_APPLE_ENCHANTED = 466;
+    int ENCHANTED_GOLDEN_APPLE = 466;
+    int APPLEENCHANTED = 466;
     int HEART_OF_THE_SEA = 467;
     int SCUTE = 468;
     int TURTLE_SHELL = 469;
@@ -291,6 +302,10 @@ public interface ItemID {
     int MANGROVE_CHEST_BOAT = 644;
     int CHEST_BOAT = 645;
 
+    int GLOW_BERRIES = 654;
+
+    int RECORD_RELIC = 701;
+
     int CAMPFIRE = 720;
 
     // 514 - 733 not yet in Minecraft
@@ -312,14 +327,17 @@ public interface ItemID {
     int NETHERITE_LEGGINGS = 750;
     int NETHERITE_BOOTS = 751;
     int NETHERITE_SCRAP = 752;
-    //
+    int CRIMSON_SIGN = 753;
+    int WARPED_SIGN = 754;
     int CRIMSON_DOOR = 755;
     int WARPED_DOOR = 756;
-    //
     int WARPED_FUNGUS_ON_A_STICK = 757;
     //
     int RECORD_PIGSTEP = 759;
     //
+    int AMETHYST_SHARD = 771;
     int SPYGLASS = 772;
     int RECORD_OTHERSIDE = 773;
+
+    int SOUL_CAMPFIRE = 801;
 }

@@ -7,7 +7,7 @@ public class UpdateSoftEnumPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.UPDATE_SOFT_ENUM_PACKET;
 
-    public final String[] values = new String[0];
+    public String[] values = new String[0];
     public String name = "";
     public Type type = Type.SET;
 

@@ -30,7 +30,7 @@ public class ItemEmptyMap extends Item {
         if (!player.isCreative()) {
             this.count--;
         }
-        player.getInventory().addItem(new ItemMap());
+        player.getInventory().addItem(Item.get(Item.MAP));
         return true;
     }
 
@@ -39,7 +39,7 @@ public class ItemEmptyMap extends Item {
         if (!player.isCreative()) {
             this.count--;
         }
-        player.getInventory().addItem(new ItemMap());
+        player.getInventory().addItem(Item.get(Item.MAP));
         return true;
     }
 }

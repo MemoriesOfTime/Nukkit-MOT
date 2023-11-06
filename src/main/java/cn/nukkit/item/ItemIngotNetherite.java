@@ -1,6 +1,8 @@
 package cn.nukkit.item;
 
-public class ItemIngotNetherite extends Item {
+import cn.nukkit.item.trim.ItemTrimMaterialType;
+
+public class ItemIngotNetherite extends Item implements ItemTrimMaterial {
 
     public ItemIngotNetherite() {
         this(0, 1);
@@ -12,5 +14,10 @@ public class ItemIngotNetherite extends Item {
 
     public ItemIngotNetherite(Integer meta, int count) {
         super(NETHERITE_INGOT, 0, count, "Netherite Ingot");
+    }
+
+    @Override
+    public ItemTrimMaterialType getMaterial() {
+        return ItemTrimMaterialType.MATERIAL_NETHERITE;
     }
 }

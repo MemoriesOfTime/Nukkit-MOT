@@ -1,7 +1,6 @@
 package cn.nukkit.item;
 
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.block.*;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.level.Level;
@@ -53,7 +52,7 @@ public class ItemFireCharge extends Item {
                 if (!e.isCancelled()) {
                     level.setBlock(fire, fire, true);
                     //level.addLevelEvent(block, LevelEventPacket.EVENT_SOUND_GHAST_SHOOT, 78642);
-                    level.scheduleUpdate(fire, Server.getInstance().isLowProfileServer() ? Utils.rand(200, 400) : (fire.tickRate() + Utils.random.nextInt(10)));
+                    level.scheduleUpdate(fire, fire.tickRate() + Utils.random.nextInt(10));
                     level.addSoundToViewers(block, Sound.MOB_GHAST_FIREBALL);
 
                     if (!player.isCreative()) {

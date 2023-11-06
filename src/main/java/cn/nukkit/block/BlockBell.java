@@ -332,6 +332,7 @@ public class BlockBell extends BlockTransparentMeta implements Faceable {
         return BlockFace.fromHorizontalIndex(getDamage() & 0b11);
     }
 
+    @Override
     public void setBlockFace(BlockFace face) {
         if (face.getHorizontalIndex() == -1) {
             return;

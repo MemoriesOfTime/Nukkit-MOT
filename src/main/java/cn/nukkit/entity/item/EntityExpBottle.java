@@ -59,8 +59,6 @@ public class EntityExpBottle extends EntityProjectile {
             return false;
         }
 
-        if (this.timing != null) this.timing.startTiming();
-
         if (this.age > 1200) {
             this.close();
             return false;
@@ -71,8 +69,6 @@ public class EntityExpBottle extends EntityProjectile {
             this.close();
             return false;
         }
-
-        if (this.timing != null) this.timing.stopTiming();
 
         return super.onUpdate(currentTick);
     }

@@ -80,11 +80,11 @@ public abstract class EntityFlyingMob extends EntityFlying implements EntityMob 
         }
 
         if (minDamage == null || minDamage.length < 4) {
-            minDamage = Utils.emptyDamageArray;
+            minDamage = Utils.getEmptyDamageArray();
         }
 
         if (maxDamage == null || maxDamage.length < 4) {
-            maxDamage = Utils.emptyDamageArray;
+            maxDamage = Utils.getEmptyDamageArray();
         }
 
         for (int i = 0; i < 4; i++) {

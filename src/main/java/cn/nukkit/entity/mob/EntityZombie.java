@@ -16,7 +16,6 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.MobArmorEquipmentPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.utils.Utils;
-import co.aikar.timings.Timings;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -120,7 +119,6 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
     @Override
     public boolean entityBaseTick(int tickDiff) {
         boolean hasUpdate;
-        if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.startTiming();
 
         if (getServer().getDifficulty() == 0) {
             this.close();
@@ -137,7 +135,6 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
             }
         }
 
-        if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.stopTiming();
         return hasUpdate;
     }
 

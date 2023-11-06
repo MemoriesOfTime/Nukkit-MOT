@@ -82,19 +82,24 @@ public class RakNetInterface implements RakNetServerListener, AdvancedSourceInte
         while (iterator.hasNext()) {
             RakNetPlayerSession nukkitSession = iterator.next();
             Player player = nukkitSession.getPlayer();
-            if (nukkitSession.getDisconnectReason() != null) {
-                player.close(player.getLeaveMessage(), nukkitSession.getDisconnectReason(), false);
-                iterator.remove();
-            } else {
-                nukkitSession.serverTick();
+            try {
+                if (nukkitSession.getDisconnectReason() != null) {
+                    player.close(player.getLeaveMessage(), nukkitSession.getDisconnectReason(), false);
+                    iterator.remove();
+                    continue;
+                }
+            } catch (Exception e) {
+                player.getNetworkSession().disconnect("Internal error");
+                log.error("Exception closing player " + player.getName(), e);
             }
+            nukkitSession.serverTick();
         }
         return true;
     }
 
     @Override
     public int getNetworkLatency(Player player) {
-        RakNetServerSession session = this.raknet.getSession(player.getSocketAddress());
+        RakNetServerSession session = this.raknet.getSession(player.getRawSocketAddress());
         return session == null ? -1 : (int) session.getPing();
     }
 
@@ -110,7 +115,7 @@ public class RakNetInterface implements RakNetServerListener, AdvancedSourceInte
 
     @Override
     public void close(Player player, String reason) {
-        NetworkPlayerSession playerSession = this.getSession(player.getSocketAddress());
+        NetworkPlayerSession playerSession = this.getSession(player.getRawSocketAddress());
         if (playerSession != null) {
             playerSession.disconnect(reason);
         }

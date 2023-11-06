@@ -7,8 +7,8 @@ import cn.nukkit.command.PluginIdentifiableCommand;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.Utils;
 import com.google.common.base.Preconditions;
-import org.yaml.snakeyaml.DumperOptions;
-import org.yaml.snakeyaml.Yaml;
+import org.snakeyaml.engine.v2.api.Load;
+import org.snakeyaml.engine.v2.api.LoadSettings;
 
 import java.io.File;
 import java.io.IOException;
@@ -84,6 +84,9 @@ abstract public class PluginBase implements Plugin {
      */
     public final void setEnabled(boolean value) {
         if (isEnabled != value) {
+            if (!value && InternalPlugin.INSTANCE == this) {
+                throw new UnsupportedOperationException("The Nukkit-MOT Internal Plugin cannot be disabled");
+            }
             isEnabled = value;
             if (isEnabled) {
                 onEnable();
@@ -239,11 +242,12 @@ abstract public class PluginBase implements Plugin {
         this.config = new Config(this.configFile);
         InputStream configStream = this.getResource("config.yml");
         if (configStream != null) {
-            DumperOptions dumperOptions = new DumperOptions();
-            dumperOptions.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
-            Yaml yaml = new Yaml(dumperOptions);
+            LoadSettings settings = LoadSettings.builder()
+                    .setParseComments(false)
+                    .build();
+            Load yaml = new Load(settings);
             try {
-                this.config.setDefault(yaml.loadAs(Utils.readFile(this.configFile), LinkedHashMap.class));
+                this.config.setDefault((LinkedHashMap<String, Object>) yaml.loadFromString(Utils.readFile(this.configFile)));
             } catch (IOException e) {
                 Server.getInstance().getLogger().logException(e);
             }
@@ -283,6 +287,7 @@ abstract public class PluginBase implements Plugin {
      * @return 这个插件的文件 {@code File}对象。<br>The {@code File} object of this plugin itself.
      * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
+    @Override
     public File getFile() {
         return file;
     }

@@ -1,9 +1,14 @@
 package cn.nukkit.nbt;
 
 import cn.nukkit.item.Item;
-import cn.nukkit.nbt.stream.*;
+import cn.nukkit.item.ItemID;
+import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
+import cn.nukkit.nbt.stream.NBTInputStream;
+import cn.nukkit.nbt.stream.NBTOutputStream;
+import cn.nukkit.nbt.stream.PGZIPOutputStream;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.ThreadCache;
 
 import java.io.*;
@@ -25,10 +30,21 @@ public class NBTIO {
     }
 
     public static CompoundTag putItemHelper(Item item, Integer slot) {
+        return putItemHelper(item, slot, ProtocolInfo.CURRENT_PROTOCOL);
+    }
+
+    public static CompoundTag putItemHelper(Item item, Integer slot, int protocol) {
         CompoundTag tag = new CompoundTag((String) null)
-                .putShort("id", item.getId() & 0xFFFF)
                 .putByte("Count", item.getCount())
                 .putShort("Damage", item.getDamage());
+
+        int id = item.getId();
+        if (id == ItemID.STRING_IDENTIFIED_ITEM) {
+            tag.putString("Name", item.getNamespaceId(protocol));
+        } else {
+            tag.putShort("id", item.getId() & 0xFFFF);
+        }
+
         if (slot != null) {
             tag.putByte("Slot", slot);
         }
@@ -41,17 +57,30 @@ public class NBTIO {
     }
 
     public static Item getItemHelper(CompoundTag tag) {
-        if (!tag.contains("id") || !tag.contains("Count")) {
+        if ((!tag.contains("id") && !tag.contains("Name"))
+                || !tag.contains("Count")) {
             return Item.get(0);
         }
 
+        int damage = !tag.contains("Damage") ? 0 : tag.getShort("Damage");
+        int count = tag.getByte("Count");
         Item item;
-        try {
-            item = Item.get((short) tag.getShort("id"), !tag.contains("Damage") ? 0 : tag.getShort("Damage"), tag.getByte("Count"));
-        } catch (Exception e) {
-            item = Item.fromString(tag.getString("id"));
-            item.setDamage(!tag.contains("Damage") ? 0 : tag.getShort("Damage"));
-            item.setCount(tag.getByte("Count"));
+
+        if (tag.containsShort("id")) {
+            int id = (short) tag.getShort("id");
+            try {
+                item = Item.get((short) tag.getShort("id"), damage, count);
+            } catch (Exception e) {
+                item = Item.fromString(tag.getString("id"));
+                item.setDamage(damage);
+                item.setCount(count);
+            }
+        } else {
+            item = Item.fromString(tag.getString("Name"));
+            if (item.getDamage() == 0) {
+                item.setDamage(damage);
+            }
+            item.setCount(count);
         }
 
         if (item.count > item.getMaxStackSize()) {

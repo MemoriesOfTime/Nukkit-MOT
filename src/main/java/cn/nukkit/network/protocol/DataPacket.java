@@ -2,8 +2,8 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
 import cn.nukkit.network.Network;
-import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.SnappyCompression;
 import cn.nukkit.utils.Zlib;
 import com.nukkitx.network.raknet.RakNetReliability;
 
@@ -76,22 +76,23 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
     }
 
     public BatchPacket compress(int level) {
-        BatchPacket batch = new BatchPacket();
-        byte[][] batchPayload = new byte[2][];
-        byte[] buf = getBuffer();
-        batchPayload[0] = Binary.writeUnsignedVarInt(buf.length);
-        batchPayload[1] = buf;
-        byte[] data = Binary.appendBytes(batchPayload);
+        BinaryStream stream = new BinaryStream();
+        byte[] buf = this.getBuffer();
+        stream.putUnsignedVarInt(buf.length);
+        stream.put(buf);
         try {
-            if (protocol >= ProtocolInfo.v1_16_0) {
-                batch.payload = Zlib.deflateRaw(data, level);
+            BatchPacket batched = new BatchPacket();
+            if (Server.getInstance().useSnappy && protocol >= ProtocolInfo.v1_19_30_23) {
+                batched.payload = SnappyCompression.compress(stream.getBuffer());
+            } else if (protocol >= ProtocolInfo.v1_16_0) {
+                batched.payload = Zlib.deflateRaw(stream.getBuffer(), level);
             } else {
-                batch.payload = Zlib.deflate(data, level);
+                batched.payload = Zlib.deflatePre16Packet(stream.getBuffer(), level);
             }
+            return batched;
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return batch;
     }
 
     public final void tryEncode() {

@@ -6,6 +6,7 @@ import cn.nukkit.inventory.EnchantInventory;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.transaction.action.EnchantingAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.types.NetworkInventoryAction;
 import lombok.Getter;
@@ -23,6 +24,13 @@ public class EnchantTransaction extends InventoryTransaction {
 
     public EnchantTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions);
+        for (InventoryAction action : actions) {
+            if (action instanceof SlotChangeAction slotChangeAction) {
+                if (slotChangeAction.getInventory() instanceof EnchantInventory && slotChangeAction.getSlot() == 0) {
+                    this.outputItem = slotChangeAction.getTargetItem();
+                }
+            }
+        }
     }
 
     @Override
@@ -34,7 +42,9 @@ public class EnchantTransaction extends InventoryTransaction {
             if (cost == -1 || !eInv.getReagentSlot().equals(Item.get(Item.DYE, 4), true, false) || eInv.getReagentSlot().count < cost)
                 return false;
         }
-        return (inputItem != null && outputItem != null && inputItem.equals(eInv.getInputSlot(), true, true));
+        return inputItem != null && outputItem != null
+                && inputItem.equals(eInv.getInputSlot(), true, true)
+                && this.checkEnchantValid();
     }
 
     @Override
@@ -103,5 +113,16 @@ public class EnchantTransaction extends InventoryTransaction {
             if (action instanceof EnchantingAction) return true;
         }
         return false;
+    }
+
+    public boolean checkEnchantValid() {
+        if (this.inputItem.getId() != this.outputItem.getId()
+                || this.inputItem.getCount() != this.outputItem.getCount()) {
+            return false;
+        }
+
+        //TODO 检查附魔
+
+        return true;
     }
 }

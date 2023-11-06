@@ -1,5 +1,6 @@
 package cn.nukkit.inventory;
 
+import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.item.Item;
 
@@ -47,5 +48,17 @@ public class FurnaceInventory extends ContainerInventory {
         super.onSlotChange(index, before, send);
 
         this.getHolder().scheduleUpdate();
+    }
+
+    public boolean setItemByPlayer(Player player, int index, Item item, boolean send) {
+        if (index == 2 && (item.getId() == 0 || item.getCount() == 0)) {
+            BlockEntityFurnace holder = getHolder();
+            int xp = holder.calculateXpDrop();
+            if (xp > 0) {
+                holder.setStoredXP(0);
+                holder.level.dropExpOrb(player, xp);
+            }
+        }
+        return setItem(index, item, send);
     }
 }

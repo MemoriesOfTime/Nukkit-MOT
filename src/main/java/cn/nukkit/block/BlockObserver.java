@@ -1,13 +1,21 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.event.block.BlockRedstoneEvent;
+import cn.nukkit.event.redstone.RedstoneUpdateEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockObserver extends BlockSolidMeta implements Faceable {
+
+    private static final int FACE_BIT = 0x7; //0111
+    private static final int POWERED_BIT = 0x8; //1000
 
     public BlockObserver() {
         this(0);
@@ -66,17 +74,17 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
             if (Math.abs(player.getFloorX() - this.x) <= 1 && Math.abs(player.getFloorZ() - this.z) <= 1) {
                 double y = player.y + player.getEyeHeight();
                 if (y - this.y > 2) {
-                    this.setDamage(BlockFace.DOWN.getIndex());
+                    this.setBlockFace(BlockFace.DOWN);
                 } else if (this.y - y > 0) {
-                    this.setDamage(BlockFace.UP.getIndex());
+                    this.setBlockFace(BlockFace.UP);
                 } else {
-                    this.setDamage(player.getHorizontalFacing().getIndex());
+                    this.setBlockFace(player.getHorizontalFacing());
                 }
             } else {
-                this.setDamage(player.getHorizontalFacing().getIndex());
+                this.setBlockFace(player.getHorizontalFacing());
             }
         } else {
-            this.setDamage(0);
+            this.setBlockFace(BlockFace.DOWN);
         }
         this.getLevel().setBlock(block, this, true, true);
         return true;
@@ -84,7 +92,11 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
 
     @Override
     public BlockFace getBlockFace() {
-        return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
+        return BlockFace.fromIndex(this.getDamage() & FACE_BIT);
+    }
+
+    public void setBlockFace(BlockFace face) {
+        this.setDamage(face.getIndex() & FACE_BIT | this.getDamage() & POWERED_BIT);
     }
 
     @Override
@@ -109,45 +121,56 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
 
     @Override
     public int onUpdate(int type) {
-        return super.onUpdate(type);
-        //TODO 实现功能
-        /*if (type == Level.BLOCK_UPDATE_NORMAL && !this.isPowered()) {
-            RedstoneUpdateEvent redstoneUpdateEvent = new RedstoneUpdateEvent(this);
-            this.level.getServer().getPluginManager().callEvent(redstoneUpdateEvent);
-            if (redstoneUpdateEvent.isCancelled()) {
+        if (type == Level.BLOCK_UPDATE_SCHEDULED) {
+            RedstoneUpdateEvent ev = new RedstoneUpdateEvent(this);
+            PluginManager pluginManager = level.getServer().getPluginManager();
+            pluginManager.callEvent(ev);
+            if (ev.isCancelled()) {
                 return 0;
             }
 
-            this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 0, 15));
-            this.setPowered(true);
-            if (this.level.setBlock(this, this, false, false)) {
-                this.level.updateAroundRedstone(this, this.getBlockFace());
-                level.scheduleUpdate(this, 5);
+            if (!isPowered()) {
+                this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 0, 15));
+                this.setPowered(true);
+
+                if (this.level.setBlock(this, this)) {
+                    getSide(getBlockFace().getOpposite()).onUpdate(Level.BLOCK_UPDATE_REDSTONE);
+                    this.level.updateAroundRedstone(this, this.getBlockFace().getOpposite());
+                    this.level.scheduleUpdate(this, 2);
+                }
+            } else {
+                pluginManager.callEvent(new BlockRedstoneEvent(this, 15, 0));
+                this.setPowered(false);
+
+                this.level.setBlock(this, this);
+                getSide(getBlockFace().getOpposite()).onUpdate(Level.BLOCK_UPDATE_REDSTONE);
+                this.level.updateAroundRedstone(this, this.getBlockFace().getOpposite());
             }
-
-            return 1;
+            return type;
         }
-        if (type == Level.BLOCK_UPDATE_SCHEDULED && this.isPowered()) {
-            RedstoneUpdateEvent redstoneUpdateEvent = new RedstoneUpdateEvent(this);
-            this.level.getServer().getPluginManager().callEvent(redstoneUpdateEvent);
-            if (redstoneUpdateEvent.isCancelled()) {
-                return 0;
-            }
+        return 0;
+    }
 
-            this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 0, 15));
-            this.setPowered(false);
-            this.level.setBlock(this, this, false, false);
-            this.level.updateAroundRedstone(this, this.getBlockFace());
+    @Override
+    public void onNeighborChange(@NotNull BlockFace side) {
+        if (side != this.getBlockFace() || this.level.isUpdateScheduled(this, this)) {
+            return;
         }
 
-        return type;*/
+        RedstoneUpdateEvent ev = new RedstoneUpdateEvent(this);
+        this.level.getServer().getPluginManager().callEvent(ev);
+        if (ev.isCancelled()) {
+            return;
+        }
+
+        this.level.scheduleUpdate(this, 1);
     }
 
     public boolean isPowered() {
-        return (this.getDamage() & 8) == 8;
+        return (this.getDamage() & POWERED_BIT) == 8;
     }
 
     public void setPowered(boolean powered) {
-        this.setDamage(this.getDamage() & 7 | (powered ? 8 : 0));
+        this.setDamage(this.getDamage() & FACE_BIT | (powered ? 0x8 : 0x0));
     }
 }

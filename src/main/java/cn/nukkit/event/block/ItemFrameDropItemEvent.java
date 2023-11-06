@@ -4,19 +4,14 @@ import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
 import cn.nukkit.event.Cancellable;
-import cn.nukkit.event.HandlerList;
 import cn.nukkit.item.Item;
 
 /**
  * Event for Item Frame drops.
  * @author Pub4Game on 03.07.2016.
  */
-public class ItemFrameDropItemEvent extends BlockEvent implements Cancellable {
-
-    private static final HandlerList handlers = new HandlerList();
-    private final Player player;
-    private final Item item;
-    private final BlockEntityItemFrame itemFrame;
+@Deprecated
+public class ItemFrameDropItemEvent extends ItemFrameUseEvent implements Cancellable {
 
     /**
      * Event for item being dropped from an item frame
@@ -26,14 +21,7 @@ public class ItemFrameDropItemEvent extends BlockEvent implements Cancellable {
      * @param item Item that is dropped/contained in the item frame.
      */
     public ItemFrameDropItemEvent(Player player, Block block, BlockEntityItemFrame itemFrame, Item item) {
-        super(block);
-        this.player = player;
-        this.itemFrame = itemFrame;
-        this.item = item;
-    }
-
-    public static HandlerList getHandlers() {
-        return handlers;
+        super(player, block, itemFrame, item, Action.DROP);
     }
 
     public Player getPlayer() {

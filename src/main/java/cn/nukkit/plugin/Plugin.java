@@ -269,6 +269,15 @@ public interface Plugin extends CommandExecutor {
     PluginLogger getLogger();
 
     /**
+     * 返回这个插件的文件{@code File}对象。对于jar格式的插件，就是jar文件本身。<br>
+     * Returns the {@code File} object of this plugin itself. For jar-packed plugins, it is the jar file itself.
+     *
+     * @return 这个插件的文件 {@code File}对象。<br>The {@code File} object of this plugin itself.
+     * @since Nukkit 1.0 | Nukkit API 1.0.0
+     */
+    File getFile();
+
+    /**
      * 返回这个插件的加载器为{@link cn.nukkit.plugin.PluginLoader}对象。<br>
      * Returns the loader of this plugin as a {@link cn.nukkit.plugin.PluginLoader} object.
      *

@@ -34,6 +34,10 @@ public class Void extends Generator {
     }
 
     @Override
+    public void populateStructure(final int chunkX, final int chunkZ) {
+    }
+
+    @Override
     public void generateChunk(int chX, int chZ) {
     }
 

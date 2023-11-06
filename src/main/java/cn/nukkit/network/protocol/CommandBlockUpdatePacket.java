@@ -20,6 +20,8 @@ public class CommandBlockUpdatePacket extends DataPacket {
     public String lastOutput;
     public String name;
     public boolean shouldTrackOutput;
+    public int tickDelay;
+    public boolean executingOnFirstTick;
 
     @Override
     public byte pid() {
@@ -44,6 +46,10 @@ public class CommandBlockUpdatePacket extends DataPacket {
         this.lastOutput = this.getString();
         this.name = this.getString();
         this.shouldTrackOutput = this.getBoolean();
+        if (this.protocol >= ProtocolInfo.v1_12_0) {
+            this.tickDelay = this.getLInt();
+            this.executingOnFirstTick = this.getBoolean();
+        }
     }
 
     @Override
@@ -62,5 +68,9 @@ public class CommandBlockUpdatePacket extends DataPacket {
         this.putString(this.lastOutput);
         this.putString(this.name);
         this.putBoolean(this.shouldTrackOutput);
+        if (this.protocol >= ProtocolInfo.v1_12_0) {
+            this.putLInt(this.tickDelay);
+            this.putBoolean(this.executingOnFirstTick);
+        }
     }
 }

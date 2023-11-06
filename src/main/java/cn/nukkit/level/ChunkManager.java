@@ -1,6 +1,8 @@
 package cn.nukkit.level;
 
 import cn.nukkit.level.format.generic.BaseFullChunk;
+import cn.nukkit.math.ChunkVector2;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -37,6 +39,10 @@ public interface ChunkManager {
     void setBlockDataAt(int x, int y, int z, int data);
 
     BaseFullChunk getChunk(int chunkX, int chunkZ);
+
+    default BaseFullChunk getChunk(@NotNull ChunkVector2 pos) {
+        return getChunk(pos.getX(), pos.getZ());
+    }
 
     void setChunk(int chunkX, int chunkZ);
 

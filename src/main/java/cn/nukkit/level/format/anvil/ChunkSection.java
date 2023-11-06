@@ -1,6 +1,5 @@
 package cn.nukkit.level.format.anvil;
 
-import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.anvil.util.BlockStorage;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
@@ -11,17 +10,20 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.*;
 import com.google.common.base.Preconditions;
+import lombok.extern.log4j.Log4j2;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
+@Log4j2
 public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
 
     public static final int STREAM_STORAGE_VERSION = 8;
@@ -30,6 +32,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
     private final int y;
 
     protected final ReentrantReadWriteLock sectionLock = new ReentrantReadWriteLock();
+    private final ReentrantLock skyLightLock = new ReentrantLock();
 
     private final List<BlockStorage> storage = new ArrayList<>(1);
 
@@ -315,30 +318,37 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
 
     @Override
     public void setBlockSkyLight(int x, int y, int z, int level) {
-        if (this.skyLight == null) {
-            if (hasSkyLight && compressedLight != null) {
-                this.skyLight = getSkyLightArray();
-            } else if (level == (hasSkyLight ? 15 : 0)) {
-                return;
-            } else {
-                this.skyLight = new byte[2048];
-                if (hasSkyLight) {
-                    Arrays.fill(this.skyLight, (byte) 0xFF);
+        this.skyLightLock.lock();
+        try {
+            if (this.skyLight == null) {
+                if (hasSkyLight && compressedLight != null) {
+                    this.skyLight = getSkyLightArray();
+                } else if (level == (hasSkyLight ? 15 : 0)) {
+                    return;
+                } else {
+                    this.skyLight = new byte[2048];
+                    if (hasSkyLight) {
+                        Arrays.fill(this.skyLight, (byte) 0xFF);
+                    }
                 }
             }
-        }
-        int i = (y << 7) | (z << 3) | (x >> 1);
-        int old = this.skyLight[i] & 0xff;
-        if ((x & 1) == 0) {
-            this.skyLight[i] = (byte) ((old & 0xf0) | (level & 0x0f));
-        } else {
-            this.skyLight[i] = (byte) (((level & 0x0f) << 4) | (old & 0x0f));
+            int i = (y << 7) | (z << 3) | (x >> 1);
+            int old = this.skyLight[i] & 0xff;
+            if ((x & 1) == 0) {
+                this.skyLight[i] = (byte) ((old & 0xf0) | (level & 0x0f));
+            } else {
+                this.skyLight[i] = (byte) (((level & 0x0f) << 4) | (old & 0x0f));
+            }
+        } finally {
+            this.skyLightLock.unlock();
         }
     }
 
     @Override
     public int getBlockLight(int x, int y, int z) {
-        if (blockLight == null && !hasBlockLight) return 0;
+        if (blockLight == null && !hasBlockLight) {
+            return 0;
+        }
         this.blockLight = getLightArray();
         int l = blockLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
         if ((x & 1) == 0) {
@@ -527,7 +537,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
             }
             return true;
         } catch (IOException e) {
-            Server.getInstance().getLogger().error("Failed to decompress a chunk section", e);
+            log.error("Failed to decompress a chunk section", e);
             return false;
         }
     }
@@ -677,17 +687,21 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
             byte[] arr1 = blockLight;
             hasBlockLight = !Utils.isByteArrayEmpty(arr1);
             byte[] arr2;
-            if (skyLight != null) {
-                arr2 = skyLight;
-                hasSkyLight = !Utils.isByteArrayEmpty(arr2);
-            } else if (hasSkyLight) {
-                arr2 = EmptyChunkSection.EMPTY_SKY_LIGHT_ARR;
-            } else {
-                arr2 = EmptyChunkSection.EMPTY_LIGHT_ARR;
-                hasSkyLight = false;
+            this.skyLightLock.lock();
+            try {
+                if (skyLight != null) {
+                    arr2 = skyLight;
+                    hasSkyLight = !Utils.isByteArrayEmpty(arr2);
+                } else if (hasSkyLight) {
+                    arr2 = EmptyChunkSection.EMPTY_SKY_LIGHT_ARR;
+                } else {
+                    arr2 = EmptyChunkSection.EMPTY_LIGHT_ARR;
+                }
+                skyLight = null;
+            } finally {
+                this.skyLightLock.unlock();
             }
             blockLight = null;
-            skyLight = null;
             byte[] toDeflate = null;
             if (hasBlockLight && hasSkyLight && arr2 != EmptyChunkSection.EMPTY_SKY_LIGHT_ARR) {
                 toDeflate = Binary.appendBytes(arr1, arr2);
@@ -698,7 +712,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
                 try {
                     compressedLight = Zlib.deflate(toDeflate, 1);
                 } catch (Exception e) {
-                    Server.getInstance().getLogger().logException(e);
+                    log.error("Error compressing the light data", e);
                 }
             }
             return true;
@@ -737,6 +751,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
         }
     }
 
+    @Override
     public ChunkSection copy() {
         BlockStorage[] storageCopy = new BlockStorage[Math.min(this.storage.size(), getMaximumLayer() + 1)];
         for (int i = 0; i < storageCopy.length; i++) {

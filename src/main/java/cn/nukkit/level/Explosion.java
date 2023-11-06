@@ -46,6 +46,14 @@ public class Explosion {
     private boolean doesDamage = true;
 
     public Explosion(Position center, double size, Entity what) {
+        this(center, size, (Object) what);
+    }
+
+    public Explosion(Position center, double size, Block what) {
+        this(center, size, (Object) what);
+    }
+
+    protected Explosion(Position center, double size, Object what) {
         this.level = center.getLevel();
         this.source = center;
         this.size = Math.max(size, 0);
@@ -150,7 +158,7 @@ public class Explosion {
 
             if (distance <= 1) {
                 Vector3 motion = entity.subtract(this.source).normalize();
-                int exposure = 1;
+                float exposure = 1 - this.level.getBlockDensity(this.source, entity.boundingBox);
                 double impact = (1 - distance) * exposure;
 
                 int damage = this.doesDamage ? (int) (((impact * impact + impact) / 2) * 8 * explosionSize + 1) : 0;

@@ -42,6 +42,7 @@ import java.util.Set;
 
 import static co.aikar.timings.TimingIdentifier.DEFAULT_GROUP;
 
+@Deprecated
 public final class Timings {
 
     private static boolean timingsEnabled = false;

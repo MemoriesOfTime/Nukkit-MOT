@@ -16,6 +16,8 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.HashSet;
 
@@ -29,6 +31,14 @@ public class BlockEntityHopper extends BlockEntitySpawnable implements Inventory
     public int transferCooldown;
 
     private AxisAlignedBB pickupArea;
+
+    //由容器矿车检测漏斗并通知更新，这样子能大幅优化性能
+    @Getter
+    @Setter
+    private InventoryHolder minecartInvPickupFrom = null;
+    @Getter
+    @Setter
+    private InventoryHolder minecartInvPushTo = null;
 
     public BlockEntityHopper(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -164,12 +174,12 @@ public class BlockEntityHopper extends BlockEntitySpawnable implements Inventory
                 return true;
             }
 
-            boolean changed = pushItems();
+            boolean changed = pushItems() || pushItemsIntoMinecart();
 
             if (!changed) {
                 BlockEntity blockEntity = this.level.getBlockEntity(this.up());
                 if (!(blockEntity instanceof BlockEntityContainer)) {
-                    changed = pickupItems();
+                    changed = pickupItems() || pullItemsFromMinecart();
                 } else {
                     changed = pullItems();
                 }
@@ -183,6 +193,45 @@ public class BlockEntityHopper extends BlockEntitySpawnable implements Inventory
 
 
         return true;
+    }
+
+    public boolean pullItemsFromMinecart() {
+        if (this.inventory.isFull()) {
+            return false;
+        }
+
+        if (getMinecartInvPickupFrom() != null) {
+            var inv = getMinecartInvPickupFrom().getInventory();
+
+            for (int i = 0; i < inv.getSize(); i++) {
+                Item item = inv.getItem(i);
+
+                if (!item.isNull()) {
+                    Item itemToAdd = item.clone();
+                    itemToAdd.count = 1;
+                    if (!this.inventory.canAddItem(itemToAdd))
+                        continue;
+
+                    InventoryMoveItemEvent ev = new InventoryMoveItemEvent(inv, this.inventory, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
+                    this.server.getPluginManager().callEvent(ev);
+                    if (ev.isCancelled())
+                        continue;
+
+                    Item[] items = this.inventory.addItem(itemToAdd);
+                    if (items.length >= 1)
+                        continue;
+
+                    item.count--;
+                    inv.setItem(i, item);
+
+                    //归位为null
+                    setMinecartInvPickupFrom(null);
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     public boolean pullItems() {
@@ -320,6 +369,52 @@ public class BlockEntityHopper extends BlockEntitySpawnable implements Inventory
             level.dropItem(this, content);
         }
         inventory.clearAll();
+    }
+
+    public boolean pushItemsIntoMinecart() {
+        if (getMinecartInvPushTo() != null) {
+            Inventory holderInventory = getMinecartInvPushTo().getInventory();
+
+            if (holderInventory.isFull()) {
+                return false;
+            }
+
+            for (int i = 0; i < this.inventory.getSize(); i++) {
+                Item item = this.inventory.getItem(i);
+
+                if (!item.isNull()) {
+                    Item itemToAdd = item.clone();
+                    itemToAdd.setCount(1);
+
+                    if (!holderInventory.canAddItem(itemToAdd)) {
+                        continue;
+                    }
+
+                    InventoryMoveItemEvent ev = new InventoryMoveItemEvent(this.inventory, holderInventory, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
+                    this.server.getPluginManager().callEvent(ev);
+
+                    if (ev.isCancelled()) {
+                        continue;
+                    }
+
+                    Item[] items = holderInventory.addItem(itemToAdd);
+
+                    if (items.length > 0) {
+                        continue;
+                    }
+
+                    item.count--;
+                    this.inventory.setItem(i, item);
+
+                    //归位为null
+                    setMinecartInvPushTo(null);
+                    return true;
+                }
+            }
+
+        }
+
+        return false;
     }
 
     public boolean pushItems() {
