@@ -16,6 +16,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
         <jline.version>3.21.0</jline.version>
+        <block-state-updater.version>1.20.40-SNAPSHOT</block-state-updater.version>
     </properties>
 
     <distributionManagement>
@@ -272,6 +273,12 @@
             <groupId>com.intellij</groupId>
             <artifactId>annotations</artifactId>
             <version>12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.cloudburstmc</groupId>
+            <artifactId>block-state-updater</artifactId>
+            <version>${block-state-updater.version}</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
 
