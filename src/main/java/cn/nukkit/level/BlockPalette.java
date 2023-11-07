@@ -15,6 +15,7 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
@@ -25,6 +26,7 @@ public class BlockPalette {
     private final int protocol;
     private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
+    private final Map<CompoundTag, Integer> stateToLegacy = new HashMap<>();
 
     public BlockPalette(int protocol) {
         this.protocol = protocol;
@@ -59,6 +61,7 @@ public class BlockPalette {
             if (!runtimeIdToLegacy.containsKey(runtimeId)) {
                 runtimeIdToLegacy.put(runtimeId, legacyId);
             }
+            stateToLegacy.put(state, legacyId);
         }
     }
 
@@ -90,6 +93,7 @@ public class BlockPalette {
     public void clearStates() {
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
+        this.stateToLegacy.clear();
     }
 
     public int getRuntimeId(int id) {
@@ -112,6 +116,10 @@ public class BlockPalette {
 
     public int getLegacyFullId(int runtimeId) {
         return runtimeIdToLegacy.get(runtimeId);
+    }
+
+    public int getLegacyFullId(CompoundTag compoundTag) {
+        return stateToLegacy.getOrDefault(compoundTag, -1);
     }
 
 }
