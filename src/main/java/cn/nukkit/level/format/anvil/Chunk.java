@@ -308,8 +308,10 @@ public class Chunk extends BaseChunk {
 
         ArrayList<CompoundTag> tiles = new ArrayList<>();
         for (BlockEntity blockEntity : this.getBlockEntities().values()) {
-            blockEntity.saveNBT();
-            tiles.add(blockEntity.namedTag);
+            if (!blockEntity.closed) {
+                blockEntity.saveNBT();
+                tiles.add(blockEntity.namedTag);
+            }
         }
         ListTag<CompoundTag> tileListTag = new ListTag<>("TileEntities");
         tileListTag.setAll(tiles);
