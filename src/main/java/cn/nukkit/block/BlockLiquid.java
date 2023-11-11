@@ -281,32 +281,35 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                 }
             }
             if (decay >= 0) {
-                Block bottomBlock = this.level.getBlock((int) this.x, (int) this.y - 1, (int) this.z);
-                this.flowIntoBlock(bottomBlock, decay | 0x08);
-                if (decay == 0 || !(usesWaterLogging()? bottomBlock.canWaterloggingFlowInto(): bottomBlock.canBeFlowedInto())) {
-                    int adjacentDecay;
-                    if (decay >= 8) {
-                        adjacentDecay = 1;
-                    } else {
-                        adjacentDecay = decay + multiplier;
+                int bottomY = (int) this.y - 1;
+                if (bottomY >= 0) {
+                    Block bottomBlock = this.level.getBlock((int) this.x, bottomY, (int) this.z);
+                    this.flowIntoBlock(bottomBlock, decay | 0x08);
+                    if (decay == 0 || !(usesWaterLogging() ? bottomBlock.canWaterloggingFlowInto() : bottomBlock.canBeFlowedInto())) {
+                        int adjacentDecay;
+                        if (decay >= 8) {
+                            adjacentDecay = 1;
+                        } else {
+                            adjacentDecay = decay + multiplier;
+                        }
+                        if (adjacentDecay < 8) {
+                            boolean[] flags = this.getOptimalFlowDirections();
+                            if (flags[0]) {
+                                this.flowIntoBlock(this.level.getBlock((int) this.x - 1, (int) this.y, (int) this.z), adjacentDecay);
+                            }
+                            if (flags[1]) {
+                                this.flowIntoBlock(this.level.getBlock((int) this.x + 1, (int) this.y, (int) this.z), adjacentDecay);
+                            }
+                            if (flags[2]) {
+                                this.flowIntoBlock(this.level.getBlock((int) this.x, (int) this.y, (int) this.z - 1), adjacentDecay);
+                            }
+                            if (flags[3]) {
+                                this.flowIntoBlock(this.level.getBlock((int) this.x, (int) this.y, (int) this.z + 1), adjacentDecay);
+                            }
+                        }
                     }
-                    if (adjacentDecay < 8) {
-                        boolean[] flags = this.getOptimalFlowDirections();
-                        if (flags[0]) {
-                            this.flowIntoBlock(this.level.getBlock((int) this.x - 1, (int) this.y, (int) this.z), adjacentDecay);
-                        }
-                        if (flags[1]) {
-                            this.flowIntoBlock(this.level.getBlock((int) this.x + 1, (int) this.y, (int) this.z), adjacentDecay);
-                        }
-                        if (flags[2]) {
-                            this.flowIntoBlock(this.level.getBlock((int) this.x, (int) this.y, (int) this.z - 1), adjacentDecay);
-                        }
-                        if (flags[3]) {
-                            this.flowIntoBlock(this.level.getBlock((int) this.x, (int) this.y, (int) this.z + 1), adjacentDecay);
-                        }
-                    }
+                    this.checkForHarden();
                 }
-                this.checkForHarden();
             }
         }
         return 0;
