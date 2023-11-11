@@ -5,17 +5,21 @@ import cn.nukkit.block.BlockID;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
@@ -26,7 +30,8 @@ public class BlockPalette {
     private final int protocol;
     private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
-    private final Map<CompoundTag, Integer> stateToLegacy = new HashMap<>();
+    private final Object2IntMap<CompoundTag> stateToLegacy = new Object2IntOpenHashMap<>();
+    private final Int2ObjectMap<CompoundTag> legacyToState = new Int2ObjectOpenHashMap<>();
 
     public BlockPalette(int protocol) {
         this.protocol = protocol;
@@ -57,11 +62,20 @@ public class BlockPalette {
             int data = state.getShort("data");
             int runtimeId = state.getInt("runtimeId");
             int legacyId = id << 6 | data;
-            legacyToRuntimeId.put(legacyId, runtimeId);
-            if (!runtimeIdToLegacy.containsKey(runtimeId)) {
-                runtimeIdToLegacy.put(runtimeId, legacyId);
+            if (data >= 0) {
+                legacyToRuntimeId.put(legacyId, runtimeId);
+                if (!runtimeIdToLegacy.containsKey(runtimeId)) {
+                    runtimeIdToLegacy.put(runtimeId, legacyId);
+                }
             }
-            stateToLegacy.put(state, legacyId);
+            CompoundTag vState = state.copy()
+                    .remove("stateOverload")
+                    .remove("data")
+                    .remove("id")
+                    .remove("runtimeId")
+                    .remove("version");
+            stateToLegacy.put(vState, legacyId);
+            legacyToState.put(legacyId, vState);
         }
     }
 
@@ -94,6 +108,7 @@ public class BlockPalette {
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
         this.stateToLegacy.clear();
+        this.legacyToState.clear();
     }
 
     public int getRuntimeId(int id) {
@@ -119,7 +134,54 @@ public class BlockPalette {
     }
 
     public int getLegacyFullId(CompoundTag compoundTag) {
-        return stateToLegacy.getOrDefault(compoundTag, -1);
+        compoundTag = compoundTag.copy().remove("version");
+        int fullId = stateToLegacy.getOrDefault(compoundTag, -1);
+        if (fullId == -1) {
+            //TODO 优化
+            for (Map.Entry<CompoundTag, Integer> entry : stateToLegacy.entrySet()) {
+                if (checkCompoundTag(compoundTag, entry.getKey())) {
+                    fullId = entry.getValue();
+                    break;
+                }
+            }
+        }
+        if (fullId == -1) {
+            log.warn("Missing block state mappings for " + compoundTag);
+        }
+        return fullId;
+    }
+
+    public CompoundTag getState(int legacyFullId) {
+        return legacyToState.get(legacyFullId);
+    }
+
+    private boolean checkCompoundTag(CompoundTag tag, CompoundTag tag2) {
+        if (tag == null || tag2 == null) {
+            return false;
+        }
+        for (Tag t : tag.getAllTags()) {
+            if (!tag2.contains(t.getName())) {
+                return false;
+            }
+            if (tag2.containsCompound(t.getName()) && !checkCompoundTag((CompoundTag) t, tag2.getCompound(t.getName()))) {
+                return false;
+            }
+            if (!tag2.get(t.getName()).parseValue().equals(t.parseValue())) {
+                return false;
+            }
+        }
+        for (Tag t : tag2.getAllTags()) {
+            if (!tag.contains(t.getName())) {
+                return false;
+            }
+            if (tag.containsCompound(t.getName()) && !checkCompoundTag((CompoundTag) t, tag.getCompound(t.getName()))) {
+                return false;
+            }
+            if (!tag.get(t.getName()).parseValue().equals(t.parseValue())) {
+                return false;
+            }
+        }
+        return true;
     }
 
 }
