@@ -24,6 +24,11 @@ public class ListTag<T extends Tag> extends Tag {
         super(name);
     }
 
+    public ListTag(String name, List<T> list) {
+        super(name);
+        this.list = list;
+    }
+
     @Override
     void write(NBTOutputStream dos) throws IOException {
         if (!list.isEmpty()) type = list.get(0).getId();
@@ -109,6 +114,10 @@ public class ListTag<T extends Tag> extends Tag {
         return new ArrayList<>(list);
     }
 
+    public List<T> getAllUnsafe() {
+        return list;
+    }
+
     public void setAll(List<T> tags) {
         this.list = new ArrayList<>(tags);
     }
@@ -127,6 +136,10 @@ public class ListTag<T extends Tag> extends Tag {
 
     public int size() {
         return list.size();
+    }
+
+    public boolean isEmpty() {
+        return list.isEmpty();
     }
 
     @Override

@@ -263,11 +263,6 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
     }
 
     @Override
-    public boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId) {
-        return setBlockAtLayer(x, y, z, layer, blockId, 0);
-    }
-
-    @Override
     public Block getAndSetBlock(int x, int y, int z, Block block) {
         return getAndSetBlock(x, y, z, 0, block);
     }
@@ -286,6 +281,11 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
     @Override
     public boolean setBlock(int x, int y, int z, int blockId, int meta) {
         return setBlockAtLayer(x, y, z, 0, blockId, meta);
+    }
+
+    @Override
+    public boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId) {
+        return setBlockAtLayer(x, y, z, layer, blockId, 0);
     }
 
     @Override
@@ -557,6 +557,11 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
         return false;
     }
 
+    @Override
+    public boolean hasLayer(int layer) {
+        return getStorageIfExists(layer) != null;
+    }
+
     private byte[] toXZY(char[] raw) {
         byte[] buffer = ThreadCache.byteCache6144.get();
         for (int i = 0; i < 4096; i++) {
@@ -682,6 +687,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
         }
     }
 
+    @Override
     public boolean compress() {
         if (blockLight != null) {
             byte[] arr1 = blockLight;
@@ -747,7 +753,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
             return null;
         }
         synchronized (storage) {
-            return layer < storage.size()? storage.get(layer) : null;
+            return layer < storage.size() ? storage.get(layer) : null;
         }
     }
 

@@ -355,6 +355,13 @@ public class Binary {
                 (bytes[0] & 0xff);
     }
 
+    public static int readLInt(byte[] bytes, int offset) {
+        return (bytes[3 + offset] << 24) |
+                ((bytes[2 + offset] & 0xff) << 16) |
+                ((bytes[1 + offset] & 0xff) << 8) |
+                (bytes[offset] & 0xff);
+    }
+
     public static byte[] writeLInt(int i) {
         return new byte[]{
                 (byte) (i & 0xFF),

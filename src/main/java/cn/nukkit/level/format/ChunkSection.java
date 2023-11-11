@@ -48,11 +48,11 @@ public interface ChunkSection {
 
     int getFullBlock(int x, int y, int z, int layer);
 
-    boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId);
-
     boolean setBlock(int x, int y, int z, int blockId);
 
     boolean setBlock(int x, int y, int z, int blockId, int meta);
+
+    boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId);
 
     boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId, int meta);
 
@@ -94,6 +94,8 @@ public interface ChunkSection {
 
     boolean isEmpty();
 
+    boolean hasLayer(int layer);
+
     // for < 1.13 chunk format
     byte[] getBytes(int protocolId);
     
@@ -108,5 +110,9 @@ public interface ChunkSection {
 
     default int getContentVersion() {
         return 0;
+    }
+
+    default boolean compress() {
+        return false;
     }
 }

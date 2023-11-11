@@ -1,6 +1,7 @@
 package cn.nukkit.level.util;
 
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -10,10 +11,10 @@ import java.util.function.IntConsumer;
 
 public class PalettedBlockStorage {
 
-    private static final int SIZE = 4096;
+    protected static final int SIZE = 4096; // 16 * 16 * 16
 
-    private final IntList palette;
-    private BitArray bitArray;
+    protected IntList palette;
+    protected BitArray bitArray;
 
     public static PalettedBlockStorage createFromBlockPalette() {
         return createFromBlockPalette(BitArrayVersion.V2, 0);
@@ -41,22 +42,22 @@ public class PalettedBlockStorage {
         return new PalettedBlockStorage(version, defaultState);
     }
 
-    private PalettedBlockStorage(BitArrayVersion version, int defaultState) {
+    protected PalettedBlockStorage(BitArrayVersion version, int defaultState) {
         this.bitArray = version.createPalette(SIZE);
         this.palette = new IntArrayList(16);
         this.palette.add(defaultState);
     }
 
-    private PalettedBlockStorage(BitArray bitArray, IntList palette) {
+    protected PalettedBlockStorage(BitArray bitArray, IntList palette) {
         this.palette = palette;
         this.bitArray = bitArray;
     }
 
-    private int getPaletteHeader(BitArrayVersion version) {
+    protected int getPaletteHeader(BitArrayVersion version) {
         return (version.getId() << 1) | 1;
     }
 
-    private int getIndex(int x, int y, int z) {
+    protected int getIndex(int x, int y, int z) {
         return (x << 8) | (z << 4) | y;
     }
 
@@ -71,6 +72,10 @@ public class PalettedBlockStorage {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unable to set block runtime ID: " + runtimeId + ", palette: " + palette, e);
         }
+    }
+
+    public void setBlock(BlockVector3 pos, int value) {
+        this.setBlock(getIndex(pos.x, pos.y, pos.z), value);
     }
 
     public void writeTo(BinaryStream stream) {
