@@ -68,6 +68,11 @@ public class BinaryStream {
         this.count = buffer.length;
     }
 
+    public void reuse() {
+        this.offset = 0;
+        this.count = 0;
+    }
+
     public BinaryStream reset() {
         this.offset = 0;
         this.count = 0;
@@ -96,8 +101,16 @@ public class BinaryStream {
         return Arrays.copyOf(buffer, count);
     }
 
+    public byte[] getBufferUnsafe() {
+        return buffer;
+    }
+
     public int getCount() {
         return count;
+    }
+
+    public void setCount(int count) {
+        this.count = count;
     }
 
     public byte[] get() {
@@ -112,6 +125,13 @@ public class BinaryStream {
         len = Math.min(len, this.count - this.offset);
         this.offset += len;
         return Arrays.copyOfRange(this.buffer, this.offset - len, this.offset);
+    }
+
+    public void skip(int len) {
+        if (len <= 0) {
+            return;
+        }
+        this.offset += Math.min(len, this.count - this.offset);
     }
 
     public void put(byte[] bytes) {
@@ -219,6 +239,10 @@ public class BinaryStream {
 
     public void putBoolean(boolean bool) {
         this.putByte((byte) (bool ? 1 : 0));
+    }
+
+    public byte getSingedByte() {
+        return this.buffer[this.offset++];
     }
 
     public int getByte() {

@@ -16,8 +16,8 @@ public class EmptyChunkSection implements ChunkSection {
 
     public static final EmptyChunkSection[] EMPTY = new EmptyChunkSection[16];
 
-    private static final byte[] EMPTY_ID_ARRAY = new byte[4096];
-    private static final byte[] EMPTY_DATA_ARRAY = new byte[2048];
+    public static final byte[] EMPTY_ID_ARRAY = new byte[4096];
+    public static final byte[] EMPTY_DATA_ARRAY = new byte[2048];
     public static byte[] EMPTY_LIGHT_ARR = new byte[2048];
     public static byte[] EMPTY_SKY_LIGHT_ARR = new byte[2048];
 
@@ -205,6 +205,10 @@ public class EmptyChunkSection implements ChunkSection {
     @Override
     public boolean isEmpty() {
         return true;
+    }
+
+    public boolean hasLayer(int layer) {
+        return false;
     }
 
     @Override
