@@ -16,6 +16,7 @@ public enum LevelDBKey {
     STATE_FINALIZATION('6'),
     BORDER_BLOCKS('8'),
     HARDCODED_SPAWNERS('9'),
+    PENDING_RANDOM_TICKS(':'),
     FLAGS('f'),
     VERSION_OLD('v'),
     VERSION(',')

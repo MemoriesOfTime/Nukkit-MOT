@@ -490,7 +490,7 @@ public class LevelDBProvider implements LevelProvider {
             case 4: // 1.1.0
                 //TODO: check beds
             case 3: // 1.0.0
-                StateBlockStorage[] convertedLegacyExtraData = null;//this.deserializeLegacyExtraData(chunkX, chunkZ, chunkVersion);
+                StateBlockStorage[] convertedLegacyExtraData = this.deserializeLegacyExtraData(chunkX, chunkZ, chunkVersion);
 
                 //TODO 从DimensionData读取世界高度
                 //int minChuckSection = -64 >> 4;
