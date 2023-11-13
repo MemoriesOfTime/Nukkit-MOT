@@ -102,7 +102,7 @@ public class StateBlockStorage extends PalettedBlockStorage {
             }
 
             CompoundTag tag = BlockUpgrader.upgrade(nbtMap);
-            palette[i] = GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_LEVEL_PROTOCOL, GlobalBlockPalette.getLegacyFullId(ProtocolInfo.CURRENT_LEVEL_PROTOCOL, tag));
+            palette[i] = GlobalBlockPalette.getLegacyFullId(ProtocolInfo.CURRENT_LEVEL_PROTOCOL, tag);
         }
         stream.setOffset(stream.getCount() - bais.available());
 
@@ -116,7 +116,7 @@ public class StateBlockStorage extends PalettedBlockStorage {
 
 
     public int getBlock(int index) {
-        int fullId = GlobalBlockPalette.getLegacyFullId(ProtocolInfo.CURRENT_LEVEL_PROTOCOL, this.palette.getInt(this.bitArray.get(index)));
+        int fullId = this.palette.getInt(this.bitArray.get(index));
         if (fullId < 0) {
             return BlockID.AIR;
         }
@@ -129,6 +129,30 @@ public class StateBlockStorage extends PalettedBlockStorage {
 
     public int getBlock(BlockVector3 pos) {
         return this.getBlock(getIndex(pos.x, pos.y, pos.z));
+    }
+
+    @Override
+    public void writeTo(BinaryStream stream) {
+        BitArrayVersion version = bitArray.getVersion();
+        stream.putByte((byte) getPaletteHeader(version));
+
+        if (version == BitArrayVersion.EMPTY) {
+            return;
+        }
+
+        if (version != BitArrayVersion.V0) {
+            for (int word : bitArray.getWords()) {
+                stream.putLInt(word);
+            }
+
+            stream.putVarInt(palette.size());
+        }
+
+        //palette.forEach((IntConsumer) stream::putVarInt);
+        for (int i = 0; i < this.palette.size(); i++) {
+            int id = this.palette.getInt(i);
+            stream.putVarInt(GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_LEVEL_PROTOCOL, id));
+        }
     }
 
     /**
