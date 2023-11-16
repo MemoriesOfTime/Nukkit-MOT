@@ -447,7 +447,7 @@ public class LevelDBProvider implements LevelProvider {
         byte[] biome = null;
         StateBlockStorage[] biomes3d = null;
 
-        //int subChunkKeyOffset = chunkVersion >= 24 && chunkVersion <= 26 ? 4 : 0;
+        int subChunkKeyOffset = chunkVersion >= 24 && chunkVersion <= 26 ? 4 : 0;
 
         switch (chunkVersion) {
             case 40: // 1.18.30
@@ -497,7 +497,7 @@ public class LevelDBProvider implements LevelProvider {
                 //int maxChuckSection = 320 >> 4;
 
                 for (int y = /*minChuckSection*/0; y <= /*maxChuckSection*/15; ++y) {
-                    byte[] subChunkValue = this.db.get(SUBCHUNK_PREFIX.getSubKey(chunkX, chunkZ, y /*+ subChunkKeyOffset*/));
+                    byte[] subChunkValue = this.db.get(SUBCHUNK_PREFIX.getSubKey(chunkX, chunkZ, y + subChunkKeyOffset));
                     if (subChunkValue == null) {
                         continue;
                     }
@@ -1017,8 +1017,10 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private boolean chunkExists(int chunkX, int chunkZ) {
-        //TODO: NEW_VERSION
-        byte[] data = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ));
+        byte[] data = this.db.get(VERSION.getKey(chunkX, chunkZ));
+        if (data == null || data.length == 0) {
+            data = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ));
+        }
         return data != null && data.length != 0;
     }
 
