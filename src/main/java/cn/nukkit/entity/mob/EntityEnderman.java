@@ -12,6 +12,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.Sound;
+import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
@@ -138,7 +139,12 @@ public class EntityEnderman extends EntityWalkingMob {
         }
 
         int b = level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) this.y, NukkitMath.floorDouble(this.z));
-        if (b == BlockID.WATER || b == BlockID.STILL_WATER || (this.level.isRaining() && Utils.rand() && this.level.canBlockSeeSky(this))) {
+        CompoundTag biomeDefinitions;
+        if (b == BlockID.WATER || b == BlockID.STILL_WATER
+                || (this.level.isRaining() && Utils.rand() && this.level.canBlockSeeSky(this)
+                && ((biomeDefinitions = Biome.getBiomeDefinitions(this.level.getBiomeId(this.getFloorX(), this.getFloorZ()))) != null
+                && biomeDefinitions.getBoolean("rain")))
+        ) {
             this.attack(new EntityDamageEvent(this, EntityDamageEvent.DamageCause.DROWNING, 1));
             this.setAngry(0);
             this.teleport();
