@@ -142,8 +142,8 @@ public class EntityEnderman extends EntityWalkingMob {
         CompoundTag biomeDefinitions;
         if (b == BlockID.WATER || b == BlockID.STILL_WATER
                 || (this.level.isRaining() && Utils.rand() && this.level.canBlockSeeSky(this)
-                && ((biomeDefinitions = Biome.getBiomeDefinitions(this.level.getBiomeId(this.getFloorX(), this.getFloorZ()))) != null
-                && biomeDefinitions.getBoolean("rain")))
+                && ((biomeDefinitions = Biome.getBiomeDefinitions(this.level.getBiomeId(this.getFloorX(), this.getFloorZ()))) == null
+                || biomeDefinitions.getBoolean("rain")))
         ) {
             this.attack(new EntityDamageEvent(this, EntityDamageEvent.DamageCause.DROWNING, 1));
             this.setAngry(0);
