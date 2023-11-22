@@ -26,13 +26,8 @@ public class DefaultDispenseBehavior implements DispenseBehavior {
         }
 
         ThreadLocalRandom rand = ThreadLocalRandom.current();
-        Vector3 motion = new Vector3();
-
         double offset = rand.nextDouble() * 0.1 + 0.2;
-
-        motion.x = face.getXOffset() * offset;
-        motion.y = 0.20000000298023224;
-        motion.z = face.getZOffset() * offset;
+        Vector3 motion = new Vector3(face.getXOffset() * offset, 0.20000000298023224, face.getZOffset() * offset);
 
         motion.x += rand.nextGaussian() * 0.007499999832361937 * 6;
         motion.y += rand.nextGaussian() * 0.007499999832361937 * 6;
