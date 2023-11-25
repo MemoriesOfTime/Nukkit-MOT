@@ -1131,8 +1131,10 @@ public class Level implements ChunkManager, Metadatable {
         if (playerCount > 0 && sleepingPlayerCount / playerCount * 100 >= this.gameRules.getInteger(GameRule.PLAYERS_SLEEPING_PERCENTAGE)) {
             int time = this.getTime() % Level.TIME_FULL;
 
-            if (time >= Level.TIME_NIGHT && time < Level.TIME_SUNRISE) {
+            if ((time >= Level.TIME_NIGHT && time < Level.TIME_SUNRISE) || this.isThundering()) {
                 this.setTime(this.getTime() + Level.TIME_FULL - time);
+                this.setThundering(false);
+                this.setRaining(false);
 
                 for (Player p : this.getPlayers().values()) {
                     p.stopSleep();
