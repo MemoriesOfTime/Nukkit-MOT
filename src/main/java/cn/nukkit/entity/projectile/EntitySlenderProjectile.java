@@ -190,20 +190,23 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
         if (this.closed) {
             return false;
         }
+
+        int tickDiff = currentTick - this.lastUpdate;
+        if (tickDiff <= 0 && !this.justCreated) {
+            return true;
+        }
+        this.lastUpdate = currentTick;
+
         if (this.isCollided && this.hadCollision) {
             if (lastHitBlock != null && lastHitBlock.typeOfHit == 0 && level.getBlock(lastHitBlock.blockX, lastHitBlock.blockY, lastHitBlock.blockZ).getId() == 0) {
                 this.motionY -= this.getGravity();
                 updateRotation();
                 this.move(this.motionX, this.motionY, this.motionZ);
                 this.updateMovement();
+
             }
-            return false;
+            return this.entityBaseTick(tickDiff);
         }
-        int tickDiff = currentTick - this.lastUpdate;
-        if (tickDiff <= 0 && !this.justCreated) {
-            return true;
-        }
-        this.lastUpdate = currentTick;
 
         boolean hasUpdate = this.entityBaseTick(tickDiff);
 
