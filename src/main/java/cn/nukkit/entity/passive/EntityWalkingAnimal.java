@@ -101,7 +101,7 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
 
     @Override
     public boolean canTarget(Entity entity) {
-        return this.panicTicks == 0
+        return this.panicTicks <= 0
                 && (this.isInLove() || entity instanceof Player)
                 && entity.canBeFollowed();
     }
