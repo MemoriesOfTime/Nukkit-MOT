@@ -126,16 +126,9 @@ public class BlockTallGrass extends BlockFlowable {
         boolean dropSeeds = Utils.random.nextInt(10) == 0;
         if (item.isShears()) {
             //todo enchantment
-            if (dropSeeds) {
-                return new Item[]{
-                        new ItemSeedsWheat(),
-                        Item.get(Item.TALL_GRASS, this.getDamage(), 1)
-                };
-            } else {
-                return new Item[]{
-                        Item.get(Item.TALL_GRASS, this.getDamage(), 1)
-                };
-            }
+            return new Item[]{
+                    Item.get(Item.TALL_GRASS, this.getDamage(), 1)
+            };
         }
 
         if (dropSeeds) {

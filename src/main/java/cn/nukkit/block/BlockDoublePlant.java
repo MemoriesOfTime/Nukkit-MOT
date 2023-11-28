@@ -114,16 +114,9 @@ public class BlockDoublePlant extends BlockFlowable {
                     boolean dropSeeds = Utils.random.nextInt(10) == 0;
                     if (item.isShears()) {
                         //todo enchantment
-                        if (dropSeeds) {
-                            return new Item[]{
-                                    new ItemSeedsWheat(0, 1),
-                                    toItem()
-                            };
-                        } else {
-                            return new Item[]{
-                                    toItem()
-                            };
-                        }
+                        return new Item[]{
+                                toItem()
+                        };
                     }
 
                     if (dropSeeds) {
