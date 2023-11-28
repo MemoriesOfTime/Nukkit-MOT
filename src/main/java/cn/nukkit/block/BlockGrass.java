@@ -134,7 +134,7 @@ public class BlockGrass extends BlockDirt {
 
     @Override
     public Item[] getDrops(Item item) {
-        if (item.isShears() || item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
+        if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
             return new Item[]{this.toItem()};
         }
         return new Item[]{new ItemBlock(Block.get(BlockID.DIRT))};
