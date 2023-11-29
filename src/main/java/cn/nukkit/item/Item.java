@@ -770,6 +770,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public static OK<?> registerCustomItem(Class<? extends CustomItem> clazz) {
+        return registerCustomItem(clazz, true);
+    }
+
+    public static OK<?> registerCustomItem(Class<? extends CustomItem> clazz, boolean addCreativeItem) {
         if (!Server.getInstance().enableExperimentMode) {
             Server.getInstance().getLogger().warning("The server does not have the custom item feature enabled. Unable to register the custom item!");
             return new OK<>(false, "The server does not have the custom item feature enabled. Unable to register the custom item!");
@@ -810,28 +814,28 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             }
         }
 
-        registerCustomItem(customItem, v1_16_100, v1_16_0);
-        registerCustomItem(customItem, v1_17_0, v1_17_0);
-        registerCustomItem(customItem, v1_17_10, v1_17_10, v1_17_30, v1_17_40);
-        registerCustomItem(customItem, v1_18_0, v1_18_0);
-        registerCustomItem(customItem, v1_18_10, v1_18_10);
-        registerCustomItem(customItem, v1_18_30, v1_18_30);
-        registerCustomItem(customItem, v1_19_0, v1_19_0);
-        registerCustomItem(customItem, v1_19_10, v1_19_10, v1_19_20);
-        registerCustomItem(customItem, v1_19_50, v1_19_50);
-        registerCustomItem(customItem, v1_19_60, v1_19_60);
-        registerCustomItem(customItem, v1_19_70, v1_19_70);
-        registerCustomItem(customItem, v1_19_80, v1_19_80);
-        registerCustomItem(customItem, v1_20_0, v1_20_0);
-        registerCustomItem(customItem, v1_20_10, v1_20_10);
-        registerCustomItem(customItem, v1_20_30, v1_20_30);
-        registerCustomItem(customItem, v1_20_40, v1_20_40);
+        registerCustomItem(customItem, v1_16_100, addCreativeItem, v1_16_0);
+        registerCustomItem(customItem, v1_17_0, addCreativeItem, v1_17_0);
+        registerCustomItem(customItem, v1_17_10, addCreativeItem, v1_17_10, v1_17_30, v1_17_40);
+        registerCustomItem(customItem, v1_18_0, addCreativeItem, v1_18_0);
+        registerCustomItem(customItem, v1_18_10, addCreativeItem, v1_18_10);
+        registerCustomItem(customItem, v1_18_30, addCreativeItem, v1_18_30);
+        registerCustomItem(customItem, v1_19_0, addCreativeItem, v1_19_0);
+        registerCustomItem(customItem, v1_19_10, addCreativeItem, v1_19_10, v1_19_20);
+        registerCustomItem(customItem, v1_19_50, addCreativeItem, v1_19_50);
+        registerCustomItem(customItem, v1_19_60, addCreativeItem, v1_19_60);
+        registerCustomItem(customItem, v1_19_70, addCreativeItem, v1_19_70);
+        registerCustomItem(customItem, v1_19_80, addCreativeItem, v1_19_80);
+        registerCustomItem(customItem, v1_20_0, addCreativeItem, v1_20_0);
+        registerCustomItem(customItem, v1_20_10, addCreativeItem, v1_20_10);
+        registerCustomItem(customItem, v1_20_30, addCreativeItem, v1_20_30);
+        registerCustomItem(customItem, v1_20_40, addCreativeItem, v1_20_40);
 
         return new OK<Void>(true);
     }
 
-    private static void registerCustomItem(CustomItem item, int protocol, int... creativeProtocols) {
-        if (RuntimeItems.getMapping(protocol).registerCustomItem(item)) {
+    private static void registerCustomItem(CustomItem item, int protocol,  boolean addCreativeItem, int... creativeProtocols) {
+        if (RuntimeItems.getMapping(protocol).registerCustomItem(item) && addCreativeItem) {
             for (int creativeProtocol : creativeProtocols) {
                 addCreativeItem(creativeProtocol, (Item) item);
             }
