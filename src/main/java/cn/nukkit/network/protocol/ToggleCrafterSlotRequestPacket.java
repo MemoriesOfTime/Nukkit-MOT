@@ -1,19 +1,23 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.math.Vector3f;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 
-@Data
 @EqualsAndHashCode(doNotUseGetters = true)
 @ToString(doNotUseGetters = true)
 public class ToggleCrafterSlotRequestPacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST;
 
+    @Setter
+    @Getter
     public Vector3f blockPosition;
     public byte slot;
+    @Setter
+    @Getter
     public boolean disabled;
 
     @Override
