@@ -111,6 +111,10 @@ public class RuntimeItemMapping {
         this.generatePalette();
     }
 
+    Object2IntMap<String> getName2RuntimeId() {
+        return name2RuntimeId;
+    }
+
     synchronized boolean registerCustomItem(CustomItem customItem) {
         int runtimeId = CustomItemDefinition.getRuntimeId(customItem.getNamespaceId());
         String namespaceId = customItem.getNamespaceId();
