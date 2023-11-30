@@ -3100,8 +3100,11 @@ public class Server {
             put("level-name", "world");
             put("level-seed", "");
             put("level-type", "default");
+
             put("enable-rcon", false);
             put("rcon.password", Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13));
+            put("rcon.port", 25575);
+
             put("auto-save", true);
             put("force-resources", false);
             put("force-resources-allow-client-packs", false);
