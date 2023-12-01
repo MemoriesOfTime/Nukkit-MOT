@@ -34,8 +34,10 @@ public class ItemFirework extends Item {
             CompoundTag tag = getNamedTag();
             if (tag == null) {
                 tag = new CompoundTag();
+                // Avoid the NPE problems in the following operations while getting the ListTag "Explosions"
+                // Getting the value of "flight" has operations checking whether it's null or not.
                 tag.putCompound("Fireworks", new CompoundTag("Fireworks")
-                        .putByte("Flight", 0)
+                        .putList(new ListTag<CompoundTag>("Explosions"))
                 );
                 this.setNamedTag(tag);
             }
