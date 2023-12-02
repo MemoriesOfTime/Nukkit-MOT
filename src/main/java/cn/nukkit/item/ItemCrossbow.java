@@ -96,15 +96,15 @@ public class ItemCrossbow extends ItemBow {
             return;
         }
         CompoundTag tag = this.getNamedTag() == null ? new CompoundTag() : this.getNamedTag();
-        tag.putBoolean("Charged", true)
-                .putCompound("chargedItem", new CompoundTag("chargedItem")
-                        .putByte("Count", arrow.getCount())
-                        .putShort("Damage", arrow.getDamage())
-                        .putString("Name", "minecraft:arrow"));
+        CompoundTag chargedItem = new CompoundTag("chargedItem")
+                .putByte("Count", arrow.getCount())
+                .putShort("Damage", arrow.getDamage())
+                .putString("Name", "minecraft:arrow");
         if (arrow.hasCompoundTag()) {
-            tag.getCompound("chargedItem")
-                    .putCompound("tag", arrow.getNamedTag());
+            chargedItem.putCompound("tag", arrow.getNamedTag());
         }
+        tag.putBoolean("Charged", true)
+                .putCompound("chargedItem", chargedItem);
         this.setCompoundTag(tag);
         this.loadTick = Server.getInstance().getTick();
         player.getInventory().setItemInHand(this);
