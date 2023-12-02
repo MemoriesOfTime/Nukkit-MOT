@@ -11,6 +11,7 @@ import cn.nukkit.event.entity.EntityInventoryChangeEvent;
 import cn.nukkit.event.player.PlayerItemHeldEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.ItemMap;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.ContainerIds;
 
@@ -54,7 +55,8 @@ public class PlayerInventory extends BaseInventory {
 
         if (this.getHolder() instanceof Player) {
             Player player = (Player) this.getHolder();
-            PlayerItemHeldEvent ev = new PlayerItemHeldEvent(player, this.getItem(slot), slot);
+            Item item = this.getItem(slot);
+            PlayerItemHeldEvent ev = new PlayerItemHeldEvent(player, item, slot);
             this.getHolder().getLevel().getServer().getPluginManager().callEvent(ev);
 
             if (ev.isCancelled()) {
@@ -63,9 +65,13 @@ public class PlayerInventory extends BaseInventory {
             }
 
             if (player.fishing != null) {
-                if (!(this.getItem(slot).equals(player.fishing.rod))) {
+                if (!(item.equals(player.fishing.rod))) {
                     player.stopFishing(false);
                 }
+            }
+            if (player.protocol >= ProtocolInfo.v1_19_50 //TODO check version
+                    && item instanceof ItemMap itemMap) {
+                itemMap.trySendImage(player);
             }
         }
 
