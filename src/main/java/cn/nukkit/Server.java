@@ -3191,7 +3191,7 @@ public class Server {
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
             put("use-client-spectator", true);
-            put("enable-experiment-mode", false);
+            put("enable-experiment-mode", true);
             put("use-waterdog", false);
             put("enable-spark", false);
             put("hastebin-token", "");
