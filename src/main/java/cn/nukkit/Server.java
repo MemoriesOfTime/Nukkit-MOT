@@ -1798,7 +1798,7 @@ public class Server {
             return result;
         }
 
-        return lookupName(name).map(uuid -> new OfflinePlayer(this, uuid))
+        return lookupName(name).map(uuid -> new OfflinePlayer(this, uuid, name))
                 .orElse(new OfflinePlayer(this, name));
     }
 
