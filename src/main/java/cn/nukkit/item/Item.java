@@ -800,8 +800,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static OK<?> registerCustomItem(Class<? extends CustomItem> clazz, boolean addCreativeItem) {
         if (!Server.getInstance().enableExperimentMode) {
-            Server.getInstance().getLogger().warning("The server does not have the custom item feature enabled. Unable to register the custom item!");
-            return new OK<>(false, "The server does not have the custom item feature enabled. Unable to register the custom item!");
+            Server.getInstance().getLogger().warning("The server does not have the experiment mode feature enabled. Unable to register the custom item!");
+            return new OK<>(false, "The server does not have the experiment mode feature enabled. Unable to register the custom item!");
         }
 
         CustomItem customItem;
