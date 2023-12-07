@@ -1798,7 +1798,7 @@ public class Server {
             return result;
         }
 
-        return lookupName(name).map(uuid -> new OfflinePlayer(this, uuid))
+        return lookupName(name).map(uuid -> new OfflinePlayer(this, uuid, name))
                 .orElse(new OfflinePlayer(this, name));
     }
 
@@ -3100,8 +3100,11 @@ public class Server {
             put("level-name", "world");
             put("level-seed", "");
             put("level-type", "default");
+
             put("enable-rcon", false);
             put("rcon.password", Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13));
+            put("rcon.port", 25575);
+
             put("auto-save", true);
             put("force-resources", false);
             put("force-resources-allow-client-packs", false);
@@ -3188,7 +3191,7 @@ public class Server {
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
             put("use-client-spectator", true);
-            put("enable-experiment-mode", false);
+            put("enable-experiment-mode", true);
             put("use-waterdog", false);
             put("enable-spark", false);
             put("hastebin-token", "");

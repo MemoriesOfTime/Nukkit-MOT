@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
@@ -346,6 +347,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[ACACIA_CHEST_BOAT] = ItemChestBoatAcacia.class; //642
             list[DARK_OAK_CHEST_BOAT] = ItemChestBoatDarkOak.class; //643
             list[MANGROVE_CHEST_BOAT] = ItemChestBoatMangrove.class; //644
+
+            list[BAMBOO_CHEST_RAFT] = ItemChestRaftBamboo.class; //648
+            list[CHERRY_CHEST_BOAT] = ItemChestBoatCherry.class; //649
+
             list[GLOW_BERRIES] = ItemGlowBerries.class; //654
             list[RECORD_RELIC] = ItemRecordRelic.class; //701
             list[CAMPFIRE] = ItemCampfire.class; //720
@@ -404,6 +409,26 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             registerNamespacedIdItem(ItemRaiserArmorTrimSmithingTemplate.class);
             registerNamespacedIdItem(ItemShaperArmorTrimSmithingTemplate.class);
             registerNamespacedIdItem(ItemHostArmorTrimSmithingTemplate.class);
+
+            // 添加原版物品到NAMESPACED_ID_ITEM
+            // Add vanilla items to NAMESPACED_ID_ITEM
+            RuntimeItemMapping mapping = RuntimeItems.getMapping(ProtocolInfo.CURRENT_PROTOCOL);
+            for (Object2IntMap.Entry<String> entity : mapping.getName2RuntimeId().object2IntEntrySet()) {
+                try {
+                    RuntimeItemMapping.LegacyEntry legacyEntry = mapping.fromRuntime(entity.getIntValue());
+                    int id = legacyEntry.getLegacyId();
+                    int damage = 0;
+                    if (legacyEntry.isHasDamage()) {
+                        damage = legacyEntry.getDamage();
+                    }
+                    Item item = Item.get(id, damage);
+                    if (item.getId() != 0) {
+                        NAMESPACED_ID_ITEM.put(entity.getKey(), () -> item);
+                    }
+                } catch (Exception ignored) {
+
+                }
+            }
         }
 
         initCreativeItems();
@@ -775,8 +800,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static OK<?> registerCustomItem(Class<? extends CustomItem> clazz, boolean addCreativeItem) {
         if (!Server.getInstance().enableExperimentMode) {
-            Server.getInstance().getLogger().warning("The server does not have the custom item feature enabled. Unable to register the custom item!");
-            return new OK<>(false, "The server does not have the custom item feature enabled. Unable to register the custom item!");
+            Server.getInstance().getLogger().warning("The server does not have the experiment mode feature enabled. Unable to register the custom item!");
+            return new OK<>(false, "The server does not have the experiment mode feature enabled. Unable to register the custom item!");
         }
 
         CustomItem customItem;

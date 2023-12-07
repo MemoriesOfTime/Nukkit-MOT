@@ -302,6 +302,9 @@ public interface ItemID {
     int MANGROVE_CHEST_BOAT = 644;
     int CHEST_BOAT = 645;
 
+    int BAMBOO_CHEST_RAFT = 648;
+    int CHERRY_CHEST_BOAT = 649;
+
     int GLOW_BERRIES = 654;
 
     int RECORD_RELIC = 701;
