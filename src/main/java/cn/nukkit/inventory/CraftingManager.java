@@ -56,6 +56,7 @@ public class CraftingManager {
     public static DataPacket packet594;
     public static DataPacket packet618;
     public static DataPacket packet622;
+    public static DataPacket packet630;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -391,32 +392,42 @@ public class CraftingManager {
     private List<ShapedRecipe> loadShapedRecipes(List<Map<String, Object>> recipes) {
         ArrayList<ShapedRecipe> recipesList = new ArrayList<>();
         for (Map<String, Object> recipe : recipes) {
-            if (!"crafting_table".equals(recipe.get("block"))) {
-                // Ignore other recipes than crafting table ones
-                continue;
+            top:
+            {
+                if (!"crafting_table".equals(recipe.get("block"))) {
+                    // Ignore other recipes than crafting table ones
+                    continue;
+                }
+                List<Map> outputs = ((List<Map>) recipe.get("output"));
+                Map<String, Object> first = outputs.remove(0);
+                String[] shape = ((List<String>) recipe.get("shape")).toArray(new String[0]);
+                Map<Character, Item> ingredients = new CharObjectHashMap();
+                List<Item> extraResults = new ArrayList();
+                Map<String, Map<String, Object>> input = (Map) recipe.get("input");
+                for (Map.Entry<String, Map<String, Object>> ingredientEntry : input.entrySet()) {
+                    char ingredientChar = ingredientEntry.getKey().charAt(0);
+                    Item ingredient = Item.fromJson(ingredientEntry.getValue());
+
+                    // TODO: update recipes
+                    //1.20.50开始 木板被拆分为单独方块，给每个方块都注册一次
+                    if (ingredient.getId() == Item.PLANKS && Utils.toInt(ingredientEntry.getValue().getOrDefault("damage", 0)) == -1) {
+                        recipesList.addAll(createLegacyPlanksRecipe(recipe, first));
+                        break top;
+                    }
+
+                    ingredients.put(ingredientChar, ingredient);
+                }
+
+                for (Map<String, Object> data : outputs) {
+                    extraResults.add(Item.fromJson(data));
+                }
+
+                String recipeId = (String) recipe.get("id");
+                int priority = Utils.toInt(recipe.get("priority"));
+                Item result = Item.fromJson(first);
+
+                recipesList.add(new ShapedRecipe(recipeId, priority, result, shape, ingredients, extraResults));
             }
-            List<Map> outputs = ((List<Map>) recipe.get("output"));
-            Map<String, Object> first = outputs.remove(0);
-            String[] shape = ((List<String>) recipe.get("shape")).toArray(new String[0]);
-            Map<Character, Item> ingredients = new CharObjectHashMap();
-            List<Item> extraResults = new ArrayList();
-            Map<String, Map<String, Object>> input = (Map) recipe.get("input");
-            for (Map.Entry<String, Map<String, Object>> ingredientEntry : input.entrySet()) {
-                char ingredientChar = ingredientEntry.getKey().charAt(0);
-                Item ingredient = Item.fromJson(ingredientEntry.getValue());
-
-                ingredients.put(ingredientChar, ingredient);
-            }
-
-            for (Map<String, Object> data : outputs) {
-                extraResults.add(Item.fromJson(data));
-            }
-
-            String recipeId = (String) recipe.get("id");
-            int priority = Utils.toInt(recipe.get("priority"));
-            Item result = Item.fromJson(first);
-
-            recipesList.add(new ShapedRecipe(recipeId, priority, result, shape, ingredients, extraResults));
         }
 
         return recipesList;
@@ -536,6 +547,31 @@ public class CraftingManager {
         return recipesList;
     }
 
+    private ArrayList<ShapedRecipe> createLegacyPlanksRecipe(Map<String, Object> recipe, Map<String, Object> first) {
+        List<Map> outputs = (List<Map>) recipe.get("output");
+        String[] shape = ((List<String>) recipe.get("shape")).toArray(new String[0]);
+        List<Item> extraResults = new ArrayList<>();
+        for (Map data : outputs) {
+            extraResults.add(Item.fromJson(data));
+        }
+        ArrayList<ShapedRecipe> list = new ArrayList<>();
+        for (int planksMeta = 0; planksMeta <= 5; planksMeta++) {
+            Map<Character, Item> ingredients = new CharObjectHashMap<>();
+            Map<String, Map<String, Object>> input = (Map) recipe.get("input");
+            for (Map.Entry<String, Map<String, Object>> ingredientEntry : input.entrySet()) {
+                char ingredientChar = ingredientEntry.getKey().charAt(0);
+                ingredientEntry.getValue().put("damage", 0);
+                Item ingredient = Item.fromJson(ingredientEntry.getValue());
+                if (ingredient.getId() == Item.PLANKS) {
+                    ingredient.setDamage(planksMeta);
+                }
+                ingredients.put(ingredientChar, ingredient);
+            }
+            list.add(new ShapedRecipe((String) recipe.get("id")/* + "_" + planksMeta*/, Utils.toInt(recipe.get("priority")), Item.fromJson(first), shape, ingredients, extraResults));
+        }
+        return list;
+    }
+
     private CraftingDataPacket packetFor(int protocol) {
         CraftingDataPacket pk = new CraftingDataPacket();
         pk.protocol = protocol;
@@ -570,6 +606,8 @@ public class CraftingManager {
     }
 
     public void rebuildPacket() {
+        //TODO Multiversion 添加新版本支持时修改这里
+        packet630 = packetFor(ProtocolInfo.v1_20_50);
         packet622 = packetFor(ProtocolInfo.v1_20_40);
         packet618 = packetFor(ProtocolInfo.v1_20_30);
         packet594 = packetFor(ProtocolInfo.v1_20_10);
@@ -735,17 +773,17 @@ public class CraftingManager {
         return (id << 12) | (meta & 0xfff);
     }
 
-    public Map<Integer, Map<UUID, ShapedRecipe>> getShapedRecipes(int n) {
-        if (n >= ProtocolInfo.v1_19_0_29) {
+    public Map<Integer, Map<UUID, ShapedRecipe>> getShapedRecipes(int protocol) {
+        if (protocol >= ProtocolInfo.v1_19_0_29) {
             return this.shapedRecipes;
         }
-        if (n >= 419) {
+        if (protocol >= 419) {
             return this.shapedRecipes419;
         }
-        if (n >= 354) {
+        if (protocol >= 354) {
             return this.shapedRecipes388;
         }
-        if (n >= 340) {
+        if (protocol >= 340) {
             return this.shapedRecipes332;
         }
         return this.shapedRecipes313;
