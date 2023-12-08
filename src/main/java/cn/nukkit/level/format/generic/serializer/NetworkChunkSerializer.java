@@ -45,23 +45,23 @@ public class NetworkChunkSerializer {
     }
 
     public static void serialize(IntSet protocols, BaseChunk chunk, Consumer<NetworkChunkSerializerCallback> callback, DimensionData dimensionData) {
-        byte[] blockEntities;
-        if (chunk.getBlockEntities().isEmpty()) {
-            blockEntities = new byte[0];
-        } else {
-            blockEntities = serializeEntities(chunk);
-        }
-
-        int subChunkCount = 0;
-        ChunkSection[] sections = chunk.getSections();
-        for (int i = sections.length - 1; i >= 0; i--) {
-            if (!sections[i].isEmpty()) {
-                subChunkCount = i + 1;
-                break;
-            }
-        }
-
         for (int protocolId : protocols) {
+            byte[] blockEntities;
+            if (chunk.getBlockEntities().isEmpty()) {
+                blockEntities = new byte[0];
+            } else {
+                blockEntities = serializeEntities(chunk, protocolId);
+            }
+
+            int subChunkCount = 0;
+            ChunkSection[] sections = chunk.getSections();
+            for (int i = sections.length - 1; i >= 0; i--) {
+                if (!sections[i].isEmpty()) {
+                    subChunkCount = i + 1;
+                    break;
+                }
+            }
+
             int protocolSubChunkCount = subChunkCount;
             int maxDimensionSections = dimensionData.getHeight() >> 4;
             if (protocolId >= ProtocolInfo.v1_18_0) {
@@ -120,11 +120,11 @@ public class NetworkChunkSerializer {
         }
     }
 
-    private static byte[] serializeEntities(BaseChunk chunk) {
+    private static byte[] serializeEntities(BaseChunk chunk, int protocol) {
         List<CompoundTag> tagList = new ObjectArrayList<>();
         for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
             if (blockEntity instanceof BlockEntitySpawnable) {
-                tagList.add(((BlockEntitySpawnable) blockEntity).getSpawnCompound());
+                tagList.add(((BlockEntitySpawnable) blockEntity).getSpawnCompound(protocol));
             }
         }
 

@@ -190,7 +190,7 @@ public class Binary {
                     stream.putVarInt(pos.z);
                     break;
                 case Entity.DATA_TYPE_LONG:
-                    if (protocol < ProtocolInfo.v1_19_50) {
+                    if (protocol < ProtocolInfo.v1_19_50_20) {
                         long[] dataVersions;
                         if (id == Entity.DATA_FLAGS) {
                             dataVersions = ((LongEntityData) d).dataVersions;
@@ -353,6 +353,13 @@ public class Binary {
                 ((bytes[2] & 0xff) << 16) +
                 ((bytes[1] & 0xff) << 8) +
                 (bytes[0] & 0xff);
+    }
+
+    public static int readLInt(byte[] bytes, int offset) {
+        return (bytes[3 + offset] << 24) |
+                ((bytes[2 + offset] & 0xff) << 16) |
+                ((bytes[1 + offset] & 0xff) << 8) |
+                (bytes[offset] & 0xff);
     }
 
     public static byte[] writeLInt(int i) {

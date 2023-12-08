@@ -6,11 +6,12 @@ import cn.nukkit.item.Item;
 public class CampfireInventory extends ContainerInventory {
 
     public CampfireInventory(BlockEntityCampfire campfire) {
-        super(campfire, InventoryType.CAMPFIRE);
+        this(campfire, InventoryType.CAMPFIRE);
     }
 
     public CampfireInventory(BlockEntityCampfire furnace, InventoryType inventoryType) {
         super(furnace, inventoryType);
+        this.setMaxStackSize(1);
     }
 
     @Override
@@ -24,11 +25,6 @@ public class CampfireInventory extends ContainerInventory {
 
         this.getHolder().scheduleUpdate();
         this.getHolder().spawnToAll();
-    }
-
-    @Override
-    public int getMaxStackSize() {
-        return 1;
     }
 
     @Override

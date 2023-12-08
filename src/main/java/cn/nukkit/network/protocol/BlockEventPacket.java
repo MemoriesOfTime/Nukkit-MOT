@@ -19,8 +19,13 @@ public class BlockEventPacket extends DataPacket {
     public int x;
     public int y;
     public int z;
-    public int case1;
-    public int case2;
+    public int eventType;
+    public int eventData;
+
+    @Deprecated
+    public int case1 = -1;
+    @Deprecated
+    public int case2 = -1;
 
     @Override
     public void decode() {
@@ -28,9 +33,17 @@ public class BlockEventPacket extends DataPacket {
 
     @Override
     public void encode() {
+        //兼容NK插件
+        if (this.case1 != -1) {
+            this.eventType = this.case1;
+        }
+        if (this.case2 != -1) {
+            this.eventData = this.case2;
+        }
+
         this.reset();
         this.putBlockVector3(this.x, this.y, this.z);
-        this.putVarInt(this.case1);
-        this.putVarInt(this.case2);
+        this.putVarInt(this.eventType);
+        this.putVarInt(this.eventData);
     }
 }

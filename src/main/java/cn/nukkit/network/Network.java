@@ -11,13 +11,16 @@ import cn.nukkit.utils.VarInt;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
+import org.jetbrains.annotations.NotNull;
 import oshi.SystemInfo;
 import oshi.hardware.NetworkIF;
 
+import javax.annotation.Nonnegative;
 import java.io.ByteArrayInputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -41,8 +44,7 @@ public class Network {
     public static final byte CHANNEL_ENTITY_SPAWNING = 6; //Entity spawn/despawn channel
     public static final byte CHANNEL_TEXT = 7; //Chat and other text stuff
     public static final byte CHANNEL_END = 31;
-
-    private Class<? extends DataPacket>[] packetPool = new Class[256];
+    private final Int2ObjectOpenHashMap<Class<? extends DataPacket>> packetPool = new Int2ObjectOpenHashMap<>(256);
 
     private final Server server;
 
@@ -167,7 +169,11 @@ public class Network {
     }
 
     public void registerPacket(byte id, Class<? extends DataPacket> clazz) {
-        this.packetPool[id & 0xff] = clazz;
+        this.packetPool.put(id & 0xff, clazz);
+    }
+
+    public void registerPacketNew(@Nonnegative int id, @NotNull Class<? extends DataPacket> clazz) {
+        this.packetPool.put(id, clazz);
     }
 
     public Server getServer() {
@@ -181,7 +187,7 @@ public class Network {
     public void processBatch(BatchPacket packet, Player player) {
         ObjectArrayList<DataPacket> packets = new ObjectArrayList<>();
         try {
-            this.processBatch(packet.payload, packets, player.getNetworkSession().getCompression(), player.protocol, player.raknetProtocol);
+            this.processBatch(packet.payload, packets, player.getNetworkSession().getCompression(), player.raknetProtocol, player);
             this.processPackets(player, packets);
         } catch (Exception e) {
             log.error("Error whilst decoding batch packet from " + player.getName(), e);
@@ -189,10 +195,14 @@ public class Network {
         }
     }
 
-    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int protocol, int raknetProtocol) throws ProtocolException {
+    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) throws ProtocolException {
+        int maxSize = 3145728; // 3 * 1024 * 1024
+        if (player != null && player.getSkin() == null) {
+            maxSize = 6291456; // 6 * 1024 * 1024
+        }
         byte[] data;
         try {
-            data = compression.decompress(payload);
+            data = compression.decompress(payload, maxSize);
         } catch (Exception e) {
             log.debug("Exception while inflating batch packet", e);
             return;
@@ -230,7 +240,7 @@ public class Network {
                 DataPacket pk = this.getPacket(packetId);
 
                 if (pk != null) {
-                    pk.protocol = protocol;
+                    pk.protocol = player == null ? Integer.MAX_VALUE : player.protocol;
                     pk.setBuffer(buf, buf.length - bais.available());
                     try {
                         if (raknetProtocol > 8) {
@@ -271,7 +281,7 @@ public class Network {
     }
 
     public DataPacket getPacket(byte id) {
-        Class<? extends DataPacket> clazz = this.packetPool[id & 0xff];
+        Class<? extends DataPacket> clazz = this.packetPool.get(id & 0xff);
         if (clazz != null) {
             try {
                 return clazz.newInstance();
@@ -283,7 +293,7 @@ public class Network {
     }
 
     public DataPacket getPacket(int id) {
-        Class<? extends DataPacket> clazz = this.packetPool[id];
+        Class<? extends DataPacket> clazz = this.packetPool.get(id);
         if (clazz != null) {
             try {
                 return clazz.newInstance();
@@ -319,8 +329,6 @@ public class Network {
     }
 
     private void registerPackets() {
-        this.packetPool = new Class[256];
-
         this.registerPacket(ProtocolInfo.SERVER_TO_CLIENT_HANDSHAKE_PACKET, ServerToClientHandshakePacket.class);
         this.registerPacket(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET, ClientToServerHandshakePacket.class);
         this.registerPacket(ProtocolInfo.ADD_ENTITY_PACKET, AddEntityPacket.class);
@@ -401,10 +409,15 @@ public class Network {
         this.registerPacket(ProtocolInfo.START_GAME_PACKET, StartGamePacket.class);
         this.registerPacket(ProtocolInfo.TAKE_ITEM_ENTITY_PACKET, TakeItemEntityPacket.class);
         this.registerPacket(ProtocolInfo.TEXT_PACKET, TextPacket.class);
+        this.registerPacket(ProtocolInfo.SERVER_POST_MOVE_POSITION, ServerPostMovePositionPacket.class);
         this.registerPacket(ProtocolInfo.TRANSFER_PACKET, TransferPacket.class);
         this.registerPacket(ProtocolInfo.UPDATE_ATTRIBUTES_PACKET, UpdateAttributesPacket.class);
         this.registerPacket(ProtocolInfo.UPDATE_BLOCK_PACKET, UpdateBlockPacket.class);
+        this.registerPacket(ProtocolInfo.COMMAND_BLOCK_UPDATE_PACKET, CommandBlockUpdatePacket.class);
+        this.registerPacket(ProtocolInfo.COMMAND_OUTPUT_PACKET, CommandOutputPacket.class);
         this.registerPacket(ProtocolInfo.UPDATE_TRADE_PACKET, UpdateTradePacket.class);
+        this.registerPacket(ProtocolInfo.SET_DISPLAY_OBJECTIVE_PACKET, SetDisplayObjectivePacket.class);
+        this.registerPacket(ProtocolInfo.SET_SCORE_PACKET, SetScorePacket.class);
         this.registerPacket(ProtocolInfo.MOVE_ENTITY_DELTA_PACKET, MoveEntityDeltaPacket.class);
         this.registerPacket(ProtocolInfo.SET_LOCAL_PLAYER_AS_INITIALIZED_PACKET, SetLocalPlayerAsInitializedPacket.class);
         this.registerPacket(ProtocolInfo.NETWORK_STACK_LATENCY_PACKET, NetworkStackLatencyPacket.class);
@@ -436,13 +449,24 @@ public class Network {
         this.registerPacket(ProtocolInfo.UPDATE_ABILITIES_PACKET, UpdateAbilitiesPacket.class);
         this.registerPacket(ProtocolInfo.REQUEST_ABILITY_PACKET, RequestAbilityPacket.class);
         this.registerPacket(ProtocolInfo.UPDATE_ADVENTURE_SETTINGS_PACKET, UpdateAdventureSettingsPacket.class);
+        this.registerPacket(ProtocolInfo.DEATH_INFO_PACKET, DeathInfoPacket.class);
         this.registerPacket(ProtocolInfo.EMOTE_PACKET, EmotePacket.class);
         this.registerPacket(ProtocolInfo.ANIMATE_ENTITY_PACKET, AnimateEntityPacket.class);
         this.registerPacket(ProtocolInfo.ITEM_COMPONENT_PACKET, ItemComponentPacket.class);
         this.registerPacket(ProtocolInfo.FILTER_TEXT_PACKET, FilterTextPacket.class);
+        this.registerPacket(ProtocolInfo.SYNC_ENTITY_PROPERTY_PACKET, SyncEntityPropertyPacket.class);
+        this.registerPacket(ProtocolInfo.NPC_DIALOGUE_PACKET, NPCDialoguePacket.class);
         this.registerPacket(ProtocolInfo.TOAST_REQUEST_PACKET, ToastRequestPacket.class);
         this.registerPacket(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET, RequestNetworkSettingsPacket.class);
         this.registerPacket(ProtocolInfo.UPDATE_CLIENT_INPUT_LOCKS, UpdateClientInputLocksPacket.class);
+        this.registerPacket(ProtocolInfo.CAMERA_PRESETS_PACKET, CameraPresetsPacket.class);
+
+        this.registerPacketNew(ProtocolInfo.CAMERA_INSTRUCTION_PACKET, CameraInstructionPacket.class);
+        this.registerPacketNew(ProtocolInfo.TRIM_DATA, TrimDataPacket.class);
+        this.registerPacketNew(ProtocolInfo.OPEN_SIGN, OpenSignPacket.class);
+        this.registerPacketNew(ProtocolInfo.AGENT_ANIMATION, AgentAnimationPacket.class);
+        this.registerPacketNew(ProtocolInfo.REFRESH_ENTITLEMENTS, RefreshEntitlementsPacket.class);
+        this.registerPacketNew(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST, ToggleCrafterSlotRequestPacket.class);
     }
 
     @AllArgsConstructor

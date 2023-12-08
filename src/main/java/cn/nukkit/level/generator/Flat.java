@@ -1,7 +1,8 @@
 package cn.nukkit.level.generator;
 
 import cn.nukkit.Server;
-import cn.nukkit.block.*;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.generator.object.ore.OreType;
@@ -147,6 +148,10 @@ public class Flat extends Generator {
     public void init(ChunkManager level, NukkitRandom random) {
         this.level = level;
         this.random = random;
+    }
+
+    @Override
+    public void populateStructure(final int chunkX, final int chunkZ) {
     }
 
     @Override

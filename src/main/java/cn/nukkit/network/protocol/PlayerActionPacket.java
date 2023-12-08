@@ -43,6 +43,34 @@ public class PlayerActionPacket extends DataPacket {
     public static final int ACTION_CONTINUE_DESTROY_BLOCK = 27;
     public static final int ACTION_START_ITEM_USE_ON = 28;
     public static final int ACTION_STOP_ITEM_USE_ON = 29;
+    /**
+     * @since 1.19.60
+     */
+    public static final int ACTION_HANDLED_TELEPORT = 30;
+    /**
+     * @since 1.20.10
+     */
+    public static final int ACTION_MISSED_SWING = 31;
+    /**
+     * @since 1.20.10
+     */
+    public static final int ACTION_START_CRAWLING = 32;
+    /**
+     * @since 1.20.10
+     */
+    public static final int ACTION_STOP_CRAWLING = 33;
+    /**
+     * @since v618 1.20.30
+     */
+    public static final int ACTION_START_FLYING = 34;
+    /**
+     * @since v618 1.20.30
+     */
+    public static final int ACTION_STOP_FLYING = 35;
+    /**
+     * @since v622 1.20.40
+     */
+    public static final int ACTION_RECEIVED_SERVER_DATA = 36;
 
     public long entityId;
     public int action;

@@ -16,8 +16,6 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.AddItemEntityPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.EntityEventPacket;
-import co.aikar.timings.Timings;
-import co.aikar.timings.TimingsHistory;
 
 /**
  * @author MagicDroidX
@@ -29,6 +27,7 @@ public class EntityItem extends Entity {
     protected String thrower;
     protected Item item;
     protected int pickupDelay;
+    protected boolean floatsInLava;
 
     public EntityItem(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -107,6 +106,7 @@ public class EntityItem extends Entity {
         int id = this.item.getId();
         if (id >= Item.NETHERITE_INGOT && id <= Item.NETHERITE_SCRAP) {
             this.fireProof = true; // Netherite items are fireproof
+            this.floatsInLava = true;
         }
 
         this.server.getPluginManager().callEvent(new ItemSpawnEvent(this));
@@ -157,11 +157,8 @@ public class EntityItem extends Entity {
 
         this.lastUpdate = currentTick;
 
-        if (this.timing != null) this.timing.startTiming();
-
         if (!this.fireProof && this.isInsideOfFire()) {
             this.close();
-            if (this.timing != null) this.timing.stopTiming();
             return true;
         }
 
@@ -194,7 +191,6 @@ public class EntityItem extends Entity {
                     this.age = 0;
                 } else {
                     this.close();
-                    if (this.timing != null) this.timing.stopTiming();
                     return true;
                 }
             }
@@ -234,7 +230,8 @@ public class EntityItem extends Entity {
                 }
             }
 
-            if (this.isInsideOfWater()) {
+            int bid = level.getBlock(this.getFloorX(), NukkitMath.floorDouble(this.y + 0.53), this.getFloorZ(), false).getId();
+            if (this.isInsideOfWater() || (this.floatsInLava && (bid == BlockID.LAVA || bid == BlockID.STILL_LAVA))) {
                 this.motionY = this.getGravity() / 2;
             } else if (!this.isOnGround()) {
                 this.motionY -= this.getGravity();
@@ -262,8 +259,6 @@ public class EntityItem extends Entity {
 
             if (this.move(this.motionX, this.motionY, this.motionZ)) this.updateMovement();
         }
-
-        if (this.timing != null) this.timing.stopTiming();
 
         return hasUpdate || !this.onGround || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001;
     }
@@ -342,15 +337,12 @@ public class EntityItem extends Entity {
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.startTiming();
-
         this.collisionBlocks = null;
         this.justCreated = false;
 
         if (!this.isAlive()) {
             this.despawnFromAll();
             this.close();
-            if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.stopTiming();
             return false;
         }
 
@@ -391,14 +383,6 @@ public class EntityItem extends Entity {
         }
 
         this.age += tickDiff;
-        TimingsHistory.activatedEntityTicks++;
-        if (Timings.entityBaseTickTimer != null) Timings.entityBaseTickTimer.stopTiming();
         return hasUpdate;
-    }
-
-    @Override
-    public boolean isInsideOfWater() {
-        int bid = level.getBlockIdAt(chunk, this.getFloorX(), NukkitMath.floorDouble(this.y + 0.53), this.getFloorZ());
-        return bid == BlockID.WATER || bid == BlockID.STILL_WATER;
     }
 }

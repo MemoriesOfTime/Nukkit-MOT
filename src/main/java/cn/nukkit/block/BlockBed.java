@@ -137,7 +137,7 @@ public class BlockBed extends BlockTransparentMeta implements Faceable {
         int time = this.getLevel().getTime() % Level.TIME_FULL;
         boolean isNight = (time >= Level.TIME_NIGHT && time < Level.TIME_SUNRISE);
 
-        if (player != null && !isNight) {
+        if (player != null && !isNight && !this.getLevel().isThundering()) {
             Position spawn = Position.fromObject(b.add(0.5, 0.5, 0.5), player.getLevel());
             if (!player.getSpawn().equals(spawn)) {
                 player.setSpawnBlock(this);

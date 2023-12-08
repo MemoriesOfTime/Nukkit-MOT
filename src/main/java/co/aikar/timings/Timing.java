@@ -26,6 +26,7 @@ package co.aikar.timings;
 import java.util.HashMap;
 import java.util.Map;
 
+@Deprecated
 public class Timing implements AutoCloseable {
 
     private static int idPool = 1;

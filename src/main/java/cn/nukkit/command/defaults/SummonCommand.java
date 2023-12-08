@@ -7,6 +7,7 @@ import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Position;
 
 public class SummonCommand extends Command {
@@ -16,8 +17,8 @@ public class SummonCommand extends Command {
         this.setPermission("nukkit.command.summon");
         this.commandParameters.clear();
         this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("entityType", false, CommandParameter.ENUM_TYPE_ENTITY_LIST),
-                new CommandParameter("player", CommandParamType.TARGET, true)
+                CommandParameter.newEnum("entityType", false, Entity.getEntityRuntimeMapping().values().toArray(new String[0])),
+                CommandParameter.newType("player", true, CommandParamType.TARGET)
         });
     }
 
@@ -28,11 +29,13 @@ public class SummonCommand extends Command {
         }
 
         if (args.length == 0 || (args.length == 1 && !(sender instanceof Player))) {
+            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
             return false;
         }
 
         // Convert Minecraft format to the format what Nukkit uses
-        String mob = Character.toUpperCase(args[0].charAt(0)) + args[0].substring(1);
+        String mob = args[0].toLowerCase().replace("minecraft:", "");
+        mob = Character.toUpperCase(mob.charAt(0)) + mob.substring(1);
         int max = mob.length() - 1;
         for (int x = 2; x < max; x++) {
             if (mob.charAt(x) == '_') {
@@ -43,7 +46,7 @@ public class SummonCommand extends Command {
         Player playerThatSpawns;
 
         if (args.length == 2) {
-            playerThatSpawns = Server.getInstance().getPlayer(args[1].replace("@s", sender.getName()));
+            playerThatSpawns = Server.getInstance().getPlayerExact(args[1].replace("@s", sender.getName()));
         } else {
             playerThatSpawns = (Player) sender;
         }
@@ -53,12 +56,12 @@ public class SummonCommand extends Command {
             Entity ent;
             if ((ent = Entity.createEntity(mob, pos)) != null) {
                 ent.spawnToAll();
-                sender.sendMessage("\u00A76Spawned " + mob + " to " + playerThatSpawns.getName());
+                sender.sendMessage(new TranslationContainer("nukkit.command.summon.spawned", mob, playerThatSpawns.getName()));
             } else {
-                sender.sendMessage("\u00A7cUnable to spawn " + mob);
+                sender.sendMessage(new TranslationContainer("nukkit.command.summon.unable", mob));
             }
         } else {
-            sender.sendMessage("\u00A7cUnknown player " + (args.length == 2 ? args[1] : sender.getName()));
+            sender.sendMessage(new TranslationContainer("nukkit.command.summon.unknownPlayer"));
         }
 
         return true;

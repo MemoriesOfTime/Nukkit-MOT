@@ -473,8 +473,24 @@ public class LevelSoundEventPacket extends DataPacket {
     public static final int SOUND_SNIFFER_EGG_HATCHED = 467;
     public static final int SOUND_WAXED_SIGN_INTERACT_FAIL = 468;
     public static final int SOUND_RECORD_RELIC = 469;
+    public static final int SOUND_BUMP = 470;
+    public static final int SOUND_PUMPKIN_CARVE = 471;
+    public static final int SOUND_CONVERT_HUSK_TO_ZOMBIE = 472;
+    public static final int SOUND_PIG_DEATH = 473;
+    public static final int SOUND_HOGLIN_CONVERT_TO_ZOMBIE = 474;
+    public static final int SOUND_AMBIENT_UNDERWATER_ENTER = 475;
+    public static final int SOUND_AMBIENT_UNDERWATER_EXIT = 476;
+    public static final int SOUND_BOTTLE_FILL = 477;
+    public static final int SOUND_BOTTLE_EMPTY = 478;
+    public static final int SOUND_CRAFTER_CRAFT = 479;
+    public static final int SOUND_CRAFTER_FAILED = 480;
+    public static final int SOUND_DECORATED_POT_INSERT = 481;
+    public static final int SOUND_DECORATED_POT_INSERT_FAILED = 482;
+    public static final int SOUND_CRAFTER_DISABLE_SLOT = 483;
+    public static final int SOUND_COPPER_BULB_ON = 490;
+    public static final int SOUND_COPPER_BULB_OFF = 491;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(470);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(492);
 
     public int sound;
     public float x;

@@ -16,8 +16,11 @@ import oshi.hardware.*;
 import oshi.software.os.OperatingSystem;
 import oshi.util.platform.windows.WmiQueryHandler;
 
+import java.io.File;
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,9 +54,7 @@ public class StatusCommand extends VanillaCommand {
         vmVendor.put("XenVM", "Xen HVM");
         vmVendor.put("ACRN", "Project ACRN");
         vmVendor.put("QNXQVMBSQG", "QNX Hypervisor");
-    }
 
-    static {
         vmMac.put("00:50:56", "VMware ESX 3");
         vmMac.put("00:0C:29", "VMware ESX 3");
         vmMac.put("00:05:69", "VMware ESX 3");
@@ -95,13 +96,14 @@ public class StatusCommand extends VanillaCommand {
     private static String formatFreq(long hz) {
         if (hz >= 1000000000) {
             return String.format("%.2fGHz", hz / 1000000000.0);
-        } else if (hz >= 1000 * 1000) {
-            return String.format("%.2fMHz", hz / 1000000.0);
-        } else if (hz >= 1000) {
-            return String.format("%.2fKHz", hz / 1000.0);
-        } else {
-            return String.format("%dHz", hz);
         }
+        if (hz >= 1000 * 1000) {
+            return String.format("%.2fMHz", hz / 1000000.0);
+        }
+        if (hz >= 1000) {
+            return String.format("%.2fKHz", hz / 1000.0);
+        }
+        return String.format("%dHz", hz);
     }
 
     public static String formatUptime(long uptime) {
@@ -129,7 +131,7 @@ public class StatusCommand extends VanillaCommand {
             String mac = nif.getMacaddr().toUpperCase();
             String oui = mac.length() > 7 ? mac.substring(0, 8) : mac;
             if (vmMac.containsKey(oui)) {
-                return vmVendor.get(oui);
+                return vmMac.get(oui);
             }
         }
 
@@ -158,6 +160,26 @@ public class StatusCommand extends VanillaCommand {
             Object tmp = result.getValue(ComputerSystemEntry.HYPERVISORPRESENT, 0);
             if (tmp != null && tmp.toString().equals("true")) {
                 return "Hyper-V";
+            }
+        }
+
+        //检查是否在Docker容器中
+        //Docker检查只在非Windows上执行
+        else {
+            var file = new File("/.dockerenv");
+            if (file.exists()) {
+                return "Docker Container";
+            }
+            var cgroupFile = new File("/proc/1/cgroup");
+            if (cgroupFile.exists()) {
+                try (var lineStream = Files.lines(cgroupFile.toPath())) {
+                    var searchResult = lineStream.filter(line -> line.contains("docker") || line.contains("lxc"));
+                    if (searchResult.findAny().isPresent()) {
+                        return "Docker Container";
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
 
@@ -292,7 +314,7 @@ public class StatusCommand extends VanillaCommand {
                 sender.sendMessage("");
             }
             // 网络信息
-            {
+            try {
                 Network network = server.getNetwork();
                 if (network.getHardWareNetworkInterfaces() != null) {
                     sender.sendMessage(TextFormat.YELLOW + ">>> " + TextFormat.WHITE + "Network Info" + TextFormat.YELLOW + " <<<" + TextFormat.RESET);
@@ -309,6 +331,8 @@ public class StatusCommand extends VanillaCommand {
                     }
                     sender.sendMessage("");
                 }
+            } catch (Exception ignored) {
+                sender.sendMessage(TextFormat.RED + "    Failed to get network info.");
             }
             // CPU信息
             {
@@ -346,7 +370,7 @@ public class StatusCommand extends VanillaCommand {
                 sender.sendMessage(TextFormat.GOLD + "  Total JVM memory: " + TextFormat.RED + totalMB + " MB.");
                 sender.sendMessage(TextFormat.GOLD + "  Maximum JVM memory: " + TextFormat.RED + maxMB + " MB.");
                 // 操作系统内存
-                usage = (double) usedVirtualMemory / allVirtualMemory * 100;
+                usage = (double) usedPhysicalMemory / allPhysicalMemory * 100;
                 usageColor = TextFormat.GREEN;
                 if (usage > 85) {
                     usageColor = TextFormat.GOLD;
@@ -359,10 +383,12 @@ public class StatusCommand extends VanillaCommand {
                     usageColor = TextFormat.GOLD;
                 }
                 sender.sendMessage(TextFormat.GOLD + "  Virtual memory: " + TextFormat.GREEN + usageColor + formatMB(usedVirtualMemory) + " / " + formatMB(allVirtualMemory) + ". (" + NukkitMath.round(usage, 2) + "%)");
-                sender.sendMessage(TextFormat.GOLD + "  Hardware list: ");
-                for (PhysicalMemory each : physicalMemories) {
-                    sender.sendMessage(TextFormat.AQUA + "    " + each.getBankLabel() + " @ " + formatFreq(each.getClockSpeed()) + TextFormat.WHITE + " " + formatMB(each.getCapacity() / 1000));
-                    sender.sendMessage(TextFormat.GRAY + "      " + each.getMemoryType() + ", " + each.getManufacturer());
+                if (physicalMemories.size() > 0) {
+                    sender.sendMessage(TextFormat.GOLD + "  Hardware list: ");
+                    for (PhysicalMemory each : physicalMemories) {
+                        sender.sendMessage(TextFormat.AQUA + "    " + each.getBankLabel() + " @ " + formatFreq(each.getClockSpeed()) + TextFormat.WHITE + " " + formatMB(each.getCapacity() / 1000));
+                        sender.sendMessage(TextFormat.GRAY + "      " + each.getMemoryType() + ", " + each.getManufacturer());
+                    }
                 }
                 sender.sendMessage("");
             }

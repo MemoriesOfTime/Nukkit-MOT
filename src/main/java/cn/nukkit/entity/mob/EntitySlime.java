@@ -18,7 +18,7 @@ public class EntitySlime extends EntityJumpingMob {
 
     public static final int SIZE_SMALL = 1;
     public static final int SIZE_MEDIUM = 2;
-    public static final int SIZE_BIG = 3;
+    public static final int SIZE_BIG = 4;
 
     protected int size = SIZE_BIG;
 
@@ -54,6 +54,9 @@ public class EntitySlime extends EntityJumpingMob {
             this.size = this.namedTag.getInt("Size");
         } else {
             this.size = Utils.rand(1, 3);
+            if (this.size == 3) {
+                this.size = 4;
+            }
         }
 
         this.setScale(0.51f + size * 0.51f);
@@ -71,7 +74,7 @@ public class EntitySlime extends EntityJumpingMob {
         } else if (size == SIZE_MEDIUM) {
             this.setDamage(new int[] { 0, 2, 2, 3 });
         } else {
-            this.setDamage(Utils.emptyDamageArray);
+            this.setDamage(Utils.getEmptyDamageArray());
         }
     }
 
@@ -146,10 +149,12 @@ public class EntitySlime extends EntityJumpingMob {
 
     @Override
     public int getKillExperience() {
-        if (this.size == SIZE_BIG) return 4;
-        if (this.size == SIZE_MEDIUM) return 2;
-        if (this.size == SIZE_SMALL) return 1;
-        return 0;
+        return switch (this.size) {
+            case SIZE_BIG -> 4;
+            case SIZE_MEDIUM -> 2;
+            case SIZE_SMALL -> 1;
+            default -> 0;
+        };
     }
 
     public int getSlimeSize() {

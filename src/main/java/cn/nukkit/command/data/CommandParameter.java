@@ -1,8 +1,11 @@
 package cn.nukkit.command.data;
 
 
+import com.google.common.collect.Lists;
+
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class CommandParameter {
 
@@ -26,7 +29,9 @@ public class CommandParameter {
     public String name;
     public CommandParamType type;
     public boolean optional;
+    @Deprecated
     public byte options = 0;
+    public List<CommandParamOption> paramOptions;
 
     public CommandEnum enumData;
     public String postFix;
@@ -109,6 +114,14 @@ public class CommandParameter {
 
     public static CommandParameter newEnum(String name, boolean optional, CommandEnum data) {
         return new CommandParameter(name, optional, CommandParamType.RAWTEXT, data, null);
+    }
+
+    public static CommandParameter newEnum(String name, boolean optional, CommandEnum data, CommandParamOption... options) {
+        CommandParameter result = newEnum(name, optional, data);
+        if (options.length != 0) {
+            result.paramOptions = Lists.newArrayList(options);
+        }
+        return result;
     }
 
     public static CommandParameter newPostfix(String name, String postfix) {

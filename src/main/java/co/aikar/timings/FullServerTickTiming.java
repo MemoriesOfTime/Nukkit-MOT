@@ -26,6 +26,7 @@ package co.aikar.timings;
 import static co.aikar.timings.TimingIdentifier.DEFAULT_GROUP;
 import static co.aikar.timings.TimingsManager.*;
 
+@Deprecated
 public class FullServerTickTiming extends Timing {
 
     private static final TimingIdentifier IDENTIFIER = new TimingIdentifier(DEFAULT_GROUP.name, "Full Server Tick", null);

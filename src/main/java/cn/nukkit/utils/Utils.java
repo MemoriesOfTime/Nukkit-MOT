@@ -1,7 +1,9 @@
 package cn.nukkit.utils;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
 import cn.nukkit.entity.mob.*;
+import cn.nukkit.item.Item;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -39,6 +41,7 @@ public class Utils {
     /**
      * An empty damage array used when mobs have no attack damage.
      */
+    @Deprecated
     public static final int[] emptyDamageArray = new int[] { 0, 0, 0, 0 };
     /**
      * List of network ids of monsters. Currently used for example to check which entities will make players unable to sleep when nearby the bed.
@@ -48,6 +51,26 @@ public class Utils {
      * List of biomes where water can freeze
      */
     public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(10, 11, 12, 26, 30, 31, 140, 158));
+
+    /**
+     * 检查物品或方块是否已在nk中实现
+     * Check if the item or block id is implemented in Nukkit.
+     *
+     * @param id 物品或方块id
+     * @return 是否已实现
+     */
+    public static boolean hasItemOrBlock(int id) {
+        if (id < 0) {
+            int blockId = 255 - id;
+            return blockId < Block.MAX_BLOCK_ID && Block.list[blockId] != null;
+        } else {
+            return id < Item.list.length && Item.list[id] != null;
+        }
+    }
+
+    public static int[] getEmptyDamageArray() {
+        return new int[] { 0, 0, 0, 0 };
+    }
 
     public static void writeFile(String fileName, String content) throws IOException {
         writeFile(fileName, new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
@@ -299,6 +322,15 @@ public class Utils {
         return (int) Math.round((double) number);
     }
 
+    public static double toDouble(Object number) {
+        if (number instanceof Double doubleNumber) {
+            return doubleNumber;
+        } else if (number instanceof String) {
+            return new BigDecimal(number.toString()).doubleValue();
+        }
+        return (double) number;
+    }
+
     public static byte[] parseHexBinary(String s) {
         final int len = s.length();
 
@@ -492,6 +524,16 @@ public class Utils {
             case ProtocolInfo.v1_20_0_23:
             case ProtocolInfo.v1_20_0:
                 return "1.20.0";
+            case ProtocolInfo.v1_20_10_21:
+            case ProtocolInfo.v1_20_10:
+                return "1.20.10";
+            case ProtocolInfo.v1_20_30_24:
+            case ProtocolInfo.v1_20_30:
+                return "1.20.30";
+            case ProtocolInfo.v1_20_40:
+                return "1.20.40";
+            case ProtocolInfo.v1_20_50:
+                return "1.20.50";
             //TODO Multiversion 添加新版本支持时修改这里
             default:
                 throw new IllegalStateException("Invalid protocol: " + protocol);

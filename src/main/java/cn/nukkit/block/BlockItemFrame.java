@@ -3,19 +3,21 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
+import cn.nukkit.event.block.ItemFrameUseEvent;
+import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemItemFrame;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.sound.ItemFrameItemAddedSound;
 import cn.nukkit.level.sound.ItemFrameItemRotated;
-import cn.nukkit.level.sound.ItemFramePlacedSound;
-import cn.nukkit.level.sound.ItemFrameRemovedSound;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -82,11 +84,28 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
+    public int onTouch(@Nullable Player player, PlayerInteractEvent.Action action) {
+        this.onUpdate(Level.BLOCK_UPDATE_TOUCH);
+        if (player != null && action == PlayerInteractEvent.Action.LEFT_CLICK_BLOCK) {
+            BlockEntity itemFrame = this.level.getBlockEntity(this);
+            if (itemFrame instanceof BlockEntityItemFrame && ((BlockEntityItemFrame) itemFrame).dropItem(player)) {
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    @Override
     public boolean onActivate(Item item, Player player) {
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
         BlockEntityItemFrame itemFrame = (BlockEntityItemFrame) blockEntity;
         if (itemFrame.getItem().getId() == Item.AIR) {
             Item itemToFrame = item.clone();
+            ItemFrameUseEvent event = new ItemFrameUseEvent(player, this, itemFrame, itemToFrame, ItemFrameUseEvent.Action.PUT);
+            this.getLevel().getServer().getPluginManager().callEvent(event);
+            if (event.isCancelled()) {
+                return false;
+            }
             if (player != null && player.isSurvival()) {
                 item.setCount(item.getCount() - 1);
                 player.getInventory().setItemInHand(item);
@@ -99,6 +118,11 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
             }
             this.getLevel().addSound(new ItemFrameItemAddedSound(this));
         } else {
+            ItemFrameUseEvent event = new ItemFrameUseEvent(player, this, itemFrame, null, ItemFrameUseEvent.Action.ROTATION);
+            this.getLevel().getServer().getPluginManager().callEvent(event);
+            if (event.isCancelled()) {
+                return false;
+            }
             itemFrame.setItemRotation((itemFrame.getItemRotation() + 1) % 8);
             if (isStoringMap()) {
                 setStoringMap(false);
@@ -127,7 +151,7 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
                 }
             }
             BlockEntity.createBlockEntity(BlockEntity.ITEM_FRAME, this.getChunk(), nbt);
-            this.getLevel().addSound(new ItemFramePlacedSound(this));
+            this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_ITEM_FRAME_PLACED);
             return true;
         }
         return false;
@@ -136,7 +160,7 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
     @Override
     public boolean onBreak(Item item) {
         this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true);
-        this.getLevel().addSound(new ItemFrameRemovedSound(this));
+        this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_ITEM_FRAME_REMOVED);
         return true;
     }
 

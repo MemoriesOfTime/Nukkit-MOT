@@ -96,13 +96,13 @@ public class ItemMap extends Item {
         pk.offsetX = 0;
         pk.offsetZ = 0;
         pk.image = image;
-        if (p.protocol >= ProtocolInfo.v1_19_50) {
+        if (p.protocol >= ProtocolInfo.v1_19_50_20) {
             pk.eids = new long[]{pk.mapId};
         }
 
         p.dataPacket(pk);
 
-        if (p.protocol >= ProtocolInfo.v1_19_20) {
+        if (p.protocol >= ProtocolInfo.v1_19_20 && p.protocol < ProtocolInfo.v1_19_50) {
             Server.getInstance().getScheduler().scheduleDelayedTask(null, () -> p.dataPacket(pk), 20);
         }
     }

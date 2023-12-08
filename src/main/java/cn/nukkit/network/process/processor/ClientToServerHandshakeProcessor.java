@@ -13,7 +13,13 @@ public class ClientToServerHandshakeProcessor extends DataPacketProcessor<Client
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull ClientToServerHandshakePacket pk) {
         if (playerHandle.player.isEnableNetworkEncryption()) {
-            playerHandle.processLogin();
+            if (!playerHandle.isAwaitingEncryptionHandshake()) {
+                playerHandle.player.close("Invalid encryption handshake");
+                return;
+            }
+
+            playerHandle.setAwaitingEncryptionHandshake(false);
+            playerHandle.processPreLogin();
         }
     }
 

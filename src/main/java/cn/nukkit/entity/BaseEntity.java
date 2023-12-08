@@ -20,7 +20,6 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.utils.Utils;
-import co.aikar.timings.Timings;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.apache.commons.math3.util.FastMath;
@@ -199,15 +198,8 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        if (Timings.entityBaseTickTimer != null) {
-            Timings.entityBaseTickTimer.startTiming();
-        }
-
         if (this.canDespawn() && this.age > Server.getInstance().mobDespawnTicks && !this.hasCustomName() && !(this instanceof EntityBoss)) {
             this.close();
-            if (Timings.entityBaseTickTimer != null) {
-                Timings.entityBaseTickTimer.stopTiming();
-            }
             return true;
         }
 
@@ -240,10 +232,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             }
         } else if (this.isInLoveCooldown()) {
             this.inLoveCooldown -= tickDiff;
-        }
-
-        if (Timings.entityBaseTickTimer != null) {
-            Timings.entityBaseTickTimer.stopTiming();
         }
 
         return hasUpdate;
@@ -326,10 +314,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             return false;
         }
 
-        if (Timings.entityMoveTimer != null) {
-            Timings.entityMoveTimer.startTiming();
-        }
-
         this.blocksAround = null;
 
         double movX = dx * moveMultiplier;
@@ -359,9 +343,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.checkGroundState(movX, movY, movZ, dx, dy, dz);
         this.updateFallState(this.onGround);
 
-        if (Timings.entityMoveTimer != null) {
-            Timings.entityMoveTimer.stopTiming();
-        }
         return true;
     }
 
@@ -453,7 +434,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                 break;
 		}
 
-		slots[0] = helmet;
+        slots[0] = helmet;
 
 		if (Utils.rand(1, 4) != 1) {
 			switch (Utils.rand(1, 5)) {
@@ -485,7 +466,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 			}
 		}
 
-		slots[1] = chestplate;
+        slots[1] = chestplate;
 
 		if (Utils.rand(1, 2) == 2) {
 			switch (Utils.rand(1, 5)) {
@@ -517,7 +498,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 			}
 		}
 
-		slots[2] = leggings;
+        slots[2] = leggings;
 
 		if (Utils.rand(1, 5) < 3) {
 			switch (Utils.rand(1, 5)) {
@@ -736,31 +717,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return null;
     }
 
-    protected void lookAt(Vector3 target) {
-        double dx = this.x - target.x;
-        double dy = this.y - target.y;
-        double dz = this.z - target.z;
-        double yaw = Math.asin(dx / Math.sqrt(dx * dx + dz * dz)) / Math.PI * 180.0d;
-        double asin = Math.asin(dy / Math.sqrt(dx * dx + dz * dz + dy * dy)) / Math.PI * 180.0d;
-        long pitch = Math.round(asin);
-        if (dz > 0.0d) {
-            yaw = -yaw + 180.0d;
-        }
-        this.setRotation(yaw, pitch);
-    }
-
-    protected EntityHuman getNearbyHuman() {
-        AxisAlignedBB bb = this.boundingBox.clone().expand(2.5, 2.5, 2.5);
-        EntityHuman human = null;
-        for (Entity collidingEntity : this.level.getCollidingEntities(bb)) {
-            if (collidingEntity instanceof EntityHuman) {
-                human = (EntityHuman) collidingEntity;
-                break;
-            }
-        }
-        return human;
-    }
-
     protected boolean isInTickingRange() {
         for (Player player : this.level.getPlayers().values()) {
             if (player.distanceSquared(this) < 6400) { // 80 blocks
@@ -769,5 +725,4 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         }
         return false;
     }
-
 }

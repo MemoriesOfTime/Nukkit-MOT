@@ -12,6 +12,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 
 import java.util.*;
 
@@ -60,11 +62,7 @@ public abstract class BaseInventory implements Inventory {
 
         this.type = type;
 
-        if (overrideSize != null) {
-            this.size = overrideSize;
-        } else {
-            this.size = this.type.getDefaultSize();
-        }
+        this.size = Objects.requireNonNullElseGet(overrideSize, this.type::getDefaultSize);
 
         if (overrideTitle != null) {
             this.title = overrideTitle;
@@ -109,7 +107,7 @@ public abstract class BaseInventory implements Inventory {
     }
 
     public Item getItemFast(int index) {
-        return this.slots.containsKey(index) ? this.slots.get(index) : air;
+        return this.slots.getOrDefault(index, air);
     }
 
     @Override
@@ -266,13 +264,14 @@ public abstract class BaseInventory implements Inventory {
         int i1 = this.getSize();
         for (int i = 0; i < i1; ++i) {
             Item slot = this.getItemFast(i);
+            int maxStackSize = Math.min(slot.getMaxStackSize(), this.getMaxStackSize());
             if (item.equals(slot, checkDamage, checkTag)) {
                 int diff;
-                if ((diff = slot.getMaxStackSize() - slot.getCount()) > 0) {
+                if ((diff = maxStackSize - slot.getCount()) > 0) {
                     count -= diff;
                 }
             } else if (slot.getId() == Item.AIR) {
-                count -= this.getMaxStackSize();
+                count -= maxStackSize;
             }
 
             if (count <= 0) {
@@ -297,7 +296,7 @@ public abstract class BaseInventory implements Inventory {
             }
         }
 
-        List<Integer> emptySlots = new ArrayList<>();
+        IntList emptySlots = new IntArrayList();
 
         for (int i = 0; i < this.getSize(); ++i) {
             Item item = this.getItem(i);
@@ -305,16 +304,19 @@ public abstract class BaseInventory implements Inventory {
                 emptySlots.add(i);
             }
 
-            for (Item slot : new ArrayList<>(itemSlots)) {
-                if (slot.equals(item) && item.getCount() < item.getMaxStackSize()) {
-                    int amount = Math.min(item.getMaxStackSize() - item.getCount(), slot.getCount());
-                    amount = Math.min(amount, this.maxStackSize);
-                    if (amount > 0) {
-                        slot.setCount(slot.getCount() - amount);
-                        item.setCount(item.getCount() + amount);
-                        this.setItem(i, item);
-                        if (slot.getCount() <= 0) {
-                            itemSlots.remove(slot);
+            for (Iterator<Item> iterator = itemSlots.iterator(); iterator.hasNext();) {
+                Item slot = iterator.next();
+                if (slot.equals(item)) {
+                    int maxStackSize = Math.min(item.getMaxStackSize(), this.getMaxStackSize());
+                    if (item.getCount() < maxStackSize) {
+                        int amount = Math.min(maxStackSize - item.getCount(), slot.getCount());
+                        if (amount > 0) {
+                            slot.setCount(slot.getCount() - amount);
+                            item.setCount(item.getCount() + amount);
+                            this.setItem(i, item);
+                            if (slot.getCount() <= 0) {
+                                iterator.remove();
+                            }
                         }
                     }
                 }
@@ -328,8 +330,7 @@ public abstract class BaseInventory implements Inventory {
             for (int slotIndex : emptySlots) {
                 if (!itemSlots.isEmpty()) {
                     Item slot = itemSlots.get(0);
-                    int amount = Math.min(slot.getMaxStackSize(), slot.getCount());
-                    amount = Math.min(amount, this.maxStackSize);
+                    int amount = Math.min(Math.min(slot.getMaxStackSize(), this.getMaxStackSize()), slot.getCount());
                     slot.setCount(slot.getCount() - amount);
                     Item item = slot.clone();
                     item.setCount(amount);
@@ -341,7 +342,7 @@ public abstract class BaseInventory implements Inventory {
             }
         }
 
-        return itemSlots.toArray(new Item[0]);
+        return itemSlots.toArray(Item.EMPTY_ARRAY);
     }
 
     @Override
@@ -376,7 +377,7 @@ public abstract class BaseInventory implements Inventory {
             }
         }
 
-        return itemSlots.toArray(new Item[0]);
+        return itemSlots.toArray(Item.EMPTY_ARRAY);
     }
 
     @Override

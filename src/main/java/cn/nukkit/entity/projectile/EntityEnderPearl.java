@@ -65,8 +65,6 @@ public class EntityEnderPearl extends EntityProjectile {
             return false;
         }
 
-        if (this.timing != null) this.timing.startTiming();
-
         if (this.isCollided && this.shootingEntity instanceof Player) {
             List<Block> b = this.getCollisionBlocks();
 
@@ -105,8 +103,6 @@ public class EntityEnderPearl extends EntityProjectile {
         if (this.age > 1200 || this.isCollided) {
             this.close();
         }
-
-        if (this.timing != null) this.timing.stopTiming();
 
         return super.onUpdate(currentTick);
     }

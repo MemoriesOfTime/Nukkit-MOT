@@ -1,22 +1,20 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
-import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.data.EntityMetadata;
-import cn.nukkit.entity.mob.EntityWitch;
-import cn.nukkit.event.entity.CreatureSpawnEvent;
-import cn.nukkit.inventory.Inventory;
+import cn.nukkit.block.Block;
+import cn.nukkit.entity.data.IntEntityData;
+import cn.nukkit.entity.data.LongEntityData;
+import cn.nukkit.entity.data.profession.Profession;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.inventory.TradeInventory;
-import cn.nukkit.inventory.TradeInventoryRecipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
-
-import java.util.ArrayList;
-import java.util.List;
+import cn.nukkit.nbt.tag.Tag;
+import lombok.Getter;
 
 public class EntityVillager extends EntityWalkingAnimal implements InventoryHolder {
 
@@ -29,11 +27,72 @@ public class EntityVillager extends EntityWalkingAnimal implements InventoryHold
 
     public static final int NETWORK_ID = 15;
 
-    private TradeInventory inventory;
-    private List<TradeInventoryRecipe> recipes;
+    /**
+     * 代表交易配方
+     */
+    @Getter
+    protected ListTag<Tag> recipes = new ListTag<>("Recipes");
+    /**
+     * 用于控制村民的等级成长所需要的经验
+     * 例如[0,10,20,30,40] 村民达到1级所需经验0,2级为10,这里的经验是{@link EntityVillager#tradeExp}.
+     */
+    public int[] tierExpRequirement;
+
+    protected TradeInventory inventory;
+    /**
+     * 用于控制该村民是否可以交易
+     */
+    protected Boolean canTrade;
+    /**
+     * 代表交易UI上方所显示的名称,在原版为村民的职业名
+     */
+    protected String displayName;
+    /**
+     * 代表村民当前的交易等级
+     */
+    protected int tradeTier;
+    /**
+     * 代表村民所允许的最大交易等级
+     */
+    protected int maxTradeTier;
+    /**
+     * 代表当前村民的经验,不允许为负数
+     */
+    protected int tradeExp;
+
+    protected int tradeSeed;
+
+    /**
+     * 代表村民的职业<br>
+     * 0 generic 普通<br>
+     * 1 farmer 农民<br>
+     * 2 fisherman 渔民<br>
+     * 3 shepherd 牧羊人<br>
+     * 4 fletcher 制箭师<br>
+     * 5 librarian 图书管理员<br>
+     * 6 cartographer 制图师<br>
+     * 7 cleric 牧师<br>
+     * 8 armor 盔甲匠<br>
+     * 9 weapon 武器匠<br>
+     * 10 tool 工具匠<br>
+     * 11 butcher 屠夫<br>
+     * 12 butcher 皮匠<br>
+     * 13 mason 石匠<br>
+     * 14 nitwit 傻子<br>
+     */
+    protected int profession;
+
+    {
+        this.tierExpRequirement = new int[]{0, 10, 70, 150, 250};
+    }
 
     public EntityVillager(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+    }
+
+    @Override
+    public int getKillExperience() {
+        return 0;
     }
 
     @Override
@@ -52,232 +111,284 @@ public class EntityVillager extends EntityWalkingAnimal implements InventoryHold
     @Override
     public float getHeight() {
         if (this.isBaby()) {
-            return 0.975f;
+            return 0.95f;
         }
-        return 1.95f;
-    }
-
-    @Override
-    public double getSpeed() {
-        return 1.1;
+        return 1.9f;
     }
 
     @Override
     public void initEntity() {
-        this.setMaxHealth(10);
-
+        this.setMaxHealth(20);
         super.initEntity();
-
-        this.inventory = new TradeInventory(this);
-        this.recipes = new ArrayList<>();
-        
-        this.dataProperties.putLong(DATA_TRADING_PLAYER_EID, 0L);
-
-        try {
-            CompoundTag offers = this.namedTag.getCompound("Offers");
-            if (offers != null) {
-                ListTag<CompoundTag> nbtRecipes = offers.getList("Recipes", CompoundTag.class);
-                for (CompoundTag nbt : nbtRecipes.getAll()) {
-                    recipes.add(TradeInventoryRecipe.toNBT(nbt));
-                }
-            } else {
-                CompoundTag nbt = new CompoundTag("Offers");
-                nbt.putList(new ListTag<CompoundTag>("Recipes"));
-                nbt.putList(this.getDefaultTierExpRequirements());
-                this.namedTag.putCompound("Offers", nbt);
-            }
-        } catch (Exception ex) {
-            server.getLogger().error("Failed to load trade recipes for a villager with entity id " + this.id, ex);
-        }
-
-        if (!this.namedTag.contains("Profession")) {
-            if (this instanceof EntityVillagerV2) {
-                this.setProfession(EntityVillagerV2.PROFESSION_UNEMPLOYED);
-            }else {
-                this.setProfession(PROFESSION_GENERIC);
-            }
-        }else {
-            this.setProfession(this.getProfession());
-        }
-    
-        if(!this.namedTag.contains("Willing")) {
-            this.setWilling(true);
-        }else {
-            this.setWilling(this.isWilling());
-        }
-        
-        if (!this.namedTag.contains("TradeTier")) {
-            this.setTradeTier(0);
-        }else {
-            this.setTradeTier(this.getTradeTier());
-        }
-        
-        if (!this.namedTag.contains("MaxTradeTier")) {
-            this.setMaxTradeTier(4);
-        }else {
-            this.setMaxTradeTier(this.getMaxTradeTier());
-        }
-    }
-
-    public int getProfession() {
-        return this.namedTag.getInt("Profession");
-    }
-
-    public void setProfession(int profession) {
-        this.namedTag.putInt("Profession", profession);
-    }
-
-    @Override
-    public int getKillExperience() {
-        return 0;
-    }
-
-    @Override
-    public void onStruckByLightning(Entity entity) {
-        Entity ent = Entity.createEntity("Witch", this);
-        if (ent != null) {
-            CreatureSpawnEvent cse = new CreatureSpawnEvent(EntityWitch.NETWORK_ID, this, ent.namedTag, CreatureSpawnEvent.SpawnReason.LIGHTNING);
-            this.getServer().getPluginManager().callEvent(cse);
-
-            if (cse.isCancelled()) {
-                ent.close();
-                return;
-            }
-
-            ent.yaw = this.yaw;
-            ent.pitch = this.pitch;
-            ent.setImmobile(this.isImmobile());
-            if (this.hasCustomName()) {
-                ent.setNameTag(this.getNameTag());
-                ent.setNameTagVisible(this.isNameTagVisible());
-                ent.setNameTagAlwaysVisible(this.isNameTagAlwaysVisible());
-            }
-
-            this.close();
-            ent.spawnToAll();
+        setTradingPlayer(0L);
+        if (!this.namedTag.contains("profession")) {
+            this.setProfession(0);
         } else {
-            super.onStruckByLightning(entity);
+            var profession = this.namedTag.getInt("profession");
+            this.profession = profession;
+            this.setDataProperty(new IntEntityData(DATA_VARIANT, profession));
+        }
+        if (!this.namedTag.contains("tradeSeed")) {
+            this.setTradeSeed(new NukkitRandom().nextBoundedInt(Integer.MAX_VALUE));
+        } else {
+            this.tradeSeed = this.namedTag.getInt("tradeSeed");
+        }
+        if (!this.namedTag.contains("canTrade")) {
+            this.setCanTrade(!(profession == 0 || profession == 14));
+        } else {
+            this.canTrade = this.namedTag.getBoolean("canTrade");
+        }
+        if (!this.namedTag.contains("displayName") && profession != 0) {
+            this.setDisplayName(getProfessionName(profession));
+        } else {
+            this.displayName = this.namedTag.getString("displayName");
+        }
+        if (!this.namedTag.contains("tradeTier")) {
+            this.setTradeTier(1);
+        } else {
+            this.tradeTier = this.namedTag.getInt("tradeTier");
+        }
+        if (!this.namedTag.contains("maxTradeTier")) {
+            this.setMaxTradeTier(5);
+        } else {
+            var maxTradeTier = this.namedTag.getInt("maxTradeTier");
+            this.maxTradeTier = maxTradeTier;
+            this.setDataProperty(new IntEntityData(DATA_MAX_TRADE_TIER, maxTradeTier));
+        }
+        if (!this.namedTag.contains("tradeExp")) {
+            this.setTradeExp(0);
+        } else {
+            var tradeExp = this.namedTag.getInt("tradeExp");
+            this.tradeExp = tradeExp;
+            this.setDataProperty(new IntEntityData(DATA_TRADE_EXPERIENCE, tradeExp));
+        }
+        Profession profession = Profession.getProfession(this.profession);
+        if (profession != null) {
+            applyProfession(profession);
         }
     }
 
-    public void setTradeTier(int tier) {
-        if (tier > 4) {
-            tier = 4;
-        }
-        this.namedTag.putInt("TradeTier", tier);
-        this.dataProperties.putInt(DATA_TRADE_TIER, tier);
-        this.sendData(this.getViewers().values().toArray(new Player[0]),
-                new EntityMetadata().putInt(DATA_TRADE_TIER, tier));
+    @Override
+    public void saveNBT() {
+        super.saveNBT();
+        this.namedTag.putByte("Profession", this.getProfession());
+        this.namedTag.putBoolean("isTrade", this.getCanTrade());
+        this.namedTag.putString("displayName", this.getDisplayName());
+        this.namedTag.putInt("tradeTier", this.getTradeTier());
+        this.namedTag.putInt("maxTradeTier", this.getMaxTradeTier());
+        this.namedTag.putInt("tradeExp", this.getTradeExp());
+        this.namedTag.putInt("tradeSeed", this.getTradeSeed());
     }
 
+    /**
+     * 获取村民职业id对应的displayName硬编码
+     */
+    private String getProfessionName(int profession) {
+        return switch (profession) {
+            case 1 -> "entity.villager.farmer";
+            case 2 -> "entity.villager.fisherman";
+            case 3 -> "entity.villager.shepherd";
+            case 4 -> "entity.villager.fletcher";
+            case 5 -> "entity.villager.librarian";
+            case 6 -> "entity.villager.cartographer";
+            case 7 -> "entity.villager.cleric";
+            case 8 -> "entity.villager.armor";
+            case 9 -> "entity.villager.weapon";
+            case 10 -> "entity.villager.tool";
+            case 11 -> "entity.villager.butcher";
+            case 12 -> "entity.villager.leather";
+            case 13 -> "entity.villager.mason";
+            default -> null;
+        };
+    }
+
+    /**
+     * @return 村民的职业id
+     */
+    public int getProfession() {
+        return profession;
+    }
+
+    /**
+     * 设置村民职业
+     *
+     * @param profession 请查看{@link EntityVillager#profession}
+     */
+    public void setProfession(int profession) {
+        this.profession = profession;
+        this.setDataProperty(new IntEntityData(DATA_VARIANT, profession));
+        this.namedTag.putInt("profession", this.profession);
+    }
+
+    /**
+     * 这个方法插件一般不用
+     */
+    public void setTradingPlayer(Long eid) {
+        this.setDataProperty(new LongEntityData(DATA_TRADING_PLAYER_EID, eid));
+    }
+
+    /**
+     * @return 该村民是否可以交易
+     */
+    public boolean getCanTrade() {
+        return false;
+    }
+
+    /**
+     * 设置村民是否可以交易
+     *
+     * @param canTrade true 可以交易
+     */
+    public void setCanTrade(boolean canTrade) {
+        this.canTrade = canTrade;
+        this.namedTag.putBoolean("canTrade", canTrade);
+    }
+
+    /**
+     * @return 交易UI的显示名称
+     */
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    /**
+     * @param displayName 设置交易UI的显示名称
+     */
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+        this.namedTag.putString("displayName", displayName);
+    }
+
+    /**
+     * @return 该村民的交易等级
+     */
     public int getTradeTier() {
-        return this.namedTag.getInt("TradeTier");
+        return tradeTier;
     }
-    
-    public void setMaxTradeTier(int maxTier) {
-        if (maxTier > 4) {
-            maxTier = 4;
-        }
-        this.namedTag.putInt("MaxTradeTier", maxTier);
-        this.dataProperties.putInt(DATA_MAX_TRADE_TIER, maxTier);
-        this.sendData(this.getViewers().values().toArray(new Player[0]),
-                new EntityMetadata().putInt(DATA_MAX_TRADE_TIER, maxTier));
+
+    /**
+     * @param tradeTier <p>村民的交易等级(1-{@link EntityVillager#maxTradeTier})</p>
+     */
+    public void setTradeTier(int tradeTier) {
+        this.tradeTier = --tradeTier;
+        this.namedTag.putInt("tradeTier", this.tradeTier);
     }
-    
+
+    /**
+     * @return 村民所允许的最大交易等级
+     */
     public int getMaxTradeTier() {
-        return this.namedTag.getInt("MaxTradeTier");
-    }
-    
-    public void setExperience(int experience) {
-        this.dataProperties.putInt(DATA_TRADE_EXPERIENCE, experience);
-        this.sendData(this.getViewers().values().toArray(new Player[0]),
-                new EntityMetadata().putInt(DATA_TRADE_EXPERIENCE, experience));
-    }
-    
-    public int getExperience() {
-        return this.dataProperties.getInt(DATA_TRADE_EXPERIENCE);
+        return maxTradeTier;
     }
 
-    public void setWilling(boolean value) {
-        this.namedTag.putBoolean("Willing", value);
+    /**
+     * @param maxTradeTier 设置村民所允许的最大交易等级
+     */
+    public void setMaxTradeTier(int maxTradeTier) {
+        this.maxTradeTier = maxTradeTier;
+        this.setDataProperty(new IntEntityData(DATA_MAX_TRADE_TIER, 5));
+        this.namedTag.putInt("maxTradeTier", this.tradeTier);
     }
 
-    public boolean isWilling() {
-        return this.namedTag.getBoolean("Willing");
+    /**
+     * @return 村民当前的经验值
+     */
+    public int getTradeExp() {
+        return tradeExp;
     }
-    
-    public void cancelTradingWithPlayer() {
-        this.setTradingWith(0L);
+
+    /**
+     * @param tradeExp 设置村民当前的经验值
+     */
+    public void setTradeExp(int tradeExp) {
+        this.tradeExp = tradeExp;
+        this.setDataProperty(new IntEntityData(DATA_TRADE_EXPERIENCE, 10));
+        this.namedTag.putInt("tradeExp", this.tradeTier);
     }
-    
-    public void setTradingWith(long eid) {
-        this.dataProperties.putLong(DATA_TRADING_PLAYER_EID, eid);
-        this.sendData(this.getViewers().values().toArray(new Player[0]),
-                new EntityMetadata().putLong(DATA_TRADING_PLAYER_EID, eid));
-    }
-    
-    public boolean isTrading() {
-        return this.dataProperties.getLong(DATA_TRADING_PLAYER_EID) != 0L;
-    }
-    
-    
+
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (super.onInteract(player, item, clickedPos)) {
+        if (this.getCanTrade()) {
+            var inv = new TradeInventory(this);
+            player.addWindow(inv, Player.TRADE_WINDOW_ID);
             return true;
+        } else {
+            return false;
         }
-        return this.onInteract(player, item);
     }
 
     @Override
-    public boolean onInteract(Player player, Item item) {
-        if (recipes.size() > 0 && !this.isTrading()) {
-            player.addWindow(this.getInventory());
-            return true;
+    public TradeInventory getInventory() {
+        return inventory;
+    }
+
+    public int getTradeSeed() {
+        return tradeSeed;
+    }
+
+    protected void setTradeSeed(int tradeSeed) {
+        this.tradeSeed = tradeSeed;
+        this.namedTag.putInt("tradeSeed", tradeSeed);
+    }
+
+    public void addExperience(int xp) {
+        this.tradeExp += xp;
+        this.setDataProperty(new IntEntityData(DATA_TRADE_EXPERIENCE, this.tradeExp));
+        int next = getTradeTier()+1;
+        if (next < this.tierExpRequirement.length) {
+            if (tradeExp >= this.tierExpRequirement[next]) {
+                setTradeTier(next+1);
+            }
         }
-        return false;
-    }
-
-    public void addTradeRecipe(TradeInventoryRecipe recipe) {
-        this.recipes.add(recipe);
-    }
-
-    public List<TradeInventoryRecipe> getRecipes() {
-        return this.recipes;
-    }
-
-    public CompoundTag getOffers() {
-        CompoundTag nbt = new CompoundTag();
-        nbt.putList(this.recipesToNbt());
-        nbt.putList(this.getDefaultTierExpRequirements());
-        return nbt;
-    }
-
-    private ListTag<CompoundTag> recipesToNbt() {
-        ListTag<CompoundTag> tag = new ListTag<>("Recipes");
-        for (TradeInventoryRecipe recipe : this.recipes) {
-            tag.add(recipe.toNBT());
-        }
-        return tag;
-    }
-
-    private ListTag<CompoundTag> getDefaultTierExpRequirements() {
-        ListTag<CompoundTag> tag = new ListTag<>("TierExpRequirements");
-        tag.add(new CompoundTag().putInt("0", 0));
-        tag.add(new CompoundTag().putInt("1", 10));
-        tag.add(new CompoundTag().putInt("2", 70));
-        tag.add(new CompoundTag().putInt("3", 150));
-        tag.add(new CompoundTag().putInt("4", 250));
-        return tag;
     }
 
     @Override
-    public Inventory getInventory() {
-        return this.inventory;
+    public boolean onUpdate(int tick) {
+        if (tick % 100 == 0) {
+            if (profession != 0) {
+                if (recipes.getAll().size() == 0) {
+                    applyProfession(Profession.getProfession(this.profession));
+                }
+            }
+            if (tradeExp == 0 && !this.namedTag.contains("traded")) {
+                NukkitRandom nukkitRandom = new NukkitRandom();
+                for (int x = -1; x <= 1; x++) {
+                    for (int z = -1; z <= 1; z++) {
+                        Block block = getLocation().add(x, 0, z).getLevelBlock();
+                        int id = block.getId();
+                        for (Profession profession : Profession.getProfessions().values()) {
+                            if (id == profession.getBlockID()) {
+                                if (this.profession != profession.getIndex()) {
+                                    this.setTradeSeed(nukkitRandom.nextBoundedInt(Integer.MAX_VALUE));
+                                    this.setProfession(profession.getIndex());
+                                    this.applyProfession(profession);
+
+                                    this.namedTag.putInt("blockX", block.getFloorX());
+                                    this.namedTag.putInt("blockY", block.getFloorY());
+                                    this.namedTag.putInt("blockZ", block.getFloorZ());
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (this.profession != 0 && !this.namedTag.contains("traded")) {
+                    int x = this.namedTag.getInt("blockX");
+                    int y = this.namedTag.getInt("blockY");
+                    int z = this.namedTag.getInt("blockZ");
+                    if (level.getBlock(x, y, z).getId() != Profession.getProfession(this.profession).getBlockID()) {
+                        setProfession(0);
+                        setCanTrade(false);
+                    }
+                }
+            }
+        }
+        return super.onUpdate(tick);
     }
 
-    @Override
-    public boolean canDespawn() {
-        return false;
+    public void applyProfession(Profession profession) {
+        setDisplayName(profession.getName());
+        recipes = profession.buildTrades(getTradeSeed());
+        this.setCanTrade(true);
     }
 }

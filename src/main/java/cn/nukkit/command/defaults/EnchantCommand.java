@@ -1,7 +1,6 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
@@ -28,7 +27,7 @@ public class EnchantCommand extends VanillaCommand {
         this.commandParameters.put("byName", new CommandParameter[]{
                 CommandParameter.newType("player", CommandParamType.TARGET),
                 CommandParameter.newEnum("enchantmentName", new CommandEnum("Enchant",
-                        "protection", "fire_protection", "feather_falling", "blast_protection", "projectile_projection", "thorns", "respiration",
+                        "protection", "fire_protection", "feather_falling", "blast_protection", "projectile_protection", "thorns", "respiration",
                         "aqua_affinity", "depth_strider", "sharpness", "smite", "bane_of_arthropods", "knockback", "fire_aspect", "looting", "efficiency",
                         "silk_touch", "durability", "fortune", "power", "punch", "flame", "infinity", "luck_of_the_sea", "lure", "frost_walker", "mending",
                         "binding_curse", "vanishing_curse", "impaling", "loyalty", "riptide", "channeling", "multishot", "piercing", "quick_charge",
@@ -73,92 +72,52 @@ public class EnchantCommand extends VanillaCommand {
         }
         item.addEnchantment(enchantment);
         player.getInventory().setItemInHand(item);
-        Command.broadcastCommandMessage(sender, new TranslationContainer("%commands.enchant.success"));
+        broadcastCommandMessage(sender, new TranslationContainer("%commands.enchant.success"));
         return true;
     }
 
     public int getIdByName(String value) throws NumberFormatException {
         value = value.toLowerCase();
-        switch (value) {
-            case "protection":
-                return 0;
-            case "fire_protection":
-                return 1;
-            case "feather_falling":
-                return 2;
-            case "blast_protection":
-                return 3;
-            case "projectile_projection":
-                return 4;
-            case "thorns":
-                return 5;
-            case "respiration":
-                return 6;
-            case "depth_strider":
-                return 7;
-            case "aqua_affinity":
-                return 8;
-            case "sharpness":
-                return 9;
-            case "smite":
-                return 10;
-            case "bane_of_arthropods":
-                return 11;
-            case "knockback":
-                return 12;
-            case "fire_aspect":
-                return 13;
-            case "looting":
-                return 14;
-            case "efficiency":
-                return 15;
-            case "silk_touch":
-                return 16;
-            case "durability":
-            case "unbreaking":
-                return 17;
-            case "fortune":
-                return 18;
-            case "power":
-                return 19;
-            case "punch":
-                return 20;
-            case "flame":
-                return 21;
-            case "infinity":
-                return 22;
-            case "luck_of_the_sea":
-                return 23;
-            case "lure":
-                return 24;
-            case "frost_walker":
-                return 25;
-            case "mending":
-                return 26;
-            case "binding_curse":
-                return 27;
-            case "vanishing_curse":
-                return 28;
-            case "impaling":
-                return 29;
-            case "riptide":
-                return 30;
-            case "loyalty":
-                return 31;
-            case "channeling":
-                return 32;
-            case "multishot":
-                return 33;
-            case "piercing":
-                return 34;
-            case "quick_charge":
-                return 35;
-            case "soul_speed":
-                return 36;
-            case "swift_sneak":
-                return 37;
-            default:
-                return Integer.parseInt(value);
-        }
+        return switch (value) {
+            case "protection" -> 0;
+            case "fire_protection" -> 1;
+            case "feather_falling" -> 2;
+            case "blast_protection" -> 3;
+            case "projectile_protection" -> 4;
+            case "thorns" -> 5;
+            case "respiration" -> 6;
+            case "depth_strider" -> 7;
+            case "aqua_affinity" -> 8;
+            case "sharpness" -> 9;
+            case "smite" -> 10;
+            case "bane_of_arthropods" -> 11;
+            case "knockback" -> 12;
+            case "fire_aspect" -> 13;
+            case "looting" -> 14;
+            case "efficiency" -> 15;
+            case "silk_touch" -> 16;
+            case "durability", "unbreaking" -> 17;
+            case "fortune" -> 18;
+            case "power" -> 19;
+            case "punch" -> 20;
+            case "flame" -> 21;
+            case "infinity" -> 22;
+            case "luck_of_the_sea" -> 23;
+            case "lure" -> 24;
+            case "frost_walker" -> 25;
+            case "mending" -> 26;
+            case "binding_curse" -> 27;
+            case "vanishing_curse" -> 28;
+            case "impaling" -> 29;
+            case "riptide" -> 30;
+            case "loyalty" -> 31;
+            case "channeling" -> 32;
+            case "multishot" -> 33;
+            case "piercing" -> 34;
+            case "quick_charge" -> 35;
+            case "soul_speed" -> 36;
+            case "swift_sneak" -> 37;
+            default -> Integer.parseInt(value);
+        };
     }
 }

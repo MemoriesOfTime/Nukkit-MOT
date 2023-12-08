@@ -72,7 +72,7 @@ public class ItemArmorStand extends Item {
                 player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             }
             entity.spawnToAll();
-            player.getLevel().addLevelSoundEvent(entity, LevelEventPacket.EVENT_SOUND_ARMOR_STAND_PLACE);
+            player.getLevel().addLevelEvent(entity, LevelEventPacket.EVENT_SOUND_ARMOR_STAND_PLACE);
             return true;
         }
         return false;

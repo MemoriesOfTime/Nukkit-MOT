@@ -12,11 +12,8 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.NumberTag;
 import cn.nukkit.network.protocol.BatchPacket;
-import co.aikar.timings.Timing;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -30,11 +27,11 @@ import java.util.Map;
  */
 public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
-    protected Long2ObjectMap<Entity> entities;
+    protected Long2ObjectNonBlockingMap<Entity> entities;
 
-    protected Long2ObjectMap<BlockEntity> tiles;
+    protected Long2ObjectNonBlockingMap<BlockEntity> tiles;
 
-    protected Int2ObjectMap<BlockEntity> tileList;
+    protected Long2ObjectNonBlockingMap<BlockEntity> tileList;
 
     /**
      * encoded as:
@@ -126,11 +123,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         }
 
         if (this.entities != null) {
-            chunk.entities = new Long2ObjectOpenHashMap<>(this.entities);
+            chunk.entities = new Long2ObjectNonBlockingMap<>();
+            chunk.entities.putAll(this.entities);
         }
 
         if (this.tiles != null) {
-            chunk.tiles = new Long2ObjectOpenHashMap<>(this.tiles);
+            chunk.tiles = new Long2ObjectNonBlockingMap<>();
+            chunk.tiles.putAll(this.tiles);
         }
 
         chunk.tileList = null;
@@ -168,8 +167,6 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (this.getProvider() != null && !this.isInit) {
             boolean changed = false;
             if (this.NBTentities != null) {
-                Timing timing = this.getProvider().getLevel().timings.syncChunkLoadEntitiesTimer;
-                if (timing != null) timing.startTiming();
                 for (CompoundTag nbt : NBTentities) {
                     if (!nbt.contains("id")) {
                         this.setChanged();
@@ -185,13 +182,10 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                         changed = true;
                     }
                 }
-                if (timing != null) timing.stopTiming();
                 this.NBTentities = null;
             }
 
             if (this.NBTtiles != null) {
-                Timing timing = this.getProvider().getLevel().timings.syncChunkLoadBlockEntitiesTimer;
-                if (timing != null) timing.startTiming();
                 for (CompoundTag nbt : NBTtiles) {
                     if (nbt != null) {
                         if (!nbt.contains("id")) {
@@ -208,7 +202,6 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                         }
                     }
                 }
-                if (timing != null) timing.stopTiming();
                 this.NBTtiles = null;
             }
 
@@ -431,7 +424,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void addEntity(Entity entity) {
         if (this.entities == null) {
-            this.entities = new Long2ObjectOpenHashMap<>();
+            this.entities = new Long2ObjectNonBlockingMap<>();
         }
         this.entities.put(entity.getId(), entity);
         if (!(entity instanceof Player) && this.isInit) {
@@ -452,8 +445,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void addBlockEntity(BlockEntity blockEntity) {
         if (this.tiles == null) {
-            this.tiles = new Long2ObjectOpenHashMap<>();
-            this.tileList = new Int2ObjectOpenHashMap<>();
+            this.tiles = new Long2ObjectNonBlockingMap<>();
+            this.tileList = new Long2ObjectNonBlockingMap<>();
         }
         this.tiles.put(blockEntity.getId(), blockEntity);
         int index = ((blockEntity.getFloorZ() & 0x0f) << 12) | ((blockEntity.getFloorX() & 0x0f) << 8) | (blockEntity.getFloorY() & 0xff);

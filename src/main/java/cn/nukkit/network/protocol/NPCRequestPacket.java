@@ -19,7 +19,8 @@ public class NPCRequestPacket extends DataPacket {
         EXECUTE_CLOSING_COMMANDS,
         SET_NAME,
         SET_SKIN,
-        SET_INTERACTION_TEXT
+        SET_INTERACTION_TEXT,
+        EXECUTE_OPENING_COMMANDS
     }
 
     @Override

@@ -14,7 +14,7 @@ public class AsyncPool extends ThreadPoolExecutor {
     private final Server server;
 
     public AsyncPool(Server server, int size) {
-        super(size, Integer.MAX_VALUE, 60, TimeUnit.MILLISECONDS, new SynchronousQueue<>());
+        super(size, Integer.MAX_VALUE, 60, TimeUnit.SECONDS, new SynchronousQueue<>());
         this.setThreadFactory(runnable -> new Thread(runnable) {{
             setDaemon(true);
             setName(String.format("Nukkit Asynchronous Task Handler #%s", getPoolSize()));

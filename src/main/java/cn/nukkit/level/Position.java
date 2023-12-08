@@ -88,6 +88,13 @@ public class Position extends Vector3 {
         return this;
     }
 
+    @NotNull
+    @Override
+    public Position setComponents(@NotNull Vector3 pos) {
+        super.setComponents(pos);
+        return this;
+    }
+
     public Block getLevelBlock() {
         return this.getValidLevel().getBlock(this);
     }

@@ -101,8 +101,7 @@ public class BugReportGenerator extends Thread {
         double maxMB = NukkitMath.round(((double) runtime.maxMemory()) / 1024 / 1024, 2);
         double usage = usedMB / maxMB * 100;
 
-        ScopeCallback scopeCallback = scope -> {
-            scope.setContexts("Nukkit Version", Nukkit.getBranch() + '/' + Nukkit.VERSION.substring(4));
+        Sentry.configureScope(scope -> {
             scope.setContexts("Java Version", System.getProperty("java.vm.name") + " (" + System.getProperty("java.runtime.version") + ')');
             scope.setContexts("Host OS", osMXBean.getName() + '-' + osMXBean.getArch() + " [" + osMXBean.getVersion() + ']');
             scope.setContexts("Memory", usedMB + " MB (" + NukkitMath.round(usage, 2) + "%) of " + maxMB + " MB");
@@ -112,13 +111,12 @@ public class BugReportGenerator extends Thread {
             scope.setContexts("Players", Server.getInstance().getOnlinePlayersCount() + "/" + Server.getInstance().getMaxPlayers());
             scope.setContexts("plugin_error", pluginError);
             scope.setContexts("Plugins", plugins.toString());
-        };
+        });
 
         if (throwable != null) {
-            Sentry.captureException(throwable, scopeCallback);
+            Sentry.captureException(throwable);
         } else if (message != null) {
-            Sentry.captureMessage(message, scopeCallback);
-
+            Sentry.captureMessage(message);
         } else {
             Server.getInstance().getLogger().error("[BugReport] Failed to send a bug report: content cannot be null");
         }

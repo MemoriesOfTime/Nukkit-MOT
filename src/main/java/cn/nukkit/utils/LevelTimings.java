@@ -10,6 +10,7 @@ import co.aikar.timings.TimingsManager;
  * @author Pub4Game
  * @author Tee7even
  */
+@Deprecated
 public class LevelTimings {
 
     public final Timing doChunkUnload;

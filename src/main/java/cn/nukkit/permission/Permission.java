@@ -18,29 +18,12 @@ public class Permission {
     public static final String DEFAULT_PERMISSION = DEFAULT_OP;
 
     public static String getByName(String value) {
-        switch (value.toLowerCase()) {
-            case "op":
-            case "isop":
-            case "operator":
-            case "isoperator":
-            case "admin":
-            case "isadmin":
-                return DEFAULT_OP;
-
-            case "!op":
-            case "notop":
-            case "!operator":
-            case "notoperator":
-            case "!admin":
-            case "notadmin":
-                return DEFAULT_NOT_OP;
-
-            case "true":
-                return DEFAULT_TRUE;
-
-            default:
-                return DEFAULT_FALSE;
-        }
+        return switch (value.toLowerCase()) {
+            case "op", "isop", "operator", "isoperator", "admin", "isadmin" -> DEFAULT_OP;
+            case "!op", "notop", "!operator", "notoperator", "!admin", "notadmin" -> DEFAULT_NOT_OP;
+            case "true" -> DEFAULT_TRUE;
+            default -> DEFAULT_FALSE;
+        };
     }
 
     private final String name;

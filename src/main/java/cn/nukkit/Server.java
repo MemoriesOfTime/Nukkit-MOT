@@ -9,6 +9,8 @@ import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityHuman;
 import cn.nukkit.entity.data.Skin;
+import cn.nukkit.entity.data.profession.Profession;
+import cn.nukkit.entity.data.property.EntityProperty;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.entity.passive.*;
@@ -70,11 +72,15 @@ import cn.nukkit.plugin.service.ServiceManager;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
 import cn.nukkit.resourcepacks.ResourcePackManager;
+import cn.nukkit.resourcepacks.loader.JarPluginResourcePackLoader;
+import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
 import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.scheduler.Task;
+import cn.nukkit.scoreboard.manager.IScoreboardManager;
+import cn.nukkit.scoreboard.manager.ScoreboardManager;
+import cn.nukkit.scoreboard.storage.JSONScoreboardStorage;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.bugreport.ExceptionHandler;
-import co.aikar.timings.Timings;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import io.netty.buffer.ByteBuf;
@@ -88,6 +94,7 @@ import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.impl.Iq80DBFactory;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -99,8 +106,14 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.security.*;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 /**
@@ -142,6 +155,7 @@ public class Server {
     private final CraftingManager craftingManager;
     private final ResourcePackManager resourcePackManager;
     private final ConsoleCommandSender consoleSender;
+    private IScoreboardManager scoreboardManager;
 
     private int maxPlayers;
     private boolean autoSave = true;
@@ -199,18 +213,23 @@ public class Server {
 
     private static final Pattern uuidPattern = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}.dat$");
 
-    private final Map<Integer, Level> levels = new HashMap<Integer, Level>() {
-        public Level put(Integer key, Level value) {
+    private final Map<Integer, Level> levels = new ConcurrentHashMap<>() {
+        @Override
+        public Level put(@NotNull Integer key, @NotNull Level value) {
             Level result = super.put(key, value);
             levelArray = levels.values().toArray(new Level[0]);
             return result;
         }
+
+        @Override
         public boolean remove(Object key, Object value) {
             boolean result = super.remove(key, value);
             levelArray = levels.values().toArray(new Level[0]);
             return result;
         }
-        public Level remove(Object key) {
+
+        @Override
+        public Level remove(@NotNull Object key) {
             Level result = super.remove(key);
             levelArray = levels.values().toArray(new Level[0]);
             return result;
@@ -235,10 +254,6 @@ public class Server {
      * Disconnection message shown to players who are not allowed to join due to whitelist.
      */
     public String whitelistReason;
-    /**
-     * optimizations server enabled.
-     */
-    public boolean lowProfileServer;
     /**
      * Mob AI enabled.
      */
@@ -295,10 +310,6 @@ public class Server {
      * XP bottles can be used on creative.
      */
     public boolean xpBottlesOnCreative;
-    /**
-     * Dimension changes enabled.
-     */
-    public boolean dimensionsEnabled;
     /**
      * Call DataPacketSendEvent on data packet sending.
      */
@@ -375,6 +386,10 @@ public class Server {
      * Minimum allowed protocol version.
      */
     public int minimumProtocol;
+    /**
+     * Maximum allowed protocol version.
+     */
+    public int maximumProtocol;
     /**
      * Do not limit the maximum size of player skins.
      */
@@ -501,6 +516,14 @@ public class Server {
      * Network Compression Threshold
      */
     public int networkCompressionThreshold;
+    /**
+     * Enable Spark Plugin
+     */
+    public boolean enableSpark;
+    /**
+     * This is needed for structure generation
+     */
+    public final ForkJoinPool computeThreadPool;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -546,7 +569,7 @@ public class Server {
             ExceptionHandler.registerExceptionHandler();
             Sentry.init(options -> {
                 options.setDsn("https://b61b4bfc0057480e9644111aa4e78844@o4504694990700544.ingest.sentry.io/4504694992535552");
-                options.setTracesSampleRate(0.5); //错误报告率 0.0-1.0
+                options.setTracesSampleRate(0.8); //错误报告率 0.0-1.0
                 options.setDebug(false);
                 options.setTag("nukkit_version", Nukkit.VERSION);
                 options.setTag("branch", Nukkit.getBranch());
@@ -558,6 +581,7 @@ public class Server {
         }
 
         this.baseLang = new BaseLang(this.getPropertyString("language", BaseLang.FALLBACK_LANGUAGE));
+        computeThreadPool = new ForkJoinPool(Math.min(0x7fff, Runtime.getRuntime().availableProcessors()), new ComputeThreadPoolThreadFactory(), null, false);
 
         Object poolSize = this.getProperty("async-workers", "auto");
         if (!(poolSize instanceof Integer)) {
@@ -587,6 +611,7 @@ public class Server {
         this.entityMetadata = new EntityMetadataStore();
         this.playerMetadata = new PlayerMetadataStore();
         this.levelMetadata = new LevelMetadataStore();
+        this.scoreboardManager = new ScoreboardManager(new JSONScoreboardStorage(this.dataPath + "scoreboard.json"));
 
         this.operators = new Config(this.dataPath + "ops.txt", Config.ENUM);
         this.whitelist = new Config(this.dataPath + "white-list.txt", Config.ENUM);
@@ -618,6 +643,7 @@ public class Server {
         this.commandMap = new SimpleCommandMap(this);
 
         registerEntities();
+        registerProfessions();
         registerBlockEntities();
 
         Block.init();
@@ -648,7 +674,10 @@ public class Server {
         this.serverID = UUID.randomUUID();
 
         this.craftingManager = new CraftingManager();
-        this.resourcePackManager = new ResourcePackManager(new File(Nukkit.DATA_PATH, "resource_packs"));
+        this.resourcePackManager = new ResourcePackManager(
+                new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")),
+                new JarPluginResourcePackLoader(new File(this.pluginPath))
+        );
 
         this.pluginManager = new PluginManager(this, this.commandMap);
         this.pluginManager.subscribeToPermission(Server.BROADCAST_CHANNEL_ADMINISTRATIVE, this.consoleSender);
@@ -663,7 +692,11 @@ public class Server {
         this.network.setSubName(this.getSubMotd());
         this.network.registerInterface(new RakNetInterface(this));
 
+        this.pluginManager.loadInternalPlugin();
         if (loadPlugins) {
+            if (this.enableSpark) {
+                SparkInstaller.initSpark(this);
+            }
             this.pluginManager.loadPlugins(this.pluginPath);
             this.enablePlugins(PluginLoadOrder.STARTUP);
         }
@@ -731,6 +764,9 @@ public class Server {
         if (loadPlugins) {
             this.enablePlugins(PluginLoadOrder.POSTWORLD);
         }
+
+        EntityProperty.buildPacket();
+        EntityProperty.buildPlayerProperty();
 
         if (this.getPropertyBoolean("thread-watchdog", true)) {
             this.watchdog = new Watchdog(this, this.getPropertyInt("thread-watchdog-tick", 60000));
@@ -923,6 +959,10 @@ public class Server {
         return consoleSender;
     }
 
+    public IScoreboardManager getScoreboardManager() {
+        return scoreboardManager;
+    }
+
     public void reload() {
         log.info("Reloading...");
 
@@ -957,10 +997,12 @@ public class Server {
         }
 
         this.pluginManager.registerInterface(JavaPluginLoader.class);
+        if (this.enableSpark) {
+            SparkInstaller.initSpark(this);
+        }
         this.pluginManager.loadPlugins(this.pluginPath);
         this.enablePlugins(PluginLoadOrder.STARTUP);
         this.enablePlugins(PluginLoadOrder.POSTWORLD);
-        Timings.reset();
     }
 
     public void shutdown() {
@@ -1028,9 +1070,6 @@ public class Server {
                 this.getLogger().debug("Closing name lookup DB...");
                 nameLookup.close();
             }
-
-            this.getLogger().debug("Disabling timings...");
-            Timings.stopServer();
         } catch (Exception e) {
             log.fatal("Exception happened while shutting down, exiting the process", e);
             System.exit(1);
@@ -1105,6 +1144,7 @@ public class Server {
 
                         if (allocated > 0 || !doLevelGC) {
                             try {
+                                //noinspection BusyWait
                                 Thread.sleep(allocated, 900000);
                             } catch (Exception e) {
                                 this.getLogger().logException(e);
@@ -1112,12 +1152,11 @@ public class Server {
                         }
                     }
                 } catch (RuntimeException e) {
-                    this.getLogger().logException(e);
+                    log.error("A RuntimeException happened while ticking the server", e);
                 }
             }
         } catch (Throwable e) {
-            log.fatal("Exception happened while ticking server", e);
-            log.fatal(Utils.getAllThreadDumps());
+            log.fatal("Exception happened while ticking server\n{}", Utils.getAllThreadDumps(), e);
         }
     }
 
@@ -1209,7 +1248,15 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_20_0_23) {
+        if (player.protocol >= ProtocolInfo.v1_20_50) {
+            player.dataPacket(CraftingManager.packet630);
+        } else if (player.protocol >= ProtocolInfo.v1_20_40) {
+            player.dataPacket(CraftingManager.packet622);
+        } else if (player.protocol >= ProtocolInfo.v1_20_30_24) {
+            player.dataPacket(CraftingManager.packet618);
+        } else if (player.protocol >= ProtocolInfo.v1_20_10_21) {
+            player.dataPacket(CraftingManager.packet594);
+        } else if (player.protocol >= ProtocolInfo.v1_20_0_23) {
             player.dataPacket(CraftingManager.packet589);
         } else if (player.protocol >= ProtocolInfo.v1_19_80) {
             player.dataPacket(CraftingManager.packet582);
@@ -1217,7 +1264,7 @@ public class Server {
             player.dataPacket(CraftingManager.packet575);
         } else if (player.protocol >= ProtocolInfo.v1_19_60) {
             player.dataPacket(CraftingManager.packet567);
-        } else if (player.protocol >= ProtocolInfo.v1_19_50) {
+        } else if (player.protocol >= ProtocolInfo.v1_19_50_20) {
             player.dataPacket(CraftingManager.packet560);
         } else if (player.protocol >= ProtocolInfo.v1_19_30_23) {
             player.dataPacket(CraftingManager.packet554);
@@ -1272,6 +1319,10 @@ public class Server {
 
             try {
                 long levelTime = System.currentTimeMillis();
+                level.providerLock.readLock().lock();
+                if (level.getProvider() == null) {//世界在其他线程上卸载
+                    continue;
+                }
                 level.doTick(currentTick);
                 int tickMs = (int) (System.currentTimeMillis() - levelTime);
                 level.tickRateTime = tickMs;
@@ -1297,13 +1348,14 @@ public class Server {
                 }
             } catch (Exception e) {
                 log.error(this.baseLang.translateString("nukkit.level.tickError", new String[]{level.getFolderName(), Utils.getExceptionMessage(e)}));
+            } finally {
+                level.providerLock.readLock().unlock();
             }
         }
     }
 
     public void doAutoSave() {
         if (this.autoSave) {
-            if (Timings.levelSaveTimer != null) Timings.levelSaveTimer.startTiming();
             for (Player player : new ArrayList<>(this.players.values())) {
                 if (player.isOnline()) {
                     player.save(true);
@@ -1317,7 +1369,6 @@ public class Server {
                     level.save();
                 }
             }
-            if (Timings.levelSaveTimer != null) Timings.levelSaveTimer.stopTiming();
         }
     }
 
@@ -1338,23 +1389,15 @@ public class Server {
             return;
         }
 
-        if (Timings.isTimingsEnabled()) {
-            Timings.fullServerTickTimer.startTiming();
-        }
-
         ++this.tickCounter;
 
-        if (Timings.connectionTimer != null) Timings.connectionTimer.startTiming();
         this.network.processInterfaces();
 
         if (this.rcon != null) {
             this.rcon.check();
         }
-        if (Timings.connectionTimer != null) Timings.connectionTimer.stopTiming();
 
-        if (Timings.schedulerTimer != null) Timings.schedulerTimer.startTiming();
         this.scheduler.mainThreadHeartbeat(this.tickCounter);
-        if (Timings.schedulerTimer != null) Timings.schedulerTimer.stopTiming();
 
         this.checkTickUpdates(this.tickCounter);
 
@@ -1392,10 +1435,6 @@ public class Server {
             for (Level level : this.levelArray) {
                 level.doChunkGarbageCollection();
             }
-        }
-
-        if (Timings.isTimingsEnabled()) {
-            Timings.fullServerTickTimer.stopTiming();
         }
 
         long nowNano = System.nanoTime();
@@ -1783,7 +1822,7 @@ public class Server {
             return result;
         }
 
-        return lookupName(name).map(uuid -> new OfflinePlayer(this, uuid))
+        return lookupName(name).map(uuid -> new OfflinePlayer(this, uuid, name))
                 .orElse(new OfflinePlayer(this, name));
     }
 
@@ -2607,6 +2646,10 @@ public class Server {
         return !this.hasWhitelist() || this.operators.exists(name, true) || this.whitelist.exists(name, true);
     }
 
+    public void setWhitelisted(boolean value) {
+        whitelistEnabled = value;
+    }
+
     /**
      * Check whether a player is an operator
      *
@@ -2727,6 +2770,10 @@ public class Server {
         return currentThread;
     }
 
+    private void registerProfessions() {
+        Profession.init();
+    }
+
     /**
      * Internal method to register all default entities
      */
@@ -2744,6 +2791,7 @@ public class Server {
         Entity.registerEntity("Arrow", EntityArrow.class);
         Entity.registerEntity("Snowball", EntitySnowball.class);
         Entity.registerEntity("EnderPearl", EntityEnderPearl.class);
+        Entity.registerEntity("EnderEye", EntityEnderEye.class);
         Entity.registerEntity("ThrownExpBottle", EntityExpBottle.class);
         Entity.registerEntity("ThrownPotion", EntityPotion.class);
         Entity.registerEntity("Egg", EntityEgg.class);
@@ -2836,8 +2884,8 @@ public class Server {
         Entity.registerEntity("Axolotl", EntityAxolotl.class);
         Entity.registerEntity("GlowSquid", EntityGlowSquid.class);
         Entity.registerEntity("Allay", EntityAllay.class);
-        //TODO 骆驼正式加入时取消注释
-        //Entity.registerEntity("Camel", EntityCamel.class);
+        Entity.registerEntity("Npc", EntityNPCEntity.class);
+        Entity.registerEntity("Camel", EntityCamel.class);
         //Vehicles
         Entity.registerEntity("MinecartRideable", EntityMinecartEmpty.class);
         Entity.registerEntity("MinecartChest", EntityMinecartChest.class);
@@ -2876,10 +2924,12 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.DISPENSER, BlockEntityDispenser.class);
         BlockEntity.registerBlockEntity(BlockEntity.MOB_SPAWNER, BlockEntitySpawner.class);
         BlockEntity.registerBlockEntity(BlockEntity.MUSIC, BlockEntityMusic.class);
+        BlockEntity.registerBlockEntity(BlockEntity.LECTERN, BlockEntityLectern.class);
         BlockEntity.registerBlockEntity(BlockEntity.CAMPFIRE, BlockEntityCampfire.class);
         BlockEntity.registerBlockEntity(BlockEntity.BELL, BlockEntityBell.class);
         BlockEntity.registerBlockEntity(BlockEntity.BARREL, BlockEntityBarrel.class);
         BlockEntity.registerBlockEntity(BlockEntity.MOVING_BLOCK, BlockEntityMovingBlock.class);
+        BlockEntity.registerBlockEntity(BlockEntity.END_GATEWAY, BlockEntityEndGateway.class);
     }
 
     /**
@@ -2923,15 +2973,6 @@ public class Server {
     }
 
     /**
-     * 低配服务器模式
-     *
-     * @return 是否开启低配服务器模式
-     */
-    public boolean isLowProfileServer() {
-        return lowProfileServer;
-    }
-
-    /**
      * Get the mob spawner task
      *
      * @return spawner task
@@ -2951,8 +2992,6 @@ public class Server {
         this.autoTickRateLimit = this.getPropertyInt("auto-tick-rate-limit", 20);
         this.alwaysTickPlayers = this.getPropertyBoolean("always-tick-players", false);
         this.baseTickRate = this.getPropertyInt("base-tick-rate", 1);
-        // 低配服务器模式（会减少多场景下如：下雪，火焰等等...）
-        this.lowProfileServer = this.getPropertyBoolean("low-profile-server-mode", false);
         this.callDataPkSendEv = this.getPropertyBoolean("call-data-pk-send-event", true);
         this.callBatchPkEv = this.getPropertyBoolean("call-batch-pk-send-event", true);
         this.doLevelGC = this.getPropertyBoolean("do-level-gc", true);
@@ -2962,7 +3001,6 @@ public class Server {
         this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
         this.bedSpawnpoints = this.getPropertyBoolean("bed-spawnpoints", true);
         this.achievementsEnabled = this.getPropertyBoolean("achievements", true);
-        this.dimensionsEnabled = this.getPropertyBoolean("dimensions", true);
         this.banXBAuthFailed = this.getPropertyBoolean("temp-ip-ban-failed-xbox-auth", false);
         this.pvpEnabled = this.getPropertyBoolean("pvp", true);
         this.announceAchievements = this.getPropertyBoolean("announce-player-achievements", false);
@@ -3008,9 +3046,10 @@ public class Server {
         this.callEntityMotionEv = this.getPropertyBoolean("call-entity-motion-event", true);
         this.updateChecks = this.getPropertyBoolean("update-notifications", false);
         this.minimumProtocol = this.getPropertyInt("multiversion-min-protocol", 0);
+        this.maximumProtocol = this.getPropertyInt("multiversion-max-protocol", ProtocolInfo.CURRENT_PROTOCOL);
         this.whitelistReason = this.getPropertyString("whitelist-reason", "§cServer is white-listed").replace("§n", "\n");
         this.enableExperimentMode = this.getPropertyBoolean("enable-experiment-mode", true);
-        this.asyncChunkSending = this.getPropertyBoolean("async-chunks", false);
+        this.asyncChunkSending = this.getPropertyBoolean("async-chunks", true);
         this.deprecatedVerbose = this.getPropertyBoolean("deprecated-verbose", true);
         switch (this.getPropertyString("server-authoritative-movement")) {
             case "client-auth":
@@ -3026,10 +3065,14 @@ public class Server {
         }
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
         this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
+        if (!this.encryptionEnabled) {
+            log.warn("Encryption is not enabled. For better security, it's recommended to enable it if you don't use a proxy software.");
+        }
         this.useWaterdog = this.getPropertyBoolean("use-waterdog", false);
         this.useSnappy = this.getPropertyBoolean("use-snappy-compression", false);
         this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);
         this.networkCompressionThreshold = this.getPropertyInt("compression-threshold", 256);
+        this.enableSpark = this.getPropertyBoolean("enable-spark", false);
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
         try {
             this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
@@ -3064,34 +3107,40 @@ public class Server {
     private static class ServerProperties extends ConfigSection {
         {
             put("motd", "Minecraft Server");
-            put("sub-motd", "Powered by Nukkit");
+            put("sub-motd", "Powered by Nukkit-MOT");
             put("server-port", 19132);
             put("server-ip", "0.0.0.0");
             put("view-distance", 8);
-            put("white-list", false);
             put("achievements", true);
-            put("announce-player-achievements", false);
+            put("announce-player-achievements", true);
             put("spawn-protection", 10);
             put("max-players", 50);
-            put("drop-spawners", true);
+            put("drop-spawners", true); //TODO 考虑弃用
             put("spawn-animals", true);
             put("spawn-mobs", true);
             put("gamemode", 0);
             put("force-gamemode", true);
+            put("difficulty", 2);
             put("hardcore", false);
             put("pvp", true);
-            put("difficulty", 2);
+
+            put("white-list", false);
+            put("whitelist-reason", "§cServer is white-listed");
+
             put("generator-settings", "");
             put("level-name", "world");
             put("level-seed", "");
             put("level-type", "default");
-            put("enable-query", true);
+
             put("enable-rcon", false);
             put("rcon.password", Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13));
+            put("rcon.port", 25575);
+
             put("auto-save", true);
             put("force-resources", false);
             put("force-resources-allow-client-packs", false);
             put("xbox-auth", true);
+            put("encryption", true);
             put("bed-spawnpoints", true);
             put("explosion-break-blocks", true);
             put("stop-in-game", false);
@@ -3105,24 +3154,25 @@ public class Server {
             put("force-language", false);
             put("shutdown-message", "§cServer closed");
             put("save-player-data", true);
+            put("enable-query", true);
             put("query-plugins", false);
             put("debug-level", 1);
             put("async-workers", "auto");
+
             put("zlib-provider", 2);
             put("compression-level", 4);
+            put("compression-threshold", "256");
+            put("use-snappy-compression", true);
+            put("min-mtu", 576);
+            put("max-mtu", 1492);
+            put("timeout-milliseconds", 25000);
+
             put("auto-tick-rate", true);
             put("auto-tick-rate-limit", 20);
             put("base-tick-rate", 1);
             put("always-tick-players", false);
-            put("enable-timings", false);
-            put("timings-verbose", false);
-            put("timings-privacy", false);
-            put("timings-history-interval", 6000);
-            put("timings-history-length", 72000);
-            put("timings-bypass-max", false);
             put("light-updates", false);
             put("clear-chunk-tick-list", true);
-            put("cache-chunks", false);
             put("spawn-threshold", 56);
             put("chunk-sending-per-tick", 4);
             put("chunk-ticking-per-tick", 40);
@@ -3134,60 +3184,86 @@ public class Server {
             put("ticks-per-entity-despawns", 12000);
             put("thread-watchdog", true);
             put("thread-watchdog-tick", 60000);
+
             put("nether", true);
             put("end", false);
-            put("low-profile-server-mode", false);
+            put("vanilla-portals", true);
+            put("multi-nether-worlds", "");
+
             put("do-not-tick-worlds", "");
+            put("worlds-entity-spawning-disabled", "");
             put("load-all-worlds", true);
             put("ansi-title", false);
-            put("worlds-entity-spawning-disabled", "");
             put("block-listener", true);
             put("allow-flight", false);
-            put("timeout-milliseconds", 25000);
             put("multiversion-min-protocol", 0);
+            put("multiversion-max-protocol", -1);
             put("vanilla-bossbars", false);
-            put("dimensions", true);
-            put("whitelist-reason", "§cServer is white-listed");
-            put("chemistry-resources-enabled", false);
             put("strong-ip-bans", false);
             put("worlds-level-auto-save-disabled", "");
             put("temp-ip-ban-failed-xbox-auth", false);
             put("call-data-pk-send-event", true);
             put("call-batch-pk-send-event", true);
             put("do-level-gc", true);
-            put("skin-change-cooldown", 30);
+            put("skin-change-cooldown", 15);
             put("check-op-movement", false);
             put("do-not-limit-interactions", false);
             put("do-not-limit-skin-geometry", true);
             put("automatic-bug-report", true);
             put("anvils-enabled", true);
             put("save-player-data-by-uuid", true);
-            put("vanilla-portals", true);
             put("persona-skins", true);
-            put("multi-nether-worlds", "");
             put("call-entity-motion-event", true);
             put("update-notifications", true);
             put("bstats-metrics", true);
-            put("min-mtu", 576);
-            put("max-mtu", 1492);
-            put("enable-experiment-mode", false);
-            put("async-chunks", false);
+            put("cache-chunks", false);
+            put("async-chunks", true);
             put("deprecated-verbose", true);
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
-            put("encryption", true);
-            put("use-waterdog", false);
-            put("use-snappy-compression", false);
             put("use-client-spectator", true);
-            put("compression-threshold", "256");
+            put("enable-experiment-mode", true);
+            put("use-waterdog", false);
+            put("enable-spark", false);
+            put("hastebin-token", "");
         }
     }
 
     private class ConsoleThread extends Thread implements InterruptibleThread {
-
         @Override
         public void run() {
             console.start();
+        }
+    }
+
+    private static class ComputeThread extends ForkJoinWorkerThread {
+        ComputeThread(final ForkJoinPool pool, final AtomicInteger threadCount) {
+            super(pool);
+            setName("ComputeThreadPool-thread-" + threadCount.getAndIncrement());
+        }
+    }
+
+    private static class ComputeThreadPoolThreadFactory implements ForkJoinPool.ForkJoinWorkerThreadFactory {
+        private static final AtomicInteger threadCount = new AtomicInteger(0);
+
+        @SuppressWarnings("removal")
+        private static final AccessControlContext ACC = contextWithPermissions(
+            new RuntimePermission("getClassLoader"),
+            new RuntimePermission("setContextClassLoader")
+        );
+
+        @SuppressWarnings("removal")
+        static AccessControlContext contextWithPermissions(final Permission... perms) {
+            final Permissions permissions = new Permissions();
+            for (final Permission perm : perms) {
+                permissions.add(perm);
+            }
+            return new AccessControlContext(new ProtectionDomain[]{new ProtectionDomain(null, permissions)});
+        }
+
+        @SuppressWarnings("removal")
+        public ForkJoinWorkerThread newThread(final ForkJoinPool pool) {
+            return AccessController.doPrivileged((PrivilegedAction<ForkJoinWorkerThread>) () -> new ComputeThread(pool, threadCount), ACC);
         }
     }
 }

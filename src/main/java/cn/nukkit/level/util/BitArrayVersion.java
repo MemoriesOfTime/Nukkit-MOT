@@ -9,7 +9,17 @@ public enum BitArrayVersion {
     V4(4, 8, V5),
     V3(3, 10, V4), // 2 bit padding
     V2(2, 16, V3),
-    V1(1, 32, V2);
+    V1(1, 32, V2),
+    /**
+     * 1 element.
+     * @since 1.18.0
+     */
+    V0(0, 1, V2),
+    /**
+     * No element. mainly used for 3D biomes.
+     * @since 1.18.0
+     */
+    EMPTY(-1, -1, V0);
 
     final byte bits;
     final byte entriesPerWord;
@@ -39,6 +49,9 @@ public enum BitArrayVersion {
     }
 
     public BitArray createPalette(int size) {
+        if (this == V0) {
+            return new SingletonBitArray(size);
+        }
         return this.createPalette(size, new int[this.getWordsForSize(size)]);
     }
 
@@ -47,7 +60,7 @@ public enum BitArrayVersion {
     }
 
     public int getWordsForSize(int size) {
-        return (size / entriesPerWord) + (size % entriesPerWord == 0 ? 0 : 1);
+        return this == V0 ? 0 : (size / entriesPerWord) + (size % entriesPerWord == 0 ? 0 : 1);
     }
 
     public int getMaxEntryValue() {
@@ -59,6 +72,9 @@ public enum BitArrayVersion {
     }
 
     public BitArray createPalette(int size, int[] words) {
+        if (this == V0) {
+            return new SingletonBitArray(size);
+        }
         if (this == V3 || this == V5 || this == V6) {
             // Padded palettes aren't able to use bitwise operations due to their padding.
             return new PaddedBitArray(this, size, words);

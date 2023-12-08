@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
@@ -18,25 +19,29 @@ import cn.nukkit.metadata.Metadatable;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 
+import static cn.nukkit.utils.Utils.dynamic;
+
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
+@Log4j2
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
-
-    public static final int MAX_BLOCK_ID = 600;
-    public static final int DATA_BITS = 6;
-    public static final int DATA_SIZE = 1 << DATA_BITS;
-    public static final int DATA_MASK = DATA_SIZE - 1;
+    public static final int MAX_BLOCK_ID = dynamic(800);
+    public static final int DATA_BITS = dynamic(6);
+    public static final int DATA_SIZE = dynamic(1 << DATA_BITS);
+    public static final int DATA_MASK = dynamic(DATA_SIZE - 1);
 
     @SuppressWarnings("rawtypes")
     public static Class[] list = null;
@@ -47,14 +52,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static double[] hardness = null;
     public static boolean[] transparent = null;
     public static boolean[] diffusesSkyLight = null;
-
-    public AxisAlignedBB boundingBox = null;
-    public AxisAlignedBB collisionBoundingBox = null;
     public static boolean[] hasMeta = null;
 
-    public int layer = 0;
+    private static final boolean[] usesFakeWater = new boolean[MAX_BLOCK_ID];
 
-    private static final boolean[] usesFakeWater = new boolean[512];
+    public AxisAlignedBB boundingBox = null;
+    public int layer = 0;
 
     protected Block() {}
 
@@ -352,15 +355,22 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[BLOCK_KELP] = BlockKelp.class; //393
             list[DRIED_KELP_BLOCK] = BlockDriedKelpBlock.class; //394
 
+            list[ACACIA_TRAPDOOR] = BlockTrapdoorAcacia.class; //400
+            list[BIRCH_TRAPDOOR] = BlockTrapdoorBirch.class; //401
+            list[DARK_OAK_TRAPDOOR] = BlockTrapdoorDarkOak.class; //402
+            list[JUNGLE_TRAPDOOR] = BlockTrapdoorJungle.class; //403
+            list[SPRUCE_TRAPDOOR] = BlockTrapdoorSpruce.class; //404
+
             list[CARVED_PUMPKIN] = BlockCarvedPumpkin.class; //410
             list[SEA_PICKLE] = BlockSeaPickle.class; //411
 
+            list[BUBBLE_COLUMN] = BlockBubbleColumn.class; //415
             list[BARRIER] = BlockBarrier.class; //416
-            list[STONE_SLAB3] = BlockSlabStone3.class ; //417
+            list[STONE_SLAB3] = BlockSlabStone3.class; //417
             list[BAMBOO] = BlockBamboo.class; //418
             list[BAMBOO_SAPLING] = BlockBambooSapling.class; //419
             list[SCAFFOLDING] = BlockScaffolding.class; //420
-            list[STONE_SLAB4] = BlockSlabStone4.class ; //421
+            list[STONE_SLAB4] = BlockSlabStone4.class; //421
             list[DOUBLE_STONE_SLAB3] = BlockDoubleSlabStone3.class; //422
             list[DOUBLE_STONE_SLAB4] = BlockDoubleSlabStone4.class; //423
             list[GRANITE_STAIRS] = BlockStairsGranite.class; //424
@@ -380,6 +390,19 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[RED_NETHER_BRICK_STAIRS] = BlockStairsRedNetherBrick.class; //439
             list[SMOOTH_QUARTZ_STAIRS] = BlockStairsSmoothQuartz.class; //440
 
+            list[SPRUCE_STANDING_SIGN] = BlockSpruceSignPost.class; //436
+            list[SPRUCE_WALL_SIGN] = BlockSpruceWallSign.class; //437
+
+            list[BIRCH_STANDING_SIGN] = BlockBirchSignPost.class; //441
+            list[BIRCH_WALL_SIGN] = BlockBirchWallSign.class; //442
+            list[JUNGLE_STANDING_SIGN] = BlockJungleSignPost.class; //443
+            list[JUNGLE_WALL_SIGN] = BlockJungleWallSign.class; //444
+            list[ACACIA_STANDING_SIGN] = BlockAcaciaSignPost.class; //445
+            list[ACACIA_WALL_SIGN] = BlockAcaciaWallSign.class; //446
+            list[DARKOAK_STANDING_SIGN] = BlockDarkOakSignPost.class; //447
+            list[DARKOAK_WALL_SIGN] = BlockDarkOakWallSign.class; //448
+            list[LECTERN] = BlockLectern.class; //449
+
             list[SMITHING_TABLE] = BlockSmithingTable.class; //457
             list[BARREL] = BlockBarrel.class; //458
 
@@ -392,6 +415,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[PISTON_HEAD_STICKY] = BlockPistonHeadSticky.class; //472
 
+            list[CRIMSON_ROOTS] = BlockRootsCrimson.class; //478
+            list[WARPED_ROOTS] = BlockRootsWarped.class; //479
             list[CRIMSON_STEM] = BlockStemCrimson.class; //480
             list[WARPED_STEM] = BlockStemWarped.class; //481
             list[WARPED_WART_BLOCK] = BlockWarpedWartBlock.class; //482
@@ -401,18 +426,39 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[CRIMSON_NYLIUM] = BlockNyliumCrimson.class; //487
             list[WARPED_NYLIUM] = BlockNyliumWarped.class; //488
+            list[BASALT] = BlockBasalt.class; //489
+
+            list[SOUL_SOIL] = BlockSoulSoil.class; //491
+
             list[STRIPPED_CRIMSON_STEM] = BlockStemStrippedCrimson.class; //495
             list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
             list[CRIMSON_PLANKS] = BlockPlanksCrimson.class; //497
             list[WARPED_PLANKS] = BlockPlanksWarped.class; //498
             list[CRIMSON_DOOR_BLOCK] = BlockDoorCrimson.class; //499
             list[WARPED_DOOR_BLOCK] = BlockDoorWarped.class; //500
+            list[CRIMSON_TRAPDOOR] = BlockTrapdoorCrimson.class; //501
+            list[WARPED_TRAPDOOR] = BlockTrapdoorWarped.class; //502
 
-            //TODO
-            //list[CRIMSON_TRAPDOOR] = BlockTrapdoorCrimson.class; //501
-            //list[WARPED_TRAPDOOR] = BlockTrapdoorWarped.class; //502
+            list[CRIMSON_STANDING_SIGN] = BlockCrimsonSignPost.class; //505
+            list[WARPED_STANDING_SIGN] = BlockWarpedSignPost.class; //506
+            list[CRIMSON_WALL_SIGN] = BlockCrimsonWallSign.class; //507
+            list[WARPED_WALL_SIGN] = BlockWarpedWallSign.class; //508
 
+            list[SOUL_LANTERN] = BlockSoulLantern.class; //524
+            list[NETHERITE_BLOCK] = BlockNetheriteBlock.class; //525
+            list[ANCIENT_DEBRIS] = BlockAncientDebris.class; //526
             list[RESPAWN_ANCHOR] = BlockRespawnAnchor.class; //527
+            list[BLACKSTONE] = BlockBlackstone.class; //528
+
+            list[NETHER_GOLD_ORE] = BlockOreGoldNether.class; //543
+            list[CRYING_OBSIDIAN] = BlockCryingObsidian.class; //544
+            list[SOUL_CAMPFIRE_BLOCK] = BlockCampfireSoul.class; //545
+
+            list[COPPER_ORE] = BlockOreCopper.class; // 566
+
+            list[RAW_IRON_BLOCK] = BlockRawIron.class; //706
+            list[RAW_COPPER_BLOCK] = BlockRawCopper.class; //707
+            list[RAW_GOLD_BLOCK] = BlockRawGold.class; //708
 
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];
@@ -487,27 +533,38 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int id) {
-        if (id < 0) {
-            id = 255 - id;
-        }
-        return fullList[id << DATA_BITS].clone();
+        return get(id, null);
     }
 
     public static Block get(int id, Integer meta) {
         if (id < 0) {
             id = 255 - id;
         }
+        int fullId = id << DATA_BITS;
         if (meta != null) {
             int iMeta = meta;
             if (iMeta <= DATA_SIZE) {
-                return fullList[(id << DATA_BITS) | meta].clone();
+                fullId = fullId | meta;
+                if (fullId >= fullList.length || fullList[fullId] == null) {
+                    log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, iMeta);
+                    return new BlockUnknown(id, iMeta);
+                }
+                return fullList[fullId].clone();
             } else {
-                Block block = fullList[id << DATA_BITS].clone();
+                if (fullId >= fullList.length || fullList[fullId] == null) {
+                    log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, iMeta);
+                    return new BlockUnknown(id, iMeta);
+                }
+                Block block = fullList[fullId].clone();
                 block.setDamage(iMeta);
                 return block;
             }
         } else {
-            return fullList[id << DATA_BITS].clone();
+            if (fullId >= fullList.length || fullList[fullId] == null) {
+                log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, 0);
+                return new BlockUnknown(id, 0);
+            }
+            return fullList[fullId].clone();
         }
     }
 
@@ -521,11 +578,22 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         Block block;
+        int fullId = id << DATA_BITS;
         if (meta != null && meta > DATA_SIZE) {
-            block = fullList[id << DATA_BITS].clone();
+            if (fullId >= fullList.length || fullList[fullId] == null) {
+                log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
+                return new BlockUnknown(id, meta);
+            }
+            block = fullList[fullId].clone();
             block.setDamage(meta);
         } else {
-            block = fullList[(id << DATA_BITS) | (meta == null ? 0 : meta)].clone();
+            meta = meta == null ? 0 : meta;
+            fullId = fullId | meta;
+            if (fullId >= fullList.length || fullList[fullId] == null) {
+                log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
+                return new BlockUnknown(id, meta);
+            }
+            block = fullList[fullId].clone();
         }
 
         if (pos != null) {
@@ -542,10 +610,20 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id < 0) {
             id = 255 - id;
         }
+        int fullId = id << DATA_BITS;
+        if (fullId >= fullList.length) {
+            log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, data);
+            return new BlockUnknown(id, data);
+        }
         if (data < DATA_SIZE) {
-            return fullList[(id << DATA_BITS) | data].clone();
+            fullId = fullId | data;
+            if (fullList[fullId] == null) {
+                log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, data);
+                return new BlockUnknown(id, data);
+            }
+            return fullList[fullId].clone();
         } else {
-            Block block = fullList[(id << DATA_BITS)].clone();
+            Block block = fullList[fullId].clone();
             block.setDamage(data);
             return block;
         }
@@ -556,6 +634,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int fullId, Level level, int x, int y, int z, int layer) {
+        if (fullId >= fullList.length || fullList[fullId] == null) {
+            int id = fullId << DATA_BITS;
+            int meta = fullId & DATA_BITS;
+            log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
+            return new BlockUnknown(id, meta);
+        }
         Block block = fullList[fullId].clone();
         block.x = x;
         block.y = y;
@@ -583,6 +667,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         block.level = level;
         //block.layer = layer;
         return block;
+    }
+
+    public static Block fromFullId(int fullId) {
+        return get(fullId >> DATA_BITS, fullId & DATA_MASK);
     }
 
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
@@ -617,11 +705,35 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     }
 
+
+    /**
+     * 当玩家使用与左键或者右键方块时会触发，常被用于处理例如物品展示框左键掉落物品这种逻辑<br>
+     * 触发点在{@link Player}的onBlockBreakStart中
+     * <p>
+     * It will be triggered when the player uses the left or right click on the block, which is often used to deal with logic such as left button dropping items in the item frame<br>
+     * The trigger point is in the onBlockBreakStart of {@link Player}
+     *
+     * @param player the player
+     * @param action the action
+     * @return 状态值，返回值不为0代表这是一个touch操作而不是一个挖掘方块的操作<br>Status value, if the return value is not 0, it means that this is a touch operation rather than a mining block operation
+     */
+    public int onTouch(@Nullable Player player, PlayerInteractEvent.Action action) {
+        this.onUpdate(Level.BLOCK_UPDATE_TOUCH);
+        return 0;
+    }
+
     public boolean onActivate(Item item) {
         return this.onActivate(item, null);
     }
 
     public boolean onActivate(Item item, Player player) {
+        return false;
+    }
+
+    /**
+     * @return 是否可以被灵魂疾行附魔加速<br>Whether it can be accelerated by the soul speed enchantment
+     */
+    public boolean isSoulSpeedCompatible() {
         return false;
     }
 
@@ -743,19 +855,20 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public int getItemId() {
         int id = getId();
+
         if (id > 255) {
             return 255 - id;
-        } else {
-            return id;
         }
-    }
+
+        return id;
+	}
 
     /**
      * The full id is a combination of the id and data.
      * @return full id
      */
     public int getFullId() {
-        return (getId() << DATA_BITS);
+        return getId() << DATA_BITS;
     }
 
     public void addVelocityToEntity(Entity entity, Vector3 vector) {
@@ -898,8 +1011,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
 
         int blockId = this.getId();
-        boolean correctTool = correctTool0(this.getToolType(), item, blockId);
-        if (correctTool){
+        if (correctTool0(this.getToolType(), item, blockId)) {
             speedMultiplier = toolBreakTimeBonus0(item);
             int efficiencyLevel = Optional.ofNullable(item.getEnchantment(Enchantment.ID_EFFICIENCY))
                     .map(Enchantment::getLevel).orElse(0);

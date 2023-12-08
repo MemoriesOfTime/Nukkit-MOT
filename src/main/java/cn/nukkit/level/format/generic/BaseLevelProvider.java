@@ -15,12 +15,10 @@ import com.google.common.collect.ImmutableMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.lang.ref.WeakReference;
 import java.nio.ByteOrder;
 import java.util.HashMap;
@@ -34,6 +32,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @author MagicDroidX
  * Nukkit Project
  */
+@Log4j2
 public abstract class BaseLevelProvider implements LevelProvider {
 
     protected Level level;
@@ -56,10 +55,37 @@ public abstract class BaseLevelProvider implements LevelProvider {
         this.level = level;
         this.path = path;
         File file_path = new File(this.path);
-        if (!file_path.exists()) {
-            file_path.mkdirs();
+        if (!file_path.exists() && !file_path.mkdirs()) {
+            throw new LevelException("Could not create the directory " + file_path);
         }
-        CompoundTag levelData = NBTIO.readCompressed(new FileInputStream(new File(this.path + "level.dat")), ByteOrder.BIG_ENDIAN);
+        CompoundTag levelData;
+        File levelDatFile = new File(getPath(), "level.dat");
+        try (FileInputStream fos = new FileInputStream(levelDatFile); BufferedInputStream input = new BufferedInputStream(fos)) {
+            levelData = NBTIO.readCompressed(input, ByteOrder.BIG_ENDIAN);
+        } catch (Exception e) {
+            log.fatal("Failed to load the level.dat file at {}, attempting to load level.dat.bak instead!", levelDatFile.getAbsolutePath(), e);
+            try {
+                File bak = new File(getPath(), "level.dat.bak");
+                if (!bak.isFile()) {
+                    log.fatal("The file {} does not exists!", bak.getAbsolutePath());
+                    FileNotFoundException ex = new FileNotFoundException("The file " + bak.getAbsolutePath() + " does not exists!");
+                    ex.addSuppressed(e);
+                    throw ex;
+                }
+                try (FileInputStream fos = new FileInputStream(bak); BufferedInputStream input = new BufferedInputStream(fos)) {
+                    levelData = NBTIO.readCompressed(input, ByteOrder.BIG_ENDIAN);
+                } catch (Exception e2) {
+                    log.fatal("Failed to load the level.dat.bak file at {}", levelDatFile.getAbsolutePath());
+                    e2.addSuppressed(e);
+                    throw e2;
+                }
+            } catch (Exception e2) {
+                LevelException ex = new LevelException("Could not load the level.dat and the level.dat.bak files. You might need to restore them from a backup!", e);
+                ex.addSuppressed(e2);
+                throw ex;
+            }
+        }
+
         if (levelData.get("Data") instanceof CompoundTag) {
             this.levelData = levelData.getCompound("Data");
         } else {
@@ -80,9 +106,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
     public abstract BaseFullChunk loadChunk(long index, int chunkX, int chunkZ, boolean create);
 
     public int size() {
-        synchronized (chunks) {
-            return this.chunks.size();
-        }
+        return this.chunks.size();
     }
 
     @Override
@@ -110,9 +134,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        synchronized (chunks) {
-            return ImmutableMap.copyOf(chunks);
-        }
+        return ImmutableMap.copyOf(chunks);
     }
 
     @Override
@@ -121,16 +143,12 @@ public abstract class BaseLevelProvider implements LevelProvider {
     }
 
     public void putChunk(long index, BaseFullChunk chunk) {
-        synchronized (chunks) {
-            chunks.put(index, chunk);
-        }
+        chunks.put(index, chunk);
     }
 
     @Override
     public boolean isChunkLoaded(long hash) {
-        synchronized (chunks) {
-            return this.chunks.containsKey(hash);
-        }
+        return this.chunks.containsKey(hash);
     }
 
     public BaseRegionLoader getRegion(int x, int z) {
@@ -292,12 +310,10 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Override
     public void saveChunks() {
-        synchronized (chunks) {
-            for (BaseFullChunk chunk : this.chunks.values()) {
-                if (chunk.getChanges() != 0) {
-                    chunk.setChanged(false);
-                    this.saveChunk(chunk.getX(), chunk.getZ());
-                }
+        for (BaseFullChunk chunk : this.chunks.values()) {
+            if (chunk.getChanges() != 0) {
+                chunk.setChanged(false);
+                this.saveChunk(chunk.getX(), chunk.getZ());
             }
         }
     }
@@ -338,10 +354,8 @@ public abstract class BaseLevelProvider implements LevelProvider {
     @Override
     public boolean loadChunk(int chunkX, int chunkZ, boolean create) {
         long index = Level.chunkHash(chunkX, chunkZ);
-        synchronized (chunks) {
-            if (this.chunks.containsKey(index)) {
-                return true;
-            }
+        if (this.chunks.containsKey(index)) {
+            return true;
         }
         return loadChunk(index, chunkX, chunkZ, create) != null;
     }
@@ -354,13 +368,11 @@ public abstract class BaseLevelProvider implements LevelProvider {
     @Override
     public boolean unloadChunk(int X, int Z, boolean safe) {
         long index = Level.chunkHash(X, Z);
-        synchronized (chunks) {
-            BaseFullChunk chunk = this.chunks.get(index);
-            if (chunk != null && chunk.unload(false, safe)) {
-                lastChunk.set(null);
-                this.chunks.remove(index, chunk);
-                return true;
-            }
+        BaseFullChunk chunk = this.chunks.get(index);
+        if (chunk != null && chunk.unload(false, safe)) {
+            lastChunk.set(null);
+            this.chunks.remove(index, chunk);
+            return true;
         }
         return false;
     }
@@ -423,12 +435,10 @@ public abstract class BaseLevelProvider implements LevelProvider {
         chunk.setProvider(this);
         chunk.setPosition(chunkX, chunkZ);
         long index = Level.chunkHash(chunkX, chunkZ);
-        synchronized (chunks) {
-            if (this.chunks.containsKey(index) && !this.chunks.get(index).equals(chunk)) {
-                this.unloadChunk(chunkX, chunkZ, false);
-            }
-            this.chunks.put(index, (BaseFullChunk) chunk);
+        if (this.chunks.containsKey(index) && !this.chunks.get(index).equals(chunk)) {
+            this.unloadChunk(chunkX, chunkZ, false);
         }
+        this.chunks.put(index, (BaseFullChunk) chunk);
     }
 
     @Override

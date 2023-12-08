@@ -1,10 +1,10 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
-import lombok.Value;
 
 import java.util.List;
 
@@ -14,8 +14,8 @@ public class ResourcePackStackPacket extends DataPacket {
     public static final byte NETWORK_ID = ProtocolInfo.RESOURCE_PACK_STACK_PACKET;
 
     public boolean mustAccept = false;
-    public ResourcePack[] behaviourPackStack = new ResourcePack[0];
-    public ResourcePack[] resourcePackStack = new ResourcePack[0];
+    public ResourcePack[] behaviourPackStack = ResourcePack.EMPTY_ARRAY;
+    public ResourcePack[] resourcePackStack = ResourcePack.EMPTY_ARRAY;
     /**
      * Below v1.16.100
      */
@@ -24,6 +24,12 @@ public class ResourcePackStackPacket extends DataPacket {
      * v1.16.100 and above
      */
     public final List<ExperimentData> experiments = new ObjectArrayList<>();
+
+    /**
+     * 兼容NK插件，MOT不使用这个字段
+     */
+    @Deprecated
+    public String gameVersion = Utils.getVersionByProtocol(ProtocolInfo.CURRENT_PROTOCOL);
 
     @Override
     public void decode() {
@@ -70,11 +76,5 @@ public class ResourcePackStackPacket extends DataPacket {
     @Override
     public byte pid() {
         return NETWORK_ID;
-    }
-
-    @Value
-    public static class ExperimentData {
-        String name;
-        boolean enabled;
     }
 }

@@ -201,6 +201,34 @@ public class BlockVector3 implements Cloneable {
         return Math.pow(this.x - x, 2) + Math.pow(this.y - y, 2) + Math.pow(this.z - z, 2);
     }
 
+    public int getChunkX() {
+        return x >> 4;
+    }
+
+    public int getChunkZ() {
+        return z >> 4;
+    }
+
+    public int getChunkSectionY() {
+        return y >> 4;
+    }
+
+    public int getChunkSectionY(boolean is384World) {
+        return (y >> 4) + (is384World ? 4 : 0);
+    }
+
+    public ChunkVector2 getChunkVector() {
+        return new ChunkVector2(getChunkX(), getChunkZ());
+    }
+
+    public int getAxis(BlockFace.Axis axis) {
+        return switch (axis) {
+            case X -> x;
+            case Y -> y;
+            default -> z;
+        };
+    }
+
     @Override
     public boolean equals(Object o) {
         if (o == null) return false;

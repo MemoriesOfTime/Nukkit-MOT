@@ -19,7 +19,7 @@ public class GameruleCommand extends VanillaCommand {
         this.setPermission("nukkit.command.gamerule");
         this.commandParameters.clear();
         this.commandParameters.put("byString", new CommandParameter[]{
-                new CommandParameter("gamerule", true , GameRule.getNamesLowerCase()),
+                new CommandParameter("gamerule", true, GameRule.getNamesLowerCase()),
                 new CommandParameter("value", CommandParamType.STRING, true)
         });
     }
@@ -39,14 +39,14 @@ public class GameruleCommand extends VanillaCommand {
         switch (args.length) {
             case 0:
                 StringJoiner rulesJoiner = new StringJoiner(", ");
-                for (GameRule rule: rules.getRules()) {
+                for (GameRule rule : rules.getRules()) {
                     rulesJoiner.add(rule.getName().toLowerCase());
                 }
                 sender.sendMessage(rulesJoiner.toString());
                 return true;
             case 1:
                 Optional<GameRule> gameRule = GameRule.parseString(args[0]);
-                if (!gameRule.isPresent() || !rules.hasRule(gameRule.get())) {
+                if (gameRule.isEmpty() || !rules.hasRule(gameRule.get())) {
                     sender.sendMessage(new TranslationContainer("commands.generic.syntax", "/gamerule", args[0]));
                     return true;
                 }
@@ -56,7 +56,7 @@ public class GameruleCommand extends VanillaCommand {
             default:
                 Optional<GameRule> optionalRule = GameRule.parseString(args[0]);
 
-                if (!optionalRule.isPresent()) {
+                if (optionalRule.isEmpty()) {
                     sender.sendMessage(new TranslationContainer("commands.generic.syntax", "/gamerule ", args[0], ' ' + String.join(" ", Arrays.copyOfRange(args, 1, args.length))));
                     return true;
                 }

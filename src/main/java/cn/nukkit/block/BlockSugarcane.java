@@ -126,7 +126,7 @@ public class BlockSugarcane extends BlockFlowable {
 
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        if (block.getId() != AIR) {
+        if (block.isSolid()) {
             return false;
         }
         Block down = this.down();

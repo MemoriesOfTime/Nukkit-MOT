@@ -9,9 +9,8 @@ import cn.nukkit.permission.Permission;
 import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.PluginException;
 import cn.nukkit.utils.Utils;
-import co.aikar.timings.Timing;
-import co.aikar.timings.Timings;
 import io.netty.util.internal.ConcurrentSet;
+import lombok.extern.log4j.Log4j2;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
@@ -23,6 +22,7 @@ import java.util.regex.Pattern;
 /**
  * @author MagicDroidX
  */
+@Log4j2
 public class PluginManager {
 
     private final Server server;
@@ -74,6 +74,26 @@ public class PluginManager {
     public Map<String, Plugin> getPlugins() {
         return plugins;
     }
+
+    public void loadInternalPlugin() {
+        PluginLoader pluginLoader = fileAssociations.get(JavaPluginLoader.class.getName());
+        InternalPlugin plugin = InternalPlugin.INSTANCE;
+        Map<String, Object> info = new HashMap<>();
+        info.put("name", "Nukkit-MOT");
+        info.put("version", server.getNukkitVersion());
+        info.put("main", InternalPlugin.class.getName());
+        File file;
+        try {
+            file = new File(Server.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        } catch (Exception e) {
+            file = new File(".");
+        }
+        PluginDescription description = new PluginDescription(info);
+        plugin.init(pluginLoader, server, description, new File("Nukkit-MOT"), file);
+        plugins.put(description.getName(), plugin);
+        enablePlugin(plugin);
+    }
+
 
     public Plugin loadPlugin(String path) {
         return this.loadPlugin(path, null);
@@ -317,7 +337,6 @@ public class PluginManager {
     }
 
     private void calculatePermissionDefault(Permission permission) {
-        if (Timings.permissionDefaultTimer != null) Timings.permissionDefaultTimer.startTiming();
         if (permission.getDefault().equals(Permission.DEFAULT_OP) || permission.getDefault().equals(Permission.DEFAULT_TRUE)) {
             this.defaultPermsOp.put(permission.getName(), permission);
             this.dirtyPermissibles(true);
@@ -327,7 +346,6 @@ public class PluginManager {
             this.defaultPerms.put(permission.getName(), permission);
             this.dirtyPermissibles(false);
         }
-        if (Timings.permissionDefaultTimer != null) Timings.permissionDefaultTimer.stopTiming();
     }
 
     private void dirtyPermissibles(boolean op) {
@@ -469,11 +487,18 @@ public class PluginManager {
         ListIterator<Plugin> plugins = new ArrayList<>(this.plugins.values()).listIterator(this.plugins.size());
 
         while (plugins.hasPrevious()) {
-            this.disablePlugin(plugins.previous());
+            Plugin previous = plugins.previous();
+            if (previous != InternalPlugin.INSTANCE) {
+                this.disablePlugin(previous);
+            }
         }
     }
 
     public void disablePlugin(Plugin plugin) {
+        if (InternalPlugin.INSTANCE == plugin) {
+            throw new UnsupportedOperationException("The Nukkit-MOT Internal plugin can't be disabled.");
+        }
+
         if (plugin.isEnabled()) {
             try {
                 plugin.getPluginLoader().disablePlugin(plugin);
@@ -511,12 +536,11 @@ public class PluginManager {
                 try {
                     registration.callEvent(event);
                 } catch (Exception e) {
-                    this.server.getLogger().critical(this.server.getLanguage().translateString("nukkit.plugin.eventError", event.getEventName(), registration.getPlugin().getDescription().getFullName(), e.getMessage(), registration.getListener().getClass().getName()));
-                    this.server.getLogger().logException(e);
+                    log.error(this.server.getLanguage().translateString("nukkit.plugin.eventError", event.getEventName(), registration.getPlugin().getDescription().getFullName(), e.getMessage(), registration.getListener().getClass().getName()), e);
                 }
             }
         } catch (IllegalAccessException e) {
-            this.server.getLogger().logException(e);
+            log.error("An error has occurred while calling the event {}", event, e);
         }
     }
 
@@ -575,10 +599,10 @@ public class PluginManager {
         }
 
         try {
-            Timing timing = Timings.getPluginEventTiming(event, listener, executor, plugin);
-            this.getEventListeners(event).register(new RegisteredListener(listener, executor, priority, plugin, ignoreCancelled, timing));
+            this.getEventListeners(event).register(new RegisteredListener(listener, executor, priority, plugin, ignoreCancelled));
         } catch (IllegalAccessException e) {
-            Server.getInstance().getLogger().logException(e);
+            log.error("An error occurred while registering the event listener event:{}, listener:{} for plugin:{} version:{}",
+                    event, listener, plugin.getDescription().getName(), plugin.getDescription().getVersion(), e);
         }
     }
 

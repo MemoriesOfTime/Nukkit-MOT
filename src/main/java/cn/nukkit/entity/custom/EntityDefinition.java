@@ -2,10 +2,12 @@ package cn.nukkit.entity.custom;
 
 import cn.nukkit.entity.Entity;
 import cn.nukkit.nbt.tag.CompoundTag;
+import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+@EqualsAndHashCode
 @ToString
 public class EntityDefinition {
     public static final AtomicInteger ID_ALLOCATOR = new AtomicInteger(10000);

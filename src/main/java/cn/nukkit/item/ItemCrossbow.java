@@ -50,7 +50,9 @@ public class ItemCrossbow extends ItemBow {
 
         Inventory inventory = player.getOffhandInventory();
 
-        if (!inventory.contains(itemArrow) && !(inventory = player.getInventory()).contains(itemArrow) && player.isSurvival()) {
+        if ((player.isSurvival() || player.isAdventure()) &&
+                (itemArrow = this.getArrow(inventory)) == null &&
+                (itemArrow = this.getArrow(inventory = player.getInventory())) == null) {
             player.getOffhandInventory().sendContents(player);
             inventory.sendContents(player);
             return true;
@@ -90,13 +92,19 @@ public class ItemCrossbow extends ItemBow {
     }
 
     public void loadArrow(Player player, Item arrow) {
-        if (arrow == null) return;
+        if (arrow == null) {
+            return;
+        }
         CompoundTag tag = this.getNamedTag() == null ? new CompoundTag() : this.getNamedTag();
+        CompoundTag chargedItem = new CompoundTag("chargedItem")
+                .putByte("Count", arrow.getCount())
+                .putShort("Damage", arrow.getDamage())
+                .putString("Name", "minecraft:arrow");
+        if (arrow.hasCompoundTag()) {
+            chargedItem.putCompound("tag", arrow.getNamedTag());
+        }
         tag.putBoolean("Charged", true)
-                .putCompound("chargedItem", new CompoundTag("chargedItem")
-                        .putByte("Count", arrow.getCount())
-                        .putShort("Damage", arrow.getDamage())
-                        .putString("Name", "minecraft:arrow"));
+                .putCompound("chargedItem", chargedItem);
         this.setCompoundTag(tag);
         this.loadTick = Server.getInstance().getTick();
         player.getInventory().setItemInHand(this);
@@ -119,6 +127,7 @@ public class ItemCrossbow extends ItemBow {
 
     public boolean launchArrow(Player player) {
         if (this.isLoaded() && Server.getInstance().getTick() - this.loadTick > 20) {
+            CompoundTag itemInfo = (CompoundTag) this.getNamedTagEntry("chargedItem");
             CompoundTag nbt = new CompoundTag()
                     .putList(new ListTag<DoubleTag>("Pos")
                             .add(new DoubleTag("", player.x))
@@ -130,7 +139,12 @@ public class ItemCrossbow extends ItemBow {
                             .add(new DoubleTag("", Math.cos(player.yaw / 180 * Math.PI) * Math.cos(player.pitch / 180 * Math.PI))))
                     .putList(new ListTag<FloatTag>("Rotation")
                             .add(new FloatTag("", (player.yaw > 180 ? 360 : 0) - (float) player.yaw))
-                            .add(new FloatTag("", (float) -player.pitch)));
+                            .add(new FloatTag("", (float) -player.pitch)))
+                    .putCompound("item", new CompoundTag()
+                            .putInt("id", Item.ARROW)
+                            .putInt("Damage", itemInfo.getShort("Damage"))
+                            .putInt("Count", itemInfo.getByte("Count"))
+                            .putCompound("tag", itemInfo.getCompound("tag")));
 
             EntityArrow arrow = new EntityArrow(player.chunk, nbt, player, false);
             if (this.hasEnchantment(Enchantment.ID_CROSSBOW_PIERCING)) {
@@ -160,10 +174,5 @@ public class ItemCrossbow extends ItemBow {
             return true;
         }
         return false;
-    }
-
-    @Override
-    public int getEnchantAbility() {
-        return 1;
     }
 }

@@ -1,5 +1,8 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.Server;
+import lombok.extern.log4j.Log4j2;
+
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -11,9 +14,10 @@ import java.util.regex.Pattern;
 /**
  * An utility that is used to send debugpaste reports to hastebin.com
  */
+@Log4j2
 public class HastebinUtility {
 
-    public static final String BIN_URL = "https://www.toptal.com/developers/hastebin/documents", USER_AGENT = "Mozilla/5.0";
+    public static final String BIN_URL = "https://hastebin.com/documents", USER_AGENT = "Mozilla/5.0";
     public static final Pattern PATTERN = Pattern.compile("\\{\"key\":\"([\\S\\s]*)\"}");
 
     /**
@@ -28,6 +32,12 @@ public class HastebinUtility {
         final HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
         connection.setRequestMethod("POST");
+        String key = Server.getInstance().getPropertyString("hastebin-token");
+        if (key == null || key.isBlank()) {
+            log.error("You haven't set a Hastebin token yet! Please create a token on https://www.toptal.com/developers/hastebin/documentation and fill in the obtained key as `hastebin-token` in the `server.properties` file.");
+        } else {
+            connection.setRequestProperty("Authorization", "Bearer " + key.trim());
+        }
         connection.setRequestProperty("User-Agent", USER_AGENT);
         connection.setDoOutput(true);
 
@@ -48,7 +58,7 @@ public class HastebinUtility {
 
         Matcher matcher = PATTERN.matcher(response.toString());
         if (matcher.matches()) {
-            return "https://www.toptal.com/developers/hastebin/" + matcher.group(1);
+            return "https://hastebin.com/share/" + matcher.group(1);
         } else {
             throw new RuntimeException("Couldn't read response!");
         }
@@ -67,7 +77,7 @@ public class HastebinUtility {
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                if (!line.contains("rcon.password=")) {
+                if (!line.contains("rcon.password=") && !line.contains("hastebin-token=")) {
                     lines.add(line);
                 }
             }

@@ -8,6 +8,7 @@ import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.utils.Utils;
 
 import java.text.DecimalFormat;
 
@@ -44,7 +45,7 @@ public class SetWorldSpawnCommand extends VanillaCommand {
         } else if (args.length == 3) {
             level = sender.getServer().getDefaultLevel();
             try {
-                pos = new Vector3(Integer.parseInt(args[0]), Integer.parseInt(args[1]), Integer.parseInt(args[2]));
+                pos = new Vector3(Utils.toInt(args[0]), Utils.toInt(args[1]), Utils.toInt(args[2]));
             } catch (NumberFormatException e1) {
                 sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
                 return true;
@@ -55,7 +56,7 @@ public class SetWorldSpawnCommand extends VanillaCommand {
         }
         level.setSpawnLocation(pos);
         DecimalFormat round2 = new DecimalFormat("##0.00");
-        Command.broadcastCommandMessage(sender, new TranslationContainer("commands.setworldspawn.success", round2.format(pos.x), round2.format(pos.y), round2.format(pos.z)));
+        broadcastCommandMessage(sender, new TranslationContainer("commands.setworldspawn.success", round2.format(pos.x), round2.format(pos.y), round2.format(pos.z)));
         return true;
     }
 }

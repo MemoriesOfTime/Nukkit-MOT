@@ -7,8 +7,6 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.ChunkException;
-import co.aikar.timings.Timing;
-import co.aikar.timings.Timings;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 
@@ -42,11 +40,13 @@ public abstract class BlockEntity extends Position {
     public static final String JUKEBOX = "Jukebox";
     public static final String SHULKER_BOX = "ShulkerBox";
     public static final String BANNER = "Banner";
+    public static final String LECTERN = "Lectern";
     public static final String DROPPER = "Dropper";
     public static final String DISPENSER = "Dispenser";
     public static final String BARREL = "Barrel";
     public static final String CAMPFIRE = "Campfire";
     public static final String BELL = "Bell";
+    public static final String END_GATEWAY = "EndGateway";
 
     public static long count = 1;
 
@@ -61,14 +61,12 @@ public abstract class BlockEntity extends Position {
     public boolean closed = false;
     public CompoundTag namedTag;
     protected Server server;
-    protected Timing timing;
 
     public BlockEntity(FullChunk chunk, CompoundTag nbt) {
         if (chunk == null || chunk.getProvider() == null) {
             throw new ChunkException("Invalid garbage chunk given to BlockEntity");
         }
 
-        this.timing = Timings.getBlockEntityTiming(this);
         this.server = chunk.getProvider().getLevel().getServer();
         this.chunk = chunk;
         this.setLevel(chunk.getProvider().getLevel());

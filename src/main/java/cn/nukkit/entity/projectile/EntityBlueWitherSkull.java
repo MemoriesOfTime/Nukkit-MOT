@@ -44,8 +44,6 @@ public class EntityBlueWitherSkull extends EntityWitherSkull implements EntityEx
             return false;
         }
 
-        if (this.timing != null) this.timing.startTiming();
-
         if (this.age > 1200 || this.isCollided || this.hadCollision) {
             if (this.canExplode) {
                 this.explode();
@@ -55,8 +53,6 @@ public class EntityBlueWitherSkull extends EntityWitherSkull implements EntityEx
         } else if (this.age % 4 == 0) {
             this.level.addParticle(new SmokeParticle(this.add(this.getWidth() / 2 + Utils.rand(-100.0, 100.0) / 500, this.getHeight() / 2 + Utils.rand(-100.0, 100.0) / 500, this.getWidth() / 2 + Utils.rand(-100.0, 100.0) / 500)));
         }
-
-        if (this.timing != null) this.timing.stopTiming();
 
         super.onUpdate(currentTick);
         return !this.closed;

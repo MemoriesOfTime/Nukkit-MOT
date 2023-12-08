@@ -74,7 +74,7 @@ public class BlockDropper extends BlockSolidMeta implements Faceable {
     public boolean canHarvestWithHand() {
         return false;
     }
-    
+
     @Override
     public boolean canBeActivated() {
         return true;
@@ -122,7 +122,7 @@ public class BlockDropper extends BlockSolidMeta implements Faceable {
 
     @Override
     public BlockFace getBlockFace() {
-        return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
+        return BlockFace.fromIndex(getDamage() & 0x07);
     }
 
     @Override
@@ -180,13 +180,8 @@ public class BlockDropper extends BlockSolidMeta implements Faceable {
         }
 
         ThreadLocalRandom rand = ThreadLocalRandom.current();
-        Vector3 motion = new Vector3();
-
         double offset = rand.nextDouble() * 0.1 + 0.2;
-
-        motion.x = face.getXOffset() * offset;
-        motion.y = 0.1;
-        motion.z = face.getZOffset() * offset;
+        Vector3 motion = new Vector3(face.getXOffset() * offset, 0.1, face.getZOffset() * offset);
 
         motion.x += rand.nextGaussian() * 0.007499999832361937 * 6;
         motion.y += rand.nextGaussian() * 0.007499999832361937 * 6;

@@ -21,10 +21,12 @@ public class NetworkSettingsPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putLShort(this.compressionThreshold);
-        this.putLShort(this.compressionAlgorithm.ordinal());
-        this.putBoolean(this.clientThrottleEnabled);
-        this.putByte(this.clientThrottleThreshold);
-        this.putLFloat(this.clientThrottleScalar);
+        if (protocol >= ProtocolInfo.v1_19_30) {
+            this.putLShort(this.compressionAlgorithm.ordinal());
+            this.putBoolean(this.clientThrottleEnabled);
+            this.putByte(this.clientThrottleThreshold);
+            this.putLFloat(this.clientThrottleScalar);
+        }
     }
 
     @Override
