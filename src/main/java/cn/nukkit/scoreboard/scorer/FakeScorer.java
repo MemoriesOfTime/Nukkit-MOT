@@ -27,7 +27,8 @@ public class FakeScorer implements IScorer {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof FakeScorer fakeScorer) {
+        if (obj instanceof FakeScorer) {
+            FakeScorer fakeScorer = (FakeScorer) obj;
             return fakeScorer.fakeName.equals(fakeName);
         }
         return false;

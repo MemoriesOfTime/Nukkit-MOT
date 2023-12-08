@@ -50,14 +50,18 @@ public class PopulatorPillagerOutpost extends Populator {
                 final int baseMeta = chunk.getBlockData(x, baseY, z);
 
                 switch (baseId) {
-                    case COBBLESTONE, MOSS_STONE, LOG2, PLANKS, FENCE -> {
+                    case COBBLESTONE:
+                    case MOSS_STONE:
+                    case LOG2:
+                    case PLANKS:
+                    case FENCE:
                         int y = baseY - 1;
                         int id = chunk.getBlockId(x, y, z);
                         while (BlockTypes.isPlantOrFluid[id] && y > 1) {
                             chunk.setBlock(x, y, z, baseId, baseMeta);
                             id = chunk.getBlockId(x, --y, z);
                         }
-                    }
+                        break;
                 }
             }
         }
@@ -67,22 +71,28 @@ public class PopulatorPillagerOutpost extends Populator {
         return nbt -> {
             if (nbt.getString("id").equals("StructureBlock")) {
                 switch (nbt.getString("metadata")) {
-                    case "topChest" -> {
+                    case "topChest":
                         final ListTag<CompoundTag> itemList = new ListTag<>("Items");
                         PillagerOutpostChest.get().create(itemList, random);
                         Server.getInstance().getScheduler().scheduleDelayedTask(new LootSpawnTask(chunk.getProvider().getLevel(),
-                            new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
-                    }
-                    case "pillager" -> Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
-                        Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
-                            .putString("id", String.valueOf(EntityPillager.NETWORK_ID))), 2);
-                    case "captain" -> Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
-                        Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
-                            .putString("id", String.valueOf(EntityPillager.NETWORK_ID))
-                            .putBoolean("PatrolLeader", true)), 2);
-                    case "cage" -> Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
-                        Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
-                            .putString("id", String.valueOf(EntityIronGolem.NETWORK_ID))), 2);
+                                new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
+                        break;
+                    case "pillager":
+                        Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
+                                Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
+                                        .putString("id", String.valueOf(EntityPillager.NETWORK_ID))), 2);
+                        break;
+                    case "captain":
+                        Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
+                                Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
+                                        .putString("id", String.valueOf(EntityPillager.NETWORK_ID))
+                                        .putBoolean("PatrolLeader", true)), 2);
+                        break;
+                    case "cage":
+                        Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
+                                Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
+                                        .putString("id", String.valueOf(EntityIronGolem.NETWORK_ID))), 2);
+                        break;
                 }
             }
         };

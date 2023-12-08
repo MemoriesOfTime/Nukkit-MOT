@@ -149,7 +149,9 @@ public class EntityNPCEntity extends EntityLiving implements EntityNPC, EntityIn
 
     @Override
     public boolean attack(EntityDamageEvent source) {
-        if (source instanceof EntityDamageByEntityEvent event && event.getDamager() instanceof Player damager && damager.isCreative()) {
+        if (source instanceof EntityDamageByEntityEvent && ((EntityDamageByEntityEvent) source).getDamager() instanceof Player && ((Player) ((EntityDamageByEntityEvent) source).getDamager()).isCreative()) {
+            EntityDamageByEntityEvent event = (EntityDamageByEntityEvent) source;
+            Player damager = (Player) event.getDamager();
             this.kill();
         }
         return false;

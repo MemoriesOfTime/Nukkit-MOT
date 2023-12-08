@@ -184,22 +184,36 @@ public class EntityVillager extends EntityWalkingAnimal implements InventoryHold
      * 获取村民职业id对应的displayName硬编码
      */
     private String getProfessionName(int profession) {
-        return switch (profession) {
-            case 1 -> "entity.villager.farmer";
-            case 2 -> "entity.villager.fisherman";
-            case 3 -> "entity.villager.shepherd";
-            case 4 -> "entity.villager.fletcher";
-            case 5 -> "entity.villager.librarian";
-            case 6 -> "entity.villager.cartographer";
-            case 7 -> "entity.villager.cleric";
-            case 8 -> "entity.villager.armor";
-            case 9 -> "entity.villager.weapon";
-            case 10 -> "entity.villager.tool";
-            case 11 -> "entity.villager.butcher";
-            case 12 -> "entity.villager.leather";
-            case 13 -> "entity.villager.mason";
-            default -> null;
-        };
+        switch (profession) {
+            case 1:
+                return "entity.villager.farmer";
+            case 2:
+                return "entity.villager.fisherman";
+            case 3:
+                return "entity.villager.shepherd";
+            case 4:
+                return "entity.villager.fletcher";
+            case 5:
+                return "entity.villager.librarian";
+            case 6:
+                return "entity.villager.cartographer";
+            case 7:
+                return "entity.villager.cleric";
+            case 8:
+                return "entity.villager.armor";
+            case 9:
+                return "entity.villager.weapon";
+            case 10:
+                return "entity.villager.tool";
+            case 11:
+                return "entity.villager.butcher";
+            case 12:
+                return "entity.villager.leather";
+            case 13:
+                return "entity.villager.mason";
+            default:
+                return null;
+        }
     }
 
     /**

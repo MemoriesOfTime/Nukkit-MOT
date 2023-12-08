@@ -246,7 +246,8 @@ public class Effect implements Cloneable {
             return;
         }
 
-        if (entity instanceof Player player) {
+        if (entity instanceof Player) {
+            Player player = (Player) entity;
             MobEffectPacket pk = new MobEffectPacket();
             pk.eid = entity.getId();
             pk.effectId = this.getId();
@@ -274,7 +275,8 @@ public class Effect implements Cloneable {
                 }
                 player.setMovementSpeed(player.getMovementSpeed() * (1 - 0.15f * (this.amplifier + 1)));
             }
-        } else if (entity instanceof EntityLiving entityLiving) {
+        } else if (entity instanceof EntityLiving) {
+            EntityLiving entityLiving = (EntityLiving) entity;
             if (this.id == Effect.SPEED && (oldEffect == null || oldEffect.amplifier != this.amplifier)) {
                 if (oldEffect != null) {
                     entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 + 0.2f * (oldEffect.amplifier + 1)));
@@ -308,8 +310,10 @@ public class Effect implements Cloneable {
             return;
         }
 
-        if (entity instanceof EntityLiving entityLiving) {
-            if (entityLiving instanceof Player player) {
+        if (entity instanceof EntityLiving) {
+            EntityLiving entityLiving = (EntityLiving) entity;
+            if (entityLiving instanceof Player) {
+                Player player = (Player) entityLiving;
                 MobEffectPacket pk = new MobEffectPacket();
                 pk.eid = player.getId();
                 pk.effectId = this.getId();

@@ -3116,13 +3116,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
 
                         switch (action.getAction()) {
-                            case START_DESTROY_BLOCK -> this.onBlockBreakStart(blockPos.asVector3(), blockFace);
-                            case ABORT_DESTROY_BLOCK, STOP_DESTROY_BLOCK -> this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
-                            case CONTINUE_DESTROY_BLOCK -> this.onBlockBreakContinue(blockPos.asVector3(), blockFace);
-                            case PREDICT_DESTROY_BLOCK -> {
+                            case START_DESTROY_BLOCK:
+                                this.onBlockBreakStart(blockPos.asVector3(), blockFace);
+                                break;
+                            case ABORT_DESTROY_BLOCK:
+                            case STOP_DESTROY_BLOCK:
+                                this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
+                                break;
+                            case CONTINUE_DESTROY_BLOCK:
+                                this.onBlockBreakContinue(blockPos.asVector3(), blockFace);
+                                break;
+                            case PREDICT_DESTROY_BLOCK:
                                 this.onBlockBreakAbort(blockPos.asVector3(), blockFace);
                                 this.onBlockBreakComplete(blockPos, blockFace);
-                            }
+                                break;
                         }
                         this.lastBlockAction = action;
                     }
@@ -4247,7 +4254,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                         for (Inventory inventory : this.tradingTransaction.getInventories()) {
 
-                            if (inventory instanceof TradeInventory tradeInventory) {
+                            if (inventory instanceof TradeInventory) {
+                                TradeInventory tradeInventory = (TradeInventory) inventory;
                                 EntityVillager ent = tradeInventory.getHolder();
                                 ent.namedTag.putBoolean("traded", true);
                                 for (Tag tag : ent.getRecipes().getAll()) {
@@ -6821,7 +6829,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (near) {
-            if (entity instanceof EntityArrow entityArrow && entityArrow.hadCollision) {
+            if (entity instanceof EntityArrow && ((EntityArrow) entity).hadCollision) {
+                EntityArrow entityArrow = (EntityArrow) entity;
                 Item item;
                 if (entityArrow.namedTag != null && entityArrow.namedTag.containsCompound("item")) {
                     CompoundTag tag = entityArrow.namedTag.getCompound("item");
@@ -6926,8 +6935,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                         if (server.achievementsEnabled) {
                             switch (item.getId()) {
-                                case Item.WOOD, Item.WOOD2 -> this.awardAchievement("mineWood");
-                                case Item.DIAMOND -> this.awardAchievement("diamond");
+                                case Item.WOOD:
+                                case Item.WOOD2:
+                                    this.awardAchievement("mineWood");
+                                    break;
+                                case Item.DIAMOND:
+                                    this.awardAchievement("diamond");
+                                    break;
                             }
                         }
 
@@ -6945,7 +6959,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        if (pickedXPOrb < server.getTick() && entity instanceof EntityXPOrb xpOrb && this.boundingBox.isVectorInside(entity)) {
+        if (pickedXPOrb < server.getTick() && entity instanceof EntityXPOrb && this.boundingBox.isVectorInside(entity)) {
+            EntityXPOrb xpOrb = (EntityXPOrb) entity;
             if (xpOrb.getPickupDelay() <= 0) {
                 int exp = xpOrb.getExp();
                 entity.close();

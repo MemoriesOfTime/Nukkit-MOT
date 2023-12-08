@@ -832,7 +832,8 @@ public class CraftingManager {
     }
 
     public void registerRecipe(int protocol, Recipe recipe) {
-        if (recipe instanceof SmithingRecipe smithingRecipe) {
+        if (recipe instanceof SmithingRecipe) {
+            SmithingRecipe smithingRecipe = (SmithingRecipe) recipe;
             this.registerSmithingRecipe(protocol, smithingRecipe);
         } else if (recipe instanceof CraftingRecipe) {
             UUID id = Utils.dataToUUID(String.valueOf(++RECIPE_COUNT), String.valueOf(recipe.getResult().getId()), String.valueOf(recipe.getResult().getDamage()), String.valueOf(recipe.getResult().getCount()), Arrays.toString(recipe.getResult().getCompoundTag()));
@@ -843,7 +844,8 @@ public class CraftingManager {
             } else if (recipe instanceof ShapelessRecipe) {
                 this.registerShapelessRecipe(protocol, (ShapelessRecipe) recipe);
             }
-        } else if (recipe instanceof FurnaceRecipe furnaceRecipe) {
+        } else if (recipe instanceof FurnaceRecipe) {
+            FurnaceRecipe furnaceRecipe = (FurnaceRecipe) recipe;
             this.registerFurnaceRecipe(protocol, furnaceRecipe);
         }
         recipe.registerToCraftingManager(this);

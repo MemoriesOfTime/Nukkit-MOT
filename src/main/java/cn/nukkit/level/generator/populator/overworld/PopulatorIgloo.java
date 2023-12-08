@@ -40,18 +40,22 @@ public class PopulatorIgloo extends Populator {
         return nbt -> {
             if (nbt.getString("id").equals("StructureBlock")) {
                 switch (nbt.getString("metadata")) {
-                    case "chest" -> {
+                    case "chest":
                         final ListTag<CompoundTag> itemList = new ListTag<>("Items");
                         IglooChest.get().create(itemList, random);
                         Server.getInstance().getScheduler().scheduleDelayedTask(new LootSpawnTask(chunk.getProvider().getLevel(),
-                            new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
-                    }
-                    case "Villager" -> Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
-                        Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
-                            .putString("id", String.valueOf(EntityVillager.NETWORK_ID))), 2);
-                    case "Zombie Villager" -> Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
-                        Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
-                            .putString("id", String.valueOf(EntityZombieVillager.NETWORK_ID))), 2);
+                                new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
+                        break;
+                    case "Villager":
+                        Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
+                                Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
+                                        .putString("id", String.valueOf(EntityVillager.NETWORK_ID))), 2);
+                        break;
+                    case "Zombie Villager":
+                        Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
+                                Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
+                                        .putString("id", String.valueOf(EntityZombieVillager.NETWORK_ID))), 2);
+                        break;
                 }
             }
         };

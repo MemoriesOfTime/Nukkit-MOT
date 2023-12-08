@@ -49,8 +49,12 @@ public class TradeInventoryRecipe {
 
     public TradeInventoryRecipe setBuyCount(int count, int type) {
         switch (type) {
-            case A_ITEM -> this.buyCountA = count;
-            case B_ITEM -> this.buyCountB = count;
+            case A_ITEM:
+                this.buyCountA = count;
+                break;
+            case B_ITEM:
+                this.buyCountB = count;
+                break;
         }
         return this;
     }

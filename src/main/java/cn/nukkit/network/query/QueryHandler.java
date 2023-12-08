@@ -75,7 +75,7 @@ public class QueryHandler {
         int sessionId = packet.readInt();
 
         switch (packetId) {
-            case HANDSHAKE -> {
+            case HANDSHAKE:
                 ByteBuf reply = PooledByteBufAllocator.DEFAULT.ioBuffer(10); // 1 + 4 + 4 + 1
                 reply.writeByte(HANDSHAKE);
                 reply.writeInt(sessionId);
@@ -83,13 +83,13 @@ public class QueryHandler {
                 reply.writeByte(0);
 
                 this.server.getNetwork().sendPacket(address, reply);
-            }
-            case STATISTICS -> {
+                break;
+            case STATISTICS:
                 byte[] token = new byte[4];
                 packet.readBytes(token);
 
                 if (!Arrays.equals(token, getTokenString(this.token, address.getAddress())) &&
-                    !Arrays.equals(token, getTokenString(this.lastToken, address.getAddress()))) {
+                        !Arrays.equals(token, getTokenString(this.lastToken, address.getAddress()))) {
                     break;
                 }
 
@@ -107,7 +107,7 @@ public class QueryHandler {
                 }
 
                 this.server.getNetwork().sendPacket(address, reply);
-            }
+                break;
         }
     }
 }

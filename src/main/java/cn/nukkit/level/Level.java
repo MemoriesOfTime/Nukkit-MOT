@@ -59,8 +59,6 @@ import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.scheduler.BlockUpdateScheduler;
 import cn.nukkit.utils.*;
-import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
-import cn.nukkit.utils.collection.nb.LongObjectEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import it.unimi.dsi.fastutil.ints.*;
@@ -151,17 +149,13 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.SWEET_BERRY_BUSH] = true;
     }
 
-    @NonComputationAtomic
-    public final Long2ObjectNonBlockingMap<Entity> updateEntities = new Long2ObjectNonBlockingMap<>();
+    private final Map<Long, BlockEntity> blockEntities = new ConcurrentHashMap<>();
 
-    @NonComputationAtomic
-    private final Long2ObjectNonBlockingMap<BlockEntity> blockEntities = new Long2ObjectNonBlockingMap<>();
+    private final Map<Long, Player> players = new ConcurrentHashMap<>();
 
-    @NonComputationAtomic
-    private final Long2ObjectNonBlockingMap<Player> players = new Long2ObjectNonBlockingMap<>();
+    public final Map<Long, Entity> entities = new ConcurrentHashMap<>();
 
-    @NonComputationAtomic
-    public final Long2ObjectNonBlockingMap<Entity> entities = new Long2ObjectNonBlockingMap<>();
+    public final Long2ObjectMap<Entity> updateEntities = Long2ObjectMaps.synchronize(new Long2ObjectOpenHashMap<>());
 
     private final ConcurrentLinkedQueue<BlockEntity> updateBlockEntities = new ConcurrentLinkedQueue<>();
 
@@ -185,8 +179,7 @@ public class Level implements ChunkManager, Metadatable {
 
     private final Map<Long, Deque<DataPacket>> chunkPackets = new ConcurrentHashMap<>();
 
-    @NonComputationAtomic
-    private final Long2ObjectNonBlockingMap<Long> unloadQueue = new Long2ObjectNonBlockingMap<>();
+    private final Long2LongMap unloadQueue = Long2LongMaps.synchronize(new Long2LongOpenHashMap());
 
     private int time;
 
@@ -247,7 +240,7 @@ public class Level implements ChunkManager, Metadatable {
     public final boolean isEnd;
 
     private final Class<? extends Generator> generatorClass;
-    private final ThreadLocal<Generator> generators = new ThreadLocal<>() {
+    private final ThreadLocal<Generator> generators = new ThreadLocal<Generator>() {
         @Override
         public Generator initialValue() {
             try {
@@ -281,8 +274,6 @@ public class Level implements ChunkManager, Metadatable {
     @Getter
     private ExecutorService asyncChuckExecutor;
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
-
-    private Iterator<LongObjectEntry<Long>> lastUsingUnloadingIter;
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
         this.levelId = levelIdCounter++;
@@ -972,7 +963,7 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         if (!this.updateEntities.isEmpty()) {
-            for (long id : this.updateEntities.keySetLong()) {
+            for (long id : new ObjectArrayList<>(this.updateEntities.keySet())) {
                 Entity entity = this.updateEntities.get(id);
                 if (entity == null) {
                     this.updateEntities.remove(id);

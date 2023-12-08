@@ -50,7 +50,8 @@ public class SmithingTransaction extends InventoryTransaction {
         //额外检查 保证在所有action处理完成后再检查
         boolean hasSlotChangeAction = false;
         for (InventoryAction action : actions) {
-            if (action instanceof SlotChangeAction slotChangeAction) {
+            if (action instanceof SlotChangeAction) {
+                SlotChangeAction slotChangeAction = (SlotChangeAction) action;
                 if (slotChangeAction.getInventory() instanceof PlayerInventory) { //真正给玩家背包物品的操作
                     if (hasSlotChangeAction) {
                         this.isError = true;
@@ -68,14 +69,22 @@ public class SmithingTransaction extends InventoryTransaction {
         super.addAction(action);
         if (action instanceof SmithingItemAction) {
             switch (((SmithingItemAction) action).getType()) {
-                case 0 -> // input
+                // input
+                case 0:
                     this.equipmentItem = action.getTargetItem();
-                case 2 -> // result
+                    break;
+                // result
+                case 2:
                     this.outputItem = action.getSourceItem();
-                case 1 -> // ingredient
+                    break;
+                // ingredient
+                case 1:
                     this.ingredientItem = action.getTargetItem();
-                case 3 -> // template
+                    break;
+                // template
+                case 3:
                     this.templateItem = action.getTargetItem();
+                    break;
             }
         } else if (action instanceof CreativeInventoryAction) {
             CreativeInventoryAction creativeAction = (CreativeInventoryAction) action;

@@ -29,11 +29,11 @@ import com.nimbusds.jose.shaded.ow2asm.ClassWriter;
 import com.nimbusds.jose.shaded.ow2asm.Label;
 import com.nimbusds.jose.shaded.ow2asm.MethodVisitor;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import lombok.var;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import java.lang.ref.WeakReference;
-import java.lang.reflect.InaccessibleObjectException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -317,7 +317,7 @@ public abstract class Enchantment implements Cloneable {
     private static WeakReference<Method> defineClassMethodRef = new WeakReference<>(null);
 
     @SuppressWarnings("DuplicatedCode")
-    private static Class<?> loadClass(ClassLoader loader, String className, byte[] b) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException, InaccessibleObjectException {
+    private static Class<?> loadClass(ClassLoader loader, String className, byte[] b) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException {
         Class<?> clazz;
         java.lang.reflect.Method method;
         if (defineClassMethodRef.get() == null) {
@@ -338,19 +338,30 @@ public abstract class Enchantment implements Cloneable {
     }
 
     public static String getLevelString(int level) {
-        return switch (level) {
-            case 1 -> "I";
-            case 2 -> "II";
-            case 3 -> "III";
-            case 4 -> "IV";
-            case 5 -> "V";
-            case 6 -> "VI";
-            case 7 -> "VII";
-            case 8 -> "VIII";
-            case 9 -> "IX";
-            case 10 -> "X";
-            default -> "∞";
-        };
+        switch (level) {
+            case 1:
+                return "I";
+            case 2:
+                return "II";
+            case 3:
+                return "III";
+            case 4:
+                return "IV";
+            case 5:
+                return "V";
+            case 6:
+                return "VI";
+            case 7:
+                return "VII";
+            case 8:
+                return "VIII";
+            case 9:
+                return "IX";
+            case 10:
+                return "X";
+            default:
+                return "∞";
+        }
     }
 
     public static Enchantment get(int id) {

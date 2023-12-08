@@ -37,23 +37,23 @@ public class BlockOreGoldNether extends BlockOreGold {
         final NukkitRandom nukkitRandom = new NukkitRandom();
         int count = nukkitRandom.nextRange(2, 6);
         switch (fortune) {
-            case 0 -> {
-            }
-            case 1 -> {
+            case 0:
+                break;
+            case 1:
                 if (nukkitRandom.nextRange(0, 2) == 0) {
                     count *= 2;
                 }
-            }
-            case 2 -> {
+                break;
+            case 2:
                 if (nukkitRandom.nextRange(0, 1) == 0) {
                     count *= nukkitRandom.nextRange(2, 3);
                 }
-            }
-            case 3 -> {
+                break;
+            case 3:
                 if (nukkitRandom.nextRange(0, 4) < 3) {
                     count *= nukkitRandom.nextRange(2, 4);
                 }
-            }
+                break;
         }
 
         return new Item[]{Item.get(ItemID.GOLD_NUGGET, 0, count)};

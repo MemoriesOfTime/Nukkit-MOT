@@ -61,12 +61,17 @@ public abstract class StructurePiece {
         if (orientation == null) {
             return x;
         }
-        return switch (orientation) {
-            case NORTH, SOUTH -> boundingBox.x0 + x;
-            case WEST -> boundingBox.x1 - z;
-            case EAST -> boundingBox.x0 + z;
-            default -> x;
-        };
+        switch (orientation) {
+            case NORTH:
+            case SOUTH:
+                return boundingBox.x0 + x;
+            case WEST:
+                return boundingBox.x1 - z;
+            case EAST:
+                return boundingBox.x0 + z;
+            default:
+                return x;
+        }
     }
 
     protected int getWorldY(final int y) {
@@ -78,12 +83,17 @@ public abstract class StructurePiece {
         if (orientation == null) {
             return z;
         }
-        return switch (orientation) {
-            case NORTH -> boundingBox.z1 - z;
-            case SOUTH -> boundingBox.z0 + z;
-            case WEST, EAST -> boundingBox.z0 + x;
-            default -> z;
-        };
+        switch (orientation) {
+            case NORTH:
+                return boundingBox.z1 - z;
+            case SOUTH:
+                return boundingBox.z0 + z;
+            case WEST:
+            case EAST:
+                return boundingBox.z0 + x;
+            default:
+                return z;
+        }
     }
 
     protected void placeBlock(final ChunkManager level, BlockState block, final int x, final int y, final int z, final BoundingBox boundingBox) {
@@ -278,10 +288,18 @@ public abstract class StructurePiece {
             rotation = Rotation.NONE;
         } else {
             switch (orientation) {
-                case SOUTH -> rotation = Rotation.CLOCKWISE_180;
-                case WEST -> rotation = Rotation.COUNTERCLOCKWISE_90;
-                case EAST -> rotation = Rotation.CLOCKWISE_90;
-                default -> rotation = Rotation.NONE;
+                case SOUTH:
+                    rotation = Rotation.CLOCKWISE_180;
+                    break;
+                case WEST:
+                    rotation = Rotation.COUNTERCLOCKWISE_90;
+                    break;
+                case EAST:
+                    rotation = Rotation.CLOCKWISE_90;
+                    break;
+                default:
+                    rotation = Rotation.NONE;
+                    break;
             }
         }
     }

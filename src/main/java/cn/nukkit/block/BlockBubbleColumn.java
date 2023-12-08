@@ -105,7 +105,8 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
                 if (getDamage() == 1) {
                     entity.motionY = Math.max(-0.9, entity.motionY - 0.03);
                 } else {
-                    if ((entity instanceof EntityCreature entityCreature) && entity.motionY < -entityCreature.getGravity() * 8) {
+                    if ((entity instanceof EntityCreature) && entity.motionY < -((EntityCreature) entity).getGravity() * 8) {
+                        EntityCreature entityCreature = (EntityCreature) entity;
                         entity.motionY = -entityCreature.getGravity() * 2;
                     }
                     entity.motionY = Math.min(1.8, entity.motionY + 0.1);

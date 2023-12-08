@@ -26,6 +26,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.SneakyThrows;
 import lombok.extern.log4j.Log4j2;
+import lombok.var;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -679,36 +680,93 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static void addCreativeItem(int protocol, Item item) {
         switch (protocol) { // NOTE: Not all versions are supposed to be here
-            case v1_2_0 -> Item.creative137.add(item.clone());
-            case v1_5_0 -> Item.creative274.add(item.clone());
-            case v1_7_0 -> Item.creative291.add(item.clone());
-            case v1_8_0 -> Item.creative313.add(item.clone());
-            case v1_9_0 -> Item.creative332.add(item.clone());
-            case v1_10_0 -> Item.creative340.add(item.clone());
-            case v1_11_0 -> Item.creative354.add(item.clone());
-            case v1_14_0 -> Item.creative389.add(item.clone());
-            case v1_16_0 -> Item.creative407.add(item.clone());
-            case v1_17_0 -> Item.creative440.add(item.clone());
-            case v1_17_10 -> Item.creative448.add(item.clone());
-            case v1_17_30 -> Item.creative465.add(item.clone());
-            case v1_17_40 -> Item.creative471.add(item.clone());
-            case v1_18_10 -> Item.creative486.add(item.clone());
-            case v1_18_0 -> Item.creative475.add(item.clone());
-            case v1_18_30 -> Item.creative503.add(item.clone());
-            case v1_19_0 -> Item.creative527.add(item.clone());
-            case v1_19_10 -> Item.creative534.add(item.clone());
-            case v1_19_20 -> Item.creative544.add(item.clone());
-            case v1_19_50 -> Item.creative560.add(item.clone());
-            case v1_19_60 -> Item.creative567.add(item.clone());
-            case v1_19_70 -> Item.creative575.add(item.clone());
-            case v1_19_80 -> Item.creative582.add(item.clone());
-            case v1_20_0 -> Item.creative589.add(item.clone());
-            case v1_20_10 -> Item.creative594.add(item.clone());
-            case v1_20_30 -> Item.creative618.add(item.clone());
-            case v1_20_40 -> Item.creative622.add(item.clone());
-            case v1_20_50 -> Item.creative630.add(item.clone());
+            case v1_2_0:
+                Item.creative137.add(item.clone());
+                break;
+            case v1_5_0:
+                Item.creative274.add(item.clone());
+                break;
+            case v1_7_0:
+                Item.creative291.add(item.clone());
+                break;
+            case v1_8_0:
+                Item.creative313.add(item.clone());
+                break;
+            case v1_9_0:
+                Item.creative332.add(item.clone());
+                break;
+            case v1_10_0:
+                Item.creative340.add(item.clone());
+                break;
+            case v1_11_0:
+                Item.creative354.add(item.clone());
+                break;
+            case v1_14_0:
+                Item.creative389.add(item.clone());
+                break;
+            case v1_16_0:
+                Item.creative407.add(item.clone());
+                break;
+            case v1_17_0:
+                Item.creative440.add(item.clone());
+                break;
+            case v1_17_10:
+                Item.creative448.add(item.clone());
+                break;
+            case v1_17_30:
+                Item.creative465.add(item.clone());
+                break;
+            case v1_17_40:
+                Item.creative471.add(item.clone());
+                break;
+            case v1_18_10:
+                Item.creative486.add(item.clone());
+                break;
+            case v1_18_0:
+                Item.creative475.add(item.clone());
+                break;
+            case v1_18_30:
+                Item.creative503.add(item.clone());
+                break;
+            case v1_19_0:
+                Item.creative527.add(item.clone());
+                break;
+            case v1_19_10:
+                Item.creative534.add(item.clone());
+                break;
+            case v1_19_20:
+                Item.creative544.add(item.clone());
+                break;
+            case v1_19_50:
+                Item.creative560.add(item.clone());
+                break;
+            case v1_19_60:
+                Item.creative567.add(item.clone());
+                break;
+            case v1_19_70:
+                Item.creative575.add(item.clone());
+                break;
+            case v1_19_80:
+                Item.creative582.add(item.clone());
+                break;
+            case v1_20_0:
+                Item.creative589.add(item.clone());
+                break;
+            case v1_20_10:
+                Item.creative594.add(item.clone());
+                break;
+            case v1_20_30:
+                Item.creative618.add(item.clone());
+                break;
+            case v1_20_40:
+                Item.creative622.add(item.clone());
+                break;
+            case v1_20_50:
+                Item.creative630.add(item.clone());
+                break;
             // TODO Multiversion
-            default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
+            default:
+                throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
     }
 
@@ -840,7 +898,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerNamespacedIdItem(customItem.getNamespaceId(), supplier);
 
         // 在服务端注册自定义物品的tag
-        if (customDef.getNbt(ProtocolInfo.CURRENT_PROTOCOL).get("components") instanceof CompoundTag componentTag) {
+        if (customDef.getNbt(ProtocolInfo.CURRENT_PROTOCOL).get("components") instanceof CompoundTag) {
+            CompoundTag componentTag = (CompoundTag) customDef.getNbt(ProtocolInfo.CURRENT_PROTOCOL).get("components");
             var tagList = componentTag.getList("item_tags", StringTag.class);
             if (tagList.size() != 0) {
                 ItemTag.registerItemTag(customItem.getNamespaceId(), tagList.getAll().stream().map(tag -> tag.data).collect(Collectors.toSet()));

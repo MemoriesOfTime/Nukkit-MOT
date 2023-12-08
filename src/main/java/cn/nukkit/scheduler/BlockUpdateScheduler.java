@@ -6,21 +6,20 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockUpdateEntry;
-import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
+import com.google.common.collect.Maps;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 public class BlockUpdateScheduler {
 
     private final Level level;
     private long lastTick;
-    private final Long2ObjectNonBlockingMap<Set<BlockUpdateEntry>> queuedUpdates;
+    private Map<Long, LinkedHashSet<BlockUpdateEntry>> queuedUpdates;
 
     private Set<BlockUpdateEntry> pendingUpdates;
 
     public BlockUpdateScheduler(Level level, long currentTick) {
-        queuedUpdates = new Long2ObjectNonBlockingMap<>();
+        queuedUpdates = Maps.newHashMap(); // Change to ConcurrentHashMap if this needs to be concurrent
         lastTick = currentTick;
         this.level = level;
     }
@@ -96,16 +95,16 @@ public class BlockUpdateScheduler {
 
     public void add(BlockUpdateEntry entry) {
         long time = getMinTime(entry);
-        Set<BlockUpdateEntry> updateSet = queuedUpdates.get(time);
+        LinkedHashSet<BlockUpdateEntry> updateSet = queuedUpdates.get(time);
         if (updateSet == null) {
-            Set<BlockUpdateEntry> tmp = queuedUpdates.putIfAbsent(time, updateSet = ConcurrentHashMap.newKeySet());
+            LinkedHashSet<BlockUpdateEntry> tmp = queuedUpdates.putIfAbsent(time, updateSet = new LinkedHashSet<>());
             if (tmp != null) updateSet = tmp;
         }
         updateSet.add(entry);
     }
 
     public boolean contains(BlockUpdateEntry entry) {
-        for (Map.Entry<Long, Set<BlockUpdateEntry>> tickUpdateSet : queuedUpdates.entrySet()) {
+        for (Map.Entry<Long, LinkedHashSet<BlockUpdateEntry>> tickUpdateSet : queuedUpdates.entrySet()) {
             if (tickUpdateSet.getValue().contains(entry)) {
                 return true;
             }
@@ -114,7 +113,7 @@ public class BlockUpdateScheduler {
     }
 
     public boolean remove(BlockUpdateEntry entry) {
-        for (Map.Entry<Long, Set<BlockUpdateEntry>> tickUpdateSet : queuedUpdates.entrySet()) {
+        for (Map.Entry<Long, LinkedHashSet<BlockUpdateEntry>> tickUpdateSet : queuedUpdates.entrySet()) {
             if (tickUpdateSet.getValue().remove(entry)) {
                 return true;
             }

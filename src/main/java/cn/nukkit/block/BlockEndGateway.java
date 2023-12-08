@@ -46,7 +46,8 @@ public class BlockEndGateway extends BlockSolid {
         }
 
         if (this.getLevel().getDimension() == Level.DIMENSION_THE_END) {
-            if (this.getLevel().getBlockEntity(this) instanceof BlockEntityEndGateway entityEndGateway) {
+            if (this.getLevel().getBlockEntity(this) instanceof BlockEntityEndGateway) {
+                BlockEntityEndGateway entityEndGateway = (BlockEntityEndGateway) this.getLevel().getBlockEntity(this);
                 return !entityEndGateway.isTeleportCooldown();
             }
         }
@@ -112,9 +113,10 @@ public class BlockEndGateway extends BlockSolid {
             return;
         }
 
-        if (!(this.getLevel().getBlockEntity(this) instanceof BlockEntityEndGateway endGateway)) {
+        if (!(this.getLevel().getBlockEntity(this) instanceof BlockEntityEndGateway)) {
             return;
         }
+        BlockEntityEndGateway endGateway = (BlockEntityEndGateway) this.getLevel().getBlockEntity(this);
 
         if (!endGateway.isTeleportCooldown()) {
             endGateway.teleportEntity(entity);

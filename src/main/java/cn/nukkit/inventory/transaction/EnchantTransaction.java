@@ -25,7 +25,8 @@ public class EnchantTransaction extends InventoryTransaction {
     public EnchantTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions);
         for (InventoryAction action : actions) {
-            if (action instanceof SlotChangeAction slotChangeAction) {
+            if (action instanceof SlotChangeAction) {
+                SlotChangeAction slotChangeAction = (SlotChangeAction) action;
                 if (slotChangeAction.getInventory() instanceof EnchantInventory && slotChangeAction.getSlot() == 0) {
                     this.outputItem = slotChangeAction.getTargetItem();
                 }

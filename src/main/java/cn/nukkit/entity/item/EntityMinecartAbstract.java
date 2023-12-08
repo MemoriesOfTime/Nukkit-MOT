@@ -228,7 +228,8 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
 
             //使矿车通知漏斗更新而不是漏斗来检测矿车
             //通常情况下，矿车的数量远远少于漏斗，所以说此举能大福提高性能
-            if (this instanceof InventoryHolder holder) {
+            if (this instanceof InventoryHolder) {
+                InventoryHolder holder = (InventoryHolder) this;
                 checkPickupHopper(new SimpleAxisAlignedBB(this.x, this.y - 1, this.z, this.x, this.y, this.z), holder);
                 //漏斗矿车会自行拉取物品!
                 if (!(this instanceof EntityMinecartHopper)) {
@@ -418,7 +419,8 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                 for (int y = minY; y <= maxY; ++y) {
                     tmpBV.setComponents(x, y, z);
                     var be = this.level.getBlockEntity(tmpBV);
-                    if (be instanceof BlockEntityHopper blockEntityHopper) {
+                    if (be instanceof BlockEntityHopper) {
+                        BlockEntityHopper blockEntityHopper = (BlockEntityHopper) be;
                         blockEntityHopper.setMinecartInvPushTo(holder);
                         return true;
                     }
@@ -447,7 +449,8 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                 for (int y = minY; y <= maxY; ++y) {
                     tmpBV.setComponents(x, y, z);
                     var be = this.level.getBlockEntity(tmpBV);
-                    if (be instanceof BlockEntityHopper blockEntityHopper) {
+                    if (be instanceof BlockEntityHopper) {
+                        BlockEntityHopper blockEntityHopper = (BlockEntityHopper) be;
                         blockEntityHopper.setMinecartInvPickupFrom(holder);
                         return true;
                     }

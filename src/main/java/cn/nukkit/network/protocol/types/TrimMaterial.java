@@ -1,4 +1,12 @@
 package cn.nukkit.network.protocol.types;
 
-public record TrimMaterial(String materialId, String color, String itemName) {
+import lombok.Data;
+
+@Data
+public class TrimMaterial {
+
+    private String materialId;
+    private String color;
+    private String itemName;
+
 }

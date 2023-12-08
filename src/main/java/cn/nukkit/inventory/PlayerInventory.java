@@ -70,7 +70,8 @@ public class PlayerInventory extends BaseInventory {
                 }
             }
             if (player.protocol >= ProtocolInfo.v1_19_50 //TODO check version
-                    && item instanceof ItemMap itemMap) {
+                    && item instanceof ItemMap) {
+                ItemMap itemMap = (ItemMap) item;
                 itemMap.trySendImage(player);
             }
         }

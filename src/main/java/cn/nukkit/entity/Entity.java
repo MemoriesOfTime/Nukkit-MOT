@@ -3097,7 +3097,8 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if(property.getIdentifier() == identifier && property instanceof EnumEntityProperty enumEntityProperty) {
+            if(property.getIdentifier() == identifier && property instanceof EnumEntityProperty) {
+                EnumEntityProperty enumEntityProperty = (EnumEntityProperty) property;
                 int index = enumEntityProperty.findIndex(value);
 
                 if(index >= 0) {
@@ -3125,13 +3126,17 @@ public abstract class Entity extends Location implements Metadatable {
         for (EntityProperty property : entityPropertyList) {
             final String identifier = property.getIdentifier();
 
-            if (property instanceof FloatEntityProperty floatProperty) {
+            if (property instanceof FloatEntityProperty) {
+                FloatEntityProperty floatProperty = (FloatEntityProperty) property;
                 floatProperties.put(identifier, floatProperty.getDefaultValue());
-            } else if (property instanceof IntEntityProperty intProperty) {
+            } else if (property instanceof IntEntityProperty) {
+                IntEntityProperty intProperty = (IntEntityProperty) property;
                 intProperties.put(identifier, intProperty.getDefaultValue());
-            } else if (property instanceof BooleanEntityProperty booleanProperty) {
+            } else if (property instanceof BooleanEntityProperty) {
+                BooleanEntityProperty booleanProperty = (BooleanEntityProperty) property;
                 intProperties.put(identifier, booleanProperty.getDefaultValue() ? 1 : 0);
-            } else if (property instanceof EnumEntityProperty enumProperty) {
+            } else if (property instanceof EnumEntityProperty) {
+                EnumEntityProperty enumProperty = (EnumEntityProperty) property;
                 intProperties.put(identifier, enumProperty.findIndex(enumProperty.getDefaultValue()));
             }
         }

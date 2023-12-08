@@ -37,7 +37,8 @@ public class RepairItemTransaction extends InventoryTransaction {
         //额外检查 保证在所有action处理完成后再检查
         boolean hasSlotChangeAction = false;
         for (InventoryAction action : actions) {
-            if (action instanceof SlotChangeAction slotChangeAction) {
+            if (action instanceof SlotChangeAction) {
+                SlotChangeAction slotChangeAction = (SlotChangeAction) action;
                 if (slotChangeAction.getInventory() instanceof PlayerInventory) { //真正给玩家背包物品的操作
                     if (hasSlotChangeAction) {
                         this.isError = true;

@@ -34,7 +34,8 @@ public class EntityScorer implements IScorer {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof EntityScorer entityScorer) {
+        if (obj instanceof EntityScorer) {
+            EntityScorer entityScorer = (EntityScorer) obj;
             return entityUuid.equals(entityScorer.entityUuid);
         }
         return false;

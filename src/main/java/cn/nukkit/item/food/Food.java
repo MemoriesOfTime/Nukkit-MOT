@@ -107,9 +107,11 @@ public abstract class Food {
         Objects.requireNonNull(food);
         Objects.requireNonNull(plugin);
         food.relativeIDs.forEach(n -> {
-            if (n instanceof NodeStringIDMeta nodeStringIDMeta) {
+            if (n instanceof NodeStringIDMeta) {
+                NodeStringIDMeta nodeStringIDMeta = (NodeStringIDMeta) n;
                 registryCustom.put(nodeStringIDMeta, food);
-            } else if (n instanceof NodeIDMetaPlugin nodeIDMetaPlugin) {
+            } else if (n instanceof NodeIDMetaPlugin) {
+                NodeIDMetaPlugin nodeIDMetaPlugin = (NodeIDMetaPlugin) n;
                 registryCustom.put(nodeIDMetaPlugin, food);
             } else {
                 registryCustom.put(new NodeIDMetaPlugin(n.id, n.meta, plugin), food);
@@ -140,7 +142,8 @@ public abstract class Food {
     public static Food getByRelative(int relativeID, String stringID, int meta) {
         final Food[] result = {null};
         registryCustom.forEach((n, f) -> {
-            if (n.id == relativeID && n.meta == meta && n.plugin.isEnabled() && (n instanceof NodeStringIDMeta ns && ns.stringID.equals(stringID))) {
+            if (n.id == relativeID && n.meta == meta && n.plugin.isEnabled() && (n instanceof NodeStringIDMeta && ((NodeStringIDMeta) n).stringID.equals(stringID))) {
+                NodeStringIDMeta ns = (NodeStringIDMeta) n;
                 result[0] = f;
             }
         });

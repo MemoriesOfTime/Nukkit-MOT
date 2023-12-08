@@ -323,7 +323,8 @@ public class Utils {
     }
 
     public static double toDouble(Object number) {
-        if (number instanceof Double doubleNumber) {
+        if (number instanceof Double) {
+            Double doubleNumber = (Double) number;
             return doubleNumber;
         } else if (number instanceof String) {
             return new BigDecimal(number.toString()).doubleValue();

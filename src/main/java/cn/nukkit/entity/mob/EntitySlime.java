@@ -149,12 +149,16 @@ public class EntitySlime extends EntityJumpingMob {
 
     @Override
     public int getKillExperience() {
-        return switch (this.size) {
-            case SIZE_BIG -> 4;
-            case SIZE_MEDIUM -> 2;
-            case SIZE_SMALL -> 1;
-            default -> 0;
-        };
+        switch (this.size) {
+            case SIZE_BIG:
+                return 4;
+            case SIZE_MEDIUM:
+                return 2;
+            case SIZE_SMALL:
+                return 1;
+            default:
+                return 0;
+        }
     }
 
     public int getSlimeSize() {

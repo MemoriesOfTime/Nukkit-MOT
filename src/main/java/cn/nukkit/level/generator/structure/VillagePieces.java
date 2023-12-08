@@ -246,10 +246,13 @@ public final class VillagePieces {
         protected StructurePiece generateChildLeft(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int yOffset, final int horizontalOffset) {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
-                return switch (orientation) {
-                    case WEST, EAST -> generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
-                    default -> generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.WEST, getGenDepth());
-                };
+                switch (orientation) {
+                    case WEST:
+                    case EAST:
+                        return generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
+                    default:
+                        return generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.WEST, getGenDepth());
+                }
             }
             return null;
         }
@@ -257,10 +260,13 @@ public final class VillagePieces {
         protected StructurePiece generateChildRight(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int yOffset, final int horizontalOffset) {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
-                return switch (orientation) {
-                    case WEST, EAST -> generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
-                    default -> generatePieceFromSmallDoor(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.EAST, getGenDepth());
-                };
+                switch (orientation) {
+                    case WEST:
+                    case EAST:
+                        return generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
+                    default:
+                        return generatePieceFromSmallDoor(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.EAST, getGenDepth());
+                }
             }
             return null;
         }
@@ -339,72 +345,77 @@ public final class VillagePieces {
 
         protected BlockState getSpecificBlock(final BlockState block) {
             switch (type) {
-                case DESERT -> {
+                case DESERT:
                     switch (block.getId()) {
-                        case BlockID.LOG, BlockID.LOG2, BlockID.COBBLESTONE, BlockID.GRAVEL -> {
+                        case BlockID.LOG:
+                        case BlockID.LOG2:
+                        case BlockID.COBBLESTONE:
+                        case BlockID.GRAVEL:
                             return SANDSTONE;
-                        }
-                        case BlockID.PLANKS -> {
+                        case BlockID.PLANKS:
                             return SMOOTH_SANDSTONE;
-                        }
-                        case BlockID.WOOD_STAIRS, BlockID.COBBLESTONE_STAIRS -> {
+                        case BlockID.WOOD_STAIRS:
+                        case BlockID.COBBLESTONE_STAIRS:
                             return new BlockState(Block.SANDSTONE_STAIRS, block.getMeta());
-                        }
                     }
-                }
-                case TAIGA, COLD -> {
+                    break;
+                case TAIGA:
+                case COLD:
                     switch (block.getId()) {
-                        case BlockID.LOG, BlockID.LOG2 -> {
-                            return switch (block.getMeta() | 0b11) {
-                                case 0b111 -> new BlockState(Block.LOG, BlockWood.SPRUCE | 0b101);
-                                case 0b1011 -> new BlockState(Block.LOG, BlockWood.SPRUCE | 0b1001);
-                                default -> new BlockState(Block.LOG, BlockWood.SPRUCE);
-                            };
-                        }
-                        case BlockID.PLANKS -> {
+                        case BlockID.LOG:
+                        case BlockID.LOG2:
+                            switch (block.getMeta() | 0b11) {
+                                case 0b111:
+                                    return new BlockState(Block.LOG, BlockWood.SPRUCE | 0b101);
+                                case 0b1011:
+                                    return new BlockState(Block.LOG, BlockWood.SPRUCE | 0b1001);
+                                default:
+                                    return new BlockState(Block.LOG, BlockWood.SPRUCE);
+                            }
+                        case BlockID.PLANKS:
                             return SPRUCE_PLANKS;
-                        }
-                        case BlockID.WOOD_STAIRS -> {
+                        case BlockID.WOOD_STAIRS:
                             return new BlockState(Block.SPRUCE_WOOD_STAIRS, block.getMeta());
-                        }
-                        case BlockID.FENCE -> {
+                        case BlockID.FENCE:
                             return SPRUCE_FENCE;
-                        }
                     }
-                }
-                case SAVANNA -> {
+                    break;
+                case SAVANNA:
                     switch (block.getId()) {
-                        case BlockID.LOG, BlockID.LOG2 -> {
-                            return switch (block.getMeta() | 0b11) {
-                                case 0b111 -> new BlockState(Block.LOG2, BlockWood2.ACACIA | 0b101);
-                                case 0b1011 -> new BlockState(Block.LOG2, BlockWood2.ACACIA | 0b1001);
-                                default -> new BlockState(Block.LOG2, BlockWood2.ACACIA);
-                            };
-                        }
-                        case BlockID.PLANKS -> {
+                        case BlockID.LOG:
+                        case BlockID.LOG2:
+                            switch (block.getMeta() | 0b11) {
+                                case 0b111:
+                                    return new BlockState(Block.LOG2, BlockWood2.ACACIA | 0b101);
+                                case 0b1011:
+                                    return new BlockState(Block.LOG2, BlockWood2.ACACIA | 0b1001);
+                                default:
+                                    return new BlockState(Block.LOG2, BlockWood2.ACACIA);
+                            }
+                        case BlockID.PLANKS:
                             return ACACIA_PLANKS;
-                        }
-                        case BlockID.WOOD_STAIRS -> {
+                        case BlockID.WOOD_STAIRS:
                             return new BlockState(Block.ACACIA_WOODEN_STAIRS, block.getMeta());
-                        }
-                        case BlockID.COBBLESTONE -> {
+                        case BlockID.COBBLESTONE:
                             return ACACIA_LOG__Y;
-                        }
-                        case BlockID.FENCE -> {
+                        case BlockID.FENCE:
                             return ACACIA_FENCE;
-                        }
                     }
-                }
+                    break;
             }
             return block;
         }
 
         protected BlockState getDoorBlock() {
-            return switch (type) {
-                case SAVANNA -> ACACIA_DOOR;
-                case TAIGA, COLD -> SPRUCE_DOOR;
-                default -> OAK_DOOR;
-            };
+            switch (type) {
+                case SAVANNA:
+                    return ACACIA_DOOR;
+                case TAIGA:
+                case COLD:
+                    return SPRUCE_DOOR;
+                default:
+                    return OAK_DOOR;
+            }
         }
 
         protected void placeDoor(final ChunkManager level, final BoundingBox boundingBox, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation) {
@@ -416,10 +427,18 @@ public final class VillagePieces {
         protected void placeTorch(final ChunkManager level, final BlockFace orientation, final int x, final int y, final int z, final BoundingBox boundingBox) {
             if (!isZombieVillage) {
                 switch (orientation) {
-                    case SOUTH -> placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.SOUTH), x, y, z, boundingBox);
-                    case EAST -> placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.EAST), x, y, z, boundingBox);
-                    case WEST -> placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.WEST), x, y, z, boundingBox);
-                    default -> placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.NORTH), x, y, z, boundingBox);
+                    case SOUTH:
+                        placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.SOUTH), x, y, z, boundingBox);
+                        break;
+                    case EAST:
+                        placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.EAST), x, y, z, boundingBox);
+                        break;
+                    case WEST:
+                        placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.WEST), x, y, z, boundingBox);
+                        break;
+                    default:
+                        placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.NORTH), x, y, z, boundingBox);
+                        break;
                 }
             }
         }
@@ -1219,12 +1238,18 @@ public final class VillagePieces {
 
 		//\\ Farmland::selectCrops(Random &,StartPiece &)
 		protected static BlockState selectCrops(final NukkitRandom random) {
-			return switch (random.nextBoundedInt(10)) {
-				case 0, 1 -> CARROTS;
-				case 2, 3 -> POTATOES;
-				case 4 -> BEETROOTS;
-				default -> WHEAT;
-			};
+            switch (random.nextBoundedInt(10)) {
+                case 0:
+                case 1:
+                    return CARROTS;
+                case 2:
+                case 3:
+                    return POTATOES;
+                case 4:
+                    return BEETROOTS;
+                default:
+                    return WHEAT;
+            }
 		}
 
 		public static Farmland createPiece(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
@@ -1687,21 +1712,37 @@ public final class VillagePieces {
 			final BlockFace orientation = getOrientation();
 
 			if (success && random.nextBoundedInt(3) > 0 && orientation != null) {
-				switch (orientation) {
-					case SOUTH -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z1 - 2, BlockFace.WEST, getGenDepth());
-					case WEST -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
-					case EAST -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 - 2, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
-					default -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0, BlockFace.WEST, getGenDepth());
-				}
+                switch (orientation) {
+                    case SOUTH:
+                        generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z1 - 2, BlockFace.WEST, getGenDepth());
+                        break;
+                    case WEST:
+                        generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
+                        break;
+                    case EAST:
+                        generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 - 2, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
+                        break;
+                    default:
+                        generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0, BlockFace.WEST, getGenDepth());
+                        break;
+                }
 			}
 
 			if (success && random.nextBoundedInt(3) > 0 && orientation != null) {
-				switch (orientation) {
-					case SOUTH -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z1 - 2, BlockFace.EAST, getGenDepth());
-					case WEST -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
-					case EAST -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 - 2, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
-					default -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0, BlockFace.EAST, getGenDepth());
-				}
+                switch (orientation) {
+                    case SOUTH:
+                        generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z1 - 2, BlockFace.EAST, getGenDepth());
+                        break;
+                    case WEST:
+                        generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
+                        break;
+                    case EAST:
+                        generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 - 2, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
+                        break;
+                    default:
+                        generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0, BlockFace.EAST, getGenDepth());
+                        break;
+                }
 			}
 		}
 

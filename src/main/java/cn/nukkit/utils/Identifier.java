@@ -138,7 +138,8 @@ public class Identifier {
         if (this == o) {
             return true;
         }
-        if (o instanceof Identifier lv) {
+        if (o instanceof Identifier) {
+            Identifier lv = (Identifier) o;
             return this.namespace.equals(lv.namespace) && this.path.equals(lv.path);
         }
         return false;

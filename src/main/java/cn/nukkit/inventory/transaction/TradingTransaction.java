@@ -15,7 +15,8 @@ public class TradingTransaction extends InventoryTransaction {
     @Override
     public boolean canExecute() {
         for (var action : this.getActionList()) {
-            if (action instanceof TradeAction tradeAction) {
+            if (action instanceof TradeAction) {
+                TradeAction tradeAction = (TradeAction) action;
                 if (tradeAction.isValid(this.source)) {
                     return true;
                 }
@@ -27,7 +28,8 @@ public class TradingTransaction extends InventoryTransaction {
     @Override
     public boolean execute() {
         for (InventoryAction action : this.actions) {
-            if (action instanceof SlotChangeAction slotChangeAction) {
+            if (action instanceof SlotChangeAction) {
+                SlotChangeAction slotChangeAction = (SlotChangeAction) action;
                 if (slotChangeAction.execute(this.source)) {
                     slotChangeAction.onExecuteSuccess(this.source);
                 } else {

@@ -231,8 +231,10 @@ public final class StrongholdPieces {
         //\\ StrongholdPiece::generateSmallDoor(BlockSource *,Random &,BoundingBox const &,StrongholdPiece::SmallDoorType,int,int,int)
         protected void generateSmallDoor(final ChunkManager level, final BoundingBox boundingBox, final SmallDoorType type, final int x, final int y, final int z) {
             switch (type) {
-                case OPENING -> generateBox(level, boundingBox, x, y, z, x + 3 - 1, y + 3 - 1, z, BlockState.AIR, BlockState.AIR, false);
-                case WOOD_DOOR -> {
+                case OPENING:
+                    generateBox(level, boundingBox, x, y, z, x + 3 - 1, y + 3 - 1, z, BlockState.AIR, BlockState.AIR, false);
+                    break;
+                case WOOD_DOOR:
                     placeBlock(level, STONE_BRICKS, x, y, z, boundingBox);
                     placeBlock(level, STONE_BRICKS, x, y + 1, z, boundingBox);
                     placeBlock(level, STONE_BRICKS, x, y + 2, z, boundingBox);
@@ -242,8 +244,8 @@ public final class StrongholdPieces {
                     placeBlock(level, STONE_BRICKS, x + 2, y, z, boundingBox);
                     placeBlock(level, OAK_DOOR, x + 1, y, z, boundingBox);
                     placeBlock(level, new BlockState(Block.WOODEN_DOOR_BLOCK, UpperBlockBit.UPPER), x + 1, y + 1, z, boundingBox);
-                }
-                case GRATES -> {
+                    break;
+                case GRATES:
                     placeBlock(level, BlockState.AIR, x + 1, y, z, boundingBox);
                     placeBlock(level, BlockState.AIR, x + 1, y + 1, z, boundingBox);
                     placeBlock(level, IRON_BARS, x, y, z, boundingBox);
@@ -253,8 +255,8 @@ public final class StrongholdPieces {
                     placeBlock(level, IRON_BARS, x + 2, y + 2, z, boundingBox);
                     placeBlock(level, IRON_BARS, x + 2, y + 1, z, boundingBox);
                     placeBlock(level, IRON_BARS, x + 2, y, z, boundingBox);
-                }
-                case IRON_DOOR -> {
+                    break;
+                case IRON_DOOR:
                     placeBlock(level, STONE_BRICKS, x, y, z, boundingBox);
                     placeBlock(level, STONE_BRICKS, x, y + 1, z, boundingBox);
                     placeBlock(level, STONE_BRICKS, x, y + 2, z, boundingBox);
@@ -266,18 +268,22 @@ public final class StrongholdPieces {
                     placeBlock(level, new BlockState(Block.IRON_DOOR_BLOCK, UpperBlockBit.UPPER), x + 1, y + 1, z, boundingBox);
                     placeBlock(level, new BlockState(Block.STONE_BUTTON, FacingDirection.NORTH), x + 2, y + 1, z + 1, boundingBox);
                     placeBlock(level, new BlockState(Block.STONE_BUTTON, FacingDirection.SOUTH), x + 2, y + 1, z - 1, boundingBox);
-                }
+                    break;
             }
         }
 
         protected SmallDoorType randomSmallDoor(final NukkitRandom random) {
             final int i = random.nextBoundedInt(5);
-            return switch (i) {
-                case 2 -> SmallDoorType.WOOD_DOOR;
-                case 3 -> SmallDoorType.GRATES;
-                case 4 -> SmallDoorType.IRON_DOOR;
-                default -> SmallDoorType.OPENING;
-            };
+            switch (i) {
+                case 2:
+                    return SmallDoorType.WOOD_DOOR;
+                case 3:
+                    return SmallDoorType.GRATES;
+                case 4:
+                    return SmallDoorType.IRON_DOOR;
+                default:
+                    return SmallDoorType.OPENING;
+            }
         }
 
         //\\ StrongholdPiece::generateSmallDoorChildForward(SHStartPiece *,std::vector<std::unique_ptr<StructurePiece,std::default_delete<StructurePiece>>,std::allocator<std::unique_ptr<StructurePiece,std::default_delete<StructurePiece>>>> &,Random &,int,int)
@@ -285,10 +291,18 @@ public final class StrongholdPieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case NORTH -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 + x, boundingBox.y0 + y, boundingBox.z0 - 1, orientation, getGenDepth());
-                    case SOUTH -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 + x, boundingBox.y0 + y, boundingBox.z1 + 1, orientation, getGenDepth());
-                    case WEST -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + y, boundingBox.z0 + x, orientation, getGenDepth());
-                    case EAST -> generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + y, boundingBox.z0 + x, orientation, getGenDepth());
+                    case NORTH:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x0 + x, boundingBox.y0 + y, boundingBox.z0 - 1, orientation, getGenDepth());
+                        break;
+                    case SOUTH:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x0 + x, boundingBox.y0 + y, boundingBox.z1 + 1, orientation, getGenDepth());
+                        break;
+                    case WEST:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + y, boundingBox.z0 + x, orientation, getGenDepth());
+                        break;
+                    case EAST:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + y, boundingBox.z0 + x, orientation, getGenDepth());
+                        break;
                 }
             }
         }
@@ -298,8 +312,14 @@ public final class StrongholdPieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case NORTH, SOUTH -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + y, boundingBox.z0 + z, BlockFace.WEST, getGenDepth());
-                    case WEST, EAST -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 + z, boundingBox.y0 + y, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
+                    case NORTH:
+                    case SOUTH:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + y, boundingBox.z0 + z, BlockFace.WEST, getGenDepth());
+                        break;
+                    case WEST:
+                    case EAST:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x0 + z, boundingBox.y0 + y, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
+                        break;
                 }
             }
         }
@@ -309,8 +329,14 @@ public final class StrongholdPieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case NORTH, SOUTH -> generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + y, boundingBox.z0 + z, BlockFace.EAST, getGenDepth());
-                    case WEST, EAST -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 + z, boundingBox.y0 + y, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
+                    case NORTH:
+                    case SOUTH:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + y, boundingBox.z0 + z, BlockFace.EAST, getGenDepth());
+                        break;
+                    case WEST:
+                    case EAST:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x0 + z, boundingBox.y0 + y, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
+                        break;
                 }
             }
         }
@@ -760,7 +786,7 @@ public final class StrongholdPieces {
             generateBox(level, boundingBox, 10, 1, 4, 10, 3, 6, BlockState.AIR, BlockState.AIR, false);
 
             switch (type) {
-                case 0 -> {
+                case 0:
                     placeBlock(level, STONE_BRICKS, 5, 1, 5, boundingBox);
                     placeBlock(level, STONE_BRICKS, 5, 2, 5, boundingBox);
                     placeBlock(level, STONE_BRICKS, 5, 3, 5, boundingBox);
@@ -776,8 +802,8 @@ public final class StrongholdPieces {
                     placeBlock(level, SMOOTH_STONE_SLAB, 6, 1, 6, boundingBox);
                     placeBlock(level, SMOOTH_STONE_SLAB, 5, 1, 4, boundingBox);
                     placeBlock(level, SMOOTH_STONE_SLAB, 5, 1, 6, boundingBox);
-                }
-                case 1 -> {
+                    break;
+                case 1:
                     for (int i = 0; i < 5; ++i) {
                         placeBlock(level, STONE_BRICKS, 3, 1, 3 + i, boundingBox);
                         placeBlock(level, STONE_BRICKS, 7, 1, 3 + i, boundingBox);
@@ -804,8 +830,8 @@ public final class StrongholdPieces {
                         placeBlock(level, water9, 5, y, 6, boundingBox);
                         placeBlock(level, water9, 5, y, 4, boundingBox);
                     }
-                }
-                case 2 -> {
+                    break;
+                case 2:
                     for (int z = 1; z <= 9; ++z) {
                         placeBlock(level, COBBLESTONE, 1, 3, z, boundingBox);
                         placeBlock(level, COBBLESTONE, 9, 3, z, boundingBox);
@@ -859,7 +885,7 @@ public final class StrongholdPieces {
                             Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
                         }
                     }
-                }
+                    break;
             }
 
             return true;

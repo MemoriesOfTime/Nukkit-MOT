@@ -75,7 +75,8 @@ public class InventoryTransaction {
             return;
         }
 
-        if (action instanceof SlotChangeAction slotChangeAction) {
+        if (action instanceof SlotChangeAction) {
+            SlotChangeAction slotChangeAction = (SlotChangeAction) action;
             Item targetItem = slotChangeAction.getTargetItem();
             Item sourceItem = slotChangeAction.getSourceItem();
             if (targetItem.getCount() > targetItem.getMaxStackSize() || sourceItem.getCount() > sourceItem.getMaxStackSize()) {
@@ -87,7 +88,8 @@ public class InventoryTransaction {
 
             while (iterator.hasNext()) {
                 InventoryAction existingAction = iterator.next();
-                if (existingAction instanceof SlotChangeAction existingSlotChangeAction) {
+                if (existingAction instanceof SlotChangeAction) {
+                    SlotChangeAction existingSlotChangeAction = (SlotChangeAction) existingAction;
                     if (slotChangeAction.getInventory() instanceof ShulkerBoxInventory && (targetItem.getId() == BlockID.SHULKER_BOX || targetItem.getId() == BlockID.UNDYED_SHULKER_BOX)) {
                         invalid = true;
                         return;

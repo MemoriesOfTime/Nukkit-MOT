@@ -14,59 +14,45 @@ public enum Rotation {
             case BlockID.UNLIT_REDSTONE_TORCH:
             case BlockID.REDSTONE_TORCH:
                 switch (meta) {
-                    case 1 -> {
+                    case 1:
                         return 3;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 4;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 2;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 1;
-                    }
                 }
                 break;
 
             case BlockID.RAIL:
                 switch (meta) {
-                    case 6 -> {
+                    case 6:
                         return 7;
-                    }
-                    case 7 -> {
+                    case 7:
                         return 8;
-                    }
-                    case 8 -> {
+                    case 8:
                         return 9;
-                    }
-                    case 9 -> {
+                    case 9:
                         return 6;
-                    }
                 }
 
             case BlockID.POWERED_RAIL:
             case BlockID.DETECTOR_RAIL:
             case BlockID.ACTIVATOR_RAIL:
                 switch (meta & 0x7) {
-                    case 0 -> {
+                    case 0:
                         return 1 | meta & ~0x7;
-                    }
-                    case 1 -> {
+                    case 1:
                         return meta & ~0x7;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 5 | meta & ~0x7;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 4 | meta & ~0x7;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 2 | meta & ~0x7;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 3 | meta & ~0x7;
-                    }
                 }
                 break;
 
@@ -85,30 +71,22 @@ public enum Rotation {
             case BlockID.DARK_OAK_WOODEN_STAIRS:
             case BlockID.PURPUR_STAIRS:
                 switch (meta) {
-                    case 0 -> {
+                    case 0:
                         return 2;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 3;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 1;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 0;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 6;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 7;
-                    }
-                    case 6 -> {
+                    case 6:
                         return 5;
-                    }
-                    case 7 -> {
+                    case 7:
                         return 4;
-                    }
                 }
                 break;
 
@@ -116,18 +94,14 @@ public enum Rotation {
             case BlockID.WOODEN_BUTTON: {
                 final int thrown = meta & 0x8;
                 switch (meta & ~0x8) {
-                    case 2 -> {
+                    case 2:
                         return 5 | thrown;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 4 | thrown;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 2 | thrown;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 3 | thrown;
-                    }
                 }
                 break;
             }
@@ -135,30 +109,22 @@ public enum Rotation {
             case BlockID.LEVER: {
                 final int thrown = meta & 0x8;
                 switch (meta & ~0x8) {
-                    case 1 -> {
+                    case 1:
                         return 3 | thrown;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 4 | thrown;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 2 | thrown;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 1 | thrown;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 6 | thrown;
-                    }
-                    case 6 -> {
+                    case 6:
                         return 5 | thrown;
-                    }
-                    case 7 -> {
+                    case 7:
                         return thrown;
-                    }
-                    case 0 -> {
+                    case 0:
                         return 7 | thrown;
-                    }
                 }
                 break;
             }
@@ -180,18 +146,14 @@ public enum Rotation {
                 final int extra = meta & ~0x3;
                 final int withoutFlags = meta & 0x3;
                 switch (withoutFlags) {
-                    case 0 -> {
+                    case 0:
                         return 1 | extra;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 2 | extra;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 3 | extra;
-                    }
-                    case 3 -> {
+                    case 3:
                         return extra;
-                    }
                 }
                 break;
             }
@@ -211,18 +173,14 @@ public enum Rotation {
                 final int extra = meta & 0x8;
                 final int withoutFlags = meta & ~0x8;
                 switch (withoutFlags) {
-                    case 2 -> {
+                    case 2:
                         return 5 | extra;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 4 | extra;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 2 | extra;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 3 | extra;
-                    }
                 }
                 break;
             }
@@ -231,36 +189,28 @@ public enum Rotation {
             case BlockID.END_ROD:
                 final int dispPower = meta & 0x8;
                 switch (meta & ~0x8) {
-                    case 2 -> {
+                    case 2:
                         return 5 | dispPower;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 4 | dispPower;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 2 | dispPower;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 3 | dispPower;
-                    }
                 }
                 break;
 
             case BlockID.PUMPKIN:
             case BlockID.JACK_O_LANTERN:
                 switch (meta) {
-                    case 0 -> {
+                    case 0:
                         return 1;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 2;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 3;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 0;
-                    }
                 }
                 break;
 
@@ -280,18 +230,14 @@ public enum Rotation {
                 final int dir = meta & 0x03;
                 final int delay = meta - dir;
                 switch (dir) {
-                    case 0 -> {
+                    case 0:
                         return 1 | delay;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 2 | delay;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 3 | delay;
-                    }
-                    case 3 -> {
+                    case 3:
                         return delay;
-                    }
                 }
                 break;
 
@@ -300,18 +246,14 @@ public enum Rotation {
                 final int withoutOrientation = meta & ~0x3;
                 final int orientation = meta & 0x3;
                 switch (orientation) {
-                    case 0 -> {
+                    case 0:
                         return 3 | withoutOrientation;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 2 | withoutOrientation;
-                    }
-                    case 2 -> {
+                    case 2:
                         return withoutOrientation;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 1 | withoutOrientation;
-                    }
                 }
                 break;
 
@@ -323,18 +265,14 @@ public enum Rotation {
             case 189: //BlockID.CHAIN_COMMAND_BLOCK
                 final int rest = meta & ~0x7;
                 switch (meta & 0x7) {
-                    case 2 -> {
+                    case 2:
                         return 5 | rest;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 4 | rest;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 2 | rest;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 3 | rest;
-                    }
                 }
                 break;
 
@@ -357,18 +295,14 @@ public enum Rotation {
             case BlockID.ANVIL:
                 final int damage = meta & ~0x3;
                 switch (meta & 0x3) {
-                    case 0 -> {
+                    case 0:
                         return 3 | damage;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 1 | damage;
-                    }
-                    case 1 -> {
+                    case 1:
                         return damage;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 2 | damage;
-                    }
                 }
                 break;
 
@@ -394,18 +328,14 @@ public enum Rotation {
             case BlockID.BLACK_GLAZED_TERRACOTTA:
             case BlockID.OBSERVER:
                 switch (meta) {
-                    case 2 -> {
+                    case 2:
                         return 5;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 4;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 2;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 3;
-                    }
                 }
                 break;
 
@@ -414,18 +344,14 @@ public enum Rotation {
 
             case BlockID.ITEM_FRAME_BLOCK:
                 switch (meta) {
-                    case 0 -> {
+                    case 0:
                         return 2;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 3;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 1;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 0;
-                    }
                 }
                 break;
 
@@ -440,35 +366,27 @@ public enum Rotation {
             case BlockID.UNLIT_REDSTONE_TORCH:
             case BlockID.REDSTONE_TORCH:
                 switch (meta) {
-                    case 3 -> {
+                    case 3:
                         return 1;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 2;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 3;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 4;
-                    }
                 }
                 break;
 
             case BlockID.RAIL:
                 switch (meta) {
-                    case 7 -> {
+                    case 7:
                         return 6;
-                    }
-                    case 8 -> {
+                    case 8:
                         return 7;
-                    }
-                    case 9 -> {
+                    case 9:
                         return 8;
-                    }
-                    case 6 -> {
+                    case 6:
                         return 9;
-                    }
                 }
 
             case BlockID.POWERED_RAIL:
@@ -476,24 +394,18 @@ public enum Rotation {
             case BlockID.ACTIVATOR_RAIL:
                 final int power = meta & ~0x7;
                 switch (meta & 0x7) {
-                    case 1 -> {
+                    case 1:
                         return power;
-                    }
-                    case 0 -> {
+                    case 0:
                         return 1 | power;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 2 | power;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 3 | power;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 4 | power;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 5 | power;
-                    }
                 }
                 break;
 
@@ -512,30 +424,22 @@ public enum Rotation {
             case BlockID.DARK_OAK_WOODEN_STAIRS:
             case BlockID.PURPUR_STAIRS:
                 switch (meta) {
-                    case 2 -> {
+                    case 2:
                         return 0;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 1;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 2;
-                    }
-                    case 0 -> {
+                    case 0:
                         return 3;
-                    }
-                    case 6 -> {
+                    case 6:
                         return 4;
-                    }
-                    case 7 -> {
+                    case 7:
                         return 5;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 6;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 7;
-                    }
                 }
                 break;
 
@@ -543,18 +447,14 @@ public enum Rotation {
             case BlockID.WOODEN_BUTTON: {
                 final int thrown = meta & 0x8;
                 switch (meta & ~0x8) {
-                    case 4 -> {
+                    case 4:
                         return 3 | thrown;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 2 | thrown;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 5 | thrown;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 4 | thrown;
-                    }
                 }
                 break;
             }
@@ -562,30 +462,22 @@ public enum Rotation {
             case BlockID.LEVER: {
                 final int thrown = meta & 0x8;
                 switch (meta & ~0x8) {
-                    case 3 -> {
+                    case 3:
                         return 1 | thrown;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 2 | thrown;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 3 | thrown;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 4 | thrown;
-                    }
-                    case 6 -> {
+                    case 6:
                         return 5 | thrown;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 6 | thrown;
-                    }
-                    case 0 -> {
+                    case 0:
                         return 7 | thrown;
-                    }
-                    case 7 -> {
+                    case 7:
                         return thrown;
-                    }
                 }
                 break;
             }
@@ -607,18 +499,14 @@ public enum Rotation {
                 final int extra = meta & ~0x3;
                 final int withoutFlags = meta & 0x3;
                 switch (withoutFlags) {
-                    case 1 -> {
+                    case 1:
                         return extra;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 1 | extra;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 2 | extra;
-                    }
-                    case 0 -> {
+                    case 0:
                         return 3 | extra;
-                    }
                 }
                 break;
             }
@@ -638,18 +526,14 @@ public enum Rotation {
                 final int extra = meta & 0x8;
                 final int withoutFlags = meta & ~0x8;
                 switch (withoutFlags) {
-                    case 5 -> {
+                    case 5:
                         return 2 | extra;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 3 | extra;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 4 | extra;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 5 | extra;
-                    }
                 }
                 break;
             }
@@ -658,35 +542,27 @@ public enum Rotation {
             case BlockID.END_ROD:
                 final int dispPower = meta & 0x8;
                 switch (meta & ~0x8) {
-                    case 5 -> {
+                    case 5:
                         return 2 | dispPower;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 3 | dispPower;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 4 | dispPower;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 5 | dispPower;
-                    }
                 }
                 break;
             case BlockID.PUMPKIN:
             case BlockID.JACK_O_LANTERN:
                 switch (meta) {
-                    case 1 -> {
+                    case 1:
                         return 0;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 1;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 2;
-                    }
-                    case 0 -> {
+                    case 0:
                         return 3;
-                    }
                 }
                 break;
             case BlockID.HAY_BALE:
@@ -705,18 +581,14 @@ public enum Rotation {
                 final int dir = meta & 0x03;
                 final int delay = meta - dir;
                 switch (dir) {
-                    case 1 -> {
+                    case 1:
                         return delay;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 1 | delay;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 2 | delay;
-                    }
-                    case 0 -> {
+                    case 0:
                         return 3 | delay;
-                    }
                 }
                 break;
 
@@ -725,18 +597,14 @@ public enum Rotation {
                 final int withoutOrientation = meta & ~0x3;
                 final int orientation = meta & 0x3;
                 switch (orientation) {
-                    case 3 -> {
+                    case 3:
                         return withoutOrientation;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 1 | withoutOrientation;
-                    }
-                    case 0 -> {
+                    case 0:
                         return 2 | withoutOrientation;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 3 | withoutOrientation;
-                    }
                 }
 
             case BlockID.PISTON:
@@ -747,18 +615,14 @@ public enum Rotation {
             case 189: //BlockID.CHAIN_COMMAND_BLOCK
                 final int rest = meta & ~0x7;
                 switch (meta & 0x7) {
-                    case 5 -> {
+                    case 5:
                         return 2 | rest;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 3 | rest;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 4 | rest;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 5 | rest;
-                    }
                 }
                 break;
 
@@ -781,18 +645,14 @@ public enum Rotation {
             case BlockID.ANVIL:
                 final int damage = meta & ~0x3;
                 switch (meta & 0x3) {
-                    case 0 -> {
+                    case 0:
                         return 1 | damage;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 3 | damage;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 2 | damage;
-                    }
-                    case 3 -> {
+                    case 3:
                         return damage;
-                    }
                 }
                 break;
 
@@ -818,18 +678,14 @@ public enum Rotation {
             case BlockID.BLACK_GLAZED_TERRACOTTA:
             case BlockID.OBSERVER:
                 switch (meta) {
-                    case 2 -> {
+                    case 2:
                         return 4;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 5;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 3;
-                    }
-                    case 5 -> {
+                    case 5:
                         return 2;
-                    }
                 }
                 break;
 
@@ -838,18 +694,14 @@ public enum Rotation {
 
             case BlockID.ITEM_FRAME_BLOCK:
                 switch (meta) {
-                    case 0 -> {
+                    case 0:
                         return 3;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 2;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 0;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 1;
-                    }
                 }
                 break;
 
@@ -863,37 +715,29 @@ public enum Rotation {
             case BlockID.TORCH:
             case BlockID.UNLIT_REDSTONE_TORCH:
             case BlockID.REDSTONE_TORCH:
+                // 5 is vertical
                 switch (meta) {
-                    case 1 -> {
+                    case 1:
                         return 2;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 1;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 4;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 3;
-                    }
-                    // 5 is vertical
                 }
                 break;
 
             case BlockID.RAIL:
                 switch (meta) {
-                    case 6 -> {
+                    case 6:
                         return 8;
-                    }
-                    case 7 -> {
+                    case 7:
                         return 9;
-                    }
-                    case 8 -> {
+                    case 8:
                         return 6;
-                    }
-                    case 9 -> {
+                    case 9:
                         return 7;
-                    }
                 }
 
 
@@ -901,25 +745,19 @@ public enum Rotation {
             case BlockID.DETECTOR_RAIL:
             case BlockID.ACTIVATOR_RAIL:
                 switch (meta & 0x7) {
-                    case 0 -> {
+                    case 0:
                         return meta & ~0x7;
-                    }
-                    case 1 -> {
+                    case 1:
                         return 1 | meta & ~0x7;
-                    }
-                    case 2 -> {
+                    case 2:
                         return 3 | meta & ~0x7;
-                    }
-                    case 3 -> {
+                    case 3:
                         return 2 | meta & ~0x7;
-                    }
-                    case 4 -> {
+                    case 4:
                         return 5 | meta & ~0x7;
-					}
-					case 5 -> {
-						return 4 | meta & ~0x7;
-					}
-				}
+                    case 5:
+                        return 4 | meta & ~0x7;
+                }
 				break;
 
 			case BlockID.RED_SANDSTONE_STAIRS:
@@ -936,83 +774,63 @@ public enum Rotation {
 			case BlockID.ACACIA_WOODEN_STAIRS:
 			case BlockID.DARK_OAK_WOODEN_STAIRS:
 			case BlockID.PURPUR_STAIRS:
-				switch (meta) {
-					case 0 -> {
-						return 1;
-					}
-					case 1 -> {
-						return 0;
-					}
-					case 2 -> {
-						return 3;
-					}
-					case 3 -> {
-						return 2;
-					}
-					case 4 -> {
-						return 5;
-					}
-					case 5 -> {
-						return 4;
-					}
-					case 6 -> {
-						return 7;
-					}
-					case 7 -> {
-						return 6;
-					}
-				}
+                switch (meta) {
+                    case 0:
+                        return 1;
+                    case 1:
+                        return 0;
+                    case 2:
+                        return 3;
+                    case 3:
+                        return 2;
+                    case 4:
+                        return 5;
+                    case 5:
+                        return 4;
+                    case 6:
+                        return 7;
+                    case 7:
+                        return 6;
+                }
 				break;
 
 			case BlockID.STONE_BUTTON:
 			case BlockID.WOODEN_BUTTON: {
 				final int thrown = meta & 0x8;
-				switch (meta & ~0x8) {
-					case 2 -> {
-						return 3 | thrown;
-					}
-					case 3 -> {
-						return 2 | thrown;
-					}
-					case 4 -> {
-						return 5 | thrown;
-					}
-					case 5 -> {
-						return 4 | thrown;
-					}
-					// 0 and 1 are vertical
-				}
+                // 0 and 1 are vertical
+                switch (meta & ~0x8) {
+                    case 2:
+                        return 3 | thrown;
+                    case 3:
+                        return 2 | thrown;
+                    case 4:
+                        return 5 | thrown;
+                    case 5:
+                        return 4 | thrown;
+                }
 				break;
 			}
 
 			case BlockID.LEVER: {
 				final int thrown = meta & 0x8;
-				switch (meta & ~0x8) {
-					case 1 -> {
-						return 2 | thrown;
-					}
-					case 2 -> {
-						return 1 | thrown;
-					}
-					case 3 -> {
-						return 4 | thrown;
-					}
-					case 4 -> {
-						return 3 | thrown;
-					}
-					case 5 -> {
-						return 5 | thrown;
-					}
-					case 6 -> {
-						return 6 | thrown;
-					}
-					case 7 -> {
-						return 7 | thrown;
-					}
-					case 0 -> {
-						return thrown;
-					}
-				}
+                switch (meta & ~0x8) {
+                    case 1:
+                        return 2 | thrown;
+                    case 2:
+                        return 1 | thrown;
+                    case 3:
+                        return 4 | thrown;
+                    case 4:
+                        return 3 | thrown;
+                    case 5:
+                        return 5 | thrown;
+                    case 6:
+                        return 6 | thrown;
+                    case 7:
+                        return 7 | thrown;
+                    case 0:
+                        return thrown;
+                }
 				break;
 			}
 
@@ -1034,20 +852,16 @@ public enum Rotation {
 			case BlockID.TRIPWIRE_HOOK: {
 				final int extra = meta & ~0x3;
 				final int withoutFlags = meta & 0x3;
-				switch (withoutFlags) {
-					case 0 -> {
-						return 2 | extra;
-					}
-					case 1 -> {
-						return 3 | extra;
-					}
-					case 2 -> {
-						return extra;
-					}
-					case 3 -> {
-						return 1 | extra;
-					}
-				}
+                switch (withoutFlags) {
+                    case 0:
+                        return 2 | extra;
+                    case 1:
+                        return 3 | extra;
+                    case 2:
+                        return extra;
+                    case 3:
+                        return 1 | extra;
+                }
 				break;
 			}
 			case BlockID.SIGN_POST:
@@ -1065,58 +879,46 @@ public enum Rotation {
 			case BlockID.HOPPER_BLOCK: {
 				final int extra = meta & 0x8;
 				final int withoutFlags = meta & ~0x8;
-				switch (withoutFlags) {
-					case 2 -> {
-						return 3 | extra;
-					}
-					case 3 -> {
-						return 2 | extra;
-					}
-					case 4 -> {
-						return 5 | extra;
-					}
-					case 5 -> {
-						return 4 | extra;
-					}
-				}
+                switch (withoutFlags) {
+                    case 2:
+                        return 3 | extra;
+                    case 3:
+                        return 2 | extra;
+                    case 4:
+                        return 5 | extra;
+                    case 5:
+                        return 4 | extra;
+                }
 				break;
 			}
 			case BlockID.DISPENSER:
 			case BlockID.DROPPER:
 			case BlockID.END_ROD:
 				final int dispPower = meta & 0x8;
-				switch (meta & ~0x8) {
-					case 2 -> {
-						return 3 | dispPower;
-					}
-					case 3 -> {
-						return 2 | dispPower;
-					}
-					case 4 -> {
-						return 5 | dispPower;
-					}
-					case 5 -> {
-						return 4 | dispPower;
-					}
-				}
+                switch (meta & ~0x8) {
+                    case 2:
+                        return 3 | dispPower;
+                    case 3:
+                        return 2 | dispPower;
+                    case 4:
+                        return 5 | dispPower;
+                    case 5:
+                        return 4 | dispPower;
+                }
 				break;
 
 			case BlockID.PUMPKIN:
 			case BlockID.JACK_O_LANTERN:
-				switch (meta) {
-					case 0 -> {
-						return 2;
-					}
-					case 1 -> {
-						return 3;
-					}
-					case 2 -> {
-						return 0;
-					}
-					case 3 -> {
-						return 1;
-					}
-				}
+                switch (meta) {
+                    case 0:
+                        return 2;
+                    case 1:
+                        return 3;
+                    case 2:
+                        return 0;
+                    case 3:
+                        return 1;
+                }
 				break;
 
 			case BlockID.HAY_BALE:
@@ -1124,7 +926,8 @@ public enum Rotation {
 			case BlockID.LOG2:
 			case BlockID.QUARTZ_BLOCK:
 			case BlockID.PURPUR_BLOCK:
-			case BlockID.BONE_BLOCK, BlockID.NETHER_PORTAL:
+            case BlockID.BONE_BLOCK:
+            case BlockID.NETHER_PORTAL:
 				break;
 
 			case BlockID.UNPOWERED_COMPARATOR:
@@ -1133,40 +936,32 @@ public enum Rotation {
 			case BlockID.POWERED_REPEATER:
 				final int dir = meta & 0x03;
 				final int delay = meta - dir;
-				switch (dir) {
-					case 0 -> {
-						return 2 | delay;
-					}
-					case 1 -> {
-						return 3 | delay;
-					}
-					case 2 -> {
-						return delay;
-					}
-					case 3 -> {
-						return 1 | delay;
-					}
-				}
+                switch (dir) {
+                    case 0:
+                        return 2 | delay;
+                    case 1:
+                        return 3 | delay;
+                    case 2:
+                        return delay;
+                    case 3:
+                        return 1 | delay;
+                }
 				break;
 
 			case BlockID.TRAPDOOR:
 			case BlockID.IRON_TRAPDOOR:
 				final int withoutOrientation = meta & ~0x3;
 				final int orientation = meta & 0x3;
-				switch (orientation) {
-					case 0 -> {
-						return 1 | withoutOrientation;
-					}
-					case 1 -> {
-						return withoutOrientation;
-					}
-					case 2 -> {
-						return 3 | withoutOrientation;
-					}
-					case 3 -> {
-						return 2 | withoutOrientation;
-					}
-				}
+                switch (orientation) {
+                    case 0:
+                        return 1 | withoutOrientation;
+                    case 1:
+                        return withoutOrientation;
+                    case 2:
+                        return 3 | withoutOrientation;
+                    case 3:
+                        return 2 | withoutOrientation;
+                }
 				break;
 
 			case BlockID.PISTON:
@@ -1176,20 +971,16 @@ public enum Rotation {
 			case 188: //BlockID.REPEATING_COMMAND_BLOCK
 			case 189: //BlockID.CHAIN_COMMAND_BLOCK
 				final int rest = meta & ~0x7;
-				switch (meta & 0x7) {
-					case 2 -> {
-						return 3 | rest;
-					}
-					case 3 -> {
-						return 2 | rest;
-					}
-					case 4 -> {
-						return 5 | rest;
-					}
-					case 5 -> {
-						return 4 | rest;
-					}
-				}
+                switch (meta & 0x7) {
+                    case 2:
+                        return 3 | rest;
+                    case 3:
+                        return 2 | rest;
+                    case 4:
+                        return 5 | rest;
+                    case 5:
+                        return 4 | rest;
+                }
 				break;
 
 			case BlockID.BROWN_MUSHROOM_BLOCK:
@@ -1210,20 +1001,16 @@ public enum Rotation {
 
 			case BlockID.ANVIL:
 				final int damage = meta & ~0x3;
-				switch (meta & 0x3) {
-					case 0 -> {
-						return 2 | damage;
-					}
-					case 2 -> {
-						return damage;
-					}
-					case 1 -> {
-						return 3 | damage;
-					}
-					case 3 -> {
-						return 1 | damage;
-					}
-				}
+                switch (meta & 0x3) {
+                    case 0:
+                        return 2 | damage;
+                    case 2:
+                        return damage;
+                    case 1:
+                        return 3 | damage;
+                    case 3:
+                        return 1 | damage;
+                }
 				break;
 
 			case BlockID.BED_BLOCK:
@@ -1247,37 +1034,29 @@ public enum Rotation {
 			case BlockID.RED_GLAZED_TERRACOTTA:
 			case BlockID.BLACK_GLAZED_TERRACOTTA:
 			case BlockID.OBSERVER:
-				switch (meta) {
-					case 2 -> {
-						return 3;
-					}
-					case 3 -> {
-						return 2;
-					}
-					case 4 -> {
-						return 5;
-					}
-					case 5 -> {
-						return 4;
-					}
-				}
+                switch (meta) {
+                    case 2:
+                        return 3;
+                    case 3:
+                        return 2;
+                    case 4:
+                        return 5;
+                    case 5:
+                        return 4;
+                }
 				break;
 
 			case BlockID.ITEM_FRAME_BLOCK:
-				switch (meta) {
-					case 0 -> {
-						return 1;
-					}
-					case 1 -> {
-						return 0;
-					}
-					case 2 -> {
-						return 3;
-					}
-					case 3 -> {
-						return 2;
-					}
-				}
+                switch (meta) {
+                    case 0:
+                        return 1;
+                    case 1:
+                        return 0;
+                    case 2:
+                        return 3;
+                    case 3:
+                        return 2;
+                }
 				break;
 
 		}

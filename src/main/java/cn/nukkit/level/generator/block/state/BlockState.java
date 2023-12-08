@@ -48,11 +48,15 @@ public class BlockState {
     }
 
     public BlockState rotate(final Rotation rot) {
-        return switch (rot) {
-            case CLOCKWISE_90 -> new BlockState(id, Rotation.clockwise90(id, meta));
-            case CLOCKWISE_180 -> new BlockState(id, Rotation.clockwise180(id, meta));
-            case COUNTERCLOCKWISE_90 -> new BlockState(id, Rotation.counterclockwise90(id, meta));
-            default -> this;
-        };
+        switch (rot) {
+            case CLOCKWISE_90:
+                return new BlockState(id, Rotation.clockwise90(id, meta));
+            case CLOCKWISE_180:
+                return new BlockState(id, Rotation.clockwise180(id, meta));
+            case COUNTERCLOCKWISE_90:
+                return new BlockState(id, Rotation.counterclockwise90(id, meta));
+            default:
+                return this;
+        }
     }
 }

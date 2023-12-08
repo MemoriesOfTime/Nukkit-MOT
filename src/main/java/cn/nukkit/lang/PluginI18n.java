@@ -98,7 +98,8 @@ public class PluginI18n {
      */
     public String tr(LangCode lang, TextContainer c) {
         String baseText = this.parseLanguageText(lang, c.getText());
-        if (c instanceof TranslationContainer cc) {
+        if (c instanceof TranslationContainer) {
+            TranslationContainer cc = (TranslationContainer) c;
             for (int i = 0; i < cc.getParameters().length; i++) {
                 baseText = baseText.replace("{%" + i + "}", this.parseLanguageText(lang, cc.getParameters()[i]));
             }
@@ -258,30 +259,22 @@ public class PluginI18n {
 
     protected String parseArg(Object arg) {
         switch (arg.getClass().getSimpleName()) {
-            case "int[]" -> {
+            case "int[]":
                 return Arrays.toString((int[]) arg);
-            }
-            case "double[]" -> {
+            case "double[]":
                 return Arrays.toString((double[]) arg);
-            }
-            case "float[]" -> {
+            case "float[]":
                 return Arrays.toString((float[]) arg);
-            }
-            case "short[]" -> {
+            case "short[]":
                 return Arrays.toString((short[]) arg);
-            }
-            case "byte[]" -> {
+            case "byte[]":
                 return Arrays.toString((byte[]) arg);
-            }
-            case "long[]" -> {
+            case "long[]":
                 return Arrays.toString((long[]) arg);
-            }
-            case "boolean[]" -> {
+            case "boolean[]":
                 return Arrays.toString((boolean[]) arg);
-            }
-            default -> {
+            default:
                 return String.valueOf(arg);
-            }
         }
     }
 

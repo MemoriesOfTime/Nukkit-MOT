@@ -567,15 +567,29 @@ public class CustomItemDefinition {
                     .putInt("damage", item.getAttackDamage());
 
             if (speed == null) {
-                speed = switch (item.getTier()) {
-                    case 6 -> 7;
-                    case 5 -> 6;
-                    case 4 -> 5;
-                    case 3 -> 4;
-                    case 2 -> 3;
-                    case 1 -> 2;
-                    default -> 1;
-                };
+                switch (item.getTier()) {
+                    case 6:
+                        speed = 7;
+                        break;
+                    case 5:
+                        speed = 6;
+                        break;
+                    case 4:
+                        speed = 5;
+                        break;
+                    case 3:
+                        speed = 4;
+                        break;
+                    case 2:
+                        speed = 3;
+                        break;
+                    case 1:
+                        speed = 2;
+                        break;
+                    default:
+                        speed = 1;
+                        break;
+                }
             }
             Identifier type = null;
             if (item.isPickaxe()) {

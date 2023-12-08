@@ -48,7 +48,8 @@ public class PlayerScorer implements IScorer {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof PlayerScorer playerScorer) {
+        if (obj instanceof PlayerScorer) {
+            PlayerScorer playerScorer = (PlayerScorer) obj;
             return uuid.equals(playerScorer.uuid);
         }
         return false;

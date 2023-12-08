@@ -17,12 +17,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Getter
 public class JSONScoreboardStorage implements IScoreboardStorage {
@@ -115,12 +110,17 @@ public class JSONScoreboardStorage implements IScoreboardStorage {
             Map<String, Object> line = new HashMap<>();
             line.put("score", e.getScore());
             line.put("scorerType", e.getScorer().getScorerType().name());
-            line.put("name", switch (e.getScorer().getScorerType()) {
-                case PLAYER -> ((PlayerScorer) e.getScorer()).getUuid().toString();
-                case ENTITY -> ((EntityScorer) e.getScorer()).getEntityUuid().toString();
-                case FAKE -> ((FakeScorer) e.getScorer()).getFakeName();
-                default -> null;
-            });
+            switch (e.getScorer().getScorerType()) {
+                case PLAYER:
+                    line.put("name",  ((PlayerScorer) e.getScorer()).getUuid().toString());
+                    break;
+                case ENTITY:
+                    line.put("name",  ((EntityScorer) e.getScorer()).getEntityUuid().toString());
+                    break;
+                case FAKE:
+                    line.put("name",  ((FakeScorer) e.getScorer()).getFakeName());
+                    break;
+            }
             lines.add(line);
         }
         map.put("lines", lines);
@@ -135,11 +135,20 @@ public class JSONScoreboardStorage implements IScoreboardStorage {
         IScoreboard scoreboard = new Scoreboard(objectiveName, displayName, criteriaName, sortOrder);
         for (Map<String, Object> line : (List<Map<String, Object>>) map.get("lines")) {
             int score = ((Double) line.get("score")).intValue();
-            IScorer scorer = switch (line.get("scorerType").toString()) {
-                case "PLAYER" -> new PlayerScorer(UUID.fromString((String) line.get("name")));
-                case "ENTITY" -> new EntityScorer(UUID.fromString((String) line.get("name")));
-                case "FAKE" -> new FakeScorer((String) line.get("name"));
-                default -> null;
+            IScorer scorer;
+            switch (line.get("scorerType").toString()) {
+                case "PLAYER":
+                    scorer = new PlayerScorer(UUID.fromString((String) line.get("name")));
+                    break;
+                case "ENTITY":
+                    scorer = new EntityScorer(UUID.fromString((String) line.get("name")));
+                    break;
+                case "FAKE":
+                    scorer = new FakeScorer((String) line.get("name"));
+                    break;
+                default:
+                    scorer = null;
+                    break;
             };
             scoreboard.addLine(new ScoreboardLine(scoreboard, scorer, score));
         }

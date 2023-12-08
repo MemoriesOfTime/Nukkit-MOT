@@ -198,10 +198,18 @@ public final class NetherBridgePieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case SOUTH -> generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, orientation, getGenDepth(), isCastle);
-                    case WEST -> generateAndAddPiece(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, orientation, getGenDepth(), isCastle);
-                    case EAST -> generateAndAddPiece(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, orientation, getGenDepth(), isCastle);
-                    default -> generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, orientation, getGenDepth(), isCastle);
+                    case SOUTH:
+                        generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, orientation, getGenDepth(), isCastle);
+                        break;
+                    case WEST:
+                        generateAndAddPiece(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, orientation, getGenDepth(), isCastle);
+                        break;
+                    case EAST:
+                        generateAndAddPiece(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, orientation, getGenDepth(), isCastle);
+                        break;
+                    default:
+                        generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, orientation, getGenDepth(), isCastle);
+                        break;
                 }
             }
         }
@@ -210,8 +218,13 @@ public final class NetherBridgePieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case WEST, EAST -> generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth(), isCastle);
-                    default -> generateAndAddPiece(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.WEST, getGenDepth(), isCastle);
+                    case WEST:
+                    case EAST:
+                        generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth(), isCastle);
+                        break;
+                    default:
+                        generateAndAddPiece(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.WEST, getGenDepth(), isCastle);
+                        break;
                 }
             }
         }
@@ -220,8 +233,13 @@ public final class NetherBridgePieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case WEST, EAST -> generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth(), isCastle);
-                    default -> generateAndAddPiece(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.EAST, getGenDepth(), isCastle);
+                    case WEST:
+                    case EAST:
+                        generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth(), isCastle);
+                        break;
+                    default:
+                        generateAndAddPiece(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.EAST, getGenDepth(), isCastle);
+                        break;
                 }
             }
         }

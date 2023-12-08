@@ -108,7 +108,6 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
@@ -213,7 +212,7 @@ public class Server {
 
     private static final Pattern uuidPattern = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}.dat$");
 
-    private final Map<Integer, Level> levels = new ConcurrentHashMap<>() {
+    private final Map<Integer, Level> levels = new ConcurrentHashMap<Integer, Level>() {
         @Override
         public Level put(@NotNull Integer key, @NotNull Level value) {
             Level result = super.put(key, value);

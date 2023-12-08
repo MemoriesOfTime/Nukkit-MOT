@@ -78,9 +78,10 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable {
         int page = 0;
         int maxPage = 0;
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
-        if (!(blockEntity instanceof BlockEntityLectern lectern)) {
+        if (!(blockEntity instanceof BlockEntityLectern)) {
             return power;
         }
+        BlockEntityLectern lectern = (BlockEntityLectern) blockEntity;
         if (lectern.hasBook()) {
             maxPage = lectern.getTotalPages();
             page = lectern.getLeftPage() + 1;
@@ -202,9 +203,10 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable {
 
     public void dropBook(Player player) {
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
-        if (!(blockEntity instanceof BlockEntityLectern lectern)) {
+        if (!(blockEntity instanceof BlockEntityLectern)) {
             return;
         }
+        BlockEntityLectern lectern = (BlockEntityLectern) blockEntity;
 
         Item book = lectern.getBook();
         if (book.isNull()) {

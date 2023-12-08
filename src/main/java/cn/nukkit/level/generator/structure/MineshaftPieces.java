@@ -232,22 +232,22 @@ public final class MineshaftPieces {
                 i = count * 5;
 
                 switch (orientation) {
-                    case SOUTH -> {
+                    case SOUTH:
                         boundingBox.x1 = x + 3 - 1;
                         boundingBox.z1 = z + i - 1;
-                    }
-                    case WEST -> {
+                        break;
+                    case WEST:
                         boundingBox.x0 = x - (i - 1);
                         boundingBox.z1 = z + 3 - 1;
-                    }
-                    case EAST -> {
+                        break;
+                    case EAST:
                         boundingBox.x1 = x + i - 1;
                         boundingBox.z1 = z + 3 - 1;
-                    }
-                    default -> {
+                        break;
+                    default:
                         boundingBox.x1 = x + 3 - 1;
                         boundingBox.z0 = z - (i - 1);
-                    }
+                        break;
                 }
 
                 if (findCollisionPiece(pieces, boundingBox) == null) {
@@ -270,7 +270,7 @@ public final class MineshaftPieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case SOUTH -> {
+                    case SOUTH:
                         if (target <= 1) {
                             generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0 - 1 + random.nextBoundedInt(3), boundingBox.z1 + 1, orientation, genDepth);
                         } else if (target == 2) {
@@ -278,8 +278,8 @@ public final class MineshaftPieces {
                         } else {
                             generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 - 1 + random.nextBoundedInt(3), boundingBox.z1 - 3, BlockFace.EAST, genDepth);
                         }
-                    }
-                    case WEST -> {
+                        break;
+                    case WEST:
                         if (target <= 1) {
                             generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0 - 1 + random.nextBoundedInt(3), boundingBox.z0, orientation, genDepth);
                         } else if (target == 2) {
@@ -287,8 +287,8 @@ public final class MineshaftPieces {
                         } else {
                             generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0 - 1 + random.nextBoundedInt(3), boundingBox.z1 + 1, BlockFace.SOUTH, genDepth);
                         }
-                    }
-                    case EAST -> {
+                        break;
+                    case EAST:
                         if (target <= 1) {
                             generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 - 1 + random.nextBoundedInt(3), boundingBox.z0, orientation, genDepth);
                         } else if (target == 2) {
@@ -296,8 +296,8 @@ public final class MineshaftPieces {
                         } else {
                             generateAndAddPiece(piece, pieces, random, boundingBox.x1 - 3, boundingBox.y0 - 1 + random.nextBoundedInt(3), boundingBox.z1 + 1, BlockFace.SOUTH, genDepth);
                         }
-                    }
-                    default -> {
+                        break;
+                    default:
                         if (target <= 1) {
                             generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0 - 1 + random.nextBoundedInt(3), boundingBox.z0 - 1, orientation, genDepth);
                         } else if (target == 2) {
@@ -305,7 +305,7 @@ public final class MineshaftPieces {
                         } else {
                             generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 - 1 + random.nextBoundedInt(3), boundingBox.z0, BlockFace.EAST, genDepth);
                         }
-                    }
+                        break;
                 }
             }
 
@@ -477,26 +477,26 @@ public final class MineshaftPieces {
             }
 
             switch (orientation) {
-                case SOUTH -> {
+                case SOUTH:
                     boundingBox.x0 = x - 1;
                     boundingBox.x1 = x + 3;
                     boundingBox.z1 = z + 3 + 1;
-                }
-                case WEST -> {
+                    break;
+                case WEST:
                     boundingBox.x0 = x - 4;
                     boundingBox.z0 = z - 1;
                     boundingBox.z1 = z + 3;
-                }
-                case EAST -> {
+                    break;
+                case EAST:
                     boundingBox.x1 = x + 3 + 1;
                     boundingBox.z0 = z - 1;
                     boundingBox.z1 = z + 3;
-                }
-                default -> {
+                    break;
+                default:
                     boundingBox.x0 = x - 1;
                     boundingBox.x1 = x + 3;
                     boundingBox.z0 = z - 4;
-                }
+                    break;
             }
 
             return findCollisionPiece(pieces, boundingBox) == null ? boundingBox : null;
@@ -511,26 +511,26 @@ public final class MineshaftPieces {
         public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
             final int genDepth = getGenDepth();
             switch (direction) {
-                case SOUTH -> {
+                case SOUTH:
                     generateAndAddPiece(piece, pieces, random, boundingBox.x0 + 1, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, genDepth);
                     generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0 + 1, BlockFace.WEST, genDepth);
                     generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0 + 1, BlockFace.EAST, genDepth);
-                }
-                case WEST -> {
+                    break;
+                case WEST:
                     generateAndAddPiece(piece, pieces, random, boundingBox.x0 + 1, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, genDepth);
                     generateAndAddPiece(piece, pieces, random, boundingBox.x0 + 1, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, genDepth);
                     generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0 + 1, BlockFace.WEST, genDepth);
-                }
-                case EAST -> {
+                    break;
+                case EAST:
                     generateAndAddPiece(piece, pieces, random, boundingBox.x0 + 1, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, genDepth);
                     generateAndAddPiece(piece, pieces, random, boundingBox.x0 + 1, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, genDepth);
                     generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0 + 1, BlockFace.EAST, genDepth);
-                }
-                default -> {
+                    break;
+                default:
                     generateAndAddPiece(piece, pieces, random, boundingBox.x0 + 1, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, genDepth);
                     generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0 + 1, BlockFace.WEST, genDepth);
                     generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0 + 1, BlockFace.EAST, genDepth);
-                }
+                    break;
             }
 
             if (isTwoFloored) {
@@ -602,22 +602,22 @@ public final class MineshaftPieces {
         public static BoundingBox findStairs(final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation) {
             final BoundingBox boundingBox = new BoundingBox(x, y - 5, z, x, y + 3 - 1, z);
             switch (orientation) {
-                case SOUTH -> {
+                case SOUTH:
                     boundingBox.x1 = x + 3 - 1;
                     boundingBox.z1 = z + 8;
-                }
-                case WEST -> {
+                    break;
+                case WEST:
                     boundingBox.x0 = x - 8;
                     boundingBox.z1 = z + 3 - 1;
-                }
-                case EAST -> {
+                    break;
+                case EAST:
                     boundingBox.x1 = x + 8;
                     boundingBox.z1 = z + 3 - 1;
-                }
-                default -> {
+                    break;
+                default:
                     boundingBox.x1 = x + 3 - 1;
                     boundingBox.z0 = z - 8;
-                }
+                    break;
             }
 
             return findCollisionPiece(pieces, boundingBox) == null ? boundingBox : null;
@@ -634,10 +634,18 @@ public final class MineshaftPieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case SOUTH -> generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, genDepth);
-                    case WEST -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0, BlockFace.WEST, genDepth);
-                    case EAST -> generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0, BlockFace.EAST, genDepth);
-                    default -> generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, genDepth);
+                    case SOUTH:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, genDepth);
+                        break;
+                    case WEST:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0, BlockFace.WEST, genDepth);
+                        break;
+                    case EAST:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0, BlockFace.EAST, genDepth);
+                        break;
+                    default:
+                        generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, genDepth);
+                        break;
                 }
             }
         }

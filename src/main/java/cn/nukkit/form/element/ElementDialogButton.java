@@ -83,12 +83,16 @@ public class ElementDialogButton {
     }
 
     public Mode getMode() {
-        return switch (mode) {
-            case 0 -> Mode.BUTTON_MODE;
-            case 1 -> Mode.ON_EXIT;
-            case 2 -> Mode.ON_ENTER;
-            default -> throw new IllegalStateException("Unexpected value: " + mode);
-        };
+        switch (mode) {
+            case 0:
+                return Mode.BUTTON_MODE;
+            case 1:
+                return Mode.ON_EXIT;
+            case 2:
+                return Mode.ON_ENTER;
+            default:
+                throw new IllegalStateException("Unexpected value: " + mode);
+        }
     }
 
     public void setMode(Mode mode) {

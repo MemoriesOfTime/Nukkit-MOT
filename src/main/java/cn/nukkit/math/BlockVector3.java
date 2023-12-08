@@ -222,11 +222,14 @@ public class BlockVector3 implements Cloneable {
     }
 
     public int getAxis(BlockFace.Axis axis) {
-        return switch (axis) {
-            case X -> x;
-            case Y -> y;
-            default -> z;
-        };
+        switch (axis) {
+            case X:
+                return x;
+            case Y:
+                return y;
+            default:
+                return z;
+        }
     }
 
     @Override

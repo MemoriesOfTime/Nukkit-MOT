@@ -1,6 +1,7 @@
 package cn.nukkit.resourcepacks.loader;
 
 import cn.nukkit.Server;
+import cn.nukkit.lang.BaseLang;
 import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.resourcepacks.ZippedResourcePack;
 import com.google.common.io.Files;
@@ -27,7 +28,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
 
     @Override
     public List<ResourcePack> loadPacks() {
-        var baseLang = Server.getInstance().getLanguage();
+        BaseLang baseLang = Server.getInstance().getLanguage();
         List<ResourcePack> loadedResourcePacks = new ArrayList<>();
         for (File pack : path.listFiles()) {
             try {
@@ -35,8 +36,13 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
                 String fileExt = Files.getFileExtension(pack.getName());
                 if (!pack.isDirectory() && !fileExt.equals("key")) { //directory resource packs temporarily unsupported
                     switch (fileExt) {
-                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack);
-                        default -> log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
+                        case "zip":
+                        case "mcpack":
+                            resourcePack = new ZippedResourcePack(pack);
+                            break;
+                        default:
+                            log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
+                            break;
                     }
                 }
                 if (resourcePack != null) {

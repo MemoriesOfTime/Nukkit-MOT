@@ -15,12 +15,17 @@ public enum ItemCreativeCategory {
     NONE;
 
     public static ItemCreativeCategory fromID(int num) {
-        return switch (num) {
-            case 1 -> CONSTRUCTOR;
-            case 2 -> NATURE;
-            case 3 -> EQUIPMENT;
-            case 4 -> ITEMS;
-            default -> NONE;
-        };
+        switch (num) {
+            case 1:
+                return CONSTRUCTOR;
+            case 2:
+                return NATURE;
+            case 3:
+                return EQUIPMENT;
+            case 4:
+                return ITEMS;
+            default:
+                return NONE;
+        }
     }
 }

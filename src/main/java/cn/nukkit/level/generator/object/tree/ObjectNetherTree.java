@@ -115,7 +115,8 @@ public abstract class ObjectNetherTree extends ObjectTree {
     }
 
     private boolean checkY(final ChunkManager chunkManager, final int y) {
-        if (chunkManager instanceof final Level level) {
+        if (chunkManager instanceof Level) {
+            final Level level = (Level) chunkManager;
             if (level.getDimension() == Level.DIMENSION_NETHER) {
                 return y > 126;
             }

@@ -50,7 +50,7 @@ public class FogCommand extends VanillaCommand {
             player = Server.getInstance().getPlayer(args[0]);
         }
         switch (args[1]) {
-            case "push" -> {
+            case "push":
                 if (args.length < 4) {
                     sender.sendMessage(new TranslationContainer("commands.generic.usage", "/fog <victim: target> push <fogId: string> <userProvidedId: string>"));
                     return false;
@@ -67,8 +67,7 @@ public class FogCommand extends VanillaCommand {
                 player.sendFogStack();
                 sender.sendMessage(new TranslationContainer("commands.fog.success.push", userProvidedId, fogIdStr));
                 return true;
-            }
-            case "pop" -> {
+            case "pop":
                 if (args.length < 3) {
                     sender.sendMessage(new TranslationContainer("commands.generic.usage", "/fog <victim: target> <mode: delete> <userProvidedId: string>"));
                     return false;
@@ -86,8 +85,7 @@ public class FogCommand extends VanillaCommand {
                 }
                 sender.sendMessage(new TranslationContainer("commands.fog.invalidUserId", userProvidedId));
                 return false;
-            }
-            case "remove" -> {
+            case "remove":
                 if (args.length < 3) {
                     sender.sendMessage(new TranslationContainer("commands.generic.usage", "/fog <victim: target> <mode: delete> <userProvidedId: string>"));
                     return false;
@@ -108,11 +106,9 @@ public class FogCommand extends VanillaCommand {
                     return false;
                 }
                 return true;
-            }
-            default -> {
+            default:
                 sender.sendMessage(new TranslationContainer("commands.generic.usage", "/fog <victim: target> push <fogId: string> <userProvidedId: string>"));
                 return false;
-            }
         }
     }
 }

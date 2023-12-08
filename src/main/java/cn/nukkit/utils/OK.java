@@ -1,5 +1,7 @@
 package cn.nukkit.utils;
 
+import lombok.Data;
+
 import javax.annotation.Nullable;
 import java.util.Objects;
 
@@ -8,15 +10,25 @@ import java.util.Objects;
  *
  * @param <E> the error parameter
  */
-public record OK<E>(boolean ok, @Nullable E error) {
+@Data
+public class OK<E> {
     public static final OK<Void> TRUE = new OK<>(true);
+
+    private boolean ok;
+    private E error;
 
     public OK(boolean ok) {
         this(ok, null);
     }
 
+    public OK(boolean ok, @Nullable E error) {
+        this.ok = ok;
+        this.error = error;
+    }
+
     public Throwable getError() {
-        if (error instanceof Throwable throwable) {
+        if (error instanceof Throwable) {
+            Throwable throwable = (Throwable) error;
             return new AssertionError(throwable);
         } else {
             return new AssertionError(Objects.toString(error, "Unknown error"));
@@ -32,7 +44,8 @@ public record OK<E>(boolean ok, @Nullable E error) {
      */
     public void assertOK() throws AssertionError {
         if (!ok) {
-            if (error instanceof Throwable throwable) {
+            if (error instanceof Throwable) {
+                Throwable throwable = (Throwable) error;
                 throw new AssertionError(throwable);
             } else {
                 throw new AssertionError(Objects.toString(error, "Unknown error"));

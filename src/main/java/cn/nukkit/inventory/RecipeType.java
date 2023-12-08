@@ -28,10 +28,13 @@ public enum RecipeType {
     }
 
     public int getNetworkType(int protocol) {
-        return switch (this) {
-            case SMITHING_TRANSFORM -> protocol >= ProtocolInfo.v1_19_60 ? networkType : 0;
-            case SMITHING_TRIM -> protocol >= ProtocolInfo.v1_19_80 ? networkType : 0;
-            default -> networkType;
-        };
+        switch (this) {
+            case SMITHING_TRANSFORM:
+                return protocol >= ProtocolInfo.v1_19_60 ? networkType : 0;
+            case SMITHING_TRIM:
+                return protocol >= ProtocolInfo.v1_19_80 ? networkType : 0;
+            default:
+                return networkType;
+        }
     }
 }

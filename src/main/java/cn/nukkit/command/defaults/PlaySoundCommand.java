@@ -34,10 +34,11 @@ public class PlaySoundCommand extends VanillaCommand {
         }
 
         if (args.length == 1) {
-            if (!(sender instanceof Player p)) {
+            if (!(sender instanceof Player)) {
                 sender.sendMessage(new TranslationContainer("commands.generic.ingame"));
                 return true;
             }
+            Player p = (Player) sender;
 
             p.getLevel().addSound(p, args[0], p);
             p.sendMessage(new TranslationContainer("commands.playsound.success", args[0], p.getName()));
