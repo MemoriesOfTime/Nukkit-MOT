@@ -842,7 +842,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         // 在服务端注册自定义物品的tag
         if (customDef.getNbt(ProtocolInfo.CURRENT_PROTOCOL).get("components") instanceof CompoundTag componentTag) {
             var tagList = componentTag.getList("item_tags", StringTag.class);
-            if (tagList.size() != 0) {
+            if (!tagList.isEmpty()) {
                 ItemTag.registerItemTag(customItem.getNamespaceId(), tagList.getAll().stream().map(tag -> tag.data).collect(Collectors.toSet()));
             }
         }
@@ -863,6 +863,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCustomItem(customItem, v1_20_10, addCreativeItem, v1_20_10);
         registerCustomItem(customItem, v1_20_30, addCreativeItem, v1_20_30);
         registerCustomItem(customItem, v1_20_40, addCreativeItem, v1_20_40);
+        registerCustomItem(customItem, v1_20_50, addCreativeItem, v1_20_50);
+        //TODO Multiversion 添加新版本支持时修改这里
 
         return new OK<Void>(true);
     }
@@ -878,7 +880,6 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     public static void deleteCustomItem(String namespaceId) {
         if (CUSTOM_ITEMS.containsKey(namespaceId)) {
             Item customItem = fromString(namespaceId);
-            removeCreativeItem(customItem);
             CUSTOM_ITEMS.remove(namespaceId);
             CUSTOM_ITEM_DEFINITIONS.remove(namespaceId);
 
@@ -898,13 +899,15 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             deleteCustomItem(customItem, v1_20_10, v1_20_10);
             deleteCustomItem(customItem, v1_20_30, v1_20_30);
             deleteCustomItem(customItem, v1_20_40, v1_20_40);
+            deleteCustomItem(customItem, v1_20_50, v1_20_50);
+            //TODO Multiversion 添加新版本支持时修改这里
         }
     }
 
     private static void deleteCustomItem(Item item, int protocol, int... creativeProtocols) {
         RuntimeItems.getMapping(protocol).deleteCustomItem((CustomItem) item);
         for (int creativeProtocol : creativeProtocols) {
-            removeCreativeItem(creativeProtocol, (Item) item);
+            removeCreativeItem(creativeProtocol, item);
         }
     }
 
