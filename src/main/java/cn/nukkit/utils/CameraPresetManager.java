@@ -7,6 +7,7 @@ import cn.nukkit.math.Vector3f;
 import cn.nukkit.network.protocol.UpdateSoftEnumPacket;
 import cn.nukkit.network.protocol.types.camera.CameraPreset;
 import lombok.Getter;
+import lombok.var;
 import org.cloudburstmc.protocol.common.DefinitionRegistry;
 import org.cloudburstmc.protocol.common.NamedDefinition;
 import org.cloudburstmc.protocol.common.SimpleDefinitionRegistry;

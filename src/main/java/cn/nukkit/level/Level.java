@@ -3603,14 +3603,14 @@ public class Level implements ChunkManager, Metadatable {
                 loader.onChunkLoaded(chunk);
             }
         } else {
-            this.unloadQueue.put(index, (Long) System.currentTimeMillis());
+            this.unloadQueue.put(index, System.currentTimeMillis());
         }
         return chunk;
     }
 
     private void queueUnloadChunk(int x, int z) {
         long index = Level.chunkHash(x, z);
-        this.unloadQueue.put(index, (Long) System.currentTimeMillis());
+        this.unloadQueue.put(index, System.currentTimeMillis());
     }
 
     public boolean unloadChunkRequest(int x, int z) {
@@ -3913,7 +3913,7 @@ public class Level implements ChunkManager, Metadatable {
 
             int unloaded = 0;
             LongList toRemove = null;
-            for (var entry : unloadQueue.fastEntrySet()) {
+            for (Long2LongMap.Entry entry : unloadQueue.long2LongEntrySet()) {
                 long index = entry.getLongKey();
 
                 if (isChunkInUse(index)) {
@@ -3921,7 +3921,7 @@ public class Level implements ChunkManager, Metadatable {
                 }
 
                 if (!force) {
-                    long time = entry.getValue();
+                    long time = entry.getLongValue();
                     if (unloaded > maxUnload) {
                         break;
                     } else if (time > (now - 20000)) {
@@ -3949,6 +3949,8 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    private int lastUnloadIndex;
+
     /**
      * @param now           current time
      * @param allocatedTime allocated time
@@ -3960,19 +3962,17 @@ public class Level implements ChunkManager, Metadatable {
             boolean result = true;
             int maxIterations = this.unloadQueue.size();
 
-            if (lastUsingUnloadingIter == null) {
-                lastUsingUnloadingIter = this.unloadQueue.fastEntrySet().iterator();
-            }
-
-            var iter = lastUsingUnloadingIter;
+            if (lastUnloadIndex > maxIterations) lastUnloadIndex = 0;
+            ObjectIterator<Long2LongMap.Entry> iter = this.unloadQueue.long2LongEntrySet().iterator();
+            if (lastUnloadIndex != 0) iter.skip(lastUnloadIndex);
 
             LongList toUnload = null;
 
             for (int i = 0; i < maxIterations; i++) {
                 if (!iter.hasNext()) {
-                    iter = this.unloadQueue.fastEntrySet().iterator();
+                    iter = this.unloadQueue.long2LongEntrySet().iterator();
                 }
-                var entry = iter.next();
+                Long2LongMap.Entry entry = iter.next();
 
                 long index = entry.getLongKey();
 
@@ -3981,19 +3981,18 @@ public class Level implements ChunkManager, Metadatable {
                 }
 
                 if (!force) {
-                    long time = entry.getValue();
+                    long time = entry.getLongValue();
                     if (time > (now - 20000)) {
                         continue;
                     }
                 }
 
-                if (toUnload == null) {
-                    toUnload = new LongArrayList();
-                }
+                if (toUnload == null) toUnload = new LongArrayList();
                 toUnload.add(index);
             }
 
             if (toUnload != null) {
+                //long[] arr = toUnload.toLongArray();
                 for (long index : toUnload) {
                     int X = getHashX(index);
                     int Z = getHashZ(index);

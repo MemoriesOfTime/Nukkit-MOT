@@ -3,6 +3,7 @@ package cn.nukkit.resourcepacks;
 import cn.nukkit.Server;
 import com.google.gson.JsonParser;
 import lombok.extern.log4j.Log4j2;
+import lombok.var;
 
 import javax.annotation.Nullable;
 import java.io.ByteArrayOutputStream;

@@ -21,6 +21,8 @@ import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import com.google.common.collect.Lists;
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -248,6 +250,10 @@ public class PopulatorOceanRuin extends Populator {
         }
     }
 
-    public record ChunkPosition(int x, int z) {
+    @AllArgsConstructor
+    @Data
+    public static class ChunkPosition {
+        int x;
+        int z;
     }
 }

@@ -2,6 +2,7 @@ package cn.nukkit.utils;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.nbt.tag.CompoundTag;
+import lombok.var;
 
 public class RecipeBuildUtils {
     private final CompoundTag recipe;

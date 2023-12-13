@@ -6,6 +6,7 @@ import cn.nukkit.plugin.PluginBase;
 import io.netty.util.internal.EmptyArrays;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
+import lombok.var;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -154,8 +155,10 @@ public class PluginI18n {
         if (result != null) {
             return result;
         } else {
-            var matcher = split.matcher(str);
-            return matcher.replaceAll(m -> this.getOrOriginal(lang, m.group().substring(1)));
+            return str;
+            //TODO
+            /*var matcher = split.matcher(str);
+            return matcher.replaceAll(m -> this.getOrOriginal(lang, m.group().substring(1)));*/
         }
     }
 

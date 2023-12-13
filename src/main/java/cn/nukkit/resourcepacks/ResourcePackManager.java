@@ -5,6 +5,7 @@ import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
 import com.google.common.collect.Sets;
 import lombok.extern.log4j.Log4j2;
+import lombok.var;
 
 import java.io.File;
 import java.util.*;

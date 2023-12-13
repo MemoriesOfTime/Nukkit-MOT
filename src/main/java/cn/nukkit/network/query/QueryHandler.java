@@ -97,7 +97,7 @@ public class QueryHandler {
                     this.regenerateInfo();
                 }
 
-                ByteBuf reply = PooledByteBufAllocator.DEFAULT.directBuffer(64);
+                reply = PooledByteBufAllocator.DEFAULT.directBuffer(64);
                 reply.writeByte(STATISTICS);
                 reply.writeInt(sessionId);
                 if (packet.readableBytes() == 8) {

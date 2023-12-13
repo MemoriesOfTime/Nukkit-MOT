@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.inventory.transaction.action.TradeAction;
+import lombok.var;
 
 import java.util.List;
 

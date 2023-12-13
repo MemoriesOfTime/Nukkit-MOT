@@ -3,6 +3,7 @@ package cn.nukkit.inventory;
 import cn.nukkit.Server;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.Identifier;
+import lombok.var;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;

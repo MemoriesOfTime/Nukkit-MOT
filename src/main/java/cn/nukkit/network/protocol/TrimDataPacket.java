@@ -51,9 +51,9 @@ public class TrimDataPacket extends DataPacket {
         });
         putUnsignedVarInt(materials.size());
         materials.forEach(m -> {
-            putString(m.materialId());
-            putString(m.color());
-            putString(m.itemName());
+            putString(m.getMaterialId());
+            putString(m.getColor());
+            putString(m.getItemName());
         });
     }
 }

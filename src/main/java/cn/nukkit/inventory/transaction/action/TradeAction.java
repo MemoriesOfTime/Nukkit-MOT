@@ -6,6 +6,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.types.NetworkInventoryAction;
+import lombok.var;
 
 public class TradeAction extends InventoryAction {
 

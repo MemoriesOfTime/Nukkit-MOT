@@ -7,6 +7,7 @@ import cn.nukkit.form.handler.FormDialogHandler;
 import com.google.common.reflect.TypeToken;
 import com.google.gson.Gson;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import lombok.var;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;

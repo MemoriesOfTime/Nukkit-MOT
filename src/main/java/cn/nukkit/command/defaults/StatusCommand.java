@@ -10,6 +10,7 @@ import cn.nukkit.network.Network;
 import cn.nukkit.utils.TextFormat;
 import com.sun.jna.platform.win32.COM.WbemcliUtil;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import lombok.var;
 import oshi.SystemInfo;
 import oshi.driver.windows.wmi.Win32ComputerSystem;
 import oshi.hardware.*;

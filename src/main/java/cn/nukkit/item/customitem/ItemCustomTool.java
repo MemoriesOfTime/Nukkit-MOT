@@ -3,6 +3,7 @@ package cn.nukkit.item.customitem;
 import cn.nukkit.item.*;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.var;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

@@ -10,6 +10,7 @@ import cn.nukkit.math.Vector3;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import lombok.var;
 
 import java.util.Collections;
 import java.util.List;

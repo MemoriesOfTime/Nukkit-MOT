@@ -18,6 +18,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.var;
 
 import java.util.HashSet;
 

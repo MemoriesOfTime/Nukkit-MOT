@@ -15,6 +15,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Identifier;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.NonNull;
+import lombok.var;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;

@@ -9,6 +9,7 @@ import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.network.protocol.PlayerFogPacket;
 import cn.nukkit.utils.Identifier;
+import lombok.var;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -72,10 +73,10 @@ public class FogCommand extends VanillaCommand {
                     sender.sendMessage(new TranslationContainer("commands.generic.usage", "/fog <victim: target> <mode: delete> <userProvidedId: string>"));
                     return false;
                 }
-                String userProvidedId = args[2];
+                userProvidedId = args[2];
                 List<PlayerFogPacket.Fog> fogStack = player.getFogStack();
                 for (int i = fogStack.size() - 1; i >= 0; i--) {
-                    var fog = fogStack.get(i);
+                    fog = fogStack.get(i);
                     if (fog.userProvidedId().equals(userProvidedId)) {
                         fogStack.remove(fog);
                         player.sendFogStack();
@@ -90,13 +91,13 @@ public class FogCommand extends VanillaCommand {
                     sender.sendMessage(new TranslationContainer("commands.generic.usage", "/fog <victim: target> <mode: delete> <userProvidedId: string>"));
                     return false;
                 }
-                String userProvidedId = args[2];
-                var fogStack = player.getFogStack();
+                userProvidedId = args[2];
+                fogStack = player.getFogStack();
                 List<PlayerFogPacket.Fog> shouldRemoved = new ArrayList<>();
-                for (PlayerFogPacket.Fog fog : fogStack) {
-                    if (fog.userProvidedId().equals(userProvidedId)) {
-                        shouldRemoved.add(fog);
-                        sender.sendMessage(new TranslationContainer("commands.fog.success.remove", userProvidedId, fog.identifier().toString()));
+                for (PlayerFogPacket.Fog fog1 : fogStack) {
+                    if (fog1.userProvidedId().equals(userProvidedId)) {
+                        shouldRemoved.add(fog1);
+                        sender.sendMessage(new TranslationContainer("commands.fog.success.remove", userProvidedId, fog1.identifier().toString()));
                     }
                 }
                 fogStack.removeAll(shouldRemoved);

@@ -424,7 +424,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void addEntity(Entity entity) {
         if (this.entities == null) {
-            this.entities = new Long2ObjectNonBlockingMap<>();
+            this.entities = new Long2ObjectOpenHashMap<>();
         }
         this.entities.put(entity.getId(), entity);
         if (!(entity instanceof Player) && this.isInit) {
@@ -445,8 +445,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void addBlockEntity(BlockEntity blockEntity) {
         if (this.tiles == null) {
-            this.tiles = new Long2ObjectNonBlockingMap<>();
-            this.tileList = new Long2ObjectNonBlockingMap<>();
+            this.tiles = new Long2ObjectOpenHashMap<>();
+            this.tileList = new Int2ObjectOpenHashMap<>();
         }
         this.tiles.put(blockEntity.getId(), blockEntity);
         int index = ((blockEntity.getFloorZ() & 0x0f) << 12) | ((blockEntity.getFloorX() & 0x0f) << 8) | (blockEntity.getFloorY() & 0xff);

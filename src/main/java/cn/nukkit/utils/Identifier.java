@@ -1,5 +1,6 @@
 package cn.nukkit.utils;
 
+import lombok.var;
 import org.jetbrains.annotations.Nullable;
 
 /**

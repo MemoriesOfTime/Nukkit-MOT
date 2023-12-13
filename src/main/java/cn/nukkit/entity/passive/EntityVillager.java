@@ -15,6 +15,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.Tag;
 import lombok.Getter;
+import lombok.var;
 
 public class EntityVillager extends EntityWalkingAnimal implements InventoryHolder {
 

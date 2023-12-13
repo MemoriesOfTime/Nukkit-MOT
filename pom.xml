@@ -5,7 +5,7 @@
     <name>Nukkit-MOT</name>
     <groupId>cn.nukkit</groupId>
     <artifactId>Nukkit</artifactId>
-    <version>MOT-SNAPSHOT</version>
+    <version>MOT-java8-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
