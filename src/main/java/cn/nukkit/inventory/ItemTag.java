@@ -6,7 +6,6 @@ import cn.nukkit.utils.Identifier;
 import lombok.var;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -64,18 +63,10 @@ public final class ItemTag {
 
     static {
         final var config = new Config(Config.JSON);
-        try {
-            config.load(Server.class.getModule().getResourceAsStream("tag_2_items.json"));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        config.load(Server.class.getClassLoader().getResourceAsStream("tag_2_items.json"));
         config.getAll().forEach((k, v) -> TAG_2_ITEMS.put(k, ((List<?>) v).stream().map(s -> (String) s).collect(Collectors.toSet())));
 
-        try {
-            config.load(Server.class.getModule().getResourceAsStream("item_2_tags.json"));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        config.load(Server.class.getClassLoader().getResourceAsStream("item_2_tags.json"));
         config.getAll().forEach((k, v) -> ITEM_2_TAGS.put(k, ((List<?>) v).stream().map(s -> (String) s).collect(Collectors.toSet())));
     }
 
@@ -90,23 +81,23 @@ public final class ItemTag {
     public static List<String> getTags(String namespaceId) {
         var result = ITEM_2_TAGS.get(namespaceId);
         if (result == null) return null;
-        return result.stream().toList();
+        return new ArrayList<>(result);
     }
 
     @NotNull
     public static Set<String> getTagSet(String namespaceId) {
-        return Collections.unmodifiableSet(ITEM_2_TAGS.getOrDefault(namespaceId, Set.of()));
+        return Collections.unmodifiableSet(ITEM_2_TAGS.getOrDefault(namespaceId, new HashSet<>()));
     }
 
     public static List<String> getItems(String tag) {
         var result = TAG_2_ITEMS.get(tag);
         if (result == null) return null;
-        return result.stream().toList();
+        return new ArrayList<>(result);
     }
 
     @NotNull
     public static Set<String> getItemSet(String tag) {
-        return Collections.unmodifiableSet(TAG_2_ITEMS.getOrDefault(tag, Set.of()));
+        return Collections.unmodifiableSet(TAG_2_ITEMS.getOrDefault(tag, new HashSet<>()));
     }
 
     /**

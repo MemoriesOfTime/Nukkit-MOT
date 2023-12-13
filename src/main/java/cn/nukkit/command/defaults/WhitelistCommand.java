@@ -74,7 +74,7 @@ public class WhitelistCommand extends VanillaCommand {
 
                     sender.sendMessage(new TranslationContainer("commands.allowlist.list", String.valueOf(count), String.valueOf(count)));
 
-                    if (!result.isEmpty()) {
+                    if (result.length() > 0) {
                         sender.sendMessage(result.substring(0, result.length() - 2));
                     }
                     break;

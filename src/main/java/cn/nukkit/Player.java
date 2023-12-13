@@ -1111,7 +1111,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.server.getPluginManager().callEvent(playerJoinEvent);
 
-        if (!playerJoinEvent.getJoinMessage().toString().isBlank()) {
+        if (!playerJoinEvent.getJoinMessage().toString().trim().isEmpty()) {
             this.server.broadcastMessage(playerJoinEvent.getJoinMessage());
         }
 

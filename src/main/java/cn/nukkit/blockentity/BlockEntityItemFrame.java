@@ -126,7 +126,7 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
                     String namespaceId;
                     try {
                         namespaceId = item.getNamespaceId(protocol);
-                        if (namespaceId == null || namespaceId.isBlank()) {
+                        if (namespaceId == null || namespaceId.trim().isEmpty()) {
                             throw new Exception("Empty namespaceId");
                         }
                     } catch (Exception e) {

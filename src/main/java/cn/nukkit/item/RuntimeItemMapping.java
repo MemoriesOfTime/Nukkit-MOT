@@ -226,7 +226,7 @@ public class RuntimeItemMapping {
             if ("minecraft:raw_iron".equalsIgnoreCase(identifier)) {
                 int test = 1;
             }
-            if (networkId.isEmpty() || !Item.NAMESPACED_ID_ITEM.containsKey(identifier)) {
+            if (!networkId.isPresent() || !Item.NAMESPACED_ID_ITEM.containsKey(identifier)) {
                 if (!ignoreUnknown) {
                     throw new IllegalStateException("Can not find legacyEntry for " + identifier);
                 }
@@ -319,7 +319,7 @@ public class RuntimeItemMapping {
     public int getNetworkId(Item item) {
         if (item instanceof StringItem) {
             OptionalInt networkIdByNamespaceId = getNetworkIdByNamespaceId(item.getNamespaceId());
-            if (networkIdByNamespaceId.isEmpty()) {
+            if (!networkIdByNamespaceId.isPresent()) {
                 throw new IllegalArgumentException("Unknown item mapping " + item + " protocol=" + this.protocolId);
             }
             return networkIdByNamespaceId.getAsInt();

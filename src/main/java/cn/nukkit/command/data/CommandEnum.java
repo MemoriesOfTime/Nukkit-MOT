@@ -5,10 +5,7 @@ import cn.nukkit.network.protocol.UpdateSoftEnumPacket;
 import cn.nukkit.utils.CameraPresetManager;
 import com.google.common.collect.ImmutableList;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.function.Supplier;
 
 /**
@@ -92,7 +89,7 @@ public class CommandEnum {
 
     public List<String> getValues() {
         if (this.strListSupplier != null) {
-            return strListSupplier.get().stream().toList();
+            return new ArrayList<String>(strListSupplier.get());
         }
         return values;
     }

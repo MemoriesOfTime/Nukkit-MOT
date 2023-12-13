@@ -1035,7 +1035,7 @@ public class BinaryStream {
         boolean isErrorItem = false;
         boolean isStringItem = item instanceof StringItem;
         try {
-            if (isStringItem && mapping.getNetworkIdByNamespaceId(item.getNamespaceId()).isEmpty()) {
+            if (isStringItem && !mapping.getNetworkIdByNamespaceId(item.getNamespaceId()).isPresent()) {
                 throw new IllegalArgumentException("Unknown StringItem : NamespaceId=" + item.getNamespaceId() + " protocol=" + protocolId);
             } else {
                 mapping.toRuntime(item.getId(), item.getDamage());

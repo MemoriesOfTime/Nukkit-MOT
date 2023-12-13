@@ -62,7 +62,7 @@ public abstract class BaseInventory implements Inventory {
 
         this.type = type;
 
-        this.size = Objects.requireNonNullElseGet(overrideSize, this.type::getDefaultSize);
+        this.size = overrideSize != null ? overrideSize : this.type.getDefaultSize();
 
         if (overrideTitle != null) {
             this.title = overrideTitle;

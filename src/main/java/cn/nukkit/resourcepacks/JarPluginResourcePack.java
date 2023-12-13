@@ -6,10 +6,7 @@ import lombok.extern.log4j.Log4j2;
 import lombok.var;
 
 import javax.annotation.Nullable;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -80,7 +77,10 @@ public class JarPluginResourcePack extends AbstractResourcePack {
 
             ZipEntry encryptionKeyEntry = jar.getEntry(RESOURCE_PACK_PATH + "encryption.key");
             if (encryptionKeyEntry != null) {
-                this.encryptionKey = new String(jar.getInputStream(encryptionKeyEntry).readAllBytes(),StandardCharsets.UTF_8);
+                InputStream inputStream = jar.getInputStream(encryptionKeyEntry);
+                byte[] bytes = new byte[inputStream.available()];
+                inputStream.read(bytes);
+                this.encryptionKey = new String(bytes, StandardCharsets.UTF_8);
                 log.debug(this.encryptionKey);
             }
 
@@ -88,7 +88,10 @@ public class JarPluginResourcePack extends AbstractResourcePack {
                 if (entry.getName().startsWith(RESOURCE_PACK_PATH) && !entry.isDirectory() && !entry.getName().equals(RESOURCE_PACK_PATH + "encryption.key")) {
                     try {
                         zipOutputStream.putNextEntry(new ZipEntry(entry.getName().substring(RESOURCE_PACK_PATH.length())));
-                        zipOutputStream.write(jar.getInputStream(entry).readAllBytes());
+                        InputStream inputStream = jar.getInputStream(entry);
+                        byte[] bytes = new byte[inputStream.available()];
+                        inputStream.read(bytes);
+                        zipOutputStream.write(bytes);
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
@@ -143,7 +146,7 @@ public class JarPluginResourcePack extends AbstractResourcePack {
         }
 
         try{
-            zippedByteBuffer.get(off, chunk);
+            zippedByteBuffer.get(chunk, off, chunk.length);
         } catch (Exception e) {
             log.error("An error occurred while processing the resource pack {} at offset:{} and length:{}", getPackName(), off, len, e);
         }

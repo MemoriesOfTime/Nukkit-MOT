@@ -51,7 +51,7 @@ public class BanIpCommand extends VanillaCommand {
             reason.append(args[i]).append(' ');
         }
 
-        if (!reason.isEmpty()) {
+        if (reason.length() > 0) {
             reason = new StringBuilder(reason.substring(0, reason.length() - 1));
         }
 

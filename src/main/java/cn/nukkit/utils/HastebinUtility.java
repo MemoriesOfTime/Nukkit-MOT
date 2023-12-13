@@ -33,7 +33,7 @@ public class HastebinUtility {
 
         connection.setRequestMethod("POST");
         String key = Server.getInstance().getPropertyString("hastebin-token");
-        if (key == null || key.isBlank()) {
+        if (key == null || key.trim().isEmpty()) {
             log.error("You haven't set a Hastebin token yet! Please create a token on https://www.toptal.com/developers/hastebin/documentation and fill in the obtained key as `hastebin-token` in the `server.properties` file.");
         } else {
             connection.setRequestProperty("Authorization", "Bearer " + key.trim());

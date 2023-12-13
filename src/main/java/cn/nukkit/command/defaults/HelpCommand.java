@@ -47,7 +47,7 @@ public class HelpCommand extends VanillaCommand {
                 System.arraycopy(args, 0, newargs, 0, newargs.length);
                 args = newargs;
                 for (String arg : args) {
-                    if (!command.isEmpty()) {
+                    if (command.length() != 0) {
                         command.append(' ');
                     }
                     command.append(arg);
@@ -55,7 +55,7 @@ public class HelpCommand extends VanillaCommand {
             } catch (NumberFormatException e) {
                 pageNumber = 1;
                 for (String arg : args) {
-                    if (!command.isEmpty()) {
+                    if (command.length() != 0) {
                         command.append(' ');
                     }
                     command.append(arg);
@@ -67,7 +67,7 @@ public class HelpCommand extends VanillaCommand {
             pageHeight = Integer.MAX_VALUE;
         }
 
-        if (command.isEmpty()) {
+        if (command.length() == 0) {
             Map<String, Command> commands = new TreeMap<>();
             for (Command cmd : sender.getServer().getCommandMap().getCommands().values()) {
                 if (cmd.testPermissionSilent(sender)) {
@@ -99,7 +99,7 @@ public class HelpCommand extends VanillaCommand {
             message += TextFormat.GOLD + "Description: " + TextFormat.WHITE + cmd.getDescription() + '\n';
             StringBuilder usage = new StringBuilder();
             for (String u : cmd.getUsage().split("\n")) {
-                if (!usage.isEmpty()) {
+                if (usage.length() != 0) {
                     usage.append('\n').append(TextFormat.WHITE);
                 }
                 usage.append(u);

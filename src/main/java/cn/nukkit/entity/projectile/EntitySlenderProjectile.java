@@ -15,7 +15,6 @@ import lombok.var;
 
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.function.Predicate;
 
 /**
  * @author PowerNukkitX Project Team
@@ -81,7 +80,7 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
                 break;
             }
             collisionEntity = Arrays.stream(collisionEntities)
-                    .filter(Predicate.not(entity -> (entity == shootEntity && ticks < 5) ||
+                    .filter(entity -> !((entity == shootEntity && ticks < 5) ||
                             (entity instanceof Player && ((Player) entity).getGamemode() == Player.SPECTATOR)))
                     .min(Comparator.comparingDouble(o -> o.distanceSquared(projectile)))
                     .orElse(null);
