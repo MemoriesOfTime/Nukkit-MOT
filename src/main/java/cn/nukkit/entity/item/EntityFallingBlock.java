@@ -19,6 +19,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.DestroyBlockParticle;
 import cn.nukkit.level.sound.AnvilFallSound;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
@@ -206,6 +207,19 @@ public class EntityFallingBlock extends Entity {
                     if (!event.isCancelled()) {
                         this.level.setBlock(pos, event.getTo(), true, true);
                         this.level.scheduleUpdate(this.level.getBlock(pos), 1);
+
+                        //== 临时修复掉落方块问题
+                        // 可能原因：onGround更新不及时 或者两个EntityFallingBlock离得太近，导致核心误判为同一位置
+                        // 这里检查重叠的EntityFallingBlock，并将其上移一格，防止多个EntityFallingBlock设置到同一坐标
+                        AxisAlignedBB bb = this.getBoundingBox();
+                        bb.setMaxY(bb.getMaxY() + 0.021); //实体高度为0.98，这里增加一点防止误判
+                        Entity[] entities = level.getCollidingEntities(bb);
+                        for (Entity entity : entities) {
+                            if (entity instanceof EntityFallingBlock) {
+                                entity.teleport(entity.add(0, 1.1, 0));
+                            }
+                        }
+                        //== 临时修复掉落方块问题
 
                         if (event.getTo().getId() == Item.ANVIL) {
                             this.level.addSound(new AnvilFallSound(pos));
