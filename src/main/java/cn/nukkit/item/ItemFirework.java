@@ -34,19 +34,11 @@ public class ItemFirework extends Item {
             CompoundTag tag = getNamedTag();
             if (tag == null) {
                 tag = new CompoundTag();
-
-                CompoundTag ex = new CompoundTag()
-                        .putByteArray("FireworkColor", new byte[]{(byte) DyeColor.BLACK.getDyeData()})
-                        .putByteArray("FireworkFade", new byte[]{})
-                        .putBoolean("FireworkFlicker", false)
-                        .putBoolean("FireworkTrail", false)
-                        .putByte("FireworkType", FireworkExplosion.ExplosionType.CREEPER_SHAPED.ordinal());
-
+                // Avoid the NPE problems in the following operations while getting the ListTag "Explosions"
+                // Getting the value of "flight" has operations checking whether it's null or not.
                 tag.putCompound("Fireworks", new CompoundTag("Fireworks")
-                        .putList(new ListTag<CompoundTag>("Explosions").add(ex))
-                        .putByte("Flight", 1)
+                        .putList(new ListTag<CompoundTag>("Explosions"))
                 );
-
                 this.setNamedTag(tag);
             }
         }

@@ -111,26 +111,31 @@ public class RuntimeItemMapping {
         this.generatePalette();
     }
 
+    Object2IntMap<String> getName2RuntimeId() {
+        return name2RuntimeId;
+    }
+
     synchronized boolean registerCustomItem(CustomItem customItem) {
         int runtimeId = CustomItemDefinition.getRuntimeId(customItem.getNamespaceId());
         String namespaceId = customItem.getNamespaceId();
-        if (!Server.getInstance().enableExperimentMode || this.customItems.contains(namespaceId)) {
+        if (!Server.getInstance().enableExperimentMode) {
             return false;
         }
-        this.customItems.add(namespaceId);
+        if (!this.customItems.contains(namespaceId)) { //多个版本共用一个RuntimeItemMapping时，重复不返回false
+            this.customItems.add(namespaceId);
 
-        RuntimeEntry entry = new RuntimeEntry(
-                customItem.getNamespaceId(),
-                runtimeId,
-                false,
-                true
-        );
-        this.itemPaletteEntries.add(entry);
-        this.runtimeId2Name.put(runtimeId, namespaceId);
-        this.name2RuntimeId.put(namespaceId, runtimeId);
+            RuntimeEntry entry = new RuntimeEntry(
+                    customItem.getNamespaceId(),
+                    runtimeId,
+                    false,
+                    true
+            );
+            this.itemPaletteEntries.add(entry);
+            this.runtimeId2Name.put(runtimeId, namespaceId);
+            this.name2RuntimeId.put(namespaceId, runtimeId);
 
-        this.generatePalette();
-
+            this.generatePalette();
+        }
         return true;
     }
 

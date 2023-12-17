@@ -126,6 +126,9 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
                     String namespaceId;
                     try {
                         namespaceId = item.getNamespaceId(protocol);
+                        if (namespaceId == null || namespaceId.isBlank()) {
+                            throw new Exception("Empty namespaceId");
+                        }
                     } catch (Exception e) {
                         namespaceId = "minecraft:unknown";
                         Server.getInstance().getLogger().error("Failed to get namespaceId of " + item.getId() + ":" + item.getDamage() + " (" + item.getName() + ")", e);

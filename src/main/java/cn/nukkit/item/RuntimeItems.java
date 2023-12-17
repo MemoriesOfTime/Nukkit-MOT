@@ -37,6 +37,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping589;
     private static RuntimeItemMapping mapping594;
     private static RuntimeItemMapping mapping618;
+    private static RuntimeItemMapping mapping630;
 
     private static boolean initialized;
 
@@ -63,12 +64,18 @@ public class RuntimeItems {
         JsonObject itemMapping = JsonParser.parseReader(new InputStreamReader(mappingStream)).getAsJsonObject();
 
         Map<String, MappingEntry> mappingEntries = new HashMap<>();
+        Map<String, MappingEntry> mappingEntries630 = new HashMap<>();
         for (String legacyName : itemMapping.keySet()) {
             JsonObject convertData = itemMapping.getAsJsonObject(legacyName);
             for (String damageStr : convertData.keySet()) {
                 String identifier = convertData.get(damageStr).getAsString();
                 int damage = Integer.parseInt(damageStr);
-                mappingEntries.put(identifier, new MappingEntry(legacyName, damage));
+                MappingEntry value = new MappingEntry(legacyName, damage);
+                mappingEntries630.put(identifier, value);
+                if ("minecraft:stone".equals(legacyName)) {
+                    continue; // Stone 在1.20.50及以后拆分，对于以前的版本，不需要重复注册
+                }
+                mappingEntries.put(identifier, value);
             }
         }
 
@@ -88,10 +95,13 @@ public class RuntimeItems {
         mapping589 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_0);
         mapping594 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_10);
         mapping618 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_30);
+        mapping630 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_50);
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_20_30_24) {
+        if (protocolId >= ProtocolInfo.v1_20_50) {
+            return mapping630;
+        } else if (protocolId >= ProtocolInfo.v1_20_30_24) {
             return mapping618;
         } else if (protocolId >= ProtocolInfo.v1_20_10_21) {
             return mapping594;

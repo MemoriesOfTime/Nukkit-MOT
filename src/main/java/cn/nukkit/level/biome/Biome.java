@@ -5,15 +5,20 @@ import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.generator.populator.type.Populator;
 import cn.nukkit.math.NukkitRandom;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,6 +31,7 @@ public abstract class Biome implements BlockID {
     public static final Biome[] biomes = new Biome[256];
     public static final List<Biome> unorderedBiomes = new ObjectArrayList<>();
     private static final Int2ObjectMap<String> runtimeId2Identifier = new Int2ObjectOpenHashMap<>();
+    private static CompoundTag biomeDefinitions;
 
     private final ArrayList<Populator> populators = new ArrayList<>();
     private int id;
@@ -42,6 +48,16 @@ public abstract class Biome implements BlockID {
         } catch (NullPointerException | IOException e) {
             throw new AssertionError("Unable to load biome mapping from biome_id_map.json", e);
         }
+
+        //TODO Multiversion
+        try (InputStream stream = Biome.class.getClassLoader().getResourceAsStream("biome_definitions_554.dat")) {
+            if (stream == null) {
+                throw new AssertionError("Unable to locate block biome_definitions_554");
+            }
+            biomeDefinitions = (CompoundTag) NBTIO.readTag(new BufferedInputStream(stream), ByteOrder.BIG_ENDIAN, true);
+        } catch (IOException e) {
+            throw new AssertionError("Unable to locate block biome_definitions_554", e);
+        }
     }
 
     public static String getBiomeNameFromId(int protocol, int biomeId) {
@@ -53,6 +69,14 @@ public abstract class Biome implements BlockID {
             return EnumBiome.OCEAN.id;
         }
         return biomeId;
+    }
+
+    public static CompoundTag getBiomeDefinitions(int biomeId) {
+        return getBiomeDefinitions(getBiomeNameFromId(ProtocolInfo.CURRENT_PROTOCOL, biomeId));
+    }
+
+    public static CompoundTag getBiomeDefinitions(String biomeName) {
+        return biomeDefinitions.getCompound(biomeName);
     }
 
     protected static void register(int id, Biome biome) {

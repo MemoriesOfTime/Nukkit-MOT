@@ -13,10 +13,12 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.Faceable;
-import cn.nukkit.utils.Utils;
 
 import java.util.Map.Entry;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Created by CreeperFace on 15.4.2017.
@@ -135,7 +137,9 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable {
 
             dispense();
             return type;
-        } else if (type == Level.BLOCK_UPDATE_REDSTONE) {
+        }
+
+        if (type == Level.BLOCK_UPDATE_REDSTONE) {
             if ((level.isBlockPowered(this) || level.isBlockPowered(this.up())) && !isTriggered()) {
                 this.setTriggered(true);
                 this.level.setBlock(this, this, false, false);
@@ -155,6 +159,7 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable {
             return;
         }
 
+        Random rand = ThreadLocalRandom.current();
         int r = 1;
         int slot = -1;
         Item target = null;
@@ -163,38 +168,58 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable {
         for (Entry<Integer, Item> entry : inv.getContents().entrySet()) {
             Item item = entry.getValue();
 
-            if (!item.isNull() && Utils.random.nextInt(r++) == 0) {
+            if (!item.isNull() && rand.nextInt(r++) == 0) {
                 target = item;
                 slot = entry.getKey();
             }
         }
 
+        LevelEventPacket pk = new LevelEventPacket();
+
+        BlockFace facing = getBlockFace();
+
+        pk.x = 0.5f + facing.getXOffset() * 0.7f;
+        pk.y = 0.5f + facing.getYOffset() * 0.7f;
+        pk.z = 0.5f + facing.getZOffset() * 0.7f;
+
         if (target == null) {
-            //this.level.addLevelSoundEvent(this); //TODO: sound
+            pk.evid = LevelEventPacket.EVENT_SOUND_CLICK_FAIL;
+            pk.data = 1200;
+
+            level.addChunkPacket(getChunkX(), getChunkZ(), pk.clone());
             return;
         }
-        //Item origin = target;
+
+        pk.evid = LevelEventPacket.EVENT_SOUND_CLICK;
+        pk.data = 1000;
+
+        level.addChunkPacket(getChunkX(), getChunkZ(), pk.clone());
+
+        pk.evid = LevelEventPacket.EVENT_PARTICLE_SHOOT;
+        pk.data = 7;
+        level.addChunkPacket(getChunkX(), getChunkZ(), pk);
+
+        Item origin = target;
         target = target.clone();
 
         DispenseBehavior behavior = DispenseBehaviorRegister.getBehavior(target.getId());
-        Item result = behavior.dispense(this, getBlockFace(), target);
+        Item result = behavior.dispense(this, facing, target);
 
-        if (result == null) {
-            target.count--;
-            inv.setItem(slot, target);
-        } else {
-            /*if (result.getId() != origin.getId() || result.getDamage() != origin.getDamage()) {
+        pk.evid = LevelEventPacket.EVENT_SOUND_CLICK;
+
+        target.count--;
+        inv.setItem(slot, target);
+
+        if (result != null) {
+            if (result.getId() != origin.getId() || result.getDamage() != origin.getDamage()) {
                 Item[] fit = inv.addItem(result);
 
-                if (fit.length > 0) {
-                    for (Item drop : fit) {
-                        this.level.dropItem(this, drop);
-                    }
+                for (Item drop : fit) {
+                    level.dropItem(this, drop);
                 }
             } else {
                 inv.setItem(slot, result);
-            }*/
-            inv.setItem(slot, result);
+            }
         }
     }
 

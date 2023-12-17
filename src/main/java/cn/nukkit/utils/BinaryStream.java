@@ -901,7 +901,13 @@ public class BinaryStream {
             if (runtimeId == Item.INFO_UPDATE) { // Fix unknown item mapping errors with 1.16.100+ item replacements
                 runtimeEntry = mapping.toRuntime(Item.INFO_UPDATE, item.getDamage());
             } else {
-                runtimeEntry = mapping.toRuntime(item.getId(), item.getDamage());
+                try {
+                    runtimeEntry = mapping.toRuntime(item.getId(), item.getDamage());
+                } catch (IllegalArgumentException e) {
+                    runtimeEntry = mapping.toRuntime(Item.INFO_UPDATE, item.getDamage());
+                    saveOriginalID = true;
+                    Server.getInstance().getLogger().debug("Unknown Item", e);
+                }
             }
             runtimeId = runtimeEntry.getRuntimeId();
             damage = runtimeEntry.isHasDamage() ? 0 : item.getDamage();
