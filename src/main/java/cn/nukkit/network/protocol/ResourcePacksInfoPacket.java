@@ -68,7 +68,9 @@ public class ResourcePacksInfoPacket extends DataPacket {
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
             this.putString(entry.getEncryptionKey()); // encryption key
-            this.putString(""); // sub-pack name
+            if (protocol >= ProtocolInfo.v1_2_0) {
+                this.putString(""); // sub-pack name
+            }
             if (protocol > ProtocolInfo.v1_5_0) {
                 this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
                 if (protocol >= ProtocolInfo.v1_9_0) {

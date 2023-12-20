@@ -246,7 +246,7 @@ public class Network {
                         if (raknetProtocol > 8) {
                             pk.decode();
                         }else { // version < 1.6
-                            pk.setBuffer(buf, 3);
+                            pk.setBuffer(buf, pk.protocol < ProtocolInfo.v1_2_0 ? 1 : 3);
                             pk.decode();
                         }
                     } catch (Exception e) {
