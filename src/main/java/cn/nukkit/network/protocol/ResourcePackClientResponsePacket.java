@@ -23,7 +23,11 @@ public class ResourcePackClientResponsePacket extends DataPacket {
         this.packEntries = new Entry[Math.min(this.getLShort(), 1024)];
         for (int i = 0; i < this.packEntries.length; i++) {
             String[] entry = this.getString().split("_");
-            this.packEntries[i] = new Entry(UUID.fromString(entry[0]), entry[1]);
+            String version = "1.2.0";
+            if (protocol >= ProtocolInfo.v1_6_0_5) {
+                version = entry[1];
+            }
+            this.packEntries[i] = new Entry(UUID.fromString(entry[0]), version);
         }
     }
 
