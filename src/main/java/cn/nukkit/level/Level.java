@@ -1228,6 +1228,9 @@ public class Level implements ChunkManager, Metadatable {
                 }
 
                 for (Player player : players) {
+                    if (player.protocol < ProtocolInfo.v1_4_0 && dataLayer > 0) {
+                        continue; //1.4以前的版本不支持dataLayer
+                    }
                     player.dataPacket(packet);
                 }
             }
