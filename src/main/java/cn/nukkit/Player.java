@@ -1038,13 +1038,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (!this.hasSpawnChunks && this.chunksSent >= server.spawnThreshold) {
             this.hasSpawnChunks = true;
 
-            if (this.protocol < ProtocolInfo.v1_5_0) {
+            if (this.protocol <= ProtocolInfo.v1_5_0) {
                 this.doFirstSpawn();
             }
 
             this.sendPlayStatus(PlayStatusPacket.PLAYER_SPAWN);
 
-            if (protocol < ProtocolInfo.v1_5_0) {
+            if (protocol <= ProtocolInfo.v1_5_0) {
                 this.server.getPluginManager().callEvent(new PlayerLocallyInitializedEvent(this));
             }
         }
