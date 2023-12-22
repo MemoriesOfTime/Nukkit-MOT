@@ -14,6 +14,7 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemMap;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 
 import java.util.Collection;
 
@@ -521,12 +522,22 @@ public class PlayerInventory extends BaseInventory {
         Player p = (Player) this.getHolder();
 
         if (p.protocol < 407) {
-            InventoryContentPacket pk = new InventoryContentPacket();
-            pk.inventoryId = ContainerIds.CREATIVE;
-            if (!p.isSpectator()) { //fill it for all gamemodes except spectator
-                pk.slots = Item.getCreativeItems(p.protocol).toArray(Item.EMPTY_ARRAY);
+            if (p.protocol < ProtocolInfo.v1_2_0) {
+                ContainerSetContentPacketV113 pk = new ContainerSetContentPacketV113();
+                pk.windowid = ContainerSetContentPacketV113.SPECIAL_CREATIVE;
+                pk.eid = p.getId();
+                if (!p.isSpectator()) {
+                    pk.slots = Item.getCreativeItems(p.protocol).toArray(Item.EMPTY_ARRAY);
+                }
+                p.dataPacket(pk);
+            } else {
+                InventoryContentPacket pk = new InventoryContentPacket();
+                pk.inventoryId = ContainerIds.CREATIVE;
+                if (!p.isSpectator()) { //fill it for all gamemodes except spectator
+                    pk.slots = Item.getCreativeItems(p.protocol).toArray(Item.EMPTY_ARRAY);
+                }
+                p.dataPacket(pk);
             }
-            p.dataPacket(pk);
         } else {
             CreativeContentPacket pk = new CreativeContentPacket();
             pk.entries = p.isSpectator() ? Item.EMPTY_ARRAY : Item.getCreativeItems(p.protocol).toArray(Item.EMPTY_ARRAY);
