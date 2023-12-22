@@ -5,12 +5,14 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
 import cn.nukkit.utils.VarInt;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.AllArgsConstructor;
@@ -45,6 +47,9 @@ public class Network {
     public static final byte CHANNEL_TEXT = 7; //Chat and other text stuff
     public static final byte CHANNEL_END = 31;
     private final Int2ObjectOpenHashMap<Class<? extends DataPacket>> packetPool = new Int2ObjectOpenHashMap<>(256);
+
+    private PacketPool packetPool113;
+    private PacketPool packetPoolCurrent;
 
     private final Server server;
 
@@ -237,7 +242,7 @@ public class Network {
                         break;
                 }
 
-                DataPacket pk = this.getPacket(packetId);
+                DataPacket pk = this.getPacket(packetId, player == null ? ProtocolInfo.CURRENT_PROTOCOL : player.protocol);
 
                 if (pk != null) {
                     pk.protocol = player == null ? Integer.MAX_VALUE : player.protocol;
@@ -280,8 +285,15 @@ public class Network {
         packets.forEach(player::handleDataPacket);
     }
 
+    @Deprecated
     public DataPacket getPacket(byte id) {
-        Class<? extends DataPacket> clazz = this.packetPool.get(id & 0xff);
+        return getPacket(id & 0xff);
+    }
+
+    @Deprecated
+    public DataPacket getPacket(int id) {
+        Server.mvw("Network#getPacket(int id)");
+        Class<? extends DataPacket> clazz = this.packetPool.get(id);
         if (clazz != null) {
             try {
                 return clazz.newInstance();
@@ -292,16 +304,15 @@ public class Network {
         return null;
     }
 
-    public DataPacket getPacket(int id) {
-        Class<? extends DataPacket> clazz = this.packetPool.get(id);
-        if (clazz != null) {
-            try {
-                return clazz.newInstance();
-            } catch (Exception e) {
-                Server.getInstance().getLogger().logException(e);
-            }
+    public DataPacket getPacket(int id, int protocol) {
+        return getPacketPool(protocol).getPacket(id);
+    }
+
+    public PacketPool getPacketPool(int protocol) {
+        if (protocol > ProtocolInfo.v1_1_0) {
+            return this.packetPoolCurrent;
         }
-        return null;
+        return this.packetPool113;
     }
 
     public void sendPacket(InetSocketAddress socketAddress, ByteBuf payload) {
@@ -467,6 +478,22 @@ public class Network {
         this.registerPacketNew(ProtocolInfo.AGENT_ANIMATION, AgentAnimationPacket.class);
         this.registerPacketNew(ProtocolInfo.REFRESH_ENTITLEMENTS, RefreshEntitlementsPacket.class);
         this.registerPacketNew(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST, ToggleCrafterSlotRequestPacket.class);
+
+        PacketPool.Builder builder = PacketPool.builder()
+                .protocolVersion(ProtocolInfo.v1_1_0)
+                .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v1_1_0));
+        for (Int2ObjectMap.Entry<Class<? extends DataPacket>> entry : packetPool.int2ObjectEntrySet()) {
+            builder.registerPacket(entry.getIntKey(), entry.getValue());
+        }
+        this.packetPool113 = builder
+                .registerPacket(ProtocolInfo.CRAFTING_DATA_PACKET, ContainerSetContentPacketV113.class)
+                .build();
+
+        this.packetPoolCurrent = this.packetPool113.toBuilder()
+                .protocolVersion(ProtocolInfo.CURRENT_PROTOCOL)
+                .minecraftVersion(ProtocolInfo.MINECRAFT_VERSION)
+                .registerPacket(ProtocolInfo.CRAFTING_DATA_PACKET, CraftingDataPacket.class)
+                .build();
     }
 
     @AllArgsConstructor
