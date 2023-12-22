@@ -488,6 +488,7 @@ public class Network {
         }
         this.packetPool113 = builder
                 .registerPacket(RemoveBlockPacketV113.NETWORK_ID, RemoveBlockPacketV113.class) //0x15
+                .registerPacket(0x16, UpdateBlockPacket.class)
                 .registerPacket(ExplodePacketV113.NETWORK_ID, ExplodePacketV113.class) //0x18
                 .registerPacket(0x19, LevelSoundEventPacketV1.class)
                 .registerPacket(0x1a, LevelEventPacket.class)
