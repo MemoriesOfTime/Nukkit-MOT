@@ -506,6 +506,7 @@ public class Network {
                 .registerPacket(0x36, CraftingEventPacket.class)
                 .registerPacket(ReplaceItemInSlotPacketV113.NETWORK_ID, ReplaceItemInSlotPacketV113.class) //0x48
                 .registerPacket(0x49, GameRulesChangedPacket.class)
+                .deregisterPacket(0x4a) //CameraPacket
                 .registerPacket(AddItemPacketV113.NETWORK_ID, AddItemPacketV113.class) //0x4b
                 .registerPacket(0x4c, BossEventPacket.class)
                 .registerPacket(0x4d, ShowCreditsPacket.class)

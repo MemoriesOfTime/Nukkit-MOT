@@ -42,7 +42,7 @@ public class ContainerSetContentPacketV113 extends DataPacket {
         this.slots = new Item[count];
 
         for (int s = 0; s < count && !this.feof(); ++s) {
-            this.slots[s] = this.getSlot();
+            this.slots[s] = this.getSlot(protocol);
         }
 
         count = (int) this.getUnsignedVarInt();
@@ -59,7 +59,7 @@ public class ContainerSetContentPacketV113 extends DataPacket {
         this.putVarLong(this.eid);
         this.putUnsignedVarInt(this.slots.length);
         for (Item slot : this.slots) {
-            this.putSlot(slot);
+            this.putSlot(protocol, slot);
         }
 
         if (this.windowid == SPECIAL_INVENTORY && this.hotbar.length > 0) {

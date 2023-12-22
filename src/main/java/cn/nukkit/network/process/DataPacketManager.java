@@ -5,7 +5,9 @@ import cn.nukkit.network.process.processor.ClientToServerHandshakeProcessor;
 import cn.nukkit.network.process.processor.LecternUpdateProcessor;
 import cn.nukkit.network.process.processor.NPCRequestProcessor;
 import cn.nukkit.network.process.processor.RequestAbilityProcessor;
+import cn.nukkit.network.process.processor.v113.DropItemProcessorV113;
 import cn.nukkit.network.process.processor.v113.RemoveBlockProcessorV113;
+import cn.nukkit.network.process.processor.v137.ContainerOpenProcessorV137;
 import cn.nukkit.network.process.processor.v137.UpdateBlockProcessorV137;
 import cn.nukkit.network.process.processor.v274.SetLocalPlayerAsInitializedProcessorV274;
 import cn.nukkit.network.process.processor.v282.SetLocalPlayerAsInitializedProcessorV282;
@@ -78,11 +80,13 @@ public final class DataPacketManager {
 
         registerProcessor(
                 ProtocolInfo.v1_1_0,
+                DropItemProcessorV113.INSTANCE,
                 RemoveBlockProcessorV113.INSTANCE
         );
 
         registerProcessor(
                 ProtocolInfo.v1_2_0,
+                ContainerOpenProcessorV137.INSTANCE,
                 UpdateBlockProcessorV137.INSTANCE
         );
 

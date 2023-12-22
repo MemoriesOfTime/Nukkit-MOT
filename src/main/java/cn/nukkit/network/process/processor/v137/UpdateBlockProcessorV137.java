@@ -2,6 +2,7 @@ package cn.nukkit.network.process.processor.v137;
 
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.UpdateBlockPacket;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,6 +21,6 @@ public class UpdateBlockProcessorV137 extends DataPacketProcessor<UpdateBlockPac
 
     @Override
     public int getPacketId() {
-        return UpdateBlockPacket.NETWORK_ID;
+        return ProtocolInfo.toNewProtocolID(UpdateBlockPacket.NETWORK_ID);
     }
 }
