@@ -1,4 +1,4 @@
-package cn.nukkit.network.process.processor;
+package cn.nukkit.network.process.processor.v282;
 
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.event.player.PlayerLocallyInitializedEvent;
@@ -7,10 +7,13 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.SetLocalPlayerAsInitializedPacket;
 import org.jetbrains.annotations.NotNull;
 
-public class SetLocalPlayerAsInitializedProcessor extends DataPacketProcessor<SetLocalPlayerAsInitializedPacket> {
+public class SetLocalPlayerAsInitializedProcessorV282 extends DataPacketProcessor<SetLocalPlayerAsInitializedPacket> {
+
+    public static final SetLocalPlayerAsInitializedProcessorV282 INSTANCE = new SetLocalPlayerAsInitializedProcessorV282();
+
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull SetLocalPlayerAsInitializedPacket pk) {
-        if (playerHandle.player.locallyInitialized || playerHandle.player.protocol <= ProtocolInfo.v1_5_0) {
+        if (playerHandle.player.locallyInitialized) {
             return;
         }
 

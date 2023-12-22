@@ -13,6 +13,9 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import org.jetbrains.annotations.NotNull;
 
 public class LecternUpdateProcessor extends DataPacketProcessor<LecternUpdatePacket> {
+
+    public static final LecternUpdateProcessor INSTANCE = new LecternUpdateProcessor();
+
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull LecternUpdatePacket pk) {
         BlockVector3 blockPosition = pk.blockPosition;

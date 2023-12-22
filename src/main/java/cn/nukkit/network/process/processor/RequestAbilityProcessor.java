@@ -14,6 +14,9 @@ import org.jetbrains.annotations.NotNull;
 
 @Log4j2
 public class RequestAbilityProcessor extends DataPacketProcessor<RequestAbilityPacket> {
+
+    public static final RequestAbilityProcessor INSTANCE = new RequestAbilityProcessor();
+
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull RequestAbilityPacket pk) {
         Player player = playerHandle.player;
