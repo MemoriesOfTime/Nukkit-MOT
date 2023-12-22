@@ -5,6 +5,8 @@ import cn.nukkit.network.process.processor.ClientToServerHandshakeProcessor;
 import cn.nukkit.network.process.processor.LecternUpdateProcessor;
 import cn.nukkit.network.process.processor.NPCRequestProcessor;
 import cn.nukkit.network.process.processor.RequestAbilityProcessor;
+import cn.nukkit.network.process.processor.v113.RemoveBlockProcessorV113;
+import cn.nukkit.network.process.processor.v137.UpdateBlockProcessorV137;
 import cn.nukkit.network.process.processor.v274.SetLocalPlayerAsInitializedProcessorV274;
 import cn.nukkit.network.process.processor.v282.SetLocalPlayerAsInitializedProcessorV282;
 import cn.nukkit.network.protocol.DataPacket;
@@ -72,6 +74,16 @@ public final class DataPacketManager {
                 LecternUpdateProcessor.INSTANCE,
                 RequestAbilityProcessor.INSTANCE,
                 NPCRequestProcessor.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_1_0,
+                RemoveBlockProcessorV113.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_2_0,
+                UpdateBlockProcessorV137.INSTANCE
         );
 
         registerProcessor(
