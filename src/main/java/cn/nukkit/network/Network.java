@@ -503,6 +503,21 @@ public class Network {
                 .registerPacket(ProtocolInfo.CRAFTING_DATA_PACKET, ContainerSetContentPacketV113.class) //0x34
                 .registerPacket(0x35, CraftingDataPacket.class)
                 .registerPacket(0x36, CraftingEventPacket.class)
+                .registerPacket(ReplaceItemInSlotPacketV113.NETWORK_ID, ReplaceItemInSlotPacketV113.class) //0x48
+                .registerPacket(0x49, GameRulesChangedPacket.class)
+                .registerPacket(AddItemPacketV113.NETWORK_ID, AddItemPacketV113.class) //0x4b
+                .registerPacket(0x4c, BossEventPacket.class)
+                .registerPacket(0x4d, ShowCreditsPacket.class)
+                .registerPacket(0x4e, AvailableCommandsPacket.class)
+                .registerPacket(CommandStepPacketV113.NETWORK_ID, CommandStepPacketV113.class) //0x4f
+                .registerPacket(0x51, UpdateTradePacket.class)
+                .registerPacket(0x53, ResourcePackDataInfoPacket.class)
+                .registerPacket(0x54, ResourcePackChunkDataPacket.class)
+                .registerPacket(0x55, ResourcePackChunkRequestPacket.class)
+                .registerPacket(0x56, TransferPacket.class)
+                .registerPacket(0x57, PlaySoundPacket.class)
+                .registerPacket(0x58, StopSoundPacket.class)
+                .registerPacket(0x59, SetTitlePacket.class)
                 .build();
 
         this.packetPoolCurrent = this.packetPool113.toBuilder()
