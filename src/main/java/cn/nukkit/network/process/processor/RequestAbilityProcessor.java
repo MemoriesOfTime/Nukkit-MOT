@@ -21,7 +21,7 @@ public class RequestAbilityProcessor extends DataPacketProcessor<RequestAbilityP
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull RequestAbilityPacket pk) {
         Player player = playerHandle.player;
         if (player.protocol < ProtocolInfo.v1_19_30_23
-                && player.protocol >= ProtocolInfo.v1_20_30_24) { //1.20.30开始飞行切换使用PlayerAuthInputPacket/PlayerActionPacket
+                || player.protocol >= ProtocolInfo.v1_20_30_24) { //1.20.30开始飞行切换使用PlayerAuthInputPacket/PlayerActionPacket
             return;
         }
         PlayerAbility ability = pk.getAbility();
