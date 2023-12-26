@@ -21,7 +21,7 @@ public class BlockWall extends BlockTransparentMeta {
     public static final int NONE_MOSSY_WALL = 0;
     public static final int MOSSY_WALL = 1;
 
-    private static final int WALL_BLOCK_TYPE_BIT = 0b1111;
+    public static final int WALL_BLOCK_TYPE_BIT = 0b1111;
 
     public BlockWall() {
         this(0);
