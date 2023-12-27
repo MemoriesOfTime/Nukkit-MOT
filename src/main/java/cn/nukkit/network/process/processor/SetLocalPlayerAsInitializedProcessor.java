@@ -10,7 +10,7 @@ import org.jetbrains.annotations.NotNull;
 public class SetLocalPlayerAsInitializedProcessor extends DataPacketProcessor<SetLocalPlayerAsInitializedPacket> {
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull SetLocalPlayerAsInitializedPacket pk) {
-        if (playerHandle.player.locallyInitialized || playerHandle.player.protocol < ProtocolInfo.v1_5_0) {
+        if (playerHandle.player.locallyInitialized || playerHandle.player.protocol <= ProtocolInfo.v1_5_0) {
             return;
         }
 

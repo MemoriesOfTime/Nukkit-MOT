@@ -35,7 +35,9 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
         super.reset();
         if (protocol <= 274) {
             this.putByte(this.pid());
-            this.putShort(0);
+            if (protocol >= ProtocolInfo.v1_2_0) {
+                this.putShort(0);
+            }
         } else {
             this.putUnsignedVarInt(this.packetId());
         }
