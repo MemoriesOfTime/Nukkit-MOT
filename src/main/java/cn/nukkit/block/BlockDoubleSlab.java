@@ -8,6 +8,7 @@ import cn.nukkit.utils.BlockColor;
  * @author MagicDroidX
  * Nukkit Project
  */
+@Deprecated
 public class BlockDoubleSlab extends BlockSolidMeta {
 
     public static final int STONE = 0;

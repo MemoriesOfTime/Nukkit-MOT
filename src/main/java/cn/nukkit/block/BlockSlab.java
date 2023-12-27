@@ -13,6 +13,9 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
  */
 public abstract class BlockSlab extends BlockTransparentMeta {
 
+    public static final int SLAB_BLOCK_TYPE_BIT = 0x07;
+    public static final int SLAB_TOP_BIT = 0x08;
+
     protected final int doubleSlab;
 
     public BlockSlab(int meta, int doubleSlab) {
@@ -22,7 +25,7 @@ public abstract class BlockSlab extends BlockTransparentMeta {
 
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
-        if ((this.getDamage() & 0x08) > 0) {
+        if ((this.getDamage() & SLAB_TOP_BIT) > 0) {
             return new SimpleAxisAlignedBB(this.x, this.y + 0.5, this.z, this.x + 1, this.y + 1, this.z + 1);
         } else {
             return new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x + 1, this.y + 0.5, this.z + 1);
@@ -46,25 +49,25 @@ public abstract class BlockSlab extends BlockTransparentMeta {
 
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        this.setDamage(this.getDamage() & 0x07);
+        this.setDamage(this.getDamage() & SLAB_BLOCK_TYPE_BIT);
         if (face == BlockFace.DOWN) {
-            if (target instanceof BlockSlab && (target.getDamage() & 0x08) == 0x08 && (target.getDamage() & 0x07) == (this.getDamage() & 0x07)) {
+            if (target instanceof BlockSlab && (target.getDamage() & SLAB_TOP_BIT) == SLAB_TOP_BIT && (target.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
                 this.getLevel().setBlock(target, Block.get(doubleSlab, this.getDamage()), true);
 
                 return true;
-            } else if (block instanceof BlockSlab && (block.getDamage() & 0x07) == (this.getDamage() & 0x07)) {
+            } else if (block instanceof BlockSlab && (block.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
                 this.getLevel().setBlock(block, Block.get(doubleSlab, this.getDamage()), true);
 
                 return true;
             } else {
-                this.setDamage(this.getDamage() | 0x08);
+                this.setDamage(this.getDamage() | SLAB_TOP_BIT);
             }
         } else if (face == BlockFace.UP) {
-            if (target instanceof BlockSlab && (target.getDamage() & 0x08) == 0 && (target.getDamage() & 0x07) == (this.getDamage() & 0x07)) {
+            if (target instanceof BlockSlab && (target.getDamage() & SLAB_TOP_BIT) == 0 && (target.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
                 this.getLevel().setBlock(target, Block.get(doubleSlab, this.getDamage()), true);
 
                 return true;
-            } else if (block instanceof BlockSlab && (block.getDamage() & 0x07) == (this.getDamage() & 0x07)) {
+            } else if (block instanceof BlockSlab && (block.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
                 this.getLevel().setBlock(block, Block.get(doubleSlab, this.getDamage()), true);
 
                 return true;
@@ -72,7 +75,7 @@ public abstract class BlockSlab extends BlockTransparentMeta {
             //TODO: check for collision
         } else {
             if (block instanceof BlockSlab) {
-                if ((block.getDamage() & 0x07) == (this.getDamage() & 0x07)) {
+                if ((block.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
                     this.getLevel().setBlock(block, Block.get(doubleSlab, this.getDamage()), true);
 
                     return true;
@@ -81,12 +84,12 @@ public abstract class BlockSlab extends BlockTransparentMeta {
                 return false;
             } else {
                 if (fy > 0.5) {
-                    this.setDamage(this.getDamage() | 0x08);
+                    this.setDamage(this.getDamage() | SLAB_TOP_BIT);
                 }
             }
         }
 
-        if (block instanceof BlockSlab && (target.getDamage() & 0x07) != (this.getDamage() & 0x07)) {
+        if (block instanceof BlockSlab && (target.getDamage() & SLAB_BLOCK_TYPE_BIT) != (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {
             return false;
         }
         this.getLevel().setBlock(block, this, true, true);
@@ -97,6 +100,6 @@ public abstract class BlockSlab extends BlockTransparentMeta {
     @Override
     public boolean isTransparent() {
         //HACK: Fix unable to place many blocks on slabs
-        return (this.getDamage() & 0x08) <= 0;
+        return (this.getDamage() & SLAB_TOP_BIT) <= 0;
     }
 }
