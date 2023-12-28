@@ -446,6 +446,7 @@ public interface BlockID {
     int CRIMSON_WALL_SIGN = 507;
     int WARPED_WALL_SIGN = 508;
 
+    int SOUL_TORCH = 523;
     int SOUL_LANTERN = 524;
     int NETHERITE_BLOCK = 525;
     int ANCIENT_DEBRIS = 526;
