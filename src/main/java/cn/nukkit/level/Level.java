@@ -1219,6 +1219,9 @@ public class Level implements ChunkManager, Metadatable {
                 }
 
                 for (Player player : players) {
+                    if (player.protocol < ProtocolInfo.v1_4_0 && dataLayer > 0) {
+                        continue; //1.4以前的版本不支持dataLayer
+                    }
                     player.dataPacket(packet);
                 }
             }
@@ -2368,6 +2371,14 @@ public class Level implements ChunkManager, Metadatable {
         Block target = this.getBlock(vector);
         Block block = target.getSide(face);
 
+        //针对半砖特判
+        if (target instanceof BlockSlab
+                && (face == BlockFace.UP || face == BlockFace.DOWN)
+                && item.getId() == target.getId()
+                && (item.getDamage() & BlockSlab.SLAB_BLOCK_TYPE_BIT) == (target.getDamage() & BlockSlab.SLAB_BLOCK_TYPE_BIT)) {
+            block = target;
+        }
+
         if (block.y > 255 || block.y < 0) {
             return null;
         }
@@ -2447,7 +2458,7 @@ public class Level implements ChunkManager, Metadatable {
             return null;
         }
 
-        if (!(block.canBeReplaced() || (hand.getId() == Item.SLAB && block.getId() == Item.SLAB))) {
+        if (!(block.canBeReplaced() || (hand instanceof BlockSlab && block instanceof BlockSlab))) {
             return null;
         }
 

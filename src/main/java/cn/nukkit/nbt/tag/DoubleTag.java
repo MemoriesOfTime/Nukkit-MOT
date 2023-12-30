@@ -54,6 +54,16 @@ public class DoubleTag extends NumberTag<Double> {
     }
 
     @Override
+    public String toSNBT() {
+        return data + "d";
+    }
+
+    @Override
+    public String toSNBT(int space) {
+        return data + "d";
+    }
+
+    @Override
     public Tag copy() {
         return new DoubleTag(getName(), data);
     }

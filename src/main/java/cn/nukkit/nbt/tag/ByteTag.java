@@ -58,6 +58,16 @@ public class ByteTag extends NumberTag<Integer> {
     }
 
     @Override
+    public String toSNBT() {
+        return data + "b";
+    }
+
+    @Override
+    public String toSNBT(int space) {
+        return data + "b";
+    }
+
+    @Override
     public boolean equals(Object obj) {
         if (super.equals(obj)) {
             ByteTag byteTag = (ByteTag) obj;

@@ -35,6 +35,18 @@ public class LoginPacket extends DataPacket {
     @Override
     public void decode() {
         this.protocol_ = this.getInt();
+        if (this.protocol_ > ProtocolInfo.CURRENT_PROTOCOL + 1000) {
+            int ofs = this.getOffset();
+            this.setOffset(1);
+            try {
+                this.protocol_ = this.getInt();
+                if (this.protocol_ >= ProtocolInfo.v1_2_0) {
+                    throw new RuntimeException();
+                }
+            } catch (Throwable th) {
+                setOffset(ofs);
+            }
+        }
         if (this.protocol_ == 0) {
             setOffset(getOffset() + 2);
             this.protocol_ = getInt();

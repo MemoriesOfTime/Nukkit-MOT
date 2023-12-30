@@ -1033,13 +1033,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (!this.hasSpawnChunks && this.chunksSent >= server.spawnThreshold) {
             this.hasSpawnChunks = true;
 
-            if (this.protocol < ProtocolInfo.v1_5_0) {
+            if (this.protocol <= ProtocolInfo.v1_5_0) {
                 this.doFirstSpawn();
             }
 
             this.sendPlayStatus(PlayStatusPacket.PLAYER_SPAWN);
 
-            if (protocol < ProtocolInfo.v1_5_0) {
+            if (protocol <= ProtocolInfo.v1_5_0) {
                 this.server.getPluginManager().callEvent(new PlayerLocallyInitializedEvent(this));
             }
         }
@@ -2724,10 +2724,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.inventory.sendHeldItemIfNotAir(this);
 
             // BDS sends armor trim templates and materials before the CraftingDataPacket
-            TrimDataPacket trimDataPacket = new TrimDataPacket();
-            trimDataPacket.getMaterials().addAll(TrimFactory.trimMaterials);
-            trimDataPacket.getPatterns().addAll(TrimFactory.trimPatterns);
-            this.dataPacket(trimDataPacket);
+            if (this.protocol >= ProtocolInfo.v1_19_80) {
+                TrimDataPacket trimDataPacket = new TrimDataPacket();
+                trimDataPacket.getMaterials().addAll(TrimFactory.trimMaterials);
+                trimDataPacket.getPatterns().addAll(TrimFactory.trimPatterns);
+                this.dataPacket(trimDataPacket);
+            }
 
             this.server.sendRecipeList(this);
 
@@ -5999,7 +6001,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         MovePlayerPacket pk = new MovePlayerPacket();
         pk.eid = this.getId();
         pk.x = (float) pos.x;
-        pk.y = (float) (pos.y + this.getEyeHeight());
+        pk.y = (float) (pos.y + this.getBaseOffset());
         pk.z = (float) pos.z;
         pk.headYaw = (float) yaw;
         pk.pitch = (float) pitch;
@@ -6025,7 +6027,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         MovePlayerPacket pk = new MovePlayerPacket();
         pk.eid = this.getId();
         pk.x = (float) x;
-        pk.y = (float) y + this.getEyeHeight();
+        pk.y = (float) y + this.getBaseOffset();
         pk.z = (float) z;
         pk.headYaw = (float) yaw;
         pk.pitch = (float) pitch;
