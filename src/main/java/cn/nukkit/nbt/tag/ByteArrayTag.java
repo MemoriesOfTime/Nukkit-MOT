@@ -52,6 +52,26 @@ public class ByteArrayTag extends Tag {
     }
 
     @Override
+    public String toSNBT() {
+        StringBuilder builder = new StringBuilder("[B;");
+        for (int i = 0; i < this.data.length - 1; i++) {
+            builder.append(data[i]).append('b').append(',');
+        }
+        builder.append(data[data.length - 1]).append("b]");
+        return builder.toString();
+    }
+
+    @Override
+    public String toSNBT(int space) {
+        StringBuilder builder = new StringBuilder("[B; ");
+        for (int i = 0; i < this.data.length - 1; i++) {
+            builder.append(data[i]).append("b, ");
+        }
+        builder.append(data[data.length - 1]).append("b]");
+        return builder.toString();
+    }
+
+    @Override
     public boolean equals(Object obj) {
         if (super.equals(obj)) {
             ByteArrayTag byteArrayTag = (ByteArrayTag) obj;

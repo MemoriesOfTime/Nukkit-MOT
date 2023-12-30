@@ -45,6 +45,16 @@ public class StringTag extends Tag {
     }
 
     @Override
+    public String toSNBT() {
+        return "\"" + data + "\"";
+    }
+
+    @Override
+    public String toSNBT(int space) {
+        return "\"" + data + "\"";
+    }
+
+    @Override
     public Tag copy() {
         return new StringTag(getName(), data);
     }
