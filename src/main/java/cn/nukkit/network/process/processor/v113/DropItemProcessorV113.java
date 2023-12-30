@@ -50,4 +50,9 @@ public class DropItemProcessorV113 extends DataPacketProcessor<DropItemPacketV11
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(DropItemPacketV113.NETWORK_ID);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol < ProtocolInfo.v1_2_0;
+    }
 }

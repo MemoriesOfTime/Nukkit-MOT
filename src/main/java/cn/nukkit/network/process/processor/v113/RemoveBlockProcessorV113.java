@@ -74,4 +74,9 @@ public class RemoveBlockProcessorV113 extends DataPacketProcessor<RemoveBlockPac
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(RemoveBlockPacketV113.NETWORK_ID);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol < ProtocolInfo.v1_2_0;
+    }
 }

@@ -137,5 +137,9 @@ public class ContainerSetSlotProcessorV113 extends DataPacketProcessor<Container
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ContainerSetContentPacketV113.NETWORK_ID);
     }
-    
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol < ProtocolInfo.v1_2_0;
+    }
 }

@@ -8,10 +8,6 @@ import cn.nukkit.network.process.processor.RequestAbilityProcessor;
 import cn.nukkit.network.process.processor.v113.ContainerSetSlotProcessorV113;
 import cn.nukkit.network.process.processor.v113.DropItemProcessorV113;
 import cn.nukkit.network.process.processor.v113.RemoveBlockProcessorV113;
-import cn.nukkit.network.process.processor.v137.ContainerOpenProcessorV137;
-import cn.nukkit.network.process.processor.v137.InventorySlotProcessorV137;
-import cn.nukkit.network.process.processor.v137.UpdateBlockProcessorV137;
-import cn.nukkit.network.process.processor.v274.SetLocalPlayerAsInitializedProcessorV274;
 import cn.nukkit.network.process.processor.v282.SetLocalPlayerAsInitializedProcessorV282;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -54,8 +50,8 @@ public final class DataPacketManager {
             protocol--;
             Int2ObjectOpenHashMap<DataPacketProcessor> map = PROTOCOL_PROCESSORS.get(protocol);
             processor = map != null ? map.get(packetId) : null;
-        } while (processor == null && protocol >= 0);
-        if (protocol != originProtocol && processor != null) {
+        } while ((processor == null || !processor.isSupported(originProtocol)) && protocol >= 0);
+        if (protocol != originProtocol && processor != null && processor.isSupported(originProtocol)) {
             registerProcessor(originProtocol, processor);
         }
         return processor;
@@ -85,18 +81,6 @@ public final class DataPacketManager {
                 ContainerSetSlotProcessorV113.INSTANCE,
                 DropItemProcessorV113.INSTANCE,
                 RemoveBlockProcessorV113.INSTANCE
-        );
-
-        registerProcessor(
-                ProtocolInfo.v1_2_0,
-                ContainerOpenProcessorV137.INSTANCE,
-                InventorySlotProcessorV137.INSTANCE,
-                UpdateBlockProcessorV137.INSTANCE
-        );
-
-        registerProcessor(
-                ProtocolInfo.v1_5_0,
-                SetLocalPlayerAsInitializedProcessorV274.INSTANCE
         );
 
         registerProcessor(

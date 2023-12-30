@@ -26,4 +26,9 @@ public class SetLocalPlayerAsInitializedProcessorV282 extends DataPacketProcesso
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.SET_LOCAL_PLAYER_AS_INITIALIZED_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_6_0_5;
+    }
 }
