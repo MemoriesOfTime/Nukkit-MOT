@@ -8,12 +8,13 @@ import cn.nukkit.nbt.snbt.ast.*;
 import cn.nukkit.nbt.tag.*;
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
+import lombok.var;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 
 public class SNBTParser {
     private final cn.nukkit.nbt.snbt.Node root;
@@ -27,8 +28,13 @@ public class SNBTParser {
     public static CompoundTag parse(String SNBT) throws ParseException {
         SNBTParser parser = new SNBTParser(SNBT);
         Tag tag = parser.parseNode(parser.root.getFirstChild());
-        if (tag instanceof CompoundTag compoundTag) return compoundTag;
-        return new CompoundTag(Map.of("", tag));
+        if (tag instanceof CompoundTag) {
+            CompoundTag compoundTag = (CompoundTag) tag;
+            return compoundTag;
+        }
+        HashMap<String, Tag> map = new HashMap<>();
+        map.put("", tag);
+        return new CompoundTag(map);
     }
 
     private Tag parseNode(Node node) throws ParseException {
@@ -37,7 +43,8 @@ public class SNBTParser {
             var tmp = new ArrayList<Byte>();
             for (Iterator<Node> it = node.iterator(); it.hasNext(); ) {
                 Node child = it.next();
-                if (child instanceof Token token) {
+                if (child instanceof Token) {
+                    Token token = (Token) child;
                     var s = token.getNormalizedText();
                     if (isLiteralValue(token)) {
                         tmp.add(Byte.parseByte(s.substring(0, s.length() - 1)));
@@ -49,7 +56,8 @@ public class SNBTParser {
             var tmp = new ArrayList<Integer>();
             for (Iterator<Node> it = node.iterator(); it.hasNext(); ) {
                 Node child = it.next();
-                if (child instanceof Token token) {
+                if (child instanceof Token) {
+                    Token token = (Token) child;
                     if (isLiteralValue(token)) {
                         tmp.add(Integer.parseInt(token.getNormalizedText()));
                     }
@@ -90,10 +98,11 @@ public class SNBTParser {
     }
 
     private ListTag<?> parseListTag(Node node) {
-        var result = new ListTag<>();
+        ListTag<Tag> result = new ListTag<>();
         for (Iterator<Node> it = node.iterator(); it.hasNext(); ) {
             Node child = it.next();
-            if (child instanceof Token token) {
+            if (child instanceof Token) {
+                Token token = (Token) child;
                 if (isLiteralValue(token)) {
                     result.add(parseToken(token));
                 }
@@ -108,33 +117,24 @@ public class SNBTParser {
         try {
             var s = token.getNormalizedText();
             switch (token.getType()) {
-                case FLOAT -> {
+                case FLOAT:
                     return new FloatTag("", Float.parseFloat(s.substring(0, s.length() - 1)));
-                }
-                case DOUBLE -> {
+                case DOUBLE:
                     return new DoubleTag("", Double.parseDouble(s.substring(0, s.length() - 1)));
-                }
-                case BOOLEAN -> {
+                case BOOLEAN:
                     return new ByteTag("", Boolean.parseBoolean(token.getNormalizedText()) ? 1 : 0);
-                }
-                case BYTE -> {
+                case BYTE:
                     return new ByteTag("", Byte.parseByte(s.substring(0, s.length() - 1)));
-                }
-                case SHORT -> {
+                case SHORT:
                     return new ShortTag("", Short.parseShort(s.substring(0, s.length() - 1)));
-                }
-                case INTEGER -> {
+                case INTEGER:
                     return new IntTag("", Integer.parseInt(token.getNormalizedText()));
-                }
-                case LONG -> {
+                case LONG:
                     return new LongTag("", Long.parseLong(s.substring(0, s.length() - 1)));
-                }
-                case STRING -> {
+                case STRING:
                     return new StringTag("", s.substring(1, s.length() - 1));
-                }
-                default -> {
+                default:
                     return new EndTag();
-                }
             }
         } catch (NumberFormatException e) {
             e.printStackTrace();
@@ -143,10 +143,19 @@ public class SNBTParser {
     }
 
     private boolean isLiteralValue(Token token) {
-        return switch (token.getType()) {
-            case FLOAT, DOUBLE, STRING, SHORT, INTEGER, LONG, BYTE, BOOLEAN -> true;
-            default -> false;
-        };
+        switch (token.getType()) {
+            case FLOAT:
+            case DOUBLE:
+            case STRING:
+            case SHORT:
+            case INTEGER:
+            case LONG:
+            case BYTE:
+            case BOOLEAN:
+                return true;
+            default:
+                return false;
+        }
     }
 }
 

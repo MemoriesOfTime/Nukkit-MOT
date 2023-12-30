@@ -321,7 +321,10 @@ public class CompoundTag extends Tag implements Cloneable {
 
     public String toSNBT(int space) {
         StringBuilder addSpace = new StringBuilder();
-        addSpace.append(" ".repeat(Math.max(0, space)));
+        int max = Math.max(0, space);
+        for (int i=0; i<max; i++) {
+            addSpace.append(" ");
+        }
         StringJoiner joiner = new StringJoiner(",\n" + addSpace);
         tags.forEach((key, tag) -> joiner.add("\"" + key + "\": " + tag.toSNBT(space).replace("\n", "\n" + addSpace)));
         return "{\n" + addSpace + joiner + "\n}";

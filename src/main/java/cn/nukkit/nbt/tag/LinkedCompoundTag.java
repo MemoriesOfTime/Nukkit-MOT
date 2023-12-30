@@ -1,5 +1,7 @@
 package cn.nukkit.nbt.tag;
 
+import lombok.var;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
 
