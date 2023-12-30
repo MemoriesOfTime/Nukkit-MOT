@@ -54,6 +54,16 @@ public class LongTag extends NumberTag<Long> {
     }
 
     @Override
+    public String toSNBT() {
+        return data + "L";
+    }
+
+    @Override
+    public String toSNBT(int space) {
+        return data + "L";
+    }
+
+    @Override
     public Tag copy() {
         return new LongTag(getName(), data);
     }

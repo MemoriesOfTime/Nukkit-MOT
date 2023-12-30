@@ -3157,7 +3157,7 @@ public class Server {
             put("thread-watchdog-tick", 60000);
 
             put("nether", true);
-            put("end", false);
+            put("end", true);
             put("vanilla-portals", true);
             put("multi-nether-worlds", "");
 

@@ -54,6 +54,16 @@ public class ShortTag extends NumberTag<Integer> {
     }
 
     @Override
+    public String toSNBT() {
+        return data + "s";
+    }
+
+    @Override
+    public String toSNBT(int space) {
+        return data + "s";
+    }
+
+    @Override
     public Tag copy() {
         return new ShortTag(getName(), data);
     }
