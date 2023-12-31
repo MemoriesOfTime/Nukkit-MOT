@@ -1748,6 +1748,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         try {
             Item item = (Item) super.clone();
             item.tags = this.tags.clone();
+            item.cachedNBT = null;
             return item;
         } catch (CloneNotSupportedException e) {
             return null;
