@@ -18,6 +18,7 @@ import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
@@ -25,7 +26,7 @@ import java.util.Map;
  * @author Angelic47
  * Nukkit Project
  */
-public class BlockChest extends BlockTransparentMeta implements Faceable {
+public class BlockChest extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityChest> {
 
     private static final int[] faces = {2, 5, 3, 4};
 
@@ -45,6 +46,18 @@ public class BlockChest extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return CHEST;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityChest> getBlockEntityClass() {
+        return BlockEntityChest.class;
+    }
+    
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.CHEST;
     }
 
     @Override

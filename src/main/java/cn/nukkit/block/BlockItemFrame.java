@@ -24,7 +24,7 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Created by Pub4Game on 03.07.2016.
  */
-public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
+public class BlockItemFrame extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityItemFrame> {
 
     private final static int[] FACING = new int[]{4, 5, 3, 2, 1, 0}; // TODO when 1.13 support arrives, add UP/DOWN facings
 
@@ -49,6 +49,18 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable {
     @Override
     public String getName() {
         return "Item Frame";
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityItemFrame> getBlockEntityClass() {
+        return BlockEntityItemFrame.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.ITEM_FRAME;
     }
 
     @Override

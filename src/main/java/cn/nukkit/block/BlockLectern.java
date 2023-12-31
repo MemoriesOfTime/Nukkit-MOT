@@ -17,7 +17,7 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 
-public class BlockLectern extends BlockTransparentMeta implements Faceable {
+public class BlockLectern extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityLectern> {
 
     public BlockLectern() {
         this(0);
@@ -35,6 +35,18 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return LECTERN;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityLectern> getBlockEntityClass() {
+        return BlockEntityLectern.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.LECTERN;
     }
 
     @Override

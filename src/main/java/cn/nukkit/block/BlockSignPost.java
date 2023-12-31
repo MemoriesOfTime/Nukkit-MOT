@@ -20,11 +20,12 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Nukkit Project Team
  */
-public class BlockSignPost extends BlockTransparentMeta implements Faceable {
+public class BlockSignPost extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntitySign> {
 
     public BlockSignPost() {
         this(0);
@@ -37,6 +38,18 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return SIGN_POST;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntitySign> getBlockEntityClass() {
+        return BlockEntitySign.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.SIGN;
     }
 
     @Override

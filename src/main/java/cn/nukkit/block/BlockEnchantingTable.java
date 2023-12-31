@@ -12,6 +12,7 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
@@ -19,7 +20,7 @@ import java.util.Map;
  * Created on 2015/11/22 by CreeperFace.
  * Package cn.nukkit.block in project Nukkit .
  */
-public class BlockEnchantingTable extends BlockTransparent {
+public class BlockEnchantingTable extends BlockTransparent implements BlockEntityHolder<BlockEntityEnchantTable> {
 
     @Override
     public int getId() {
@@ -29,6 +30,18 @@ public class BlockEnchantingTable extends BlockTransparent {
     @Override
     public String getName() {
         return "Enchanting Table";
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.ENCHANT_TABLE;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityEnchantTable> getBlockEntityClass() {
+        return BlockEntityEnchantTable.class;
     }
 
     @Override

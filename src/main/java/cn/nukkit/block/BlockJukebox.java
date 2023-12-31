@@ -11,11 +11,12 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by CreeperFace on 7.8.2017.
  */
-public class BlockJukebox extends BlockSolid {
+public class BlockJukebox extends BlockSolid implements BlockEntityHolder<BlockEntityJukebox> {
 
     @Override
     public String getName() {
@@ -25,6 +26,18 @@ public class BlockJukebox extends BlockSolid {
     @Override
     public int getId() {
         return JUKEBOX;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityJukebox> getBlockEntityClass() {
+        return BlockEntityJukebox.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.JUKEBOX;
     }
 
     @Override
@@ -95,7 +108,8 @@ public class BlockJukebox extends BlockSolid {
         return false;
     }*/
 
-    private BlockEntity createBlockEntity() {
+    @Override
+    public BlockEntityJukebox createBlockEntity() {
         CompoundTag nbt = new CompoundTag()
                 .putList(new ListTag<>("Items"))
                 .putString("id", BlockEntity.JUKEBOX)
@@ -103,7 +117,7 @@ public class BlockJukebox extends BlockSolid {
                 .putInt("y", getFloorY())
                 .putInt("z", getFloorZ());
 
-        return BlockEntity.createBlockEntity(BlockEntity.JUKEBOX, this.level.getChunk(getFloorX() >> 4, getFloorZ() >> 4), nbt);
+        return (BlockEntityJukebox) BlockEntity.createBlockEntity(BlockEntity.JUKEBOX, this.level.getChunk(getFloorX() >> 4, getFloorZ() >> 4), nbt);
     }
 
     @Override

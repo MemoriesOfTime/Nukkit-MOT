@@ -10,11 +10,12 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author PikyCZ
  */
-public class BlockEndGateway extends BlockSolid {
+public class BlockEndGateway extends BlockSolid implements BlockEntityHolder<BlockEntityEndGateway> {
 
     @Override
     public String getName() {
@@ -24,6 +25,18 @@ public class BlockEndGateway extends BlockSolid {
     @Override
     public int getId() {
         return END_GATEWAY;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityEndGateway> getBlockEntityClass() {
+        return BlockEntityEndGateway.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.END_GATEWAY;
     }
 
     @Override

@@ -12,11 +12,12 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author CreeperFace
  */
-public class BlockHopper extends BlockTransparentMeta implements Faceable {
+public class BlockHopper extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityHopper> {
 
     public BlockHopper() {
         this(0);
@@ -34,6 +35,18 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable {
     @Override
     public String getName() {
         return "Hopper Block";
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityHopper> getBlockEntityClass() {
+        return BlockEntityHopper.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.HOPPER;
     }
 
     @Override
