@@ -12,6 +12,8 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
@@ -19,7 +21,7 @@ import java.util.Map;
  * @author Angelic47
  * Nukkit Project
  */
-public class BlockFurnaceBurning extends BlockSolidMeta {
+public class BlockFurnaceBurning extends BlockSolidMeta implements Faceable, BlockEntityHolder<BlockEntityFurnace> {
 
     private static final int[] faces = {2, 5, 3, 4};
 
@@ -39,6 +41,18 @@ public class BlockFurnaceBurning extends BlockSolidMeta {
     @Override
     public String getName() {
         return "Burning Furnace";
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityFurnace> getBlockEntityClass() {
+        return BlockEntityFurnace.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.FURNACE;
     }
 
     @Override
@@ -166,5 +180,10 @@ public class BlockFurnaceBurning extends BlockSolidMeta {
     @Override
     public boolean canHarvestWithHand() {
         return false;
+    }
+
+    @Override
+    public BlockFace getBlockFace() {
+        return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
     }
 }

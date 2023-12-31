@@ -15,6 +15,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map.Entry;
 import java.util.Random;
@@ -23,7 +24,7 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Created by CreeperFace on 15.4.2017.
  */
-public class BlockDispenser extends BlockSolidMeta implements Faceable {
+public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEntityHolder<BlockEntityDispenser> {
 
     public BlockDispenser() {
         this(0);
@@ -46,6 +47,18 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable {
     @Override
     public int getId() {
         return DISPENSER;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityDispenser> getBlockEntityClass() {
+        return BlockEntityDispenser.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.DISPENSER;
     }
 
     @Override
