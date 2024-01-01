@@ -218,12 +218,12 @@ public class BlockBamboo extends BlockTransparentMeta {
 
     @Override
     public double getHardness() {
-        return 2;
+        return 1;
     }
 
     @Override
     public double getResistance() {
-        return 5;
+        return 2;
     }
 
     public boolean isThick() {
@@ -246,11 +246,6 @@ public class BlockBamboo extends BlockTransparentMeta {
     public void setLeafSize(int leafSize) {
         leafSize = MathHelper.clamp(leafSize, LEAF_SIZE_NONE, LEAF_SIZE_LARGE) & 0b11;
         this.setDamage(this.getDamage() & (DATA_MASK ^ 0b110) | (leafSize << 1));
-    }
-
-    @Override
-    public boolean canHarvestWithHand() {
-        return true;
     }
 
     @Override
