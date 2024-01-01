@@ -988,8 +988,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return calculateBreakTime(item, null);
     }
 
-    public double calculateBreakTime(Item item, Player player) {
-        Objects.requireNonNull(item, "getBreakTime: Item can not be null");
+    public double calculateBreakTime(@Nonnull Item item, Player player) {
+        Objects.requireNonNull(item, "Block#calculateBreakTime(): Item can not be null");
         double seconds = 0;
         double blockHardness = this.getHardness();
         boolean canHarvest = this.canHarvest(item);
@@ -1043,7 +1043,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return seconds;
     }
 
-    public double getBreakTime(Item item, Player player) {
+    public double getBreakTime(@Nonnull Item item, Player player) {
         return calculateBreakTime(item, player);
         /*Objects.requireNonNull(item, "getBreakTime: Item can not be null");
         Objects.requireNonNull(player, "getBreakTime: Player can not be null");
