@@ -1784,6 +1784,9 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public String getNamespaceId(int protocolId) {
+        if (this.getId() == 0) {
+            return "minecraft:air";
+        }
         RuntimeItemMapping runtimeMapping = RuntimeItems.getMapping(protocolId);
         return runtimeMapping.getNamespacedIdByNetworkId(this.getNetworkId(protocolId));
     }
