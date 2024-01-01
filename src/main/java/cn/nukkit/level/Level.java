@@ -803,7 +803,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public void addChunkPacket(int chunkX, int chunkZ, DataPacket packet) {
         long index = Level.chunkHash(chunkX, chunkZ);
-        Deque<DataPacket> packets = chunkPackets.computeIfAbsent(index, i -> new ArrayDeque<>());
+        Deque<DataPacket> packets = chunkPackets.computeIfAbsent(index, i -> new ConcurrentLinkedDeque<>());
         packets.add(packet);
     }
 
@@ -1033,13 +1033,14 @@ public class Level implements ChunkManager, Metadatable {
             this.checkSleep();
         }
 
-        for (long index : this.chunkPackets.keySet()) {
+        for (Map.Entry<Long, Deque<DataPacket>> entry : this.chunkPackets.entrySet()) {
+            Long index = entry.getKey();
             int chunkX = Level.getHashX(index);
             int chunkZ = Level.getHashZ(index);
             Map<Integer, Player> map = this.getChunkPlayers(chunkX, chunkZ);
             if (!map.isEmpty()) {
                 Player[] chunkPlayers = map.values().toArray(new Player[0]);
-                for (DataPacket pk : this.chunkPackets.get(index)) {
+                for (DataPacket pk : entry.getValue()) {
                     Server.broadcastPacket(chunkPlayers, pk);
                 }
             }
