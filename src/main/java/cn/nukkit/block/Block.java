@@ -988,8 +988,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return calculateBreakTime(item, null);
     }
 
-    public double calculateBreakTime(Item item, Player player) {
-        Objects.requireNonNull(item, "getBreakTime: Item can not be null");
+    public double calculateBreakTime(@Nonnull Item item, Player player) {
+        Objects.requireNonNull(item, "Block#calculateBreakTime(): Item can not be null");
         double seconds = 0;
         double blockHardness = this.getHardness();
         boolean canHarvest = this.canHarvest(item);
@@ -1012,6 +1012,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
 
         int blockId = this.getId();
+
+        if (blockId == BAMBOO && item.isSword()) {
+            return 0; //用剑挖竹子时瞬间破坏
+        }
+
         if (correctTool0(this.getToolType(), item, blockId)) {
             speedMultiplier = toolBreakTimeBonus0(item);
             int efficiencyLevel = Optional.ofNullable(item.getEnchantment(Enchantment.ID_EFFICIENCY))
@@ -1038,8 +1043,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return seconds;
     }
 
-    public double getBreakTime(Item item, Player player) {
-        Objects.requireNonNull(item, "getBreakTime: Item can not be null");
+    public double getBreakTime(@Nonnull Item item, Player player) {
+        return calculateBreakTime(item, player);
+        /*Objects.requireNonNull(item, "getBreakTime: Item can not be null");
         Objects.requireNonNull(player, "getBreakTime: Player can not be null");
         double blockHardness = getHardness();
 
@@ -1062,7 +1068,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                         .map(Enchantment::getLevel).map(l -> l >= 1).orElse(false);
         boolean outOfWaterButNotOnGround = !player.isOnGround() && !submerged;
         return breakTime0(blockHardness, correctTool, canHarvestWithHand, blockId, itemToolType, itemTier,
-                efficiencyLoreLevel, hasteEffectLevel, insideOfWaterWithoutAquaAffinity, outOfWaterButNotOnGround);
+                efficiencyLoreLevel, hasteEffectLevel, insideOfWaterWithoutAquaAffinity, outOfWaterButNotOnGround);*/
     }
 
     public boolean canBeBrokenWith(Item item) {
