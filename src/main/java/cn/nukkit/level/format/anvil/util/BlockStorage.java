@@ -2,13 +2,11 @@ package cn.nukkit.level.format.anvil.util;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class BlockStorage {
     public static final int SECTION_SIZE = 4096;
@@ -405,52 +403,29 @@ public class BlockStorage {
     }
 
     protected final boolean canBeObfuscated(int x, int y, int z) {
-        return !Block.transparent[getBlockId(x + 1, y, z)] &&
-                !Block.transparent[getBlockId(x - 1, y, z)] &&
-                !Block.transparent[getBlockId(x, y + 1, z)] &&
-                !Block.transparent[getBlockId(x, y - 1, z)] &&
-                !Block.transparent[getBlockId(x, y, z + 1)] &&
-                !Block.transparent[getBlockId(x, y, z - 1)];
+        return x != 15 && !Block.transparent[getBlockId(x + 1, y, z)] &&
+                x != 0 && !Block.transparent[getBlockId(x - 1, y, z)] &&
+                y != 15 && !Block.transparent[getBlockId(x, y + 1, z)] &&
+                y != 0 && !Block.transparent[getBlockId(x, y - 1, z)] &&
+                z != 15 && !Block.transparent[getBlockId(x, y, z + 1)] &&
+                z != 0 && !Block.transparent[getBlockId(x, y, z - 1)];
     }
 
     public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
-        int[] ids = this.getBlockIdsExtended();
-        int[] data = this.getBlockDataExtended();
-        int[] blockStates = new int[ids.length];
-        Int2IntOpenHashMap runtime2palette = new Int2IntOpenHashMap();
-        ArrayList<Integer> palette2runtime = new ArrayList<>();
-        AtomicInteger nextPaletteId = new AtomicInteger(0);
-        //TODO Use compressed formats based on the value of this variable
-        AtomicInteger maxRuntimeId = new AtomicInteger(0);
+        PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
-        for (int i = 0; i < blockStates.length; i++) {
+        for (int i = 0; i < SECTION_SIZE; i++) {
             int bid;
-            if (antiXray && canBeObfuscated(i >> 8, i & 0xF, (i >> 4) & 0xF)) {
-                bid = 0;
+            if (antiXray && canBeObfuscated((i >> 8) & 0xF, i & 0xF, (i >> 4) & 0xF)) {
+                bid = Block.STONE;
             } else {
-                bid = ids[i];
+                bid = getBlockId(i);
             }
-            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, data[i]);
-            int paletteId = runtime2palette.computeIfAbsent(runtimeId, rid -> {
-                int pid = nextPaletteId.getAndIncrement();
-                palette2runtime.add(rid);
-                if (maxRuntimeId.get() < rid) {
-                    maxRuntimeId.set(rid);
-                }
-                return pid;
-            });
-            blockStates[i] = paletteId;
+            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, getBlockData(i));
+            palettedBlockStorage.setBlock(i, runtimeId);
         }
 
-        int bitsPerBlock = 16;
-        stream.putByte( (byte) (1 | (bitsPerBlock << 1)) );
-        for (int blockState : blockStates) {
-            stream.putLShort(blockState);
-        }
-        stream.putVarInt(palette2runtime.size());
-        for (Integer runtimeId : palette2runtime) {
-            stream.putVarInt(runtimeId);
-        }
+        palettedBlockStorage.writeTo(stream);
     }
 
     public BlockStorage copy() {
