@@ -1351,6 +1351,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
     }
 
+    @NotNull
+    public final Block getBlock() {
+        return clone();
+    }
+
     public Block clone() {
         return (Block) super.clone();
     }
