@@ -1779,7 +1779,6 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public String getNamespaceId() {
-        Server.mvw("Item#getNamespaceId()");
         return this.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL);
     }
 
