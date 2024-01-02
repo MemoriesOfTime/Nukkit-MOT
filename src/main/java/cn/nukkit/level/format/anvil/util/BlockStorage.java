@@ -2,6 +2,7 @@ package cn.nukkit.level.format.anvil.util;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
@@ -415,11 +416,9 @@ public class BlockStorage {
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
         for (int i = 0; i < SECTION_SIZE; i++) {
-            int bid;
-            if (antiXray && canBeObfuscated((i >> 8) & 0xF, i & 0xF, (i >> 4) & 0xF)) {
+            int bid = getBlockId(i);
+            if (antiXray && Level.xrayableBlocks[bid] && canBeObfuscated((i >> 8) & 0xF, i & 0xF, (i >> 4) & 0xF)) {
                 bid = Block.STONE;
-            } else {
-                bid = getBlockId(i);
             }
             int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, getBlockData(i));
             palettedBlockStorage.setBlock(i, runtimeId);
