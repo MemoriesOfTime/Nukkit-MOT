@@ -129,6 +129,8 @@ import java.util.stream.Stream;
 @Log4j2
 public class Player extends EntityHuman implements CommandSender, InventoryHolder, ChunkLoader, IPlayer, IScoreboardViewer {
 
+    public static final Player[] EMPTY_ARRAY = new Player[0];
+
     public static final int SURVIVAL = 0;
     public static final int CREATIVE = 1;
     public static final int ADVENTURE = 2;
@@ -4911,6 +4913,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 pk.z = (float) pos.z;
                 pk.data = (int) (65535 / breakTime);
                 this.getLevel().addChunkPacket(pos.getFloorX() >> 4, pos.getFloorZ() >> 4, pk);
+
+                // 优化反矿透时玩家的挖掘体验
+                if (this.getLevel().antiXrayEnabled()) {
+                    var vecList = new ArrayList<Vector3>(5);
+                    Vector3 tmpVec;
+                    for (var each : BlockFace.values()) {
+                        if (each == face) continue;
+                        var tmpX = target.getFloorX() + each.getXOffset();
+                        var tmpY = target.getFloorY() + each.getYOffset();
+                        var tmpZ = target.getFloorZ() + each.getZOffset();
+                        if (this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ) != BlockID.STONE) {
+                            vecList.add(new Vector3(tmpX, tmpY, tmpZ));
+                        }
+                    }
+                    this.getLevel().sendBlocks(new Player[]{this}, vecList.toArray(Vector3[]::new), UpdateBlockPacket.FLAG_ALL);
+                }
             }
         }
 

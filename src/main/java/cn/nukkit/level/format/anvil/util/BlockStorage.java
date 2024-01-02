@@ -399,15 +399,21 @@ public class BlockStorage {
         }
     }
 
+    @Deprecated
     public void writeTo(int protocol, BinaryStream stream) {
-        /*if (protocol > ProtocolInfo.v1_18_0) {
-            PalettedBlockStorage storage = PalettedBlockStorage.createFromBlockPalette();
-            for (int i = 0; i < SECTION_SIZE; i++) {
-                storage.setBlock(i, GlobalBlockPalette.getOrCreateRuntimeId(blockIds[i] & 0xff, blockData.get(i)));
-            }
-            storage.writeTo(protocol, stream);
-            return;
-        }*/
+        writeTo(protocol, stream, false);
+    }
+
+    protected final boolean canBeObfuscated(int x, int y, int z) {
+        return !Block.transparent[getBlockId(x + 1, y, z)] &&
+                !Block.transparent[getBlockId(x - 1, y, z)] &&
+                !Block.transparent[getBlockId(x, y + 1, z)] &&
+                !Block.transparent[getBlockId(x, y - 1, z)] &&
+                !Block.transparent[getBlockId(x, y, z + 1)] &&
+                !Block.transparent[getBlockId(x, y, z - 1)];
+    }
+
+    public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
         int[] ids = this.getBlockIdsExtended();
         int[] data = this.getBlockDataExtended();
         int[] blockStates = new int[ids.length];
@@ -418,7 +424,13 @@ public class BlockStorage {
         AtomicInteger maxRuntimeId = new AtomicInteger(0);
 
         for (int i = 0; i < blockStates.length; i++) {
-            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, ids[i], data[i]);
+            int bid;
+            if (antiXray && canBeObfuscated(i >> 8, i & 0xF, (i >> 4) & 0xF)) {
+                bid = 0;
+            } else {
+                bid = ids[i];
+            }
+            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, data[i]);
             int paletteId = runtime2palette.computeIfAbsent(runtimeId, rid -> {
                 int pid = nextPaletteId.getAndIncrement();
                 palette2runtime.add(rid);

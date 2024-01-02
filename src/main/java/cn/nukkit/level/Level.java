@@ -114,6 +114,7 @@ public class Level implements ChunkManager, Metadatable {
 
     // The blocks that can randomly tick
     private static final boolean[] randomTickBlocks = new boolean[Block.MAX_BLOCK_ID];
+    public static final boolean[] xrayableBlocks = new boolean[Block.MAX_BLOCK_ID];
 
     static {
         randomTickBlocks[Block.GRASS] = true;
@@ -149,6 +150,14 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.CORAL_FAN_DEAD] = true;
         randomTickBlocks[Block.BLOCK_KELP] = true;
         randomTickBlocks[Block.SWEET_BERRY_BUSH] = true;
+
+        Level.xrayableBlocks[Block.GOLD_ORE] = true;
+        Level.xrayableBlocks[Block.IRON_ORE] = true;
+        Level.xrayableBlocks[Block.LAPIS_ORE] = true;
+        Level.xrayableBlocks[Block.DIAMOND_ORE] = true;
+        Level.xrayableBlocks[Block.REDSTONE_ORE] = true;
+        Level.xrayableBlocks[Block.EMERALD_ORE] = true;
+        Level.xrayableBlocks[Block.ANCIENT_DEBRIS] = true;
     }
 
     @NonComputationAtomic
@@ -284,6 +293,8 @@ public class Level implements ChunkManager, Metadatable {
 
     private Iterator<LongObjectEntry<Long>> lastUsingUnloadingIter;
 
+    private final boolean antiXray;
+
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
         this.levelId = levelIdCounter++;
         this.blockMetadata = new BlockMetadataStore(this);
@@ -344,6 +355,8 @@ public class Level implements ChunkManager, Metadatable {
         this.isEnd = name.equals("the_end");
 
         this.randomTickingEnabled = !Server.noTickingWorlds.contains(name);
+
+        this.antiXray = Server.antiXrayWorlds.contains(name);
 
         if (this.server.asyncChunkSending) {
             this.asyncChuckExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("AsyncChunkThread for " + name).build());
@@ -1004,14 +1017,102 @@ public class Level implements ChunkManager, Metadatable {
                                 p.onChunkChanged(chunk);
                             }
                         } else {
-                            Player[] playerArray = this.getChunkPlayers(chunkX, chunkZ).values().toArray(new Player[0]);
-                            Vector3[] blocksArray = new Vector3[blocks.size()];
-                            int i = 0;
-                            for (char blockHash : blocks.keySet()) {
-                                Vector3 hash = getBlockXYZ(index, blockHash);
-                                blocksArray[i++] = hash;
+                            Player[] playerArray = this.getChunkPlayers(chunkX, chunkZ).values().toArray(Player.EMPTY_ARRAY);
+                            int size = blocks.size();
+                            Vector3[] blocksArray = new Vector3[size];
+                            if (this.antiXrayEnabled()) {
+                                var vectorSet = new IntOpenHashSet(size * 6);
+                                var vList = new ArrayList<Vector3>(size * 7);
+                                Vector3 tmpV3;
+                                for (char blockHash : blocks.keySet()) {
+                                    Vector3 hash = getBlockXYZ(index, blockHash);
+                                    var x = hash.getFloorX();
+                                    var y = hash.getFloorY();
+                                    var z = hash.getFloorZ();
+                                    if (!vectorSet.contains(blockHash)) {
+                                        vectorSet.add(blockHash);
+                                        try {
+                                            tmpV3 = new Vector3(x, y, z);
+                                            vList.add(tmpV3);
+                                            if (!Block.transparent[this.getBlockIdAt(x, y, z)]) {
+                                                continue;
+                                            }
+                                        } catch (Exception ignore) {
+
+                                        }
+                                    }
+                                    x++;
+                                    blockHash = localBlockHash(x, y, z);
+                                    if (!vectorSet.contains(blockHash)) {
+                                        vectorSet.add(blockHash);
+                                        try {
+                                            vList.add(new Vector3(x, y, z));
+                                        } catch (Exception ignore) {
+
+                                        }
+                                    }
+                                    x -= 2;
+                                    blockHash = localBlockHash(x, y, z);
+                                    if (!vectorSet.contains(blockHash)) {
+                                        vectorSet.add(blockHash);
+                                        try {
+                                            vList.add(new Vector3(x, y, z));
+                                        } catch (Exception ignore) {
+
+                                        }
+                                    }
+                                    x++;
+                                    y++;
+                                    blockHash = localBlockHash(x, y, z);
+                                    if (!vectorSet.contains(blockHash)) {
+                                        vectorSet.add(blockHash);
+                                        try {
+                                            vList.add(new Vector3(x, y, z));
+                                        } catch (Exception ignore) {
+
+                                        }
+                                    }
+                                    y -= 2;
+                                    blockHash = localBlockHash(x, y, z);
+                                    if (!vectorSet.contains(blockHash)) {
+                                        vectorSet.add(blockHash);
+                                        try {
+                                            vList.add(new Vector3(x, y, z));
+                                        } catch (Exception ignore) {
+
+                                        }
+                                    }
+                                    y++;
+                                    z++;
+                                    blockHash = localBlockHash(x, y, z);
+                                    if (!vectorSet.contains(blockHash)) {
+                                        vectorSet.add(blockHash);
+                                        try {
+                                            vList.add(new Vector3(x, y, z));
+                                        } catch (Exception ignore) {
+
+                                        }
+                                    }
+                                    z -= 2;
+                                    blockHash = localBlockHash(x, y, z);
+                                    if (!vectorSet.contains(blockHash)) {
+                                        vectorSet.add(blockHash);
+                                        try {
+                                            vList.add(new Vector3(x, y, z));
+                                        } catch (Exception ignore) {
+
+                                        }
+                                    }
+                                }
+                                this.sendBlocks(playerArray, vList.toArray(Vector3[]::new), UpdateBlockPacket.FLAG_ALL);
+                            } else {
+                                int i = 0;
+                                for (char blockHash : blocks.keySet()) {
+                                    Vector3 hash = getBlockXYZ(index, blockHash);
+                                    blocksArray[i++] = hash;
+                                }
+                                this.sendBlocks(playerArray, blocksArray, UpdateBlockPacket.FLAG_ALL);
                             }
-                            this.sendBlocks(playerArray, blocksArray, UpdateBlockPacket.FLAG_ALL);
                         }
                     }
                 }
@@ -2044,7 +2145,18 @@ public class Level implements ChunkManager, Metadatable {
         int cz = z >> 4;
 
         if (direct) {
-            this.sendBlocks(this.getChunkPlayers(cx, cz).values().toArray(new Player[0]), new Block[]{block}, UpdateBlockPacket.FLAG_ALL_PRIORITY, block.layer);
+            if (this.antiXrayEnabled() && block.isTransparent()) { //刷新暴露的方块
+                this.sendBlocks(this.getChunkPlayers(cx, cz).values().toArray(Player.EMPTY_ARRAY),
+                        new Vector3[]{
+                                block.add(-1),
+                                block.add(1),
+                                block.add(0, -1),
+                                block.add(0, 1),
+                                block.add(0, 0, 1),
+                                block.add(0, 0, -1)
+                        }, UpdateBlockPacket.FLAG_ALL_PRIORITY);
+            }
+            this.sendBlocks(this.getChunkPlayers(cx, cz).values().toArray(Player.EMPTY_ARRAY), new Block[]{block}, UpdateBlockPacket.FLAG_ALL_PRIORITY, block.layer);
         } else {
             this.addBlockChange(Level.chunkHash(cx, cz), x, y, z);
         }
@@ -4371,6 +4483,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public boolean isMobSpawningAllowed() {
         return !Server.disabledSpawnWorlds.contains(getName()) && gameRules.getBoolean(GameRule.DO_MOB_SPAWNING);
+    }
+
+    public boolean antiXrayEnabled() {
+        return this.antiXray;
     }
 
     public boolean createPortal(Block target, boolean fireCharge) {
