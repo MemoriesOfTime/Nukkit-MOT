@@ -1,6 +1,7 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
+import cn.nukkit.blockentity.BlockEntityBeehive;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.mob.EntityFlyingMob;
@@ -112,5 +113,21 @@ public class EntityBee extends EntityFlyingMob { // A mob because it needs to ha
     public void setAngry(boolean angry) {
         this.angry = angry;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_ANGRY, angry);
+    }
+
+    public boolean getHasNectar() {
+        return false; //TODO
+    }
+
+    public void setHasNectar(boolean hasNectar) {
+        //TODO
+    }
+
+    public void nectarDelivered(BlockEntityBeehive blockEntityBeehive) {
+        //TODO
+    }
+
+    public void leftBeehive(BlockEntityBeehive blockEntityBeehive) {
+        //TODO
     }
 }
