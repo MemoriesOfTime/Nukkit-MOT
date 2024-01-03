@@ -2171,6 +2171,9 @@ public class Level implements ChunkManager, Metadatable {
 
         //发送给玩家
         for (Vector3 v : vector3Array) {
+            if (v == null) {
+                continue;
+            }
             int x = (int) v.x;
             int y = (int) v.y;
             int z = (int) v.z;

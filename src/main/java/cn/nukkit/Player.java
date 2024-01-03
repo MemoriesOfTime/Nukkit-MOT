@@ -4917,18 +4917,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 // 优化反矿透时玩家的挖掘体验
                 if (this.getLevel().antiXrayEnabled()) {
-                    var vecList = new ArrayList<Vector3>(5);
-                    Vector3 tmpVec;
-                    for (var each : BlockFace.values()) {
-                        if (each == face) continue;
-                        var tmpX = target.getFloorX() + each.getXOffset();
-                        var tmpY = target.getFloorY() + each.getYOffset();
-                        var tmpZ = target.getFloorZ() + each.getZOffset();
-                        if (this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ) != BlockID.STONE) {
-                            vecList.add(new Vector3(tmpX, tmpY, tmpZ));
+                    Vector3[] vector3s = new Vector3[5];
+                    int index = 0;
+                    for (BlockFace each : BlockFace.values()) {
+                        if (each == face) {
+                            continue;
+                        }
+                        int tmpX = target.getFloorX() + each.getXOffset();
+                        int tmpY = target.getFloorY() + each.getYOffset();
+                        int tmpZ = target.getFloorZ() + each.getZOffset();
+                        if (Level.xrayableBlocks[this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ)]) {
+                            vector3s[index] = new Vector3(tmpX, tmpY, tmpZ);
+                            index++;
                         }
                     }
-                    this.getLevel().sendBlocks(new Player[]{this}, vecList.toArray(Vector3[]::new), UpdateBlockPacket.FLAG_ALL);
+                    this.getLevel().sendBlocks(new Player[]{this}, vector3s, UpdateBlockPacket.FLAG_ALL);
                 }
             }
         }
