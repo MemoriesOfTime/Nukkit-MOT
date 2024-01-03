@@ -287,8 +287,6 @@ public class Level implements ChunkManager, Metadatable {
     private ExecutorService asyncChuckExecutor;
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
-    private Iterator<LongObjectEntry<Long>> lastUsingUnloadingIter;
-
     private final boolean antiXray;
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
@@ -2120,7 +2118,7 @@ public class Level implements ChunkManager, Metadatable {
         //获取要发送的方块位置
         Vector3[] vector3Array;
         switch (type) {
-            case 0 -> { //explode
+            case 0: //explode
                 vector3 = vector3.floor();
                 vector3Array = new Vector3[] {
                         vector3.add(1, 0, 0),
@@ -2128,10 +2126,9 @@ public class Level implements ChunkManager, Metadatable {
                         vector3.add(0, 1, 0),
                         vector3.add(0, -1, 0),
                         vector3.add(0, 0, 1),
-                        vector3.add(0, 0, -1)
-                };
-            }
-            case 1 -> { //block change
+                        vector3.add(0, 0, -1)};
+                break;
+            case 1: //block change
                 vector3Array = new Vector3[26];
                 int index = 0;
                 for (int x = -1; x < 2; x++) {
@@ -2144,10 +2141,10 @@ public class Level implements ChunkManager, Metadatable {
                         }
                     }
                 }
-            }
-            case 2 -> { //player move
+                break;
+            case 2: //player move
                 vector3Array = new Vector3[100];
-                int index = 0;
+                index = 0;
                 for (int x = -2; x < 3; x++) {
                     for (int z = -2; z < 3; z++) {
                         for (int y = -1; y < 3; y++) {
@@ -2156,10 +2153,9 @@ public class Level implements ChunkManager, Metadatable {
                         }
                     }
                 }
-            }
-            default -> {
+                break;
+            default:
                 return;
-            }
         }
 
         //发送给玩家
