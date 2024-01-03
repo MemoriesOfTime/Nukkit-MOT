@@ -2029,6 +2029,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (distance != 0 && this.nextChunkOrderRun > 20) {
                 this.nextChunkOrderRun = 20;
             }
+            this.level.antiXrayOnBlockChange(this, this, 2);
         }
     }
 

@@ -72,6 +72,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.SoftReference;
 import java.util.*;
@@ -153,11 +154,13 @@ public class Level implements ChunkManager, Metadatable {
 
         Level.xrayableBlocks[Block.GOLD_ORE] = true;
         Level.xrayableBlocks[Block.IRON_ORE] = true;
+        Level.xrayableBlocks[Block.COAL_ORE] = true;
         Level.xrayableBlocks[Block.LAPIS_ORE] = true;
         Level.xrayableBlocks[Block.DIAMOND_ORE] = true;
         Level.xrayableBlocks[Block.REDSTONE_ORE] = true;
         Level.xrayableBlocks[Block.EMERALD_ORE] = true;
         Level.xrayableBlocks[Block.ANCIENT_DEBRIS] = true;
+        Level.xrayableBlocks[Block.COPPER_ORE] = true;
     }
 
     @NonComputationAtomic
@@ -1020,99 +1023,12 @@ public class Level implements ChunkManager, Metadatable {
                             Player[] playerArray = this.getChunkPlayers(chunkX, chunkZ).values().toArray(Player.EMPTY_ARRAY);
                             int size = blocks.size();
                             Vector3[] blocksArray = new Vector3[size];
-                            if (this.antiXrayEnabled()) {
-                                var vectorSet = new IntOpenHashSet(size * 6);
-                                var vList = new ArrayList<Vector3>(size * 7);
-                                Vector3 tmpV3;
-                                for (char blockHash : blocks.keySet()) {
-                                    Vector3 hash = getBlockXYZ(index, blockHash);
-                                    var x = hash.getFloorX();
-                                    var y = hash.getFloorY();
-                                    var z = hash.getFloorZ();
-                                    if (!vectorSet.contains(blockHash)) {
-                                        vectorSet.add(blockHash);
-                                        try {
-                                            tmpV3 = new Vector3(x, y, z);
-                                            vList.add(tmpV3);
-                                            if (!Block.transparent[this.getBlockIdAt(x, y, z)]) {
-                                                continue;
-                                            }
-                                        } catch (Exception ignore) {
-
-                                        }
-                                    }
-                                    x++;
-                                    blockHash = localBlockHash(x, y, z);
-                                    if (!vectorSet.contains(blockHash)) {
-                                        vectorSet.add(blockHash);
-                                        try {
-                                            vList.add(new Vector3(x, y, z));
-                                        } catch (Exception ignore) {
-
-                                        }
-                                    }
-                                    x -= 2;
-                                    blockHash = localBlockHash(x, y, z);
-                                    if (!vectorSet.contains(blockHash)) {
-                                        vectorSet.add(blockHash);
-                                        try {
-                                            vList.add(new Vector3(x, y, z));
-                                        } catch (Exception ignore) {
-
-                                        }
-                                    }
-                                    x++;
-                                    y++;
-                                    blockHash = localBlockHash(x, y, z);
-                                    if (!vectorSet.contains(blockHash)) {
-                                        vectorSet.add(blockHash);
-                                        try {
-                                            vList.add(new Vector3(x, y, z));
-                                        } catch (Exception ignore) {
-
-                                        }
-                                    }
-                                    y -= 2;
-                                    blockHash = localBlockHash(x, y, z);
-                                    if (!vectorSet.contains(blockHash)) {
-                                        vectorSet.add(blockHash);
-                                        try {
-                                            vList.add(new Vector3(x, y, z));
-                                        } catch (Exception ignore) {
-
-                                        }
-                                    }
-                                    y++;
-                                    z++;
-                                    blockHash = localBlockHash(x, y, z);
-                                    if (!vectorSet.contains(blockHash)) {
-                                        vectorSet.add(blockHash);
-                                        try {
-                                            vList.add(new Vector3(x, y, z));
-                                        } catch (Exception ignore) {
-
-                                        }
-                                    }
-                                    z -= 2;
-                                    blockHash = localBlockHash(x, y, z);
-                                    if (!vectorSet.contains(blockHash)) {
-                                        vectorSet.add(blockHash);
-                                        try {
-                                            vList.add(new Vector3(x, y, z));
-                                        } catch (Exception ignore) {
-
-                                        }
-                                    }
-                                }
-                                this.sendBlocks(playerArray, vList.toArray(Vector3[]::new), UpdateBlockPacket.FLAG_ALL);
-                            } else {
-                                int i = 0;
-                                for (char blockHash : blocks.keySet()) {
-                                    Vector3 hash = getBlockXYZ(index, blockHash);
-                                    blocksArray[i++] = hash;
-                                }
-                                this.sendBlocks(playerArray, blocksArray, UpdateBlockPacket.FLAG_ALL);
+                            int i = 0;
+                            for (char blockHash : blocks.keySet()) {
+                                Vector3 hash = getBlockXYZ(index, blockHash);
+                                blocksArray[i++] = hash;
                             }
+                            this.sendBlocks(playerArray, blocksArray, UpdateBlockPacket.FLAG_ALL);
                         }
                     }
                 }
@@ -1875,6 +1791,16 @@ public class Level implements ChunkManager, Metadatable {
         return this.getChunk(x >> 4, z >> 4, false).getFullBlock(x & 0x0f, y & 0xff, z & 0x0f, layer);
     }
 
+    public int getFullBlock(FullChunk fullChunk, int x, int y, int z, int layer) {
+        FullChunk chunk = fullChunk;
+        int cx = x >> 4;
+        int cz = z >> 4;
+        if (chunk == null || chunk.getX() != cx || chunk.getZ() != cz) {
+            chunk = getChunk(cx, cz, false);
+        }
+        return chunk.getFullBlock(x & 0x0f, y & 0xff, z & 0x0f, layer);
+    }
+
     public int getBlockRuntimeId(int x, int y, int z, int layer) {
         return this.getBlockRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, x, y, z, layer);
     }
@@ -2145,17 +2071,6 @@ public class Level implements ChunkManager, Metadatable {
         int cz = z >> 4;
 
         if (direct) {
-            if (this.antiXrayEnabled() && block.isTransparent()) { //刷新暴露的方块
-                this.sendBlocks(this.getChunkPlayers(cx, cz).values().toArray(Player.EMPTY_ARRAY),
-                        new Vector3[]{
-                                block.add(-1),
-                                block.add(1),
-                                block.add(0, -1),
-                                block.add(0, 1),
-                                block.add(0, 0, 1),
-                                block.add(0, 0, -1)
-                        }, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-            }
             this.sendBlocks(this.getChunkPlayers(cx, cz).values().toArray(Player.EMPTY_ARRAY), new Block[]{block}, UpdateBlockPacket.FLAG_ALL_PRIORITY, block.layer);
         } else {
             this.addBlockChange(Level.chunkHash(cx, cz), x, y, z);
@@ -2177,6 +2092,9 @@ public class Level implements ChunkManager, Metadatable {
                 block = ev.getBlock();
                 block.onUpdate(BLOCK_UPDATE_NORMAL);
                 block.getLevelBlockAtLayer(layer == 0 ? 1 : 0).onUpdate(BLOCK_UPDATE_NORMAL);
+                if (block.isTransparent()) {
+                    this.antiXrayOnBlockChange(null, block, 1);
+                }
                 this.updateAround(new Vector3(x, y, z));
             }
         }
@@ -2198,6 +2116,110 @@ public class Level implements ChunkManager, Metadatable {
                 } else {
                     currentMap.put(Level.localBlockHash(x, y, z), changeBlocksPresent);
                 }
+            }
+        }
+    }
+
+    public void antiXrayOnBlockChange(@Nullable Player player, @NotNull Vector3 vector3, int type) {
+        if (!this.antiXrayEnabled()) {
+            return;
+        }
+
+        //获取要发送的方块位置
+        Vector3[] vector3Array;
+        switch (type) {
+            case 0 -> { //explode
+                vector3 = vector3.floor();
+                vector3Array = new Vector3[] {
+                        vector3.add(1.0, 0.0, 0.0),
+                        vector3.add(-1.0, 0.0, 0.0),
+                        vector3.add(0.0, 1.0, 0.0),
+                        vector3.add(0.0, -1.0, 0.0),
+                        vector3.add(0.0, 0.0, 1.0),
+                        vector3.add(0.0, 0.0, -1.0)
+                };
+            }
+            case 1 -> { //block change
+                vector3Array = new Vector3[26];
+                int index = 0;
+                for (int x = -1; x < 2; x++) {
+                    for (int z = -1; z < 2; z++) {
+                        for (int y = -1; y < 2; y++) {
+                            if (x != 0 && y != 0 && z != 0) {
+                                vector3Array[index] = vector3.add(x, y, z);
+                                index++;
+                            }
+                        }
+                    }
+                }
+            }
+            case 2 -> { //player move
+                vector3Array = new Vector3[100];
+                int index = 0;
+                for (int x = -2; x < 3; x++) {
+                    for (int z = -2; z < 3; z++) {
+                        for (int y = -1; y < 3; y++) {
+                            vector3Array[index] = vector3.add(x, y, z);
+                            index++;
+                        }
+                    }
+                }
+            }
+            default -> {
+                return;
+            }
+        }
+
+        //发送给玩家
+        for (Vector3 v : vector3Array) {
+            int x = (int) v.x;
+            int y = (int) v.y;
+            int z = (int) v.z;
+            FullChunk fullChunk = player == null ? null : player.chunk;
+
+            int fullId = this.getFullBlock(fullChunk, x, y, z, 0);
+            int id = fullId >> Block.DATA_BITS;
+            if (!Level.xrayableBlocks[id]) {
+                continue;
+            }
+
+            if (player == null) {
+                Int2ObjectMap<ObjectList<Player>> players = Server.sortPlayers(this.getChunkPlayers(v.getChunkX(), v.getChunkZ()).values().toArray(Player.EMPTY_ARRAY));
+                for (Int2ObjectMap.Entry<ObjectList<Player>> entry : players.int2ObjectEntrySet()) {
+                    int protocol = entry.getIntKey();
+
+                    UpdateBlockPacket pk = new UpdateBlockPacket();
+                    pk.x = x;
+                    pk.y = y;
+                    pk.z = z;
+                    pk.flags = UpdateBlockPacket.FLAG_ALL;
+
+                    if (protocol > ProtocolInfo.v1_2_10) {
+                        pk.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, id, fullId & 0xf);
+                    } else {
+                        pk.blockId = id;
+                        pk.blockData = fullId & 0xf;
+                    }
+
+                    for (Player p : entry.getValue()) {
+                        p.dataPacket(pk);
+                    }
+                }
+            } else {
+                UpdateBlockPacket pk = new UpdateBlockPacket();
+                pk.x = x;
+                pk.y = y;
+                pk.z = z;
+                pk.flags = UpdateBlockPacket.FLAG_ALL;
+
+                if (player.protocol > ProtocolInfo.v1_2_10) {
+                    pk.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(player.protocol, id, fullId & 0xf);
+                } else {
+                    pk.blockId = id;
+                    pk.blockData = fullId & 0xf;
+                }
+
+                player.dataPacket(pk);
             }
         }
     }

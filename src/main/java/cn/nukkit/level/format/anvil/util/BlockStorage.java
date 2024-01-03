@@ -403,21 +403,12 @@ public class BlockStorage {
         writeTo(protocol, stream, false);
     }
 
-    protected final boolean canBeObfuscated(int x, int y, int z) {
-        return x != 15 && !Block.transparent[getBlockId(x + 1, y, z)] &&
-                x != 0 && !Block.transparent[getBlockId(x - 1, y, z)] &&
-                y != 15 && !Block.transparent[getBlockId(x, y + 1, z)] &&
-                y != 0 && !Block.transparent[getBlockId(x, y - 1, z)] &&
-                z != 15 && !Block.transparent[getBlockId(x, y, z + 1)] &&
-                z != 0 && !Block.transparent[getBlockId(x, y, z - 1)];
-    }
-
     public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
         for (int i = 0; i < SECTION_SIZE; i++) {
             int bid = getBlockId(i);
-            if (antiXray && Level.xrayableBlocks[bid] && canBeObfuscated((i >> 8) & 0xF, i & 0xF, (i >> 4) & 0xF)) {
+            if (antiXray && Level.xrayableBlocks[bid]) {
                 bid = Block.STONE;
             }
             int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, getBlockData(i));
