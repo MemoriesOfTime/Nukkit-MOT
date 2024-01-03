@@ -2130,12 +2130,12 @@ public class Level implements ChunkManager, Metadatable {
             case 0 -> { //explode
                 vector3 = vector3.floor();
                 vector3Array = new Vector3[] {
-                        vector3.add(1.0, 0.0, 0.0),
-                        vector3.add(-1.0, 0.0, 0.0),
-                        vector3.add(0.0, 1.0, 0.0),
-                        vector3.add(0.0, -1.0, 0.0),
-                        vector3.add(0.0, 0.0, 1.0),
-                        vector3.add(0.0, 0.0, -1.0)
+                        vector3.add(1, 0, 0),
+                        vector3.add(-1, 0, 0),
+                        vector3.add(0, 1, 0),
+                        vector3.add(0, -1, 0),
+                        vector3.add(0, 0, 1),
+                        vector3.add(0, 0, -1)
                 };
             }
             case 1 -> { //block change
