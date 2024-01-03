@@ -1021,8 +1021,7 @@ public class Level implements ChunkManager, Metadatable {
                             }
                         } else {
                             Player[] playerArray = this.getChunkPlayers(chunkX, chunkZ).values().toArray(Player.EMPTY_ARRAY);
-                            int size = blocks.size();
-                            Vector3[] blocksArray = new Vector3[size];
+                            Vector3[] blocksArray = new Vector3[blocks.size()];
                             int i = 0;
                             for (char blockHash : blocks.keySet()) {
                                 Vector3 hash = getBlockXYZ(index, blockHash);
