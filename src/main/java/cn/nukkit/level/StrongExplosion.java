@@ -196,6 +196,7 @@ public class StrongExplosion extends Explosion {
                         ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
                     }
                     updateBlocks.add(index);
+                    this.level.antiXrayOnBlockChange(null, block, 0);
                 }
             }
         }

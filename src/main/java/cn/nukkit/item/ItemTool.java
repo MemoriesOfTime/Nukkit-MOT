@@ -82,6 +82,8 @@ public abstract class ItemTool extends Item implements ItemDurable {
             this.meta++;
         } else if (!this.isShears() && block.calculateBreakTime(this) > 0) {
             this.meta += 2;
+        } else if (this.isSword() && block.getHardness() > 0.0) {
+            this.meta += 2;
         } else if (this.isHoe()) {
             if (block.getId() == GRASS || block.getId() == DIRT) {
                 this.meta++;
