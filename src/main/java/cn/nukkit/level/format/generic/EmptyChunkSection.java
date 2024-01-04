@@ -217,7 +217,7 @@ public class EmptyChunkSection implements ChunkSection {
     }
 
     @Override
-    public void writeTo(int protocol, BinaryStream stream) {
+    public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
         stream.put(this.getBytes(protocol));
     }
 

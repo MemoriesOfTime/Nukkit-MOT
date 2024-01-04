@@ -129,6 +129,8 @@ import java.util.stream.Stream;
 @Log4j2
 public class Player extends EntityHuman implements CommandSender, InventoryHolder, ChunkLoader, IPlayer, IScoreboardViewer {
 
+    public static final Player[] EMPTY_ARRAY = new Player[0];
+
     public static final int SURVIVAL = 0;
     public static final int CREATIVE = 1;
     public static final int ADVENTURE = 2;
@@ -2027,6 +2029,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (distance != 0 && this.nextChunkOrderRun > 20) {
                 this.nextChunkOrderRun = 20;
             }
+            this.level.antiXrayOnBlockChange(this, this, 2);
         }
     }
 
@@ -4911,6 +4914,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 pk.z = (float) pos.z;
                 pk.data = (int) (65535 / breakTime);
                 this.getLevel().addChunkPacket(pos.getFloorX() >> 4, pos.getFloorZ() >> 4, pk);
+
+                // 优化反矿透时玩家的挖掘体验
+                if (this.getLevel().antiXrayEnabled()) {
+                    Vector3[] vector3s = new Vector3[5];
+                    int index = 0;
+                    for (BlockFace each : BlockFace.values()) {
+                        if (each == face) {
+                            continue;
+                        }
+                        int tmpX = target.getFloorX() + each.getXOffset();
+                        int tmpY = target.getFloorY() + each.getYOffset();
+                        int tmpZ = target.getFloorZ() + each.getZOffset();
+                        if (Level.xrayableBlocks[this.getLevel().getBlockIdAt(tmpX, tmpY, tmpZ)]) {
+                            vector3s[index] = new Vector3(tmpX, tmpY, tmpZ);
+                            index++;
+                        }
+                    }
+                    this.getLevel().sendBlocks(new Player[]{this}, vector3s, UpdateBlockPacket.FLAG_ALL);
+                }
             }
         }
 

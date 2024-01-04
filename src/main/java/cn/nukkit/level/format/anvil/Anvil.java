@@ -117,7 +117,7 @@ public class Anvil extends BaseLevelProvider {
                             networkChunkSerializerCallback.getSubchunks(),
                             networkChunkSerializerCallback.getStream().getBuffer()
                     );
-                }, getLevel().getDimensionData());
+                }, level.antiXrayEnabled(), getLevel().getDimensionData());
             });
         }else {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
@@ -128,7 +128,7 @@ public class Anvil extends BaseLevelProvider {
                         networkChunkSerializerCallback.getSubchunks(),
                         networkChunkSerializerCallback.getStream().getBuffer()
                 );
-            }, this.level.getDimensionData());
+            }, level.antiXrayEnabled(), this.level.getDimensionData());
         }
     }
 

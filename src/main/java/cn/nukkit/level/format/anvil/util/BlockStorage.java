@@ -2,13 +2,12 @@ package cn.nukkit.level.format.anvil.util;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.level.Level;
+import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class BlockStorage {
     public static final int SECTION_SIZE = 4096;
@@ -399,46 +398,24 @@ public class BlockStorage {
         }
     }
 
+    @Deprecated
     public void writeTo(int protocol, BinaryStream stream) {
-        /*if (protocol > ProtocolInfo.v1_18_0) {
-            PalettedBlockStorage storage = PalettedBlockStorage.createFromBlockPalette();
-            for (int i = 0; i < SECTION_SIZE; i++) {
-                storage.setBlock(i, GlobalBlockPalette.getOrCreateRuntimeId(blockIds[i] & 0xff, blockData.get(i)));
+        writeTo(protocol, stream, false);
+    }
+
+    public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
+        PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
+
+        for (int i = 0; i < SECTION_SIZE; i++) {
+            int bid = getBlockId(i);
+            if (antiXray && Level.xrayableBlocks[bid]) {
+                bid = Block.STONE;
             }
-            storage.writeTo(protocol, stream);
-            return;
-        }*/
-        int[] ids = this.getBlockIdsExtended();
-        int[] data = this.getBlockDataExtended();
-        int[] blockStates = new int[ids.length];
-        Int2IntOpenHashMap runtime2palette = new Int2IntOpenHashMap();
-        ArrayList<Integer> palette2runtime = new ArrayList<>();
-        AtomicInteger nextPaletteId = new AtomicInteger(0);
-        //TODO Use compressed formats based on the value of this variable
-        AtomicInteger maxRuntimeId = new AtomicInteger(0);
-
-        for (int i = 0; i < blockStates.length; i++) {
-            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, ids[i], data[i]);
-            int paletteId = runtime2palette.computeIfAbsent(runtimeId, rid -> {
-                int pid = nextPaletteId.getAndIncrement();
-                palette2runtime.add(rid);
-                if (maxRuntimeId.get() < rid) {
-                    maxRuntimeId.set(rid);
-                }
-                return pid;
-            });
-            blockStates[i] = paletteId;
+            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, getBlockData(i));
+            palettedBlockStorage.setBlock(i, runtimeId);
         }
 
-        int bitsPerBlock = 16;
-        stream.putByte( (byte) (1 | (bitsPerBlock << 1)) );
-        for (int blockState : blockStates) {
-            stream.putLShort(blockState);
-        }
-        stream.putVarInt(palette2runtime.size());
-        for (Integer runtimeId : palette2runtime) {
-            stream.putVarInt(runtimeId);
-        }
+        palettedBlockStorage.writeTo(stream);
     }
 
     public BlockStorage copy() {
