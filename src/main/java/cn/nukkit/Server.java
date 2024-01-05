@@ -2904,6 +2904,7 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.MOB_SPAWNER, BlockEntitySpawner.class);
         BlockEntity.registerBlockEntity(BlockEntity.MUSIC, BlockEntityMusic.class);
         BlockEntity.registerBlockEntity(BlockEntity.LECTERN, BlockEntityLectern.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BEEHIVE, BlockEntityBeehive.class);
         BlockEntity.registerBlockEntity(BlockEntity.CAMPFIRE, BlockEntityCampfire.class);
         BlockEntity.registerBlockEntity(BlockEntity.BELL, BlockEntityBell.class);
         BlockEntity.registerBlockEntity(BlockEntity.BARREL, BlockEntityBarrel.class);

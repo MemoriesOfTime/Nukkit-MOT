@@ -415,6 +415,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[PISTON_HEAD_STICKY] = BlockPistonHeadSticky.class; //472
 
+            list[BEE_NEST] = BlockBeeNest.class; //473
+            list[BEEHIVE] = BlockBeehive.class; //474
+
             list[CRIMSON_ROOTS] = BlockRootsCrimson.class; //478
             list[WARPED_ROOTS] = BlockRootsWarped.class; //479
             list[CRIMSON_STEM] = BlockStemCrimson.class; //480
