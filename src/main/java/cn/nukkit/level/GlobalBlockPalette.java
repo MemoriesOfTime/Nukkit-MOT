@@ -262,7 +262,7 @@ public class GlobalBlockPalette {
         ListTag<CompoundTag> tag389;
         try {
             //noinspection unchecked
-            tag389 = (ListTag<CompoundTag>) NBTIO.readTag(stream389, ByteOrder.LITTLE_ENDIAN, false);
+            tag389 = (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream389)), ByteOrder.BIG_ENDIAN, false);
         } catch (IOException e) {
             throw new AssertionError("Unable to load block palette 389", e);
         }
