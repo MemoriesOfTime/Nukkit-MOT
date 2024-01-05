@@ -721,7 +721,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             data.put(command.getName(), command.generateCustomCommandData(this));
         }
 
-        if (data.size() != 0) {
+        if (!data.isEmpty()) {
             pk.commands = data;
             this.dataPacket(pk);
         }
