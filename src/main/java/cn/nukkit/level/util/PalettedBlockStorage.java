@@ -7,8 +7,6 @@ import cn.nukkit.utils.BinaryStream;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 
-import java.util.function.IntConsumer;
-
 public class PalettedBlockStorage {
 
     protected static final int SIZE = 4096; // 16 * 16 * 16
@@ -54,7 +52,11 @@ public class PalettedBlockStorage {
     }
 
     protected int getPaletteHeader(BitArrayVersion version) {
-        return (version.getId() << 1) | 1;
+        return getPaletteHeader(version, true);
+    }
+
+    protected int getPaletteHeader(BitArrayVersion version, boolean runtime) {
+        return (version.getId() << 1) | (runtime ? 1 : 0);
     }
 
     protected int getIndex(int x, int y, int z) {
@@ -86,7 +88,7 @@ public class PalettedBlockStorage {
         }
 
         stream.putVarInt(palette.size());
-        palette.forEach((IntConsumer) stream::putVarInt);
+        palette.forEach(stream::putVarInt);
     }
 
     private void onResize(BitArrayVersion version) {
