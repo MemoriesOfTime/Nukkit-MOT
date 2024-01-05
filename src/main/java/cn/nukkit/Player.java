@@ -2026,10 +2026,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.resetClientMovement();
         } else {
             this.forceMovement = null;
-            if (distance != 0 && this.nextChunkOrderRun > 20) {
-                this.nextChunkOrderRun = 20;
+            if (distance != 0) {
+                if (this.nextChunkOrderRun > 20) {
+                    this.nextChunkOrderRun = 20;
+                }
+                this.level.antiXrayOnBlockChange(this, this, 2);
             }
-            this.level.antiXrayOnBlockChange(this, this, 2);
         }
     }
 
