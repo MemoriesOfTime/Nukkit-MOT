@@ -127,8 +127,12 @@ public class BiomeSelector {
                     } else if (rainfall > 0.1f) {
                         if (noiseOcean < 0.155f)  {
                             biome = EnumBiome.JUNGLE_M;
-                        } if (rainfall > 0.2f){
-                            biome = EnumBiome.JUNGLE_BAMBOO;
+                        } if (rainfall > 0.2f) {
+                            if (hills < 0f) {
+                                biome = EnumBiome.BAMBOO_JUNGLE_HILLS;
+                            } else {
+                                biome = EnumBiome.BAMBOO_JUNGLE;
+                            }
                         }else {
                             biome = EnumBiome.JUNGLE;
                         }
