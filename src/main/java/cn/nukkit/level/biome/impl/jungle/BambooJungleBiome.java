@@ -3,32 +3,34 @@ package cn.nukkit.level.biome.impl.jungle;
 import cn.nukkit.level.generator.populator.impl.PopulatorBambooForest;
 import cn.nukkit.level.generator.populator.impl.PopulatorMelon;
 import cn.nukkit.level.generator.populator.impl.tree.JungleBigTreePopulator;
-import cn.nukkit.level.generator.populator.impl.tree.JungleTreePopulator;
 
 /**
  * @author Alemiz112
  */
-public class JungleBambooBiome extends JungleBiome {
+public class BambooJungleBiome extends JungleBiome {
 
-    public JungleBambooBiome() {
-        JungleTreePopulator trees = new JungleTreePopulator();
+    public BambooJungleBiome() {
+        /*JungleTreePopulator trees = new JungleTreePopulator();
         trees.setBaseAmount(3);
-        this.addPopulator(trees);
+        this.addPopulator(trees);*/
+
+        PopulatorBambooForest bamboo = new PopulatorBambooForest();
+        bamboo.setBaseAmount(80);
+        bamboo.setRandomAmount(30);
+        this.addPopulator(bamboo);
 
         JungleBigTreePopulator bigTrees = new JungleBigTreePopulator();
-        bigTrees.setBaseAmount(7);
+        bigTrees.setBaseAmount(-1);
+        bigTrees.setRandomAmount(2);
         this.addPopulator(bigTrees);
 
         PopulatorMelon melon = new PopulatorMelon();
         melon.setRandomAmount(2);
         this.addPopulator(melon);
-
-        PopulatorBambooForest bamboo = new PopulatorBambooForest();
-        this.addPopulator(bamboo);
     }
 
     @Override
     public String getName() {
-        return "Jungle Bamboo";
+        return "Bamboo Jungle";
     }
 }
