@@ -44,6 +44,7 @@ public final class DataPacketManager {
         if (!REGISTERED_PACKETS.contains(packetId)) {
             return null;
         }
+
         DataPacketProcessor processor;
         protocol++;
         do {
@@ -51,10 +52,14 @@ public final class DataPacketManager {
             Int2ObjectOpenHashMap<DataPacketProcessor> map = PROTOCOL_PROCESSORS.get(protocol);
             processor = map != null ? map.get(packetId) : null;
         } while ((processor == null || !processor.isSupported(originProtocol)) && protocol >= 0);
-        if (protocol != originProtocol && processor != null && processor.isSupported(originProtocol)) {
-            registerProcessor(originProtocol, processor);
+
+        if (processor != null && processor.isSupported(originProtocol)) {
+            if (protocol != originProtocol) {
+                registerProcessor(originProtocol, processor);
+            }
+            return processor;
         }
-        return processor;
+        return null;
     }
 
     public static void processPacket(@NotNull PlayerHandle playerHandle, @NotNull DataPacket packet) {
