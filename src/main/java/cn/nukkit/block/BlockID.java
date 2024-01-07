@@ -413,6 +413,8 @@ public interface BlockID {
     int WOOD_BARK = 467;
     int COMPOSTER = 468;
     int PISTON_HEAD_STICKY = 472;
+    int BEE_NEST = 473;
+    int BEEHIVE = 474;
 
     int LODESTONE = 477;
     int CRIMSON_ROOTS = 478;

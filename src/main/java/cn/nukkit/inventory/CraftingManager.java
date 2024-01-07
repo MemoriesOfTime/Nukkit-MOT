@@ -585,8 +585,11 @@ public class CraftingManager {
         for (SmithingRecipe recipe : this.getSmithingRecipes(protocol).values()) {
             pk.addShapelessRecipe(recipe);
         }
-        for (FurnaceRecipe recipe : this.getFurnaceRecipes(protocol).values()) {
-            pk.addFurnaceRecipe(recipe);
+        //TODO Fix 1.13.0 - 1.14.0 client crash
+        if (protocol != ProtocolInfo.v1_13_0) {
+            for (FurnaceRecipe recipe : this.getFurnaceRecipes(protocol).values()) {
+                pk.addFurnaceRecipe(recipe);
+            }
         }
         if (protocol >= ProtocolInfo.v1_13_0) {
             for (BrewingRecipe recipe : this.getBrewingRecipes(protocol).values()) {

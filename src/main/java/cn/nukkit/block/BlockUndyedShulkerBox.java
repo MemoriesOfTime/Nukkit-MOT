@@ -1,12 +1,14 @@
 package cn.nukkit.block;
 
 import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityShulkerBox;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
+import org.jetbrains.annotations.NotNull;
 
-public class BlockUndyedShulkerBox extends BlockShulkerBox {
+public class BlockUndyedShulkerBox extends BlockShulkerBox implements BlockEntityHolder<BlockEntityShulkerBox> {
 
     public BlockUndyedShulkerBox() {
         super(0);
@@ -20,6 +22,18 @@ public class BlockUndyedShulkerBox extends BlockShulkerBox {
     @Override
     public String getName() {
         return "Shulker Box";
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityShulkerBox> getBlockEntityClass() {
+        return BlockEntityShulkerBox.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.SHULKER_BOX;
     }
 
     @Override

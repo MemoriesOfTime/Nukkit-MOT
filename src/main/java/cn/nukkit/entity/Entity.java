@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
+import cn.nukkit.entity.custom.CustomEntity;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.data.*;
@@ -1253,6 +1254,10 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final String getSaveId() {
+        if(this instanceof CustomEntity) {
+            EntityDefinition entityDefinition = ((CustomEntity) this).getEntityDefinition();
+            return entityDefinition == null ? "" : entityDefinition.getIdentifier();
+        }
         return shortNames.getOrDefault(this.getClass().getSimpleName(), "");
     }
 

@@ -18,11 +18,12 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class BlockCampfire extends BlockTransparentMeta implements Faceable {
+public class BlockCampfire extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityCampfire> {
     public BlockCampfire() {
         super(0);
     }
@@ -34,6 +35,18 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return CAMPFIRE_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.CAMPFIRE;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityCampfire> getBlockEntityClass() {
+        return BlockEntityCampfire.class;
     }
 
     @Override

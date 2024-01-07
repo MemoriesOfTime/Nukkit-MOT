@@ -62,12 +62,7 @@ public enum EnumBiome {
     FOREST_HILLS(18, new ForestHillsBiome()),
     TAIGA_HILLS(19, new TaigaHillsBiome()),
     EXTREME_HILLS_EDGE(20, new ExtremeHillsEdgeBiome()),
-
-    //TODO: figure out why ID 168 does not work, until than 21
-    JUNGLE_BAMBOO(21, new JungleBambooBiome()),
-    //Overwrite it with right biome, but BAMBOO will be registered
     JUNGLE(21, new JungleBiome()),
-
     JUNGLE_HILLS(22, new JungleHillsBiome()),
     JUNGLE_EDGE(23, new JungleEdgeBiome()),
     DEEP_OCEAN(24, new DeepOceanBiome()),
@@ -87,6 +82,10 @@ public enum EnumBiome {
     MESA_PLATEAU_F(38, new MesaPlateauFBiome()),
     MESA_PLATEAU(39, new MesaPlateauBiome()),
     // All biomes below this comment are mutated variants of existing biomes
+    @Deprecated
+    JUNGLE_BAMBOO(48, new BambooJungleBiome()),
+    BAMBOO_JUNGLE(48, new BambooJungleBiome()),
+    BAMBOO_JUNGLE_HILLS(49, new BambooJungleHillsBiome()),
     SUNFLOWER_PLAINS(129, new SunflowerPlainsBiome()),
     DESERT_M(130, new DesertMBiome()),
     EXTREME_HILLS_M(131, new ExtremeHillsMBiome()),

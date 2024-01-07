@@ -9,15 +9,28 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Angelic47 Nukkit Project
  */
-public class BlockBeacon extends BlockTransparent {
+public class BlockBeacon extends BlockTransparent implements BlockEntityHolder<BlockEntityBeacon> {
 
     @Override
     public int getId() {
         return BEACON;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityBeacon> getBlockEntityClass() {
+        return BlockEntityBeacon.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.BEACON;
     }
 
     @Override

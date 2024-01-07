@@ -12,13 +12,14 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.network.protocol.BlockEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Created by Snake1999 on 2016/1/17.
  * Package cn.nukkit.block in project nukkit.
  */
-public class BlockNoteblock extends BlockSolid {
+public class BlockNoteblock extends BlockSolid implements BlockEntityHolder<BlockEntityMusic> {
 
     @Override
     public String getName() {
@@ -28,6 +29,18 @@ public class BlockNoteblock extends BlockSolid {
     @Override
     public int getId() {
         return NOTEBLOCK;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityMusic> getBlockEntityClass() {
+        return BlockEntityMusic.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.MUSIC;
     }
 
     @Override
@@ -258,18 +271,6 @@ public class BlockNoteblock extends BlockSolid {
             }
         }
         return super.onUpdate(type);
-    }
-
-    private BlockEntityMusic getBlockEntity() {
-        BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
-        if (blockEntity instanceof BlockEntityMusic) {
-            return (BlockEntityMusic) blockEntity;
-        }
-        return null;
-    }
-
-    private BlockEntityMusic createBlockEntity() {
-        return (BlockEntityMusic) BlockEntity.createBlockEntity(BlockEntity.MUSIC, this.getChunk(), BlockEntity.getDefaultCompound(this, BlockEntity.MUSIC));
     }
 
     public enum Instrument {

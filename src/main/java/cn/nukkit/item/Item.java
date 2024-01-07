@@ -1749,6 +1749,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         try {
             Item item = (Item) super.clone();
             item.tags = this.tags.clone();
+            item.cachedNBT = null;
             return item;
         } catch (CloneNotSupportedException e) {
             return null;
@@ -1779,11 +1780,13 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public String getNamespaceId() {
-        Server.mvw("Item#getNamespaceId()");
         return this.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL);
     }
 
     public String getNamespaceId(int protocolId) {
+        if (this.getId() == 0) {
+            return "minecraft:air";
+        }
         RuntimeItemMapping runtimeMapping = RuntimeItems.getMapping(protocolId);
         return runtimeMapping.getNamespacedIdByNetworkId(this.getNetworkId(protocolId));
     }

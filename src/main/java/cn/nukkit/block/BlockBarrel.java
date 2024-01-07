@@ -14,10 +14,11 @@ import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
-public class BlockBarrel extends BlockSolidMeta implements Faceable {
+public class BlockBarrel extends BlockSolidMeta implements Faceable, BlockEntityHolder<BlockEntityBarrel> {
 
     public BlockBarrel() {
         this(0);
@@ -35,6 +36,18 @@ public class BlockBarrel extends BlockSolidMeta implements Faceable {
     @Override
     public int getId() {
         return BARREL;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.BARREL;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityBarrel> getBlockEntityClass() {
+        return BlockEntityBarrel.class;
     }
 
     @Override
