@@ -288,7 +288,7 @@ public class LevelDBProvider implements LevelProvider {
                             networkChunkSerializerCallback.getSubchunks(),
                             networkChunkSerializerCallback.getStream().getBuffer()
                     );
-                }, getLevel().getDimensionData());
+                }, level.antiXrayEnabled(), getLevel().getDimensionData());
             });
         }else {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
@@ -299,7 +299,7 @@ public class LevelDBProvider implements LevelProvider {
                         networkChunkSerializerCallback.getSubchunks(),
                         networkChunkSerializerCallback.getStream().getBuffer()
                 );
-            }, this.level.getDimensionData());
+            }, level.antiXrayEnabled(),this.level.getDimensionData());
         }
     }
 
