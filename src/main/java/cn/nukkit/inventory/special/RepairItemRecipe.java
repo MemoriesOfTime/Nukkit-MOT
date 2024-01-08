@@ -1,5 +1,6 @@
 package cn.nukkit.inventory.special;
 
+import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 
 import java.util.List;
@@ -13,7 +14,7 @@ public class RepairItemRecipe implements SpecialRecipe {
     public RepairItemRecipe(){}
 
     @Override
-    public boolean canExecute(List<Item> inputs, Item outputItem) {
+    public boolean canExecute(Player player, List<Item> inputs, Item outputItem) {
         // Processing the checks about the inputs and outputItem
         if (inputs.size() == 2) {
             Item item1 = inputs.get(0);

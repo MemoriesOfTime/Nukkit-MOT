@@ -1,5 +1,6 @@
 package cn.nukkit.inventory.special;
 
+import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 
 import java.util.List;
@@ -10,6 +11,6 @@ import java.util.List;
  */
 public interface SpecialRecipe {
 
-    boolean canExecute(List<Item> inputs, Item outputItem);
+    boolean canExecute(Player player, List<Item> inputs, Item outputItem);
 
 }

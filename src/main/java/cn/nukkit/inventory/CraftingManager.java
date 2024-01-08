@@ -1023,11 +1023,6 @@ public class CraftingManager {
                 }
             }
         }
-
-        if (SpecialRecipeManager.canExecute(inputList, primaryOutput)) {
-            return new ShapelessRecipe(primaryOutput, inputList);
-        }
-
         return null;
     }
 

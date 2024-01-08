@@ -1,5 +1,6 @@
 package cn.nukkit.inventory.special;
 
+import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 
 import java.util.Collections;
@@ -32,11 +33,11 @@ public class SpecialRecipeManager {
         specialRecipeList.put(UUID.fromString(TYPE_REPAIR_ITEM), new RepairItemRecipe());
     }
 
-    public static boolean canExecute(Item inputItem, Item outputItem){
-        return canExecute(Collections.singletonList(inputItem), outputItem);
+    public static boolean canExecute(Player player, Item inputItem, Item outputItem){
+        return canExecute(player, Collections.singletonList(inputItem), outputItem);
     }
 
-    public static boolean canExecute(List<Item> inputs, Item outputItem){
-        return specialRecipeList.entrySet().stream().anyMatch(specialRecipe -> specialRecipe.getValue().canExecute(inputs, outputItem));
+    public static boolean canExecute(Player player, List<Item> inputs, Item outputItem){
+        return specialRecipeList.entrySet().stream().anyMatch(specialRecipe -> specialRecipe.getValue().canExecute(player, inputs, outputItem));
     }
 }
