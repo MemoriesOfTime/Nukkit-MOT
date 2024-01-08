@@ -1,6 +1,7 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.Server;
+import cn.nukkit.inventory.special.SpecialRecipeManager;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
 import cn.nukkit.item.ItemID;
@@ -1021,6 +1022,10 @@ public class CraftingManager {
                     return shapelessRecipe;
                 }
             }
+        }
+
+        if (SpecialRecipeManager.canExecute(inputList, primaryOutput)) {
+            return new ShapelessRecipe(primaryOutput, inputList);
         }
 
         return null;
