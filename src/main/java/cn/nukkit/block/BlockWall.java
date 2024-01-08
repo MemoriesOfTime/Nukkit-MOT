@@ -4,6 +4,13 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.utils.BlockColor;
+import lombok.Getter;
+
+import java.util.Arrays;
+import java.util.stream.Collectors;
+
+import static cn.nukkit.utils.BlockColor.*;
 
 /**
  * @author MagicDroidX
@@ -13,6 +20,8 @@ public class BlockWall extends BlockTransparentMeta {
 
     public static final int NONE_MOSSY_WALL = 0;
     public static final int MOSSY_WALL = 1;
+
+    public static final int WALL_BLOCK_TYPE_BIT = 0b1111;
 
     public BlockWall() {
         this(0);
@@ -47,13 +56,17 @@ public class BlockWall extends BlockTransparentMeta {
         return ItemTool.TIER_WOODEN;
     }
 
+    public WallType getWallType() {
+        return WallType.values()[this.getDamage(WALL_BLOCK_TYPE_BIT)];
+    }
+
+    public void setWallType(WallType wallType) {
+        this.setDamage(WALL_BLOCK_TYPE_BIT, wallType.ordinal());
+    }
+
     @Override
     public String getName() {
-        if (this.getDamage() == 0x01) {
-            return "Mossy Cobblestone Wall";
-        }
-
-        return "Cobblestone Wall";
+        return this.getWallType().getTypeName();
     }
 
     @Override
@@ -104,5 +117,39 @@ public class BlockWall extends BlockTransparentMeta {
     @Override
     public boolean canHarvestWithHand() {
         return false;
+    }
+
+    @Getter
+    public enum WallType {
+        COBBLESTONE,
+        MOSSY_COBBLESTONE,
+        GRANITE(DIRT_BLOCK_COLOR),
+        DIORITE(QUARTZ_BLOCK_COLOR),
+        ANDESITE,
+        SANDSTONE(SAND_BLOCK_COLOR),
+        BRICK(RED_BLOCK_COLOR),
+        STONE_BRICK,
+        MOSSY_STONE_BRICK,
+        END_BRICK(SAND_BLOCK_COLOR),
+        NETHER_BRICK(NETHERRACK_BLOCK_COLOR),
+        PRISMARINE(CYAN_BLOCK_COLOR),
+        RED_SANDSTONE(ORANGE_BLOCK_COLOR),
+        RED_NETHER_BRICK(NETHERRACK_BLOCK_COLOR);
+
+        private final BlockColor color;
+        private final String typeName;
+
+        WallType(BlockColor color) {
+            this.color = color;
+            String name = Arrays.stream(name().split("_"))
+                    .map(part-> part.charAt(0) + part.substring(1).toLowerCase())
+                    .collect(Collectors.joining(" "));
+            typeName = name + " Wall";
+        }
+
+        WallType() {
+            this(STONE_BLOCK_COLOR);
+        }
+
     }
 }

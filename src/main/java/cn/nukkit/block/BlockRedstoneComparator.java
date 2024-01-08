@@ -11,11 +11,12 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author CreeperFace
  */
-public abstract class BlockRedstoneComparator extends BlockRedstoneDiode {
+public abstract class BlockRedstoneComparator extends BlockRedstoneDiode implements BlockEntityHolder<BlockEntityComparator> {
 
     public BlockRedstoneComparator() {
         this(0);
@@ -23,6 +24,18 @@ public abstract class BlockRedstoneComparator extends BlockRedstoneDiode {
 
     public BlockRedstoneComparator(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityComparator> getBlockEntityClass() {
+        return BlockEntityComparator.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.COMPARATOR;
     }
 
     @Override

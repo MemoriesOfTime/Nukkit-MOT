@@ -16,6 +16,7 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -24,7 +25,7 @@ import java.util.concurrent.ThreadLocalRandom;
  * @author CreeperFace
  * Nukkit Project
  */
-public class BlockCauldron extends BlockSolidMeta {
+public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<BlockEntityCauldron> {
 
     /**
      * Used to cache biome check for freezing
@@ -43,6 +44,18 @@ public class BlockCauldron extends BlockSolidMeta {
     @Override
     public int getId() {
         return CAULDRON_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.CAULDRON;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityCauldron> getBlockEntityClass() {
+        return BlockEntityCauldron.class;
     }
 
     public String getName() {

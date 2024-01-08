@@ -54,6 +54,16 @@ public class IntTag extends NumberTag<Integer> {
     }
 
     @Override
+    public String toSNBT() {
+        return String.valueOf(data);
+    }
+
+    @Override
+    public String toSNBT(int space) {
+        return String.valueOf(data);
+    }
+
+    @Override
     public Tag copy() {
         return new IntTag(getName(), data);
     }

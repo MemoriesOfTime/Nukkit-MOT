@@ -20,12 +20,13 @@ import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.*;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
-public class BlockBed extends BlockTransparentMeta implements Faceable {
+public class BlockBed extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityBed> {
 
     public BlockBed() {
         this(0);
@@ -38,6 +39,18 @@ public class BlockBed extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return BED_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityBed> getBlockEntityClass() {
+        return BlockEntityBed.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.BED;
     }
 
     @Override

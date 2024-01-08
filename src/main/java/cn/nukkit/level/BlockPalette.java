@@ -8,6 +8,8 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.Utils;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -22,6 +24,7 @@ import java.io.InputStream;
 import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 
 @Log4j2
@@ -32,6 +35,8 @@ public class BlockPalette {
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
     private final Object2IntMap<CompoundTag> stateToLegacy = new Object2IntOpenHashMap<>();
     private final Int2ObjectMap<CompoundTag> legacyToState = new Int2ObjectOpenHashMap<>();
+
+    private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
     public BlockPalette(int protocol) {
         this.protocol = protocol;
@@ -122,8 +127,14 @@ public class BlockPalette {
         if (runtimeId == -1) {
             runtimeId = legacyToRuntimeId.get(id << 6);
             if (runtimeId == -1) {
-                log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
-                runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << 6);
+                Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyId);
+                if (cache == null) {
+                    log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
+                    runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << 6);
+                    legacyToRuntimeIdCache.put(legacyId, runtimeId);
+                } else {
+                    runtimeId = cache;
+                }
             }
         }
         return runtimeId;

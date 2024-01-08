@@ -29,6 +29,10 @@ public abstract class Tag {
 
     public abstract String toString();
 
+    public abstract String toSNBT();
+
+    public abstract String toSNBT(int space);
+
     public abstract byte getId();
 
     protected Tag(String name) {

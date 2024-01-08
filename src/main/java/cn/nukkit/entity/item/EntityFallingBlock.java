@@ -23,6 +23,7 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * @author MagicDroidX
@@ -117,7 +118,13 @@ public class EntityFallingBlock extends Entity {
             addEntity.speedX = (float) this.motionX;
             addEntity.speedY = (float) this.motionY;
             addEntity.speedZ = (float) this.motionZ;
-            addEntity.metadata = this.dataProperties.clone().put(new IntEntityData(DATA_VARIANT, GlobalBlockPalette.getOrCreateRuntimeId(player.protocol, this.blockId, this.damage)));
+            int runtimeId;
+            if (player.protocol >= ProtocolInfo.v1_2_13) {
+                runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(player.protocol, this.blockId, this.damage);
+            } else {
+                runtimeId = this.blockId | this.damage << 8;
+            }
+            addEntity.metadata = this.dataProperties.clone().put(new IntEntityData(DATA_VARIANT, runtimeId));
             player.dataPacket(addEntity);
             this.hasSpawned.put(player.getLoaderId(), player);
         }

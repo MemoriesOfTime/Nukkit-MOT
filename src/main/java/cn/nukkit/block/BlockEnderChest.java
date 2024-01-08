@@ -17,12 +17,13 @@ import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-public class BlockEnderChest extends BlockTransparentMeta implements Faceable {
+public class BlockEnderChest extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityEnderChest> {
 
     private static final int[] FACES = {2, 5, 3, 4};
 
@@ -44,6 +45,18 @@ public class BlockEnderChest extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return ENDER_CHEST;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.ENDER_CHEST;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityEnderChest> getBlockEntityClass() {
+        return BlockEntityEnderChest.class;
     }
 
     @Override

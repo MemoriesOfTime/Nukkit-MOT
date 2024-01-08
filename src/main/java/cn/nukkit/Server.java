@@ -203,6 +203,7 @@ public class Server {
      * Worlds that have their own nether worlds.
      */
     public static final List<String> multiNetherWorlds = new ArrayList<>();
+    public static final List<String> antiXrayWorlds = new ArrayList<>();
     /**
      * Worlds where random block ticking is disabled.
      */
@@ -1220,7 +1221,7 @@ public class Server {
     }
 
     public void updatePlayerListData(UUID uuid, long entityId, String name, Skin skin, String xboxUserId, Collection<Player> players) {
-        this.updatePlayerListData(uuid, entityId, name, skin, xboxUserId, players.toArray(new Player[0]));
+        this.updatePlayerListData(uuid, entityId, name, skin, xboxUserId, players.toArray(Player.EMPTY_ARRAY));
     }
 
     public void removePlayerListData(UUID uuid) {
@@ -2907,6 +2908,7 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.MOB_SPAWNER, BlockEntitySpawner.class);
         BlockEntity.registerBlockEntity(BlockEntity.MUSIC, BlockEntityMusic.class);
         BlockEntity.registerBlockEntity(BlockEntity.LECTERN, BlockEntityLectern.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BEEHIVE, BlockEntityBeehive.class);
         BlockEntity.registerBlockEntity(BlockEntity.CAMPFIRE, BlockEntityCampfire.class);
         BlockEntity.registerBlockEntity(BlockEntity.BELL, BlockEntityBell.class);
         BlockEntity.registerBlockEntity(BlockEntity.BARREL, BlockEntityBarrel.class);
@@ -2978,8 +2980,19 @@ public class Server {
         this.callBatchPkEv = this.getPropertyBoolean("call-batch-pk-send-event", true);
         this.doLevelGC = this.getPropertyBoolean("do-level-gc", true);
         this.mobAiEnabled = this.getPropertyBoolean("mob-ai", true);
+
         this.netherEnabled = this.getPropertyBoolean("nether", true);
         this.endEnabled = this.getPropertyBoolean("end", false);
+
+        antiXrayWorlds.clear();
+        String antiXrayWorldsString = this.getPropertyString("anti-xray-worlds");
+        if (!antiXrayWorldsString.trim().isEmpty()) {
+            StringTokenizer tokenizer = new StringTokenizer(antiXrayWorldsString, ", ");
+            while (tokenizer.hasMoreTokens()) {
+                antiXrayWorlds.add(tokenizer.nextToken());
+            }
+        }
+
         this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
         this.bedSpawnpoints = this.getPropertyBoolean("bed-spawnpoints", true);
         this.achievementsEnabled = this.getPropertyBoolean("achievements", true);
@@ -3163,9 +3176,10 @@ public class Server {
             put("thread-watchdog-tick", 60000);
 
             put("nether", true);
-            put("end", false);
+            put("end", true);
             put("vanilla-portals", true);
             put("multi-nether-worlds", "");
+            put("anti-xray-worlds", "");
 
             put("do-not-tick-worlds", "");
             put("worlds-entity-spawning-disabled", "");

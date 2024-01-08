@@ -13,7 +13,7 @@ import java.util.StringJoiner;
 
 public class CompoundTag extends Tag implements Cloneable {
 
-    private final Map<String, Tag> tags;
+    protected final Map<String, Tag> tags;
 
     public CompoundTag() {
         this("");
@@ -310,6 +310,21 @@ public class CompoundTag extends Tag implements Cloneable {
         StringJoiner joiner = new StringJoiner(",\n\t");
         tags.forEach((key, tag) -> joiner.add('\'' + key + "' : " + tag.toString().replace("\n", "\n\t")));
         return "CompoundTag '" + this.getName() + "' (" + tags.size() + " entries) {\n\t" + joiner.toString() + "\n}";
+    }
+
+    @Override
+    public String toSNBT() {
+        StringJoiner joiner = new StringJoiner(",");
+        tags.forEach((key, tag) -> joiner.add("\"" + key + "\":" + tag.toSNBT()));
+        return "{" + joiner + "}";
+    }
+
+    public String toSNBT(int space) {
+        StringBuilder addSpace = new StringBuilder();
+        addSpace.append(" ".repeat(Math.max(0, space)));
+        StringJoiner joiner = new StringJoiner(",\n" + addSpace);
+        tags.forEach((key, tag) -> joiner.add("\"" + key + "\": " + tag.toSNBT(space).replace("\n", "\n" + addSpace)));
+        return "{\n" + addSpace + joiner + "\n}";
     }
 
     public void print(String prefix, PrintStream out) {

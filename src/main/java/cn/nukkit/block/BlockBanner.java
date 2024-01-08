@@ -16,11 +16,12 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by PetteriM1
  */
-public class BlockBanner extends BlockTransparentMeta implements Faceable {
+public class BlockBanner extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityBanner> {
 
     public BlockBanner() {
         this(0);
@@ -33,6 +34,18 @@ public class BlockBanner extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return STANDING_BANNER;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.BANNER;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityBanner> getBlockEntityClass() {
+        return BlockEntityBanner.class;
     }
 
     @Override

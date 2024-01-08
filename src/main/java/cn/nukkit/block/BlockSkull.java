@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntitySkull;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemSkull;
 import cn.nukkit.item.ItemTool;
@@ -13,11 +14,12 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Justin
  */
-public class BlockSkull extends BlockTransparentMeta implements Faceable {
+public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntitySkull> {
 
     public BlockSkull() {
         this(0);
@@ -30,6 +32,18 @@ public class BlockSkull extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return SKULL_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntitySkull> getBlockEntityClass() {
+        return BlockEntitySkull.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.SKULL;
     }
 
     @Override

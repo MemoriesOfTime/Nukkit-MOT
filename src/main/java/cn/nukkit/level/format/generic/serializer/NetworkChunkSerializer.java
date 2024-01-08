@@ -44,7 +44,7 @@ public class NetworkChunkSerializer {
         negativeSubChunks = stream.getBuffer();
     }
 
-    public static void serialize(IntSet protocols, BaseChunk chunk, Consumer<NetworkChunkSerializerCallback> callback, DimensionData dimensionData) {
+    public static void serialize(IntSet protocols, BaseChunk chunk, Consumer<NetworkChunkSerializerCallback> callback, boolean antiXray, DimensionData dimensionData) {
         for (int protocolId : protocols) {
             byte[] blockEntities;
             if (chunk.getBlockEntities().isEmpty()) {
@@ -93,7 +93,7 @@ public class NetworkChunkSerializer {
                     stream.putByte((byte) 0);
                     stream.put(sections[i].getBytes(protocolId));
                 }else {
-                    sections[i].writeTo(protocolId, stream);
+                    sections[i].writeTo(protocolId, stream, antiXray);
                 }
             }
 

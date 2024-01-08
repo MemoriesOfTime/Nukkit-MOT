@@ -144,12 +144,6 @@ public class BlockSapling extends BlockFlowable {
 
                     if (!bigTree) {
                         ObjectTree.growTree(this.getLevel(), (int) this.x, (int) this.y, (int) this.z, new NukkitRandom(), this.getDamage() & 0x07);
-                    } else {
-                        Block air = Block.get(BlockID.AIR);
-                        this.level.setBlock(this.add(this.x, 0, this.z), air, true, false);
-                        this.level.setBlock(this.add(this.x + 1, 0, this.z), air, true, false);
-                        this.level.setBlock(this.add(this.x, 0, this.z + 1), air, true, false);
-                        this.level.setBlock(this.add(this.x + 1, 0, this.z + 1), air, true, false);
                     }
 
                     return true;

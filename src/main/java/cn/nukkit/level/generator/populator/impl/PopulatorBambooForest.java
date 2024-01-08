@@ -1,86 +1,132 @@
 package cn.nukkit.level.generator.populator.impl;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockBamboo;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.generator.object.ObjectBamboo;
-import cn.nukkit.level.generator.populator.type.Populator;
-import cn.nukkit.math.NukkitMath;
+import cn.nukkit.level.generator.populator.helper.EnsureBelow;
+import cn.nukkit.level.generator.populator.helper.EnsureCover;
+import cn.nukkit.level.generator.populator.helper.EnsureGrassBelow;
+import cn.nukkit.level.generator.populator.helper.PopulatorHelpers;
+import cn.nukkit.level.generator.populator.type.PopulatorCount;
 import cn.nukkit.math.NukkitRandom;
-import cn.nukkit.math.Vector3;
 
 /**
  * Created by Alemiz112
  */
-public class PopulatorBambooForest extends Populator {
+public class PopulatorBambooForest extends PopulatorCount {
+
+    private static final BlockBamboo BLOCK_BAMBOO = new BlockBamboo();
+    private static final Block BLOCK_BAMBOO_DEFAULT = BLOCK_BAMBOO.clone();
+    private static final Block BLOCK_BAMBOO_LEAF_SMALL = BLOCK_BAMBOO_DEFAULT.clone();
+    private static final Block BLOCK_BAMBOO_LEAF_LARGE = BLOCK_BAMBOO_DEFAULT.clone();
+    private static final Block BLOCK_BAMBOO_LEAF_LARGE_AGED = BLOCK_BAMBOO_LEAF_LARGE.clone();
+
+    static {
+        ((BlockBamboo) BLOCK_BAMBOO_DEFAULT).setThick(true);
+    }
+
+    static {
+        ((BlockBamboo) BLOCK_BAMBOO_LEAF_SMALL).setLeafSize(BlockBamboo.LEAF_SIZE_SMALL);
+        ((BlockBamboo) BLOCK_BAMBOO_LEAF_LARGE).setLeafSize(BlockBamboo.LEAF_SIZE_LARGE);
+    }
+
+    static {
+        ((BlockBamboo) BLOCK_BAMBOO_LEAF_LARGE_AGED).setAge(1);
+    }
+
+    /**
+     * 灰化土生成概率
+     */
+    private double podzolProbability = 0.6;
 
     private ChunkManager level;
 
-    @Override
-    public void populate(ChunkManager level, int chunkX, int chunkZ, NukkitRandom random, FullChunk chunk) {
-        this.level = level;
-        int x = NukkitMath.randomRange(random, chunkX << 4, (chunkX << 4) + 15);
-        int z = NukkitMath.randomRange(random, chunkZ << 4, (chunkZ << 4) + 15);
-        int y = this.getHighestWorkableBlock(x, z);
-        if (y < 3) {
-            return;
-        }
+    private boolean canStay(int x, int y, int z, FullChunk chunk) {
+        return EnsureCover.ensureCover(x, y, z, chunk) && (EnsureGrassBelow.ensureGrassBelow(x, y, z, chunk) || EnsureBelow.ensureBelow(x, y, z, DIRT, chunk) || EnsureBelow.ensureBelow(x, y, z, PODZOL, chunk));
+    }
 
-        if (random.nextBoundedInt(5) == 0 && !this.isBambooNear(level, x, y, z, random)) return;
+    private void generateBamboo(ChunkManager level, int x, int y, int z, NukkitRandom random) {
+        final int height = getMaxHeight(level, x, y, z, random.nextBoundedInt(12) + 5);
 
-        int count = random.nextRange(8, 15);
-        for (int i = 0; i < count; i++){
-            if (i > 0) {
-                x += NukkitMath.randomRange(random, -3, 3);
-                z += NukkitMath.randomRange(random, -3, 3);
-                y = this.getHighestWorkableBlock(x, z);
+        for (int i = 0; i < height; i++) {
+            if (i > (height - 3) && height >= 3) {
+                if (i > (height - 2)) {
+                    if (i == (height - 1)) {
+                        level.setBlockAt(x, y + i, z, BLOCK_BAMBOO_LEAF_LARGE_AGED.getId(), BLOCK_BAMBOO_LEAF_LARGE_AGED.getDamage());
+                    } else {
+                        level.setBlockAt(x, y + i, z, BLOCK_BAMBOO_LEAF_LARGE.getId(), BLOCK_BAMBOO_LEAF_LARGE.getDamage());
+                    }
+                } else {
+                    level.setBlockAt(x, y + i, z, BLOCK_BAMBOO_LEAF_SMALL.getId(), BLOCK_BAMBOO_LEAF_SMALL.getDamage());
+                }
+            } else {
+                level.setBlockAt(x, y + i, z, BLOCK_BAMBOO_DEFAULT.getId(), BLOCK_BAMBOO_DEFAULT.getDamage());
             }
-            ObjectBamboo.growBamboo(level, new Vector3(x, y, z), random);
         }
     }
 
-    private int getHighestWorkableBlock(int x, int z) {
-        int y;
-        for (y = 255; y > 0; --y) {
-            int b = this.level.getBlockIdAt(x, y, z);
-            if (b == Block.DIRT || b == Block.GRASS) {
+    private void generatePodzol(ChunkManager level, int x, int y, int z, NukkitRandom random) {
+        int radius = random.nextBoundedInt(4) + 1;
+
+        for (int podzolX = x - radius; podzolX <= x + radius; podzolX++) {
+            for (int podzolZ = z - radius; podzolZ <= z + radius; podzolZ++) {
+                if ((podzolX - x) * (podzolX - x) + (podzolZ - z) * (podzolZ - z) <= radius * radius) {
+                    int checkId = level.getBlockIdAt(x, y - 1, z);
+
+                    if (checkId == GRASS || checkId == DIRT) {
+                        level.setBlockAt(podzolX, y - 1, podzolZ, PODZOL);
+                    }
+                }
+            }
+        }
+    }
+
+    private int getMaxHeight(ChunkManager level, int x, int y, int z, int height) {
+        int maxHeight = 0;
+        for (int i = 0; i < height; i++) {
+            if (level.getBlockIdAt(x, (y + i), z) == AIR) {
+                maxHeight++;
+            } else {
                 break;
-            } else if (b != Block.AIR && b != Block.SNOW_LAYER) {
-                return -1;
             }
         }
-        return ++y;
+
+        return maxHeight;
     }
 
-    private boolean isBambooNear(ChunkManager level, int x, int y, int z, NukkitRandom random){
-        return this.getNearBamboo(level, x, y, z, random) != null;
-    }
-
-    private Vector3 getNearBamboo(ChunkManager level, int x, int y, int z, NukkitRandom random){
-        int checkRadius = 3;
-        boolean xBased = random.nextBoolean();
-
-        for (int yy = -checkRadius; yy < (checkRadius + 1); ++yy) {
-            if (xBased){
-                for (int xx = -checkRadius; xx < (checkRadius + 1); ++xx) {
-                    for (int zz = -checkRadius; zz < (checkRadius + 1); ++zz) {
-                        if (level.getBlockIdAt(x + xx, y + yy, z + zz) == Block.BAMBOO) {
-                            new Vector3(x + xx, y + yy, z + zz);
-                        }
-                    }
-                }
-            }else {
-                for (int zz = -checkRadius; zz < (checkRadius + 1); ++zz) {
-                    for (int xx = -checkRadius; xx < (checkRadius + 1); ++xx) {
-                        if (level.getBlockIdAt(x + xx, y + yy, z + zz) == Block.BAMBOO) {
-                            new Vector3(x + xx, y + yy, z + zz);
-                        }
-                    }
-                }
+    @Override
+    protected int getHighestWorkableBlock(ChunkManager level, int x, int z, FullChunk chunk) {
+        int y;
+        for (y = 254; y >= 0; --y) {
+            if (!PopulatorHelpers.isNonSolid(chunk.getBlockId(x, y, z))) {
+                break;
             }
         }
-        return null;
+
+        return y == 0 ? -1 : ++y;
     }
 
+    @Override
+    protected void populateCount(ChunkManager level, int chunkX, int chunkZ, NukkitRandom random, FullChunk chunk) {
+        int x = random.nextBoundedInt(16);
+        int z = random.nextBoundedInt(16);
+        int y = getHighestWorkableBlock(level, x, z, chunk);
+
+        if (y > 0 && canStay(x, y, z, chunk)) {
+            x += (chunkX << 4);
+            z += (chunkZ << 4);
+
+            if (random.nextDouble() < this.podzolProbability) {
+                generatePodzol(level, x, y, z, random);
+            }
+
+            generateBamboo(level, x, y, z, random);
+        }
+    }
+
+    public void setPodzolProbability(double podzolProbability) {
+        this.podzolProbability = podzolProbability;
+    }
 
 }

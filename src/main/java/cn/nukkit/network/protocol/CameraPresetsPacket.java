@@ -122,6 +122,6 @@ public class CameraPresetsPacket extends DataPacket {
 
         CameraAudioListener listener = this.getOptional(null, binaryStream -> CameraAudioListener.values()[binaryStream.getByte()]);
         OptionalBoolean effects = this.getOptional(OptionalBoolean.empty(), binaryStream -> OptionalBoolean.of(binaryStream.getBoolean()));
-        return new CameraPreset(identifier, parentPreset, pos, pitch, yaw, listener, effects);
+        return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, listener, effects);
     }
 }

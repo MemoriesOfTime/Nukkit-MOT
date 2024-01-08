@@ -103,8 +103,13 @@ public interface ChunkSection {
 
     CompoundTag toNBT();
 
+    @Deprecated
+    default void writeTo(int protocol, BinaryStream stream) {
+        writeTo(protocol, stream, false);
+    }
+
     // for >= 1.13 chunk format
-    void writeTo(int protocol, BinaryStream stream);
+    void writeTo(int protocol, BinaryStream stream, boolean antiXray);
 
     ChunkSection copy();
 

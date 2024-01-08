@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 public class ListTag<T extends Tag> extends Tag {
 
@@ -64,6 +65,30 @@ public class ListTag<T extends Tag> extends Tag {
         StringJoiner joiner = new StringJoiner(",\n\t");
         list.forEach(tag -> joiner.add(tag.toString().replace("\n", "\n\t")));
         return "ListTag '" + this.getName() + "' (" + list.size() + " entries of type " + Tag.getTagName(type) + ") {\n\t" + joiner.toString() + "\n}";
+    }
+
+    @Override
+    public String toSNBT() {
+        return "[" + list.stream()
+                .map(Tag::toSNBT)
+                .collect(Collectors.joining(",")) + "]";
+    }
+
+    @Override
+    public String toSNBT(int space) {
+        StringBuilder addSpace = new StringBuilder();
+        addSpace.append(" ".repeat(Math.max(0, space)));
+        if (list.isEmpty()) {
+            return "[]";
+        } else if (list.get(0) instanceof StringTag || list.get(0) instanceof CompoundTag || list.get(0) instanceof ListTag<?>) {
+            StringJoiner joiner1 = new StringJoiner(",\n" + addSpace);
+            list.forEach(tag -> joiner1.add(tag.toSNBT(space).replace("\n", "\n" + addSpace)));
+            return "[\n" + addSpace + joiner1 + "\n]";
+        } else {
+            StringJoiner joiner2 = new StringJoiner(", ");
+            list.forEach(tag -> joiner2.add(tag.toSNBT(space)));
+            return "[" + joiner2 + "]";
+        }
     }
 
     public void print(String prefix, PrintStream out) {

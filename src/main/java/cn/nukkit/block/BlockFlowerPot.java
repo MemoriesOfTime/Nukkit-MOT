@@ -11,11 +11,12 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Nukkit Project Team
  */
-public class BlockFlowerPot extends BlockFlowable {
+public class BlockFlowerPot extends BlockFlowable implements BlockEntityHolder<BlockEntityFlowerPot> {
 
     public BlockFlowerPot() {
         this(0);
@@ -57,6 +58,18 @@ public class BlockFlowerPot extends BlockFlowable {
     @Override
     public int getId() {
         return FLOWER_POT_BLOCK;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityFlowerPot> getBlockEntityClass() {
+        return BlockEntityFlowerPot.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.FLOWER_POT;
     }
 
     private boolean isSupportValid(Block block) {

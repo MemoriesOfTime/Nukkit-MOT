@@ -587,7 +587,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
     }
 
     @Override
-    public void writeTo(int protocolId, BinaryStream stream) {
+    public void writeTo(int protocolId, BinaryStream stream, boolean antiXray) {
         synchronized (storage) {
             stream.putByte((byte) STREAM_STORAGE_VERSION);
             stream.putByte((byte) storage.size());
@@ -595,7 +595,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
                 if (blockStorage == null) {
                     blockStorage = new BlockStorage();
                 }
-                blockStorage.writeTo(protocolId, stream);
+                blockStorage.writeTo(protocolId, stream, antiXray);
             }
         }
     }

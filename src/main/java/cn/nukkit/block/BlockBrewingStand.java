@@ -14,10 +14,11 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
-public class BlockBrewingStand extends BlockTransparentMeta {
+public class BlockBrewingStand extends BlockTransparentMeta implements BlockEntityHolder<BlockEntityBrewingStand> {
 
     public BlockBrewingStand() {
         this(0);
@@ -25,6 +26,18 @@ public class BlockBrewingStand extends BlockTransparentMeta {
 
     public BlockBrewingStand(int meta) {
         super(meta);
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityBrewingStand> getBlockEntityClass() {
+        return BlockEntityBrewingStand.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.BREWING_STAND;
     }
 
     @Override

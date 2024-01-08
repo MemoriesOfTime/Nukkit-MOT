@@ -18,8 +18,9 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
-public class BlockBell extends BlockTransparentMeta implements Faceable {
+public class BlockBell extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityBell> {
     public static final int TYPE_ATTACHMENT_STANDING = 0;
     public static final int TYPE_ATTACHMENT_HANGING = 1;
     public static final int TYPE_ATTACHMENT_SIDE = 2;
@@ -41,6 +42,18 @@ public class BlockBell extends BlockTransparentMeta implements Faceable {
     @Override
     public int getId() {
         return BELL;
+    }
+
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityBell> getBlockEntityClass() {
+        return BlockEntityBell.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.BELL;
     }
 
     private boolean isConnectedTo(BlockFace connectedFace, int attachmentType, BlockFace blockFace) {
@@ -314,12 +327,14 @@ public class BlockBell extends BlockTransparentMeta implements Faceable {
         return true;
     }
 
-    private BlockEntityBell createBlockEntity() {
+    @Override
+    public BlockEntityBell createBlockEntity() {
         CompoundTag nbt = BlockEntity.getDefaultCompound(this, BlockEntity.BELL);
         return (BlockEntityBell) BlockEntity.createBlockEntity(BlockEntity.BELL, this, nbt);
     }
 
-    private BlockEntityBell getOrCreateBlockEntity() {
+    @Override
+    public BlockEntityBell getOrCreateBlockEntity() {
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
         if (!(blockEntity instanceof BlockEntityBell)) {
             blockEntity = this.createBlockEntity();

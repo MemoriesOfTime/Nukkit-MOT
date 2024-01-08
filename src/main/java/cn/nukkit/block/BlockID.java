@@ -413,6 +413,8 @@ public interface BlockID {
     int WOOD_BARK = 467;
     int COMPOSTER = 468;
     int PISTON_HEAD_STICKY = 472;
+    int BEE_NEST = 473;
+    int BEEHIVE = 474;
 
     int LODESTONE = 477;
     int CRIMSON_ROOTS = 478;
@@ -446,6 +448,7 @@ public interface BlockID {
     int CRIMSON_WALL_SIGN = 507;
     int WARPED_WALL_SIGN = 508;
 
+    int SOUL_TORCH = 523;
     int SOUL_LANTERN = 524;
     int NETHERITE_BLOCK = 525;
     int ANCIENT_DEBRIS = 526;
