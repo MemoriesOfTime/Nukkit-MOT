@@ -1,4 +1,4 @@
-package cn.nukkit.network.process.processor;
+package cn.nukkit.network.process.processor.common;
 
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;

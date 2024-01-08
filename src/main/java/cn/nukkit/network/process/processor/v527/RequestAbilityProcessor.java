@@ -1,4 +1,4 @@
-package cn.nukkit.network.process.processor;
+package cn.nukkit.network.process.processor.v527;
 
 import cn.nukkit.AdventureSettings;
 import cn.nukkit.Player;
@@ -50,5 +50,10 @@ public class RequestAbilityProcessor extends DataPacketProcessor<RequestAbilityP
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_ABILITY_PACKET);
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_19_0_29;
     }
 }

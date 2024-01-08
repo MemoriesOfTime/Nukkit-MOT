@@ -1,14 +1,15 @@
 package cn.nukkit.network.process;
 
 import cn.nukkit.PlayerHandle;
-import cn.nukkit.network.process.processor.ClientToServerHandshakeProcessor;
-import cn.nukkit.network.process.processor.LecternUpdateProcessor;
-import cn.nukkit.network.process.processor.NPCRequestProcessor;
-import cn.nukkit.network.process.processor.RequestAbilityProcessor;
+import cn.nukkit.Server;
+import cn.nukkit.network.process.processor.common.ClientToServerHandshakeProcessor;
+import cn.nukkit.network.process.processor.common.NPCRequestProcessor;
 import cn.nukkit.network.process.processor.v113.ContainerSetSlotProcessorV113;
 import cn.nukkit.network.process.processor.v113.DropItemProcessorV113;
 import cn.nukkit.network.process.processor.v113.RemoveBlockProcessorV113;
 import cn.nukkit.network.process.processor.v282.SetLocalPlayerAsInitializedProcessorV282;
+import cn.nukkit.network.process.processor.v340.LecternUpdateProcessor;
+import cn.nukkit.network.process.processor.v527.RequestAbilityProcessor;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -51,7 +52,7 @@ public final class DataPacketManager {
             protocol--;
             Int2ObjectOpenHashMap<DataPacketProcessor> map = PROTOCOL_PROCESSORS.get(protocol);
             processor = map != null ? map.get(packetId) : null;
-        } while ((processor == null || !processor.isSupported(originProtocol)) && protocol >= 0);
+        } while ((processor == null || !processor.isSupported(originProtocol)) && protocol >= Server.getInstance().minimumProtocol);
 
         if (processor != null && processor.isSupported(originProtocol)) {
             if (protocol != originProtocol) {
@@ -76,8 +77,6 @@ public final class DataPacketManager {
         registerProcessor(
                 0, //base
                 ClientToServerHandshakeProcessor.INSTANCE,
-                LecternUpdateProcessor.INSTANCE,
-                RequestAbilityProcessor.INSTANCE,
                 NPCRequestProcessor.INSTANCE
         );
 
@@ -91,6 +90,16 @@ public final class DataPacketManager {
         registerProcessor(
                 ProtocolInfo.v1_6_0_5,
                 SetLocalPlayerAsInitializedProcessorV282.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_10_0,
+                LecternUpdateProcessor.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_19_0,
+                RequestAbilityProcessor.INSTANCE
         );
     }
 }

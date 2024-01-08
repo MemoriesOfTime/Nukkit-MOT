@@ -1,4 +1,4 @@
-package cn.nukkit.network.process.processor;
+package cn.nukkit.network.process.processor.v340;
 
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.block.Block;
@@ -45,5 +45,10 @@ public class LecternUpdateProcessor extends DataPacketProcessor<LecternUpdatePac
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.LECTERN_UPDATE_PACKET);
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_10_0;
     }
 }
