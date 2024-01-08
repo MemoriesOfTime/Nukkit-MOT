@@ -31,13 +31,14 @@ public class SpecialRecipeManager {
 
     static {
         specialRecipeList.put(UUID.fromString(TYPE_REPAIR_ITEM), new RepairItemRecipe());
+        specialRecipeList.put(UUID.fromString(TYPE_BOOK_CLONING), new BookCloningRecipe());
     }
 
-    public static boolean canExecute(Player player, Item inputItem, Item outputItem){
-        return canExecute(player, Collections.singletonList(inputItem), outputItem);
+    public static SpecialRecipe getRecipe(Player player, Item inputItem, Item outputItem){
+        return getRecipe(player, Collections.singletonList(inputItem), outputItem);
     }
 
-    public static boolean canExecute(Player player, List<Item> inputs, Item outputItem){
-        return specialRecipeList.entrySet().stream().anyMatch(specialRecipe -> specialRecipe.getValue().canExecute(player, inputs, outputItem));
+    public static SpecialRecipe getRecipe(Player player, List<Item> inputs, Item outputItem){
+        return specialRecipeList.values().stream().filter(specialRecipe -> specialRecipe.canExecute(player, inputs, outputItem)).findFirst().orElse(null);
     }
 }

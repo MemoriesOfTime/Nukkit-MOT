@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.special.SpecialRecipe;
 import cn.nukkit.inventory.special.SpecialRecipeManager;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
@@ -99,23 +100,21 @@ public class CraftingTransaction extends InventoryTransaction {
     public boolean canExecute() {
         CraftingManager craftingManager = source.getServer().getCraftingManager();
         Inventory inventory;
-        switch (craftingType) {
-            case Player.CRAFTING_SMITHING -> {
-                inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
-                if (inventory instanceof SmithingInventory smithingInventory) {
-                    addInventory(inventory);
-                    SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
-                    if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment(), smithingInventory.getTemplate()), true, true)) {
-                        setTransactionRecipe(smithingRecipe);
-                    }
+        if (craftingType == Player.CRAFTING_SMITHING) {
+            inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
+            if (inventory instanceof SmithingInventory smithingInventory) {
+                addInventory(inventory);
+                SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
+                if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment(), smithingInventory.getTemplate()), true, true)) {
+                    setTransactionRecipe(smithingRecipe);
                 }
             }
-            default -> {
-                if (SpecialRecipeManager.canExecute(this.source, this.getInputList(), this.getPrimaryOutput())) {
-                    setTransactionRecipe(new ShapelessRecipe(this.getPrimaryOutput(), this.getInputList()));
-                } else {
-                    setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
-                }
+        } else {
+            SpecialRecipe specialRecipe = SpecialRecipeManager.getRecipe(this.source, this.getInputList(), this.getPrimaryOutput());
+            if (specialRecipe != null) {
+                setTransactionRecipe(specialRecipe.toRecipe(this.source, this.getInputList(), this.getPrimaryOutput()));
+            } else {
+                setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
             }
         }
         return this.getTransactionRecipe() != null && super.canExecute();
