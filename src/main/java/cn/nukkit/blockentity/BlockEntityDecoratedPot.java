@@ -15,7 +15,7 @@ public class BlockEntityDecoratedPot extends BlockEntitySpawnable {
 
     public static final List<String> emptyDecoration = List.of("minecraft:brick", "minecraft:brick", "minecraft:brick", "minecraft:brick");
 
-    private Item item = Item.AIR_ITEM;
+    private Item item;
 
     public BlockEntityDecoratedPot(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -33,6 +33,8 @@ public class BlockEntityDecoratedPot extends BlockEntitySpawnable {
 
         if (this.namedTag.contains("item")) {
             this.item = NBTIO.getItemHelper(this.namedTag.getCompound("item"));
+        } else {
+            this.item = Item.AIR_ITEM.clone();
         }
 
         super.initBlockEntity();
