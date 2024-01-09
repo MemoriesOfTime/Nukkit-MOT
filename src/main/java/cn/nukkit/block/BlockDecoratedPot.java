@@ -12,12 +12,19 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
+import java.util.Objects;
 
 
-public class BlockDecoratedPot extends BlockTransparent implements Faceable, BlockEntityHolder<BlockEntityDecoratedPot> {
+public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityDecoratedPot> {
+
+    public static final int DIRECTION_BIT = 0x3;
 
     public BlockDecoratedPot() {
         super();
+    }
+
+    public BlockDecoratedPot(int meta) {
+        super(meta);
     }
 
     public String getName() {
@@ -47,6 +54,7 @@ public class BlockDecoratedPot extends BlockTransparent implements Faceable, Blo
         nbt.putInt("y", (int) this.y);
         nbt.putInt("z", (int) this.y);
 
+        this.setBlockFace(player.getDirection().getOpposite());
         return BlockEntityHolder.setBlockAndCreateEntity(this, true, true, nbt) != null;
     }
 
@@ -63,7 +71,12 @@ public class BlockDecoratedPot extends BlockTransparent implements Faceable, Blo
     }
 
     @Override
+    public void setBlockFace(BlockFace face) {
+        this.setDamage(DIRECTION_BIT, Objects.requireNonNullElse(face, BlockFace.SOUTH).getHorizontalIndex() & 0x3);
+    }
+
+    @Override
     public BlockFace getBlockFace() {
-        return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
+        return BlockFace.fromHorizontalIndex(this.getDamage(DIRECTION_BIT));
     }
 }
