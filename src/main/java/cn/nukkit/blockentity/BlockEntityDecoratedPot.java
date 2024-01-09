@@ -1,7 +1,6 @@
 package cn.nukkit.blockentity;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -16,11 +15,19 @@ public class BlockEntityDecoratedPot extends BlockEntitySpawnable {
 
     public BlockEntityDecoratedPot(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
-        ListTag<StringTag> listTag = new ListTag<>();
-        for (String s : emptyDecoration) {
-            listTag.add(new StringTag(s));
+    }
+
+    @Override
+    protected void initBlockEntity() {
+        if (!this.namedTag.contains("sherds")) {
+            ListTag<StringTag> listTag = new ListTag<>();
+            for (String s : emptyDecoration) {
+                listTag.add(new StringTag("", s));
+            }
+            this.namedTag.putList("sherds", listTag);
         }
-        this.namedTag.putList(listTag);
+
+        super.initBlockEntity();
     }
 
     @Override
