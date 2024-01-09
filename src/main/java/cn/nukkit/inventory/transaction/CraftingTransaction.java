@@ -4,8 +4,6 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
-import cn.nukkit.inventory.special.SpecialRecipe;
-import cn.nukkit.inventory.special.SpecialRecipeManager;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -110,9 +108,9 @@ public class CraftingTransaction extends InventoryTransaction {
                 }
             }
         } else {
-            SpecialRecipe specialRecipe = SpecialRecipeManager.getRecipe(this.source, this.getInputList(), this.getPrimaryOutput());
-            if (specialRecipe != null) {
-                setTransactionRecipe(specialRecipe.toRecipe(this.source, this.getInputList(), this.getPrimaryOutput()));
+            MultiRecipe multiRecipe = Server.getInstance().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
+            if (multiRecipe != null) {
+                setTransactionRecipe(multiRecipe.toRecipe(this.source, this.getPrimaryOutput(), this.getInputList()));
             } else {
                 setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
             }

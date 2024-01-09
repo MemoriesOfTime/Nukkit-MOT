@@ -1,20 +1,24 @@
 package cn.nukkit.inventory.special;
 
 import cn.nukkit.Player;
+import cn.nukkit.inventory.MultiRecipe;
 import cn.nukkit.item.Item;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * @author glorydark
  * @date {2024/1/8} {16:04}
  */
-public class RepairItemRecipe implements SpecialRecipe {
+public class RepairItemRecipe extends MultiRecipe {
 
-    public RepairItemRecipe(){}
+    public RepairItemRecipe(){
+        super(UUID.fromString(TYPE_REPAIR_ITEM));
+    }
 
     @Override
-    public boolean canExecute(Player player, List<Item> inputs, Item outputItem) {
+    public boolean canExecute(Player player, Item outputItem, List<Item> inputs) {
         // Processing the checks about the inputs and outputItem
         if (inputs.size() == 2) {
             Item item1 = inputs.get(0);

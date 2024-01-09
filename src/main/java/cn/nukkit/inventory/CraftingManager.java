@@ -1,7 +1,8 @@
 package cn.nukkit.inventory;
 
+import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.inventory.special.SpecialRecipeManager;
+import cn.nukkit.inventory.special.RepairItemRecipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
 import cn.nukkit.item.ItemID;
@@ -110,10 +111,14 @@ public class CraftingManager {
     @SuppressWarnings("unchecked")
     public CraftingManager() {
         MainLogger.getLogger().debug("Loading recipes...");
-        ConfigSection multiRecipes = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes/special_hardcoded.json")).getRootSection();
-        for (String uuidString : new ArrayList<>(multiRecipes.getStringList("list"))) {
-            this.registerMultiRecipe(new MultiRecipe(UUID.fromString(uuidString)));
-        }
+
+        // Register multi-recipes internally
+        // todo:
+        //  Currently, we can take the original written book out from the crafting slot,
+        //  but book cloning recipe requires a further fix
+        //  because original written books will soon vanish due to a mysterious SlotChangeAction
+        // this.registerMultiRecipe(new BookCloningRecipe());
+        this.registerMultiRecipe(new RepairItemRecipe());
 
         ConfigSection recipes_419_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes419.json")).getRootSection();
         List<Map> recipes_388 = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes388.json")).getRootSection().getMapList("recipes");
@@ -725,6 +730,10 @@ public class CraftingManager {
             return this.multiRecipes;
         }
         throw new IllegalArgumentException("Multi recipes are not supported for protocol " + protocol + " (< 407)");
+    }
+
+    public MultiRecipe getMultiRecipe(Player player, Item outputItem, List<Item> inputs) {
+        return this.multiRecipes.values().stream().filter(multiRecipe -> multiRecipe.canExecute(player, outputItem, inputs)).findFirst().orElse(null);
     }
 
     public FurnaceRecipe matchFurnaceRecipe(Item input) {
