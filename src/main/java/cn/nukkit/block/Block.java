@@ -38,7 +38,7 @@ import static cn.nukkit.utils.Utils.dynamic;
  */
 @Log4j2
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
-    public static final int MAX_BLOCK_ID = dynamic(800);
+    public static final int MAX_BLOCK_ID = dynamic(810);
     public static final int DATA_BITS = dynamic(6);
     public static final int DATA_SIZE = dynamic(1 << DATA_BITS);
     public static final int DATA_MASK = dynamic(DATA_SIZE - 1);
@@ -463,6 +463,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[RAW_IRON_BLOCK] = BlockRawIron.class; //706
             list[RAW_COPPER_BLOCK] = BlockRawCopper.class; //707
             list[RAW_GOLD_BLOCK] = BlockRawGold.class; //708
+
+            // todo: update the runtime_block_states.dat
+            // list[DECORATED_POT] = BlockDecoratedPot.class; //806
 
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];

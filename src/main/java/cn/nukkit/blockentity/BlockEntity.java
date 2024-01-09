@@ -49,6 +49,8 @@ public abstract class BlockEntity extends Position {
     public static final String BELL = "Bell";
     public static final String END_GATEWAY = "EndGateway";
 
+    public static final String DECORATED_POT = "minecraft:decorated_pot";
+
     public static long count = 1;
 
     private static final BiMap<String, Class<? extends BlockEntity>> knownBlockEntities = HashBiMap.create(24);

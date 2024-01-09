@@ -409,6 +409,26 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             registerNamespacedIdItem(ItemRaiserArmorTrimSmithingTemplate.class);
             registerNamespacedIdItem(ItemShaperArmorTrimSmithingTemplate.class);
             registerNamespacedIdItem(ItemHostArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(AnglerPotterySherd.class);
+            registerNamespacedIdItem(ArcherPotterySherd.class);
+            registerNamespacedIdItem(ArmsUpPotterySherd.class);
+            registerNamespacedIdItem(BladePotterySherd.class);
+            registerNamespacedIdItem(BrewerPotterySherd.class);
+            registerNamespacedIdItem(BurnPotterySherd.class);
+            registerNamespacedIdItem(DangerPotterySherd.class);
+            registerNamespacedIdItem(ExplorerPotterySherd.class);
+            registerNamespacedIdItem(FriendPotterySherd.class);
+            registerNamespacedIdItem(HeartPotterySherd.class);
+            registerNamespacedIdItem(HeartbreakPotterySherd.class);
+            registerNamespacedIdItem(HowlPotterySherd.class);
+            registerNamespacedIdItem(MinerPotterySherd.class);
+            registerNamespacedIdItem(MournerPotterySherd.class);
+            registerNamespacedIdItem(PlentyPotterySherd.class);
+            registerNamespacedIdItem(PrizePotterySherd.class);
+            registerNamespacedIdItem(SheafPotterySherd.class);
+            registerNamespacedIdItem(ShelterPotterySherd.class);
+            registerNamespacedIdItem(SkullPotterySherd.class);
+            registerNamespacedIdItem(SnortPotterySherd.class);
 
             // 添加原版物品到NAMESPACED_ID_ITEM
             // Add vanilla items to NAMESPACED_ID_ITEM
