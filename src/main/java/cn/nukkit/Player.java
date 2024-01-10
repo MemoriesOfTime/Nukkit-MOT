@@ -3971,79 +3971,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 chunkRadiusUpdatePacket.radius = this.chunkRadius;
                 this.dataPacket(chunkRadiusUpdatePacket);
                 break;
-            case ProtocolInfo.SET_PLAYER_GAME_TYPE_PACKET:
-                SetPlayerGameTypePacket setPlayerGameTypePacket = (SetPlayerGameTypePacket) packet;
-                if (setPlayerGameTypePacket.gamemode != this.gamemode) {
-                    if (!this.hasPermission("nukkit.command.gamemode")) {
-                        this.kick(PlayerKickEvent.Reason.INVALID_PACKET, "Invalid SetPlayerGameTypePacket", true, "type=SetPlayerGameTypePacket");
-                        /*SetPlayerGameTypePacket setPlayerGameTypePacket1 = new SetPlayerGameTypePacket();
-                        setPlayerGameTypePacket1.gamemode = this.gamemode & 0x01;
-                        this.dataPacket(setPlayerGameTypePacket1);
-                        this.adventureSettings.update();*/
-                        break;
-                    }
-                    this.setGamemode(setPlayerGameTypePacket.gamemode, true);
-                    Command.broadcastCommandMessage(this, new TranslationContainer("commands.gamemode.success.self", Server.getGamemodeString(this.gamemode)));
-                }
-                break;
-            case ProtocolInfo.ITEM_FRAME_DROP_ITEM_PACKET:
-                ItemFrameDropItemPacket itemFrameDropItemPacket = (ItemFrameDropItemPacket) packet;
-                Vector3 vector3 = this.temporalVector.setComponents(itemFrameDropItemPacket.x, itemFrameDropItemPacket.y, itemFrameDropItemPacket.z);
-                if (vector3.distanceSquared(this) < 1000) {
-                    BlockEntity itemFrame = this.level.getBlockEntityIfLoaded(vector3);
-                    if (itemFrame instanceof BlockEntityItemFrame) {
-                        ((BlockEntityItemFrame) itemFrame).dropItem(this);
-                    }
-                }
-                break;
-            case ProtocolInfo.MAP_INFO_REQUEST_PACKET:
-                MapInfoRequestPacket pk = (MapInfoRequestPacket) packet;
-                ItemMap mapItem = null;
-
-                for (Item item1 : this.offhandInventory.getContents().values()) {
-                    if (item1 instanceof ItemMap map && map.getMapId() == pk.mapId) {
-                        mapItem = map;
-                    }
-                }
-
-                if (mapItem == null) {
-                    for (Item item1 : this.inventory.getContents().values()) {
-                        if (item1 instanceof ItemMap map && map.getMapId() == pk.mapId) {
-                            mapItem = map;
-                        }
-                    }
-                }
-
-                if (mapItem == null) {
-                    for (BlockEntity be : this.level.getBlockEntities().values()) {
-                        if (be instanceof BlockEntityItemFrame itemFrame1) {
-
-                            if (itemFrame1.getItem() instanceof ItemMap && ((ItemMap) itemFrame1.getItem()).getMapId() == pk.mapId) {
-                                ((ItemMap) itemFrame1.getItem()).sendImage(this);
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    PlayerMapInfoRequestEvent event;
-                    getServer().getPluginManager().callEvent(event = new PlayerMapInfoRequestEvent(this, mapItem));
-
-                    if (!event.isCancelled()) {
-                        if (mapItem.trySendImage(this)) {
-                            return;
-                        }
-
-                        ItemMap finalMapItem = mapItem;
-                        this.server.getScheduler().scheduleAsyncTask(new AsyncTask() {
-                            @Override
-                            public void onRun() {
-                                finalMapItem.renderMap(Player.this.getLevel(), (Player.this.getFloorX() / 128) << 7, (Player.this.getFloorZ() / 128) << 7, 1);
-                                finalMapItem.sendImage(Player.this);
-                            }
-                        });
-                    }
-                }
-                break;
             case ProtocolInfo.LEVEL_SOUND_EVENT_PACKET:
             case ProtocolInfo.LEVEL_SOUND_EVENT_PACKET_V1:
             case ProtocolInfo.LEVEL_SOUND_EVENT_PACKET_V2:
@@ -4734,43 +4661,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                 }
                 break;
-            case ProtocolInfo.PLAYER_HOTBAR_PACKET:
-                PlayerHotbarPacket hotbarPacket = (PlayerHotbarPacket) packet;
-
-                if (hotbarPacket.windowId != ContainerIds.INVENTORY) {
-                    return;
-                }
-
-                this.inventory.equipItem(hotbarPacket.selectedHotbarSlot);
-                break;
-            case ProtocolInfo.SERVER_SETTINGS_REQUEST_PACKET:
-                PlayerServerSettingsRequestEvent settingsRequestEvent = new PlayerServerSettingsRequestEvent(this, new HashMap<>(this.serverSettings));
-                this.getServer().getPluginManager().callEvent(settingsRequestEvent);
-
-                if (!settingsRequestEvent.isCancelled()) {
-                    settingsRequestEvent.getSettings().forEach((id, window) -> {
-                        ServerSettingsResponsePacket re = new ServerSettingsResponsePacket();
-                        re.formId = id;
-                        re.data = window.getJSONData();
-                        this.dataPacket(re);
-                    });
-                }
-                break;
-            case ProtocolInfo.RESPAWN_PACKET:
-                if (this.isAlive() || this.protocol < 388) {
-                    break;
-                }
-
-                RespawnPacket respawnPacket = (RespawnPacket) packet;
-                if (respawnPacket.respawnState == RespawnPacket.STATE_CLIENT_READY_TO_SPAWN) {
-                    RespawnPacket respawn1 = new RespawnPacket();
-                    respawn1.x = (float) this.getX();
-                    respawn1.y = (float) this.getY();
-                    respawn1.z = (float) this.getZ();
-                    respawn1.respawnState = RespawnPacket.STATE_READY_TO_SPAWN;
-                    this.dataPacket(respawn1);
-                }
-                break;
             case ProtocolInfo.BOOK_EDIT_PACKET:
                 BookEditPacket bookEditPacket = (BookEditPacket) packet;
                 Item oldBook = this.inventory.getItem(bookEditPacket.inventorySlot);
@@ -4818,27 +4708,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
                 break;
-            case ProtocolInfo.FILTER_TEXT_PACKET:
-                FilterTextPacket filterTextPacket = (FilterTextPacket) packet;
-                if (filterTextPacket.text == null || filterTextPacket.text.length() > 64) {
-                    this.getServer().getLogger().debug(username + ": FilterTextPacket with too long text");
-                    return;
-                }
-                FilterTextPacket textResponsePacket = new FilterTextPacket();
-                textResponsePacket.text = filterTextPacket.text;
-                textResponsePacket.fromServer = true;
-                this.dataPacket(textResponsePacket);
-                break;
-            case ProtocolInfo.SET_DIFFICULTY_PACKET:
-                if (!this.spawned || !this.hasPermission("nukkit.command.difficulty")) {
-                    return;
-                }
-                server.setDifficulty(((SetDifficultyPacket) packet).difficulty);
-                SetDifficultyPacket difficultyPacket = new SetDifficultyPacket();
-                difficultyPacket.difficulty = server.getDifficulty();
-                Server.broadcastPacket(server.getOnlinePlayers().values(), difficultyPacket);
-                Command.broadcastCommandMessage(this, new TranslationContainer("commands.difficulty.success", String.valueOf(server.getDifficulty())));
-                break;
             case ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET:
                 PacketViolationWarningPacket PVWpk = (PacketViolationWarningPacket) packet;
                 if (pkIDs == null) {
@@ -4853,18 +4722,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                         }).map(Field::getName).findFirst();
                 this.getServer().getLogger().warning("PacketViolationWarningPacket" + PVWpkName.map(name -> " for packet " + name).orElse(" UNKNOWN") + " from " + this.username + " (Protocol " + this.protocol + "): " + PVWpk.toString());
-                break;
-            case ProtocolInfo.EMOTE_PACKET:
-                if (!this.spawned || server.getTick() - this.lastEmote < 20) {
-                    return;
-                }
-                this.lastEmote = server.getTick();
-                EmotePacket emotePacket = (EmotePacket) packet;
-                if (emotePacket.runtimeId != this.id) {
-                    server.getLogger().warning(this.username + " tried to send EmotePacket with invalid entity id: " + emotePacket.runtimeId + "!=" + this.id);
-                    return;
-                }
-                this.emote(emotePacket);
                 break;
             default:
                 break;
@@ -7350,5 +7207,21 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (line.getScorer().equals(scorer) && line.getScoreboard().getViewers(DisplaySlot.BELOW_NAME).contains(this)) {
             this.setScoreTag(line.getScore() + " " + line.getScoreboard().getDisplayName());
         }
+    }
+
+    public Map<Integer, FormWindow> getServerSettings() {
+        return serverSettings;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public int getLastEmote() {
+        return lastEmote;
+    }
+
+    public void setLastEmote(int lastEmote) {
+        this.lastEmote = lastEmote;
     }
 }

@@ -2,8 +2,7 @@ package cn.nukkit.network.process;
 
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.Server;
-import cn.nukkit.network.process.processor.common.ClientToServerHandshakeProcessor;
-import cn.nukkit.network.process.processor.common.NPCRequestProcessor;
+import cn.nukkit.network.process.processor.common.*;
 import cn.nukkit.network.process.processor.v113.ContainerSetSlotProcessorV113;
 import cn.nukkit.network.process.processor.v113.DropItemProcessorV113;
 import cn.nukkit.network.process.processor.v113.RemoveBlockProcessorV113;
@@ -77,7 +76,16 @@ public final class DataPacketManager {
         registerProcessor(
                 0, //base
                 ClientToServerHandshakeProcessor.INSTANCE,
-                NPCRequestProcessor.INSTANCE
+                NPCRequestProcessor.INSTANCE,
+                EmotePacketProcessor.INSTANCE,
+                FilterTextProcessor.INSTANCE,
+                ItemFrameDropItemProcessor.INSTANCE,
+                MapInfoRequestProcessor.INSTANCE,
+                PlayerHotbarProcessor.INSTANCE,
+                RespawnProcessor.INSTANCE,
+                ServerSettingsRequestProcessor.INSTANCE,
+                SetDifficultyProcessor.INSTANCE,
+                SetPlayerGameTypeProcessor.INSTANCE
         );
 
         registerProcessor(
