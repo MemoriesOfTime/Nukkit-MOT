@@ -1,8 +1,8 @@
 package cn.nukkit.item;
 
-public class AnglerPotterySherd extends StringItemBase {
+public class ItemAnglerPotterySherd extends ItemPotterySherd {
 
-    public AnglerPotterySherd() {
+    public ItemAnglerPotterySherd() {
         super("minecraft:angler_pottery_sherd", "Angler Pottery Sherd");
     }
 }
