@@ -4,9 +4,12 @@ import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityDecoratedPot;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.particle.GenericParticle;
+import cn.nukkit.level.particle.Particle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -27,6 +30,18 @@ public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable,
         super(meta);
     }
 
+    @NotNull
+    @Override
+    public Class<? extends BlockEntityDecoratedPot> getBlockEntityClass() {
+        return BlockEntityDecoratedPot.class;
+    }
+
+    @NotNull
+    @Override
+    public String getBlockEntityType() {
+        return BlockEntity.DECORATED_POT;
+    }
+
     public String getName() {
         return "Decorated Pot";
     }
@@ -34,6 +49,16 @@ public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable,
     @Override
     public int getId() {
         return Block.DECORATED_POT;
+    }
+
+    @Override
+    public double getHardness() {
+        return 0;
+    }
+
+    @Override
+    public double getResistance() {
+        return 0;
     }
 
     @Override
@@ -58,16 +83,43 @@ public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable,
         return BlockEntityHolder.setBlockAndCreateEntity(this, true, true, nbt) != null;
     }
 
-    @NotNull
     @Override
-    public Class<? extends BlockEntityDecoratedPot> getBlockEntityClass() {
-        return BlockEntityDecoratedPot.class;
+    public boolean canBeActivated() {
+        return true;
     }
 
-    @NotNull
     @Override
-    public String getBlockEntityType() {
-        return BlockEntity.DECORATED_POT;
+    public boolean onActivate(Item item, Player player) {
+        BlockEntityDecoratedPot pot = this.getOrCreateBlockEntity();
+        Item potItem = pot.getItem();
+        if ((potItem.getId() == Block.AIR || potItem.equals(item)) && potItem.getCount() < potItem.getMaxStackSize() && item.getCount() > 0) {
+            item.count--;
+            if (potItem.getId() == Block.AIR) {
+                potItem = item.clone();
+                potItem.setCount(1);
+            } else {
+                potItem.setCount(potItem.getCount() + 1);
+            }
+
+            pot.setItem(potItem);
+            pot.setAnimation(2);
+            pot.spawnToAll();
+
+            level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_DECORATED_POT_INSERT, 746);
+            level.addParticle(new GenericParticle(this.add(0.5, 1.25, 0.5), (Particle.TYPE_DUST_PLUME)));
+        } else {
+            pot.setAnimation(1);
+            pot.spawnToAll();
+
+            level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_DECORATED_POT_INSERT_FAILED);
+        }
+        return true;
+    }
+
+    @Override
+    public Item[] getDrops(Item item) {
+        return super.getDrops(item);
+        //TODO 调整掉落
     }
 
     @Override
