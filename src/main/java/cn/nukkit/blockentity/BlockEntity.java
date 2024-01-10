@@ -48,7 +48,6 @@ public abstract class BlockEntity extends Position {
     public static final String CAMPFIRE = "Campfire";
     public static final String BELL = "Bell";
     public static final String END_GATEWAY = "EndGateway";
-
     public static final String DECORATED_POT = "DecoratedPot";
 
     public static long count = 1;
