@@ -34,6 +34,10 @@ public final class PlayerHandle {
         this.player = player;
     }
 
+    public int getProtocol() {
+        return player.protocol;
+    }
+
     public NetworkPlayerSession getNetworkSession() {
         return player.networkSession;
     }

@@ -2,6 +2,7 @@ package cn.nukkit.network.process;
 
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -17,7 +18,7 @@ public abstract class DataPacketProcessor<T extends DataPacket> {
 
     public abstract int getPacketId();
 
-    public int getProtocol() {
-        return -1;
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_2_0;
     }
 }

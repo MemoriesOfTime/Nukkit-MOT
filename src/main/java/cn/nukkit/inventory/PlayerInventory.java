@@ -14,6 +14,8 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemMap;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
+import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
 
 import java.util.Collection;
 
@@ -431,11 +433,19 @@ public class PlayerInventory extends BaseInventory {
 
         for (Player player : players) {
             if (player.equals(this.getHolder())) {
-                InventorySlotPacket pk2 = new InventorySlotPacket();
-                pk2.inventoryId = InventoryContentPacket.SPECIAL_ARMOR;
-                pk2.slot = index - this.getSize();
-                pk2.item = this.getItem(index);
-                player.dataPacket(pk2);
+                if (player.protocol >= ProtocolInfo.v1_2_0) {
+                    InventorySlotPacket pk2 = new InventorySlotPacket();
+                    pk2.inventoryId = InventoryContentPacket.SPECIAL_ARMOR;
+                    pk2.slot = index - this.getSize();
+                    pk2.item = this.getItem(index);
+                    player.dataPacket(pk2);
+                } else {
+                    ContainerSetSlotPacketV113 pk3 = new ContainerSetSlotPacketV113();
+                    pk3.windowid = ContainerSetContentPacketV113.SPECIAL_ARMOR;
+                    pk3.slot = index - this.getSize();
+                    pk3.item = this.getItem(index);
+                    player.dataPacket(pk3);
+                }
             } else {
                 player.dataPacket(pk);
             }
@@ -498,10 +508,19 @@ public class PlayerInventory extends BaseInventory {
         pk.slot = index;
         pk.item = this.getItem(index).clone();
 
+        ContainerSetSlotPacketV113 pk2 = new ContainerSetSlotPacketV113();
+        pk2.slot = index;
+        pk2.item = pk.item.clone();
+
         for (Player player : players) {
             if (player.equals(this.getHolder())) {
                 pk.inventoryId = ContainerIds.INVENTORY;
-                player.dataPacket(pk);
+                pk2.windowid = 0;
+                if (player.protocol >= ProtocolInfo.v1_2_0) {
+                    player.dataPacket(pk);
+                } else {
+                    player.dataPacket(pk2);
+                }
             } else {
                 int id = player.getWindowId(this);
                 if (id == -1) {
@@ -509,7 +528,12 @@ public class PlayerInventory extends BaseInventory {
                     continue;
                 }
                 pk.inventoryId = id;
-                player.dataPacket(pk.clone());
+                pk2.windowid = id;
+                if (player.protocol >= ProtocolInfo.v1_2_0) {
+                    player.dataPacket(pk.clone());
+                } else {
+                    player.dataPacket(pk2.clone());
+                }
             }
         }
     }
@@ -521,12 +545,22 @@ public class PlayerInventory extends BaseInventory {
         Player p = (Player) this.getHolder();
 
         if (p.protocol < 407) {
-            InventoryContentPacket pk = new InventoryContentPacket();
-            pk.inventoryId = ContainerIds.CREATIVE;
-            if (!p.isSpectator()) { //fill it for all gamemodes except spectator
-                pk.slots = Item.getCreativeItems(p.protocol).toArray(Item.EMPTY_ARRAY);
+            if (p.protocol < ProtocolInfo.v1_2_0) {
+                ContainerSetContentPacketV113 pk = new ContainerSetContentPacketV113();
+                pk.windowid = ContainerSetContentPacketV113.SPECIAL_CREATIVE;
+                pk.eid = p.getId();
+                if (!p.isSpectator()) {
+                    pk.slots = Item.getCreativeItems(p.protocol).toArray(Item.EMPTY_ARRAY);
+                }
+                p.dataPacket(pk);
+            } else {
+                InventoryContentPacket pk = new InventoryContentPacket();
+                pk.inventoryId = ContainerIds.CREATIVE;
+                if (!p.isSpectator()) { //fill it for all gamemodes except spectator
+                    pk.slots = Item.getCreativeItems(p.protocol).toArray(Item.EMPTY_ARRAY);
+                }
+                p.dataPacket(pk);
             }
-            p.dataPacket(pk);
         } else {
             CreativeContentPacket pk = new CreativeContentPacket();
             pk.entries = p.isSpectator() ? Item.EMPTY_ARRAY : Item.getCreativeItems(p.protocol).toArray(Item.EMPTY_ARRAY);

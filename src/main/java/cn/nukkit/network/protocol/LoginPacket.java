@@ -43,6 +43,7 @@ public class LoginPacket extends DataPacket {
                 if (this.protocol_ >= ProtocolInfo.v1_2_0) {
                     throw new RuntimeException();
                 }
+                this.getByte(); //gameEdition
             } catch (Throwable th) {
                 setOffset(ofs);
             }
