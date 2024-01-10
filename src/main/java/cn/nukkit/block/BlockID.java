@@ -468,5 +468,4 @@ public interface BlockID {
     int RAW_GOLD_BLOCK = 708;
 
     int DECORATED_POT = 806;
-    // todo: Decorated pot currently cannot be normally shown, but a unknown block
 }
