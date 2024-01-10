@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.inventory.MultiRecipe;
 import cn.nukkit.inventory.Recipe;
 import cn.nukkit.inventory.ShapedRecipe;
+import cn.nukkit.inventory.transaction.CraftingTransaction;
 import cn.nukkit.item.Item;
 
 import java.util.*;
@@ -34,7 +35,8 @@ public class BookCloningRecipe extends MultiRecipe {
     }
 
     @Override
-    public void executeExtra(Player player, Item outputItem, List<Item> inputs) {
+    public void executeExtra(Player player, CraftingTransaction craftingTransaction) {
+        List<Item> inputs = craftingTransaction.getInputList();
         Item item1 = inputs.get(0);
         Item item2 = inputs.get(1);
         Item saveInput;

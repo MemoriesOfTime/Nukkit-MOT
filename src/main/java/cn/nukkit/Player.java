@@ -4198,7 +4198,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.craftingTransaction.execute();
                             MultiRecipe multiRecipe = Server.getInstance().getCraftingManager().getMultiRecipe(this, this.craftingTransaction.getPrimaryOutput(), this.craftingTransaction.getInputList());
                             if (multiRecipe != null) {
-                                multiRecipe.executeExtra(this, this.craftingTransaction.getPrimaryOutput(), this.craftingTransaction.getInputList());
+                                multiRecipe.executeExtra(this, this.craftingTransaction);
                             }
                         } catch (Exception e) {
                             this.server.getLogger().debug("Executing crafting transaction failed");
@@ -4292,9 +4292,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     return;
                 } else if (this.craftingTransaction != null) {
-                    if (craftingTransaction.checkForCraftingPart(actions)) {
+                    MultiRecipe multiRecipe = Server.getInstance().getCraftingManager().getMultiRecipe(this, this.craftingTransaction.getPrimaryOutput(), this.craftingTransaction.getInputList());
+                    if (craftingTransaction.checkForCraftingPart(actions) || multiRecipe != null) {
                         for (InventoryAction action : actions) {
                             craftingTransaction.addAction(action);
+                        }
+                        if (multiRecipe != null) {
+                            multiRecipe.executeExtra(this, this.craftingTransaction);
+                            this.craftingTransaction = null;
                         }
                         return;
                     } else {

@@ -1,6 +1,7 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
+import cn.nukkit.inventory.transaction.CraftingTransaction;
 import cn.nukkit.item.Item;
 
 import java.util.List;
@@ -59,10 +60,12 @@ public class MultiRecipe implements Recipe {
     }
 
     public Recipe toRecipe(Player player, Item outputItem, List<Item> inputs) {
-        return new ShapelessRecipe(this.id.toString(), 50, outputItem, inputs);
+        return new ShapelessRecipe(outputItem, inputs);
     }
 
-    public void executeExtra(Player player, Item outputItem, List<Item> inputs) {
-
+    public void executeExtra(Player player, CraftingTransaction craftingTransaction) {
+        // todo:
+        //  Quite weird that there are so many packets whilst cloning a map or a written book.
+        //  This method is used to cope with some strange circumstances mentioned above.
     }
 }

@@ -3,6 +3,7 @@ package cn.nukkit.inventory;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.inventory.special.BookCloningRecipe;
+import cn.nukkit.inventory.special.MapCloningRecipe;
 import cn.nukkit.inventory.special.RepairItemRecipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
@@ -115,11 +116,11 @@ public class CraftingManager {
 
         // Register multi-recipes internally
         // todo:
-        //  Currently, we can take the original written book out from the crafting slot,
-        //  but book cloning recipe requires a further fix
-        //  because original written books will soon vanish due to a mysterious SlotChangeAction
-        this.registerMultiRecipe(new BookCloningRecipe());
+        //  Book cloning recipe may require a further fix
+        //  because we only use the simplest way to solve problem of original book vanishing.
         this.registerMultiRecipe(new RepairItemRecipe());
+        this.registerMultiRecipe(new BookCloningRecipe());
+        this.registerMultiRecipe(new MapCloningRecipe());
 
         ConfigSection recipes_419_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes419.json")).getRootSection();
         List<Map> recipes_388 = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes388.json")).getRootSection().getMapList("recipes");
