@@ -2,6 +2,7 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.inventory.special.BookCloningRecipe;
 import cn.nukkit.inventory.special.RepairItemRecipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
@@ -117,7 +118,7 @@ public class CraftingManager {
         //  Currently, we can take the original written book out from the crafting slot,
         //  but book cloning recipe requires a further fix
         //  because original written books will soon vanish due to a mysterious SlotChangeAction
-        // this.registerMultiRecipe(new BookCloningRecipe());
+        this.registerMultiRecipe(new BookCloningRecipe());
         this.registerMultiRecipe(new RepairItemRecipe());
 
         ConfigSection recipes_419_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes419.json")).getRootSection();

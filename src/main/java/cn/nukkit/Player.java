@@ -4196,6 +4196,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (this.craftingTransaction.getPrimaryOutput() != null && this.craftingTransaction.canExecute()) {
                         try {
                             this.craftingTransaction.execute();
+                            MultiRecipe multiRecipe = Server.getInstance().getCraftingManager().getMultiRecipe(this, this.craftingTransaction.getPrimaryOutput(), this.craftingTransaction.getInputList());
+                            if (multiRecipe != null) {
+                                multiRecipe.executeExtra(this, this.craftingTransaction.getPrimaryOutput(), this.craftingTransaction.getInputList());
+                            }
                         } catch (Exception e) {
                             this.server.getLogger().debug("Executing crafting transaction failed");
                         }

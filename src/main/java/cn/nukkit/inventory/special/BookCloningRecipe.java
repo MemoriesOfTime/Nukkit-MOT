@@ -34,19 +34,15 @@ public class BookCloningRecipe extends MultiRecipe {
     }
 
     @Override
-    public Recipe toRecipe(Player player, Item outputItem, List<Item> inputs) {
+    public void executeExtra(Player player, Item outputItem, List<Item> inputs) {
         Item item1 = inputs.get(0);
         Item item2 = inputs.get(1);
         Item saveInput;
-        Map<Character, Item> map = new LinkedHashMap<>();
         if (item2.getId() == Item.WRITTEN_BOOK) {
             saveInput = item2;
-            map.put("B".toCharArray()[0], item1);
         } else {
             saveInput = item1;
-            map.put("B".toCharArray()[0], item2);
         }
-
-        return new ShapedRecipe(outputItem, new String[]{"B"}, map, Collections.singletonList(saveInput));
+        player.getInventory().addItem(saveInput);
     }
 }
