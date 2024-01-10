@@ -1853,6 +1853,7 @@ public class Server {
         } catch (IOException e) {
             log.warn(this.getLanguage().translateString("nukkit.data.playerCorrupted", name));
             log.throwing(e);
+            create = true;
         } finally {
             if (dataStream.isPresent()) {
                 try {
