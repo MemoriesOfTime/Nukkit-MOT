@@ -4,8 +4,6 @@ import cn.nukkit.Player;
 import cn.nukkit.event.inventory.EnchantItemEvent;
 import cn.nukkit.inventory.EnchantInventory;
 import cn.nukkit.inventory.Inventory;
-import cn.nukkit.inventory.PlayerInventory;
-import cn.nukkit.inventory.PlayerUIInventory;
 import cn.nukkit.inventory.transaction.action.EnchantingAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
@@ -13,9 +11,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.types.NetworkInventoryAction;
 import lombok.Getter;
 import lombok.Setter;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -46,8 +42,9 @@ public class EnchantTransaction extends InventoryTransaction {
             if (cost == -1 || !eInv.getReagentSlot().equals(Item.get(Item.DYE, 4), true, false) || eInv.getReagentSlot().count < cost)
                 return false;
         }
-        return inputItem != null && outputItem != null
-                && inputItem.equals(eInv.getInputSlot(), true, true)
+        if (inputItem == null || outputItem == null) return false;
+        Item inputSlot = eInv.getInputSlot();
+        return inputItem.equals(inputSlot, true, true)
                 && this.checkEnchantValid();
     }
 
@@ -119,46 +116,13 @@ public class EnchantTransaction extends InventoryTransaction {
         return false;
     }
 
-    /**
-     * 检查并完成 从附魔台取出附魔书操作
-     */
-    @Nullable
-    public List<SlotChangeAction> checkForSlotChange(List<InventoryAction> actions) {
-        if (actions.size() != 2) {
-            return null;
-        }
-        List<SlotChangeAction> slotChangeActions = new ArrayList<>();
-        Item sourceItem = null;
-        Item targetItem = null;
-        boolean isSource = true; //正常的数据包第一个为源物品
-        for (InventoryAction action : actions) {
-            if (action instanceof SlotChangeAction slotChangeAction) {
-                if (slotChangeAction.getInventory() instanceof EnchantInventory
-                        || slotChangeAction.getInventory() instanceof PlayerUIInventory
-                        || slotChangeAction.getInventory() instanceof PlayerInventory) {
-                    slotChangeActions.add(slotChangeAction);
-                    if (isSource) {
-                        sourceItem = slotChangeAction.getSourceItem();
-                    } else {
-                        targetItem = slotChangeAction.getTargetItem();
-                    }
-                    isSource = false;
-                }
-            }
-        }
-        if (sourceItem != null && sourceItem.equals(targetItem)) {
-            for (SlotChangeAction action : slotChangeActions) {
-                action.execute(source);
-            }
-            return slotChangeActions;
-        }
-        return null;
-    }
-
     public boolean checkEnchantValid() {
         if (this.inputItem.getId() != this.outputItem.getId()
                 || this.inputItem.getCount() != this.outputItem.getCount()) {
-            return false;
+            //附魔书特判
+            if (this.getInputItem().getId() != Item.BOOK || this.getOutputItem().getId() != Item.ENCHANTED_BOOK) {
+                return false;
+            }
         }
 
         //TODO 检查附魔
