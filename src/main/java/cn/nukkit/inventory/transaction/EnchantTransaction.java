@@ -43,8 +43,7 @@ public class EnchantTransaction extends InventoryTransaction {
                 return false;
         }
         if (inputItem == null || outputItem == null) return false;
-        Item inputSlot = eInv.getInputSlot();
-        return inputItem.equals(inputSlot, true, true)
+        return inputItem.equals(eInv.getInputSlot(), true, true)
                 && this.checkEnchantValid();
     }
 
