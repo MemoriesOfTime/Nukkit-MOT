@@ -4305,7 +4305,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.enchantTransaction != null) {
                     List<SlotChangeAction> slotChangeActions = enchantTransaction.checkForSlotChange(actions);
-                    if (slotChangeActions.size() > 0) {
+                    if (slotChangeActions != null && !slotChangeActions.isEmpty()) {
                         this.enchantTransaction = null;
                         return;
                     }
