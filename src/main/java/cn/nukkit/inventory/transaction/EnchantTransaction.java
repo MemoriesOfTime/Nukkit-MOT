@@ -12,6 +12,7 @@ import cn.nukkit.network.protocol.types.NetworkInventoryAction;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -113,6 +114,23 @@ public class EnchantTransaction extends InventoryTransaction {
             if (action instanceof EnchantingAction) return true;
         }
         return false;
+    }
+
+    public List<SlotChangeAction> checkForSlotChange(List<InventoryAction> actions) {
+        List<SlotChangeAction> slotChangeActions = new ArrayList<>();
+        for (InventoryAction action : new ArrayList<>(actions)) {
+            if (action instanceof SlotChangeAction) {
+                if (action.getSourceItem().getId() == Item.ENCHANTED_BOOK && action.getSourceItem().getCount() == 1) {
+                    slotChangeActions.add((SlotChangeAction) action);
+                    action.execute(source);
+                }
+                if (action.getTargetItem().getId() == Item.ENCHANTED_BOOK && action.getTargetItem().getCount() == 1) {
+                    slotChangeActions.add((SlotChangeAction) action);
+                    action.execute(source);
+                }
+            }
+        }
+        return slotChangeActions;
     }
 
     public boolean checkEnchantValid() {

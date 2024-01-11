@@ -39,6 +39,7 @@ import cn.nukkit.form.window.FormWindowDialog;
 import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.transaction.*;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
+import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
@@ -4303,6 +4304,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.craftingTransaction = null;
                     }
                 } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.enchantTransaction != null) {
+                    List<SlotChangeAction> slotChangeActions = enchantTransaction.checkForSlotChange(actions);
+                    if (slotChangeActions.size() > 0) {
+                        this.enchantTransaction = null;
+                        return;
+                    }
                     if (enchantTransaction.checkForEnchantPart(actions)) {
                         for (InventoryAction action : actions) {
                             enchantTransaction.addAction(action);
