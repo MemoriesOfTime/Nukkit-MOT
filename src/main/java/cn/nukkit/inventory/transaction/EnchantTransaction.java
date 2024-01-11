@@ -42,8 +42,8 @@ public class EnchantTransaction extends InventoryTransaction {
             if (cost == -1 || !eInv.getReagentSlot().equals(Item.get(Item.DYE, 4), true, false) || eInv.getReagentSlot().count < cost)
                 return false;
         }
-        if (inputItem == null || outputItem == null) return false;
-        return inputItem.equals(eInv.getInputSlot(), true, true)
+        return inputItem != null && outputItem != null
+                && inputItem.equals(eInv.getInputSlot(), true, true)
                 && this.checkEnchantValid();
     }
 
