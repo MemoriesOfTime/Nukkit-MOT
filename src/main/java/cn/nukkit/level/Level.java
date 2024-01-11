@@ -2181,7 +2181,7 @@ public class Level implements ChunkManager, Metadatable {
 
             int fullId = this.getFullBlock(fullChunk, x, y, z, 0);
             int id = fullId >> Block.DATA_BITS;
-            if (!Level.xrayableBlocks[id]) {
+            if (id >= Block.MAX_BLOCK_ID || !Level.xrayableBlocks[id]) {
                 continue;
             }
 
