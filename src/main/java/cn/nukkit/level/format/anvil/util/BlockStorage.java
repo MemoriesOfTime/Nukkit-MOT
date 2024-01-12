@@ -408,7 +408,7 @@ public class BlockStorage {
 
         for (int i = 0; i < SECTION_SIZE; i++) {
             int bid = getBlockId(i);
-            if (antiXray && Level.xrayableBlocks[bid]) {
+            if (antiXray && bid < Block.MAX_BLOCK_ID && Level.xrayableBlocks[bid]) {
                 bid = Block.STONE;
             }
             int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, getBlockData(i));
