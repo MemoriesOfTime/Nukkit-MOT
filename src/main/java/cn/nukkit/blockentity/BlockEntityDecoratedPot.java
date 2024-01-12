@@ -3,6 +3,7 @@ package cn.nukkit.blockentity;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemPotterySherd;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -10,16 +11,11 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
 import lombok.Getter;
 
-import java.util.List;
 
-
+@Getter
 public class BlockEntityDecoratedPot extends BlockEntitySpawnable {
 
-    public static final List<String> emptyDecoration = List.of("minecraft:brick", "minecraft:brick", "minecraft:brick", "minecraft:brick");
-
-    @Getter
     private int animation;
-    @Getter
     private Item item;
 
     public BlockEntityDecoratedPot(FullChunk chunk, CompoundTag nbt) {
@@ -30,8 +26,8 @@ public class BlockEntityDecoratedPot extends BlockEntitySpawnable {
     protected void initBlockEntity() {
         if (!this.namedTag.contains("sherds")) {
             ListTag<StringTag> listTag = new ListTag<>();
-            for (String s : emptyDecoration) {
-                listTag.add(new StringTag("", s));
+            while (listTag.size() < 4) {
+                listTag.add(new StringTag("", "minecraft:brick"));
             }
             this.namedTag.putList("sherds", listTag);
         }
@@ -82,6 +78,31 @@ public class BlockEntityDecoratedPot extends BlockEntitySpawnable {
         this.item = item;
     }
 
+    public void setDecoration(DecoratedFace face, ItemPotterySherd itemPotterySherd) {
+        this.setDecoration(face, itemPotterySherd.getNamespaceId());
+    }
+
+    public void setDecoration(DecoratedFace face, String potterySherd) {
+        ListTag<StringTag> listTag = this.namedTag.getList("sherds", StringTag.class);
+        while (listTag.size() < 4) {
+            listTag.add(new StringTag("", "minecraft:brick"));
+        }
+        listTag.add(face.ordinal(), new StringTag("", potterySherd));
+        this.namedTag.putList("sherds", listTag);
+    }
+
+    public void playInsertAnimation() {
+        this.setAnimation(2);
+        this.spawnToAll();
+        this.setAnimation(0);
+    }
+
+    public void playInsertFailAnimation() {
+        this.setAnimation(1);
+        this.spawnToAll();
+        this.setAnimation(0);
+    }
+
     @Override
     public void onBreak() {
         if (this.item.getId() != BlockID.AIR) {
@@ -91,8 +112,8 @@ public class BlockEntityDecoratedPot extends BlockEntitySpawnable {
 
     public enum DecoratedFace {
         BACK,
-        LEFT,
         RIGHT,
+        LEFT,
         FRONT
     }
 }

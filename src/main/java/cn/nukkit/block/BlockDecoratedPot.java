@@ -100,17 +100,17 @@ public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable,
             } else {
                 potItem.setCount(potItem.getCount() + 1);
             }
-
             pot.setItem(potItem);
-            pot.setAnimation(2);
-            pot.spawnToAll();
 
-            level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_DECORATED_POT_INSERT, 746);
+            pot.playInsertAnimation();
+            level.addLevelSoundEvent(
+                    this,
+                    LevelSoundEventPacket.SOUND_DECORATED_POT_INSERT,
+                    698 + potItem.getCount() * 8 //抓包BDS，从689开始，每增加一个数量 数据+8 实现音调变化
+            );
             level.addParticle(new GenericParticle(this.add(0.5, 1.25, 0.5), (Particle.TYPE_DUST_PLUME)));
         } else {
-            pot.setAnimation(1);
-            pot.spawnToAll();
-
+            pot.playInsertFailAnimation();
             level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_DECORATED_POT_INSERT_FAILED);
         }
         return true;
