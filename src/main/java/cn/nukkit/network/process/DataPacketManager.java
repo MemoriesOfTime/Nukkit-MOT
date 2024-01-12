@@ -22,6 +22,7 @@ import org.jetbrains.annotations.NotNull;
 public final class DataPacketManager {
     private static final Int2ObjectOpenHashMap<Int2ObjectOpenHashMap<DataPacketProcessor>> PROTOCOL_PROCESSORS = new Int2ObjectOpenHashMap<>();
     private static final IntOpenHashSet REGISTERED_PACKETS = new IntOpenHashSet();
+    private static final IntOpenHashSet UNREGISTERED_PACKETS = new IntOpenHashSet();
 
     public static void registerProcessor(int protocol, @NotNull DataPacketProcessor... processors) {
         Int2ObjectOpenHashMap<DataPacketProcessor> map = PROTOCOL_PROCESSORS.computeIfAbsent(protocol, (v) -> new Int2ObjectOpenHashMap<>());
@@ -30,6 +31,7 @@ public final class DataPacketManager {
             map.put(processor.getPacketId(), processor);
         }
         map.trim();
+        UNREGISTERED_PACKETS.clear();
     }
 
     public static boolean canProcess(int protocol, int packetId) {
@@ -41,7 +43,8 @@ public final class DataPacketManager {
     }
 
     private static DataPacketProcessor getProcessor(int protocol, int originProtocol, int packetId) {
-        if (!REGISTERED_PACKETS.contains(packetId)) {
+        int index = getIndex(protocol, packetId);
+        if (!REGISTERED_PACKETS.contains(packetId) || UNREGISTERED_PACKETS.contains(index)) {
             return null;
         }
 
@@ -59,7 +62,13 @@ public final class DataPacketManager {
             }
             return processor;
         }
+
+        UNREGISTERED_PACKETS.add(index);
         return null;
+    }
+
+    private static int getIndex(int protocol, int packetId) {
+        return protocol * 10000 + packetId;
     }
 
     public static void processPacket(@NotNull PlayerHandle playerHandle, @NotNull DataPacket packet) {
