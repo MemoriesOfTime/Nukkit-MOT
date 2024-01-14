@@ -13,7 +13,7 @@ import com.nukkitx.network.raknet.RakNetReliability;
  */
 public abstract class DataPacket extends BinaryStream implements Cloneable {
 
-    public int protocol = 999;
+    public int protocol = Integer.MAX_VALUE;
 
     public volatile boolean isEncoded = false;
     private int channel = Network.CHANNEL_NONE;

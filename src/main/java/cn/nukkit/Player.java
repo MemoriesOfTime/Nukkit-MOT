@@ -218,7 +218,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     /**
      * Client protocol version
      */
-    public int protocol = 999;
+    public int protocol = Integer.MAX_VALUE;
     /**
      * Client RakNet protocol version
      */
@@ -2805,7 +2805,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (packet.protocol == 999) {
+        if (packet.protocol == Integer.MAX_VALUE) {
             packet.protocol = this.protocol;
         }
 
