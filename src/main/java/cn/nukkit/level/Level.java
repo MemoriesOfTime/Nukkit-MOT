@@ -4386,6 +4386,14 @@ public class Level implements ChunkManager, Metadatable {
         return this.dimensionData.getDimensionId();
     }
 
+    public int getMinBlockY() {
+        return this.dimensionData.getMinHeight();
+    }
+
+    public int getMaxBlockY() {
+        return this.dimensionData.getMaxHeight();
+    }
+
     public boolean canBlockSeeSky(Vector3 pos) {
         return this.getHighestBlockAt(pos.getFloorX(), pos.getFloorZ()) < pos.getY();
     }
