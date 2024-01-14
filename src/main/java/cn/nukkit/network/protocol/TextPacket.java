@@ -64,6 +64,9 @@ public class TextPacket extends DataPacket {
             case TYPE_JUKEBOX_POPUP:
                 this.message = this.getString();
                 int count = (int) this.getUnsignedVarInt();
+                if (count > 10) {
+                    break;
+                }
                 this.parameters = new String[Math.min(count, 128)];
                 for (int i = 0; i < this.parameters.length; i++) {
                     this.parameters[i] = this.getString();
