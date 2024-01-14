@@ -30,6 +30,6 @@ public class FilterTextProcessor extends DataPacketProcessor<FilterTextPacket> {
 
     @Override
     public int getPacketId() {
-        return ProtocolInfo.FILTER_TEXT_PACKET;
+        return ProtocolInfo.toNewProtocolID(ProtocolInfo.FILTER_TEXT_PACKET);
     }
 }

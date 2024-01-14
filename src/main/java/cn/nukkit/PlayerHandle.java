@@ -474,4 +474,8 @@ public final class PlayerHandle {
     public void doFirstSpawn() {
         player.doFirstSpawn();
     }
+
+    public boolean isLoginPacketReceived() {
+        return player.loginPacketReceived;
+    }
 }

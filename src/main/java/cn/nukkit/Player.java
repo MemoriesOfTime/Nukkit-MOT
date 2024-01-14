@@ -58,7 +58,6 @@ import cn.nukkit.math.*;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
-import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.encryption.PrepareEncryptionTask;
 import cn.nukkit.network.process.DataPacketManager;
@@ -172,7 +171,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public boolean loggedIn = false;
     protected boolean loginVerified = false;
     private int unverifiedPackets;
-    private boolean loginPacketReceived;
+    protected boolean loginPacketReceived;
     protected boolean awaitingEncryptionHandshake;
     public int gamemode;
     public long lastBreak = -1;
@@ -1506,6 +1505,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean setGamemode(int gamemode, boolean clientSide, AdventureSettings newSettings) {
+        if (gamemode == 5) {
+            gamemode = this.server.getDefaultGamemode();
+        } else if (gamemode == 6) {
+            gamemode = SPECTATOR;
+        }
         if (gamemode < 0 || gamemode > 3 || this.gamemode == gamemode) {
             return false;
         }
@@ -2827,45 +2831,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         packetswitch:
         switch (pid) {
-            case ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET:
-                if (this.raknetProtocol < 11) {
-                    return;
-                }
-                if (this.loginPacketReceived) {
-                    log.debug("{}: got a RequestNetworkSettingsPacket but player is already logged in", username);
-                    return;
-                }
-
-                this.protocol = ((RequestNetworkSettingsPacket) packet).protocolVersion;
-
-                NetworkSettingsPacket settingsPacket = new NetworkSettingsPacket();
-                PacketCompressionAlgorithm algorithm;
-                if (this.server.useSnappy && protocol >= ProtocolInfo.v1_19_30_23) {
-                    algorithm = PacketCompressionAlgorithm.SNAPPY;
-                } else {
-                    algorithm = PacketCompressionAlgorithm.ZLIB;
-                }
-                settingsPacket.compressionAlgorithm = algorithm;
-                settingsPacket.compressionThreshold = 1; // compress everything
-                this.forceDataPacket(settingsPacket, () -> {
-                    this.networkSession.setCompression(CompressionProvider.from(algorithm, this.raknetProtocol));
-                });
-
-                if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
-                    this.close("", "You are running unsupported Minecraft version");
-                    this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol (SupportedProtocols) " + this.protocol);
-                    return;
-                }
-                if (this.protocol < this.server.minimumProtocol) {
-                    this.close("", "Support for this Minecraft version is not enabled");
-                    this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol (minimumProtocol) " + this.protocol);
-                    return;
-                } else if (this.server.maximumProtocol >= Math.max(0, this.server.minimumProtocol) && this.protocol > this.server.maximumProtocol) {
-                    this.close("", "Support for this Minecraft version is not enabled");
-                    this.server.getLogger().debug(this.getAddress() + " disconnected with unsupported protocol (maximumProtocol) " + this.protocol);
-                    return;
-                }
-                break;
             case ProtocolInfo.LOGIN_PACKET:
                 if (this.loginPacketReceived) {
                     this.close("", "Invalid login packet");

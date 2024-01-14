@@ -15,9 +15,9 @@ import org.jetbrains.annotations.NotNull;
 /**
  * @author LT_Name
  */
-public class DropItemProcessorV113 extends DataPacketProcessor<DropItemPacketV113> {
+public class DropItemProcessor_v113 extends DataPacketProcessor<DropItemPacketV113> {
 
-    public static final DropItemProcessorV113 INSTANCE = new DropItemProcessorV113();
+    public static final DropItemProcessor_v113 INSTANCE = new DropItemProcessor_v113();
 
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull DropItemPacketV113 pk) {

@@ -34,6 +34,6 @@ public class RespawnProcessor extends DataPacketProcessor<RespawnPacket> {
 
     @Override
     public int getPacketId() {
-        return ProtocolInfo.RESPAWN_PACKET;
+        return ProtocolInfo.toNewProtocolID(ProtocolInfo.RESPAWN_PACKET);
     }
 }

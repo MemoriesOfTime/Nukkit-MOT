@@ -13,9 +13,9 @@ import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 @Log4j2
-public class RequestAbilityProcessor extends DataPacketProcessor<RequestAbilityPacket> {
+public class RequestAbilityProcessor_v527 extends DataPacketProcessor<RequestAbilityPacket> {
 
-    public static final RequestAbilityProcessor INSTANCE = new RequestAbilityProcessor();
+    public static final RequestAbilityProcessor_v527 INSTANCE = new RequestAbilityProcessor_v527();
 
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull RequestAbilityPacket pk) {

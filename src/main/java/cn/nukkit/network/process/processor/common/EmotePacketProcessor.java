@@ -31,6 +31,6 @@ public class EmotePacketProcessor extends DataPacketProcessor<EmotePacket> {
 
     @Override
     public int getPacketId() {
-        return ProtocolInfo.EMOTE_PACKET;
+        return ProtocolInfo.toNewProtocolID(ProtocolInfo.EMOTE_PACKET);
     }
 }

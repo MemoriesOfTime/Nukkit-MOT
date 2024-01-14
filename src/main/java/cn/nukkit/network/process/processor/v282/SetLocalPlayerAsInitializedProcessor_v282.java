@@ -7,9 +7,9 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.SetLocalPlayerAsInitializedPacket;
 import org.jetbrains.annotations.NotNull;
 
-public class SetLocalPlayerAsInitializedProcessorV282 extends DataPacketProcessor<SetLocalPlayerAsInitializedPacket> {
+public class SetLocalPlayerAsInitializedProcessor_v282 extends DataPacketProcessor<SetLocalPlayerAsInitializedPacket> {
 
-    public static final SetLocalPlayerAsInitializedProcessorV282 INSTANCE = new SetLocalPlayerAsInitializedProcessorV282();
+    public static final SetLocalPlayerAsInitializedProcessor_v282 INSTANCE = new SetLocalPlayerAsInitializedProcessor_v282();
 
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull SetLocalPlayerAsInitializedPacket pk) {

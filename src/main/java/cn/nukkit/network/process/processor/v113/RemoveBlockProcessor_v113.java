@@ -19,9 +19,9 @@ import org.jetbrains.annotations.NotNull;
  * @author LT_Name
  */
 @Log4j2
-public class RemoveBlockProcessorV113 extends DataPacketProcessor<RemoveBlockPacketV113> {
+public class RemoveBlockProcessor_v113 extends DataPacketProcessor<RemoveBlockPacketV113> {
 
-    public static final RemoveBlockProcessorV113 INSTANCE = new RemoveBlockProcessorV113();
+    public static final RemoveBlockProcessor_v113 INSTANCE = new RemoveBlockProcessor_v113();
 
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull RemoveBlockPacketV113 pk) {

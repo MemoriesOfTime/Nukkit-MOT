@@ -18,9 +18,9 @@ import org.jetbrains.annotations.NotNull;
 /**
  * @author LT_Name
  */
-public class ContainerSetSlotProcessorV113 extends DataPacketProcessor<ContainerSetSlotPacketV113> {
+public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<ContainerSetSlotPacketV113> {
     
-    public static final ContainerSetSlotProcessorV113 INSTANCE = new ContainerSetSlotProcessorV113();
+    public static final ContainerSetSlotProcessor_v113 INSTANCE = new ContainerSetSlotProcessor_v113();
 
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull ContainerSetSlotPacketV113 pk) {

@@ -3,12 +3,13 @@ package cn.nukkit.network.process;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.Server;
 import cn.nukkit.network.process.processor.common.*;
-import cn.nukkit.network.process.processor.v113.ContainerSetSlotProcessorV113;
-import cn.nukkit.network.process.processor.v113.DropItemProcessorV113;
-import cn.nukkit.network.process.processor.v113.RemoveBlockProcessorV113;
-import cn.nukkit.network.process.processor.v282.SetLocalPlayerAsInitializedProcessorV282;
-import cn.nukkit.network.process.processor.v340.LecternUpdateProcessor;
-import cn.nukkit.network.process.processor.v527.RequestAbilityProcessor;
+import cn.nukkit.network.process.processor.v113.ContainerSetSlotProcessor_v113;
+import cn.nukkit.network.process.processor.v113.DropItemProcessor_v113;
+import cn.nukkit.network.process.processor.v113.RemoveBlockProcessor_v113;
+import cn.nukkit.network.process.processor.v282.SetLocalPlayerAsInitializedProcessor_v282;
+import cn.nukkit.network.process.processor.v340.LecternUpdateProcessor_v340;
+import cn.nukkit.network.process.processor.v527.RequestAbilityProcessor_v527;
+import cn.nukkit.network.process.processor.v554.RequestNetworkSettingsProcessor_v554;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -99,24 +100,29 @@ public final class DataPacketManager {
 
         registerProcessor(
                 ProtocolInfo.v1_1_0,
-                ContainerSetSlotProcessorV113.INSTANCE,
-                DropItemProcessorV113.INSTANCE,
-                RemoveBlockProcessorV113.INSTANCE
+                ContainerSetSlotProcessor_v113.INSTANCE,
+                DropItemProcessor_v113.INSTANCE,
+                RemoveBlockProcessor_v113.INSTANCE
         );
 
         registerProcessor(
                 ProtocolInfo.v1_6_0_5,
-                SetLocalPlayerAsInitializedProcessorV282.INSTANCE
+                SetLocalPlayerAsInitializedProcessor_v282.INSTANCE
         );
 
         registerProcessor(
                 ProtocolInfo.v1_10_0,
-                LecternUpdateProcessor.INSTANCE
+                LecternUpdateProcessor_v340.INSTANCE
         );
 
         registerProcessor(
                 ProtocolInfo.v1_19_0,
-                RequestAbilityProcessor.INSTANCE
+                RequestAbilityProcessor_v527.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_19_30,
+                RequestNetworkSettingsProcessor_v554.INSTANCE
         );
     }
 }

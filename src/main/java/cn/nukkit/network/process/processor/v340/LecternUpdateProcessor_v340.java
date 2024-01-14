@@ -12,9 +12,9 @@ import cn.nukkit.network.protocol.LecternUpdatePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import org.jetbrains.annotations.NotNull;
 
-public class LecternUpdateProcessor extends DataPacketProcessor<LecternUpdatePacket> {
+public class LecternUpdateProcessor_v340 extends DataPacketProcessor<LecternUpdatePacket> {
 
-    public static final LecternUpdateProcessor INSTANCE = new LecternUpdateProcessor();
+    public static final LecternUpdateProcessor_v340 INSTANCE = new LecternUpdateProcessor_v340();
 
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull LecternUpdatePacket pk) {

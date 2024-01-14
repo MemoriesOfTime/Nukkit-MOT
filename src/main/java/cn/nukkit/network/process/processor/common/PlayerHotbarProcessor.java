@@ -28,6 +28,6 @@ public class PlayerHotbarProcessor extends DataPacketProcessor<PlayerHotbarPacke
 
     @Override
     public int getPacketId() {
-        return ProtocolInfo.PLAYER_HOTBAR_PACKET;
+        return ProtocolInfo.toNewProtocolID(ProtocolInfo.PLAYER_HOTBAR_PACKET);
     }
 }
