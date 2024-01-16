@@ -14,6 +14,7 @@ public class ItemSkull extends Item {
     public static final int HEAD = 3;
     public static final int CREEPER_HEAD = 4;
     public static final int DRAGON_HEAD = 5;
+    public static final int PIGLIN_HEAD = 6;
 
     public ItemSkull() {
         this(0, 1);
@@ -40,6 +41,8 @@ public class ItemSkull extends Item {
                 return "Creeper Head";
             case DRAGON_HEAD:
                 return "Dragon Head";
+            case PIGLIN_HEAD:
+                return "Piglin Head";
             case SKELETON_SKULL:
             default:
                 return "Skeleton Skull";
