@@ -26,6 +26,10 @@ public class Skin {
     public static final int SKIN_128_64_SIZE = 32768;
     public static final int SKIN_128_128_SIZE = 65536;
 
+    // Currently, Minecraft character creator's skin picture size is 256*256.
+    // Therefore, we need this to make sure Binary#getSkin() and BinaryStream#setSkin() is available for Mojang's one.
+    public static final int SKIN_256_256_SIZE_MJ = 262144;
+
     private static final int MAX_DATA_SIZE = 262144;
 
     public static final String GEOMETRY_CUSTOM = convertLegacyGeometryName("geometry.humanoid.custom");
