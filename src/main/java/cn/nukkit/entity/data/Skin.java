@@ -28,7 +28,7 @@ public class Skin {
 
     // Currently, Minecraft character creator's skin picture size is 256*256.
     // Therefore, we need this to make sure Binary#getSkin() and BinaryStream#setSkin() is available for Mojang's one.
-    public static final int SKIN_256_256_SIZE_MJ = 262144;
+    public static final int SKIN_256_256_SIZE = 262144;
 
     private static final int MAX_DATA_SIZE = 262144;
 
