@@ -2,6 +2,8 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.resourcepacks.ResourcePack;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 import lombok.Value;
 
@@ -20,6 +22,8 @@ public class ResourcePacksInfoPacket extends DataPacket {
     /**
      * @since v618
      */
+    @Getter
+    @Setter
     private List<CDNEntry> CDNEntries = new ObjectArrayList<>();
 
     @Override
@@ -39,13 +43,12 @@ public class ResourcePacksInfoPacket extends DataPacket {
 
         this.encodeBehaviourPacks(this.behaviourPackEntries);
         this.encodeResourcePacks(this.resourcePackEntries);
-        putUnsignedVarInt(getCDNEntries().size());
 
         if (protocol >= ProtocolInfo.v1_20_30_24) {
-            for (var cdn : getCDNEntries()) {
-                putString(cdn.packId);
-                putString(cdn.remoteUrl);
-            }
+            this.putArray(this.CDNEntries, (entry) -> {
+                this.putString(entry.getPackId());
+                this.putString(entry.getRemoteUrl());
+            });
         }
     }
 
@@ -87,15 +90,9 @@ public class ResourcePacksInfoPacket extends DataPacket {
         return NETWORK_ID;
     }
 
-    public void setCDNEntries(List<CDNEntry> CDNEntries) {
-        this.CDNEntries = CDNEntries;
-    }
-    public List<CDNEntry> getCDNEntries() {
-        return CDNEntries;
-    }
     @Value
     public static class CDNEntry {
-        private final String packId;
-        private final String remoteUrl;
+        String packId;
+        String remoteUrl;
     }
 }
