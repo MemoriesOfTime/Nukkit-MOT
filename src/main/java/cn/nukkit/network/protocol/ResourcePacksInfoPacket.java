@@ -39,12 +39,13 @@ public class ResourcePacksInfoPacket extends DataPacket {
 
         this.encodeBehaviourPacks(this.behaviourPackEntries);
         this.encodeResourcePacks(this.resourcePackEntries);
+        putUnsignedVarInt(getCDNEntries().size());
 
         if (protocol >= ProtocolInfo.v1_20_30_24) {
-            this.putArray(this.CDNEntries, (entry) -> {
-                this.putString(entry.getPackId());
-                this.putString(entry.getRemoteUrl());
-            });
+            for (var cdn : getCDNEntries()) {
+                putString(cdn.packId);
+                putString(cdn.remoteUrl);
+            }
         }
     }
 
@@ -86,6 +87,12 @@ public class ResourcePacksInfoPacket extends DataPacket {
         return NETWORK_ID;
     }
 
+    public void setCDNEntries(List<CDNEntry> CDNEntries) {
+        this.CDNEntries = CDNEntries;
+    }
+    public List<CDNEntry> getCDNEntries() {
+        return CDNEntries;
+    }
     @Value
     public static class CDNEntry {
         private final String packId;
