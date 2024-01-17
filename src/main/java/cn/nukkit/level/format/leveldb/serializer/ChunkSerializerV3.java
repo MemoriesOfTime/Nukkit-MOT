@@ -1,8 +1,21 @@
 package cn.nukkit.level.format.leveldb.serializer;
 
+import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.format.Chunk;
+import cn.nukkit.level.format.leveldb.LevelDBKey;
+import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
+import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
+import cn.nukkit.utils.ChunkException;
+import cn.nukkit.utils.Utils;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
+import it.unimi.dsi.fastutil.ints.Int2ShortOpenHashMap;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
+
+import static cn.nukkit.level.format.leveldb.LevelDbConstants.CURRENT_LEVEL_SUBCHUNK_VERSION;
 
 /**
  * @author LT_Name
@@ -12,120 +25,80 @@ public class ChunkSerializerV3 implements ChunkSerializer {
     public static final ChunkSerializer INSTANCE = new ChunkSerializerV3();
 
     @Override
-    public LevelDBChunkSection deserialize(DB db) {
-        //TODO
-        return null;
-
-        /*boolean hasBeenUpgraded = chunkVersion < CURRENT_LEVEL_CHUNK_VERSION;
-
-        LevelDbSubChunk[] subChunks = new LevelDbSubChunk[16];
-        short[] heightmap = null;
-        byte[] biome = null;
-        PalettedBlockStorage[] biomes3d = null;
-
-        int subChunkKeyOffset = chunkVersion >= 24 && chunkVersion <= 26 ? 4 : 0;
-
-        PalettedBlockStorage[] convertedLegacyExtraData = this.deserializeLegacyExtraData(chunkX, chunkZ, chunkVersion);
-
-        for (int y = 0; y <= 15; ++y) {
-            byte[] subChunkValue = this.db.get(SUBCHUNK_PREFIX.getSubKey(chunkX, chunkZ, y + subChunkKeyOffset));
-            if (subChunkValue == null) {
+    public void serializer(WriteBatch writeBatch, Chunk chunk) {
+        DimensionData dimensionData = chunk.getProvider().getLevel().getDimensionData();
+        for (int ySection = dimensionData.getMinSectionY(); ySection <= dimensionData.getMaxSectionY(); ++ySection) {
+            LevelDBChunkSection section = (LevelDBChunkSection) chunk.getSection(ySection);
+            if (section == null) {
                 continue;
             }
-            if (subChunkValue.length == 0) {
-                throw new ChunkException("Unexpected empty data for subchunk " + y);
-            }
-            BinaryStream stream = new BinaryStream(subChunkValue);
 
-            int subChunkVersion = stream.getByte();
-            if (subChunkVersion < CURRENT_LEVEL_SUBCHUNK_VERSION) {
-                hasBeenUpgraded = true;
-            }
-
-            switch (subChunkVersion) {
-                case 8:
-                case 9:
-                    int storageCount = stream.getByte();
-
-                    if (subChunkVersion >= 9) {
-                        int indexY = stream.getByte();
-                        if (indexY != y) {
-                            throw new ChunkException("Unexpected Y index (" + indexY + ") for subchunk " + y);
-                        }
-                    }
-
-                    if (storageCount > 0) {
-                        PalettedBlockStorage[] storages = new PalettedBlockStorage[storageCount];
-                        for (int i = 0; i < storageCount; ++i) {
-                            storages[i] = *//*PalettedBlockStorage.createFromBlockPalette();*//* PalettedBlockStorage.ofBlock(stream);
-                        }
-
-                        subChunks[y] = new LevelDbSubChunk(y, storages);
-                    }
-                    break;
-                case 0:
-                case 2: //these are all identical to version 0, but vanilla respects these so we should also
-                case 3:
-                case 4:
-                case 5:
-                case 6:
-                case 7:
-                    byte[] blocks = stream.get(4096);
-                    NibbleArray blockData = new NibbleArray(stream.get(2048));
-
-                    if (chunkVersion < 4) {
-                        stream.setOffset(stream.getOffset() + 4096); //legacy light info, discard it
-                        hasBeenUpgraded = true;
-                    }
-
-                    PalettedBlockStorage[] storages = new PalettedBlockStorage[2];
-                    PalettedBlockStorage storage = PalettedBlockStorage.createFromBlockPalette();
-                    for (int i = 0; i < SUB_CHUNK_SIZE; i++) {
-                        storage.setBlock(i, (blocks[i] & 0xff) << Block.DATA_BITS | blockData.get(i));
-                    }
-                    storages[0] = storage;
-
-                    if (convertedLegacyExtraData != null && convertedLegacyExtraData.length > y) {
-                        storages[1] = convertedLegacyExtraData[y];
-                    }
-
-                    subChunks[y] = new LevelDbSubChunk(y, storages);
-                    break;
-                case 1: //paletted v1, has a single block storage
-                    storages = new PalettedBlockStorage[2];
-                    storages[0] = PalettedBlockStorage.ofBlock(stream);
-
-                    if (convertedLegacyExtraData != null && convertedLegacyExtraData.length > y) {
-                        storages[1] = convertedLegacyExtraData[y];
-                    }
-
-                    subChunks[y] = new LevelDbSubChunk(y, storages);
-                    break;
-                default:
-                    //TODO: set chunks read-only so the version on disk doesn't get overwritten
-                    throw new ChunkException("don't know how to decode LevelDB subchunk format version " + subChunkVersion);
+            ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+            try {
+                byteBuf.writeByte(CURRENT_LEVEL_SUBCHUNK_VERSION);
+                ChunkSectionSerializers.serializer(byteBuf, section.getStorages(), ySection, CURRENT_LEVEL_SUBCHUNK_VERSION);
+                writeBatch.put(
+                        LevelDBKey.CHUNK_SECTION_PREFIX.getSubKey(
+                                chunk.getX(), chunk.getZ(), ySection, chunk.getProvider().getLevel().getDimension()
+                        ), Utils.convertByteBuf2Array(byteBuf));
+            } finally {
+                byteBuf.release();
             }
         }
-
-        byte[] maps2d = this.db.get(DATA_2D.getKey(chunkX, chunkZ));
-        if (maps2d != null && maps2d.length >= SUB_CHUNK_2D_SIZE * 2 + SUB_CHUNK_2D_SIZE) {
-            heightmap = new short[SUB_CHUNK_2D_SIZE];
-            biome = new byte[SUB_CHUNK_2D_SIZE];
-
-            ByteBuf buf = Unpooled.wrappedBuffer(maps2d);
-            try {
-                for (int i = 0; i < SUB_CHUNK_2D_SIZE; i++)  {
-                    heightmap[i] = buf.readShortLE();
-                }
-                buf.readBytes(biome);
-            } finally {
-                buf.release();
-            }
-        }*/
     }
 
     @Override
-    public void serializer(WriteBatch writeBatch, LevelDBChunkSection subChunk) {
+    public void deserialize(DB db, ChunkBuilder chunkBuilder) {
+        int chunkX = chunkBuilder.getChunkX();
+        int chunkZ = chunkBuilder.getChunkZ();
 
+        Int2ShortOpenHashMap extraBlocks = null;
+        byte[] extraRawData = db.get(LevelDBKey.BLOCK_EXTRA_DATA.getKey(chunkX, chunkZ, chunkBuilder.getDimensionData()));
+        if (extraRawData != null) {
+            extraBlocks = new Int2ShortOpenHashMap();
+            ByteBuf extraData = Unpooled.wrappedBuffer(extraRawData);
+            int count = extraData.readIntLE();
+            for (int i = 0; i < count; ++i) {
+                extraBlocks.put(extraData.readIntLE(), extraData.readShortLE());
+            }
+        }
+
+        DimensionData dimensionInfo = chunkBuilder.getDimensionData();
+        LevelDBChunkSection[] sections = new LevelDBChunkSection[dimensionInfo.getHeight() >> 4];
+        for (int ySection = dimensionInfo.getMinSectionY(); ySection <= dimensionInfo.getMaxSectionY(); ++ySection) {
+            StateBlockStorage[] stateBlockStorageArray;
+            byte[] bytes = db.get(LevelDBKey.CHUNK_SECTION_PREFIX.getKey(chunkX, chunkZ, ySection, chunkBuilder.getDimensionData()));
+            if (bytes != null) {
+                ByteBuf byteBuf = Unpooled.wrappedBuffer(bytes);
+                if (!byteBuf.isReadable()) {
+                    throw new ChunkException("Chunk section " + ySection + " is empty");
+                }
+                short subChunkVersion = byteBuf.readUnsignedByte();
+                stateBlockStorageArray = ChunkSectionSerializers.deserialize(byteBuf, chunkBuilder, subChunkVersion);
+
+                if (stateBlockStorageArray[1] == null) {
+                    stateBlockStorageArray[1] = new StateBlockStorage();
+                }
+
+                if (extraBlocks != null) {
+                    for (int i3 = 0; i3 < 16; ++i3) {
+                        for (int i4 = 0; i4 < 16; ++i4) {
+                            int n7;
+                            int n8 = n7 + 16;
+                            for (n7 = ySection << 4; n7 < n8; ++n7) {
+                                short s4 = ChunkBuilder.a(i3, n7, i4);
+                                if (!extraBlocks.containsKey(s4)) continue;
+                                short s5 = extraBlocks.get(ChunkBuilder.a(i3, n7, i4));
+                                int n9 = s5 & 0xFF;
+                                int n10 = s5 >> 8 & 0xF;
+                                stateBlockStorageArray[1].a(ChunkBuilder.b(i3, n7, i4), BlockStateMapping.get().b(n9, n10, l7), l5);
+                            }
+                        }
+                    }
+                }
+            }
+            sections[ySection + dimensionInfo.getSectionOffset()] = new LevelDBChunkSection(ySection, stateBlockStorageArray);
+        }
+        chunkBuilder.sections(sections);
     }
 }

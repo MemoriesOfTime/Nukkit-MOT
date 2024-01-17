@@ -591,6 +591,10 @@ public class LevelDBChunkSection implements ChunkSection {
         }
     }*/
 
+    public StateBlockStorage[] getStorages() {
+        return storages;
+    }
+
     @Override
     public boolean compress() {
         try {

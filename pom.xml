@@ -268,6 +268,12 @@
             <version>${block-state-updater.version}</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>org.cloudburstmc</groupId>
+            <artifactId>nbt</artifactId>
+            <version>3.0.2.Final</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <build>

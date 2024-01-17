@@ -6,6 +6,7 @@ import cn.nukkit.entity.mob.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 
@@ -545,4 +546,9 @@ public class Utils {
         return (T) clazz1;
     }
 
+    public static byte[] convertByteBuf2Array(ByteBuf buf) {
+        byte[] payload = new byte[buf.readableBytes()];
+        buf.readBytes(payload);
+        return payload;
+    }
 }

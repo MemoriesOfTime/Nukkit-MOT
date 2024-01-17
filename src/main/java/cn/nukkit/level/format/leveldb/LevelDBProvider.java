@@ -16,9 +16,7 @@ import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
-import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
-import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
-import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
+import cn.nukkit.level.format.leveldb.structure.*;
 import cn.nukkit.level.format.leveldb.updater.BlockUpgrader;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.math.BlockVector3;
@@ -432,14 +430,31 @@ public class LevelDBProvider implements LevelProvider {
 
     @Nullable
     public LevelDBChunk readChunk(int chunkX, int chunkZ) {
-        byte[] versionData = this.db.get(VERSION.getKey(chunkX, chunkZ, 0)); //TODO dimension
+        byte[] versionData = this.db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (versionData == null || versionData.length != 1) {
-            versionData = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, 0)); //TODO dimension
+            versionData = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimension()));
             if (versionData == null || versionData.length != 1) {
                 return null;
             }
         }
+
+        ChunkBuilder chunkBuilder = new ChunkBuilder(chunkX, chunkZ, this);
+
+        byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimension()));
+        if (finalized == null) {
+            chunkBuilder.state(ChunkState.FINISHED);
+        } else {
+            chunkBuilder.state(ChunkState.values()[Unpooled.wrappedBuffer(finalized).readIntLE() + 1]);
+        }
+
         byte chunkVersion = versionData[0];
+
+        if (chunkVersion < 7) {
+
+        }
+
+
+
         boolean hasBeenUpgraded = chunkVersion < CURRENT_LEVEL_CHUNK_VERSION;
 
         LevelDBChunkSection[] chunkSections = new LevelDBChunkSection[16];
@@ -497,7 +512,7 @@ public class LevelDBProvider implements LevelProvider {
                 //int maxChuckSection = 320 >> 4;
 
                 for (int y = /*minChuckSection*/0; y <= /*maxChuckSection*/15; ++y) {
-                    byte[] subChunkValue = this.db.get(SUBCHUNK_PREFIX.getSubKey(chunkX, chunkZ, y + subChunkKeyOffset));
+                    byte[] subChunkValue = this.db.get(CHUNK_SECTION_PREFIX.getSubKey(chunkX, chunkZ, y + subChunkKeyOffset));
                     if (subChunkValue == null) {
                         continue;
                     }
@@ -725,7 +740,7 @@ public class LevelDBProvider implements LevelProvider {
                 if (sections != null) {
                     for (int y = 0; y < 16; y++) {
                         ChunkSection section = sections[y];
-                        byte[] key = SUBCHUNK_PREFIX.getSubKey(chunkX, chunkZ, y);
+                        byte[] key = CHUNK_SECTION_PREFIX.getSubKey(chunkX, chunkZ, y);
 
                         if (section == null || section.isEmpty()) {
                             batch.delete(key);

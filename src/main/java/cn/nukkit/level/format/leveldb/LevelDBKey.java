@@ -1,12 +1,17 @@
 package cn.nukkit.level.format.leveldb;
 
+import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.DimensionEnum;
 import cn.nukkit.level.Level;
 
 public enum LevelDBKey {
     DATA_3D('+'),
     DATA_2D('-'),
     DATA_2D_LEGACY('.'),
-    SUBCHUNK_PREFIX('/'),
+    /**
+     * Block data for a 16×16×16 chunk section
+     */
+    CHUNK_SECTION_PREFIX('/'),
     LEGACY_TERRAIN('0'),
     BLOCK_ENTITIES('1'),
     ENTITIES('2'),
@@ -44,6 +49,10 @@ public enum LevelDBKey {
                 (byte) ((chunkZ >>> 24) & 0xff),
                 this.encoded,
         };
+    }
+
+    public byte[] getKey(int chunkX, int chunkZ, DimensionData dimension) {
+        return getKey(chunkX, chunkZ, dimension.getDimensionId());
     }
 
     public byte[] getKey(int chunkX, int chunkZ, int dimension) {
@@ -96,5 +105,42 @@ public enum LevelDBKey {
                 this.encoded,
                 (byte) (chunkY & 0xff),
         };
+    }
+
+    public byte[] getKey(int chunkX, int chunkZ, int chunkSectionY, DimensionData dimension) {
+        if (this.encoded != CHUNK_SECTION_PREFIX.encoded)
+            throw new IllegalArgumentException("The method must be used with CHUNK_SECTION_PREFIX!");
+        if (dimension.equals(DimensionEnum.OVERWORLD.getDimensionData())) {
+            return new byte[]{
+                    (byte) (chunkX & 0xff),
+                    (byte) ((chunkX >>> 8) & 0xff),
+                    (byte) ((chunkX >>> 16) & 0xff),
+                    (byte) ((chunkX >>> 24) & 0xff),
+                    (byte) (chunkZ & 0xff),
+                    (byte) ((chunkZ >>> 8) & 0xff),
+                    (byte) ((chunkZ >>> 16) & 0xff),
+                    (byte) ((chunkZ >>> 24) & 0xff),
+                    this.encoded,
+                    (byte) chunkSectionY
+            };
+        } else {
+            byte dimensionId = (byte) dimension.getDimensionId();
+            return new byte[]{
+                    (byte) (chunkX & 0xff),
+                    (byte) ((chunkX >>> 8) & 0xff),
+                    (byte) ((chunkX >>> 16) & 0xff),
+                    (byte) ((chunkX >>> 24) & 0xff),
+                    (byte) (chunkZ & 0xff),
+                    (byte) ((chunkZ >>> 8) & 0xff),
+                    (byte) ((chunkZ >>> 16) & 0xff),
+                    (byte) ((chunkZ >>> 24) & 0xff),
+                    (byte) (dimensionId & 0xff),
+                    (byte) ((dimensionId >>> 8) & 0xff),
+                    (byte) ((dimensionId >>> 16) & 0xff),
+                    (byte) ((dimensionId >>> 24) & 0xff),
+                    this.encoded,
+                    (byte) chunkSectionY
+            };
+        }
     }
 }
