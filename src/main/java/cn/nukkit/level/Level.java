@@ -3707,6 +3707,9 @@ public class Level implements ChunkManager, Metadatable {
     public void removeBlockEntity(BlockEntity entity) {
         Preconditions.checkNotNull(entity, "entity");
         Preconditions.checkArgument(entity.getLevel() == this, "BlockEntity is not in this level");
+
+        entity.close();
+
         blockEntities.remove(entity.getId());
         updateBlockEntities.remove(entity);
     }
