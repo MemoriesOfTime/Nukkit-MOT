@@ -139,15 +139,14 @@ public class NetworkChunkSerializer {
         PalettedBlockStorage palette = PalettedBlockStorage.createWithDefaultState(Biome.getBiomeIdOrCorrect(protocolId, chunk.getBiomeId(0, 0)));
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                int biomeId = Biome.getBiomeIdOrCorrect(protocolId, chunk.getBiomeId(x, z));
                 for (int y = 0; y < 16; y++) {
-                    palette.setBlock(x, y, z, biomeId);
+                    palette.setBlock(x, y, z, chunk.getBiomeId(x, z));
                 }
             }
         }
 
         BinaryStream stream = ThreadCache.binaryStream.get().reset();
-        palette.writeTo(stream);
+        palette.writeTo(stream, Biome::getBiomeIdOrCorrect);
         byte[] bytes = stream.getBuffer();
         stream.reset();
 
