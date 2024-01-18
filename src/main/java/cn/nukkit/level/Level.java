@@ -4390,11 +4390,19 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public int getMinBlockY() {
-        return this.dimensionData.getMinHeight();
+        int minHeight = this.dimensionData.getMinHeight();
+        if (minHeight < 0) {
+            return 0; //TODO 支持-64高度时移除
+        }
+        return minHeight;
     }
 
     public int getMaxBlockY() {
-        return this.dimensionData.getMaxHeight();
+        int maxHeight = this.dimensionData.getMaxHeight();
+        if (maxHeight > 255) {
+            return 255; //TODO 支持319世界高度时移除
+        }
+        return maxHeight;
     }
 
     public boolean canBlockSeeSky(Vector3 pos) {
