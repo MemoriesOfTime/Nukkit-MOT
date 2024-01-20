@@ -1422,7 +1422,11 @@ public class Level implements ChunkManager, Metadatable {
         this.requireProvider().saveChunks();
     }
 
-    public void updateAroundRedstone(Vector3 pos, BlockFace ignoredFace) {
+    public void updateAroundRedstone(@NotNull Vector3 pos) {
+        this.updateAroundRedstone(pos, null);
+    }
+
+    public void updateAroundRedstone(@NotNull Vector3 pos, @Nullable BlockFace ignoredFace) {
         for (BlockFace side : BlockFace.values()) {
             if (ignoredFace != null && side == ignoredFace) {
                 continue;

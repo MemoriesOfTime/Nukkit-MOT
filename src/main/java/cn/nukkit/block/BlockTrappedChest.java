@@ -3,16 +3,11 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityChest;
-import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.mob.EntityPiglin;
-import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.item.Item;
-import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Plane;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.nbt.tag.Tag;
 
 import java.util.Map;
@@ -88,69 +83,6 @@ public class BlockTrappedChest extends BlockChest {
 
         return true;
     }
-
-
-    @Override
-    public boolean onActivate(Item item, Player player){
-        if (player != null) {
-            Block top = this.up();
-            if (!top.isTransparent() && !(top instanceof BlockSlab && (top.getDamage() & 0x07) <= 0)) { // avoid issues with the slab hack
-                return true;
-            }
-
-            BlockEntity t = this.getLevel().getBlockEntity(this);
-            BlockEntityChest chest;
-            if (t instanceof BlockEntityChest) {
-                chest = (BlockEntityChest) t;
-            } else {
-                CompoundTag nbt = new CompoundTag("")
-                        .putList(new ListTag<>("Items"))
-                        .putString("id", BlockEntity.CHEST)
-                        .putInt("x", (int) this.x)
-                        .putInt("y", (int) this.y)
-                        .putInt("z", (int) this.z);
-                chest = (BlockEntityChest) BlockEntity.createBlockEntity(BlockEntity.CHEST, this.getChunk(), nbt);
-            }
-
-            if (chest.namedTag.contains("Lock") && chest.namedTag.get("Lock") instanceof StringTag) {
-                if (!chest.namedTag.getString("Lock").equals(item.getCustomName())) {
-                    return true;
-                }
-            }
-
-            player.addWindow(chest.getInventory());
-            this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 0, getWeakPower(getBlockFace())));
-            onUpdate(Level.BLOCK_UPDATE_SCHEDULED);
-            for (Entity e : this.getChunk().getEntities().values()) {
-                if (e instanceof EntityPiglin) {
-                    ((EntityPiglin) e).setAngry(600);
-                }
-            }
-        }
-
-        return true;
-    }
-
-    @Override
-    public int onUpdate(int type) {
-        if (type == Level.BLOCK_UPDATE_SCHEDULED) {
-            BlockEntity blockEntity = this.level.getBlockEntity(this);
-            if (blockEntity instanceof BlockEntityChest){
-                if (!((BlockEntityChest) blockEntity).getInventory().getViewers().isEmpty()){
-                    this.level.updateAroundRedstone(getLocation(),this.getBlockFace());
-                    this.level.updateAroundRedstone(getLocation(),this.getBlockFace().getOpposite());
-                    this.level.scheduleUpdate(this, 2);
-                }else {
-                    this.level.updateAroundRedstone(getLocation(),this.getBlockFace());
-                    this.level.updateAroundRedstone(getLocation(),this.getBlockFace().getOpposite());
-                    this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, getWeakPower(getBlockFace()), 0));
-                }
-            }
-            return type;
-            }
-        return 0;
-    }
-
 
     @Override
     public int getWeakPower(BlockFace face) {
