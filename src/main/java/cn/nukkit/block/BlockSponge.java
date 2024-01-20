@@ -102,21 +102,30 @@ public class BlockSponge extends BlockSolidMeta {
         int waterRemoved = 0;
         while (waterRemoved < 64 && (entry = entries.poll()) != null) {
             for (BlockFace face : BlockFace.values()) {
+                Block faceBlock = entry.block.getSideAtLayer(0, face);
+                Block faceBlock1 = faceBlock.getLevelBlockAtLayer(1);
 
-                Block faceBlock = entry.block.getSide(face);
-                if (faceBlock.getId() == BlockID.WATER || faceBlock.getId() == BlockID.STILL_WATER) {
-                    this.level.setBlock(faceBlock, Block.get(BlockID.AIR));
-                    ++waterRemoved;
+                if (faceBlock instanceof BlockWater) {
+                    this.getLevel().setBlock(faceBlock,Block.get(new BlockAir().getId()));
+                    this.getLevel().updateAround(faceBlock);
+                    waterRemoved++;
                     if (entry.distance < 6) {
                         entries.add(new Entry(faceBlock, entry.distance + 1));
                     }
-                } else if (faceBlock.getId() == BlockID.AIR) {
+                } else if (faceBlock1 instanceof BlockWater) {
+                    if (faceBlock.getId() == BlockID.BLOCK_KELP || faceBlock.getId() == BlockID.SEAGRASS || faceBlock.getId() == BlockID.SEA_PICKLE || faceBlock instanceof BlockCoralFan) {
+                        faceBlock.getLevel().useBreakOn(faceBlock);
+                    }
+                    this.getLevel().setBlock(faceBlock1,Block.get(new BlockAir().getId()));
+                    this.getLevel().updateAround(faceBlock1);
+                    waterRemoved++;
                     if (entry.distance < 6) {
-                        entries.add(new Entry(faceBlock, entry.distance + 1));
+                        entries.add(new Entry(faceBlock1, entry.distance + 1));
                     }
                 }
             }
         }
+
         return waterRemoved > 0;
     }
 
