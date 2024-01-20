@@ -1019,7 +1019,11 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             Supplier<Item> constructor = NAMESPACED_ID_ITEM.get(namespacedId);
             if (constructor != null) {
                 try {
-                    return constructor.get();
+                    Item item = constructor.get();
+                    if (metaGroup != null) {
+                        item.setDamage(Integer.parseInt(metaGroup));
+                    }
+                    return item;
                 } catch (Exception e) {
                     log.warn("Could not create a new instance of {} using the namespaced id {}", constructor, namespacedId, e);
                 }
