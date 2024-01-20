@@ -3707,6 +3707,9 @@ public class Level implements ChunkManager, Metadatable {
     public void removeBlockEntity(BlockEntity entity) {
         Preconditions.checkNotNull(entity, "entity");
         Preconditions.checkArgument(entity.getLevel() == this, "BlockEntity is not in this level");
+
+        entity.close();
+
         blockEntities.remove(entity.getId());
         updateBlockEntities.remove(entity);
     }
@@ -4012,7 +4015,7 @@ public class Level implements ChunkManager, Metadatable {
         this.cancelUnloadChunkRequest(x, z);
         LevelProvider levelProvider = requireProvider();
         levelProvider.setChunk(x, z, levelProvider.getEmptyChunk(x, z));
-        this.generateChunk(x, z);
+        this.generateChunk(x, z, true);
     }
 
     public void doChunkGarbageCollection() {
@@ -4384,6 +4387,22 @@ public class Level implements ChunkManager, Metadatable {
 
     public int getDimension() {
         return this.dimensionData.getDimensionId();
+    }
+
+    public int getMinBlockY() {
+        int minHeight = this.dimensionData.getMinHeight();
+        if (minHeight < 0) {
+            return 0; //TODO 支持-64高度时移除
+        }
+        return minHeight;
+    }
+
+    public int getMaxBlockY() {
+        int maxHeight = this.dimensionData.getMaxHeight();
+        if (maxHeight > 255) {
+            return 255; //TODO 支持319世界高度时移除
+        }
+        return maxHeight;
     }
 
     public boolean canBlockSeeSky(Vector3 pos) {

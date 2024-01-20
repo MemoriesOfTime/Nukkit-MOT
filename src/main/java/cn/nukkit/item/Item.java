@@ -1096,7 +1096,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public Item setCompoundTag(byte[] tags) {
-        this.tags = tags;
+        this.tags = tags == null ? new byte[0] : tags;
         this.cachedNBT = null;
         return this;
     }
