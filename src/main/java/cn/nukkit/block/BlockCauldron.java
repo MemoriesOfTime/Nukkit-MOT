@@ -388,11 +388,11 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
     private void consumePotion(Item item, Player player) {
         if (player.isSurvival() || player.isAdventure()) {
             if (item.getCount() == 1) {
-                player.getInventory().setItemInHand(new ItemBlock(new BlockAir()));
+                player.getInventory().setItemInHand(Item.get(ItemID.GLASS_BOTTLE));
             } else if (item.getCount() > 1) {
                 item.setCount(item.getCount() - 1);
                 player.getInventory().setItemInHand(item);
-                Item bottle = new ItemGlassBottle();
+                Item bottle = Item.get(ItemID.GLASS_BOTTLE);
                 if (player.getInventory().canAddItem(bottle)) {
                     player.getInventory().addItem(bottle);
                 } else {
