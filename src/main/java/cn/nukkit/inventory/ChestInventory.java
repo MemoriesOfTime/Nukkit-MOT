@@ -1,7 +1,11 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockTrappedChest;
 import cn.nukkit.blockentity.BlockEntityChest;
+import cn.nukkit.event.redstone.RedstoneUpdateEvent;
 import cn.nukkit.level.Level;
 import cn.nukkit.network.protocol.BlockEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
@@ -41,6 +45,8 @@ public class ChestInventory extends ContainerInventory {
                 level.addChunkPacket((int) this.getHolder().getX() >> 4, (int) this.getHolder().getZ() >> 4, pk);
             }
         }
+
+        this.checkTrappedChest();
     }
 
     @Override
@@ -61,6 +67,26 @@ public class ChestInventory extends ContainerInventory {
         }
 
         super.onClose(who);
+
+        this.checkTrappedChest();
+    }
+
+    public void checkTrappedChest() {
+        try {
+            Level level = this.getHolder().getLevel();
+            if (level != null) {
+                Block block = this.getHolder().getBlock();
+                if (block instanceof BlockTrappedChest trappedChest) {
+                    RedstoneUpdateEvent event = new RedstoneUpdateEvent(trappedChest);
+                    this.getHolder().level.getServer().getPluginManager().callEvent(event);
+                    if (!event.isCancelled()) {
+                        level.updateAroundRedstone(block);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Server.getInstance().getLogger().logException(e);
+        }
     }
 
     public void setDoubleInventory(DoubleChestInventory doubleInventory) {

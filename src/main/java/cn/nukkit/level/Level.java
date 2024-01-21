@@ -1422,7 +1422,11 @@ public class Level implements ChunkManager, Metadatable {
         this.requireProvider().saveChunks();
     }
 
-    public void updateAroundRedstone(Vector3 pos, BlockFace ignoredFace) {
+    public void updateAroundRedstone(@NotNull Vector3 pos) {
+        this.updateAroundRedstone(pos, null);
+    }
+
+    public void updateAroundRedstone(@NotNull Vector3 pos, @Nullable BlockFace ignoredFace) {
         for (BlockFace side : BlockFace.values()) {
             if (ignoredFace != null && side == ignoredFace) {
                 continue;
@@ -1808,6 +1812,19 @@ public class Level implements ChunkManager, Metadatable {
         return this.getChunk(x >> 4, z >> 4, false).getBlockRuntimeId(protocolId, x & 0x0f, y & 0xff, z & 0x0f, layer);
     }
 
+    public Set<Block> getBlockAround(@NotNull Vector3 pos) {
+        return this.getBlockAround(pos, 0);
+    }
+
+    public Set<Block> getBlockAround(@NotNull Vector3 pos, int layer) {
+        Set<Block> around = new HashSet<>();
+        Block block = getBlock(pos);
+        for (BlockFace face : BlockFace.values()) {
+            Block side = block.getSideAtLayer(layer, face);
+            around.add(side);
+        }
+        return around;
+    }
 
     public Block getBlock(Vector3 pos) {
         return getBlock(pos, 0);
