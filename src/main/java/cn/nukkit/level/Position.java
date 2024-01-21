@@ -106,7 +106,11 @@ public class Position extends Vector3 {
     }
 
     public Set<Block> getLevelBlockAround() {
-        return this.getValidLevel().getBlockAround(this);
+        return this.getLevelBlockAround(0);
+    }
+
+    public Set<Block> getLevelBlockAround(int layer) {
+        return this.getValidLevel().getBlockAround(this, layer);
     }
 
     @NotNull

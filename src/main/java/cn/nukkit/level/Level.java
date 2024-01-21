@@ -1813,10 +1813,14 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public Set<Block> getBlockAround(@NotNull Vector3 pos) {
+        return this.getBlockAround(pos, 0);
+    }
+
+    public Set<Block> getBlockAround(@NotNull Vector3 pos, int layer) {
         Set<Block> around = new HashSet<>();
         Block block = getBlock(pos);
         for (BlockFace face : BlockFace.values()) {
-            Block side = block.getSideAtLayer(0, face);
+            Block side = block.getSideAtLayer(layer, face);
             around.add(side);
         }
         return around;
