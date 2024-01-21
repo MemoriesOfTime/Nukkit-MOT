@@ -7,6 +7,8 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.LevelException;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Set;
+
 /**
  * @author MagicDroidX
  * Nukkit Project
@@ -101,6 +103,10 @@ public class Position extends Vector3 {
 
     public Block getLevelBlockAtLayer(int layer) {
         return this.getValidLevel().getBlock(this, layer);
+    }
+
+    public Set<Block> getLevelBlockAround() {
+        return this.getValidLevel().getBlockAround(this);
     }
 
     @NotNull

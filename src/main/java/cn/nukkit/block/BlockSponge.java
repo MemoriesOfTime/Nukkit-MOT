@@ -74,7 +74,9 @@ public class BlockSponge extends BlockSolidMeta {
             level.addSoundToViewers(block.getLocation(), Sound.RANDOM_FIZZ);
             level.addParticle(new ExplodeParticle(block.add(0.5, 1, 0.5)));
             return true;
-        } else if (this.getDamage() == DRY && block instanceof BlockWater && performWaterAbsorb(block)) {
+        } else if (this.getDamage() == DRY &&
+                (block instanceof BlockWater || block.getLevelBlockAround().stream().anyMatch(b -> b instanceof BlockWater)) &&
+                performWaterAbsorb(block)) {
             level.setBlock(block, Block.get(BlockID.SPONGE, WET), true, true);
 
             for (int i = 0; i < 4; i++) {
