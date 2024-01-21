@@ -1812,7 +1812,7 @@ public class Level implements ChunkManager, Metadatable {
         return this.getChunk(x >> 4, z >> 4, false).getBlockRuntimeId(protocolId, x & 0x0f, y & 0xff, z & 0x0f, layer);
     }
 
-    public Set<Block> getBlockAround(Vector3 pos) {
+    public Set<Block> getBlockAround(@NotNull Vector3 pos) {
         Set<Block> around = new HashSet<>();
         Block block = getBlock(pos);
         for (BlockFace face : BlockFace.values()) {
