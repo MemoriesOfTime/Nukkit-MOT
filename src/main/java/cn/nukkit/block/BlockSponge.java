@@ -106,8 +106,7 @@ public class BlockSponge extends BlockSolidMeta {
                 Block faceBlock1 = faceBlock.getLevelBlockAtLayer(1);
 
                 if (faceBlock instanceof BlockWater) {
-                    this.getLevel().setBlock(faceBlock,Block.get(new BlockAir().getId()));
-                    this.getLevel().updateAround(faceBlock);
+                    this.getLevel().setBlock(faceBlock,Block.get(BlockID.AIR));
                     waterRemoved++;
                     if (entry.distance < 6) {
                         entries.add(new Entry(faceBlock, entry.distance + 1));
@@ -116,8 +115,7 @@ public class BlockSponge extends BlockSolidMeta {
                     if (faceBlock.getId() == BlockID.BLOCK_KELP || faceBlock.getId() == BlockID.SEAGRASS || faceBlock.getId() == BlockID.SEA_PICKLE || faceBlock instanceof BlockCoralFan) {
                         faceBlock.getLevel().useBreakOn(faceBlock);
                     }
-                    this.getLevel().setBlock(faceBlock1,Block.get(new BlockAir().getId()));
-                    this.getLevel().updateAround(faceBlock1);
+                    this.getLevel().setBlock(faceBlock1,Block.get(BlockID.AIR));
                     waterRemoved++;
                     if (entry.distance < 6) {
                         entries.add(new Entry(faceBlock1, entry.distance + 1));
