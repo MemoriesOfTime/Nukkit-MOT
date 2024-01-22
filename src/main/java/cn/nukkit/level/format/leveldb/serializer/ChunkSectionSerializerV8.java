@@ -9,23 +9,21 @@ public class ChunkSectionSerializerV8 implements ChunkSectionSerializer {
     public static final ChunkSectionSerializer INSTANCE = new ChunkSectionSerializerV8();
 
     @Override
-    public void a(ByteBuf byteBuf, StateBlockStorage[] stateBlockStorageArray, int n2) {
-        byteBuf.writeByte(stateBlockStorageArray.length);
-        for (StateBlockStorage stateBlockStorage : stateBlockStorageArray) {
-            stateBlockStorage.writeTo(byteBuf);
+    public void serializer(ByteBuf byteBuf, StateBlockStorage[] storages, int ySection) {
+        byteBuf.writeByte(storages.length);
+        for (StateBlockStorage storage : storages) {
+            storage.writeTo(byteBuf);
         }
     }
 
     @Override
-    public StateBlockStorage[] a(ByteBuf byteBuf, ChunkBuilder chunkBuilder, long l2) {
-        long l3 = l2 ^ 0x21DF810E46E0L;
-        int n2 = byteBuf.readUnsignedByte();
-        StateBlockStorage[] stateBlockStorageArray = new StateBlockStorage[Math.max(n2, 2)];
-        for (int i2 = 0; i2 < n2; ++i2) {
-            stateBlockStorageArray[i2] = new StateBlockStorage();
-            stateBlockStorageArray[i2].a(byteBuf, chunkBuilder, l3);
+    public StateBlockStorage[] deserialize(ByteBuf byteBuf, ChunkBuilder chunkBuilder) {
+        int layerCount = byteBuf.readUnsignedByte();
+        StateBlockStorage[] storages = new StateBlockStorage[Math.max(layerCount, 2)];
+        for (int layer = 0; layer < layerCount; ++layer) {
+            storages[layer] = StateBlockStorage.ofBlock(byteBuf);
         }
-        return stateBlockStorageArray;
+        return storages;
     }
 }
 

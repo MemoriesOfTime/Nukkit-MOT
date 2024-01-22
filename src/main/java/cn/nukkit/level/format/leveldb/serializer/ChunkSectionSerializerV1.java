@@ -9,17 +9,15 @@ public class ChunkSectionSerializerV1 implements ChunkSectionSerializer {
     public static final ChunkSectionSerializer INSTANCE = new ChunkSectionSerializerV1();
 
     @Override
-    public void a(ByteBuf byteBuf, StateBlockStorage[] stateBlockStorageArray, int n2) {
+    public void serializer(ByteBuf byteBuf, StateBlockStorage[] storages, int ySection) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public StateBlockStorage[] a(ByteBuf byteBuf, ChunkBuilder chunkBuilder, long l2) {
-        long l3 = l2 ^ 0x21DF810E46E0L;
-        StateBlockStorage[] stateBlockStorageArray = new StateBlockStorage[2];
-        stateBlockStorageArray[0] = new StateBlockStorage();
-        stateBlockStorageArray[0].a(byteBuf, chunkBuilder, l3);
-        return stateBlockStorageArray;
+    public StateBlockStorage[] deserialize(ByteBuf byteBuf, ChunkBuilder chunkBuilder) {
+        StateBlockStorage[] storages = new StateBlockStorage[2];
+        storages[0] = StateBlockStorage.ofBlock(byteBuf);
+        return storages;
     }
 }
 
