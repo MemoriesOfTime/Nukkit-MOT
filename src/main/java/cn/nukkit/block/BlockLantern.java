@@ -118,11 +118,6 @@ public class BlockLantern extends BlockFlowable {
     }
 
     @Override
-    public boolean canHarvestWithHand() {
-        return false;
-    }
-
-    @Override
     public double getMinX() {
         return x + (5.0/16);
     }
