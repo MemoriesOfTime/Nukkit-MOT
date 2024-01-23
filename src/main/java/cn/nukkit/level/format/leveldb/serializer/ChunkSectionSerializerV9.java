@@ -23,7 +23,8 @@ public class ChunkSectionSerializerV9 implements ChunkSectionSerializer {
         byteBuf.readUnsignedByte(); //sectionY not use
         StateBlockStorage[] storages = new StateBlockStorage[Math.max(layerCount, 2)];
         for (int layer = 0; layer < layerCount; ++layer) {
-            storages[layer] = StateBlockStorage.ofBlock(byteBuf);
+            storages[layer] = new StateBlockStorage();
+            storages[layer].readFrom(byteBuf, chunkBuilder);
         }
         return storages;
     }

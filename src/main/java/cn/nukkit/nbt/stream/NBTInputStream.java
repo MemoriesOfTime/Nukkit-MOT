@@ -212,7 +212,7 @@ public class NBTInputStream implements DataInput, AutoCloseable {
                     this.readFully(bytes);
                     return new ByteArrayTag("", bytes);
                 case Tag.TAG_String:
-                    return new StringTag(this.readUTF());
+                    return new StringTag("", this.readUTF());
                 case Tag.TAG_Compound:
                     LinkedHashMap<String, Tag> map = new LinkedHashMap<>();
                     int nbtType;
