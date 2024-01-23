@@ -4,7 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.biome.EnumBiome;
-import cn.nukkit.level.format.leveldb.updater.BlockUpgrader;
+import cn.nukkit.level.blockstateupdater.BlockStateUpdaters;
 import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.math.BlockVector3;
@@ -107,27 +107,21 @@ public class StateBlockStorage {
             throw new ChunkException("Invalid paletteSize size: " + paletteSize + ", max: " + version.getMaxEntryValue());
         }
 
-        int[] palette = new int[paletteSize];
-
         NBTInputStream inputStream = null;
         try {
-            ByteBufInputStream stream = new ByteBufInputStream(byteBuf);
-            inputStream = new NBTInputStream(stream, ByteOrder.LITTLE_ENDIAN);
-            //inputStream = NbtUtils.createReaderLE(stream);
+            inputStream = new NBTInputStream(new ByteBufInputStream(byteBuf), ByteOrder.LITTLE_ENDIAN);
             for (int i = 0; i < paletteSize; ++i) {
                 CompoundTag tag;
                 try {
                     CompoundTag readTag = (CompoundTag) inputStream.readTag();
-                    tag = readTag; BlockUpgrader.upgrade(readTag); //TODO 实现方块状态更新
+                    tag = BlockStateUpdaters.updateBlockState(readTag, readTag.getInt("version"));
                 } catch (IOException e) {
                     throw new ChunkException("Invalid blockstate NBT at offset " + i + " in paletted storage", e);
                 }
 
                 int fullId = GlobalBlockPalette.getLegacyFullId(ProtocolInfo.CURRENT_PROTOCOL, tag);
-                palette[i] = GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, fullId);
+                this.palette.add(GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, fullId));
             }
-
-            this.palette.addAll(IntList.of(palette));
         } finally {
             try {
                 if (inputStream != null) {

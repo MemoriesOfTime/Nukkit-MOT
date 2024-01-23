@@ -2,12 +2,9 @@ package cn.nukkit.level.format.leveldb.structure;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
-import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
-import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 
 import javax.annotation.Nullable;
@@ -505,24 +502,12 @@ public class LevelDBChunkSection implements ChunkSection {
         try {
             this.readLock.lock();
 
-            int layers = Math.max(2, this.storages.length);
+            int layers = this.hasLayer(1) ? 2 : 1;
 
-            if (protocol >= ProtocolInfo.v1_18_0) {
-                stream.putByte((byte) 9);
-                stream.putByte((byte) layers);
-                stream.putByte((byte) this.y);
-            } else {
-                stream.putByte((byte) 8);
-                stream.putByte((byte) layers);
-            }
+            stream.putByte((byte) 8);
+            stream.putByte((byte) layers);
 
             for (int i = 0; i < layers; i++) {
-                if (!this.hasLayerUnsafe(i)) {
-                    StateBlockStorage.ofBlock(BitArrayVersion.V1, GlobalBlockPalette.getOrCreateRuntimeId(protocol, Block.AIR, 0))
-                            .writeTo(stream);
-                    continue;
-                }
-
                 this.storages[i].writeTo(stream);
             }
         } finally {
