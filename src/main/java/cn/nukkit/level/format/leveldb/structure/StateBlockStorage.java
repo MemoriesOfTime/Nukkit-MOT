@@ -38,7 +38,15 @@ public class StateBlockStorage {
     private IntList palette;
     private BitArray bitArray;
 
-    private StateBlockStorage(BitArrayVersion version, int firstId) {
+    public StateBlockStorage() {
+        this(BitArrayVersion.V2);
+    }
+
+    public StateBlockStorage(BitArrayVersion version) {
+        this(version, Block.AIR);
+    }
+
+    public StateBlockStorage(BitArrayVersion version, int firstId) {
         this.bitArray = version.createPalette(SIZE);
         if (version == BitArrayVersion.EMPTY) {
             this.palette = IntLists.EMPTY_LIST;
@@ -48,7 +56,7 @@ public class StateBlockStorage {
         this.palette.add(firstId); // Air is at the start of every block palette.
     }
 
-    private StateBlockStorage(BitArray bitArray, IntList palette) {
+    public StateBlockStorage(BitArray bitArray, IntList palette) {
         this.palette = palette;
         this.bitArray = bitArray;
     }
@@ -69,41 +77,48 @@ public class StateBlockStorage {
         return new StateBlockStorage(version, airBlockId);
     }
 
-    @Nullable
-    public static StateBlockStorage ofBlock(ByteBuf byteBuf) {
+    public void readFrom(ByteBuf byteBuf, ChunkBuilder chunkBuilder) {
         short header = byteBuf.readUnsignedByte();
 
         if (header == -1) {
-            return null;
+            return;
         }
+
+        this.palette.clear();
 
         BitArrayVersion version = BitArrayVersion.get(header >> 1, true);
 
+        int paletteSize;
         if (version == BitArrayVersion.V0) {
-            return new StateBlockStorage(version.createPalette(SUB_CHUNK_SIZE, null), new IntArrayList());
+            this.bitArray = version.createPalette(SUB_CHUNK_SIZE, null);
+            paletteSize = 1;
+        } else {
+            int expectedWordSize = version.getWordsForSize(SUB_CHUNK_SIZE);
+            int[] words = new int[expectedWordSize];
+            int i2 = 0;
+            for (int i = 0; i < expectedWordSize; ++i) {
+                words[i] = byteBuf.readIntLE();
+            }
+            this.bitArray = version.createPalette(SUB_CHUNK_SIZE, words);
+            paletteSize = byteBuf.readIntLE();
         }
 
-        int expectedWordSize = version.getWordsForSize(SUB_CHUNK_SIZE);
-        int[] words = new int[expectedWordSize];
-        int i2 = 0;
-        for (int i = 0; i < expectedWordSize; ++i) {
-            words[i] = byteBuf.readIntLE();
+        if (version.getMaxEntryValue() < paletteSize - 1) {
+            throw new ChunkException("Invalid paletteSize size: " + paletteSize + ", max: " + version.getMaxEntryValue());
         }
-        BitArray bitArray = version.createPalette(SUB_CHUNK_SIZE, words);
 
-        int paletteSize = byteBuf.readIntLE();
         int[] palette = new int[paletteSize];
 
         NBTInputStream inputStream = null;
         try {
-            //TODO fix
             ByteBufInputStream stream = new ByteBufInputStream(byteBuf);
-            inputStream = new NBTInputStream(stream);
+            inputStream = new NBTInputStream(stream, ByteOrder.LITTLE_ENDIAN);
             //inputStream = NbtUtils.createReaderLE(stream);
             for (int i = 0; i < paletteSize; ++i) {
                 CompoundTag tag;
                 try {
-                    tag = BlockUpgrader.upgrade((CompoundTag) inputStream.readTag());
+                    CompoundTag readTag = (CompoundTag) inputStream.readTag();
+                    tag = readTag; BlockUpgrader.upgrade(readTag); //TODO 实现方块状态更新
                 } catch (IOException e) {
                     throw new ChunkException("Invalid blockstate NBT at offset " + i + " in paletted storage", e);
                 }
@@ -112,12 +127,7 @@ public class StateBlockStorage {
                 palette[i] = GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, fullId);
             }
 
-            if (paletteSize == 0) {
-                // corrupted
-                return ofBlock(BlockID.AIR);
-            }
-
-            return new StateBlockStorage(bitArray, IntArrayList.wrap(palette));
+            this.palette.addAll(IntList.of(palette));
         } finally {
             try {
                 if (inputStream != null) {
