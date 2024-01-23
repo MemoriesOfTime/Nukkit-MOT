@@ -8,14 +8,13 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
-import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
+import cn.nukkit.level.format.leveldb.serializer.ChunkSerializers;
 import cn.nukkit.level.format.leveldb.structure.*;
 import cn.nukkit.level.format.leveldb.updater.BlockUpgrader;
 import cn.nukkit.level.generator.Generator;
@@ -450,209 +449,40 @@ public class LevelDBProvider implements LevelProvider {
         byte chunkVersion = versionData[0];
 
         if (chunkVersion < 7) {
-
+            //TODO 设置需要更新
+            //chunkBuilder.
         }
 
+        ChunkSerializers.deserialize(this.db, chunkBuilder, (int)chunkVersion);
 
+        //TODO
+        /*Data3dSerializer.a(this.db, chunkBuilder);
+        if (!chunkBuilder.) {
+            Data2dSerializer.a(this.db, chunkBuilder);
+        }
+        BlockEntitySerializer.a(this.db, chunkBuilder);
+        EntitySerializer.a(this.db, chunkBuilder);*/
 
         boolean hasBeenUpgraded = chunkVersion < CURRENT_LEVEL_CHUNK_VERSION;
 
-        LevelDBChunkSection[] chunkSections = new LevelDBChunkSection[16];
         short[] heightmap = null;
         byte[] biome = null;
         StateBlockStorage[] biomes3d = null;
 
-        int subChunkKeyOffset = chunkVersion >= 24 && chunkVersion <= 26 ? 4 : 0;
+        byte[] maps2d = this.db.get(DATA_2D.getKey(chunkX, chunkZ));
+        if (maps2d != null && maps2d.length >= SUB_CHUNK_2D_SIZE * 2 + SUB_CHUNK_2D_SIZE) {
+            heightmap = new short[SUB_CHUNK_2D_SIZE];
+            biome = new byte[SUB_CHUNK_2D_SIZE];
 
-        switch (chunkVersion) {
-            case 40: // 1.18.30
-            case 39: // 1.18.0.25 beta
-            case 38: // 1.18.0.24 beta internal_experimental
-            case 37: // 1.18.0.24 beta experimental
-            case 36: // 1.18.0.22 beta internal_experimental
-            case 35: // 1.18.0.22 beta experimental
-            case 34: // 1.18.0.20 beta internal_experimental
-            case 33: // 1.18.0.20 beta experimental
-            case 32: // 1.17.40
-            case 31: // 1.17.40.20 beta experimental
-            case 30: // 1.17.30.25 beta internal_experimental
-            case 29: // 1.17.30.25 beta experimental
-            case 28: // 1.17.30.23 beta internal_experimental
-            case 27: // 1.17.30.23 beta experimental
-            case 26: // 1.16.230.50 beta internal_experimental
-            case 25: // 1.16.230.50 beta experimental
-            case 24: // 1.16.220.50 beta internal_experimental
-            case 23: // 1.16.220.50 beta experimental
-            case 22: // 1.16.210
-            case 21: // 1.16.100.57 beta
-            case 20: // 1.16.100.52 beta
-            case 19: // 1.16.0
-            case 18: // 1.16.0.51 beta
-            //TODO: check walls
-            case 17: // 1.12 hotfix
-            case 16: // 1.12.0
-            case 15: // 1.12.0.4 beta
-            case 14: // 1.11.1.2
-            case 13: // 1.11.0.4 beta
-            case 12: // 1.11.0.3 beta
-            case 11: // 1.11.0.1 beta
-            case 10: // 1.9.0
-            case 9: // 1.8.0
-            case 8: // 1.2.13
-            case 7: // 1.2.0
-            case 6: // 1.2.0.2 beta
-            case 5: // 1.1.0 converted_from_console
-            case 4: // 1.1.0
-                //TODO: check beds
-            case 3: // 1.0.0
-                StateBlockStorage[] convertedLegacyExtraData = this.deserializeLegacyExtraData(chunkX, chunkZ, chunkVersion);
-
-                //TODO 从DimensionData读取世界高度
-                //int minChuckSection = -64 >> 4;
-                //int maxChuckSection = 320 >> 4;
-
-                for (int y = /*minChuckSection*/0; y <= /*maxChuckSection*/15; ++y) {
-                    byte[] subChunkValue = this.db.get(CHUNK_SECTION_PREFIX.getSubKey(chunkX, chunkZ, y + subChunkKeyOffset));
-                    if (subChunkValue == null) {
-                        continue;
-                    }
-                    if (subChunkValue.length == 0) {
-                        throw new ChunkException("Unexpected empty data for subchunk " + y);
-                    }
-                    BinaryStream stream = new BinaryStream(subChunkValue);
-
-                    int chunkSectionVersion = stream.getByte();
-                    if (chunkSectionVersion < CURRENT_LEVEL_SUBCHUNK_VERSION) {
-                        hasBeenUpgraded = true;
-                    }
-
-                    switch (chunkSectionVersion) {
-                        case 8:
-                        case 9:
-                            int storageCount = stream.getByte();
-
-                            if (chunkSectionVersion >= 9) {
-                                int indexY = stream.getByte();
-                                if (indexY != y) {
-                                    throw new ChunkException("Unexpected Y index (" + indexY + ") for subchunk " + y);
-                                }
-                            }
-
-                            StateBlockStorage[] storages = new StateBlockStorage[storageCount];
-                            for (int i = 0; i < storageCount; ++i) {
-                                storages[i] = StateBlockStorage.ofBlock(stream);
-                            }
-
-                            chunkSections[y] = new LevelDBChunkSection(y, storages);
-                            break;
-                        case 0:
-                        case 2: //these are all identical to version 0, but vanilla respects these so we should also
-                        case 3:
-                        case 4:
-                        case 5:
-                        case 6:
-                        case 7:
-                            byte[] blocks = stream.get(4096);
-                            NibbleArray blockData = new NibbleArray(stream.get(2048));
-
-                            if (chunkVersion < 4) {
-                                stream.setOffset(stream.getOffset() + 4096); //legacy light info, discard it
-                                hasBeenUpgraded = true;
-                            }
-
-                            storages = new StateBlockStorage[2];
-                            StateBlockStorage storage = StateBlockStorage.createFromBlockPalette();
-                            for (int i = 0; i < SUB_CHUNK_SIZE; i++) {
-                                storage.setBlock(i, (blocks[i] & 0xff) << Block.DATA_BITS | blockData.get(i));
-                            }
-                            storages[0] = storage;
-
-                            if (convertedLegacyExtraData != null && convertedLegacyExtraData.length > y) {
-                                storages[1] = convertedLegacyExtraData[y];
-                            }
-
-                            chunkSections[y] = new LevelDBChunkSection(y, storages);
-                            break;
-                        case 1: //paletted v1, has a single block storage
-                            storages = new StateBlockStorage[2];
-                            storages[0] = StateBlockStorage.ofBlock(stream);
-
-                            if (convertedLegacyExtraData != null && convertedLegacyExtraData.length > y) {
-                                storages[1] = convertedLegacyExtraData[y];
-                            }
-
-                            chunkSections[y] = new LevelDBChunkSection(y, storages);
-                            break;
-                        default:
-                            //TODO: set chunks read-only so the version on disk doesn't get overwritten
-                            throw new ChunkException("don't know how to decode LevelDB subchunk format version " + chunkSectionVersion);
-                    }
+            ByteBuf buf = Unpooled.wrappedBuffer(maps2d);
+            try {
+                for (int i = 0; i < SUB_CHUNK_2D_SIZE; i++)  {
+                    heightmap[i] = buf.readShortLE();
                 }
-
-                byte[] maps2d = this.db.get(DATA_2D.getKey(chunkX, chunkZ));
-                if (maps2d != null && maps2d.length >= SUB_CHUNK_2D_SIZE * 2 + SUB_CHUNK_2D_SIZE) {
-                    heightmap = new short[SUB_CHUNK_2D_SIZE];
-                    biome = new byte[SUB_CHUNK_2D_SIZE];
-
-                    ByteBuf buf = Unpooled.wrappedBuffer(maps2d);
-                    try {
-                        for (int i = 0; i < SUB_CHUNK_2D_SIZE; i++)  {
-                            heightmap[i] = buf.readShortLE();
-                        }
-                        buf.readBytes(biome);
-                    } finally {
-                        buf.release();
-                    }
-                }
-
-                break;
-            case 2: // 0.9.5
-            case 1: // 0.9.2
-            case 0: // 0.9.0.1 beta (first version)
-                convertedLegacyExtraData = this.deserializeLegacyExtraData(chunkX, chunkZ, chunkVersion);
-
-                byte[] legacyTerrain = this.db.get(LEGACY_TERRAIN.getKey(chunkX, chunkZ));
-                if (legacyTerrain == null || legacyTerrain.length == 0) {
-                    throw new ChunkException("Missing expected legacy terrain data for format version " + chunkVersion);
-                }
-
-                BinaryStream stream = new BinaryStream(legacyTerrain);
-                // max height 128
-                byte[] blocks = stream.get(8 * SUB_CHUNK_SIZE);
-                NibbleArray blockData = new NibbleArray(stream.get(8 * SUB_CHUNK_SIZE / 2));
-
-                for (int y = 0; y < 8; y++) {
-                    StateBlockStorage[] storages = new StateBlockStorage[2];
-                    StateBlockStorage storage = StateBlockStorage.createFromBlockPalette();
-                    for (int i = 0; i < SUB_CHUNK_SIZE; i++) {
-                        storage.setBlock(i, (blocks[i] & 0xff) << 4 | blockData.get(i));
-                    }
-
-                    if (convertedLegacyExtraData != null && convertedLegacyExtraData.length > y) {
-                        storages[1] = convertedLegacyExtraData[y];
-                    }
-
-                    chunkSections[y] = new LevelDBChunkSection(y, storages);
-                }
-
-                // Discard skyLight and blockLight
-                stream.skip(8 * SUB_CHUNK_SIZE / 2 + 8 * SUB_CHUNK_SIZE / 2);
-
-                /*heightmap = new short[SUB_CHUNK_2D_SIZE];
-                for (int i = 0; i < SUB_CHUNK_2D_SIZE; i++) {
-                    heightmap[i] = (short) (stream.getByte() & 0xff);
-                }*/
-                stream.skip(SUB_CHUNK_2D_SIZE); // recalculate heightmap
-
-                biome = new byte[SUB_CHUNK_2D_SIZE];
-                for (int i = 0; i < SUB_CHUNK_2D_SIZE; i++) {
-                    biome[i] = (byte) (Biome.getBiomeIdOrCorrect(ProtocolInfo.CURRENT_LEVEL_PROTOCOL, stream.getInt() >> 24) & 0xff);
-                }
-
-                break;
-            default:
-                //TODO: set chunks read-only so the version on disk doesn't get overwritten
-                throw new ChunkException("don't know how to decode chunk format version " + chunkVersion);
+                buf.readBytes(biome);
+            } finally {
+                buf.release();
+            }
         }
 
         List<CompoundTag> blockEntities = new ObjectArrayList<>();
@@ -705,7 +535,7 @@ public class LevelDBProvider implements LevelProvider {
             finalisation = FINALISATION_DONE; //older versions didn't have this tag
         }
 
-        LevelDBChunk chunk = new LevelDBChunk(this, chunkX, chunkZ, chunkSections, heightmap, biome, biomes3d, entities, blockEntities);
+        LevelDBChunk chunk = new LevelDBChunk(this, chunkX, chunkZ, chunkBuilder.getSections(), heightmap, biome, biomes3d, entities, blockEntities);
 
         if (finalisation == FINALISATION_DONE) {
             chunk.setGenerated();
@@ -726,6 +556,11 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private void writeChunk(LevelDBChunk chunk, boolean convert, boolean background) {
+        //TODO
+        if (true) {
+            return;
+        }
+
         int chunkX = chunk.getX();
         int chunkZ = chunk.getZ();
         BinaryStream stream = new BinaryStream();
@@ -1244,10 +1079,10 @@ public class LevelDBProvider implements LevelProvider {
             int chunkY = pos.y >> 4;
             StateBlockStorage storage = extraDataLayers[chunkY];
             if (storage == null) {
-                storage = StateBlockStorage.createFromBlockPalette();
+                storage = StateBlockStorage.ofBlock();
                 extraDataLayers[chunkY] = storage;
             }
-            storage.setBlock(pos, (blockId << Block.DATA_BITS) | blockData);
+            storage.set(pos, (blockId << Block.DATA_BITS) | blockData);
         }
         return extraDataLayers;
     }

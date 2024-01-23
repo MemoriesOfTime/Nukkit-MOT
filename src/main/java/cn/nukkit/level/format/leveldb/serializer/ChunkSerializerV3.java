@@ -77,10 +77,10 @@ public class ChunkSerializerV3 implements ChunkSerializer {
                 stateBlockStorageArray = ChunkSectionSerializers.deserialize(byteBuf, chunkBuilder, subChunkVersion);
 
                 if (stateBlockStorageArray[1] == null) {
-                    stateBlockStorageArray[1] = new StateBlockStorage();
+                    stateBlockStorageArray[1] = StateBlockStorage.ofBlock();
                 }
 
-                if (extraBlocks != null) {
+                /*if (extraBlocks != null) {
                     for (int i3 = 0; i3 < 16; ++i3) {
                         for (int i4 = 0; i4 < 16; ++i4) {
                             int n7;
@@ -95,9 +95,9 @@ public class ChunkSerializerV3 implements ChunkSerializer {
                             }
                         }
                     }
-                }
+                }*/
+                sections[ySection + dimensionInfo.getSectionOffset()] = new LevelDBChunkSection(ySection, stateBlockStorageArray);
             }
-            sections[ySection + dimensionInfo.getSectionOffset()] = new LevelDBChunkSection(ySection, stateBlockStorageArray);
         }
         chunkBuilder.sections(sections);
     }

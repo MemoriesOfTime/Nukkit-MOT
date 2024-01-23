@@ -69,7 +69,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 continue;
             }
 
-            storages[i] = StateBlockStorage.createFromBlockPalette();
+            storages[i] = StateBlockStorage.ofBlock();
         }
 
         if (maxLayer == -1) {
@@ -113,7 +113,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 return BlockID.AIR;
             }
 
-            return (this.storages[layer].getBlock(x, y, z)) >> Block.DATA_MASK;
+            return (this.storages[layer].get(x, y, z)) >> Block.DATA_MASK;
         } finally {
             this.readLock.unlock();
         }
@@ -138,14 +138,14 @@ public class LevelDBChunkSection implements ChunkSection {
             }
 
             StateBlockStorage storage = this.storages[layer];
-            int previous = storage.getBlock(x, y, z);
+            int previous = storage.get(x, y, z);
             int fullId = (id << Block.DATA_BITS) | (previous & Block.DATA_MASK);
 
             if (previous == fullId) {
                 return;
             }
 
-            storage.setBlock(x, y, z, fullId);
+            storage.set(x, y, z, fullId);
 
             dirty = true;
             parent.onSubChunkBlockChanged(this, layer, x, y, z, previous, fullId);
@@ -168,7 +168,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 return 0;
             }
 
-            return (this.storages[layer].getBlock(x, y, z)) & Block.DATA_MASK;
+            return (this.storages[layer].get(x, y, z)) & Block.DATA_MASK;
         } finally {
             this.readLock.unlock();
         }
@@ -189,14 +189,14 @@ public class LevelDBChunkSection implements ChunkSection {
             }
 
             StateBlockStorage storage = this.storages[layer];
-            int previous = storage.getBlock(x, y, z);
+            int previous = storage.get(x, y, z);
             int fullId = (previous & Block.DATA_BITS) | (data & Block.DATA_MASK);
 
             if (previous == fullId) {
                 return;
             }
 
-            storage.setBlock(x, y, z, fullId);
+            storage.set(x, y, z, fullId);
 
             dirty = true;
             parent.onSubChunkBlockChanged(this, layer, x, y, z, previous, fullId);
@@ -219,7 +219,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 return BlockID.AIR;
             }
 
-            return this.storages[layer].getBlock(x, y, z);
+            return this.storages[layer].get(x, y, z);
         } finally {
             this.readLock.unlock();
         }
@@ -272,7 +272,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 fullId = block.getFullId();
             } else {
                 storage = this.storages[layer];
-                previous = storage.getBlock(x, y, z);
+                previous = storage.get(x, y, z);
 
                 fullId = block.getFullId();
 
@@ -281,7 +281,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 }
             }
 
-            storage.setBlock(x, y, z, fullId);
+            storage.set(x, y, z, fullId);
 
             dirty = true;
             parent.onSubChunkBlockChanged(this, layer, x, y, z, previous, fullId);
@@ -314,14 +314,14 @@ public class LevelDBChunkSection implements ChunkSection {
                 previous = BlockID.AIR;
             } else {
                 storage = this.storages[layer];
-                previous = storage.getBlock(x, y, z);
+                previous = storage.get(x, y, z);
 
                 if (previous == fullId) {
                     return false;
                 }
             }
 
-            storage.setBlock(x, y, z, fullId);
+            storage.set(x, y, z, fullId);
 
             dirty = true;
             parent.onSubChunkBlockChanged(this, layer, x, y, z, previous, fullId);
@@ -496,7 +496,7 @@ public class LevelDBChunkSection implements ChunkSection {
             if (storages[i] != null) {
                 continue;
             }
-            storages[i] = StateBlockStorage.createFromBlockPalette();
+            storages[i] = StateBlockStorage.ofBlock();
         }
     }
 
@@ -518,9 +518,7 @@ public class LevelDBChunkSection implements ChunkSection {
 
             for (int i = 0; i < layers; i++) {
                 if (!this.hasLayerUnsafe(i)) {
-//                    EMPTY_STORAGE.writeTo(stream, (id) -> getStaticBlockPalette(version)
-//                            .getOrCreateRuntimeId0(id >> Block.DATA_BITS, id & Block.DATA_MASK));
-                    StateBlockStorage.createWithDefaultState(BitArrayVersion.V1, GlobalBlockPalette.getOrCreateRuntimeId(protocol, Block.AIR, 0))
+                    StateBlockStorage.ofBlock(BitArrayVersion.V1, GlobalBlockPalette.getOrCreateRuntimeId(protocol, Block.AIR, 0))
                             .writeTo(stream);
                     continue;
                 }

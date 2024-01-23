@@ -4,7 +4,6 @@ import cn.nukkit.block.Block;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseChunk;
-import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.tag.CompoundTag;
 
 import javax.annotation.Nullable;
@@ -16,7 +15,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import static cn.nukkit.level.format.leveldb.LevelDbConstants.SUB_CHUNK_2D_SIZE;
 
 public class LevelDBChunk extends BaseChunk {
-    protected PalettedBlockStorage[] biomes3d; //TODO
+    protected StateBlockStorage[] biomes3d; //TODO
     /**
      * 0-256, ZZZZXXXX key bit order.
      */
@@ -34,8 +33,8 @@ public class LevelDBChunk extends BaseChunk {
         this(level, chunkX, chunkZ, null, new short[SUB_CHUNK_2D_SIZE], null, null, null, null);
     }
 
-    public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ, @Nullable LevelDBChunkSection[] sections,
-                        @Nullable short[] heightmap, @Nullable byte[] biomes2d, @Nullable PalettedBlockStorage[] biomes3d,
+    public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ, @Nullable ChunkSection[] sections,
+                        @Nullable short[] heightmap, @Nullable byte[] biomes2d, @Nullable StateBlockStorage[] biomes3d,
                         @Nullable List<CompoundTag> entities, @Nullable List<CompoundTag> blockEntities) {
         this.ioLock = new ReentrantLock();
         this.provider = level;
@@ -119,7 +118,7 @@ public class LevelDBChunk extends BaseChunk {
         }
     }
 
-    public PalettedBlockStorage[] getBiomes() {
+    public StateBlockStorage[] getBiomes() {
         return this.biomes3d;
     }
 

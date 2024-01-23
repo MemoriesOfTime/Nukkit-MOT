@@ -9,6 +9,7 @@ import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.stream.NBTInputStream;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
@@ -21,9 +22,6 @@ import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntLists;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
-import org.cloudburstmc.nbt.NBTInputStream;
-import org.cloudburstmc.nbt.NbtMap;
-import org.cloudburstmc.nbt.NbtUtils;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -92,12 +90,14 @@ public class StateBlockStorage {
 
         NBTInputStream inputStream = null;
         try {
+            //TODO fix
             ByteBufInputStream stream = new ByteBufInputStream(byteBuf);
-            inputStream = NbtUtils.createReaderLE(stream);
+            inputStream = new NBTInputStream(stream);
+            //inputStream = NbtUtils.createReaderLE(stream);
             for (int i = 0; i < paletteSize; ++i) {
                 CompoundTag tag;
                 try {
-                    tag = BlockUpgrader.upgrade((NbtMap) inputStream.readTag());
+                    tag = BlockUpgrader.upgrade((CompoundTag) inputStream.readTag());
                 } catch (IOException e) {
                     throw new ChunkException("Invalid blockstate NBT at offset " + i + " in paletted storage", e);
                 }
@@ -230,6 +230,34 @@ public class StateBlockStorage {
                 id = idConvert.applyAsInt(id);
             }
             byteBuf.writeIntLE(id);
+        }
+    }
+
+    public void writeTo(BinaryStream stream) {
+        this.writeTo(stream, null);
+    }
+
+    public void writeTo(BinaryStream stream, Int2IntFunction idConvert) {
+        BitArrayVersion version = bitArray.getVersion();
+        stream.putByte((byte) getPaletteHeader(version, true));
+        if (version == BitArrayVersion.EMPTY) {
+            return;
+        }
+
+        if (version != BitArrayVersion.V0) {
+            for (int word : bitArray.getWords()) {
+                stream.putVarInt(word);
+            }
+
+            stream.putVarInt(palette.size());
+        }
+
+        for (int i = 0; i < this.palette.size(); i++) {
+            int id = this.palette.getInt(i);
+            if (idConvert != null) {
+                id = idConvert.applyAsInt(id);
+            }
+            stream.putVarInt(id);
         }
     }
 

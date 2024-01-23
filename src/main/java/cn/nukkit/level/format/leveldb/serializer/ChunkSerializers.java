@@ -2,7 +2,6 @@ package cn.nukkit.level.format.leveldb.serializer;
 
 import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
-import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
 import io.netty.util.collection.IntObjectHashMap;
 import io.netty.util.collection.IntObjectMap;
 import org.iq80.leveldb.DB;
@@ -16,9 +15,9 @@ public class ChunkSerializers {
     private static final IntObjectMap<ChunkSerializer> serializers = new IntObjectHashMap<>();
 
     static {
-        serializers.put(0, ChunkSerializerV1.INSTANCE);
+        /*serializers.put(0, ChunkSerializerV1.INSTANCE);
         serializers.put(1, ChunkSerializerV1.INSTANCE);
-        serializers.put(2, ChunkSerializerV1.INSTANCE);
+        serializers.put(2, ChunkSerializerV1.INSTANCE);*/
 
         serializers.put(3, ChunkSerializerV3.INSTANCE);
         serializers.put(4, ChunkSerializerV3.INSTANCE);
@@ -68,8 +67,8 @@ public class ChunkSerializers {
         return chunkSerializer;
     }
 
-    public static LevelDBChunkSection deserialize(DB db, ChunkBuilder chunkBuilder, int chunkVersion) {
-        return getChuckSerializer(chunkVersion).deserialize(db, chunkBuilder);
+    public static void deserialize(DB db, ChunkBuilder chunkBuilder, int chunkVersion) {
+        getChuckSerializer(chunkVersion).deserialize(db, chunkBuilder);
     }
 
     public static void serializer(WriteBatch writeBatch, Chunk chunk, int chunkVersion) {

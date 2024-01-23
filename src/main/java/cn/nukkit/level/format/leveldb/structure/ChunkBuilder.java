@@ -1,7 +1,6 @@
 package cn.nukkit.level.format.leveldb.structure;
 
 import cn.nukkit.level.DimensionData;
-import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
@@ -9,7 +8,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import com.google.common.base.Preconditions;
 import lombok.Getter;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class ChunkBuilder {
@@ -90,15 +88,15 @@ public class ChunkBuilder {
         return this;
     }
 
-    public Chunk build() {
+    /*public Chunk build() {
         Preconditions.checkNotNull(levelProvider);
         if (state == null) state = ChunkState.NEW;
-        if (sections == null) sections = new ChunkSection[levelProvider.getLevel().getDimensionData().getChunkSectionCount()];
+        if (sections == null) sections = new ChunkSection[levelProvider.getLevel().getDimensionData().getHeight()];
         if (heightMap == null) heightMap = new short[256];
         if (entities == null) entities = new ArrayList<>();
         if (blockEntities == null) blockEntities = new ArrayList<>();
         if (extraData == null) extraData = new CompoundTag();
-        return new Chunk(
+        return new LevelDBChunk(
                 state,
                 chunkX,
                 chunkZ,
@@ -109,11 +107,11 @@ public class ChunkBuilder {
                 blockEntities,
                 extraData
         );
-    }
+    }*/
 
-    public Chunk emptyChunk(int chunkX, int chunkZ) {
+    /*public Chunk emptyChunk(int chunkX, int chunkZ) {
         Preconditions.checkNotNull(levelProvider);
         return new Chunk(chunkX, chunkZ, levelProvider);
-    }
+    }*/
 
 }

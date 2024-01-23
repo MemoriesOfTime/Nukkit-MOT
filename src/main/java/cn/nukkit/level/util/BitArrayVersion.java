@@ -82,4 +82,8 @@ public enum BitArrayVersion {
             return new Pow2BitArray(this, size, words);
         }
     }
+
+    public boolean isSingleton() {
+        return this == V0 || this == V1;
+    }
 }
