@@ -78,8 +78,14 @@ public class StateBlockStorage {
         }
 
         BitArrayVersion version = BitArrayVersion.get(header >> 1, true);
+
+        if (version == BitArrayVersion.V0) {
+            return new StateBlockStorage(version.createPalette(SUB_CHUNK_SIZE, null), new IntArrayList());
+        }
+
         int expectedWordSize = version.getWordsForSize(SUB_CHUNK_SIZE);
         int[] words = new int[expectedWordSize];
+        int i2 = 0;
         for (int i = 0; i < expectedWordSize; ++i) {
             words[i] = byteBuf.readIntLE();
         }
@@ -105,6 +111,13 @@ public class StateBlockStorage {
                 int fullId = GlobalBlockPalette.getLegacyFullId(ProtocolInfo.CURRENT_PROTOCOL, tag);
                 palette[i] = GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, fullId);
             }
+
+            if (paletteSize == 0) {
+                // corrupted
+                return ofBlock(BlockID.AIR);
+            }
+
+            return new StateBlockStorage(bitArray, IntArrayList.wrap(palette));
         } finally {
             try {
                 if (inputStream != null) {
@@ -114,13 +127,6 @@ public class StateBlockStorage {
                 log.error("Failed to close NBT stream", e);
             }
         }
-
-        if (paletteSize == 0) {
-            // corrupted
-            return ofBlock(BlockID.AIR);
-        }
-
-        return new StateBlockStorage(bitArray, IntArrayList.wrap(palette));
     }
 
     public static StateBlockStorage ofBiome(int biomeId) {
