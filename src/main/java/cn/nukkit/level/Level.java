@@ -278,6 +278,7 @@ public class Level implements ChunkManager, Metadatable {
     };
 
     private boolean raining;
+    private int rainingIntensity;
     private int rainTime;
     private boolean thundering;
     private int thunderTime;
@@ -4281,7 +4282,11 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean setRaining(boolean raining) {
-        WeatherChangeEvent ev = new WeatherChangeEvent(this, raining);
+        return this.setRaining(raining, ThreadLocalRandom.current().nextInt(50000) + 10000);
+    }
+
+    public boolean setRaining(boolean raining, int intensity) {
+        WeatherChangeEvent ev = new WeatherChangeEvent(this, raining, intensity);
         this.server.getPluginManager().callEvent(ev);
 
         if (ev.isCancelled()) {
@@ -4289,15 +4294,15 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         this.raining = raining;
+        this.rainingIntensity = ev.getIntensity();
 
         LevelEventPacket pk = new LevelEventPacket();
         // These numbers are from Minecraft
 
         if (raining) {
             pk.evid = LevelEventPacket.EVENT_START_RAIN;
-            int time = Utils.random.nextInt(12000) + 12000;
-            pk.data = time;
-            setRainTime(time);
+            pk.data = this.rainingIntensity;
+            setRainTime(Utils.random.nextInt(12000) + 12000);
         } else {
             pk.evid = LevelEventPacket.EVENT_STOP_RAIN;
             setRainTime(Utils.random.nextInt(168000) + 12000);
@@ -4306,6 +4311,10 @@ public class Level implements ChunkManager, Metadatable {
         Server.broadcastPacket(this.getPlayers().values(), pk);
 
         return true;
+    }
+
+    public int getRainingIntensity() {
+        return rainingIntensity;
     }
 
     public int getRainTime() {
@@ -4368,7 +4377,7 @@ public class Level implements ChunkManager, Metadatable {
 
         if (this.raining) {
             pk.evid = LevelEventPacket.EVENT_START_RAIN;
-            pk.data = this.rainTime;
+            pk.data = this.rainingIntensity;
         } else {
             pk.evid = LevelEventPacket.EVENT_STOP_RAIN;
         }
