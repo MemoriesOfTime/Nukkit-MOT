@@ -126,21 +126,9 @@ public class LevelDBChunk extends BaseChunk {
         return this.heightmap;
     }
 
-    @Override
-    public int getBiomeId(int x, int z) {
-        return this.biomes[index2d(x, z)] & 0xff;
-//        return this.getBiomeId(x, 0, z);
-    }
-
     public int getBiomeId(int x, int y, int z) {
         return this.biomes[index2d(x, z)] & 0xff;
 //        return this.biomes3d[0].get(x, 0, z);
-    }
-
-    @Override
-    public void setBiomeId(int x, int z, byte biomeId) {
-//        this.biomes[index2d(x, z)] = biomeId;
-        this.setBiomeId(x, 0, z, biomeId);
     }
 
     public void setBiomeId(int x, int y, int z, byte biomeId) {

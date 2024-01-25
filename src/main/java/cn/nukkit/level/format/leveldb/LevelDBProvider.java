@@ -485,6 +485,18 @@ public class LevelDBProvider implements LevelProvider {
             }
         }
 
+        //TODO
+        //Data3dSerializer.deserialize(this.db, chunkBuilder);
+
+        if (heightmap == null) {
+            heightmap = new short[256];
+            Arrays.fill(heightmap, (byte) 255);
+        }
+        if (biome == null) {
+            biome = new byte[SUB_CHUNK_2D_SIZE];
+            Arrays.fill(biome, (byte) 0);
+        }
+
         List<CompoundTag> blockEntities = new ObjectArrayList<>();
         byte[] blockEntityData = this.db.get(BLOCK_ENTITIES.getKey(chunkX, chunkZ));
         if (blockEntityData != null && blockEntityData.length != 0) {

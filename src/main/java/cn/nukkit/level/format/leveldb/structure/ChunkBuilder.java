@@ -4,6 +4,7 @@ import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
+import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.tag.CompoundTag;
 import com.google.common.base.Preconditions;
 import lombok.Getter;
@@ -19,7 +20,8 @@ public class ChunkBuilder {
     int chunkX;
     LevelProvider levelProvider;
     ChunkSection[] sections;
-    short[] heightMap;
+    int[] heightMap;
+    PalettedBlockStorage[] biomeStorage;
     List<CompoundTag> entities;
     List<CompoundTag> blockEntities;
     CompoundTag extraData;
@@ -68,8 +70,13 @@ public class ChunkBuilder {
         return sections;
     }
 
-    public ChunkBuilder heightMap(short[] heightMap) {
+    public ChunkBuilder heightMap(int[] heightMap) {
         this.heightMap = heightMap;
+        return this;
+    }
+
+    public ChunkBuilder biomeStorage(PalettedBlockStorage[] biomeStorage) {
+        this.biomeStorage = biomeStorage;
         return this;
     }
 

@@ -1,11 +1,16 @@
 package cn.nukkit.level.util;
 
+import cn.nukkit.Server;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.ChunkException;
+import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+
+import static cn.nukkit.level.format.leveldb.LevelDbConstants.SUB_CHUNK_SIZE;
 
 public class PalettedBlockStorage {
 
@@ -78,6 +83,40 @@ public class PalettedBlockStorage {
 
     public void setBlock(BlockVector3 pos, int value) {
         this.setBlock(getIndex(pos.x, pos.y, pos.z), value);
+    }
+
+    public void readFromStorage(ByteBuf byteBuf) {
+        short header = byteBuf.readUnsignedByte();
+
+        BitArrayVersion version  = BitArrayVersion.get(header >> 1, true);
+
+        this.palette.clear();
+
+        int paletteSize = 1;
+        if (version == BitArrayVersion.V0) {
+            this.bitArray = version.createPalette(SUB_CHUNK_SIZE, null);
+        } else {
+            int expectedWordSize = version.getWordsForSize(SUB_CHUNK_SIZE);
+            int[] words = new int[expectedWordSize];
+            int i2 = 0;
+            for (int i = 0; i < expectedWordSize; ++i) {
+                words[i] = byteBuf.readIntLE();
+            }
+            this.bitArray = version.createPalette(SUB_CHUNK_SIZE, words);
+            paletteSize = byteBuf.readIntLE();
+        }
+
+        if (version.getMaxEntryValue() < paletteSize - 1) {
+            throw new ChunkException("Invalid paletteSize size: " + paletteSize + ", max: " + version.getMaxEntryValue());
+        }
+
+        for (int i = 0; i < paletteSize; i++) {
+            int runtimeId = byteBuf.readIntLE();
+            this.palette.add(runtimeId);
+            if (runtimeId < 0) {
+                Server.getInstance().getLogger().warning("Invalid block runtime ID: " + runtimeId + ", palette: " + palette);
+            }
+        }
     }
 
     public void writeTo(BinaryStream stream) {
