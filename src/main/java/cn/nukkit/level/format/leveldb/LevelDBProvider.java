@@ -16,6 +16,7 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.format.leveldb.serializer.ChunkSerializers;
 import cn.nukkit.level.format.leveldb.serializer.Data2dSerializer;
+import cn.nukkit.level.format.leveldb.serializer.Data3dSerializer;
 import cn.nukkit.level.format.leveldb.structure.*;
 import cn.nukkit.level.format.leveldb.updater.BlockUpgrader;
 import cn.nukkit.level.generator.Generator;
@@ -457,8 +458,7 @@ public class LevelDBProvider implements LevelProvider {
 
         boolean hasBeenUpgraded = chunkVersion < CURRENT_LEVEL_CHUNK_VERSION;
 
-        //TODO
-        //Data3dSerializer.deserialize(this.db, chunkBuilder);
+        Data3dSerializer.deserialize(this.db, chunkBuilder);
         if (!chunkBuilder.hasBiome3d()) {
             Data2dSerializer.deserialize(this.db, chunkBuilder);
         }

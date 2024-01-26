@@ -53,11 +53,11 @@ public class Data3dSerializer {
 
                 PalettedBlockStorage[] biomePalettes = new PalettedBlockStorage[dimensionData.getHeight() >> 4];
                 PalettedBlockStorage last = null;
-                for (int y = 0; y <= biomePalettes.length; y++) {
+                for (int y = 0; y < biomePalettes.length; y++) {
                     PalettedBlockStorage biomePalette = readBiomePalette(heightAndBiomesBuffer);
                     if (biomePalette == null) {
                         if (last != null) {
-                            biomePalette = last;
+                            biomePalette = last.copy();
                         } else {
                             throw new IllegalStateException("Invalid biome palette");
                         }
