@@ -4,6 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseChunk;
+import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.tag.CompoundTag;
 
 import javax.annotation.Nullable;
@@ -15,11 +16,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import static cn.nukkit.level.format.leveldb.LevelDbConstants.SUB_CHUNK_2D_SIZE;
 
 public class LevelDBChunk extends BaseChunk {
-    protected StateBlockStorage[] biomes3d; //TODO
-    /**
-     * 0-256, ZZZZXXXX key bit order.
-     */
-    protected short[] heightmap;
+    protected PalettedBlockStorage[] biomes3d; //TODO
 
     protected boolean terrainGenerated;
     protected boolean terrainPopulated;
@@ -30,11 +27,11 @@ public class LevelDBChunk extends BaseChunk {
     public final Lock ioLock;
 
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ) {
-        this(level, chunkX, chunkZ, null, new short[SUB_CHUNK_2D_SIZE], null, null, null, null);
+        this(level, chunkX, chunkZ, null, new int[SUB_CHUNK_2D_SIZE], null, null, null, null);
     }
 
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ, @Nullable ChunkSection[] sections,
-                        @Nullable short[] heightmap, @Nullable byte[] biomes2d, @Nullable StateBlockStorage[] biomes3d,
+                        @Nullable int[] heightmap, @Nullable byte[] biomes2d, @Nullable PalettedBlockStorage[] biomes3d,
                         @Nullable List<CompoundTag> entities, @Nullable List<CompoundTag> blockEntities) {
         this.ioLock = new ReentrantLock();
         this.provider = level;
@@ -58,11 +55,13 @@ public class LevelDBChunk extends BaseChunk {
             ((LevelDBChunkSection) section).setParent(this);
         }
 
-        super.heightMap = new byte[SUB_CHUNK_2D_SIZE]; //防止clone空指针
+        this.heightMap = new byte[SUB_CHUNK_2D_SIZE];
         if (heightmap != null && heightmap.length == SUB_CHUNK_2D_SIZE) {
-            this.heightmap = heightmap;
+            for (int i=0; i<heightmap.length; i++) {
+                this.heightMap[i] = (byte) heightmap[i];
+            }
         } else {
-            this.heightmap = new short[SUB_CHUNK_2D_SIZE];
+            Arrays.fill(this.heightMap, (byte)-1);
             this.recalculateHeightMap();
         }
 
@@ -118,12 +117,8 @@ public class LevelDBChunk extends BaseChunk {
         }
     }
 
-    public StateBlockStorage[] getBiomes() {
+    public PalettedBlockStorage[] getBiomes() {
         return this.biomes3d;
-    }
-
-    public short[] getHeightmap() {
-        return this.heightmap;
     }
 
     public int getBiomeId(int x, int y, int z) {
@@ -159,29 +154,11 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @Override
-    public int getHeightMap(int x, int z) {
-        return this.heightmap[index2d(x, z)];
-    }
-
-    @Override
     public void setHeightMap(int x, int z, int value) {
-        int index = index2d(x, z);
-        if (this.heightmap[index] == value) {
-            return;
-        }
-        this.heightmap[index] = (short) value;
+        super.setHeightMap(x, z, value);
 
         this.heightmapOrBiomesDirty = true;
         this.setChanged();
-    }
-
-    @Override
-    public void recalculateHeightMap() {
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                this.getHighestBlockAt(x, z, false);
-            }
-        }
     }
 
     public void onSubChunkBlockChanged(LevelDBChunkSection subChunk, int layer, int x, int y, int z, int previousId, int newId) {
@@ -286,10 +263,6 @@ public class LevelDBChunk extends BaseChunk {
     @Override
     public BaseChunk clone() {
         LevelDBChunk chunk = (LevelDBChunk) super.clone();
-
-        if (this.heightmap != null) {
-            chunk.heightmap = this.heightmap.clone();
-        }
 
         for (int i = 0; i < chunk.sections.length; i++) {
             ChunkSection section = chunk.sections[i];

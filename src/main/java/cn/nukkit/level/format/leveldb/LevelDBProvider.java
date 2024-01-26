@@ -15,6 +15,7 @@ import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.format.leveldb.serializer.ChunkSerializers;
+import cn.nukkit.level.format.leveldb.serializer.Data2dSerializer;
 import cn.nukkit.level.format.leveldb.structure.*;
 import cn.nukkit.level.format.leveldb.updater.BlockUpgrader;
 import cn.nukkit.level.generator.Generator;
@@ -28,7 +29,6 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
 import com.google.common.collect.ImmutableMap;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
@@ -275,7 +275,7 @@ public class LevelDBProvider implements LevelProvider {
         long timestamp = chunk.getChanges();
 
         if (this.getServer().asyncChunkSending) {
-            final BaseChunk chunkClone = chunk.clone();
+            final BaseChunk chunkClone = chunk.fullClone();
             this.level.getAsyncChuckExecutor().execute(() -> {
                 NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
                     getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
@@ -296,7 +296,7 @@ public class LevelDBProvider implements LevelProvider {
                         networkChunkSerializerCallback.getSubchunks(),
                         networkChunkSerializerCallback.getStream().getBuffer()
                 );
-            }, level.antiXrayEnabled(),this.level.getDimensionData());
+            }, level.antiXrayEnabled(), this.level.getDimensionData());
         }
     }
 
@@ -455,47 +455,17 @@ public class LevelDBProvider implements LevelProvider {
 
         ChunkSerializers.deserialize(this.db, chunkBuilder, (int)chunkVersion);
 
-        //TODO
-        /*Data3dSerializer.a(this.db, chunkBuilder);
-        if (!chunkBuilder.) {
-            Data2dSerializer.a(this.db, chunkBuilder);
-        }
-        BlockEntitySerializer.a(this.db, chunkBuilder);
-        EntitySerializer.a(this.db, chunkBuilder);*/
-
         boolean hasBeenUpgraded = chunkVersion < CURRENT_LEVEL_CHUNK_VERSION;
-
-        short[] heightmap = null;
-        byte[] biome = null;
-        StateBlockStorage[] biomes3d = null;
-
-        byte[] maps2d = this.db.get(DATA_2D.getKey(chunkX, chunkZ));
-        if (maps2d != null && maps2d.length >= SUB_CHUNK_2D_SIZE * 2 + SUB_CHUNK_2D_SIZE) {
-            heightmap = new short[SUB_CHUNK_2D_SIZE];
-            biome = new byte[SUB_CHUNK_2D_SIZE];
-
-            ByteBuf buf = Unpooled.wrappedBuffer(maps2d);
-            try {
-                for (int i = 0; i < SUB_CHUNK_2D_SIZE; i++)  {
-                    heightmap[i] = buf.readShortLE();
-                }
-                buf.readBytes(biome);
-            } finally {
-                buf.release();
-            }
-        }
 
         //TODO
         //Data3dSerializer.deserialize(this.db, chunkBuilder);
+        if (!chunkBuilder.hasBiome3d()) {
+            Data2dSerializer.deserialize(this.db, chunkBuilder);
+        }
 
-        if (heightmap == null) {
-            heightmap = new short[256];
-            Arrays.fill(heightmap, (byte) 255);
-        }
-        if (biome == null) {
-            biome = new byte[SUB_CHUNK_2D_SIZE];
-            Arrays.fill(biome, (byte) 0);
-        }
+        //TODO
+        /*BlockEntitySerializer.deserialize(this.db, chunkBuilder);
+        EntitySerializer.deserialize(this.db, chunkBuilder);*/
 
         List<CompoundTag> blockEntities = new ObjectArrayList<>();
         byte[] blockEntityData = this.db.get(BLOCK_ENTITIES.getKey(chunkX, chunkZ));
@@ -512,6 +482,7 @@ public class LevelDBProvider implements LevelProvider {
                 throw new ChunkException("Corrupted block entity data", e);
             }
         }
+        chunkBuilder.blockEntities(blockEntities);
 
         List<CompoundTag> entities = new ObjectArrayList<>();
         byte[] entityData = this.db.get(ENTITIES.getKey(chunkX, chunkZ));
@@ -528,6 +499,7 @@ public class LevelDBProvider implements LevelProvider {
                 throw new ChunkException("Corrupted entity data", e);
             }
         }
+        chunkBuilder.entities(entities);
 
         byte[] tickingData = this.db.get(PENDING_TICKS.getKey(chunkX, chunkZ));
         if (tickingData != null && tickingData.length != 0) {
@@ -547,7 +519,7 @@ public class LevelDBProvider implements LevelProvider {
             finalisation = FINALISATION_DONE; //older versions didn't have this tag
         }
 
-        LevelDBChunk chunk = new LevelDBChunk(this, chunkX, chunkZ, chunkBuilder.getSections(), heightmap, biome, biomes3d, entities, blockEntities);
+        LevelDBChunk chunk = chunkBuilder.build();
 
         if (finalisation == FINALISATION_DONE) {
             chunk.setGenerated();
@@ -606,7 +578,7 @@ public class LevelDBProvider implements LevelProvider {
             }
 
             if (chunk.isHeightmapOrBiomesDirty()) {
-                for (short height : chunk.getHeightmap()) {
+                for (int height : chunk.getHeightMapArray()) {
                     stream.putLShort(height);
                 }
                 int mark = stream.getCount();
