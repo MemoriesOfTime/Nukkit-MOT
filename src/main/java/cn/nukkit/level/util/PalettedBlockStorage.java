@@ -5,12 +5,11 @@ import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
+import it.unimi.dsi.fastutil.ints.Int2IntFunction;
 import cn.nukkit.utils.ChunkException;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-
-import static cn.nukkit.level.format.leveldb.LevelDbConstants.SUB_CHUNK_SIZE;
 
 public class PalettedBlockStorage {
 
@@ -94,15 +93,15 @@ public class PalettedBlockStorage {
 
         int paletteSize = 1;
         if (version == BitArrayVersion.V0) {
-            this.bitArray = version.createPalette(SUB_CHUNK_SIZE, null);
+            this.bitArray = version.createPalette(SIZE, null);
         } else {
-            int expectedWordSize = version.getWordsForSize(SUB_CHUNK_SIZE);
+            int expectedWordSize = version.getWordsForSize(SIZE);
             int[] words = new int[expectedWordSize];
             int i2 = 0;
             for (int i = 0; i < expectedWordSize; ++i) {
                 words[i] = byteBuf.readIntLE();
             }
-            this.bitArray = version.createPalette(SUB_CHUNK_SIZE, words);
+            this.bitArray = version.createPalette(SIZE, words);
             paletteSize = byteBuf.readIntLE();
         }
 
@@ -120,14 +119,27 @@ public class PalettedBlockStorage {
     }
 
     public void writeTo(BinaryStream stream) {
+        this.writeTo(stream, id -> id);
+    }
+
+    public void writeTo(BinaryStream stream, Int2IntFunction idConvert) {
         stream.putByte((byte) getPaletteHeader(bitArray.getVersion()));
 
-        for (int word : bitArray.getWords()) {
-            stream.putLInt(word);
+        if (bitArray.getVersion() != BitArrayVersion.V0) {
+            for (int word : bitArray.getWords()) {
+                stream.putLInt(word);
+            }
+
+            stream.putVarInt(palette.size());
         }
 
-        stream.putVarInt(palette.size());
-        palette.forEach(stream::putVarInt);
+        for (int i = 0; i < this.palette.size(); i++) {
+            int id = this.palette.getInt(i);
+            if (idConvert != null) {
+                id = idConvert.applyAsInt(id);
+            }
+            stream.putVarInt(id);
+        }
     }
 
     private void onResize(BitArrayVersion version) {

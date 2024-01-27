@@ -1422,7 +1422,11 @@ public class Level implements ChunkManager, Metadatable {
         this.requireProvider().saveChunks();
     }
 
-    public void updateAroundRedstone(Vector3 pos, BlockFace ignoredFace) {
+    public void updateAroundRedstone(@NotNull Vector3 pos) {
+        this.updateAroundRedstone(pos, null);
+    }
+
+    public void updateAroundRedstone(@NotNull Vector3 pos, @Nullable BlockFace ignoredFace) {
         for (BlockFace side : BlockFace.values()) {
             if (ignoredFace != null && side == ignoredFace) {
                 continue;
@@ -1808,6 +1812,19 @@ public class Level implements ChunkManager, Metadatable {
         return this.getChunk(x >> 4, z >> 4, false).getBlockRuntimeId(protocolId, x & 0x0f, y & 0xff, z & 0x0f, layer);
     }
 
+    public Set<Block> getBlockAround(@NotNull Vector3 pos) {
+        return this.getBlockAround(pos, 0);
+    }
+
+    public Set<Block> getBlockAround(@NotNull Vector3 pos, int layer) {
+        Set<Block> around = new HashSet<>();
+        Block block = getBlock(pos);
+        for (BlockFace face : BlockFace.values()) {
+            Block side = block.getSideAtLayer(layer, face);
+            around.add(side);
+        }
+        return around;
+    }
 
     public Block getBlock(Vector3 pos) {
         return getBlock(pos, 0);
@@ -1950,8 +1967,9 @@ public class Level implements ChunkManager, Metadatable {
             int y = Hash.hashBlockY(node);
             int z = Hash.hashBlockZ(node);
 
-            int lightLevel = this.getBlockLightAt(x, y, z)
-                    - Block.lightFilter[this.getBlockIdAt(x, y, z)];
+            int id = this.getBlockIdAt(x, y, z);
+            int lightFilter = id >= Block.MAX_BLOCK_ID ? 15 : Block.lightFilter[id];
+            int lightLevel = this.getBlockLightAt(x, y, z) - lightFilter;
 
             if (lightLevel >= 1) {
                 this.computeSpreadBlockLight(x - 1, y, z, lightLevel, lightPropagationQueue, visited);
@@ -2181,7 +2199,7 @@ public class Level implements ChunkManager, Metadatable {
 
             int fullId = this.getFullBlock(fullChunk, x, y, z, 0);
             int id = fullId >> Block.DATA_BITS;
-            if (!Level.xrayableBlocks[id]) {
+            if (id >= Block.MAX_BLOCK_ID || !Level.xrayableBlocks[id]) {
                 continue;
             }
 
@@ -3706,6 +3724,9 @@ public class Level implements ChunkManager, Metadatable {
     public void removeBlockEntity(BlockEntity entity) {
         Preconditions.checkNotNull(entity, "entity");
         Preconditions.checkArgument(entity.getLevel() == this, "BlockEntity is not in this level");
+
+        entity.close();
+
         blockEntities.remove(entity.getId());
         updateBlockEntities.remove(entity);
     }
@@ -4011,7 +4032,7 @@ public class Level implements ChunkManager, Metadatable {
         this.cancelUnloadChunkRequest(x, z);
         LevelProvider levelProvider = requireProvider();
         levelProvider.setChunk(x, z, levelProvider.getEmptyChunk(x, z));
-        this.generateChunk(x, z);
+        this.generateChunk(x, z, true);
     }
 
     public void doChunkGarbageCollection() {
@@ -4383,6 +4404,22 @@ public class Level implements ChunkManager, Metadatable {
 
     public int getDimension() {
         return this.dimensionData.getDimensionId();
+    }
+
+    public int getMinBlockY() {
+        int minHeight = this.dimensionData.getMinHeight();
+        if (minHeight < 0) {
+            return 0; //TODO 支持-64高度时移除
+        }
+        return minHeight;
+    }
+
+    public int getMaxBlockY() {
+        int maxHeight = this.dimensionData.getMaxHeight();
+        if (maxHeight > 255) {
+            return 255; //TODO 支持319世界高度时移除
+        }
+        return maxHeight;
     }
 
     public boolean canBlockSeeSky(Vector3 pos) {

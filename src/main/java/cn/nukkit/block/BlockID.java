@@ -466,4 +466,12 @@ public interface BlockID {
     int RAW_COPPER_BLOCK = 707;
 
     int RAW_GOLD_BLOCK = 708;
+
+    int PEARLESCENT_FROGLIGHT = 724;
+
+    int VERDANT_FROGLIGHT = 725;
+
+    int OCHRE_FROGLIGHT = 726;
+
+    int DECORATED_POT = 806;
 }

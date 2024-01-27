@@ -1857,6 +1857,7 @@ public class Server {
         } catch (IOException e) {
             log.warn(this.getLanguage().translateString("nukkit.data.playerCorrupted", name));
             log.throwing(e);
+            create = true;
         } finally {
             if (dataStream.isPresent()) {
                 try {
@@ -2914,6 +2915,7 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.BARREL, BlockEntityBarrel.class);
         BlockEntity.registerBlockEntity(BlockEntity.MOVING_BLOCK, BlockEntityMovingBlock.class);
         BlockEntity.registerBlockEntity(BlockEntity.END_GATEWAY, BlockEntityEndGateway.class);
+        BlockEntity.registerBlockEntity(BlockEntity.DECORATED_POT, BlockEntityDecoratedPot.class);
     }
 
     /**
