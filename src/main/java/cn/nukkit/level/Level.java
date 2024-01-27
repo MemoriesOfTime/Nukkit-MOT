@@ -77,7 +77,10 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.ref.SoftReference;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 
@@ -298,6 +301,11 @@ public class Level implements ChunkManager, Metadatable {
     private Iterator<LongObjectEntry<Long>> lastUsingUnloadingIter;
 
     private final boolean antiXray;
+
+    // 用于实现世界监听的回调
+    private static final AtomicInteger callbackIdCounter = new AtomicInteger();
+    private final Int2ObjectMap<Consumer<Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<BiConsumer<Long, DataPacket>> callbackChunkPacketSend = new Int2ObjectOpenHashMap<>();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
         this.levelId = levelIdCounter++;
@@ -822,6 +830,13 @@ public class Level implements ChunkManager, Metadatable {
         long index = Level.chunkHash(chunkX, chunkZ);
         Deque<DataPacket> packets = chunkPackets.computeIfAbsent(index, i -> new ConcurrentLinkedDeque<>());
         packets.add(packet);
+        try {
+            for (BiConsumer<Long, DataPacket> consumer : this.callbackChunkPacketSend.values()) {
+                consumer.accept(index, packet);
+            }
+        } catch (Exception e) {
+            Server.getInstance().getLogger().error("Error while calling chunk packet send callback", e);
+        }
     }
 
     public void registerChunkLoader(ChunkLoader loader, int chunkX, int chunkZ) {
@@ -2085,6 +2100,15 @@ public class Level implements ChunkManager, Metadatable {
         block.z = z;
         block.level = this;
         block.layer = layer;
+
+        try {
+            for (Consumer<Block> callback : this.callbackBlockSet.values()) {
+                callback.accept(block);
+            }
+        } catch (Exception e) {
+            Server.getInstance().getLogger().error("Error while calling block set callback", e);
+        }
+
         int cx = x >> 4;
         int cz = z >> 4;
 
@@ -4861,6 +4885,38 @@ public class Level implements ChunkManager, Metadatable {
         } else {
             return 0;
         }
+    }
+
+    /**
+     * 添加方块设置回调，当世界中有方块被更改时，会触发回调
+     *
+     * @param consumer 回调
+     * @return 回调id
+     */
+    public int addCallbackBlockSet(Consumer<Block> consumer) {
+        int id = callbackIdCounter.incrementAndGet();
+        callbackBlockSet.put(id, consumer);
+        return id;
+    }
+
+    public void removeCallbackBlockSet(int id) {
+        callbackBlockSet.remove(id);
+    }
+
+    /**
+     * 添加区块数据包发送回调，当世界中有区块数据包被发送时，会触发回调
+     *
+     * @param consumer 回调
+     * @return 回调id
+     */
+    public int addCallbackChunkPacketSend(BiConsumer<Long, DataPacket> consumer) {
+        int id = callbackIdCounter.incrementAndGet();
+        callbackChunkPacketSend.put(id, consumer);
+        return id;
+    }
+
+    public void removeCallbackChunkPacketSend(int id) {
+        callbackChunkPacketSend.remove(id);
     }
 
     private ConcurrentMap<Long, Int2ObjectMap<Player>> getChunkSendQueue(int protocol) {
