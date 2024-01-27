@@ -143,8 +143,8 @@ public class PlayerFood {
                 if (this.foodTickTimer >= 80) {
                     if (this.player.getHealth() < this.player.getMaxHealth()) {
                         EntityRegainHealthEvent ev = new EntityRegainHealthEvent(this.player, 1, EntityRegainHealthEvent.CAUSE_EATING);
+                        this.player.heal(ev);
                         if (!ev.isCancelled()) {
-                            this.player.heal(ev);
                             this.updateFoodExpLevel(6);
                         }
                     }
