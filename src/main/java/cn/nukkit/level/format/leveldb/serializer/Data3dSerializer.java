@@ -75,7 +75,6 @@ public class Data3dSerializer {
     }
 
     private static PalettedBlockStorage readBiomePalette(ByteBuf byteBuf) {
-        //TODO 修复报错
         int index = byteBuf.readerIndex();
         int header = byteBuf.readUnsignedByte() >> 1;
         if (header == 127) {
