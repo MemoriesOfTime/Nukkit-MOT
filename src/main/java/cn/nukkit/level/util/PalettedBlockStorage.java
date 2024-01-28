@@ -4,10 +4,9 @@ import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
+import it.unimi.dsi.fastutil.ints.Int2IntFunction;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-
-import java.util.function.IntConsumer;
 
 public class PalettedBlockStorage {
 
@@ -79,14 +78,27 @@ public class PalettedBlockStorage {
     }
 
     public void writeTo(BinaryStream stream) {
+        this.writeTo(stream, id -> id);
+    }
+
+    public void writeTo(BinaryStream stream, Int2IntFunction idConvert) {
         stream.putByte((byte) getPaletteHeader(bitArray.getVersion()));
 
-        for (int word : bitArray.getWords()) {
-            stream.putLInt(word);
+        if (bitArray.getVersion() != BitArrayVersion.V0) {
+            for (int word : bitArray.getWords()) {
+                stream.putLInt(word);
+            }
+
+            stream.putVarInt(palette.size());
         }
 
-        stream.putVarInt(palette.size());
-        palette.forEach((IntConsumer) stream::putVarInt);
+        for (int i = 0; i < this.palette.size(); i++) {
+            int id = this.palette.getInt(i);
+            if (idConvert != null) {
+                id = idConvert.applyAsInt(id);
+            }
+            stream.putVarInt(id);
+        }
     }
 
     private void onResize(BitArrayVersion version) {

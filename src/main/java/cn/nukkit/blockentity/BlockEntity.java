@@ -41,16 +41,18 @@ public abstract class BlockEntity extends Position {
     public static final String SHULKER_BOX = "ShulkerBox";
     public static final String BANNER = "Banner";
     public static final String LECTERN = "Lectern";
+    public static final String BEEHIVE = "Beehive";
     public static final String DROPPER = "Dropper";
     public static final String DISPENSER = "Dispenser";
     public static final String BARREL = "Barrel";
     public static final String CAMPFIRE = "Campfire";
     public static final String BELL = "Bell";
     public static final String END_GATEWAY = "EndGateway";
+    public static final String DECORATED_POT = "DecoratedPot";
 
     public static long count = 1;
 
-    private static final BiMap<String, Class<? extends BlockEntity>> knownBlockEntities = HashBiMap.create(24);
+    private static final BiMap<String, Class<? extends BlockEntity>> knownBlockEntities = HashBiMap.create(30);
 
     public FullChunk chunk;
     public String name;

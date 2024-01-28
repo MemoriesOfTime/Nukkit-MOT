@@ -28,7 +28,8 @@ import java.util.List;
  */
 public abstract class Biome implements BlockID {
 
-    public static final Biome[] biomes = new Biome[256];
+    public static final int MAX_BIOMES = 256;
+    public static final Biome[] biomes = new Biome[MAX_BIOMES];
     public static final List<Biome> unorderedBiomes = new ObjectArrayList<>();
     private static final Int2ObjectMap<String> runtimeId2Identifier = new Int2ObjectOpenHashMap<>();
     private static CompoundTag biomeDefinitions;
@@ -62,6 +63,10 @@ public abstract class Biome implements BlockID {
 
     public static String getBiomeNameFromId(int protocol, int biomeId) {
         return runtimeId2Identifier.get(biomeId);
+    }
+
+    public static int getBiomeIdOrCorrect(int biomeId) {
+        return getBiomeIdOrCorrect(ProtocolInfo.CURRENT_PROTOCOL, biomeId);
     }
 
     public static int getBiomeIdOrCorrect(int protocol, int biomeId) {

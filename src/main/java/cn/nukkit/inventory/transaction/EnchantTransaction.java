@@ -119,7 +119,10 @@ public class EnchantTransaction extends InventoryTransaction {
     public boolean checkEnchantValid() {
         if (this.inputItem.getId() != this.outputItem.getId()
                 || this.inputItem.getCount() != this.outputItem.getCount()) {
-            return false;
+            //附魔书特判
+            if (this.getInputItem().getId() != Item.BOOK || this.getOutputItem().getId() != Item.ENCHANTED_BOOK) {
+                return false;
+            }
         }
 
         //TODO 检查附魔

@@ -133,7 +133,7 @@ public class EntitySnowGolem extends EntityWalkingMob {
             if (this.age % 400 == 0) {
                 this.nowBiomeId = this.chunk.getBiomeId(this.getFloorX() & 0xF, this.getFloorZ() & 0xF);
             }
-            if (this.nowBiomeId != EnumBiome.DESERT.id && this.nowBiomeId != EnumBiome.HELL.id && this.nowBiomeId != EnumBiome.JUNGLE_BAMBOO.id &&
+            if (this.nowBiomeId != EnumBiome.DESERT.id && this.nowBiomeId != EnumBiome.HELL.id && this.nowBiomeId != EnumBiome.BAMBOO_JUNGLE.id &&
                     this.nowBiomeId != EnumBiome.JUNGLE_HILLS.id && this.nowBiomeId != EnumBiome.JUNGLE_EDGE.id && this.nowBiomeId != EnumBiome.MESA.id &&
                     this.nowBiomeId != EnumBiome.MESA_PLATEAU_F.id && this.nowBiomeId != EnumBiome.MESA_PLATEAU.id && this.nowBiomeId != EnumBiome.DESERT_M.id &&
                     this.nowBiomeId != EnumBiome.JUNGLE_M.id && this.nowBiomeId != EnumBiome.JUNGLE_EDGE_M.id && this.nowBiomeId != EnumBiome.MESA_BRYCE.id &&

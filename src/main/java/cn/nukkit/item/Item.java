@@ -410,6 +410,26 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             registerNamespacedIdItem(ItemRaiserArmorTrimSmithingTemplate.class);
             registerNamespacedIdItem(ItemShaperArmorTrimSmithingTemplate.class);
             registerNamespacedIdItem(ItemHostArmorTrimSmithingTemplate.class);
+            registerNamespacedIdItem(ItemAnglerPotterySherd.class);
+            registerNamespacedIdItem(ItemArcherPotterySherd.class);
+            registerNamespacedIdItem(ItemArmsUpPotterySherd.class);
+            registerNamespacedIdItem(ItemBladePotterySherd.class);
+            registerNamespacedIdItem(ItemBrewerPotterySherd.class);
+            registerNamespacedIdItem(ItemBurnPotterySherd.class);
+            registerNamespacedIdItem(ItemDangerPotterySherd.class);
+            registerNamespacedIdItem(ItemExplorerPotterySherd.class);
+            registerNamespacedIdItem(ItemFriendPotterySherd.class);
+            registerNamespacedIdItem(ItemHeartPotterySherd.class);
+            registerNamespacedIdItem(ItemHeartbreakPotterySherd.class);
+            registerNamespacedIdItem(ItemHowlPotterySherd.class);
+            registerNamespacedIdItem(ItemMinerPotterySherd.class);
+            registerNamespacedIdItem(ItemMournerPotterySherd.class);
+            registerNamespacedIdItem(ItemPlentyPotterySherd.class);
+            registerNamespacedIdItem(ItemPrizePotterySherd.class);
+            registerNamespacedIdItem(ItemSheafPotterySherd.class);
+            registerNamespacedIdItem(ItemShelterPotterySherd.class);
+            registerNamespacedIdItem(ItemSkullPotterySherd.class);
+            registerNamespacedIdItem(ItemSnortPotterySherd.class);
 
             // 添加原版物品到NAMESPACED_ID_ITEM
             // Add vanilla items to NAMESPACED_ID_ITEM
@@ -1058,7 +1078,11 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             Supplier<Item> constructor = NAMESPACED_ID_ITEM.get(namespacedId);
             if (constructor != null) {
                 try {
-                    return constructor.get();
+                    Item item = constructor.get();
+                    if (meta.isPresent()) {
+                        item.setDamage(meta.getAsInt());
+                    }
+                    return item;
                 } catch (Exception e) {
                     log.warn("Could not create a new instance of {} using the namespaced id {}", constructor, namespacedId, e);
                 }
@@ -1135,7 +1159,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public Item setCompoundTag(byte[] tags) {
-        this.tags = tags;
+        this.tags = tags == null ? new byte[0] : tags;
         this.cachedNBT = null;
         return this;
     }

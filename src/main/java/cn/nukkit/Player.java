@@ -716,7 +716,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             data.put(command.getName(), command.generateCustomCommandData(this));
         }
 
-        if (data.size() != 0) {
+        if (!data.isEmpty()) {
             pk.commands = data;
             this.dataPacket(pk);
         }
@@ -2009,10 +2009,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.resetClientMovement();
         } else {
             this.forceMovement = null;
-            if (distance != 0 && this.nextChunkOrderRun > 20) {
-                this.nextChunkOrderRun = 20;
+            if (distance != 0) {
+                if (this.nextChunkOrderRun > 20) {
+                    this.nextChunkOrderRun = 20;
+                }
+                this.level.antiXrayOnBlockChange(this, this, 2);
             }
-            this.level.antiXrayOnBlockChange(this, this, 2);
         }
     }
 

@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
+import cn.nukkit.entity.custom.CustomEntity;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.data.*;
@@ -470,10 +471,6 @@ public abstract class Entity extends Location implements Metadatable {
 
     public float getEyeHeight() {
         return this.getHeight() / 2 + 0.1f;
-    }
-
-    protected float getBreathableHeight() {
-        return isSwimming() || isGliding() ? -1f : 1.62f; // Hack: fix air while swimming in one block deep water
     }
 
     public float getWidth() {
@@ -1253,6 +1250,10 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final String getSaveId() {
+        if(this instanceof CustomEntity) {
+            EntityDefinition entityDefinition = ((CustomEntity) this).getEntityDefinition();
+            return entityDefinition == null ? "" : entityDefinition.getIdentifier();
+        }
         return shortNames.getOrDefault(this.getClass().getSimpleName(), "");
     }
 
@@ -2220,14 +2221,9 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isSubmerged() {
-        double y = this.y + this.getBreathableHeight();
+        double y = this.y + this.getEyeHeight();
         Block block = this.level.getBlock(this.temporalVector.setComponents(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(y), NukkitMath.floorDouble(this.z)));
-
-        if (block instanceof BlockWater) {
-            return y < (block.y + 0.9);
-        }
-
-        return false;
+        return block instanceof BlockWater || this.level.getBlock(block, 1) instanceof BlockWater;
     }
 
     public boolean isInsideOfWater() {
@@ -2243,7 +2239,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfSolid() {
-        double y = this.y + this.getBreathableHeight();
+        double y = this.y + this.getEyeHeight();
         Block block = this.level.getBlock(
                 this.temporalVector.setComponents(
                         NukkitMath.floorDouble(this.x),

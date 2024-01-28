@@ -75,7 +75,10 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.ref.SoftReference;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 
@@ -271,6 +274,7 @@ public class Level implements ChunkManager, Metadatable {
     };
 
     private boolean raining;
+    private int rainingIntensity;
     private int rainTime;
     private boolean thundering;
     private int thunderTime;
@@ -288,6 +292,11 @@ public class Level implements ChunkManager, Metadatable {
     private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
 
     private final boolean antiXray;
+
+    // 用于实现世界监听的回调
+    private static final AtomicInteger callbackIdCounter = new AtomicInteger();
+    private final Int2ObjectMap<Consumer<Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<BiConsumer<Long, DataPacket>> callbackChunkPacketSend = new Int2ObjectOpenHashMap<>();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
         this.levelId = levelIdCounter++;
@@ -812,6 +821,13 @@ public class Level implements ChunkManager, Metadatable {
         long index = Level.chunkHash(chunkX, chunkZ);
         Deque<DataPacket> packets = chunkPackets.computeIfAbsent(index, i -> new ConcurrentLinkedDeque<>());
         packets.add(packet);
+        try {
+            for (BiConsumer<Long, DataPacket> consumer : this.callbackChunkPacketSend.values()) {
+                consumer.accept(index, packet);
+            }
+        } catch (Exception e) {
+            Server.getInstance().getLogger().error("Error while calling chunk packet send callback", e);
+        }
     }
 
     public void registerChunkLoader(ChunkLoader loader, int chunkX, int chunkZ) {
@@ -1413,7 +1429,11 @@ public class Level implements ChunkManager, Metadatable {
         this.requireProvider().saveChunks();
     }
 
-    public void updateAroundRedstone(Vector3 pos, BlockFace ignoredFace) {
+    public void updateAroundRedstone(@NotNull Vector3 pos) {
+        this.updateAroundRedstone(pos, null);
+    }
+
+    public void updateAroundRedstone(@NotNull Vector3 pos, @Nullable BlockFace ignoredFace) {
         for (BlockFace side : BlockFace.values()) {
             if (ignoredFace != null && side == ignoredFace) {
                 continue;
@@ -1799,6 +1819,19 @@ public class Level implements ChunkManager, Metadatable {
         return this.getChunk(x >> 4, z >> 4, false).getBlockRuntimeId(protocolId, x & 0x0f, y & 0xff, z & 0x0f, layer);
     }
 
+    public Set<Block> getBlockAround(@NotNull Vector3 pos) {
+        return this.getBlockAround(pos, 0);
+    }
+
+    public Set<Block> getBlockAround(@NotNull Vector3 pos, int layer) {
+        Set<Block> around = new HashSet<>();
+        Block block = getBlock(pos);
+        for (BlockFace face : BlockFace.values()) {
+            Block side = block.getSideAtLayer(layer, face);
+            around.add(side);
+        }
+        return around;
+    }
 
     public Block getBlock(Vector3 pos) {
         return getBlock(pos, 0);
@@ -1941,8 +1974,9 @@ public class Level implements ChunkManager, Metadatable {
             int y = Hash.hashBlockY(node);
             int z = Hash.hashBlockZ(node);
 
-            int lightLevel = this.getBlockLightAt(x, y, z)
-                    - Block.lightFilter[this.getBlockIdAt(x, y, z)];
+            int id = this.getBlockIdAt(x, y, z);
+            int lightFilter = id >= Block.MAX_BLOCK_ID ? 15 : Block.lightFilter[id];
+            int lightLevel = this.getBlockLightAt(x, y, z) - lightFilter;
 
             if (lightLevel >= 1) {
                 this.computeSpreadBlockLight(x - 1, y, z, lightLevel, lightPropagationQueue, visited);
@@ -2057,6 +2091,15 @@ public class Level implements ChunkManager, Metadatable {
         block.z = z;
         block.level = this;
         block.layer = layer;
+
+        try {
+            for (Consumer<Block> callback : this.callbackBlockSet.values()) {
+                callback.accept(block);
+            }
+        } catch (Exception e) {
+            Server.getInstance().getLogger().error("Error while calling block set callback", e);
+        }
+
         int cx = x >> 4;
         int cz = z >> 4;
 
@@ -2170,7 +2213,7 @@ public class Level implements ChunkManager, Metadatable {
 
             int fullId = this.getFullBlock(fullChunk, x, y, z, 0);
             int id = fullId >> Block.DATA_BITS;
-            if (!Level.xrayableBlocks[id]) {
+            if (id >= Block.MAX_BLOCK_ID || !Level.xrayableBlocks[id]) {
                 continue;
             }
 
@@ -3695,6 +3738,9 @@ public class Level implements ChunkManager, Metadatable {
     public void removeBlockEntity(BlockEntity entity) {
         Preconditions.checkNotNull(entity, "entity");
         Preconditions.checkArgument(entity.getLevel() == this, "BlockEntity is not in this level");
+
+        entity.close();
+
         blockEntities.remove(entity.getId());
         updateBlockEntities.remove(entity);
     }
@@ -4000,7 +4046,7 @@ public class Level implements ChunkManager, Metadatable {
         this.cancelUnloadChunkRequest(x, z);
         LevelProvider levelProvider = requireProvider();
         levelProvider.setChunk(x, z, levelProvider.getEmptyChunk(x, z));
-        this.generateChunk(x, z);
+        this.generateChunk(x, z, true);
     }
 
     public void doChunkGarbageCollection() {
@@ -4247,7 +4293,11 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean setRaining(boolean raining) {
-        WeatherChangeEvent ev = new WeatherChangeEvent(this, raining);
+        return this.setRaining(raining, ThreadLocalRandom.current().nextInt(50000) + 10000);
+    }
+
+    public boolean setRaining(boolean raining, int intensity) {
+        WeatherChangeEvent ev = new WeatherChangeEvent(this, raining, intensity);
         this.server.getPluginManager().callEvent(ev);
 
         if (ev.isCancelled()) {
@@ -4255,15 +4305,15 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         this.raining = raining;
+        this.rainingIntensity = ev.getIntensity();
 
         LevelEventPacket pk = new LevelEventPacket();
         // These numbers are from Minecraft
 
         if (raining) {
             pk.evid = LevelEventPacket.EVENT_START_RAIN;
-            int time = Utils.random.nextInt(12000) + 12000;
-            pk.data = time;
-            setRainTime(time);
+            pk.data = this.rainingIntensity;
+            setRainTime(Utils.random.nextInt(12000) + 12000);
         } else {
             pk.evid = LevelEventPacket.EVENT_STOP_RAIN;
             setRainTime(Utils.random.nextInt(168000) + 12000);
@@ -4272,6 +4322,10 @@ public class Level implements ChunkManager, Metadatable {
         Server.broadcastPacket(this.getPlayers().values(), pk);
 
         return true;
+    }
+
+    public int getRainingIntensity() {
+        return rainingIntensity;
     }
 
     public int getRainTime() {
@@ -4334,7 +4388,7 @@ public class Level implements ChunkManager, Metadatable {
 
         if (this.raining) {
             pk.evid = LevelEventPacket.EVENT_START_RAIN;
-            pk.data = this.rainTime;
+            pk.data = this.rainingIntensity;
         } else {
             pk.evid = LevelEventPacket.EVENT_STOP_RAIN;
         }
@@ -4370,6 +4424,22 @@ public class Level implements ChunkManager, Metadatable {
 
     public int getDimension() {
         return this.dimensionData.getDimensionId();
+    }
+
+    public int getMinBlockY() {
+        int minHeight = this.dimensionData.getMinHeight();
+        if (minHeight < 0) {
+            return 0; //TODO 支持-64高度时移除
+        }
+        return minHeight;
+    }
+
+    public int getMaxBlockY() {
+        int maxHeight = this.dimensionData.getMaxHeight();
+        if (maxHeight > 255) {
+            return 255; //TODO 支持319世界高度时移除
+        }
+        return maxHeight;
     }
 
     public boolean canBlockSeeSky(Vector3 pos) {
@@ -4802,6 +4872,38 @@ public class Level implements ChunkManager, Metadatable {
         } else {
             return 0;
         }
+    }
+
+    /**
+     * 添加方块设置回调，当世界中有方块被更改时，会触发回调
+     *
+     * @param consumer 回调
+     * @return 回调id
+     */
+    public int addCallbackBlockSet(Consumer<Block> consumer) {
+        int id = callbackIdCounter.incrementAndGet();
+        callbackBlockSet.put(id, consumer);
+        return id;
+    }
+
+    public void removeCallbackBlockSet(int id) {
+        callbackBlockSet.remove(id);
+    }
+
+    /**
+     * 添加区块数据包发送回调，当世界中有区块数据包被发送时，会触发回调
+     *
+     * @param consumer 回调
+     * @return 回调id
+     */
+    public int addCallbackChunkPacketSend(BiConsumer<Long, DataPacket> consumer) {
+        int id = callbackIdCounter.incrementAndGet();
+        callbackChunkPacketSend.put(id, consumer);
+        return id;
+    }
+
+    public void removeCallbackChunkPacketSend(int id) {
+        callbackChunkPacketSend.remove(id);
     }
 
     private ConcurrentMap<Long, Int2ObjectMap<Player>> getChunkSendQueue(int protocol) {
