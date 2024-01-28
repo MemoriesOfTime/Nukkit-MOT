@@ -15,7 +15,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
-import java.util.Objects;
 
 
 public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityDecoratedPot> {
@@ -124,7 +123,10 @@ public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable,
 
     @Override
     public void setBlockFace(BlockFace face) {
-        this.setDamage(DIRECTION_BIT, Objects.requireNonNullElse(face, BlockFace.SOUTH).getHorizontalIndex() & 0x3);
+        if (face == null) {
+            face = BlockFace.SOUTH;
+        }
+        this.setDamage(DIRECTION_BIT, face.getHorizontalIndex() & 0x3);
     }
 
     @Override

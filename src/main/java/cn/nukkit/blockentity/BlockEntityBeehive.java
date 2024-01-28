@@ -120,7 +120,8 @@ public class BlockEntityBeehive extends BlockEntity {
     }
 
     public Occupant addOccupant(Entity entity) {
-        if (entity instanceof EntityBee bee) {
+        if (entity instanceof EntityBee) {
+            EntityBee bee = (EntityBee) entity;
             boolean hasNectar = bee.getHasNectar();
             return addOccupant(bee, hasNectar ? 2400 : 600, hasNectar, true);
         } else {

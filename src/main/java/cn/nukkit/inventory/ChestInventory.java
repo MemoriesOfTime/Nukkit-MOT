@@ -76,7 +76,8 @@ public class ChestInventory extends ContainerInventory {
             Level level = this.getHolder().getLevel();
             if (level != null) {
                 Block block = this.getHolder().getBlock();
-                if (block instanceof BlockTrappedChest trappedChest) {
+                if (block instanceof BlockTrappedChest) {
+                    BlockTrappedChest trappedChest = (BlockTrappedChest) block;
                     RedstoneUpdateEvent event = new RedstoneUpdateEvent(trappedChest);
                     this.getHolder().level.getServer().getPluginManager().callEvent(event);
                     if (!event.isCancelled()) {
