@@ -32,7 +32,11 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public abstract class BaseEntity extends EntityCreature implements EntityAgeable {
 
-    protected static PlayerInventory EMPTY_INVENTORY = new PlayerInventory(null);
+    /**
+     * Empty inventory
+     * Used to fix the problem of getting the player's hand-held item null pointer
+     */
+    protected static PlayerInventory EMPTY_INVENTORY;
 
     public int stayTime = 0;
     protected int moveTime = 0;
@@ -83,6 +87,11 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     public BaseEntity(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+
+        if (EMPTY_INVENTORY == null) {
+            EMPTY_INVENTORY = new PlayerInventory(null);
+        }
+
         this.setHealth(this.getMaxHealth());
         this.setAirTicks(400);
     }
