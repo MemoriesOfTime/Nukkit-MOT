@@ -9,6 +9,7 @@ import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class EntityMule extends EntityHorseBase {
 
@@ -52,7 +53,7 @@ public class EntityMule extends EntityHorseBase {
 
         if (canTarget && (creature instanceof Player player)) {
             return player.spawned && player.isAlive() && !player.closed &&
-                    this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 49;
+                    this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 49;
         }
         return false;
     }
