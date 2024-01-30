@@ -12,6 +12,7 @@ import cn.nukkit.entity.passive.EntityAnimal;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.HeartParticle;
@@ -30,6 +31,8 @@ import java.util.concurrent.ThreadLocalRandom;
  * The base class of all entities that have an AI
  */
 public abstract class BaseEntity extends EntityCreature implements EntityAgeable {
+
+    protected static PlayerInventory EMPTY_INVENTORY = new PlayerInventory(null);
 
     public int stayTime = 0;
     protected int moveTime = 0;
