@@ -1089,7 +1089,7 @@ public class Level implements ChunkManager, Metadatable {
 
     private void performThunder(long index, FullChunk chunk) {
         if (areNeighboringChunksLoaded(index)) return;
-        if (Utils.random.nextInt(10000) == 0) {
+        if (Utils.random.nextInt(100000) == 0) {
             int LCG = this.getUpdateLCG() >> 2;
 
             int chunkX = chunk.getX() << 4;
