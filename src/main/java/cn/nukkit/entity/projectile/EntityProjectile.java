@@ -69,27 +69,29 @@ public abstract class EntityProjectile extends Entity {
     public void onCollideWithEntity(Entity entity) {
         ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
         this.server.getPluginManager().callEvent(hitEvent);
-        if (!hitEvent.isCancelled()) {
-            float damage = this instanceof EntitySnowball && entity instanceof EntityBlaze ? 3 : this.getResultDamage();
+        if (hitEvent.isCancelled()) {
+            return;
+        }
 
-            EntityDamageEvent ev;
-            if (this.shootingEntity == null) {
-                ev = new EntityDamageByEntityEvent(this, entity, DamageCause.PROJECTILE, damage);
-            } else {
-                ev = new EntityDamageByChildEntityEvent(this.shootingEntity, this, entity, DamageCause.PROJECTILE, damage);
-            }
+        float damage = this instanceof EntitySnowball && entity instanceof EntityBlaze ? 3 : this.getResultDamage();
 
-            if (entity.attack(ev)) {
-                this.hadCollision = true;
+        EntityDamageEvent ev;
+        if (this.shootingEntity == null) {
+            ev = new EntityDamageByEntityEvent(this, entity, DamageCause.PROJECTILE, damage);
+        } else {
+            ev = new EntityDamageByChildEntityEvent(this.shootingEntity, this, entity, DamageCause.PROJECTILE, damage);
+        }
 
-                this.onHit();
+        if (entity.attack(ev)) {
+            this.hadCollision = true;
 
-                if (this.fireTicks > 0) {
-                    EntityCombustByEntityEvent event = new EntityCombustByEntityEvent(this, entity, 5);
-                    this.server.getPluginManager().callEvent(event);
-                    if (!event.isCancelled()) {
-                        entity.setOnFire(event.getDuration());
-                    }
+            this.onHit();
+
+            if (this.fireTicks > 0) {
+                EntityCombustByEntityEvent event = new EntityCombustByEntityEvent(this, entity, 5);
+                this.server.getPluginManager().callEvent(event);
+                if (!event.isCancelled()) {
+                    entity.setOnFire(event.getDuration());
                 }
             }
         }
