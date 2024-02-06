@@ -296,6 +296,7 @@ public interface ProtocolInfo {
     int AGENT_ANIMATION = 304;
     int REFRESH_ENTITLEMENTS = 305;
     int TOGGLE_CRAFTER_SLOT_REQUEST = 306;
+    int SET_PLAYER_INVENTORY_OPTIONS_PACKET = 307;
 
     static int toNewProtocolID(byte oldProtocolID) {
         if (oldProtocolID < 0 && oldProtocolID >= -56) { // Hack: (byte) 200+ --> (int) 300+
@@ -313,4 +314,5 @@ public interface ProtocolInfo {
     byte __INTERNAL__AGENT_ANIMATION = (byte) 204; // 304
     byte __INTERNAL__REFRESH_ENTITLEMENTS = (byte) 205; // 305
     byte __INTERNAL__TOGGLE_CRAFTER_SLOT_REQUEST = (byte) 206; // 306
+    byte __INTERNAL__SET_PLAYER_INVENTORY_OPTIONS_PACKET = (byte) 207; // 307
 }
