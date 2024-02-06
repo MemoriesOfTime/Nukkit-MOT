@@ -99,15 +99,30 @@ public class EntityEventPacket extends DataPacket {
         this.reset();
         this.putEntityRuntimeId(this.eid);
         this.putByte((byte) this.event);
-        if (this.event == EATING_ITEM && this.originProtocol > 0) {
-            // 1.19.63 <=> 1.19.70 喝药水声音转换
-            if (this.originProtocol >= ProtocolInfo.v1_19_70_24 && this.protocol < ProtocolInfo.v1_19_70_24) {
-                if (this.data >= 27983872) {
-                    this.data -= 65536;
+        if (this.event == EATING_ITEM && this.originProtocol > 0 && this.originProtocol != this.protocol) {
+            // 1.19.63-=  <=> 1.19.70+= 喝药水声音转换
+            // 1.20.40-= <=> 1.20.50+= 喝药水声音转换
+            if (this.originProtocol > this.protocol) {
+                if (this.originProtocol >= ProtocolInfo.v1_20_50 && this.protocol < ProtocolInfo.v1_20_50) {
+                    if (this.data >= 28114944) {
+                        this.data -= 65536;
+                    }
                 }
-            } else if (this.originProtocol < ProtocolInfo.v1_19_70_24 && this.protocol >= ProtocolInfo.v1_19_70_24) {
-                if (this.data >= 27918336) {
-                    this.data += 65536;
+                if (this.originProtocol >= ProtocolInfo.v1_19_70_24 && this.protocol < ProtocolInfo.v1_19_70_24) {
+                    if (this.data >= 27983872) {
+                        this.data -= 65536;
+                    }
+                }
+            } else {
+                if (this.originProtocol < ProtocolInfo.v1_19_70_24 && this.protocol >= ProtocolInfo.v1_19_70_24) {
+                    if (this.data >= 27918336) {
+                        this.data += 65536;
+                    }
+                }
+                if (this.originProtocol < ProtocolInfo.v1_20_50 && this.protocol >= ProtocolInfo.v1_20_50) {
+                    if (this.data >= 28049408) {
+                        this.data += 65536;
+                    }
                 }
             }
         }
