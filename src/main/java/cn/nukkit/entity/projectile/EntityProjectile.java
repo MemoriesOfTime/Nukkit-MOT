@@ -67,26 +67,29 @@ public abstract class EntityProjectile extends Entity {
     }
 
     public void onCollideWithEntity(Entity entity) {
-        this.server.getPluginManager().callEvent(new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity)));
-        float damage = this instanceof EntitySnowball && entity instanceof EntityBlaze ? 3 : this.getResultDamage();
+        ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
+        this.server.getPluginManager().callEvent(hitEvent);
+        if (!hitEvent.isCancelled()) {
+            float damage = this instanceof EntitySnowball && entity instanceof EntityBlaze ? 3 : this.getResultDamage();
 
-        EntityDamageEvent ev;
-        if (this.shootingEntity == null) {
-            ev = new EntityDamageByEntityEvent(this, entity, DamageCause.PROJECTILE, damage);
-        } else {
-            ev = new EntityDamageByChildEntityEvent(this.shootingEntity, this, entity, DamageCause.PROJECTILE, damage);
-        }
+            EntityDamageEvent ev;
+            if (this.shootingEntity == null) {
+                ev = new EntityDamageByEntityEvent(this, entity, DamageCause.PROJECTILE, damage);
+            } else {
+                ev = new EntityDamageByChildEntityEvent(this.shootingEntity, this, entity, DamageCause.PROJECTILE, damage);
+            }
 
-        if (entity.attack(ev)) {
-            this.hadCollision = true;
+            if (entity.attack(ev)) {
+                this.hadCollision = true;
 
-            this.onHit();
+                this.onHit();
 
-            if (this.fireTicks > 0) {
-                EntityCombustByEntityEvent event = new EntityCombustByEntityEvent(this, entity, 5);
-                this.server.getPluginManager().callEvent(event);
-                if (!event.isCancelled()) {
-                    entity.setOnFire(event.getDuration());
+                if (this.fireTicks > 0) {
+                    EntityCombustByEntityEvent event = new EntityCombustByEntityEvent(this, entity, 5);
+                    this.server.getPluginManager().callEvent(event);
+                    if (!event.isCancelled()) {
+                        entity.setOnFire(event.getDuration());
+                    }
                 }
             }
         }
@@ -186,9 +189,12 @@ public abstract class EntityProjectile extends Entity {
                 this.motionY = 0;
                 this.motionZ = 0;
 
-                this.server.getPluginManager().callEvent(new ProjectileHitEvent(this, MovingObjectPosition.fromBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ(), -1, this)));
-                this.onHit();
-                this.onHitGround(moveVector);
+                ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ(), -1, this));
+                this.server.getPluginManager().callEvent(hitEvent);
+                if (hitEvent.isCancelled()) {
+                    this.onHit();
+                    this.onHitGround(moveVector);
+                }
                 return false;
             } else if (!this.isCollided && this.hadCollision) {
                 this.hadCollision = false;
