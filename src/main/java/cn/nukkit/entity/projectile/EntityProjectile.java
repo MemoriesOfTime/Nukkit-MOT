@@ -193,7 +193,7 @@ public abstract class EntityProjectile extends Entity {
 
                 ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ(), -1, this));
                 this.server.getPluginManager().callEvent(hitEvent);
-                if (hitEvent.isCancelled()) {
+                if (!hitEvent.isCancelled()) {
                     this.onHit();
                     this.onHitGround(moveVector);
                 }
