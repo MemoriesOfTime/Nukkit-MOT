@@ -88,14 +88,14 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
                 }
 
                 if (ci) {
-                    this.compressionIn = CompressionProvider.byPrefix(buffer.readByte());
+                    this.compressionIn = CompressionProvider.byPrefix(buffer.readByte(), this.session.getProtocolVersion());
                 }
 
                 //TODO 校验数据包
                 packetBuffer = new byte[buffer.readableBytes() - 8];
             } else {
                 if (ci) {
-                    this.compressionIn = CompressionProvider.byPrefix(buffer.readByte());
+                    this.compressionIn = CompressionProvider.byPrefix(buffer.readByte(), this.session.getProtocolVersion());
                 }
 
                 packetBuffer = new byte[buffer.readableBytes()];

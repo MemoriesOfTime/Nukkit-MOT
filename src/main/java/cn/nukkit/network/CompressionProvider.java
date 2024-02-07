@@ -108,12 +108,22 @@ public interface CompressionProvider {
         throw new UnsupportedOperationException();
     }
 
-    static CompressionProvider byPrefix(byte prefix) {
-        return switch (prefix) {
-            case 0x00 -> ZLIB;
-            case 0x01 -> SNAPPY;
-            case (byte) 0xff -> NONE;
+    static CompressionProvider byPrefix(byte prefix, int raknetProtocol) {
+        switch (prefix) {
+            case 0x00 -> {
+                if (raknetProtocol >= 10) {
+                    return ZLIB_RAW;
+                } else {
+                    return ZLIB;
+                }
+            }
+            case 0x01 -> {
+                return SNAPPY;
+            }
+            case (byte) 0xff -> {
+                return NONE;
+            }
             default -> throw new IllegalArgumentException("Unsupported compression type: " + prefix);
-        };
+        }
     }
 }
