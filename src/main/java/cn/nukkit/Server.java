@@ -1259,7 +1259,10 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_20_50) {
+        if (player.protocol >= ProtocolInfo.v1_20_60) {
+            //TODO
+            //player.dataPacket(CraftingManager.packet649);
+        } else if (player.protocol >= ProtocolInfo.v1_20_50) {
             player.dataPacket(CraftingManager.packet630);
         } else if (player.protocol >= ProtocolInfo.v1_20_40) {
             player.dataPacket(CraftingManager.packet622);

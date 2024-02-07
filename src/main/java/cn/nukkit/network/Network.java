@@ -184,6 +184,7 @@ public class Network {
         return hardWareNetworkInterfaces;
     }
 
+    @Deprecated
     public void processBatch(BatchPacket packet, Player player) {
         ObjectArrayList<DataPacket> packets = new ObjectArrayList<>();
         try {
@@ -195,7 +196,7 @@ public class Network {
         }
     }
 
-    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) throws ProtocolException {
+    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
         int maxSize = 3145728; // 3 * 1024 * 1024
         if (player != null && player.getSkin() == null) {
             maxSize = 6291456; // 6 * 1024 * 1024
@@ -275,6 +276,7 @@ public class Network {
      *
      * @param packets packets
      */
+    @Deprecated
     public void processPackets(Player player, List<DataPacket> packets) {
         if (packets.isEmpty()) return;
         packets.forEach(player::handleDataPacket);

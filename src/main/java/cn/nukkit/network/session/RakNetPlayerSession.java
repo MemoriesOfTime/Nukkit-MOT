@@ -1,20 +1,19 @@
 package cn.nukkit.network.session;
 
+import cn.nukkit.Nukkit;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.DisconnectPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
 import com.nukkitx.natives.sha256.Sha256;
 import com.nukkitx.natives.util.Natives;
-import com.nukkitx.network.raknet.EncapsulatedPacket;
-import com.nukkitx.network.raknet.RakNetServerSession;
-import com.nukkitx.network.raknet.RakNetSessionListener;
-import com.nukkitx.network.raknet.RakNetState;
+import com.nukkitx.network.raknet.*;
 import com.nukkitx.network.util.DisconnectReason;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -50,7 +49,9 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
     private Player player;
     private String disconnectReason = null;
 
-    private CompressionProvider compression;
+    private CompressionProvider compressionIn;
+    private CompressionProvider compressionOut;
+    private boolean compressionInitialized;
 
     private SecretKey encryptionKey;
     private Cipher encryptionCipher;
@@ -61,7 +62,8 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
         this.server = server;
         this.session = session;
         this.tickFuture = session.getEventLoop().scheduleAtFixedRate(this::networkTick, 0, 50, TimeUnit.MILLISECONDS);
-        this.compression = session.getProtocolVersion() >= 11 ? CompressionProvider.NONE : (session.getProtocolVersion() < 10 ? CompressionProvider.ZLIB : CompressionProvider.ZLIB_RAW);
+        this.compressionIn = session.getProtocolVersion() >= 11 ? CompressionProvider.NONE : (session.getProtocolVersion() < 10 ? CompressionProvider.ZLIB : CompressionProvider.ZLIB_RAW);
+        this.compressionOut = this.compressionIn;
     }
 
     @Override
@@ -71,6 +73,11 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
         if (packetId == 0xfe) {
             byte[] packetBuffer;
 
+            boolean ci = false;
+            if (this.compressionInitialized && this.player.protocol >= ProtocolInfo.v1_20_60) {
+                ci = true;
+            }
+
             if (this.decryptionCipher != null) {
                 try {
                     ByteBuffer buf = buffer.nioBuffer();
@@ -79,20 +86,31 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
                     log.error("Packet decryption failed for " + player.getName(), e);
                     return;
                 }
+
+                if (ci) {
+                    this.compressionIn = CompressionProvider.byPrefix(buffer.readByte());
+                }
+
                 //TODO 校验数据包
                 packetBuffer = new byte[buffer.readableBytes() - 8];
             } else {
+                if (ci) {
+                    this.compressionIn = CompressionProvider.byPrefix(buffer.readByte());
+                }
+
                 packetBuffer = new byte[buffer.readableBytes()];
             }
 
             buffer.readBytes(packetBuffer);
 
             try {
-                this.server.getNetwork().processBatch(packetBuffer, this.inbound, this.getCompression(), this.session.getProtocolVersion(), this.player);
+                this.server.getNetwork().processBatch(packetBuffer, this.inbound, compressionIn, this.session.getProtocolVersion(), this.player);
             } catch (Exception e) {
                 this.disconnect("Sent malformed packet");
                 log.error("[{}] Unable to process batch packet", (this.player == null ? this.session.getAddress() : this.player.getName()), e);
             }
+        } else if (Nukkit.DEBUG > 1) {
+            log.debug("Unknown EncapsulatedPacket: " + packetId);
         }
     }
 
@@ -172,13 +190,25 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
             List<DataPacket> toBatch = new ObjectArrayList<>();
             DataPacket packet;
             while ((packet = this.outbound.poll()) != null) {
-                if (packet.pid() == ProtocolInfo.BATCH_PACKET) {
+                if (packet instanceof DisconnectPacket) {
+                    BinaryStream batched = new BinaryStream();
+                    byte[] buf = packet.getBuffer();
+                    batched.putUnsignedVarInt(buf.length);
+                    batched.put(buf);
+
+                    try {
+                        this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel), RakNetPriority.IMMEDIATE);
+                    } catch (Exception e) {
+                        log.error("Unable to compress disconnect packet", e);
+                    }
+                    return; // Disconnected
+                } else if (packet instanceof BatchPacket) {
                     if (!toBatch.isEmpty()) {
                         this.sendPackets(toBatch);
                         toBatch.clear();
                     }
 
-                    this.sendPacket(((BatchPacket) packet).payload);
+                    this.sendPacket(((BatchPacket) packet).payload, RakNetPriority.MEDIUM);
                 } else {
                     toBatch.add(packet);
                 }
@@ -207,27 +237,42 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
     private void sendPackets(Collection<DataPacket> packets) {
         BinaryStream batched = new BinaryStream();
         for (DataPacket packet : packets) {
-            Preconditions.checkArgument(!(packet instanceof BatchPacket), "Cannot batch BatchPacket");
-            Preconditions.checkState(packet.isEncoded, "Packet should have already been encoded");
+            if (packet instanceof BatchPacket) {
+                throw new IllegalArgumentException("Cannot batch BatchPacket");
+            }
+            if (!packet.isEncoded) {
+                throw new IllegalStateException("Packet should have already been encoded");
+            }
+
             byte[] buf = packet.getBuffer();
             batched.putUnsignedVarInt(buf.length);
             batched.put(buf);
         }
 
         try {
-            this.sendPacket(this.compression.compress(batched, Server.getInstance().networkCompressionLevel));
+            this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel), RakNetPriority.MEDIUM);
         } catch (Exception e) {
             log.error("Unable to compress batched packets", e);
         }
     }
 
-    private void sendPacket(byte[] compressedPayload) {
-        ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer(1 + compressedPayload.length + 8);
+    private void sendPacket(byte[] compressedPayload, RakNetPriority priority) {
+        boolean ci = false;
+        if (this.compressionInitialized && this.player.protocol >= ProtocolInfo.v1_20_60) {
+            ci = true;
+        }
+
+        ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
         finalPayload.writeByte(0xfe);
 
         if (this.encryptionCipher != null) {
             try {
-                ByteBuf compressed = Unpooled.wrappedBuffer(compressedPayload);
+                byte[] fullPayload = ci ? new byte[compressedPayload.length + 1] : compressedPayload;
+                if (ci) {
+                    fullPayload[0] = this.compressionOut.getPrefix();
+                    System.arraycopy(compressedPayload, 0, fullPayload, 1, compressedPayload.length);
+                }
+                ByteBuf compressed = Unpooled.wrappedBuffer(fullPayload);
                 ByteBuffer trailer = ByteBuffer.wrap(this.generateTrailer(compressed));
                 ByteBuffer outBuffer = finalPayload.internalNioBuffer(1, compressed.readableBytes() + 8);
                 ByteBuffer inBuffer = compressed.internalNioBuffer(compressed.readerIndex(), compressed.readableBytes());
@@ -238,21 +283,27 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
                 log.error("Packet encryption failed for {}", player.getName(), e);
             }
         }else {
+            if (ci) {
+                finalPayload.writeByte(this.compressionOut.getPrefix());
+            }
+
             finalPayload.writeBytes(compressedPayload);
         }
 
-        this.session.send(finalPayload);
+        this.session.send(finalPayload, priority);
     }
 
     @Override
     public void setCompression(CompressionProvider compression) {
-        Preconditions.checkNotNull(compression);
-        this.compression = compression;
+        Preconditions.checkNotNull(compression, "compression");
+        this.compressionIn = compression;
+        this.compressionOut = compression;
+        this.compressionInitialized = true;
     }
 
     @Override
     public CompressionProvider getCompression() {
-        return this.compression;
+        return this.compressionOut;
     }
 
     public void setPlayer(Player player) {

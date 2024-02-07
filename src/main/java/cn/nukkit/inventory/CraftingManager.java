@@ -57,6 +57,7 @@ public class CraftingManager {
     public static DataPacket packet618;
     public static DataPacket packet622;
     public static DataPacket packet630;
+    public static DataPacket packet649;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -610,6 +611,8 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        //TODO 649
+        //packet649 = packetFor(ProtocolInfo.v1_20_60);
         packet630 = packetFor(ProtocolInfo.v1_20_50);
         packet622 = packetFor(ProtocolInfo.v1_20_40);
         packet618 = packetFor(ProtocolInfo.v1_20_30);
