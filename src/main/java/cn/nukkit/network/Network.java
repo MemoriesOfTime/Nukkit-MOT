@@ -12,7 +12,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
@@ -184,18 +183,6 @@ public class Network {
         return hardWareNetworkInterfaces;
     }
 
-    @Deprecated
-    public void processBatch(BatchPacket packet, Player player) {
-        ObjectArrayList<DataPacket> packets = new ObjectArrayList<>();
-        try {
-            this.processBatch(packet.payload, packets, player.getNetworkSession().getCompression(), player.raknetProtocol, player);
-            this.processPackets(player, packets);
-        } catch (Exception e) {
-            log.error("Error whilst decoding batch packet from " + player.getName(), e);
-            player.close("", "Error whilst decoding batch packet");
-        }
-    }
-
     public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
         int maxSize = 3145728; // 3 * 1024 * 1024
         if (player != null && player.getSkin() == null) {
@@ -270,18 +257,7 @@ public class Network {
         }
     }
 
-    /**
-     * Process packets obtained from batch packets
-     * Required to perform additional analyses and filter unnecessary packets
-     *
-     * @param packets packets
-     */
     @Deprecated
-    public void processPackets(Player player, List<DataPacket> packets) {
-        if (packets.isEmpty()) return;
-        packets.forEach(player::handleDataPacket);
-    }
-
     public DataPacket getPacket(byte id) {
         Class<? extends DataPacket> clazz = this.packetPool.get(id & 0xff);
         if (clazz != null) {

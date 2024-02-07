@@ -2818,11 +2818,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (pid == ProtocolInfo.BATCH_PACKET) {
-            this.server.getNetwork().processBatch((BatchPacket) packet, this);
-            return;
-        }
-
         if (Nukkit.DEBUG > 2 /*&& !server.isIgnoredPacket(packet.getClass())*/) {
             log.trace("Inbound {}: {}", this.getName(), packet);
         }
