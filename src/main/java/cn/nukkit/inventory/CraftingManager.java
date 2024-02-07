@@ -651,7 +651,6 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
-        //TODO 649
         packet649 = packetFor(ProtocolInfo.v1_20_60);
         packet630 = packetFor(ProtocolInfo.v1_20_50);
         packet622 = packetFor(ProtocolInfo.v1_20_40);
