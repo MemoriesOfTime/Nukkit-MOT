@@ -5,6 +5,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntityWalking;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -12,7 +13,6 @@ import cn.nukkit.utils.Utils;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.Objects;
 import java.util.Optional;
 
 public abstract class EntityWalkingAnimal extends EntityWalking implements EntityAnimal {
@@ -96,7 +96,11 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
     public boolean targetOption(EntityCreature creature, double distance) {
         if (!this.isInLove() && creature instanceof Player) {
             Player player = (Player) creature;
-            return player.isAlive() && !player.closed && this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 49;
+            PlayerInventory inventory = player.getInventory();
+            if (inventory == null) {
+                inventory = EMPTY_INVENTORY;
+            }
+            return player.isAlive() && !player.closed && this.isFeedItem(inventory.getItemInHandFast()) && distance <= 49;
         }
         return super.targetOption(creature, distance);
     }

@@ -9,6 +9,7 @@ import cn.nukkit.entity.projectile.EntityLlamaSpit;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.ProjectileLaunchEvent;
+import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
@@ -17,8 +18,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
-
-import java.util.Objects;
 
 public class EntityLlama extends EntityHorseBase {
 
@@ -154,8 +153,12 @@ public class EntityLlama extends EntityHorseBase {
                 return creature instanceof BaseEntity && ((BaseEntity) creature).isInLove() && creature.isAlive() && !creature.closed && creature.getNetworkId() == this.getNetworkId() && distance <= 100;
             }else if (creature instanceof Player) {
                 Player player = (Player) creature;
+                PlayerInventory inventory = player.getInventory();
+                if (inventory == null) {
+                    inventory = EMPTY_INVENTORY;
+                }
                 return player.spawned && player.isAlive() && !player.closed &&
-                        this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 40;
+                        this.isFeedItem(inventory.getItemInHandFast()) && distance <= 40;
             }
         }
 

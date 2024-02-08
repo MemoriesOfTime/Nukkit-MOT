@@ -2,6 +2,7 @@ package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
 import cn.nukkit.entity.EntityCreature;
+import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -9,7 +10,6 @@ import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public class EntityMule extends EntityHorseBase {
 
@@ -53,8 +53,12 @@ public class EntityMule extends EntityHorseBase {
 
         if (canTarget && (creature instanceof Player)) {
             Player player = (Player) creature;
+            PlayerInventory inventory = player.getInventory();
+            if (inventory == null) {
+                inventory = EMPTY_INVENTORY;
+            }
             return player.spawned && player.isAlive() && !player.closed &&
-                    this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 49;
+                    this.isFeedItem(inventory.getItemInHandFast()) && distance <= 49;
         }
         return false;
     }
