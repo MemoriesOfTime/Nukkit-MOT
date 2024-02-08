@@ -125,39 +125,7 @@ public class CraftingManager {
         ConfigSection recipes_extras_440 = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes/recipes_extras_440.json")).getRootSection();
         Config furnaceXpConfig = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes/furnace_xp.json"));
 
-        List<Map<String, Object>> shapedRecipesList649 = new ArrayList<>();
-        List<Map<String, Object>> shapelessRecipesList649 = new ArrayList<>();
-        List<Map<String, Object>> furnaceRecipesList649 = new ArrayList<>();
-        // List<Map<String, Object>> shulkerBoxRecipesList649 = new ArrayList<>();
-
-        for (Map<String, Object> entry649 : (List<Map<String, Object>>) recipes_649_config.get("recipes")) {
-            switch ((Integer) entry649.getOrDefault("type", -1)) { // Ignore type 4, hardcoded recipes
-                case 0: // shapeless - Check block
-                    shapelessRecipesList649.add(entry649);
-                    break;
-                case 1: // shaped
-                    shapedRecipesList649.add(entry649);
-                    break;
-                case 3: // furnace
-                    furnaceRecipesList649.add(entry649);
-                    break;
-                case 5:
-                    // todo: shapeless_shulker_box
-                    // shulkerBoxRecipesList649.add(entry649);
-                    break;
-            }
-        }
-        for (ShapedRecipe recipe : loadShapedRecipes(shapedRecipesList649)) {
-            this.registerRecipe(649, recipe);
-        }
-
-        for (ShapelessRecipe recipe : loadShapelessRecips(shapelessRecipesList649)) {
-            this.registerRecipe(649, recipe);
-        }
-
-        for (SmeltingRecipe recipe : loadSmeltingRecipes(furnaceRecipesList649, furnaceXpConfig)) {
-            this.registerRecipe(649, recipe);
-        }
+        this.loadRecipes(649, recipes_649_config, furnaceXpConfig);
 
         for (ShapedRecipe recipe : loadShapedRecipes((List<Map<String, Object>>) recipes_419_config.get((Object)"shaped"))) {
             this.registerRecipe(419, recipe);
@@ -428,6 +396,45 @@ public class CraftingManager {
 
         this.rebuildPacket();
         MainLogger.getLogger().debug("Loaded " + this.recipes.size() + " recipes");
+    }
+
+    private void loadRecipes(int protocol, ConfigSection configSection, Config furnaceXpConfig) {
+        List<Map<String, Object>> shapedRecipesList = new ArrayList<>();
+        List<Map<String, Object>> shapelessRecipesList = new ArrayList<>();
+        List<Map<String, Object>> furnaceRecipesList = new ArrayList<>();
+        List<Map<String, Object>> shulkerBoxRecipesList = new ArrayList<>();
+
+        for (Map<String, Object> entry : (List<Map<String, Object>>) configSection.get("recipes")) {
+            switch ((Integer) entry.getOrDefault("type", -1)) {
+                case 0: // shapeless - Check block
+                    shapelessRecipesList.add(entry);
+                    break;
+                case 1: // shaped
+                    shapedRecipesList.add(entry);
+                    break;
+                case 3: // furnace
+                    furnaceRecipesList.add(entry);
+                    break;
+                case 4: // hardcoded recipes
+                    // Ignore type 4
+                    break;
+                case 5:
+                    shulkerBoxRecipesList.add(entry);
+                    break;
+            }
+        }
+        for (ShapedRecipe recipe : loadShapedRecipes(shapedRecipesList)) {
+            this.registerRecipe(protocol, recipe);
+        }
+
+        for (ShapelessRecipe recipe : loadShapelessRecips(shapelessRecipesList)) {
+            this.registerRecipe(protocol, recipe);
+        }
+
+        for (SmeltingRecipe recipe : loadSmeltingRecipes(furnaceRecipesList, furnaceXpConfig)) {
+            this.registerRecipe(protocol, recipe);
+        }
+        // TODO: shapeless_shulker_box
     }
 
     private List<ShapedRecipe> loadShapedRecipes(List<Map<String, Object>> recipes) {
