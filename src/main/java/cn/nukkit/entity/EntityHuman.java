@@ -11,6 +11,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.network.protocol.AddPlayerPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.SetEntityLinkPacket;
 import cn.nukkit.utils.*;
 
@@ -51,7 +52,7 @@ public class EntityHuman extends EntityHumanType {
         if(isSwimming() || isGliding()) {
             return 0.6f;
         } else if (isShortSneaking()) {
-            if (this instanceof Player player && player.protocol < 589) {
+            if (this instanceof Player player && player.protocol < ProtocolInfo.v1_20_0) {
                 return 1.65f; // Return the old height
             } else {
                 return 1.49f; // Enable the player to enter 1.5 Spaces when jumping while sneaking.
