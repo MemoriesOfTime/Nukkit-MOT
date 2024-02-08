@@ -109,18 +109,14 @@ public class BlockLantern extends BlockFlowable {
 
     @Override
     public double getResistance() {
-        return 17.5;
+        return 3.5;
     }
 
     @Override
     public double getHardness() {
-        return 5.0;
+        return 3.5;
     }
 
-    @Override
-    public boolean canHarvestWithHand() {
-        return false;
-    }
 
     @Override
     public int getToolType() {
@@ -164,7 +160,7 @@ public class BlockLantern extends BlockFlowable {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(new BlockLantern());
+        return new ItemBlock(this);
     }
 
     @Override

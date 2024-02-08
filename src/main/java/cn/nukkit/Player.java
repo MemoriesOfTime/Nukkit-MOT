@@ -972,7 +972,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
+    @Deprecated
     public void sendChunk(int x, int z, int subChunkCount, byte[] payload) {
+        log.warn("Player#sendChunk(int x, int z, int subChunkCount, byte[] payload) is deprecated");
+        this.sendChunk(x, z, subChunkCount, payload, 0);
+    }
+
+    public void sendChunk(int x, int z, int subChunkCount, byte[] payload, int dimension) {
         if (!this.connected) {
             return;
         }
@@ -980,6 +986,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         LevelChunkPacket pk = new LevelChunkPacket();
         pk.chunkX = x;
         pk.chunkZ = z;
+        pk.dimension = dimension;
         pk.subChunkCount = subChunkCount;
         pk.data = payload;
 
@@ -2794,11 +2801,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (pid == ProtocolInfo.BATCH_PACKET) {
-            this.server.getNetwork().processBatch((BatchPacket) packet, this);
-            return;
-        }
-
         if (Nukkit.DEBUG > 2 /*&& !server.isIgnoredPacket(packet.getClass())*/) {
             log.trace("Inbound {}: {}", this.getName(), packet);
         }
@@ -3144,13 +3146,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (this.teleportPosition != null) {
-                    break;
+                    return;
                 }
 
-                // Proper player.isPassenger() check may be needed
                 if (this.riding instanceof EntityMinecartAbstract) {
-                    ((EntityMinecartAbstract) riding).setCurrentSpeed(authPacket.getMotion().getY());
-                    break;
+                    double inputY = authPacket.getMotion().getY();
+                    if (inputY >= -1.001 && inputY <= 1.001) {
+                        ((EntityMinecartAbstract) riding).setCurrentSpeed(inputY);
+                    }
+                } else if (this.riding instanceof EntityBoat && authPacket.getInputData().contains(AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE)) {
+                    if (this.riding.getId() == authPacket.getPredictedVehicle() && this.riding.isControlling(this)) {
+                        if (this.temporalVector.setComponents(authPacket.getPosition().getX(), authPacket.getPosition().getY(), authPacket.getPosition().getZ()).distanceSquared(this.riding) < 100) {
+                            ((EntityBoat) this.riding).onInput(authPacket.getPosition().getX(), authPacket.getPosition().getY(), authPacket.getPosition().getZ(), authPacket.getHeadYaw());
+                        }
+                    }
                 }
 
                 if (authPacket.getInputData().contains(AuthInputAction.START_SPRINTING)) {
@@ -3240,9 +3249,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (protocol >= ProtocolInfo.v1_20_10_21 && authPacket.getInputData().contains(AuthInputAction.MISSED_SWING)) {
                     PlayerMissedSwingEvent pmse = new PlayerMissedSwingEvent(this);
+                    if (this.isSpectator()) {
+                        pmse.setCancelled();
+                    }
                     this.server.getPluginManager().callEvent(pmse);
                     if (!pmse.isCancelled()) {
-                        this.level.addSound(this, Sound.GAME_PLAYER_ATTACK_NODAMAGE);
+                        level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ATTACK_NODAMAGE, -1, "minecraft:player", false, false);
                     }
                 }
 
@@ -3336,13 +3348,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
                 break;
             case ProtocolInfo.MOVE_ENTITY_ABSOLUTE_PACKET:
-                MoveEntityAbsolutePacket moveEntityAbsolutePacket = (MoveEntityAbsolutePacket) packet;
-                if (!this.spawned || this.riding == null || this.riding.getId() != moveEntityAbsolutePacket.eid || !this.riding.isControlling(this)) {
-                    break;
-                }
-                if (this.riding instanceof EntityBoat) {
-                    if (this.temporalVector.setComponents(moveEntityAbsolutePacket.x, moveEntityAbsolutePacket.y, moveEntityAbsolutePacket.z).distanceSquared(this.riding) < 1000) {
-                        ((EntityBoat) this.riding).onInput(moveEntityAbsolutePacket.x, moveEntityAbsolutePacket.y, moveEntityAbsolutePacket.z, moveEntityAbsolutePacket.headYaw);
+                //1.20.60开始使用AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE
+                if (protocol < ProtocolInfo.v1_20_60) {
+                    MoveEntityAbsolutePacket moveEntityAbsolutePacket = (MoveEntityAbsolutePacket) packet;
+                    if (!this.spawned || this.riding == null || this.riding.getId() != moveEntityAbsolutePacket.eid || !this.riding.isControlling(this)) {
+                        break;
+                    }
+                    if (this.riding instanceof EntityBoat) {
+                        if (this.temporalVector.setComponents(moveEntityAbsolutePacket.x, moveEntityAbsolutePacket.y, moveEntityAbsolutePacket.z).distanceSquared(this.riding) < 1000) {
+                            ((EntityBoat) this.riding).onInput(moveEntityAbsolutePacket.x, moveEntityAbsolutePacket.y, moveEntityAbsolutePacket.z, moveEntityAbsolutePacket.headYaw);
+                        }
                     }
                 }
                 break;
@@ -6203,6 +6218,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 LevelChunkPacket chunk = new LevelChunkPacket();
                 chunk.chunkX = chunkPositionX + x;
                 chunk.chunkZ = chunkPositionZ + z;
+                chunk.dimension = this.level.getDimension();
                 chunk.data = new byte[0];
                 this.dataPacket(chunk);
             }
@@ -6622,6 +6638,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this.connected;
     }
 
+    @Deprecated
+    public static BatchPacket getChunkCacheFromData(int protocol, int chunkX, int chunkZ, int subChunkCount, byte[] payload) {
+        log.warn("Player#getChunkCacheFromData(protocol, chunkX, chunkZ, subChunkCount, payload) is deprecated");
+        return getChunkCacheFromData(protocol, chunkX, chunkZ, subChunkCount, payload, 0);
+    }
+
     /**
      * Get chunk cache from data
      *
@@ -6632,10 +6654,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param payload       data
      * @return BatchPacket
      */
-    public static BatchPacket getChunkCacheFromData(int protocol, int chunkX, int chunkZ, int subChunkCount, byte[] payload) {
+    public static BatchPacket getChunkCacheFromData(int protocol, int chunkX, int chunkZ, int subChunkCount, byte[] payload, int dimension) {
         LevelChunkPacket pk = new LevelChunkPacket();
         pk.chunkX = chunkX;
         pk.chunkZ = chunkZ;
+        pk.dimension = dimension;
         pk.subChunkCount = subChunkCount;
         pk.data = payload;
         pk.protocol = protocol;
@@ -7091,6 +7114,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             fishingHook.rod = fishingRod;
             fishingHook.checkLure();
             fishingHook.spawnToAll();
+            if (protocol >= ProtocolInfo.v1_20_0_23) {
+                this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_THROW, -1, "minecraft:player", false, false);
+            }
         }
     }
 

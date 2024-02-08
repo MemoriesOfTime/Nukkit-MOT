@@ -1080,7 +1080,7 @@ public class Level implements ChunkManager, Metadatable {
 
     private void performThunder(long index, FullChunk chunk) {
         if (areNeighboringChunksLoaded(index)) return;
-        if (Utils.random.nextInt(10000) == 0) {
+        if (Utils.random.nextInt(100000) == 0) {
             int LCG = this.getUpdateLCG() >> 2;
 
             int chunkX = chunk.getX() << 4;
@@ -3664,7 +3664,7 @@ public class Level implements ChunkManager, Metadatable {
         long index = Level.chunkHash(x, z);
 
         if (server.cacheChunks) {
-            BatchPacket data = Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload);
+            BatchPacket data = Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
             BaseFullChunk chunk = getChunk(x, z, false);
             if (chunk != null && chunk.getChanges() <= timestamp) {
                 chunk.setChunkPacket(protocol, data);
@@ -3682,7 +3682,7 @@ public class Level implements ChunkManager, Metadatable {
                 for (Player player : queue.get(index).values()) {
                     if (player.isConnected() && player.usedChunks.containsKey(index)) {
                         if (matchMVChunkProtocol(protocol, player.protocol)) {
-                            player.sendChunk(x, z, subChunkCount, payload);
+                            player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
                         }
                     }
                 }
@@ -4917,7 +4917,9 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_20_50) {
+        if (protocol >= ProtocolInfo.v1_20_60) {
+            return ProtocolInfo.v1_20_60;
+        } else if (protocol >= ProtocolInfo.v1_20_50) {
             return ProtocolInfo.v1_20_50;
         } else if (protocol >= ProtocolInfo.v1_20_40) {
             return ProtocolInfo.v1_20_40;
@@ -5010,7 +5012,8 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_20_30)
             if (player >= ProtocolInfo.v1_20_30_24) if (player < ProtocolInfo.v1_20_40) return true;
         if (chunk == ProtocolInfo.v1_20_40) if (player == ProtocolInfo.v1_20_40) return true;
-        if (chunk == ProtocolInfo.v1_20_50) if (player >= ProtocolInfo.v1_20_50) return true;
+        if (chunk == ProtocolInfo.v1_20_50) if (player == ProtocolInfo.v1_20_50) return true;
+        if (chunk == ProtocolInfo.v1_20_60) if (player >= ProtocolInfo.v1_20_60) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

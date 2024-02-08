@@ -34,14 +34,22 @@ public class CustomItemDefinition {
     private static final AtomicInteger nextRuntimeId = new AtomicInteger(10000);
 
     private final String identifier;
-    private final CompoundTag nbt; //465
+    private final CompoundTag nbt; //649
+    private final CompoundTag nbt465;
     private final CompoundTag nbt419;
 
     private CustomItemDefinition(String identifier, CompoundTag nbt) {
         this.identifier = identifier;
         this.nbt = nbt;
 
-        this.nbt419 = nbt.clone();
+        this.nbt465  = nbt.clone();
+        this.nbt465.getCompound("components")
+                .getCompound("item_properties")
+                .getCompound("minecraft:icon")
+                .remove("textures")
+                .putString("texture", this.getTexture());
+
+        this.nbt419 = this.nbt465.clone();
         this.nbt419.getCompound("components").getCompound("item_properties").remove("minecraft:icon");
         this.nbt419.getCompound("components").putCompound("minecraft:icon", new CompoundTag().putString("texture", this.getTexture()));
     }
@@ -55,8 +63,10 @@ public class CustomItemDefinition {
     }
 
     public CompoundTag getNbt(int protocol) {
-        if (protocol >= ProtocolInfo.v1_17_30) {
+        if (protocol >= ProtocolInfo.v1_20_60) {
             return this.nbt;
+        } else if (protocol >= ProtocolInfo.v1_17_30) {
+            return this.nbt465;
         }
         return this.nbt419;
     }
@@ -129,7 +139,11 @@ public class CustomItemDefinition {
     }
 
     public String getTexture() {
-        return this.nbt.getCompound("components").getCompound("item_properties").getCompound("minecraft:icon").getString("texture");
+        return this.nbt.getCompound("components")
+                .getCompound("item_properties")
+                .getCompound("minecraft:icon")
+                .getCompound("textures")
+                .getString("default");
     }
 
     public int getRuntimeId() {
@@ -155,7 +169,7 @@ public class CustomItemDefinition {
             this.nbt.getCompound("components")
                     .getCompound("item_properties")
                     .getCompound("minecraft:icon")
-                    .putString("texture", customItem.getTextureName());
+                    .putCompound("textures", new CompoundTag().putString("default", customItem.getTextureName()));
 
             //定义显示名
             if (item.getName() != null && !item.getName().equals(Item.UNKNOWN_STR)) {

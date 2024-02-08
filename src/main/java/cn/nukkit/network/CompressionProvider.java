@@ -17,6 +17,11 @@ public interface CompressionProvider {
         public byte[] decompress(byte[] compressed) {
             return compressed;
         }
+
+        @Override
+        public byte getPrefix() {
+            return (byte) 0xff;
+        }
     };
 
     CompressionProvider ZLIB = new CompressionProvider() {
@@ -51,6 +56,11 @@ public interface CompressionProvider {
         public byte[] decompress(byte[] compressed, int maxSize) throws Exception {
             return Zlib.inflateRaw(compressed, maxSize);
         }
+
+        @Override
+        public byte getPrefix() {
+            return (byte) 0x00;
+        }
     };
 
     CompressionProvider SNAPPY = new CompressionProvider() {
@@ -67,6 +77,11 @@ public interface CompressionProvider {
         @Override
         public byte[] decompress(byte[] compressed, int maxSize) throws Exception {
             return SnappyCompression.decompress(compressed, maxSize);
+        }
+
+        @Override
+        public byte getPrefix() {
+            return 0x01;
         }
     };
 
@@ -87,5 +102,28 @@ public interface CompressionProvider {
             return SNAPPY;
         }
         throw new UnsupportedOperationException();
+    }
+
+    default byte getPrefix() {
+        throw new UnsupportedOperationException();
+    }
+
+    static CompressionProvider byPrefix(byte prefix, int raknetProtocol) {
+        switch (prefix) {
+            case 0x00 -> {
+                if (raknetProtocol >= 10) {
+                    return ZLIB_RAW;
+                } else {
+                    return ZLIB;
+                }
+            }
+            case 0x01 -> {
+                return SNAPPY;
+            }
+            case (byte) 0xff -> {
+                return NONE;
+            }
+            default -> throw new IllegalArgumentException("Unsupported compression type: " + prefix);
+        }
     }
 }
