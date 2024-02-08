@@ -29,7 +29,7 @@ public class CraftingManager {
     private final Collection<Recipe> recipes332 = new ArrayDeque<>();
     private final Collection<Recipe> recipes354 = new ArrayDeque<>();
     private final Collection<Recipe> recipes419 = new ArrayDeque<>();
-    public final Collection<Recipe> recipes649 = new ArrayDeque<>();
+    private final Collection<Recipe> recipes527 = new ArrayDeque<>();
     public final Collection<Recipe> recipes = new ArrayDeque<>(); //649
 
     public static BatchPacket packet313;
@@ -395,7 +395,7 @@ public class CraftingManager {
         }
 
         this.rebuildPacket();
-        MainLogger.getLogger().debug("Loaded " + this.recipes.size() + " recipes");
+        MainLogger.getLogger().debug("Loaded " + this.recipes527.size() + " recipes");
     }
 
     private void loadRecipes(int protocol, ConfigSection configSection, Config furnaceXpConfig) {
@@ -702,10 +702,10 @@ public class CraftingManager {
 
     public Collection<Recipe> getRecipes(int protocol) {
         if (protocol >= ProtocolInfo.v1_20_60) {
-            return this.recipes649;
+            return this.recipes;
         }
         if (protocol >= ProtocolInfo.v1_19_0_29) {
-            return this.recipes;
+            return this.recipes527;
         }
         if (protocol >= 419) {
             return this.recipes419;
@@ -721,10 +721,10 @@ public class CraftingManager {
 
     private Collection<Recipe> getRegisterRecipes(int protocol) {
         if (protocol == 649) {
-            return this.recipes649;
+            return this.recipes;
         }
         if (protocol == 527) {
-            return this.recipes;
+            return this.recipes527;
         }
         if (protocol == 419) {
             return this.recipes419;
@@ -741,7 +741,7 @@ public class CraftingManager {
         throw new IllegalArgumentException("Invalid protocol: " + protocol + " Supported: 649 527, 419, 388, 332, 313");
     }
 
-    public Map<Integer, FurnaceRecipe> getFurnaceRecipes440() {
+    public Map<Integer, FurnaceRecipe> getFurnaceRecipes() {
         Server.mvw("CraftingManager#getFurnaceRecipes()");
         return this.getFurnaceRecipes(ProtocolInfo.CURRENT_PROTOCOL);
     }
