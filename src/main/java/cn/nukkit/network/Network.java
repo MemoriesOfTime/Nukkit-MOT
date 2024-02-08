@@ -446,6 +446,8 @@ public class Network {
         this.registerPacketNew(ProtocolInfo.AGENT_ANIMATION, AgentAnimationPacket.class);
         this.registerPacketNew(ProtocolInfo.REFRESH_ENTITLEMENTS, RefreshEntitlementsPacket.class);
         this.registerPacketNew(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST, ToggleCrafterSlotRequestPacket.class);
+        this.registerPacketNew(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class);
+        this.registerPacketNew(ProtocolInfo.SET_HUD, SetHudPacket.class);
     }
 
     @AllArgsConstructor
