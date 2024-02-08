@@ -658,12 +658,12 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
-        packet649 = packetFor(ProtocolInfo.v1_20_60).compress();
-        packet630 = packetFor(ProtocolInfo.v1_20_50);
-        packet622 = packetFor(ProtocolInfo.v1_20_40);
-        packet618 = packetFor(ProtocolInfo.v1_20_30);
-        packet594 = packetFor(ProtocolInfo.v1_20_10);
-        packet589 = packetFor(ProtocolInfo.v1_20_0);
+        packet649 = packetFor(ProtocolInfo.v1_20_60).compress(Deflater.BEST_COMPRESSION);
+        packet630 = packetFor(ProtocolInfo.v1_20_50).compress(Deflater.BEST_COMPRESSION);
+        packet622 = packetFor(ProtocolInfo.v1_20_40).compress(Deflater.BEST_COMPRESSION);
+        packet618 = packetFor(ProtocolInfo.v1_20_30).compress(Deflater.BEST_COMPRESSION);
+        packet594 = packetFor(ProtocolInfo.v1_20_10).compress(Deflater.BEST_COMPRESSION);
+        packet589 = packetFor(ProtocolInfo.v1_20_0).compress(Deflater.BEST_COMPRESSION);
         packet582 = packetFor(582);
         packet575 = packetFor(575);
         packet567 = packetFor(567);
