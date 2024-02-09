@@ -708,7 +708,7 @@ public class Level implements ChunkManager, Metadatable {
             DataPacket[] packets = particle.mvEncode(protocolId);
             if (packets != null) {
                 if (count == 1) {
-                    Server.broadcastPackets(protocolPlayers.toArray(new Player[0]), packets);
+                    Server.broadcastPackets(protocolPlayers.toArray(Player.EMPTY_ARRAY), packets);
                     continue;
                 }
 
@@ -717,13 +717,13 @@ public class Level implements ChunkManager, Metadatable {
                 for (int i = 0; i < count; i++) {
                     sendList.addAll(packetList);
                 }
-                Server.broadcastPackets(protocolPlayers.toArray(new Player[0]), sendList.toArray(new DataPacket[0]));
+                Server.broadcastPackets(protocolPlayers.toArray(Player.EMPTY_ARRAY), sendList.toArray(new DataPacket[0]));
             }
         }
     }
 
     public void addParticle(Particle particle, Collection<Player> players) {
-        this.addParticle(particle, players.toArray(new Player[0]));
+        this.addParticle(particle, players.toArray(Player.EMPTY_ARRAY));
     }
 
     public void addParticleEffect(Vector3 pos, ParticleEffect particleEffect) {
@@ -739,7 +739,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void addParticleEffect(Vector3 pos, ParticleEffect particleEffect, long uniqueEntityId, int dimensionId, Collection<Player> players) {
-        this.addParticleEffect(pos, particleEffect, uniqueEntityId, dimensionId, players.toArray(new Player[0]));
+        this.addParticleEffect(pos, particleEffect, uniqueEntityId, dimensionId, players.toArray(Player.EMPTY_ARRAY));
     }
 
     public void addParticleEffect(Vector3 pos, ParticleEffect particleEffect, long uniqueEntityId, int dimensionId, Player... players) {
