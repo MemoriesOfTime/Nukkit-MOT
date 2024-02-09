@@ -3,8 +3,8 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.network.protocol.types.HudElement;
 import cn.nukkit.network.protocol.types.HudVisibility;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 
 import java.util.Set;
@@ -12,8 +12,8 @@ import java.util.Set;
 /**
  * @since v649
  */
-@Data
-@EqualsAndHashCode(callSuper = true)
+@Setter
+@Getter
 @ToString(doNotUseGetters = true)
 public class SetHudPacket extends DataPacket {
 

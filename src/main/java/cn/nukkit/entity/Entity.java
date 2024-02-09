@@ -3060,8 +3060,22 @@ public abstract class Entity extends Location implements Metadatable {
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_HAS_COLLISION, noClip);
     }
 
+    public void addTag(String tag) {
+        this.namedTag.putList(this.namedTag.getList("Tags", StringTag.class).add(new StringTag("", tag)));
+    }
+
+    public void removeTag(String tag) {
+        ListTag<StringTag> tags = this.namedTag.getList("Tags", StringTag.class);
+        tags.remove(new StringTag("", tag));
+        this.namedTag.putList(tags);
+    }
+
     public boolean containTag(String tag) {
         return this.namedTag.getList("Tags", StringTag.class).getAll().stream().anyMatch(t -> t.data.equals(tag));
+    }
+
+    public List<StringTag> getAllTags() {
+        return this.namedTag.getList("Tags", StringTag.class).getAll();
     }
 
     private boolean validateAndSetIntProperty(String identifier, int value) {
