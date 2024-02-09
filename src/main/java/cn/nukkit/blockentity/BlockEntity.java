@@ -52,7 +52,7 @@ public abstract class BlockEntity extends Position {
 
     public static long count = 1;
 
-    private static final BiMap<String, Class<? extends BlockEntity>> knownBlockEntities = HashBiMap.create(24);
+    private static final BiMap<String, Class<? extends BlockEntity>> knownBlockEntities = HashBiMap.create(30);
 
     public FullChunk chunk;
     public String name;

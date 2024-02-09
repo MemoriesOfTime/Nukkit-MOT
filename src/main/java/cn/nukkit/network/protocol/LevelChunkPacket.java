@@ -18,6 +18,10 @@ public class LevelChunkPacket extends DataPacket {
 
     public int chunkX;
     public int chunkZ;
+    /**
+     * @since v649 v1.20.60
+     */
+    public int dimension;
     public int subChunkCount;
     public boolean cacheEnabled;
     /**
@@ -40,6 +44,9 @@ public class LevelChunkPacket extends DataPacket {
         this.reset();
         this.putVarInt(this.chunkX);
         this.putVarInt(this.chunkZ);
+        if (protocol >= ProtocolInfo.v1_20_60) {
+            this.putVarInt(this.dimension);
+        }
         if (protocol >= ProtocolInfo.v1_12_0) {
             if (protocol >= ProtocolInfo.v1_18_0) {
                 if (!this.requestSubChunks) {

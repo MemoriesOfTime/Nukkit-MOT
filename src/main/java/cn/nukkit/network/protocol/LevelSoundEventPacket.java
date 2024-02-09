@@ -489,8 +489,16 @@ public class LevelSoundEventPacket extends DataPacket {
     public static final int SOUND_CRAFTER_DISABLE_SLOT = 483;
     public static final int SOUND_COPPER_BULB_ON = 490;
     public static final int SOUND_COPPER_BULB_OFF = 491;
+    public static final int SOUND_AMBIENT_IN_AIR = 492;
+    public static final int SOUND_WIND_BURST = 493;
+    public static final int SOUND_IMITATE_BREEZE = 494;
+    public static final int SOUND_ARMADILLO_BRUSH = 495;
+    public static final int SOUND_ARMADILLO_SCUTE_DROP = 496;
+    public static final int SOUND_EQUIP_WOLF = 497;
+    public static final int SOUND_UNEQUIP_WOLF = 498;
+    public static final int SOUND_REFLECT = 499;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(492);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(500);
 
     public int sound;
     public float x;

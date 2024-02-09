@@ -88,21 +88,24 @@ public class BlockGrass extends BlockDirt {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_RANDOM) {
-            x = Utils.rand((int) x - 1, (int) x + 1);
-            y = Utils.rand((int) y - 2, (int) y + 2);
-            z = Utils.rand((int) z - 1, (int) z + 1);
-            Block block = this.getLevel().getBlock(new Vector3(x, y, z));
-            if (block.getId() == Block.DIRT && block.getDamage() == 0) {
-                if (block.up() instanceof BlockAir) {
-                    BlockSpreadEvent ev = new BlockSpreadEvent(block, this, Block.get(GRASS));
-                    Server.getInstance().getPluginManager().callEvent(ev);
-                    if (!ev.isCancelled()) {
-                        this.getLevel().setBlock(block, ev.getNewState());
-                    }
+            Block up = this.up();
+            if ((up.isSolid() && !up.isTransparent()) || up instanceof BlockLiquid) {
+                BlockSpreadEvent ev = new BlockSpreadEvent(this, this, Block.get(BlockID.DIRT));
+                Server.getInstance().getPluginManager().callEvent(ev);
+                if (!ev.isCancelled()) {
+                    this.getLevel().setBlock(this, ev.getNewState());
                 }
-            } else if (block.getId() == Block.GRASS) {
-                if (block.up() instanceof BlockSolid) {
-                    BlockSpreadEvent ev = new BlockSpreadEvent(block, this, Block.get(DIRT));
+                return 0;
+            }
+
+            int xx = Utils.rand((int) x - 1, (int) x + 1);
+            int yy = Utils.rand((int) y - 2, (int) y + 2);
+            int zz = Utils.rand((int) z - 1, (int) z + 1);
+            Block block = this.getLevel().getBlock(new Vector3(xx, yy, zz));
+            if (block.getId() == Block.DIRT && block.getDamage() == 0) {
+                up = block.up();
+                if (!up.isSolid() && up.isTransparent() && !(up instanceof BlockLiquid)) {
+                    BlockSpreadEvent ev = new BlockSpreadEvent(block, this, Block.get(GRASS));
                     Server.getInstance().getPluginManager().callEvent(ev);
                     if (!ev.isCancelled()) {
                         this.getLevel().setBlock(block, ev.getNewState());

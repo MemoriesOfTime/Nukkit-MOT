@@ -36,6 +36,10 @@ public class PlayerAuthInputPacket extends DataPacket {
      * @since 575
      */
     private Vector2f analogMoveVector;
+    /**
+     * @since 649
+     */
+    public long predictedVehicle;
 
     @Override
     public byte pid() {
@@ -94,6 +98,10 @@ public class PlayerAuthInputPacket extends DataPacket {
         }
 
         if (protocol >= ProtocolInfo.v1_19_70_24) {
+            if (protocol >= ProtocolInfo.v1_20_60 && this.inputData.contains(AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE)) {
+                this.predictedVehicle = this.getVarLong();
+            }
+
             this.analogMoveVector = this.getVector2f();
         }
     }

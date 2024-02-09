@@ -1,7 +1,6 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntitySkull;
 import cn.nukkit.item.Item;
@@ -122,10 +121,8 @@ public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockE
             }
         }
 
-        // HACK
-        Server.getInstance().getScheduler().scheduleDelayedTask(() -> {
-            BlockEntity.createBlockEntity(BlockEntity.SKULL, this.getLevel().getChunk(block.getChunkX(), block.getChunkZ()), nbt);
-        }, 2);
+        BlockEntitySkull blockEntity = (BlockEntitySkull) BlockEntity.createBlockEntity(BlockEntity.SKULL, this.getChunk(), nbt);
+        blockEntity.spawnToAll();
 
         // TODO: 2016/2/3 SPAWN WITHER
 
@@ -147,7 +144,7 @@ public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockE
         BlockEntity blockEntity = getLevel().getBlockEntity(this);
         int itemMeta = 0;
         if (blockEntity != null) itemMeta = blockEntity.namedTag.getByte("SkullType");
-        return new ItemSkull(itemMeta);
+        return Item.get(Item.SKULL, itemMeta);
     }
 
     @Override

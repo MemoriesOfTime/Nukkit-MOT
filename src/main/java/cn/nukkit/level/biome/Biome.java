@@ -65,6 +65,10 @@ public abstract class Biome implements BlockID {
         return runtimeId2Identifier.get(biomeId);
     }
 
+    public static int getBiomeIdOrCorrect(int biomeId) {
+        return getBiomeIdOrCorrect(ProtocolInfo.CURRENT_PROTOCOL, biomeId);
+    }
+
     public static int getBiomeIdOrCorrect(int protocol, int biomeId) {
         if (runtimeId2Identifier.get(biomeId) == null) {
             return EnumBiome.OCEAN.id;

@@ -14,7 +14,6 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
@@ -189,18 +188,7 @@ public class Network {
         return hardWareNetworkInterfaces;
     }
 
-    public void processBatch(BatchPacket packet, Player player) {
-        ObjectArrayList<DataPacket> packets = new ObjectArrayList<>();
-        try {
-            this.processBatch(packet.payload, packets, player.getNetworkSession().getCompression(), player.raknetProtocol, player);
-            this.processPackets(player, packets);
-        } catch (Exception e) {
-            log.error("Error whilst decoding batch packet from " + player.getName(), e);
-            player.close("", "Error whilst decoding batch packet");
-        }
-    }
-
-    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) throws ProtocolException {
+    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
         int maxSize = 3145728; // 3 * 1024 * 1024
         if (player != null && player.getSkin() == null) {
             maxSize = 6291456; // 6 * 1024 * 1024
@@ -274,6 +262,7 @@ public class Network {
         }
     }
 
+    @Deprecated
     /**
      * Process packets obtained from batch packets
      * Required to perform additional analyses and filter unnecessary packets
@@ -479,6 +468,8 @@ public class Network {
         this.registerPacketNew(ProtocolInfo.AGENT_ANIMATION, AgentAnimationPacket.class);
         this.registerPacketNew(ProtocolInfo.REFRESH_ENTITLEMENTS, RefreshEntitlementsPacket.class);
         this.registerPacketNew(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST, ToggleCrafterSlotRequestPacket.class);
+        this.registerPacketNew(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class);
+        this.registerPacketNew(ProtocolInfo.SET_HUD, SetHudPacket.class);
 
         PacketPool.Builder builder = PacketPool.builder()
                 .protocolVersion(ProtocolInfo.v1_1_0)
@@ -664,6 +655,8 @@ public class Network {
                 .registerPacket(ProtocolInfo.AGENT_ANIMATION, AgentAnimationPacket.class)
                 .registerPacket(ProtocolInfo.REFRESH_ENTITLEMENTS, RefreshEntitlementsPacket.class)
                 .registerPacket(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST, ToggleCrafterSlotRequestPacket.class)
+                .registerPacket(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class)
+                .registerPacket(ProtocolInfo.SET_HUD, SetHudPacket.class)
                 .build();
     }
 

@@ -15,6 +15,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Identifier;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.NonNull;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -28,19 +29,39 @@ import java.util.function.Consumer;
  * <p>
  * CustomBlockDefinition is used to get the data of the item behavior_pack sent to the client. The methods provided in {@link CustomItemDefinition.SimpleBuilder} control the data sent to the client, if you need to control some of the server-side behavior, please override the methods in {@link cn.nukkit.item.Item Item}.
  */
+@Log4j2
 public class CustomItemDefinition {
     private static final ConcurrentHashMap<String, Integer> INTERNAL_ALLOCATION_ID_MAP = new ConcurrentHashMap<>();
     private static final AtomicInteger nextRuntimeId = new AtomicInteger(10000);
 
     private final String identifier;
-    private final CompoundTag nbt; //465
+    private final CompoundTag nbt; //649
+    private final CompoundTag nbt465;
     private final CompoundTag nbt419;
 
     private CustomItemDefinition(String identifier, CompoundTag nbt) {
         this.identifier = identifier;
         this.nbt = nbt;
 
-        this.nbt419 = nbt.clone();
+        this.nbt465  = nbt.clone();
+        CompoundTag components465 = this.nbt465.getCompound("components");
+        components465
+                .getCompound("item_properties")
+                .getCompound("minecraft:icon")
+                .remove("textures")
+                .putString("texture", this.getTexture());
+        if (this.nbt465.getCompound("item_properties").getInt("damage") > 0
+                && !components465.containsCompound("minecraft:weapon")) {
+            components465.putCompound(new CompoundTag("minecraft:weapon"));
+        }
+        if (components465.contains("minecraft:wearable")) {
+            CompoundTag wearable465 = components465.getCompound("minecraft:wearable");
+            this.nbt465.putCompound("minecraft:armor", new CompoundTag()
+                    .putInt("protection", wearable465.getInt("protection")));
+            wearable465.remove("protection");
+        }
+
+        this.nbt419 = this.nbt465.clone();
         this.nbt419.getCompound("components").getCompound("item_properties").remove("minecraft:icon");
         this.nbt419.getCompound("components").putCompound("minecraft:icon", new CompoundTag().putString("texture", this.getTexture()));
     }
@@ -54,8 +75,10 @@ public class CustomItemDefinition {
     }
 
     public CompoundTag getNbt(int protocol) {
-        if (protocol >= ProtocolInfo.v1_17_30) {
+        if (protocol >= ProtocolInfo.v1_20_60) {
             return this.nbt;
+        } else if (protocol >= ProtocolInfo.v1_17_30) {
+            return this.nbt465;
         }
         return this.nbt419;
     }
@@ -128,7 +151,11 @@ public class CustomItemDefinition {
     }
 
     public String getTexture() {
-        return this.nbt.getCompound("components").getCompound("item_properties").getCompound("minecraft:icon").getString("texture");
+        return this.nbt.getCompound("components")
+                .getCompound("item_properties")
+                .getCompound("minecraft:icon")
+                .getCompound("textures")
+                .getString("default");
     }
 
     public int getRuntimeId() {
@@ -154,7 +181,7 @@ public class CustomItemDefinition {
             this.nbt.getCompound("components")
                     .getCompound("item_properties")
                     .getCompound("minecraft:icon")
-                    .putString("texture", customItem.getTextureName());
+                    .putCompound("textures", new CompoundTag().putString("default", customItem.getTextureName()));
 
             //定义显示名
             if (item.getName() != null && !item.getName().equals(Item.UNKNOWN_STR)) {
@@ -216,7 +243,7 @@ public class CustomItemDefinition {
          */
         public SimpleBuilder creativeGroup(String creativeGroup) {
             if (creativeGroup.isBlank()) {
-                System.out.println("creativeGroup has an invalid value!");
+                log.warn("creativeGroup has an invalid value!");
                 return this;
             }
             this.nbt.getCompound("components")
@@ -325,7 +352,7 @@ public class CustomItemDefinition {
          */
         protected SimpleBuilder addRepairs(@NotNull List<String> repairItemNames, String molang) {
             if (molang.isBlank()) {
-                System.out.println("repairAmount has an invalid value!");
+                log.warn("repairAmount has an invalid value!");
                 return this;
             }
 
@@ -447,7 +474,7 @@ public class CustomItemDefinition {
          */
         public ToolBuilder speed(int speed) {
             if (speed < 0) {
-                System.out.println("speed has an invalid value!");
+                log.warn("speed has an invalid value!");
                 return this;
             }
             if (item.isPickaxe() || item.isShovel() || item.isHoe() || item.isAxe() || item.isShears()) {
@@ -467,7 +494,7 @@ public class CustomItemDefinition {
          */
         public ToolBuilder addExtraBlock(@NotNull String blockName, int speed) {
             if (speed < 0) {
-                System.out.println("speed has an invalid value!");
+                log.warn("speed has an invalid value!");
                 return this;
             }
             this.blocks.add(new CompoundTag()
@@ -491,7 +518,7 @@ public class CustomItemDefinition {
         public ToolBuilder addExtraBlocks(@NotNull Map<String, Integer> blocks) {
             blocks.forEach((blockName, speed) -> {
                 if (speed < 0) {
-                    System.out.println("speed has an invalid value!");
+                    log.warn("speed has an invalid value!");
                     return;
                 }
                 this.blocks.add(new CompoundTag()
@@ -516,7 +543,7 @@ public class CustomItemDefinition {
          */
         public ToolBuilder addExtraBlocks(@NotNull String blockName, DigProperty property) {
             if (property.getSpeed() != null && property.getSpeed() < 0) {
-                System.out.println("speed has an invalid value!");
+                log.warn("speed has an invalid value!");
                 return this;
             }
             this.blocks.add(new CompoundTag()
@@ -530,16 +557,19 @@ public class CustomItemDefinition {
         }
 
         /**
+         * @deprecated  在1.20.60更改，会导致客户端收到错误数据包
+         *
          * 物品的攻击力必须大于0才能生效<p>
          * 标记这个物品是否为武器，如果是，会在物品描述中提示{@code "+X 攻击伤害"}的信息
          * <p>
          * The item's attack damage must be greater than 0<p>
          * define the item is a weapon or not, and if so, it will prompt {@code "+X attack damage"} in the item description
          */
+        @Deprecated
         public ToolBuilder isWeapon() {
-            if (this.item.getAttackDamage() > 0 && !this.nbt.getCompound("components").containsCompound("minecraft:weapon")) {
+            /*if (this.item.getAttackDamage() > 0 && !this.nbt.getCompound("components").containsCompound("minecraft:weapon")) {
                 this.nbt.getCompound("components").putCompound(new CompoundTag("minecraft:weapon"));
-            }
+            }*/
             return this;
         }
 
@@ -587,32 +617,32 @@ public class CustomItemDefinition {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "pickaxe");
                 this.tag("minecraft:is_pickaxe");
-                this.isWeapon();
+                //this.isWeapon();
             } else if (item.isAxe()) {
                 this.blockTags.addAll(List.of("'wood'", "'pumpkin'", "'plant'"));
                 type = ItemTag.IS_AXE;
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "axe");
                 this.tag("minecraft:is_axe");
-                this.isWeapon();
+                //this.isWeapon();
             } else if (item.isShovel()) {
                 this.blockTags.addAll(List.of("'sand'", "'dirt'", "'gravel'", "'grass'", "'snow'"));
                 type = ItemTag.IS_SHOVEL;
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "shovel");
                 this.tag("minecraft:is_shovel");
-                this.isWeapon();
+                //this.isWeapon();
             } else if (item.isHoe()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "hoe");
                 type = ItemTag.IS_HOE;
                 this.tag("minecraft:is_hoe");
-                this.isWeapon();
+                //this.isWeapon();
             } else if (item.isSword()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "sword");
                 type = ItemTag.IS_SWORD;
-                this.isWeapon();
+                //this.isWeapon();
             } else {
                 if (this.nbt.getCompound("components").contains("item_tags")) {
                     var list = this.nbt.getCompound("components").getList("item_tags", StringTag.class).getAll();
@@ -696,34 +726,34 @@ public class CustomItemDefinition {
         @Override
         public CustomItemDefinition build() {
             this.nbt.getCompound("components")
-                    .putCompound("minecraft:armor", new CompoundTag()
-                            .putInt("protection", item.getArmorPoints()))
                     .putCompound("minecraft:durability", new CompoundTag()
-                            .putInt("max_durability", item.getMaxDurability()));
+                            .putInt("max_durability", item.getMaxDurability()))
+                    .putCompound("minecraft:wearable", new CompoundTag()
+                            .putInt("protection", item.getArmorPoints()));
             if (item.isHelmet()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "armor_head");
                 this.nbt.getCompound("components")
-                        .putCompound("minecraft:wearable", new CompoundTag()
-                                .putString("slot", "slot.armor.head"));
+                        .getCompound("minecraft:wearable")
+                                .putString("slot", "slot.armor.head");
             } else if (item.isChestplate()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "armor_torso");
                 this.nbt.getCompound("components")
-                        .putCompound("minecraft:wearable", new CompoundTag()
-                                .putString("slot", "slot.armor.chest"));
+                        .getCompound("minecraft:wearable")
+                        .putString("slot", "slot.armor.chest");
             } else if (item.isLeggings()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "armor_legs");
                 this.nbt.getCompound("components")
-                        .putCompound("minecraft:wearable", new CompoundTag()
-                                .putString("slot", "slot.armor.legs"));
+                        .getCompound("minecraft:wearable")
+                                .putString("slot", "slot.armor.legs");
             } else if (item.isBoots()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "armor_feet");
                 this.nbt.getCompound("components")
-                        .putCompound("minecraft:wearable", new CompoundTag()
-                                .putString("slot", "slot.armor.feet"));
+                        .getCompound("minecraft:wearable")
+                                .putString("slot", "slot.armor.feet");
             }
             return calculateID();
         }
