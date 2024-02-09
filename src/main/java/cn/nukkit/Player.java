@@ -3808,20 +3808,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                 }
                 break;
-            case ProtocolInfo.COMMAND_REQUEST_PACKET:
-                if (!this.spawned || !this.isAlive()) {
-                    break;
-                }
-                this.craftingType = CRAFTING_SMALL;
-                CommandRequestPacket commandRequestPacket = (CommandRequestPacket) packet;
-                PlayerCommandPreprocessEvent playerCommandPreprocessEvent = new PlayerCommandPreprocessEvent(this, commandRequestPacket.command + ' ');
-                this.server.getPluginManager().callEvent(playerCommandPreprocessEvent);
-                if (playerCommandPreprocessEvent.isCancelled()) {
-                    break;
-                }
-
-                this.server.dispatchCommand(playerCommandPreprocessEvent.getPlayer(), playerCommandPreprocessEvent.getMessage().substring(1));
-                break;
             case ProtocolInfo.TEXT_PACKET:
                 if (!this.spawned || !this.isAlive()) {
                     break;

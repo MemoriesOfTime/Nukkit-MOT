@@ -87,6 +87,7 @@ public final class DataPacketManager {
                 0, //base
                 BookEditProcessor.INSTANCE,
                 ClientToServerHandshakeProcessor.INSTANCE,
+                CommandRequestProcessor.INSTANCE,
                 NPCRequestProcessor.INSTANCE,
                 EmotePacketProcessor.INSTANCE,
                 FilterTextProcessor.INSTANCE,
