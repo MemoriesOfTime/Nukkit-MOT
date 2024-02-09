@@ -94,6 +94,7 @@ public final class DataPacketManager {
                 MapInfoRequestProcessor.INSTANCE,
                 PacketViolationWarningProcessor.INSTANCE,
                 PlayerHotbarProcessor.INSTANCE,
+                PlayerSkinProcessor.INSTANCE,
                 RespawnProcessor.INSTANCE,
                 ServerSettingsRequestProcessor.INSTANCE,
                 SetDifficultyProcessor.INSTANCE,
