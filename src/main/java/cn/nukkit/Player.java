@@ -2996,15 +2996,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                 }
                 break;
-            case ProtocolInfo.PLAYER_INPUT_PACKET:
-                if (!this.isAlive() || !this.spawned || this.isMovementServerAuthoritative()) {
-                    break;
-                }
-                if (riding instanceof EntityControllable) {
-                    PlayerInputPacket ipk = (PlayerInputPacket) packet;
-                    ((EntityControllable) riding).onPlayerInput(this, ipk.motionX, ipk.motionY);
-                }
-                break;
             case ProtocolInfo.MOVE_PLAYER_PACKET:
                 if (this.teleportPosition != null || !this.spawned || this.isMovementServerAuthoritative()) {
                     break;
@@ -7113,5 +7104,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void setLastEmote(int lastEmote) {
         this.lastEmote = lastEmote;
+    }
+
+    public static boolean validateVehicleInput(float value) {
+        return -1.1f <= value && value <= 1.1f; //data from ecnk
     }
 }
