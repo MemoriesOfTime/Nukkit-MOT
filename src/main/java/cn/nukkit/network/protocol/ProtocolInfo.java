@@ -292,14 +292,14 @@ public interface ProtocolInfo {
     byte UNLOCKED_RECIPES_PACKET = (byte) 0xc7;
 
     int CAMERA_INSTRUCTION_PACKET = 300;
-    int COMPRESSED_BIOME_DEFINITIONS_LIST = 301;
-    int TRIM_DATA = 302;
-    int OPEN_SIGN = 303;
-    int AGENT_ANIMATION = 304;
-    int REFRESH_ENTITLEMENTS = 305;
-    int TOGGLE_CRAFTER_SLOT_REQUEST = 306;
+    int COMPRESSED_BIOME_DEFINITIONS_LIST_PACKET = 301;
+    int TRIM_DATA_PACKET = 302;
+    int OPEN_SIGN_PACKET = 303;
+    int AGENT_ANIMATION_PACKET = 304;
+    int REFRESH_ENTITLEMENTS_PACKET = 305;
+    int TOGGLE_CRAFTER_SLOT_REQUEST_PACKET = 306;
     int SET_PLAYER_INVENTORY_OPTIONS_PACKET = 307;
-    int SET_HUD = 308;
+    int SET_HUD_PACKET = 308;
 
     static int toNewProtocolID(byte oldProtocolID) {
         if (oldProtocolID < 0 && oldProtocolID >= -56) { // Hack: (byte) 200+ --> (int) 300+
@@ -312,10 +312,10 @@ public interface ProtocolInfo {
     // MC packet IDs continue from 300 (0x12c)
     // Hack: 100 is added to the IDs below on encode
     byte __INTERNAL__CAMERA_INSTRUCTION_PACKET = (byte) 200; // 300
-    byte __INTERNAL__TRIM_DATA = (byte) 202; // 302
+    byte __INTERNAL__TRIM_DATA_PACKET = (byte) 202; // 302
     byte __INTERNAL__OPEN_SIGN_PACKET = (byte) 203; // 303
-    byte __INTERNAL__AGENT_ANIMATION = (byte) 204; // 304
-    byte __INTERNAL__REFRESH_ENTITLEMENTS = (byte) 205; // 305
-    byte __INTERNAL__TOGGLE_CRAFTER_SLOT_REQUEST = (byte) 206; // 306
+    byte __INTERNAL__AGENT_ANIMATION_PACKET = (byte) 204; // 304
+    byte __INTERNAL__REFRESH_ENTITLEMENTS_PACKET = (byte) 205; // 305
+    byte __INTERNAL__TOGGLE_CRAFTER_SLOT_REQUEST_PACKET = (byte) 206; // 306
     byte __INTERNAL__SET_PLAYER_INVENTORY_OPTIONS_PACKET = (byte) 207; // 307
 }
