@@ -897,7 +897,7 @@ public class CraftingManager {
 
     public void registerRecipe(Recipe recipe) {
         Server.mvw("CraftingManager#registerRecipe(Recipe)");
-        this.registerRecipe(527, recipe);
+        this.registerRecipe(649, recipe);
     }
 
     public void registerRecipe(int protocol, Recipe recipe) {
