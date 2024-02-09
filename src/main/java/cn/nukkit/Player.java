@@ -105,7 +105,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
@@ -117,7 +116,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * The Player class
@@ -307,8 +305,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected AsyncTask preLoginEventTask = null;
     protected boolean shouldLogin = false;
-
-    private static Stream<Field> pkIDs;
 
     private int lastEmote;
     private int lastEnderPearl = 20;
@@ -4640,21 +4636,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.inventory.sendContents(this);
                         break;
                 }
-                break;
-            case ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET:
-                PacketViolationWarningPacket PVWpk = (PacketViolationWarningPacket) packet;
-                if (pkIDs == null) {
-                    pkIDs = Arrays.stream(ProtocolInfo.class.getDeclaredFields()).filter(field -> field.getType() == Byte.TYPE);
-                }
-                Optional<String> PVWpkName = pkIDs
-                        .filter(field -> {
-                            try {
-                                return field.getByte(null) == ((PacketViolationWarningPacket) packet).packetId;
-                            } catch (IllegalAccessException e) {
-                                return false;
-                            }
-                        }).map(Field::getName).findFirst();
-                this.getServer().getLogger().warning("PacketViolationWarningPacket" + PVWpkName.map(name -> " for packet " + name).orElse(" UNKNOWN") + " from " + this.username + " (Protocol " + this.protocol + "): " + PVWpk.toString());
                 break;
             default:
                 break;

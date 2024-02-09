@@ -92,6 +92,7 @@ public final class DataPacketManager {
                 FilterTextProcessor.INSTANCE,
                 ItemFrameDropItemProcessor.INSTANCE,
                 MapInfoRequestProcessor.INSTANCE,
+                PacketViolationWarningProcessor.INSTANCE,
                 PlayerHotbarProcessor.INSTANCE,
                 RespawnProcessor.INSTANCE,
                 ServerSettingsRequestProcessor.INSTANCE,
