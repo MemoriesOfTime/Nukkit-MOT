@@ -441,13 +441,13 @@ public class Network {
         this.registerPacket(ProtocolInfo.CAMERA_PRESETS_PACKET, CameraPresetsPacket.class);
 
         this.registerPacketNew(ProtocolInfo.CAMERA_INSTRUCTION_PACKET, CameraInstructionPacket.class);
-        this.registerPacketNew(ProtocolInfo.TRIM_DATA, TrimDataPacket.class);
-        this.registerPacketNew(ProtocolInfo.OPEN_SIGN, OpenSignPacket.class);
-        this.registerPacketNew(ProtocolInfo.AGENT_ANIMATION, AgentAnimationPacket.class);
-        this.registerPacketNew(ProtocolInfo.REFRESH_ENTITLEMENTS, RefreshEntitlementsPacket.class);
-        this.registerPacketNew(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST, ToggleCrafterSlotRequestPacket.class);
+        this.registerPacketNew(ProtocolInfo.TRIM_DATA_PACKET, TrimDataPacket.class);
+        this.registerPacketNew(ProtocolInfo.OPEN_SIGN_PACKET, OpenSignPacket.class);
+        this.registerPacketNew(ProtocolInfo.AGENT_ANIMATION_PACKET, AgentAnimationPacket.class);
+        this.registerPacketNew(ProtocolInfo.REFRESH_ENTITLEMENTS_PACKET, RefreshEntitlementsPacket.class);
+        this.registerPacketNew(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST_PACKET, ToggleCrafterSlotRequestPacket.class);
         this.registerPacketNew(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class);
-        this.registerPacketNew(ProtocolInfo.SET_HUD, SetHudPacket.class);
+        this.registerPacketNew(ProtocolInfo.SET_HUD_PACKET, SetHudPacket.class);
     }
 
     @AllArgsConstructor

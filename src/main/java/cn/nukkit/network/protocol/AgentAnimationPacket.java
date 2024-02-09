@@ -5,17 +5,19 @@ package cn.nukkit.network.protocol;
  */
 public class AgentAnimationPacket extends DataPacket {
 
+    public static final int NETWORK_ID = ProtocolInfo.AGENT_ANIMATION_PACKET;
+
     public byte animation;
     public long runtimeEntityId;
 
     @Override
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__AGENT_ANIMATION;
+        return ProtocolInfo.__INTERNAL__AGENT_ANIMATION_PACKET;
     }
 
     @Override
     public int packetId() {
-        return ProtocolInfo.AGENT_ANIMATION;
+        return NETWORK_ID;
     }
 
     @Override

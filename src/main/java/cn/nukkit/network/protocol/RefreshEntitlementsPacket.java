@@ -5,7 +5,7 @@ package cn.nukkit.network.protocol;
  */
 public class RefreshEntitlementsPacket extends DataPacket {
 
-    public static final int NETWORK_ID = ProtocolInfo.REFRESH_ENTITLEMENTS;
+    public static final int NETWORK_ID = ProtocolInfo.REFRESH_ENTITLEMENTS_PACKET;
 
     @Override
     public int packetId() {
@@ -14,7 +14,7 @@ public class RefreshEntitlementsPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__REFRESH_ENTITLEMENTS;
+        return ProtocolInfo.__INTERNAL__REFRESH_ENTITLEMENTS_PACKET;
     }
 
     @Override

@@ -17,7 +17,7 @@ import java.util.Set;
 @ToString(doNotUseGetters = true)
 public class SetHudPacket extends DataPacket {
 
-    public static final int NETWORK_ID = ProtocolInfo.SET_HUD;
+    public static final int NETWORK_ID = ProtocolInfo.SET_HUD_PACKET;
 
     private final Set<HudElement> elements = new ObjectOpenHashSet<>();
     private HudVisibility visibility;
