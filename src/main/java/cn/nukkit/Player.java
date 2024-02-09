@@ -159,7 +159,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int GRINDSTONE_WINDOW_ID = 5;
     public static final int SMITHING_WINDOW_ID = 6;
 
-    protected static final int RESOURCE_PACK_CHUNK_SIZE = 8 * 1024; // 8KB
+    public static final int RESOURCE_PACK_CHUNK_SIZE = 8 * 1024; // 8KB
 
     protected final SourceInterface interfaz;
     protected final NetworkPlayerSession networkSession;
@@ -2995,21 +2995,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         break;
                 }
-                break;
-            case ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET:
-                ResourcePackChunkRequestPacket requestPacket = (ResourcePackChunkRequestPacket) packet;
-                ResourcePack resourcePack = this.server.getResourcePackManager().getPackById(requestPacket.packId);
-                if (resourcePack == null) {
-                    this.close("", "disconnectionScreen.resourcePack");
-                    break;
-                }
-
-                ResourcePackChunkDataPacket dataPacket = new ResourcePackChunkDataPacket();
-                dataPacket.packId = resourcePack.getPackId();
-                dataPacket.chunkIndex = requestPacket.chunkIndex;
-                dataPacket.data = resourcePack.getPackChunk(RESOURCE_PACK_CHUNK_SIZE * requestPacket.chunkIndex, RESOURCE_PACK_CHUNK_SIZE);
-                dataPacket.progress = (long) RESOURCE_PACK_CHUNK_SIZE * requestPacket.chunkIndex;
-                this.dataPacket(dataPacket);
                 break;
             case ProtocolInfo.PLAYER_INPUT_PACKET:
                 if (!this.isAlive() || !this.spawned || this.isMovementServerAuthoritative()) {
