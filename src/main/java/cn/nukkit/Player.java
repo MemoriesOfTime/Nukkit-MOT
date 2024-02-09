@@ -4641,53 +4641,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                 }
                 break;
-            case ProtocolInfo.BOOK_EDIT_PACKET:
-                BookEditPacket bookEditPacket = (BookEditPacket) packet;
-                Item oldBook = this.inventory.getItem(bookEditPacket.inventorySlot);
-                if (oldBook.getId() != Item.BOOK_AND_QUILL) {
-                    return;
-                }
-
-                if (bookEditPacket.text != null && bookEditPacket.text.length() > 256) {
-                    this.getServer().getLogger().debug(username + ": BookEditPacket with too long text");
-                    return;
-                }
-
-                Item newBook = oldBook.clone();
-                boolean success;
-                switch (bookEditPacket.action) {
-                    case REPLACE_PAGE:
-                        success = ((ItemBookAndQuill) newBook).setPageText(bookEditPacket.pageNumber, bookEditPacket.text);
-                        break;
-                    case ADD_PAGE:
-                        success = ((ItemBookAndQuill) newBook).insertPage(bookEditPacket.pageNumber, bookEditPacket.text);
-                        break;
-                    case DELETE_PAGE:
-                        success = ((ItemBookAndQuill) newBook).deletePage(bookEditPacket.pageNumber);
-                        break;
-                    case SWAP_PAGES:
-                        success = ((ItemBookAndQuill) newBook).swapPages(bookEditPacket.pageNumber, bookEditPacket.secondaryPageNumber);
-                        break;
-                    case SIGN_BOOK:
-                        if (bookEditPacket.title == null || bookEditPacket.author == null || bookEditPacket.xuid == null || bookEditPacket.title.length() > 64 || bookEditPacket.author.length() > 64 || bookEditPacket.xuid.length() > 64) {
-                            this.getServer().getLogger().debug(username + ": Invalid BookEditPacket action SIGN_BOOK: title/author/xuid is too long");
-                            return;
-                        }
-                        newBook = Item.get(Item.WRITTEN_BOOK, 0, 1, oldBook.getCompoundTag());
-                        success = ((ItemBookWritten) newBook).signBook(bookEditPacket.title, bookEditPacket.author, bookEditPacket.xuid, ItemBookWritten.GENERATION_ORIGINAL);
-                        break;
-                    default:
-                        return;
-                }
-
-                if (success) {
-                    PlayerEditBookEvent editBookEvent = new PlayerEditBookEvent(this, oldBook, newBook, bookEditPacket.action);
-                    this.server.getPluginManager().callEvent(editBookEvent);
-                    if (!editBookEvent.isCancelled()) {
-                        this.inventory.setItem(bookEditPacket.inventorySlot, editBookEvent.getNewBook());
-                    }
-                }
-                break;
             case ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET:
                 PacketViolationWarningPacket PVWpk = (PacketViolationWarningPacket) packet;
                 if (pkIDs == null) {

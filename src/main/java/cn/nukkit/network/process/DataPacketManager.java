@@ -85,6 +85,7 @@ public final class DataPacketManager {
     public static void registerDefaultProcessors() {
         registerProcessor(
                 0, //base
+                BookEditProcessor.INSTANCE,
                 ClientToServerHandshakeProcessor.INSTANCE,
                 NPCRequestProcessor.INSTANCE,
                 EmotePacketProcessor.INSTANCE,
