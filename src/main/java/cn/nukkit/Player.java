@@ -3808,23 +3808,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                 }
                 break;
-            case ProtocolInfo.TEXT_PACKET:
-                if (!this.spawned || !this.isAlive()) {
-                    break;
-                }
-
-                TextPacket textPacket = (TextPacket) packet;
-
-                if (textPacket.type == TextPacket.TYPE_CHAT) {
-                    String chatMessage = textPacket.message;
-                    int breakLine = chatMessage.indexOf('\n');
-                    // Chat messages shouldn't contain break lines so ignore text afterwards
-                    if (breakLine != -1) {
-                        chatMessage = chatMessage.substring(0, breakLine);
-                    }
-                    this.chat(chatMessage);
-                }
-                break;
             case ProtocolInfo.CONTAINER_CLOSE_PACKET:
                 ContainerClosePacket containerClosePacket = (ContainerClosePacket) packet;
                 if (!this.spawned || (containerClosePacket.windowId == ContainerIds.INVENTORY && !inventoryOpen && this.protocol >= 407)) {

@@ -100,7 +100,8 @@ public final class DataPacketManager {
                 RespawnProcessor.INSTANCE,
                 ServerSettingsRequestProcessor.INSTANCE,
                 SetDifficultyProcessor.INSTANCE,
-                SetPlayerGameTypeProcessor.INSTANCE
+                SetPlayerGameTypeProcessor.INSTANCE,
+                TextProcessor.INSTANCE
         );
 
         registerProcessor(
