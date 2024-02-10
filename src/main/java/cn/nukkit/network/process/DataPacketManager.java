@@ -99,6 +99,7 @@ public final class DataPacketManager {
                 PacketViolationWarningProcessor.INSTANCE,
                 PlayerHotbarProcessor.INSTANCE,
                 PlayerSkinProcessor.INSTANCE,
+                RequestChunkRadiusProcessor.INSTANCE,
                 ResourcePackChunkRequestProcessor.INSTANCE,
                 RespawnProcessor.INSTANCE,
                 ServerSettingsRequestProcessor.INSTANCE,

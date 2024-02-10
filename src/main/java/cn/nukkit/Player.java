@@ -3865,13 +3865,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
                 break;
-            case ProtocolInfo.REQUEST_CHUNK_RADIUS_PACKET:
-                RequestChunkRadiusPacket requestChunkRadiusPacket = (RequestChunkRadiusPacket) packet;
-                ChunkRadiusUpdatedPacket chunkRadiusUpdatePacket = new ChunkRadiusUpdatedPacket();
-                this.chunkRadius = Math.max(3, Math.min(requestChunkRadiusPacket.radius, this.viewDistance));
-                chunkRadiusUpdatePacket.radius = this.chunkRadius;
-                this.dataPacket(chunkRadiusUpdatePacket);
-                break;
             case ProtocolInfo.INVENTORY_TRANSACTION_PACKET:
                 if (!this.spawned || !this.isAlive()) {
                     log.debug("Player {} sent inventory transaction packet while not spawned or not alive", this.username);
