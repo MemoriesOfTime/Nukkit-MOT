@@ -3310,35 +3310,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.adventureSettings.set(Type.FLYING, playerToggleFlightEvent.isFlying());
                 }
                 break;
-            case ProtocolInfo.MOB_EQUIPMENT_PACKET:
-                if (!this.spawned || !this.isAlive()) {
-                    break;
-                }
-
-                MobEquipmentPacket mobEquipmentPacket = (MobEquipmentPacket) packet;
-
-                Inventory inv = this.getWindowById(mobEquipmentPacket.windowId);
-
-                if (inv == null) {
-                    this.server.getLogger().debug(this.getName() + " has no open container with window ID " + mobEquipmentPacket.windowId);
-                    return;
-                }
-
-                Item item = inv.getItem(mobEquipmentPacket.hotbarSlot);
-
-                if (!item.equals(mobEquipmentPacket.item)) {
-                    this.server.getLogger().debug(this.getName() + " tried to equip " + mobEquipmentPacket.item + " but have " + item + " in target slot");
-                    inv.sendContents(this);
-                    return;
-                }
-
-                if (inv instanceof PlayerInventory) {
-                    ((PlayerInventory) inv).equipItem(mobEquipmentPacket.hotbarSlot);
-                }
-
-                this.setDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION, false);
-
-                break;
             case ProtocolInfo.PLAYER_ACTION_PACKET:
                 PlayerActionPacket playerActionPacket = (PlayerActionPacket) packet;
                 if (!this.spawned || !this.isAlive() && playerActionPacket.action != PlayerActionPacket.ACTION_RESPAWN) {

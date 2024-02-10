@@ -96,6 +96,7 @@ public final class DataPacketManager {
                 LevelSoundEventProcessorV1.INSTANCE,
                 LevelSoundEventProcessorV2.INSTANCE,
                 MapInfoRequestProcessor.INSTANCE,
+                MobEquipmentProcessor.INSTANCE,
                 ModalFormResponseProcessor.INSTANCE,
                 PacketViolationWarningProcessor.INSTANCE,
                 PlayerHotbarProcessor.INSTANCE,
