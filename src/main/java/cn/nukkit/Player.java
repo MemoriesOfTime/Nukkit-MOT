@@ -3872,17 +3872,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 chunkRadiusUpdatePacket.radius = this.chunkRadius;
                 this.dataPacket(chunkRadiusUpdatePacket);
                 break;
-            case ProtocolInfo.LEVEL_SOUND_EVENT_PACKET:
-            case ProtocolInfo.LEVEL_SOUND_EVENT_PACKET_V1:
-            case ProtocolInfo.LEVEL_SOUND_EVENT_PACKET_V2:
-                if (this.isSpectator()) {
-                    //暂时保留，低版本客户端没有旁观模式，可能会发送这些数据包
-                    if (((LevelSoundEventPacket) packet).sound == LevelSoundEventPacket.SOUND_HIT || ((LevelSoundEventPacket) packet).sound == LevelSoundEventPacket.SOUND_ATTACK_NODAMAGE || ((LevelSoundEventPacket) packet).sound == LevelSoundEventPacket.SOUND_ATTACK || ((LevelSoundEventPacket) packet).sound == LevelSoundEventPacket.SOUND_ATTACK_STRONG) {
-                        break;
-                    }
-                }
-                this.level.addChunkPacket(this.getChunkX(), this.getChunkZ(), packet);
-                break;
             case ProtocolInfo.INVENTORY_TRANSACTION_PACKET:
                 if (!this.spawned || !this.isAlive()) {
                     log.debug("Player {} sent inventory transaction packet while not spawned or not alive", this.username);
