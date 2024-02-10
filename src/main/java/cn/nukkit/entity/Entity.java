@@ -2439,11 +2439,13 @@ public abstract class Entity extends Location implements Metadatable {
 
             this.blocksAround = new ArrayList<>();
 
-            for (int z = minZ; z <= maxZ; ++z) {
-                for (int x = minX; x <= maxX; ++x) {
-                    for (int y = minY; y <= maxY; ++y) {
-                        Block block = this.level.getBlock(x, y, z, false);
-                        this.blocksAround.add(block);
+            if (minY >= this.level.getMinBlockY() && maxY <= this.level.getMaxBlockY()) {
+                for (int z = minZ; z <= maxZ; ++z) {
+                    for (int x = minX; x <= maxX; ++x) {
+                        for (int y = minY; y <= maxY; ++y) {
+                            Block block = this.level.getBlock(x, y, z, false);
+                            this.blocksAround.add(block);
+                        }
                     }
                 }
             }
