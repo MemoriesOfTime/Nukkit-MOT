@@ -3286,30 +3286,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
                 break;
-            case ProtocolInfo.ADVENTURE_SETTINGS_PACKET:
-                if (this.protocol >= ProtocolInfo.v1_19_30_23) {
-                    return;
-                }
-                AdventureSettingsPacket adventureSettingsPacket = (AdventureSettingsPacket) packet;
-                if (adventureSettingsPacket.entityUniqueId != this.getId()) {
-                    break;
-                }
-                if (!server.getAllowFlight() && adventureSettingsPacket.getFlag(AdventureSettingsPacket.FLYING) && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)
-                        || adventureSettingsPacket.getFlag(AdventureSettingsPacket.NO_CLIP) && !this.getAdventureSettings().get(Type.NO_CLIP)) {
-                    this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server", true, "type=AdventureSettingsPacket, flags=ALLOW_FLIGHT: " + adventureSettingsPacket.getFlag(AdventureSettingsPacket.ALLOW_FLIGHT) + ", FLYING: " + adventureSettingsPacket.getFlag(AdventureSettingsPacket.ALLOW_FLIGHT));
-                    break;
-                }
-                PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, adventureSettingsPacket.getFlag(AdventureSettingsPacket.FLYING));
-                if (this.isSpectator()) {
-                    playerToggleFlightEvent.setCancelled();
-                }
-                this.server.getPluginManager().callEvent(playerToggleFlightEvent);
-                if (playerToggleFlightEvent.isCancelled()) {
-                    this.adventureSettings.update();
-                } else {
-                    this.adventureSettings.set(Type.FLYING, playerToggleFlightEvent.isFlying());
-                }
-                break;
             case ProtocolInfo.PLAYER_ACTION_PACKET:
                 PlayerActionPacket playerActionPacket = (PlayerActionPacket) packet;
                 if (!this.spawned || !this.isAlive() && playerActionPacket.action != PlayerActionPacket.ACTION_RESPAWN) {
@@ -3496,7 +3472,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
                             break;
                         }
-                        playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
+                        PlayerToggleFlightEvent playerToggleFlightEvent = new PlayerToggleFlightEvent(this, true);
                         this.getServer().getPluginManager().callEvent(playerToggleFlightEvent);
                         if (playerToggleFlightEvent.isCancelled()) {
                             this.getAdventureSettings().update();
@@ -3592,7 +3568,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.getServer().getLogger().debug(username + ": Block pick request for a block too far away");
                     return;
                 }
-                item = block.toItem();
+                Item item = block.toItem();
                 if (pickRequestPacket.addUserData) {
                     BlockEntity blockEntity = this.getLevel().getBlockEntityIfLoaded(this.temporalVector.setComponents(pickRequestPacket.x, pickRequestPacket.y, pickRequestPacket.z));
                     if (blockEntity != null) {

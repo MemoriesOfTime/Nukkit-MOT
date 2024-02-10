@@ -85,6 +85,7 @@ public final class DataPacketManager {
     public static void registerDefaultProcessors() {
         registerProcessor(
                 0, //base
+                AdventureSettingsProcessor.INSTANCE,
                 BookEditProcessor.INSTANCE,
                 ClientToServerHandshakeProcessor.INSTANCE,
                 CommandRequestProcessor.INSTANCE,
