@@ -2591,7 +2591,7 @@ public abstract class Entity extends Location implements Metadatable {
         if (Math.abs(pos.x) > ENTITY_COORDINATES_MAX_VALUE ||
             Math.abs(pos.y) > ENTITY_COORDINATES_MAX_VALUE ||
             Math.abs(pos.z) > ENTITY_COORDINATES_MAX_VALUE) {
-            server.getLogger().info("Entity " + this.getName() + " is trying to set position to " + pos + " which is out of bounds!");
+            server.getLogger().warning("Entity " + this.getName() + " is trying to set position to " + pos + " which is out of bounds!");
             return false;
         }
 
