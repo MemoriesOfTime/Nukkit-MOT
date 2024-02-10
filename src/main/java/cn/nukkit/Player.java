@@ -5046,11 +5046,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void emote(EmotePacket emote) {
-        if (this.protocol < ProtocolInfo.v1_20_0_23) {
-            emote.xuid = this.getLoginChainData().getXUID();
-            //未知参数，1.20.0发送的是空的
-            //emote.platformId = this.getLoginChainData().getDeviceId();
-        }
         for (Player player : this.getViewers().values()) {
             if (player.protocol >= ProtocolInfo.v1_16_0) {
                 player.dataPacket(emote);
