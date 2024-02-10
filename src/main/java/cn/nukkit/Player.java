@@ -32,9 +32,7 @@ import cn.nukkit.event.player.PlayerInteractEvent.Action;
 import cn.nukkit.event.player.PlayerTeleportEvent.TeleportCause;
 import cn.nukkit.event.server.DataPacketReceiveEvent;
 import cn.nukkit.event.server.DataPacketSendEvent;
-import cn.nukkit.form.handler.FormResponseHandler;
 import cn.nukkit.form.window.FormWindow;
-import cn.nukkit.form.window.FormWindowCustom;
 import cn.nukkit.form.window.FormWindowDialog;
 import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.transaction.*;
@@ -3549,42 +3547,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.setUsingItem(false);
                 break;
-            case ProtocolInfo.MODAL_FORM_RESPONSE_PACKET:
-                this.formOpen = false;
-
-                if (!this.spawned || !this.isAlive()) {
-                    break;
-                }
-
-                ModalFormResponsePacket modalFormPacket = (ModalFormResponsePacket) packet;
-
-                if (formWindows.containsKey(modalFormPacket.formId)) {
-                    FormWindow window = formWindows.remove(modalFormPacket.formId);
-                    window.setResponse(modalFormPacket.data.trim());
-
-                    for (FormResponseHandler handler : window.getHandlers()) {
-                        handler.handle(this, modalFormPacket.formId);
-                    }
-
-                    PlayerFormRespondedEvent event = new PlayerFormRespondedEvent(this, modalFormPacket.formId, window);
-                    getServer().getPluginManager().callEvent(event);
-                } else if (serverSettings.containsKey(modalFormPacket.formId)) {
-                    FormWindow window = serverSettings.get(modalFormPacket.formId);
-                    window.setResponse(modalFormPacket.data.trim());
-
-                    for (FormResponseHandler handler : window.getHandlers()) {
-                        handler.handle(this, modalFormPacket.formId);
-                    }
-
-                    PlayerSettingsRespondedEvent event = new PlayerSettingsRespondedEvent(this, modalFormPacket.formId, window);
-                    getServer().getPluginManager().callEvent(event);
-
-                    if (!event.isCancelled() && window instanceof FormWindowCustom)
-                        ((FormWindowCustom) window).setElementsFromResponse();
-                }
-
-                break;
-
             case ProtocolInfo.INTERACT_PACKET:
                 if (!this.spawned || !this.isAlive()) {
                     break;
