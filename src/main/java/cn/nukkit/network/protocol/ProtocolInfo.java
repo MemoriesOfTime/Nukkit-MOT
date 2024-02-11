@@ -302,20 +302,6 @@ public interface ProtocolInfo {
     int SET_HUD_PACKET = 308;
 
     static int toNewProtocolID(byte oldProtocolID) {
-        if (oldProtocolID < 0 && oldProtocolID >= -56) { // Hack: (byte) 200+ --> (int) 300+
-            return oldProtocolID + 356;
-        }
         return oldProtocolID & 0xff;
     }
-
-    // 这是为了兼容nkx
-    // MC packet IDs continue from 300 (0x12c)
-    // Hack: 100 is added to the IDs below on encode
-    byte __INTERNAL__CAMERA_INSTRUCTION_PACKET = (byte) 200; // 300
-    byte __INTERNAL__TRIM_DATA_PACKET = (byte) 202; // 302
-    byte __INTERNAL__OPEN_SIGN_PACKET = (byte) 203; // 303
-    byte __INTERNAL__AGENT_ANIMATION_PACKET = (byte) 204; // 304
-    byte __INTERNAL__REFRESH_ENTITLEMENTS_PACKET = (byte) 205; // 305
-    byte __INTERNAL__TOGGLE_CRAFTER_SLOT_REQUEST_PACKET = (byte) 206; // 306
-    byte __INTERNAL__SET_PLAYER_INVENTORY_OPTIONS_PACKET = (byte) 207; // 307
 }

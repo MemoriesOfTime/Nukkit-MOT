@@ -14,7 +14,7 @@ public class RefreshEntitlementsPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__REFRESH_ENTITLEMENTS_PACKET;
+        throw new UnsupportedOperationException("Not supported.");
     }
 
     @Override

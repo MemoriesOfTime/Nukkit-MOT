@@ -27,7 +27,7 @@ public class TrimDataPacket extends DataPacket {
     @Deprecated
     @Override
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__TRIM_DATA_PACKET;
+        throw new UnsupportedOperationException("Not supported.");
     }
 
     @Override

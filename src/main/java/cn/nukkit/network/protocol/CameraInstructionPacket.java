@@ -34,7 +34,7 @@ public class CameraInstructionPacket extends DataPacket {
     @Override
     @Deprecated
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__CAMERA_INSTRUCTION_PACKET;
+        throw new UnsupportedOperationException("Not supported.");
     }
 
     @Override
