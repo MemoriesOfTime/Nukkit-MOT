@@ -325,6 +325,7 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FLAG_CRAWLING = 114;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
+    public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
 
     public static long entityCount = 1;
 
@@ -2583,6 +2584,16 @@ public abstract class Entity extends Location implements Metadatable {
 
     public boolean setPosition(Vector3 pos) {
         if (this.closed) {
+            return false;
+        }
+
+        // 校验坐标有效性
+        // 当坐标接近int类型范围上限时，与碰撞相关的方法有可能计算出超出int表示上限的时
+        // eg: Entity::getBlocksAround(), 在示例方法中，会导致服务端迅速OOM
+        if (Math.abs(pos.x) > ENTITY_COORDINATES_MAX_VALUE ||
+            Math.abs(pos.y) > ENTITY_COORDINATES_MAX_VALUE ||
+            Math.abs(pos.z) > ENTITY_COORDINATES_MAX_VALUE) {
+            server.getLogger().warning("Entity " + this.getName() + " is trying to set position to " + pos + " which is out of bounds!");
             return false;
         }
 
