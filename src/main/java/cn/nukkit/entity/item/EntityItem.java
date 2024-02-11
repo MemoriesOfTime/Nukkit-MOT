@@ -16,6 +16,8 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.AddItemEntityPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.EntityEventPacket;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * @author MagicDroidX
@@ -23,10 +25,22 @@ import cn.nukkit.network.protocol.EntityEventPacket;
 public class EntityItem extends Entity {
 
     public static final int NETWORK_ID = 64;
+
+    @Setter
+    @Getter
     protected String owner;
+
+    @Setter
+    @Getter
     protected String thrower;
+
+    @Getter
     protected Item item;
+
+    @Setter
+    @Getter
     protected int pickupDelay;
+
     protected boolean floatsInLava;
 
     public EntityItem(FullChunk chunk, CompoundTag nbt) {
@@ -230,10 +244,12 @@ public class EntityItem extends Entity {
                 }
             }
 
-            int bid = level.getBlock(this.getFloorX(), NukkitMath.floorDouble(this.y + 0.53), this.getFloorZ(), false).getId();
-            if (this.isInsideOfWater() || (this.floatsInLava && (bid == BlockID.LAVA || bid == BlockID.STILL_LAVA))) {
+            int bid = level.getBlock(this.getFloorX(), NukkitMath.floorDouble(this.boundingBox.getMinY()), this.getFloorZ(), false).getId();
+            if (bid == BlockID.STILL_WATER || bid == BlockID.WATER) {
+                this.motionY -= this.getGravity() * -0.015;
+            } else if (this.isInsideOfWater() || (this.floatsInLava && (bid == BlockID.LAVA || bid == BlockID.STILL_LAVA))) {
                 this.motionY = this.getGravity() / 2;
-            } else if (!this.isOnGround()) {
+            } else if (!this.isOnGround())  {
                 this.motionY -= this.getGravity();
             }
 
@@ -241,7 +257,7 @@ public class EntityItem extends Entity {
                 hasUpdate = true;
             }
 
-            //this.move(this.motionX, this.motionY, this.motionZ);
+            this.move(this.motionX, this.motionY, this.motionZ);
 
             double friction = 1 - this.getDrag();
 
@@ -257,7 +273,7 @@ public class EntityItem extends Entity {
                 this.motionY *= -0.5;
             }
 
-            if (this.move(this.motionX, this.motionY, this.motionZ)) this.updateMovement();
+            this.updateMovement();
         }
 
         return hasUpdate || !this.onGround || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001;
@@ -286,37 +302,9 @@ public class EntityItem extends Entity {
         return this.hasCustomName() ? this.getNameTag() : (this.item.hasCustomName() ? this.item.getCustomName() : this.item.getName());
     }
 
-    public Item getItem() {
-        return item;
-    }
-
     @Override
     public boolean canCollideWith(Entity entity) {
         return false;
-    }
-
-    public int getPickupDelay() {
-        return pickupDelay;
-    }
-
-    public void setPickupDelay(int pickupDelay) {
-        this.pickupDelay = pickupDelay;
-    }
-
-    public String getOwner() {
-        return owner;
-    }
-
-    public void setOwner(String owner) {
-        this.owner = owner;
-    }
-
-    public String getThrower() {
-        return thrower;
-    }
-
-    public void setThrower(String thrower) {
-        this.thrower = thrower;
     }
 
     @Override
