@@ -1,7 +1,7 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.types.HudElement;
-import cn.nukkit.network.protocol.types.HudVisibility;
+import cn.nukkit.network.protocol.types.hub.HudElement;
+import cn.nukkit.network.protocol.types.hub.HudVisibility;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import lombok.Getter;
 import lombok.Setter;
@@ -19,8 +19,8 @@ public class SetHudPacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.SET_HUD_PACKET;
 
-    private final Set<HudElement> elements = new ObjectOpenHashSet<>();
-    private HudVisibility visibility;
+    public final Set<HudElement> elements = new ObjectOpenHashSet<>();
+    public HudVisibility visibility;
 
     @Override
     public int packetId() {
@@ -29,7 +29,7 @@ public class SetHudPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        throw new UnsupportedOperationException("Not supported");
+        return 0;
     }
 
     @Override
