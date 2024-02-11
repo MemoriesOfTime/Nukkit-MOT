@@ -4439,6 +4439,10 @@ public class Level implements ChunkManager, Metadatable {
         return this.dimensionData.getDimensionId();
     }
 
+    public final boolean isYInRange(int y) {
+        return y >= getMinBlockY() && y < getMaxBlockY();
+    }
+
     public int getMinBlockY() {
         int minHeight = this.dimensionData.getMinHeight();
         if (minHeight < 0) {
