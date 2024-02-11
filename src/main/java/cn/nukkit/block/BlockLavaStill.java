@@ -13,7 +13,7 @@ public class BlockLavaStill extends BlockLava {
     }
 
     public BlockLavaStill(int meta) {
-        super(0);
+        super(meta);
     }
 
     @Override
