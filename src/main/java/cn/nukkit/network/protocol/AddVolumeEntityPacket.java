@@ -2,7 +2,6 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
-import lombok.SneakyThrows;
 import lombok.ToString;
 
 import java.io.IOException;
@@ -29,7 +28,7 @@ public class AddVolumeEntityPacket extends DataPacket {
 
 
     public AddVolumeEntityPacket() {
-        // Does nothing
+
     }
 
     @Override
@@ -46,12 +45,15 @@ public class AddVolumeEntityPacket extends DataPacket {
         instanceName = getString();
     }
 
-    @SneakyThrows(IOException.class)
     @Override
     public void encode() {
         reset();
         putUnsignedVarInt(id);
-        putByteArray(NBTIO.write(data));
+        try {
+            putByteArray(NBTIO.write(data));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         putString(engineVersion);
         putString(identifier);
         putString(instanceName);

@@ -8,11 +8,12 @@ public class PhotoTransferPacket extends DataPacket {
     public static final byte NETWORK_ID = ProtocolInfo.PHOTO_TRANSFER_PACKET;
     public String photoName;
     public String photoData;
-    public String bookId; //photos are stored in a sibling directory to the game's folder (screenshots/(some UUID)/bookID/example.png)
+    //photos are stored in a sibling directory to the game's folder (screenshots/(some UUID)/bookID/example.png)
+    public String bookId;
     public int type;
     public int sourceType;
     public long ownerActorUniqueId;
-    public String newPhotoName; //???
+    public String newPhotoName;
 
     @Override
     public byte pid() {
