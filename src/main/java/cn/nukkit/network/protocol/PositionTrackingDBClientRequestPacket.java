@@ -4,7 +4,6 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 @ToString
-@NoArgsConstructor(onConstructor = @__())
 public class PositionTrackingDBClientRequestPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.POS_TRACKING_CLIENT_REQUEST_PACKET;
@@ -13,7 +12,6 @@ public class PositionTrackingDBClientRequestPacket extends DataPacket {
     
     private Action action;
     private int trackingId;
-
 
     public Action getAction() {
         return action;

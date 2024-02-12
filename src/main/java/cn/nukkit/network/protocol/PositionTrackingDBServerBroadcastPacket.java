@@ -15,7 +15,6 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 
 @ToString
-@NoArgsConstructor(onConstructor = @__())
 public class PositionTrackingDBServerBroadcastPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.POS_TRACKING_SERVER_BROADCAST_PACKET;

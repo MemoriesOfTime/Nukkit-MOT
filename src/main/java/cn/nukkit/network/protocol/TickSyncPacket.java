@@ -4,7 +4,6 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 @ToString
-@NoArgsConstructor(onConstructor = @__())
 public class TickSyncPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.TICK_SYNC_PACKET;
