@@ -11,6 +11,8 @@ import java.util.List;
 @ToString
 public class ItemStackRequestPacket extends DataPacket {
 
+    public static final byte NETWORK_ID = ProtocolInfo.ITEM_STACK_REQUEST_PACKET;
+
     private final List<ItemStackRequest> requests = new ArrayList<>();
 
     public List<ItemStackRequest> getRequests() {
@@ -19,7 +21,7 @@ public class ItemStackRequestPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return ProtocolInfo.ITEM_STACK_REQUEST_PACKET;
+        return NETWORK_ID;
     }
 
     @Override

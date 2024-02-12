@@ -4,7 +4,8 @@ import lombok.ToString;
 
 @ToString
 public class PhotoTransferPacket extends DataPacket {
-    public static final int NETWORK_ID = ProtocolInfo.PHOTO_TRANSFER_PACKET;
+
+    public static final byte NETWORK_ID = ProtocolInfo.PHOTO_TRANSFER_PACKET;
     public String photoName;
     public String photoData;
     public String bookId; //photos are stored in a sibling directory to the game's folder (screenshots/(some UUID)/bookID/example.png)

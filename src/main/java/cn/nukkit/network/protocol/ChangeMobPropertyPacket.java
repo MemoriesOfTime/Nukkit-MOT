@@ -9,7 +9,8 @@ import lombok.ToString;
  */
 @ToString
 public class ChangeMobPropertyPacket extends DataPacket {
-    public static final int NETWORK_ID = ProtocolInfo.CHANGE_MOB_PROPERTY_PACKET;
+
+    public static final byte NETWORK_ID = ProtocolInfo.CHANGE_MOB_PROPERTY_PACKET;
     private long uniqueEntityId;
     private String property;
     private boolean boolValue;

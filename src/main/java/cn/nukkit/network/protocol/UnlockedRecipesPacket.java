@@ -9,12 +9,14 @@ import java.util.List;
 @Getter
 @ToString
 public class UnlockedRecipesPacket extends DataPacket {
+
+    public static final byte NETWORK_ID = ProtocolInfo.UNLOCKED_RECIPES_PACKET;
     public boolean unlockedNotification;
     public final List<String> unlockedRecipes = new ObjectArrayList<>();
 
     @Override
     public byte pid() {
-        return ProtocolInfo.UNLOCKED_RECIPES_PACKET;
+        return NETWORK_ID;
     }
 
     @Override

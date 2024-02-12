@@ -4,7 +4,7 @@ package cn.nukkit.network.protocol;
  * @author glorydark
  */
 public class CreatePhotoPacket extends DataPacket {
-    public static final int NETWORK_ID = ProtocolInfo.CREATE_PHOTO_PACKET;
+    public static final byte NETWORK_ID = ProtocolInfo.CREATE_PHOTO_PACKET;
     private long actorUniqueId;
     private String photoName;
     private String photoItemName;

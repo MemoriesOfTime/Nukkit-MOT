@@ -8,11 +8,14 @@ import java.util.List;
 
 @ToString
 public class DimensionDataPacket extends DataPacket {
+
+    public static final byte NETWORK_ID = ProtocolInfo.DIMENSION_DATA_PACKET;
+
     private final List<DimensionData> definitions = new ObjectArrayList<>();
 
     @Override
     public byte pid() {
-        return ProtocolInfo.DIMENSION_DATA_PACKET;
+        return NETWORK_ID;
     }
 
     @Override

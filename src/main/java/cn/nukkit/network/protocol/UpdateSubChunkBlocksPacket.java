@@ -8,6 +8,9 @@ import java.util.List;
 
 @ToString
 public class UpdateSubChunkBlocksPacket extends DataPacket {
+
+    public static final byte NETWORK_ID = ProtocolInfo.UPDATE_SUB_CHUNK_BLOCKS_PACKET;
+
     public final int chunkX;
     public final int chunkY;
     public final int chunkZ;
@@ -23,7 +26,7 @@ public class UpdateSubChunkBlocksPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return ProtocolInfo.UPDATE_SUB_CHUNK_BLOCKS_PACKET;
+        return NETWORK_ID;
     }
 
     @Override
@@ -90,9 +93,5 @@ public class UpdateSubChunkBlocksPacket extends DataPacket {
         result = result * PRIME + ((Object) this.standardBlocks).hashCode();
         result = result * PRIME + ((Object) this.extraBlocks).hashCode();
         return result;
-    }
-
-    public String toString() {
-        return "UpdateSubChunkBlocksPacket(chunkX=" + this.chunkX + ", chunkY=" + this.chunkY + ", chunkZ=" + this.chunkZ + ", standardBlocks=" + this.standardBlocks + ", extraBlocks=" + this.extraBlocks + ")";
     }
 }

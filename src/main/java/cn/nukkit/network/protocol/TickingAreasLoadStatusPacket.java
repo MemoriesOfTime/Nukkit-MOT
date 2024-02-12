@@ -4,7 +4,8 @@ import lombok.ToString;
 
 @ToString
 public class TickingAreasLoadStatusPacket extends DataPacket {
-    public static final int NETWORK_ID = ProtocolInfo.TICKING_AREAS_LOAD_STATUS_PACKET;
+
+    public static final byte NETWORK_ID = ProtocolInfo.TICKING_AREAS_LOAD_STATUS_PACKET;
     boolean waitingForPreload;
 
     @Override
