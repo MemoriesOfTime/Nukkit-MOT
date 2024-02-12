@@ -470,13 +470,13 @@ public class Binary {
     }
 
     public static byte[] writeVarInt(int v) {
-        BinaryStream stream = new BinaryStream();
+        BinaryStream stream = new BinaryStream(5);
         stream.putVarInt(v);
         return stream.getBuffer();
     }
 
     public static byte[] writeUnsignedVarInt(long v) {
-        BinaryStream stream = new BinaryStream();
+        BinaryStream stream = new BinaryStream(5);
         stream.putUnsignedVarInt(v);
         return stream.getBuffer();
     }

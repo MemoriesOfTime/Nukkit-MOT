@@ -58,6 +58,12 @@ public class BinaryStream {
         this.count = 0;
     }
 
+    public BinaryStream(int initialCapacity) {
+        this.buffer = new byte[initialCapacity];
+        this.offset = 0;
+        this.count = 0;
+    }
+
     public BinaryStream(byte[] buffer) {
         this(buffer, 0);
     }

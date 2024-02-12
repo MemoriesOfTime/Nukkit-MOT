@@ -791,9 +791,9 @@ public class CraftingManager {
     }
 
     public static UUID getMultiItemHash(Collection<Item> items) {
-        BinaryStream stream = new BinaryStream();
+        BinaryStream stream = new BinaryStream(items.size() * 5);
         for (Item item : items) {
-            stream.putVarInt(getFullItemHash(item));
+            stream.putVarInt(getFullItemHash(item)); //putVarInt 5 bit
         }
         return UUID.nameUUIDFromBytes(stream.getBuffer());
     }
