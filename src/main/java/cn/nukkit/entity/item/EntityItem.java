@@ -249,7 +249,7 @@ public class EntityItem extends Entity {
                 this.motionY -= this.getGravity() * -0.015;
             } else if (this.isInsideOfWater() || (this.floatsInLava && (bid == BlockID.LAVA || bid == BlockID.STILL_LAVA))) {
                 this.motionY = this.getGravity() / 2;
-            } else if (!this.isOnGround())  {
+            } else if (!this.isOnGround()) {
                 this.motionY -= this.getGravity();
             }
 
