@@ -22,6 +22,11 @@ import cn.nukkit.network.LittleEndianByteBufInputStream;
 import cn.nukkit.network.LittleEndianByteBufOutputStream;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.EntityLink;
+import cn.nukkit.network.protocol.types.itemstack.ContainerSlotType;
+import cn.nukkit.network.protocol.types.itemstack.request.ItemStackRequest;
+import cn.nukkit.network.protocol.types.itemstack.request.ItemStackRequestSlotData;
+import cn.nukkit.network.protocol.types.itemstack.request.TextProcessingEventOrigin;
+import cn.nukkit.network.protocol.types.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.AbstractByteBufAllocator;
 import io.netty.buffer.ByteBuf;
@@ -1567,5 +1572,89 @@ public class BinaryStream {
         return (minCapacity > MAX_ARRAY_SIZE) ?
                 Integer.MAX_VALUE :
                 MAX_ARRAY_SIZE;
+    }
+
+    public ItemStackRequest readItemStackRequest() {
+        return readItemStackRequest(ProtocolInfo.CURRENT_PROTOCOL);
+    }
+
+    public ItemStackRequest readItemStackRequest(int protocol) {
+        int requestId = getVarInt();
+        ItemStackRequestAction[] actions = getArray(ItemStackRequestAction.class, (s) -> {
+            ItemStackRequestActionType itemStackRequestActionType = ItemStackRequestActionType.fromId(s.getByte());
+            return readRequestActionData(protocol, itemStackRequestActionType);
+        });
+        String[] filteredStrings = getArray(String.class, BinaryStream::getString);
+
+        int originVal = getLInt();
+        TextProcessingEventOrigin origin = originVal == -1 ? null : TextProcessingEventOrigin.fromId(originVal);  // new for v552
+        return new ItemStackRequest(requestId, actions, filteredStrings, origin);
+    }
+
+    protected ItemStackRequestAction readRequestActionData(int protocol, ItemStackRequestActionType type) {
+        return switch (type) {
+            case CRAFT_REPAIR_AND_DISENCHANT -> new CraftGrindstoneAction((int) getUnsignedVarInt(), getVarInt());
+            case CRAFT_LOOM -> new CraftLoomAction(getString());
+            case CRAFT_RECIPE_AUTO -> new AutoCraftRecipeAction(
+                    (int) getUnsignedVarInt(), getByte(), Collections.emptyList()
+            );
+            case CRAFT_RESULTS_DEPRECATED -> new CraftResultsDeprecatedAction(
+                    getArray(Item.class, (s) -> s.getSlot(protocol)),
+                    getByte()
+            );
+            case MINE_BLOCK -> new MineBlockAction(getVarInt(), getVarInt(), getVarInt());
+            case CRAFT_RECIPE_OPTIONAL -> new CraftRecipeOptionalAction((int) getUnsignedVarInt(), getLInt());
+            case TAKE -> new TakeAction(
+                    getByte(),
+                    readStackRequestSlotInfo(),
+                    readStackRequestSlotInfo()
+            );
+            case PLACE -> new PlaceAction(
+                    getByte(),
+                    readStackRequestSlotInfo(),
+                    readStackRequestSlotInfo()
+            );
+            case SWAP -> new SwapAction(
+                    readStackRequestSlotInfo(),
+                    readStackRequestSlotInfo()
+            );
+            case DROP -> new DropAction(
+                    getByte(),
+                    readStackRequestSlotInfo(),
+                    getBoolean()
+            );
+            case DESTROY -> new DestroyAction(
+                    getByte(),
+                    readStackRequestSlotInfo()
+            );
+            case CONSUME -> new ConsumeAction(
+                    getByte(),
+                    readStackRequestSlotInfo()
+            );
+            case CREATE -> new CreateAction(
+                    getByte()
+            );
+            case LAB_TABLE_COMBINE -> new LabTableCombineAction();
+            case BEACON_PAYMENT -> new BeaconPaymentAction(
+                    getVarInt(),
+                    getVarInt()
+            );
+            case CRAFT_RECIPE -> new CraftRecipeAction(
+                    (int) getUnsignedVarInt()
+            );
+            case CRAFT_CREATIVE -> new CraftCreativeAction(
+                    (int) getUnsignedVarInt()
+            );
+            case CRAFT_NON_IMPLEMENTED_DEPRECATED -> new CraftNonImplementedAction();
+            default -> throw new UnsupportedOperationException("Unhandled stack request action type: " + type);
+        };
+    }
+
+    private ItemStackRequestSlotData readStackRequestSlotInfo() {
+        return new ItemStackRequestSlotData(
+                ContainerSlotType.fromId(getByte()),
+                getByte(),
+                getVarInt()
+        );
     }
 }
