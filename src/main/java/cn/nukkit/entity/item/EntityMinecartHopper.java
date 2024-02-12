@@ -3,7 +3,6 @@ package cn.nukkit.entity.item;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
-import cn.nukkit.blockentity.BlockEntityChest;
 import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
@@ -141,37 +140,27 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
         if(!isOnTransferCooldown()) {
             Block upperBlock = this.getPosition().floor().add(0, 1, 0).getLevelBlock();
             if (upperBlock != null) {
-                BlockEntity blockEntity = upperBlock.getLevel().getBlockEntity(upperBlock);
-                if (blockEntity != null) {
-                    switch (upperBlock.getId()) {
-                        case Block.CHEST:
-                            BlockEntityChest entityChest = (BlockEntityChest) blockEntity;
-                            BaseInventory chestInventory = entityChest.getInventory();
-                            for (Item pullItem : chestInventory.getContents().values()) {
+                BlockEntity blockEntity;
+                switch (upperBlock.getId()) {
+                    case Block.CHEST:
+                    case Block.HOPPER_BLOCK:
+                        blockEntity = upperBlock.getLevel().getBlockEntity(upperBlock);
+                        if (blockEntity instanceof InventoryHolder inventoryHolder) {
+                            Inventory inv = inventoryHolder.getInventory();
+                            for (Item pullItem : inv.getContents().values()) {
                                 pullItem = pullItem.clone();
                                 pullItem.setCount(1);
                                 if (!pullItem.isNull() && minecartHopperInventory.canAddItem(pullItem)) {
-                                    chestInventory.removeItem(pullItem);
+                                    inv.removeItem(pullItem);
                                     minecartHopperInventory.addItem(pullItem);
                                     break;
                                 }
                             }
-                            break;
-                        case Block.HOPPER_BLOCK:
-                            BlockEntityHopper entityHopper = (BlockEntityHopper) blockEntity;
-                            HopperInventory hopperInventory = entityHopper.getInventory();
-                            for (Item pullItem : hopperInventory.getContents().values()) {
-                                pullItem = pullItem.clone();
-                                pullItem.setCount(1);
-                                if (!pullItem.isNull() && minecartHopperInventory.canAddItem(pullItem)) {
-                                    hopperInventory.removeItem(pullItem);
-                                    minecartHopperInventory.addItem(pullItem);
-                                    break;
-                                }
-                            }
-                            break;
-                        case Block.FURNACE:
-                            BlockEntityFurnace entityFurnace = (BlockEntityFurnace) blockEntity;
+                        }
+                        break;
+                    case Block.FURNACE:
+                        blockEntity = upperBlock.getLevel().getBlockEntity(upperBlock);
+                        if (blockEntity instanceof BlockEntityFurnace entityFurnace) {
                             FurnaceInventory furnaceInventory = entityFurnace.getInventory();
                             Item resultItem = furnaceInventory.getResult().clone();
                             resultItem.setCount(1);
@@ -179,8 +168,8 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
                                 furnaceInventory.removeItem(resultItem);
                                 minecartHopperInventory.addItem(resultItem);
                             }
-                            break;
-                    }
+                        }
+                        break;
                 }
             }
 
