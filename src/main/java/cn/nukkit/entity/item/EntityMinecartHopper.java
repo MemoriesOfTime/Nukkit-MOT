@@ -2,6 +2,7 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityChest;
 import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.blockentity.BlockEntityHopper;
@@ -140,43 +141,46 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
         if(!isOnTransferCooldown()) {
             Block upperBlock = this.getPosition().floor().add(0, 1, 0).getLevelBlock();
             if (upperBlock != null) {
-                switch (upperBlock.getId()) {
-                    case Block.CHEST:
-                        BlockEntityChest entityChest = (BlockEntityChest) upperBlock.getLevel().getBlockEntity(upperBlock);
-                        ChestInventory chestInventory = (ChestInventory) entityChest.getInventory();
-                        for (Item pullItem : chestInventory.getContents().values()) {
-                            pullItem = pullItem.clone();
-                            pullItem.setCount(1);
-                            if (!pullItem.isNull() && minecartHopperInventory.canAddItem(pullItem)) {
-                                chestInventory.removeItem(pullItem);
-                                minecartHopperInventory.addItem(pullItem);
-                                break;
+                BlockEntity blockEntity = upperBlock.getLevel().getBlockEntity(upperBlock);
+                if (blockEntity != null) {
+                    switch (upperBlock.getId()) {
+                        case Block.CHEST:
+                            BlockEntityChest entityChest = (BlockEntityChest) blockEntity;
+                            BaseInventory chestInventory = entityChest.getInventory();
+                            for (Item pullItem : chestInventory.getContents().values()) {
+                                pullItem = pullItem.clone();
+                                pullItem.setCount(1);
+                                if (!pullItem.isNull() && minecartHopperInventory.canAddItem(pullItem)) {
+                                    chestInventory.removeItem(pullItem);
+                                    minecartHopperInventory.addItem(pullItem);
+                                    break;
+                                }
                             }
-                        }
-                        break;
-                    case Block.HOPPER_BLOCK:
-                        BlockEntityHopper entityHopper = (BlockEntityHopper) upperBlock.getLevel().getBlockEntity(upperBlock);
-                        HopperInventory hopperInventory = entityHopper.getInventory();
-                        for (Item pullItem : hopperInventory.getContents().values()) {
-                            pullItem = pullItem.clone();
-                            pullItem.setCount(1);
-                            if (!pullItem.isNull() && minecartHopperInventory.canAddItem(pullItem)) {
-                                hopperInventory.removeItem(pullItem);
-                                minecartHopperInventory.addItem(pullItem);
-                                break;
+                            break;
+                        case Block.HOPPER_BLOCK:
+                            BlockEntityHopper entityHopper = (BlockEntityHopper) blockEntity;
+                            HopperInventory hopperInventory = entityHopper.getInventory();
+                            for (Item pullItem : hopperInventory.getContents().values()) {
+                                pullItem = pullItem.clone();
+                                pullItem.setCount(1);
+                                if (!pullItem.isNull() && minecartHopperInventory.canAddItem(pullItem)) {
+                                    hopperInventory.removeItem(pullItem);
+                                    minecartHopperInventory.addItem(pullItem);
+                                    break;
+                                }
                             }
-                        }
-                        break;
-                    case Block.FURNACE:
-                        BlockEntityFurnace entityFurnace = (BlockEntityFurnace) upperBlock.getLevel().getBlockEntity(upperBlock);
-                        FurnaceInventory furnaceInventory = entityFurnace.getInventory();
-                        Item resultItem = furnaceInventory.getResult().clone();
-                        resultItem.setCount(1);
-                        if (!resultItem.isNull() && minecartHopperInventory.canAddItem(resultItem)) {
-                            furnaceInventory.removeItem(resultItem);
-                            minecartHopperInventory.addItem(resultItem);
-                        }
-                        break;
+                            break;
+                        case Block.FURNACE:
+                            BlockEntityFurnace entityFurnace = (BlockEntityFurnace) blockEntity;
+                            FurnaceInventory furnaceInventory = entityFurnace.getInventory();
+                            Item resultItem = furnaceInventory.getResult().clone();
+                            resultItem.setCount(1);
+                            if (!resultItem.isNull() && minecartHopperInventory.canAddItem(resultItem)) {
+                                furnaceInventory.removeItem(resultItem);
+                                minecartHopperInventory.addItem(resultItem);
+                            }
+                            break;
+                    }
                 }
             }
 
