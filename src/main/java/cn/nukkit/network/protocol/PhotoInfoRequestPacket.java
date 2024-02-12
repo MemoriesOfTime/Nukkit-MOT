@@ -2,7 +2,6 @@ package cn.nukkit.network.protocol;
 
 import lombok.ToString;
 
-
 @ToString
 public class PhotoInfoRequestPacket extends DataPacket {
     public static final int NETWORK_ID = ProtocolInfo.PHOTO_INFO_REQUEST_PACKET;

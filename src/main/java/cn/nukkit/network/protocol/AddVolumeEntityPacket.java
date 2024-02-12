@@ -3,10 +3,11 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import lombok.SneakyThrows;
+import lombok.ToString;
 
 import java.io.IOException;
 
-
+@ToString
 public class AddVolumeEntityPacket extends DataPacket {
     public static final int NETWORK_ID = ProtocolInfo.ADD_VOLUME_ENTITY_PACKET;
 

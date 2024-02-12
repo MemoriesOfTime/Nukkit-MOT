@@ -3,11 +3,6 @@ package cn.nukkit.network.protocol;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
-/**
- * @author joserobjr
- */
-
-
 @ToString
 @NoArgsConstructor(onConstructor = @__())
 public class PositionTrackingDBClientRequestPacket extends DataPacket {

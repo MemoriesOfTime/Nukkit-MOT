@@ -1,10 +1,13 @@
 package cn.nukkit.network.protocol;
 
+import lombok.ToString;
+
 /**
  * Server-bound packet to change the properties of a mob.
  *
  * @since v503
  */
+@ToString
 public class ChangeMobPropertyPacket extends DataPacket {
     public static final int NETWORK_ID = ProtocolInfo.CHANGE_MOB_PROPERTY_PACKET;
     private long uniqueEntityId;

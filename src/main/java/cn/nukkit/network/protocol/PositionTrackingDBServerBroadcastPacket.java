@@ -14,11 +14,6 @@ import lombok.ToString;
 import javax.annotation.Nullable;
 import java.io.IOException;
 
-/**
- * @author joserobjr
- */
-
-
 @ToString
 @NoArgsConstructor(onConstructor = @__())
 public class PositionTrackingDBServerBroadcastPacket extends DataPacket {

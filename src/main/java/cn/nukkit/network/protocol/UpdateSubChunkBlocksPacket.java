@@ -2,10 +2,11 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.network.protocol.types.BlockChangeEntry;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import lombok.ToString;
 
 import java.util.List;
 
-
+@ToString
 public class UpdateSubChunkBlocksPacket extends DataPacket {
     public final int chunkX;
     public final int chunkY;
