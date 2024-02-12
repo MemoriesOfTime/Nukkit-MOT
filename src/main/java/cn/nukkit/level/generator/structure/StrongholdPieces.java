@@ -31,8 +31,8 @@ public final class StrongholdPieces {
     private static final BlockState SMOOTH_STONE_SLAB = new BlockState(Block.STONE_SLAB, BlockSlabStone.STONE);
     private static final BlockState SMOOTH_STONE_SLAB_DOUBLE = new BlockState(Block.DOUBLE_STONE_SLAB, BlockDoubleSlabStone.STONE);
     private static final BlockState COBBLESTONE = new BlockState(Block.COBBLESTONE);
-    private static final BlockState WATER = new BlockState(Block.STILL_WATER);
-    private static final BlockState LAVA = new BlockState(Block.STILL_LAVA);
+    private static final BlockState WATER = new BlockState(Block.WATER);
+    private static final BlockState LAVA = new BlockState(Block.LAVA);
     private static final BlockState OAK_FENCE = new BlockState(Block.FENCE, BlockFence.FENCE_OAK);
     private static final BlockState OAK_PLANKS = new BlockState(Block.PLANKS, BlockPlanks.OAK);
     private static final BlockState OAK_DOOR = new BlockState(Block.WOODEN_DOOR_BLOCK);
