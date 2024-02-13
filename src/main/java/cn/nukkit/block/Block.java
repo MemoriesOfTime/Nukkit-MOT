@@ -1430,6 +1430,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return Optional.empty();
     }
 
+    public boolean isLiquidSource() {
+        return false;
+    }
+
     public static boolean hasWater(int id) {
         return id == WATER || id == STILL_WATER || usesFakeWater[id];
     }

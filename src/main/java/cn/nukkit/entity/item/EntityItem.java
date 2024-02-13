@@ -1,7 +1,8 @@
 package cn.nukkit.entity.item;
 
 import cn.nukkit.Server;
-import cn.nukkit.block.BlockID;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockLiquid;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -9,7 +10,6 @@ import cn.nukkit.event.entity.ItemDespawnEvent;
 import cn.nukkit.event.entity.ItemSpawnEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.NukkitMath;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -244,14 +244,7 @@ public class EntityItem extends Entity {
                 }
             }
 
-            int bid = level.getBlock(this.getFloorX(), NukkitMath.floorDouble(this.boundingBox.getMinY()), this.getFloorZ(), false).getId();
-            if (bid == BlockID.STILL_WATER || bid == BlockID.WATER) {
-                this.motionY -= this.getGravity() * -0.015;
-            } else if (this.isInsideOfWater() || (this.floatsInLava && (bid == BlockID.LAVA || bid == BlockID.STILL_LAVA))) {
-                this.motionY = this.getGravity() / 2;
-            } else if (!this.isOnGround()) {
-                this.motionY -= this.getGravity();
-            }
+            this.updateLiquidMovement();
 
             if (this.checkObstruction(this.x, this.y, this.z)) {
                 hasUpdate = true;
@@ -261,8 +254,16 @@ public class EntityItem extends Entity {
 
             double friction = 1 - this.getDrag();
 
-            if (this.onGround && (Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionZ) > 0.00001)) {
-                friction *= this.getLevel().getBlock(this.temporalVector.setComponents((int) Math.floor(this.x), (int) Math.floor(this.y - 1), (int) Math.floor(this.z) - 1)).getFrictionFactor();
+            Block block = this.getLevel().getBlock(this.getFloorX(), (int) Math.floor(this.y - 1), this.getFloorZ());
+            if ((this.onGround || block instanceof BlockLiquid)
+                    && (Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionZ) > 0.00001)) {
+                double frictionFactor;
+                if (block instanceof BlockLiquid) {
+                    frictionFactor = 0.8;
+                } else {
+                    frictionFactor = block.getFrictionFactor();
+                }
+                friction *= frictionFactor;
             }
 
             this.motionX *= friction;
@@ -277,6 +278,30 @@ public class EntityItem extends Entity {
         }
 
         return hasUpdate || !this.onGround || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001;
+    }
+
+    private void updateLiquidMovement() {
+        double y = this.y + getEyeHeight();
+
+        Block block = level.getBlock((int) x, (int) boundingBox.getMaxY(), (int) z);
+        if (block.isLiquidSource()) {
+            //item is fully in liquid
+            motionY -= getGravity() * -0.015;
+            return;
+        }
+
+        Block floor = getLevelBlock();
+        if (floor.isLiquidSource() || (floor = level.getBlock(floor, 1)).isLiquidSource()) {
+            double height = floor.y + 1 - ((BlockLiquid) floor).getFluidHeightPercent() - 0.1111111;
+            if (y < height) {
+                //item is going up in liquid, don't let it go back down too fast
+                motionY = getGravity() - 0.06;
+                return;
+            }
+        }
+
+        //item is not in liquid
+        motionY -= getGravity();
     }
 
     @Override
