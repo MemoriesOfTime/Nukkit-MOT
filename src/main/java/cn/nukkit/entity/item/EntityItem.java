@@ -281,8 +281,6 @@ public class EntityItem extends Entity {
     }
 
     private void updateLiquidMovement() {
-        double y = this.y + getEyeHeight();
-
         Block block = level.getBlock((int) x, (int) boundingBox.getMaxY(), (int) z);
         if (block.isLiquidSource()) {
             //item is fully in liquid
@@ -293,7 +291,7 @@ public class EntityItem extends Entity {
         Block floor = getLevelBlock();
         if (floor.isLiquidSource() || (floor = level.getBlock(floor, 1)).isLiquidSource()) {
             double height = floor.y + 1 - ((BlockLiquid) floor).getFluidHeightPercent() - 0.1111111;
-            if (y < height) {
+            if (this.y + getEyeHeight() < height) {
                 //item is going up in liquid, don't let it go back down too fast
                 motionY = getGravity() - 0.06;
                 return;
