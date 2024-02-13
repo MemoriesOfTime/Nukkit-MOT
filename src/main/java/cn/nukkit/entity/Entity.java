@@ -2440,17 +2440,22 @@ public abstract class Entity extends Location implements Metadatable {
 
             this.blocksAround = new ArrayList<>();
 
-            if (this.level.isYInRange(minY) || this.level.isYInRange(maxY)) {
-                minY = Math.max(minY, this.level.getMinBlockY());
-                maxY = Math.min(maxY, this.level.getMaxBlockY());
-                for (int z = minZ; z <= maxZ; ++z) {
-                    for (int x = minX; x <= maxX; ++x) {
-                        for (int y = minY; y <= maxY; ++y) {
-                            Block block = this.level.getBlock(x, y, z, false);
-                            this.blocksAround.add(block);
+            try {
+                if (this.level.isYInRange(minY) || this.level.isYInRange(maxY)) {
+                    minY = Math.max(minY, this.level.getMinBlockY());
+                    maxY = Math.min(maxY, this.level.getMaxBlockY());
+                    for (int z = minZ; z <= maxZ; ++z) {
+                        for (int x = minX; x <= maxX; ++x) {
+                            for (int y = minY; y <= maxY; ++y) {
+                                Block block = this.level.getBlock(x, y, z, false);
+                                this.blocksAround.add(block);
+                            }
                         }
                     }
                 }
+            } catch (NullPointerException e) {
+                // 异步传送导致空指针 忽略结果
+                return new ArrayList<>();
             }
         }
 
