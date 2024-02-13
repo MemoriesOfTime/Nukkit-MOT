@@ -1,7 +1,8 @@
 package cn.nukkit.entity.item;
 
 import cn.nukkit.Server;
-import cn.nukkit.block.BlockID;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockLiquid;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -9,13 +10,14 @@ import cn.nukkit.event.entity.ItemDespawnEvent;
 import cn.nukkit.event.entity.ItemSpawnEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.NukkitMath;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.AddItemEntityPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.EntityEventPacket;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * @author MagicDroidX
@@ -23,10 +25,22 @@ import cn.nukkit.network.protocol.EntityEventPacket;
 public class EntityItem extends Entity {
 
     public static final int NETWORK_ID = 64;
+
+    @Setter
+    @Getter
     protected String owner;
+
+    @Setter
+    @Getter
     protected String thrower;
+
+    @Getter
     protected Item item;
+
+    @Setter
+    @Getter
     protected int pickupDelay;
+
     protected boolean floatsInLava;
 
     public EntityItem(FullChunk chunk, CompoundTag nbt) {
@@ -230,23 +244,26 @@ public class EntityItem extends Entity {
                 }
             }
 
-            int bid = level.getBlock(this.getFloorX(), NukkitMath.floorDouble(this.y + 0.53), this.getFloorZ(), false).getId();
-            if (this.isInsideOfWater() || (this.floatsInLava && (bid == BlockID.LAVA || bid == BlockID.STILL_LAVA))) {
-                this.motionY = this.getGravity() / 2;
-            } else if (!this.isOnGround()) {
-                this.motionY -= this.getGravity();
-            }
+            this.updateLiquidMovement();
 
             if (this.checkObstruction(this.x, this.y, this.z)) {
                 hasUpdate = true;
             }
 
-            //this.move(this.motionX, this.motionY, this.motionZ);
+            this.move(this.motionX, this.motionY, this.motionZ);
 
             double friction = 1 - this.getDrag();
 
-            if (this.onGround && (Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionZ) > 0.00001)) {
-                friction *= this.getLevel().getBlock(this.temporalVector.setComponents((int) Math.floor(this.x), (int) Math.floor(this.y - 1), (int) Math.floor(this.z) - 1)).getFrictionFactor();
+            Block block = this.getLevel().getBlock(this.getFloorX(), (int) Math.floor(this.y - 1), this.getFloorZ());
+            if ((this.onGround || block instanceof BlockLiquid)
+                    && (Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionZ) > 0.00001)) {
+                double frictionFactor;
+                if (block instanceof BlockLiquid) {
+                    frictionFactor = 0.8;
+                } else {
+                    frictionFactor = block.getFrictionFactor();
+                }
+                friction *= frictionFactor;
             }
 
             this.motionX *= friction;
@@ -257,10 +274,32 @@ public class EntityItem extends Entity {
                 this.motionY *= -0.5;
             }
 
-            if (this.move(this.motionX, this.motionY, this.motionZ)) this.updateMovement();
+            this.updateMovement();
         }
 
         return hasUpdate || !this.onGround || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001;
+    }
+
+    private void updateLiquidMovement() {
+        Block block = level.getBlock((int) x, (int) boundingBox.getMaxY(), (int) z);
+        if (block.isLiquidSource()) {
+            //item is fully in liquid
+            motionY -= getGravity() * -0.015;
+            return;
+        }
+
+        Block floor = getLevelBlock();
+        if (floor.isLiquidSource() || (floor = level.getBlock(floor, 1)).isLiquidSource()) {
+            double height = floor.y + 1 - ((BlockLiquid) floor).getFluidHeightPercent() - 0.1111111;
+            if (this.y + getEyeHeight() < height) {
+                //item is going up in liquid, don't let it go back down too fast
+                motionY = getGravity() - 0.06;
+                return;
+            }
+        }
+
+        //item is not in liquid
+        motionY -= getGravity();
     }
 
     @Override
@@ -286,37 +325,9 @@ public class EntityItem extends Entity {
         return this.hasCustomName() ? this.getNameTag() : (this.item.hasCustomName() ? this.item.getCustomName() : this.item.getName());
     }
 
-    public Item getItem() {
-        return item;
-    }
-
     @Override
     public boolean canCollideWith(Entity entity) {
         return false;
-    }
-
-    public int getPickupDelay() {
-        return pickupDelay;
-    }
-
-    public void setPickupDelay(int pickupDelay) {
-        this.pickupDelay = pickupDelay;
-    }
-
-    public String getOwner() {
-        return owner;
-    }
-
-    public void setOwner(String owner) {
-        this.owner = owner;
-    }
-
-    public String getThrower() {
-        return thrower;
-    }
-
-    public void setThrower(String thrower) {
-        this.thrower = thrower;
     }
 
     @Override

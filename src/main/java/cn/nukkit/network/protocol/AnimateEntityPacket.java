@@ -20,7 +20,7 @@ public class AnimateEntityPacket extends DataPacket {
     public int stopExpressionVersion;
     public String controller;
     public float blendOutTime;
-    public final List<Long> entityRuntimeIds = new ArrayList<>();
+    public List<Long> entityRuntimeIds = new ArrayList<>();
 
     @Override
     public byte pid() {

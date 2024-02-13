@@ -506,4 +506,9 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
     public Item toItem() {
         return new ItemBlock(Block.get(BlockID.AIR));
     }
+
+    @Override
+    public boolean isLiquidSource() {
+        return this.getDamage() == 0;
+    }
 }
