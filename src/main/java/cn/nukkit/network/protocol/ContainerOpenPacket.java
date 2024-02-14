@@ -12,6 +12,8 @@ public class ContainerOpenPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.CONTAINER_OPEN_PACKET;
 
+    public static final int TYPE_LECTERN = 25;
+
     @Override
     public byte pid() {
         return NETWORK_ID;
