@@ -37,7 +37,7 @@ public class LevelDBChunkSection implements ChunkSection {
     public LevelDBChunkSection(LevelDBChunk parent, int y) {
         this.parent = parent;
         this.y = y;
-        this.storages = EMPTY;
+        this.storages = new StateBlockStorage[]{ new StateBlockStorage(), new StateBlockStorage() };
     }
 
     public LevelDBChunkSection(int y, @Nullable StateBlockStorage[] storages) {
@@ -49,7 +49,7 @@ public class LevelDBChunkSection implements ChunkSection {
         this.y = y;
 
         if (storages == null || storages.length == 0) {
-            this.storages = EMPTY;
+            this.storages = new StateBlockStorage[]{ new StateBlockStorage(), new StateBlockStorage() };
             return;
         }
 
@@ -70,7 +70,7 @@ public class LevelDBChunkSection implements ChunkSection {
         }
 
         if (maxLayer == -1) {
-            this.storages = EMPTY;
+            this.storages = new StateBlockStorage[]{ new StateBlockStorage(), new StateBlockStorage() };
             return;
         }
 

@@ -1,32 +1,24 @@
 package cn.nukkit.level.format.leveldb;
 
-import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
-import cn.nukkit.blockentity.BlockEntity;
-import cn.nukkit.entity.Entity;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
-import cn.nukkit.level.format.leveldb.serializer.ChunkSerializers;
-import cn.nukkit.level.format.leveldb.serializer.Data2dSerializer;
-import cn.nukkit.level.format.leveldb.serializer.Data3dSerializer;
+import cn.nukkit.level.format.leveldb.serializer.*;
 import cn.nukkit.level.format.leveldb.structure.*;
 import cn.nukkit.level.format.leveldb.updater.blockstateupdater.BlockStateUpdaters;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
-import cn.nukkit.nbt.stream.NBTInputStream;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
 import com.google.common.collect.ImmutableMap;
@@ -35,13 +27,15 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
 import org.iq80.leveldb.*;
 import org.iq80.leveldb.impl.Iq80DBFactory;
 
 import javax.annotation.Nullable;
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.ref.WeakReference;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -49,7 +43,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -135,11 +128,11 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     @SuppressWarnings("unused")
-    public static void generate(String path, String name) throws IOException {
-        generate(path, name, new HashMap<>());
+    public static void generate(String path, String name, long seed, Class<? extends Generator> generator) throws IOException {
+        generate(path, name, seed, generator, new HashMap<>());
     }
 
-    public static void generate(String path, String name, Map<String, String> options) throws IOException {
+    public static void generate(String path, String name, long seed, Class<? extends Generator> generator, Map<String, String> options) throws IOException {
         Path dirPath = Paths.get(path);
         Path dbPath = dirPath.resolve("db");
         Files.createDirectories(dbPath);
@@ -151,9 +144,10 @@ public class LevelDBProvider implements LevelProvider {
         updateLevelData(levelData);
         levelData
                 .putInt("Generator", generatorType)
-                .putString("generatorName", "default")
+                .putString("generatorName", Generator.getGeneratorName(generator))
+                .putString("generatorOptions", options.getOrDefault("preset", ""))
                 .putString("LevelName", name)
-                .putLong("RandomSeed", Long.parseLong(options.getOrDefault("seed", ThreadLocalRandom.current().nextLong() + "")))
+                .putLong("RandomSeed", seed)
                 .putInt("SpawnX", spawnPosition.getFloorX())
                 .putInt("SpawnY", spawnPosition.getFloorY())
                 .putInt("SpawnZ", spawnPosition.getFloorZ());
@@ -463,43 +457,8 @@ public class LevelDBProvider implements LevelProvider {
             Data2dSerializer.deserialize(this.db, chunkBuilder);
         }
 
-        //TODO
-        /*BlockEntitySerializer.deserialize(this.db, chunkBuilder);
-        EntitySerializer.deserialize(this.db, chunkBuilder);*/
-
-        List<CompoundTag> blockEntities = new ObjectArrayList<>();
-        byte[] blockEntityData = this.db.get(BLOCK_ENTITIES.getKey(chunkX, chunkZ));
-        if (blockEntityData != null && blockEntityData.length != 0) {
-            try (NBTInputStream nbtStream = new NBTInputStream(new ByteArrayInputStream(blockEntityData), ByteOrder.LITTLE_ENDIAN, false)) {
-                while (nbtStream.available() > 0) {
-                    Tag tag = Tag.readNamedTag(nbtStream);
-                    if (!(tag instanceof CompoundTag)) {
-                        throw new IOException("Root tag must be a compound tag");
-                    }
-                    blockEntities.add((CompoundTag) tag);
-                }
-            } catch (IOException e) {
-                throw new ChunkException("Corrupted block entity data", e);
-            }
-        }
-        chunkBuilder.blockEntities(blockEntities);
-
-        List<CompoundTag> entities = new ObjectArrayList<>();
-        byte[] entityData = this.db.get(ENTITIES.getKey(chunkX, chunkZ));
-        if (entityData != null && entityData.length != 0) {
-            try (NBTInputStream nbtStream = new NBTInputStream(new ByteArrayInputStream(entityData), ByteOrder.LITTLE_ENDIAN, false)) {
-                while (nbtStream.available() > 0) {
-                    Tag tag = Tag.readNamedTag(nbtStream);
-                    if (!(tag instanceof CompoundTag)) {
-                        throw new IOException("Root tag must be a compound tag");
-                    }
-                    entities.add((CompoundTag) tag);
-                }
-            } catch (IOException e) {
-                throw new ChunkException("Corrupted entity data", e);
-            }
-        }
-        chunkBuilder.entities(entities);
+        BlockEntitySerializer.deserialize(this.db, chunkBuilder);
+        EntitySerializer.deserialize(this.db, chunkBuilder);
 
         byte[] tickingData = this.db.get(PENDING_TICKS.getKey(chunkX, chunkZ));
         if (tickingData != null && tickingData.length != 0) {
@@ -539,178 +498,107 @@ public class LevelDBProvider implements LevelProvider {
         return chunk;
     }
 
-    private void writeChunk(LevelDBChunk chunk, boolean convert, boolean background) {
-        //TODO
-        if (true) {
+    private void writeChunk(int chunkX, int chunkZ, FullChunk fullChunk) {
+        if (!(fullChunk instanceof LevelDBChunk chunk)) {
+            throw new ChunkException("Invalid Chunk class");
+        }
+
+        chunk.setX(chunkX);
+        chunk.setZ(chunkZ);
+
+        if (!chunk.isGenerated()) {
             return;
         }
 
-        int chunkX = chunk.getX();
-        int chunkZ = chunk.getZ();
-        BinaryStream stream = new BinaryStream();
+        chunk.setChanged(false);
 
-        try (WriteBatch batch = this.db.createWriteBatch()) {
-            batch.put(VERSION_OLD.getKey(chunkX, chunkZ), CHUNK_VERSION_SAVE_DATA);
+        try (WriteBatch writeBatch = this.db.createWriteBatch()) {
+            writeBatch.put(VERSION_OLD.getKey(chunkX, chunkZ), CHUNK_VERSION_SAVE_DATA);
 
             chunk.ioLock.lock();
 
             if (chunk.isSubChunksDirty()) {
-                ChunkSection[] sections = chunk.getSections();
-                if (sections != null) {
-                    for (int y = 0; y < 16; y++) {
-                        ChunkSection section = sections[y];
-                        byte[] key = CHUNK_SECTION_PREFIX.getSubKey(chunkX, chunkZ, y);
-
-                        if (section == null || section.isEmpty()) {
-                            batch.delete(key);
-                            continue;
-                        }
-
-                        /*if (!section.isDirty()) {
-                            continue;
-                        }*/
-
-                        section.writeTo(ProtocolInfo.CURRENT_LEVEL_PROTOCOL, stream);
-                        batch.put(key, stream.getBuffer());
-                        stream.reuse();
-                    }
-                }
+                ChunkSerializers.serializer(writeBatch, chunk, CURRENT_LEVEL_CHUNK_VERSION);
             }
 
             if (chunk.isHeightmapOrBiomesDirty()) {
-                for (int height : chunk.getHeightMapArray()) {
-                    stream.putLShort(height);
+                if (chunk.has3dBiomes()) {
+                    Data3dSerializer.serializer(writeBatch, chunk);
+                } else {
+                    Data2dSerializer.serializer(writeBatch, chunk);
                 }
-                int mark = stream.getCount();
-
-                stream.put(chunk.getBiomeIdArray());
-                batch.put(DATA_2D.getKey(chunkX, chunkZ), stream.getBuffer());
-
-                stream.setCount(mark);
-                /*StateBlockStorage[] biomes3d = chunk.getBiomes();
-                biomes3d[0].writeToDiskBiome(stream);
-                for (int i = 1; i < 24; i++) {
-                    if (i >= biomes3d.length) {
-                        stream.putByte((byte) 0xff);
-                        continue;
-                    }
-                    StateBlockStorage biome3d = biomes3d[i];
-                    if (biome3d == null) {
-                        stream.putByte((byte) 0xff);
-                        continue;
-                    }
-                    biome3d.writeToDiskBiome(stream);
-                }
-                batch.put(HEIGHTMAP_AND_3D_BIOMES.getKey(chunkX, chunkZ), stream.getBuffer());*/
             }
 
-            if (!background) {
-                batch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ), chunk.isPopulated() ? FINALISATION_DONE_SAVE_DATA
-                        : chunk.isGenerated() ? FINALISATION_POPULATION_SAVE_DATA : FINALISATION_GENERATION_SAVE_DATA);
+            writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimension()), chunk.isPopulated() ? FINALISATION_DONE_SAVE_DATA
+                    : chunk.isGenerated() ? FINALISATION_POPULATION_SAVE_DATA : FINALISATION_GENERATION_SAVE_DATA);
 
-                //TODO: dirty?
-                List<CompoundTag> blockEntities = new ObjectArrayList<>();
-                for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
-                    if (!blockEntity.closed) {
-                        blockEntity.saveNBT();
-                        blockEntities.add(blockEntity.namedTag);
-                    }
-                }
+            BlockEntitySerializer.serializer(writeBatch, chunk);
 
-                byte[] blockEntitiesKey = BLOCK_ENTITIES.getKey(chunkX, chunkZ);
-                if (blockEntities.isEmpty()) {
-                    batch.delete(blockEntitiesKey);
-                } else {
-                    try {
-                        batch.put(blockEntitiesKey, NBTIO.write(blockEntities, ByteOrder.LITTLE_ENDIAN));
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
+            EntitySerializer.serializer(writeBatch, chunk);
 
+            Collection<BlockUpdateEntry> blockUpdateEntries = null;
+            Collection<BlockUpdateEntry> randomBlockUpdateEntries = null;
+            long currentTick = 0;
+
+            LevelProvider provider;
+            if ((provider = chunk.getProvider()) != null) {
+                Level level = provider.getLevel();
+                currentTick = level.getCurrentTick();
                 //dirty?
-                List<CompoundTag> entities = new ObjectArrayList<>();
-                for (Entity entity : chunk.getEntities().values()) {
-                    if (!(entity instanceof Player) && !entity.closed) {
-                        entity.saveNBT();
-                        entities.add(entity.namedTag);
-                    }
-                }
-                byte[] entitiesKey = ENTITIES.getKey(chunkX, chunkZ);
-                if (entities.isEmpty()) {
-                    batch.delete(entitiesKey);
-                } else {
+                blockUpdateEntries = level.getPendingBlockUpdates(chunk);
+                //randomBlockUpdateEntries = level.getPendingRandomBlockUpdates(chunk);
+            }
+
+            byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ);
+            if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
+                CompoundTag ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
+                if (ticks != null) {
                     try {
-                        batch.put(entitiesKey, NBTIO.write(entities, ByteOrder.LITTLE_ENDIAN));
+                        writeBatch.put(pendingScheduledTicksKey, NBTIO.write(ticks, ByteOrder.LITTLE_ENDIAN));
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
+                } else {
+                    writeBatch.delete(pendingScheduledTicksKey);
                 }
+            } else {
+                writeBatch.delete(pendingScheduledTicksKey);
+            }
 
-                Collection<BlockUpdateEntry> blockUpdateEntries = null;
-                Collection<BlockUpdateEntry> randomBlockUpdateEntries = null;
-                long currentTick = 0;
-
-                LevelProvider provider;
-                if ((provider = chunk.getProvider()) != null) {
-                    Level level = provider.getLevel();
-                    currentTick = level.getCurrentTick();
-                    //dirty?
-                    blockUpdateEntries = level.getPendingBlockUpdates(chunk);
-                    //randomBlockUpdateEntries = level.getPendingRandomBlockUpdates(chunk);
-                }
-
-                byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ);
-                if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
-                    CompoundTag ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
-                    if (ticks != null) {
-                        try {
-                            batch.put(pendingScheduledTicksKey, NBTIO.write(ticks, ByteOrder.LITTLE_ENDIAN));
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    } else {
-                        batch.delete(pendingScheduledTicksKey);
+            byte[] pendingRandomTicksKey = PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ);
+            if (randomBlockUpdateEntries != null && !randomBlockUpdateEntries.isEmpty()) {
+                CompoundTag ticks = saveBlockTickingQueue(randomBlockUpdateEntries, currentTick);
+                if (ticks != null) {
+                    try {
+                        writeBatch.put(pendingRandomTicksKey, NBTIO.write(ticks, ByteOrder.LITTLE_ENDIAN));
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
                     }
                 } else {
-                    batch.delete(pendingScheduledTicksKey);
+                    writeBatch.delete(pendingRandomTicksKey);
                 }
+            } else {
+                writeBatch.delete(pendingRandomTicksKey);
+            }
 
-                byte[] pendingRandomTicksKey = PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ);
-                if (randomBlockUpdateEntries != null && !randomBlockUpdateEntries.isEmpty()) {
-                    CompoundTag ticks = saveBlockTickingQueue(randomBlockUpdateEntries, currentTick);
-                    if (ticks != null) {
-                        try {
-                            batch.put(pendingRandomTicksKey, NBTIO.write(ticks, ByteOrder.LITTLE_ENDIAN));
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    } else {
-                        batch.delete(pendingRandomTicksKey);
-                    }
-                } else {
-                    batch.delete(pendingRandomTicksKey);
-                }
-
-                /*stream.reuse();
-                stream.putInt(CURRENT_NUKKIT_DATA_VERSION);
-                stream.putLLong(NUKKIT_DATA_MAGIC);
-                CompoundTag nbt = new CompoundTag();
-                // baked lighting
+            /*stream.reuse();
+            stream.putInt(CURRENT_NUKKIT_DATA_VERSION);
+            stream.putLLong(NUKKIT_DATA_MAGIC);
+            CompoundTag nbt = new CompoundTag();
+            // baked lighting
 //                nbt.putByteArray("BlockLight", chunk.getBlockLightArray());
 //                nbt.putByteArray("SkyLight", chunk.getBlockSkyLightArray());
-                try {
-                    stream.put(NBTIO.write(nbt, ByteOrder.LITTLE_ENDIAN));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                batch.put(NUKKIT_DATA.getKey(chunkX, chunkZ), stream.getBuffer());*/
+            try {
+                stream.put(NBTIO.write(nbt, ByteOrder.LITTLE_ENDIAN));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
+            batch.put(NUKKIT_DATA.getKey(chunkX, chunkZ), stream.getBuffer());*/
 
-            batch.delete(DATA_2D_LEGACY.getKey(chunkX, chunkZ));
-            batch.delete(LEGACY_TERRAIN.getKey(chunkX, chunkZ));
+            writeBatch.delete(DATA_2D_LEGACY.getKey(chunkX, chunkZ));
+            writeBatch.delete(LEGACY_TERRAIN.getKey(chunkX, chunkZ));
 
-            this.db.write(batch);
+            this.db.write(writeBatch);
         } catch (IOException e) {
             throw new RuntimeException("Failed to save chunk", e);
         } finally {
@@ -743,17 +631,13 @@ public class LevelDBProvider implements LevelProvider {
     @Override
     public void saveChunk(int chunkX, int chunkZ) {
         if (this.isChunkLoaded(chunkX, chunkZ)) {
-            this.writeChunk(this.getChunk(chunkX, chunkZ), false, false);
+            this.saveChunk(chunkX, chunkZ, this.getChunk(chunkX, chunkZ));
         }
     }
 
     @Override
     public void saveChunk(int chunkX, int chunkZ, FullChunk chunk) {
-        if (!(chunk instanceof LevelDBChunk)) {
-            throw new ChunkException("Invalid Chunk class");
-        }
-        LevelDBChunk dbChunk = (LevelDBChunk) chunk;
-        this.writeChunk(dbChunk, true, false);
+        this.writeChunk(chunkX, chunkZ, chunk);
     }
 
     @Override

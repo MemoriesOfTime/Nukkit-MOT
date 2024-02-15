@@ -4,6 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.level.util.PalettedBlockStorage;
 
 import java.io.IOException;
 import java.util.Map;
@@ -114,6 +115,14 @@ public interface FullChunk extends Cloneable {
     int recalculateHeightMapColumn(int chunkX, int chunkZ);
 
     void populateSkyLight();
+
+    default public boolean has3dBiomes() {
+        return false;
+    }
+
+    default PalettedBlockStorage getBiomeStorage(int y) {
+        return null;
+    }
 
     int getBiomeId(int x, int z);
 

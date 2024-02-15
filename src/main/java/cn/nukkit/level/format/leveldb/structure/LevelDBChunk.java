@@ -129,8 +129,14 @@ public class LevelDBChunk extends BaseChunk {
         }
     }
 
-    public PalettedBlockStorage[] getBiomes() {
-        return this.biomes3d;
+    @Override
+    public boolean has3dBiomes() {
+        return this.biomes3d != null && this.biomes3d.length > 0;
+    }
+
+    public PalettedBlockStorage getBiomeStorage(int y) {
+        //TODO
+        return null;
     }
 
     public int getBiomeId(int x, int y, int z) {
