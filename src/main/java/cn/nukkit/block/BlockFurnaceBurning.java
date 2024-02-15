@@ -89,12 +89,7 @@ public class BlockFurnaceBurning extends BlockSolidMeta implements Faceable, Blo
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(faces[player != null ? player.getDirection().getHorizontalIndex() : 0]);
         this.getLevel().setBlock(block, this, true, true);
-        CompoundTag nbt = new CompoundTag()
-                .putList(new ListTag<>("Items"))
-                .putString("id", BlockEntity.FURNACE)
-                .putInt("x", (int) this.x)
-                .putInt("y", (int) this.y)
-                .putInt("z", (int) this.z);
+        CompoundTag nbt = new CompoundTag().putList(new ListTag<>("Items"));
 
         if (item.hasCustomName()) {
             nbt.putString("CustomName", item.getCustomName());
@@ -107,7 +102,7 @@ public class BlockFurnaceBurning extends BlockSolidMeta implements Faceable, Blo
             }
         }
 
-        BlockEntity.createBlockEntity(this.getBlockEntityType(), this.getChunk(), nbt);
+        this.createBlockEntity(nbt);
         return true;
     }
 
@@ -120,19 +115,7 @@ public class BlockFurnaceBurning extends BlockSolidMeta implements Faceable, Blo
     @Override
     public boolean onActivate(Item item, Player player) {
         if (player != null) {
-            BlockEntity t = this.getLevel().getBlockEntity(this);
-            BlockEntityFurnace furnace;
-            if (t instanceof BlockEntityFurnace) {
-                furnace = (BlockEntityFurnace) t;
-            } else {
-                CompoundTag nbt = new CompoundTag()
-                        .putList(new ListTag<>("Items"))
-                        .putString("id", BlockEntity.FURNACE)
-                        .putInt("x", (int) this.x)
-                        .putInt("y", (int) this.y)
-                        .putInt("z", (int) this.z);
-                furnace = (BlockEntityFurnace) BlockEntity.createBlockEntity(BlockEntity.FURNACE, this.getChunk(), nbt);
-            }
+            BlockEntityFurnace furnace = this.getOrCreateBlockEntity();
 
             if (furnace.namedTag.contains("Lock") && furnace.namedTag.get("Lock") instanceof StringTag) {
                 if (!furnace.namedTag.getString("Lock").equals(item.getCustomName())) {
