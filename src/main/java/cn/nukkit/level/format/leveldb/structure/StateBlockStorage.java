@@ -256,7 +256,7 @@ public class StateBlockStorage {
 
         if (version != BitArrayVersion.V0) {
             for (int word : bitArray.getWords()) {
-                stream.putVarInt(word);
+                stream.putLInt(word);
             }
 
             stream.putVarInt(palette.size());
