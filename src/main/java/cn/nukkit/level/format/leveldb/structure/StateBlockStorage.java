@@ -4,7 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.biome.EnumBiome;
-import cn.nukkit.level.blockstateupdater.BlockStateUpdaters;
+import cn.nukkit.level.format.leveldb.updater.blockstateupdater.BlockStateUpdaters;
 import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.math.BlockVector3;
