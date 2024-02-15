@@ -18,7 +18,7 @@ import cn.nukkit.level.format.leveldb.serializer.ChunkSerializers;
 import cn.nukkit.level.format.leveldb.serializer.Data2dSerializer;
 import cn.nukkit.level.format.leveldb.serializer.Data3dSerializer;
 import cn.nukkit.level.format.leveldb.structure.*;
-import cn.nukkit.level.format.leveldb.updater.BlockUpgrader;
+import cn.nukkit.level.format.leveldb.updater.blockstateupdater.BlockStateUpdaters;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
@@ -1085,7 +1085,7 @@ public class LevelDBProvider implements LevelProvider {
 
             CompoundTag blockState = entry;
             if (blockState.contains("name")) {
-                blockState = BlockUpgrader.upgrade(blockState);
+                blockState = BlockStateUpdaters.updateBlockState(blockState, blockState.getInt("version"));
                 int fullId = GlobalBlockPalette.getLegacyFullId(ProtocolInfo.CURRENT_LEVEL_PROTOCOL, blockState);
                 block = Block.get(fullId >> Block.DATA_BITS, fullId & Block.DATA_MASK);
             } else if (entry.contains("tileID")) {
