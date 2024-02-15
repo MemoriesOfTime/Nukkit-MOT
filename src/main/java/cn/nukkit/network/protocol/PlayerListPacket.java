@@ -54,6 +54,9 @@ public class PlayerListPacket extends DataPacket {
                             this.putSkin(protocol, entry.skin);
                             this.putBoolean(entry.isTeacher);
                             this.putBoolean(entry.isHost);
+                            if (protocol >= ProtocolInfo.v1_20_60) {
+                                this.putBoolean(entry.isSubClient);
+                            }
                         }
                     }
                 }
@@ -89,6 +92,7 @@ public class PlayerListPacket extends DataPacket {
         public int buildPlatform = -1;
         public boolean isTeacher;
         public boolean isHost;
+        public boolean isSubClient;
 
         public Entry(UUID uuid) {
             this.uuid = uuid;

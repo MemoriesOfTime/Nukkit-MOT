@@ -67,7 +67,12 @@ public abstract class EntityProjectile extends Entity {
     }
 
     public void onCollideWithEntity(Entity entity) {
-        this.server.getPluginManager().callEvent(new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity)));
+        ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
+        this.server.getPluginManager().callEvent(hitEvent);
+        if (hitEvent.isCancelled()) {
+            return;
+        }
+
         float damage = this instanceof EntitySnowball && entity instanceof EntityBlaze ? 3 : this.getResultDamage();
 
         EntityDamageEvent ev;
@@ -186,9 +191,12 @@ public abstract class EntityProjectile extends Entity {
                 this.motionY = 0;
                 this.motionZ = 0;
 
-                this.server.getPluginManager().callEvent(new ProjectileHitEvent(this, MovingObjectPosition.fromBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ(), -1, this)));
-                this.onHit();
-                this.onHitGround(moveVector);
+                ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ(), -1, this));
+                this.server.getPluginManager().callEvent(hitEvent);
+                if (!hitEvent.isCancelled()) {
+                    this.onHit();
+                    this.onHitGround(moveVector);
+                }
                 return false;
             } else if (!this.isCollided && this.hadCollision) {
                 this.hadCollision = false;

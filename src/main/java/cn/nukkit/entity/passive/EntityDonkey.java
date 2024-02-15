@@ -11,6 +11,7 @@ import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class EntityDonkey extends EntityHorseBase {
 
@@ -63,7 +64,7 @@ public class EntityDonkey extends EntityHorseBase {
                 return creature instanceof BaseEntity && ((BaseEntity) creature).isInLove() && creature.isAlive() && !creature.closed && creature.getNetworkId() == this.getNetworkId() && distance <= 100;
             }else if (creature instanceof Player player) {
                 return player.spawned && player.isAlive() && !player.closed &&
-                        this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 40;
+                        this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 40;
             }
         }
         return false;

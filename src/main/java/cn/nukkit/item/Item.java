@@ -482,6 +482,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     private static final List<Item> creative618 = new ObjectArrayList<>();
     private static final List<Item> creative622 = new ObjectArrayList<>();
     private static final List<Item> creative630 = new ObjectArrayList<>();
+    private static final List<Item> creative649 = new ObjectArrayList<>();
 
     @SuppressWarnings("unchecked")
     private static void initCreativeItems() {
@@ -518,6 +519,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCreativeItemsNew(ProtocolInfo.v1_20_30, ProtocolInfo.v1_20_30, creative618);
         registerCreativeItemsNew(ProtocolInfo.v1_20_40, ProtocolInfo.v1_20_40, creative622);
         registerCreativeItemsNew(ProtocolInfo.v1_20_50, ProtocolInfo.v1_20_50, creative630);
+        registerCreativeItemsNew(ProtocolInfo.v1_20_60, ProtocolInfo.v1_20_60, creative649);
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -686,6 +688,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 return new ArrayList<>(Item.creative622);
             case v1_20_50:
                 return new ArrayList<>(Item.creative630);
+            case v1_20_60:
+                return new ArrayList<>(Item.creative649);
             // TODO Multiversion
             default:
                 throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
@@ -694,7 +698,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static void addCreativeItem(Item item) {
         Server.mvw("Item#addCreativeItem(Item)");
-        addCreativeItem(v1_20_50, item);
+        addCreativeItem(v1_20_60, item);
     }
 
     public static void addCreativeItem(int protocol, Item item) {
@@ -727,6 +731,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_20_30 -> Item.creative618.add(item.clone());
             case v1_20_40 -> Item.creative622.add(item.clone());
             case v1_20_50 -> Item.creative630.add(item.clone());
+            case v1_20_60 -> Item.creative649.add(item.clone());
             // TODO Multiversion
             default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
@@ -822,11 +827,21 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         };
     }
 
-    public static OK<?> registerCustomItem(Class<? extends CustomItem> clazz) {
+    public static OK<?> registerCustomItem(@NotNull List<Class<? extends CustomItem>> itemClassList) {
+        for (Class<? extends CustomItem> itemClass : itemClassList) {
+            OK<?> result = registerCustomItem(itemClass);
+            if (!result.ok()) {
+                return result;
+            }
+        }
+        return new OK<>(true);
+    }
+
+    public static OK<?> registerCustomItem(@NotNull Class<? extends CustomItem> clazz) {
         return registerCustomItem(clazz, true);
     }
 
-    public static OK<?> registerCustomItem(Class<? extends CustomItem> clazz, boolean addCreativeItem) {
+    public static OK<?> registerCustomItem(@NotNull Class<? extends CustomItem> clazz, boolean addCreativeItem) {
         if (!Server.getInstance().enableExperimentMode) {
             Server.getInstance().getLogger().warning("The server does not have the experiment mode feature enabled. Unable to register the custom item!");
             return new OK<>(false, "The server does not have the experiment mode feature enabled. Unable to register the custom item!");
@@ -884,6 +899,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCustomItem(customItem, v1_20_30, addCreativeItem, v1_20_30);
         registerCustomItem(customItem, v1_20_40, addCreativeItem, v1_20_40);
         registerCustomItem(customItem, v1_20_50, addCreativeItem, v1_20_50);
+        registerCustomItem(customItem, v1_20_60, addCreativeItem, v1_20_60);
         //TODO Multiversion 添加新版本支持时修改这里
 
         return new OK<Void>(true);
@@ -920,6 +936,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             deleteCustomItem(customItem, v1_20_30, v1_20_30);
             deleteCustomItem(customItem, v1_20_40, v1_20_40);
             deleteCustomItem(customItem, v1_20_50, v1_20_50);
+            deleteCustomItem(customItem, v1_20_60, v1_20_60);
             //TODO Multiversion 添加新版本支持时修改这里
         }
     }
@@ -1061,6 +1078,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public static Item fromJson(Map<String, Object> data) {
+        return fromJson(data, false);
+    }
+
+    public static Item fromJson(Map<String, Object> data, boolean ignoreUnsupported) {
         String nbt = (String) data.get("nbt_b64");
         byte[] nbtBytes;
         if (nbt != null) {
@@ -1074,7 +1095,11 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             }
         }
 
-        Item item = fromString(data.get("id") + ":" + data.getOrDefault("damage", 0));
+        Object id1 = data.get("id");
+        if (ignoreUnsupported && !Utils.hasItemOrBlock(id1)) {
+            return null;
+        }
+        Item item = fromString(id1 + ":" + data.getOrDefault("damage", 0));
         item.setCount(Utils.toInt(data.getOrDefault("count", 1)));
         item.setCompoundTag(nbtBytes);
         return item;

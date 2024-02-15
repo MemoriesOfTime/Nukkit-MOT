@@ -1,10 +1,14 @@
 package cn.nukkit.network.protocol;
 
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@Setter
+@Getter
 @ToString
 public class AnimateEntityPacket extends DataPacket {
 
@@ -16,7 +20,12 @@ public class AnimateEntityPacket extends DataPacket {
     public int stopExpressionVersion;
     public String controller;
     public float blendOutTime;
-    public final List<Long> entityRuntimeIds = new ArrayList<>();
+    public List<Long> entityRuntimeIds = new ArrayList<>();
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
 
     @Override
     public void decode() {
@@ -50,8 +59,8 @@ public class AnimateEntityPacket extends DataPacket {
         }
     }
 
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
+    public void setEntityRuntimeIds(List<Long> entityRuntimeIds) {
+        this.entityRuntimeIds.clear();
+        this.entityRuntimeIds.addAll(entityRuntimeIds);
     }
 }

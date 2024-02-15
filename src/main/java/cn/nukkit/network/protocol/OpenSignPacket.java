@@ -10,7 +10,7 @@ import lombok.ToString;
 @ToString(doNotUseGetters = true)
 public class OpenSignPacket extends DataPacket {
 
-    public static final int NETWORK_ID = ProtocolInfo.OPEN_SIGN;
+    public static final int NETWORK_ID = ProtocolInfo.OPEN_SIGN_PACKET;
 
     private BlockVector3 position;
     private boolean frontSide;

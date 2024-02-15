@@ -6,18 +6,14 @@ import cn.nukkit.network.protocol.LoginPacket;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
-import com.nimbusds.jose.JWSObject;
-import com.nimbusds.jose.crypto.ECDSAVerifier;
 import org.jetbrains.annotations.Nullable;
 
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.ECPublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
-import java.time.Instant;
 import java.util.*;
 
 /**
@@ -289,62 +285,11 @@ public final class ClientChainData implements LoginChainData {
     }
 
     private static boolean verifyChain(List<String> chains) throws Exception {
-        ECPublicKey lastKey = null;
-        boolean mojangKeyVerified = false;
-        Iterator<String> iterator = chains.iterator();
-        long epoch = Instant.now().getEpochSecond();
-        while (iterator.hasNext()) {
-            JWSObject jws = JWSObject.parse(iterator.next());
-
-            URI x5u = jws.getHeader().getX509CertURL();
-            if (x5u == null) {
-                return false;
-            }
-
-            ECPublicKey expectedKey = generateKey(x5u.toString());
-            // First key is self-signed
-            if (lastKey == null) {
-                lastKey = expectedKey;
-            } else if (!lastKey.equals(expectedKey)) {
-                return false;
-            }
-
-            if (!jws.verify(new ECDSAVerifier(lastKey))) {
-                return false;
-            }
-
-            if (mojangKeyVerified) {
-                return !iterator.hasNext();
-            }
-
-            if (lastKey.equals(EncryptionUtils.getMojangPublicKey())) {
-                mojangKeyVerified = true;
-            }
-
-            Map<String, Object> payload = jws.getPayload().toJSONObject();
-
-            // chain expiry check
-            Object chainExpiresObj = payload.get("exp");
-            long chainExpires;
-            if (chainExpiresObj instanceof Long) {
-                chainExpires = (Long)chainExpiresObj;
-            } else if (chainExpiresObj instanceof Integer) {
-                chainExpires = (Integer)chainExpiresObj;
-            } else {
-                throw new RuntimeException("Unsupported expiry time format");
-            }
-            if (chainExpires < epoch) {
-                // chain has already expires
-                return false;
-            }
-
-            Object base64key = payload.get("identityPublicKey");
-            if (!(base64key instanceof String)) {
-                throw new RuntimeException("No key found");
-            }
-            lastKey = generateKey((String) base64key);
+        try {
+            return EncryptionUtils.validateChain(chains).signed();
+        } catch (Exception e) {
+            return false;
         }
-        return mojangKeyVerified;
     }
 
     private static class MapTypeToken extends TypeToken<Map<String, List<String>>> {

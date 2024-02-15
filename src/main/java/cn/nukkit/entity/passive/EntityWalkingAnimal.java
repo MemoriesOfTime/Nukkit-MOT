@@ -12,6 +12,7 @@ import cn.nukkit.utils.Utils;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.Objects;
 import java.util.Optional;
 
 public abstract class EntityWalkingAnimal extends EntityWalking implements EntityAnimal {
@@ -94,7 +95,7 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
         if (!this.isInLove() && creature instanceof Player player) {
-            return player.isAlive() && !player.closed && this.isFeedItem(player.getInventory().getItemInHandFast()) && distance <= 49;
+            return player.isAlive() && !player.closed && this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 49;
         }
         return super.targetOption(creature, distance);
     }

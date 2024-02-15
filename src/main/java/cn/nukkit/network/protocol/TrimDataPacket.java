@@ -14,7 +14,8 @@ import java.util.List;
 @ToString(doNotUseGetters = true)
 public class TrimDataPacket extends DataPacket {
 
-    public static final int NETWORK_ID = ProtocolInfo.TRIM_DATA;
+    public static final int NETWORK_ID = ProtocolInfo.TRIM_DATA_PACKET;
+
     private final List<TrimPattern> patterns = new ObjectArrayList<>();
     private final List<TrimMaterial> materials = new ObjectArrayList<>();
 
@@ -26,7 +27,7 @@ public class TrimDataPacket extends DataPacket {
     @Deprecated
     @Override
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__TRIM_DATA;
+        return ProtocolInfo.__INTERNAL__TRIM_DATA_PACKET;
     }
 
     @Override

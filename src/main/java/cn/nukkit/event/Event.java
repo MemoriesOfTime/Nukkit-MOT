@@ -1,5 +1,6 @@
 package cn.nukkit.event;
 
+import cn.nukkit.Server;
 import cn.nukkit.utils.EventException;
 
 /**
@@ -28,6 +29,14 @@ public abstract class Event {
 
     final public String getEventName() {
         return eventName == null ? getClass().getName() : eventName;
+    }
+
+    /**
+     * 触发事件
+     * call event
+     */
+    public final void call() {
+        Server.getInstance().getPluginManager().callEvent(this);
     }
 
     public boolean isCancelled() {

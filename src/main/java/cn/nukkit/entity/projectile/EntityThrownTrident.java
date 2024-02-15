@@ -249,7 +249,11 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
             return;
         }
 
-        this.server.getPluginManager().callEvent(new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity)));
+        ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromEntity(entity));
+        this.server.getPluginManager().callEvent(hitEvent);
+        if (hitEvent.isCancelled()) {
+            return;
+        }
         float damage = this.getResultDamage();
         if (this.impalingLevel > 0 && (entity.isInsideOfWater() || (entity.getLevel().isRaining() && entity.getLevel().canBlockSeeSky(entity)))) {
             damage = damage + (2.5f * (float) this.impalingLevel);
