@@ -266,12 +266,17 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
 
     @Override
     public boolean isSectionEmpty(float fY) {
-        return this.sections[(int) fY] instanceof EmptyChunkSection;
+        return this.sections[this.getSectionOffset() + (int) fY] instanceof EmptyChunkSection;
     }
 
     @Override
     public ChunkSection getSection(float fY) {
-        return this.sections[(int) fY];
+        int y = (int) (this.getSectionOffset() + fY);
+        if (y >= this.sections.length) {
+            this.getProvider().getLevel().getServer().getLogger().logException(new ChunkException("Invalid section " + y + " in chunk " + this.getX() + ", " + this.getZ()));
+            y = this.sections.length - 1;
+        }
+        return this.sections[y];
     }
 
     @Override
@@ -279,16 +284,16 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         byte[] emptyIdArray = new byte[4096];
         byte[] emptyDataArray = new byte[2048];
         if (Arrays.equals(emptyIdArray, section.getIdArray()) && Arrays.equals(emptyDataArray, section.getDataArray())) {
-            this.sections[(int) fY] = EmptyChunkSection.EMPTY[(int) fY];
+            this.sections[this.getSectionOffset() + (int) fY] = EmptyChunkSection.EMPTY[(int) fY];
         } else {
-            this.sections[(int) fY] = section;
+            this.sections[this.getSectionOffset() + (int) fY] = section;
         }
         setChanged();
         return true;
     }
 
     private void setInternalSection(float fY, ChunkSection section) {
-        this.sections[(int) fY] = section;
+        this.sections[this.getSectionOffset() + (int) fY] = section;
         setChanged();
     }
 

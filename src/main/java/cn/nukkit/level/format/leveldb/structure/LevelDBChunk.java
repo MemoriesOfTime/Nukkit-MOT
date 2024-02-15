@@ -1,6 +1,8 @@
 package cn.nukkit.level.format.leveldb.structure;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.DimensionEnum;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseChunk;
@@ -26,6 +28,8 @@ public class LevelDBChunk extends BaseChunk {
 
     public final Lock ioLock;
 
+    private final DimensionData dimensionData;
+
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ) {
         this(level, chunkX, chunkZ, null, new int[SUB_CHUNK_2D_SIZE], null, null, null, null);
     }
@@ -37,22 +41,25 @@ public class LevelDBChunk extends BaseChunk {
         this.provider = level;
         this.setPosition(chunkX, chunkZ);
 
+        this.dimensionData = level == null ? DimensionEnum.OVERWORLD.getDimensionData() : level.getLevel().getDimensionData();
+        int minSectionY = this.dimensionData.getMinSectionY();
+        int maxSectionY = this.dimensionData.getMaxSectionY();
+        this.sections = new LevelDBChunkSection[this.dimensionData.getHeight() >> 4];
         if (sections != null) {
-            if (sections.length == SECTION_COUNT) {
-                this.sections = sections;
-            } else {
-                this.sections = Arrays.copyOf(sections, SECTION_COUNT);
+            for (int i = minSectionY; i <= maxSectionY; i++) {
+                int sectionsY = i + this.dimensionData.getSectionOffset();
+                if (sectionsY >= sections.length || sections[sectionsY] == null) {
+                    this.sections[sectionsY] = new LevelDBChunkSection(this, sectionsY);
+                } else {
+                    ChunkSection section = sections[sectionsY];
+                    ((LevelDBChunkSection) section).setParent(this);
+                    this.sections[sectionsY] = section;
+                }
             }
         } else {
-            this.sections = new LevelDBChunkSection[SECTION_COUNT];
-        }
-        for (int i = 0; i < SECTION_COUNT; i++) {
-            ChunkSection section = this.sections[i];
-            if (section == null) {
-                section = new LevelDBChunkSection(this, i);
-                this.sections[i] = section;
+            for (int i = 0; i < this.sections.length; i++) {
+                this.sections[i] = new LevelDBChunkSection(this, i);
             }
-            ((LevelDBChunkSection) section).setParent(this);
         }
 
         this.heightMap = new byte[SUB_CHUNK_2D_SIZE];
@@ -74,6 +81,11 @@ public class LevelDBChunk extends BaseChunk {
 
         this.NBTentities = entities;
         this.NBTtiles = blockEntities;
+    }
+
+    @Override
+    public int getSectionOffset() {
+        return this.dimensionData.getSectionOffset();
     }
 
     @Override
@@ -207,7 +219,7 @@ public class LevelDBChunk extends BaseChunk {
                 boolean hasColumn = false;
                 SUB_CHUNKS:
                 for (int chunkY = subChunkY - 1; chunkY >= 0; chunkY--) {
-                    LevelDBChunkSection section = this.getSection(chunkY);
+                    ChunkSection section = this.getSection(chunkY);
                     for (int localY = 15; localY >= 0; localY--) {
                         /*if (!Block.lightBlocking[section.getBlockId(0, x, localY, z)]) {
                             continue;
@@ -253,11 +265,6 @@ public class LevelDBChunk extends BaseChunk {
         }
         this.subChunksDirty |= dirty;
         return dirty;
-    }
-
-    @Override
-    public LevelDBChunkSection getSection(float y) {
-        return (LevelDBChunkSection) this.sections[(int) y];
     }
 
     @Override
