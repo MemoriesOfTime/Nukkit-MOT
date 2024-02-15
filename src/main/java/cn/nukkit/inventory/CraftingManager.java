@@ -168,6 +168,7 @@ public class CraftingManager {
         }
 
         for (Map<String, Object> recipe : recipes_388) {
+            top:
             try {
                 switch (Utils.toInt(recipe.get("type"))) {
                     case 0:
@@ -183,14 +184,23 @@ public class CraftingManager {
                         Map<String, Object> first = outputs.get(0);
                         List<Item> sorted = new ArrayList<>();
                         for (Map<String, Object> ingredient : ((List<Map>) recipe.get("input"))) {
-                            sorted.add(Item.fromJson(ingredient, true));
+                            Item sortedItem = Item.fromJson(ingredient, true);
+                            if (sortedItem == null) {
+                                break top;
+                            }
+                            sorted.add(sortedItem);
                         }
                         sorted.sort(recipeComparator);
 
                         String recipeId = (String) recipe.get("id");
                         int priority = Utils.toInt(recipe.get("priority"));
 
-                        this.registerRecipe(388, new ShapelessRecipe(recipeId, priority, Item.fromJson(first, true), sorted));
+                        Item result = Item.fromJson(first, true);
+                        if (result == null) {
+                            break top;
+                        }
+
+                        this.registerRecipe(388, new ShapelessRecipe(recipeId, priority, result, sorted));
                         break;
                     case 1:
                         craftingBlock = (String) recipe.get("block");
@@ -209,6 +219,9 @@ public class CraftingManager {
                         for (Map.Entry<String, Map<String, Object>> ingredientEntry : input.entrySet()) {
                             char ingredientChar = ingredientEntry.getKey().charAt(0);
                             Item ingredient = Item.fromJson(ingredientEntry.getValue(), true);
+                            if (ingredient == null) {
+                                break top;
+                            }
 
                             ingredients.put(ingredientChar, ingredient);
                         }
@@ -220,7 +233,12 @@ public class CraftingManager {
                         recipeId = (String) recipe.get("id");
                         priority = Utils.toInt(recipe.get("priority"));
 
-                        this.registerRecipe(388, new ShapedRecipe(recipeId, priority, Item.fromJson(first, true), shape, ingredients, extraResults));
+                        result = Item.fromJson(first, true);
+                        if (result == null) {
+                            break top;
+                        }
+
+                        this.registerRecipe(388, new ShapedRecipe(recipeId, priority, result, shape, ingredients, extraResults));
                         break;
                     case 2:
                     case 3:
@@ -231,6 +249,9 @@ public class CraftingManager {
                         }
                         Map<String, Object> resultMap = (Map) recipe.get("output");
                         Item resultItem = Item.fromJson(resultMap, true);
+                        if (resultItem == null) {
+                            break top;
+                        }
                         Item inputItem;
                         try {
                             Map<String, Object> inputMap = (Map) recipe.get("input");
