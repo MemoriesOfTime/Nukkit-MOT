@@ -16,10 +16,7 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.SplittableRandom;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -59,6 +56,19 @@ public class Utils {
      * @param id 物品或方块id
      * @return 是否已实现
      */
+    public static boolean hasItemOrBlock(Object id) {
+        if (id instanceof Number number) {
+            return hasItemOrBlock(number.intValue());
+        } else if (id instanceof String string) {
+            return hasItemOrBlock(string);
+        }
+        throw new IllegalArgumentException("id must be a number or a string");
+    }
+
+    public static boolean hasItemOrBlock(String id) {
+        return Item.NAMESPACED_ID_ITEM.containsKey(id.toLowerCase(Locale.ENGLISH));
+    }
+
     public static boolean hasItemOrBlock(int id) {
         if (id < 0) {
             int blockId = 255 - id;
