@@ -634,6 +634,7 @@ public class CraftingManager {
                         this.setRecipeXp(furnaceRecipe, xp);
                     }
                     recipesList.add(furnaceRecipe);
+                    break;
                 }
                 case "blast_furnace": {
                     BlastFurnaceRecipe furnaceRecipe = new BlastFurnaceRecipe(resultItem, inputItem);
@@ -642,6 +643,7 @@ public class CraftingManager {
                         this.setRecipeXp(furnaceRecipe, xp);
                     }
                     recipesList.add(furnaceRecipe);
+                    break;
                 }
                 case "campfire": {
                     recipesList.add(new CampfireRecipe(resultItem, inputItem));
