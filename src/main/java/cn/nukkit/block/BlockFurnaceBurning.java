@@ -107,7 +107,7 @@ public class BlockFurnaceBurning extends BlockSolidMeta implements Faceable, Blo
             }
         }
 
-        BlockEntity.createBlockEntity(BlockEntity.FURNACE, this.getChunk(), nbt);
+        BlockEntity.createBlockEntity(this.getBlockEntityType(), this.getChunk(), nbt);
         return true;
     }
 
