@@ -123,6 +123,7 @@ public abstract class DefaultPermissions {
         registerPermission(new Permission("nukkit.command.spawn", "Allows the user to use spawn command", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.enchant", "Allows the user to enchant items", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.difficulty", "Allows the user to change difficulty", Permission.DEFAULT_OP), commands);
+        registerPermission(new Permission("nukkit.command.camera", "Allows the user to control camera", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.camerashake", "Allows the user to shake camera", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.textcolor", "Allows the user to write colored text", Permission.DEFAULT_OP), commands);
 
