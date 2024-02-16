@@ -80,6 +80,9 @@ public class CraftingManager {
     public final Map<Integer, FurnaceRecipe> furnaceRecipes440 = new Int2ObjectOpenHashMap<>();
     public final Map<Integer, FurnaceRecipe> furnaceRecipes340 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, FurnaceRecipe> furnaceRecipesOld = new Int2ObjectOpenHashMap<>();
+
+    private final Map<Integer, BlastFurnaceRecipe> blastFurnaceRecipes = new Int2ObjectOpenHashMap<>(); //649
+
     public final Map<Integer, BrewingRecipe> brewingRecipes = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, BrewingRecipe> brewingRecipesOld = new Int2ObjectOpenHashMap<>();
     public final Map<Integer, ContainerRecipe> containerRecipes = new Int2ObjectOpenHashMap<>();
@@ -605,7 +608,9 @@ public class CraftingManager {
         ArrayList<SmeltingRecipe> recipesList = new ArrayList<>();
         for (Map<String, Object> recipe : recipes) {
             String craftingBlock = (String)recipe.get("block");
-            if (!"furnace".equals(craftingBlock) && !"campfire".equals(craftingBlock)) {
+            if (!"furnace".equals(craftingBlock)
+                    && !"blast_furnace".equals(craftingBlock)
+                    && !"campfire".equals(craftingBlock)) {
                 continue;
             }
 
@@ -624,6 +629,15 @@ public class CraftingManager {
             switch (craftingBlock) {
                 case "furnace": {
                     FurnaceRecipe furnaceRecipe = new FurnaceRecipe(resultItem, inputItem);
+                    double xp = furnaceXpConfig.getDouble(inputItem.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL) + ":" + inputItem.getDamage(), 0d);
+                    if (xp != 0) {
+                        this.setRecipeXp(furnaceRecipe, xp);
+                    }
+                    recipesList.add(furnaceRecipe);
+                    break;
+                }
+                case "blast_furnace": {
+                    BlastFurnaceRecipe furnaceRecipe = new BlastFurnaceRecipe(resultItem, inputItem);
                     double xp = furnaceXpConfig.getDouble(inputItem.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL) + ":" + inputItem.getDamage(), 0d);
                     if (xp != 0) {
                         this.setRecipeXp(furnaceRecipe, xp);
@@ -806,6 +820,10 @@ public class CraftingManager {
         return this.furnaceRecipesOld;
     }
 
+    public Map<Integer, BlastFurnaceRecipe> getBlastFurnaceRecipes(int protocol) {
+        return this.blastFurnaceRecipes;
+    }
+
     public Map<Integer, ContainerRecipe> getContainerRecipes(int protocol) {
         if (protocol >= ProtocolInfo.v1_16_0) {
             return this.containerRecipes;
@@ -839,6 +857,16 @@ public class CraftingManager {
         return recipe;
     }
 
+    public FurnaceRecipe matchBlastFurnaceRecipe(int protocol, Item input) {
+        Map<Integer, BlastFurnaceRecipe> recipes = this.getBlastFurnaceRecipes(protocol);
+        if (recipes == null) {
+            return null;
+        }
+        FurnaceRecipe recipe = recipes.get(getItemHash(input));
+        if (recipe == null) recipe = recipes.get(getItemHash(input, 0));
+        return recipe;
+    }
+
     public static UUID getMultiItemHash(Collection<Item> items) {
         BinaryStream stream = new BinaryStream(items.size() * 5);
         for (Item item : items) {
@@ -858,7 +886,20 @@ public class CraftingManager {
     }
 
     public void registerFurnaceRecipe(int protocol, FurnaceRecipe recipe) {
+        if (recipe instanceof BlastFurnaceRecipe) {
+            this.registerBlastFurnaceRecipe(protocol, (BlastFurnaceRecipe) recipe);
+            return;
+        }
         this.getFurnaceRecipes(protocol).put(getItemHash(recipe.getInput()), recipe);
+    }
+
+    public void registerBlastFurnaceRecipe(BlastFurnaceRecipe recipe) {
+        Server.mvw("CraftingManager#registerBlastFurnaceRecipe()");
+        this.registerBlastFurnaceRecipe(ProtocolInfo.CURRENT_PROTOCOL, recipe);
+    }
+
+    public void registerBlastFurnaceRecipe(int protocol, BlastFurnaceRecipe recipe) {
+        this.getBlastFurnaceRecipes(protocol).put(getItemHash(recipe.getInput()), recipe);
     }
 
     public void registerCampfireRecipe(CampfireRecipe recipe) {
@@ -961,6 +1002,8 @@ public class CraftingManager {
             } else if (recipe instanceof ShapelessRecipe) {
                 this.registerShapelessRecipe(protocol, (ShapelessRecipe) recipe);
             }
+        } else if (recipe instanceof BlastFurnaceRecipe blastFurnaceRecipe) {
+            this.registerBlastFurnaceRecipe(protocol, blastFurnaceRecipe);
         } else if (recipe instanceof FurnaceRecipe furnaceRecipe) {
             this.registerFurnaceRecipe(protocol, furnaceRecipe);
         }
