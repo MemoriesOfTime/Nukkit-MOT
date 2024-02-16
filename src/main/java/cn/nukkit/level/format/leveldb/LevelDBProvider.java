@@ -513,7 +513,7 @@ public class LevelDBProvider implements LevelProvider {
         chunk.setChanged(false);
 
         try (WriteBatch writeBatch = this.db.createWriteBatch()) {
-            writeBatch.put(VERSION_OLD.getKey(chunkX, chunkZ), CHUNK_VERSION_SAVE_DATA);
+            writeBatch.put(VERSION.getKey(chunkX, chunkZ, this.getLevel().getDimension()), CHUNK_VERSION_SAVE_DATA);
 
             chunk.ioLock.lock();
 

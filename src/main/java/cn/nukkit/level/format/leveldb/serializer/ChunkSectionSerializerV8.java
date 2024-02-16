@@ -12,7 +12,7 @@ public class ChunkSectionSerializerV8 implements ChunkSectionSerializer {
     public void serializer(ByteBuf byteBuf, StateBlockStorage[] storages, int ySection) {
         byteBuf.writeByte(storages.length);
         for (StateBlockStorage storage : storages) {
-            storage.writeTo(byteBuf);
+            storage.writeToDisk(byteBuf);
         }
     }
 

@@ -508,71 +508,12 @@ public class LevelDBChunkSection implements ChunkSection {
             stream.putByte((byte) layers);
 
             for (int i = 0; i < layers; i++) {
-                this.storages[i].writeTo(stream);
+                this.storages[i].writeTo(protocol, stream, antiXray);
             }
         } finally {
             this.readLock.unlock();
         }
     }
-
-    /*@Override
-    public boolean writeToCache(BinaryStream stream) {
-        return writeToCache(stream, GlobalBlockPalette::getNameByBlockId);
-    }
-
-    @Override
-    public boolean writeToCache(BinaryStream stream, IntFunction<String> blockIdToName) {
-        boolean hasBlock = false;
-        stream.putByte((byte) 8);
-
-        try {
-            this.readLock.lock();
-
-            int layers = Math.max(2, this.storages.length);
-            stream.putByte((byte) layers);
-
-            for (int i = 0; i < layers; i++) {
-                if (!this.hasLayerUnsafe(i)) {
-                    EMPTY_STORAGE.writeToCache(stream);
-                    continue;
-                }
-
-                StateBlockStorage storage = this.storages[i];
-                storage.writeToCache(stream, blockIdToName);
-
-                if (!hasBlock) {
-                    hasBlock = !storage.isEmpty(true);
-                }
-            }
-        } finally {
-            this.readLock.unlock();
-        }
-
-        return !hasBlock;
-    }
-
-    @Override
-    public void writeToDisk(BinaryStream stream) {
-//        stream.putByte((byte) 9);
-        stream.putByte((byte) 8);
-
-        try {
-            this.readLock.lock();
-
-            stream.putByte((byte) this.storages.length);
-//            stream.putByte((byte) this.y);
-
-            for (StateBlockStorage storage : this.storages) {
-                if (storage != null) {
-                    storage.writeToDisk(stream);
-                    continue;
-                }
-                EMPTY_STORAGE.writeToDisk(stream);
-            }
-        } finally {
-            this.readLock.unlock();
-        }
-    }*/
 
     public StateBlockStorage[] getStorages() {
         return storages;
