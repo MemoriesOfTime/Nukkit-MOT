@@ -66,7 +66,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 continue;
             }
 
-            storages[i] = StateBlockStorage.ofBlock();
+            storages[i] = new StateBlockStorage();
         }
 
         if (maxLayer == -1) {
@@ -98,11 +98,11 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getBlockId(int x, int y, int z) {
-        return getBlockId(0, x, y, z);
+        return getBlockId(x, y, z, 0);
     }
 
     @Override
-    public int getBlockId(int layer, int x, int y, int z) {
+    public int getBlockId(int x, int y, int z, int layer) {
         try {
             this.readLock.lock();
 
@@ -118,11 +118,11 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public void setBlockId(int x, int y, int z, int id) {
-        this.setBlockId(0, x, y, z, id);
+        this.setBlockId(x, y, z, 0, id);
     }
 
     @Override
-    public void setBlockId(int layer, int x, int y, int z, int id) {
+    public void setBlockId(int x, int y, int z, int layer, int id) {
         try {
             this.writeLock.lock();
 
@@ -153,11 +153,11 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public boolean setFullBlockId(int x, int y, int z, int fullId) {
-        return this.setFullBlockId(0, x, y, z, fullId);
+        return this.setFullBlockId(x, y, z, 0, fullId);
     }
 
     @Override
-    public int getBlockData(int layer, int x, int y, int z) {
+    public int getBlockData( int x, int y, int z, int layer) {
         try {
             this.readLock.lock();
 
@@ -173,11 +173,11 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public void setBlockData(int x, int y, int z, int data) {
-        this.setBlockData(0, x, y, z, data);
+        this.setBlockData(x, y, z, 0, data);
     }
 
     @Override
-    public void setBlockData(int layer, int x, int y, int z, int data) {
+    public void setBlockData(int x, int y, int z, int layer, int data) {
         try {
             this.writeLock.lock();
 
@@ -204,11 +204,11 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getFullBlock(int x, int y, int z) {
-        return getFullBlock(0, x, y, z);
+        return getFullBlock(x, y, z, 0);
     }
 
     @Override
-    public int getFullBlock(int layer, int x, int y, int z) {
+    public int getFullBlock(int x, int y, int z, int layer) {
         try {
             this.readLock.lock();
 
@@ -235,7 +235,7 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public boolean setBlock(int x, int y, int z, int blockId, int meta) {
-        return setBlock(0, x, y, z, blockId, meta);
+        return setBlock(x, y, z, 0, blockId, meta);
     }
 
     @Override
@@ -245,11 +245,11 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId, int meta) {
-        return setBlock(layer, x, y, z, blockId, meta);
+        return setBlock(x, y, z, layer, blockId, meta);
     }
 
     @Override
-    public Block getAndSetBlock(int layer, int x, int y, int z, Block block) {
+    public Block getAndSetBlock(int x, int y, int z, int layer, Block block) {
         int fullId;
         int previous;
         try {
@@ -290,11 +290,11 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public Block getAndSetBlock(int x, int y, int z, Block block) {
-        return getAndSetBlock(0, x, y, z, block);
+        return getAndSetBlock(x, y, z, 0, block);
     }
 
     @Override
-    public boolean setFullBlockId(int layer, int x, int y, int z, int fullId) {
+    public boolean setFullBlockId(int x, int y, int z, int layer, int fullId) {
         try {
             this.writeLock.lock();
 
@@ -330,11 +330,11 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getBlockData(int x, int y, int z) {
-        return getBlockData(0, x, y, z);
+        return getBlockData(x, y, z, 0);
     }
 
-    public boolean setBlock(int layer, int x, int y, int z, int blockId, int meta) {
-        return setFullBlockId(layer, x, y, z, (blockId << Block.DATA_BITS) | (meta & Block.DATA_MASK));
+    public boolean setBlock(int x, int y, int z, int layer, int blockId, int meta) {
+        return setFullBlockId( x, y, z, layer, (blockId << Block.DATA_BITS) | (meta & Block.DATA_MASK));
     }
 
     @Override
@@ -352,7 +352,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Override
     public int getBlockLight(int x, int y, int z) {
         //TODO: lighting
-        return Block.light[this.getBlockId(0, x, y, z)];
+        return Block.light[this.getBlockId(x, y, z, 0)];
     }
 
     @Override
@@ -493,7 +493,7 @@ public class LevelDBChunkSection implements ChunkSection {
             if (storages[i] != null) {
                 continue;
             }
-            storages[i] = StateBlockStorage.ofBlock();
+            storages[i] = new StateBlockStorage();
         }
     }
 
