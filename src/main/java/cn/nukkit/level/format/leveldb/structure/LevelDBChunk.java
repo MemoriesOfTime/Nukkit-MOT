@@ -179,7 +179,7 @@ public class LevelDBChunk extends BaseChunk {
         this.setChanged();
     }
 
-    public void onSubChunkBlockChanged(LevelDBChunkSection subChunk, int layer, int x, int y, int z, int previousId, int newId) {
+    public void onSubChunkBlockChanged(LevelDBChunkSection subChunk, int x, int y, int z, int layer, int previousId, int newId) {
         assert previousId != newId;
 
         subChunksDirty = true;

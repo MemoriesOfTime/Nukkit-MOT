@@ -196,7 +196,7 @@ public class LevelDBChunkSection implements ChunkSection {
             storage.set(x, y, z, fullId);
 
             dirty = true;
-            parent.onSubChunkBlockChanged(this, layer, x, y, z, previous, fullId);
+            parent.onSubChunkBlockChanged(this, x, y, z, layer, previous, fullId);
         } finally {
             this.writeLock.unlock();
         }
@@ -224,7 +224,7 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int[] getBlockState(int x, int y, int z, int layer) {
-        int full = this.getFullBlock(layer, x, y, z);
+        int full = this.getFullBlock(x, y, z, layer);
         return new int[] { full >> Block.DATA_BITS, full & Block.DATA_MASK };
     }
 
@@ -281,7 +281,7 @@ public class LevelDBChunkSection implements ChunkSection {
             storage.set(x, y, z, fullId);
 
             dirty = true;
-            parent.onSubChunkBlockChanged(this, layer, x, y, z, previous, fullId);
+            parent.onSubChunkBlockChanged(this, x, y, z, layer, previous, fullId);
         } finally {
             this.writeLock.unlock();
         }
@@ -321,7 +321,7 @@ public class LevelDBChunkSection implements ChunkSection {
             storage.set(x, y, z, fullId);
 
             dirty = true;
-            parent.onSubChunkBlockChanged(this, layer, x, y, z, previous, fullId);
+            parent.onSubChunkBlockChanged(this, x, y, z, layer, previous, fullId);
             return true;
         } finally {
             this.writeLock.unlock();
