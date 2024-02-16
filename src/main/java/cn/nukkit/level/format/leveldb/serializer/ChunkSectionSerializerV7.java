@@ -36,7 +36,7 @@ public class ChunkSectionSerializerV7 implements ChunkSectionSerializer {
 
     private static StateBlockStorage deserialize(byte[] blocks, byte[] blockDataArray) {
         NibbleArray blockData = new NibbleArray(blockDataArray);
-        StateBlockStorage storage = StateBlockStorage.ofBlock();
+        StateBlockStorage storage = new StateBlockStorage();
         for (int i = 0; i < SUB_CHUNK_SIZE; ++i) {
             storage.set(i, blocks[i] << Block.DATA_BITS | blockData.get(i));
         }

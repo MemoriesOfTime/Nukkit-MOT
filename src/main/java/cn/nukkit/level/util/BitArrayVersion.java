@@ -13,12 +13,7 @@ public enum BitArrayVersion {
     /**
      * @since 1.18.0
      */
-    V0(0, 0, V1),
-    /**
-     * No element. mainly used for 3D biomes.
-     * @since 1.18.0
-     */
-    EMPTY(-1, -1, V0);
+    V0(0, 0, V1);
 
     final byte bits;
     final byte entriesPerWord;

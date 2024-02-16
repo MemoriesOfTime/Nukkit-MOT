@@ -947,7 +947,7 @@ public class LevelDBProvider implements LevelProvider {
             int chunkY = pos.y >> 4;
             StateBlockStorage storage = extraDataLayers[chunkY];
             if (storage == null) {
-                storage = StateBlockStorage.ofBlock();
+                storage = new StateBlockStorage();
                 extraDataLayers[chunkY] = storage;
             }
             storage.set(pos, (blockId << Block.DATA_BITS) | blockData);

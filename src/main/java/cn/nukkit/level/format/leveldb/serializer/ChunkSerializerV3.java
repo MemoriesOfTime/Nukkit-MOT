@@ -77,7 +77,7 @@ public class ChunkSerializerV3 implements ChunkSerializer {
                 stateBlockStorageArray = ChunkSectionSerializers.deserialize(byteBuf, chunkBuilder, subChunkVersion);
 
                 if (stateBlockStorageArray[1] == null) {
-                    stateBlockStorageArray[1] = StateBlockStorage.ofBlock();
+                    stateBlockStorageArray[1] = new StateBlockStorage();
                 }
 
                 /*if (extraBlocks != null) {

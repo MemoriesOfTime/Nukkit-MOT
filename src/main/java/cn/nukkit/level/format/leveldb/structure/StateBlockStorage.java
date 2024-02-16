@@ -21,7 +21,6 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import it.unimi.dsi.fastutil.ints.IntLists;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
 
@@ -51,10 +50,6 @@ public class StateBlockStorage {
 
     public StateBlockStorage(BitArrayVersion version, int firstId) {
         this.bitArray = version.createPalette();
-        if (version == BitArrayVersion.EMPTY) {
-            this.palette = IntLists.EMPTY_LIST;
-            return;
-        }
         this.palette = new IntArrayList(version.isSingleton() ? 1 : IntArrayList.DEFAULT_INITIAL_CAPACITY);
         this.palette.add(firstId); // Air is at the start of every block palette.
     }
@@ -62,22 +57,6 @@ public class StateBlockStorage {
     public StateBlockStorage(BitArray bitArray, IntList palette) {
         this.palette = palette;
         this.bitArray = bitArray;
-    }
-
-    public static StateBlockStorage ofBlock() {
-        return new StateBlockStorage(BitArrayVersion.V2, Block.AIR);
-    }
-
-    public static StateBlockStorage ofBlock(BitArrayVersion version) {
-        return new StateBlockStorage(version, Block.AIR);
-    }
-
-    public static StateBlockStorage ofBlock(int airBlockId) {
-        return new StateBlockStorage(BitArrayVersion.V2, airBlockId);
-    }
-
-    public static StateBlockStorage ofBlock(BitArrayVersion version, int airBlockId) {
-        return new StateBlockStorage(version, airBlockId);
     }
 
     public void readFrom(ByteBuf byteBuf, ChunkBuilder chunkBuilder) {
@@ -222,9 +201,6 @@ public class StateBlockStorage {
         int paletteSize = this.palette.size();
         BitArrayVersion version = paletteSize <= 1 ? BitArrayVersion.V0 : bitArray.getVersion();
         byteBuf.writeByte(getPaletteHeader(version, false));
-        if (version == BitArrayVersion.EMPTY) {
-            return;
-        }
 
         if (version != BitArrayVersion.V0) {
             for (int word : bitArray.getWords()) {
