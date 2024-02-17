@@ -1,32 +1,27 @@
 package cn.nukkit.level.format.leveldb.structure;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockID;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.biome.EnumBiome;
-import cn.nukkit.level.format.leveldb.updater.blockstateupdater.BlockStateUpdaters;
+import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.math.BlockVector3;
-import cn.nukkit.nbt.stream.NBTInputStream;
-import cn.nukkit.nbt.stream.NBTOutputStream;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.ChunkException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
+import org.cloudburstmc.nbt.NBTInputStream;
+import org.cloudburstmc.nbt.NBTOutputStream;
+import org.cloudburstmc.nbt.NbtMap;
+import org.cloudburstmc.nbt.NbtUtils;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
-import java.nio.ByteOrder;
 import java.util.List;
 
 import static cn.nukkit.level.format.anvil.util.BlockStorage.SECTION_SIZE;
@@ -37,7 +32,7 @@ public class StateBlockStorage {
 
     private static final int SIZE = 16 * 16 * 16;
 
-    private IntList palette;
+    private final List<BlockStateSnapshot> palette;
     private BitArray bitArray;
 
     public StateBlockStorage() {
@@ -45,16 +40,12 @@ public class StateBlockStorage {
     }
 
     public StateBlockStorage(BitArrayVersion version) {
-        this(version, Block.AIR);
-    }
-
-    public StateBlockStorage(BitArrayVersion version, int firstId) {
         this.bitArray = version.createPalette();
-        this.palette = new IntArrayList(version.isSingleton() ? 1 : IntArrayList.DEFAULT_INITIAL_CAPACITY);
-        this.palette.add(firstId); // Air is at the start of every block palette.
+        this.palette = new ObjectArrayList<>(16);
+        this.palette.add(BlockStateMapping.get().getBlockState(0, 0));
     }
 
-    public StateBlockStorage(BitArray bitArray, IntList palette) {
+    public StateBlockStorage(BitArray bitArray, List<BlockStateSnapshot> palette) {
         this.palette = palette;
         this.bitArray = bitArray;
     }
@@ -91,18 +82,22 @@ public class StateBlockStorage {
 
         NBTInputStream inputStream = null;
         try {
-            inputStream = new NBTInputStream(new ByteBufInputStream(byteBuf), ByteOrder.LITTLE_ENDIAN);
+            inputStream = NbtUtils.createReaderLE(new ByteBufInputStream(byteBuf));
             for (int i = 0; i < paletteSize; ++i) {
-                CompoundTag tag;
+                NbtMap tag;
+                BlockStateSnapshot stateSnapshot;
                 try {
-                    CompoundTag readTag = (CompoundTag) inputStream.readTag();
-                    tag = BlockStateUpdaters.updateBlockState(readTag, readTag.getInt("version"));
+                    tag = (NbtMap) inputStream.readTag();
+                    tag.hashCode();
+                    stateSnapshot = BlockStateMapping.get().getBlockStateOriginal(tag);
+                    if (stateSnapshot == null) {
+                        stateSnapshot = BlockStateMapping.get().getBlockState(tag, BlockStateMapping.get().updateBlockState(tag));
+                    }
                 } catch (IOException e) {
                     throw new ChunkException("Invalid blockstate NBT at offset " + i + " in paletted storage", e);
                 }
 
-                int fullId = GlobalBlockPalette.getLegacyFullId(ProtocolInfo.CURRENT_PROTOCOL, tag);
-                this.palette.add(fullId);
+                this.palette.add(stateSnapshot);
             }
         } finally {
             try {
@@ -115,7 +110,7 @@ public class StateBlockStorage {
         }
     }
 
-    public static StateBlockStorage ofBiome(int biomeId) {
+    /*public static StateBlockStorage ofBiome(int biomeId) {
         return new StateBlockStorage(BitArrayVersion.V0, biomeId);
     }
 
@@ -151,14 +146,15 @@ public class StateBlockStorage {
         }
 
         return new StateBlockStorage(bitArray, IntArrayList.wrap(palette));
-    }
+    }*/
 
     private static int getPaletteHeader(BitArrayVersion version, boolean runtime) {
         return (version.getId() << 1) | (runtime ? 1 : 0);
     }
 
     public int get(int index) {
-        return this.palette.getInt(this.bitArray.get(index));
+        BlockStateSnapshot snapshot = this.palette.get(this.bitArray.get(index));
+        return snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData();
     }
 
     public int get(int x, int y, int z) {
@@ -169,7 +165,7 @@ public class StateBlockStorage {
         return this.get(elementIndex(pos.x, pos.y, pos.z));
     }
 
-    public void set(int index, int value) {
+    public void set(int index, BlockStateSnapshot value) {
         try {
             int paletteIndex = this.getOrAdd(value);
             this.bitArray.set(index, paletteIndex);
@@ -179,11 +175,11 @@ public class StateBlockStorage {
     }
 
     public void set(int x, int y, int z, int value) {
-        this.set(elementIndex(x, y, z), value);
+        this.set(elementIndex(x, y, z), BlockStateMapping.get().getBlockStateFromFullId(value));
     }
 
     public void set(BlockVector3 pos, int value) {
-        this.set(elementIndex(pos.x, pos.y, pos.z), value);
+        this.set(elementIndex(pos.x, pos.y, pos.z), BlockStateMapping.get().getBlockStateFromFullId(value));
     }
 
     /**
@@ -212,12 +208,12 @@ public class StateBlockStorage {
 
         NBTOutputStream outputStream = null;
         try {
-            outputStream = new NBTOutputStream(new ByteBufOutputStream(byteBuf), ByteOrder.LITTLE_ENDIAN);
+            outputStream =NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
 
             List<CompoundTag> tagList = new ObjectArrayList<>();
             for (int i = 0; i < paletteSize; i++) {
-                int fullId = this.palette.getInt(i);
-                outputStream.writeTag(GlobalBlockPalette.getState(ProtocolInfo.CURRENT_PROTOCOL, fullId));
+                BlockStateSnapshot snapshot = this.palette.get(i);
+                outputStream.writeTag(snapshot.getVamillaState());
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -260,8 +256,8 @@ public class StateBlockStorage {
     /**
      * @return palette index
      */
-    private int getOrAdd(int id) {
-        int index = this.palette.indexOf(id);
+    private int getOrAdd(BlockStateSnapshot snapshot) {
+        int index = this.palette.indexOf(snapshot);
         if (index != -1) {
             return index;
         }
@@ -272,72 +268,43 @@ public class StateBlockStorage {
             BitArrayVersion next = version.next();
             if (next != null) {
                 this.grow(next);
-            } else if (!this.compress()) {
+            }/* else if (!this.compress()) {
                 throw new IndexOutOfBoundsException("too many elements");
-            }
+            }*/
         }
-        this.palette.add(id);
+        this.palette.add(snapshot);
         return index;
     }
 
     public boolean isEmpty() {
-        return this.isEmpty(false);
-    }
-
-    public boolean isEmpty(boolean fast) {
-        if (this.palette.isEmpty()) {
+        if (this.palette.size() == 1) {
             return true;
-        }
-
-        boolean hasBlock = false;
-        for (int i = 0; i < this.palette.size(); i++) {
-            int id = this.palette.getInt(i);
-            if (id != BlockID.AIR) {
-                hasBlock = true;
-                break;
-            }
-        }
-
-        if (!hasBlock) {
-            return true;
-        }
-        if (fast) {
-            return false;
-        }
-
-        int firstId = this.palette.getInt(0);
-        if (firstId != BlockID.AIR) {
-            // Hive Chunker...
-            return false;
         }
 
         for (int word : this.bitArray.getWords()) {
-            if (word != 0) {
-                return false;
+            if (Integer.toUnsignedLong(word) == 0L) {
+                continue;
             }
+            return false;
         }
-
-        this.palette.clear();
-        this.palette.add(firstId);
         return true;
     }
 
     /**
      * @return dirty
-     */
     public boolean compress() {
         if (this.palette.isEmpty()) {
             return false;
         }
 
         int count = this.palette.size();
-        if (count == 1 && this.palette.getInt(0) == BlockID.AIR) {
+        if (count == 1 && this.palette.get(0).getLegacyId() == BlockID.AIR) {
             return false;
         }
 
         boolean noBlock = true;
         for (int i = 0; i < count; i++) {
-            int id = this.palette.getInt(i);
+            int id = this.palette.get(i).getLegacyId();
             if (id == BlockID.AIR) {
                 continue;
             }
@@ -345,7 +312,7 @@ public class StateBlockStorage {
             break;
         }
         if (noBlock) {
-            int firstId = this.palette.getInt(0);
+            BlockStateSnapshot firstId = this.palette.get(0);
             this.palette.clear();
             this.palette.add(firstId);
 
@@ -356,16 +323,16 @@ public class StateBlockStorage {
 
         BitArrayVersion version = BitArrayVersion.V2;
         BitArray newArray = version.createPalette(SIZE);
-        IntList newPalette = new IntArrayList(count);
-        newPalette.add(this.palette.getInt(0));
+        List<BlockStateSnapshot> newPalette = new ObjectArrayList<>(count);
+        newPalette.add(this.palette.get(0));
         for (int i = 0; i < SIZE; i++) {
             int paletteIndex = this.bitArray.get(i);
-            int id = this.palette.getInt(paletteIndex);
-            int newIndex = newPalette.indexOf(id);
+            BlockStateSnapshot snapshot = this.palette.get(paletteIndex);
+            int newIndex = newPalette.indexOf(snapshot);
 
             if (newIndex == -1) {
                 newIndex = newPalette.size();
-                newPalette.add(id);
+                newPalette.add(snapshot);
 
                 if (newIndex > version.getMaxEntryValue()) {
                     version = version.next();
@@ -382,10 +349,10 @@ public class StateBlockStorage {
         this.bitArray = newArray;
         this.palette = newPalette;
         return true;
-    }
+    }*/
 
     public StateBlockStorage copy() {
-        return new StateBlockStorage(this.bitArray.copy(), new IntArrayList(this.palette));
+        return new StateBlockStorage(this.bitArray.copy(), new ObjectArrayList<>(this.palette));
     }
 
     protected static int elementIndex(int x, int y, int z) {

@@ -12,14 +12,13 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.format.leveldb.serializer.*;
 import cn.nukkit.level.format.leveldb.structure.*;
-import cn.nukkit.level.format.leveldb.updater.blockstateupdater.BlockStateUpdaters;
+import cn.nukkit.level.format.leveldb.updater.CompoundTag2NbtMap;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
 import com.google.common.collect.ImmutableMap;
 import io.netty.buffer.Unpooled;
@@ -176,10 +175,10 @@ public class LevelDBProvider implements LevelProvider {
     public static void updateLevelData(CompoundTag levelData) {
         levelData.putLong("LastPlayed", System.currentTimeMillis() / 1000)
                 .putString("baseGameVersion", "*")
-                .putString("InventoryVersion", Utils.getVersionByProtocol(ProtocolInfo.CURRENT_LEVEL_PROTOCOL))
-                .putInt("NetworkVersion", ProtocolInfo.CURRENT_LEVEL_PROTOCOL)
-                .putList(new ListTag<>("MinimumCompatibleClientVersion", CURRENT_COMPATIBLE_CLIENT_VERSION))
-                .putList(new ListTag<>("lastOpenedWithVersion", CURRENT_COMPATIBLE_CLIENT_VERSION))
+                .putString("InventoryVersion", Utils.getVersionByProtocol(CURRENT_LEVEL_PROTOCOL))
+                .putInt("NetworkVersion", CURRENT_LEVEL_PROTOCOL)
+                .putList(new ListTag<>("MinimumCompatibleClientVersion", CURRENT_LEVEL_VERSION))
+                .putList(new ListTag<>("lastOpenedWithVersion", CURRENT_LEVEL_VERSION))
                 .putInt("StorageVersion", CURRENT_STORAGE_VERSION)
                 .putInt("WorldVersion", 1);
 
@@ -958,6 +957,7 @@ public class LevelDBProvider implements LevelProvider {
     protected void loadBlockTickingQueue(byte[] data, boolean tickingQueueTypeIsRandom) {
         CompoundTag ticks;
         try {
+            //TODO 使用NbtMap
             ticks = NBTIO.read(data, ByteOrder.LITTLE_ENDIAN);
         } catch (IOException e) {
             throw new ChunkException("Corrupted block ticking data", e);
@@ -969,9 +969,8 @@ public class LevelDBProvider implements LevelProvider {
 
             CompoundTag blockState = entry;
             if (blockState.contains("name")) {
-                blockState = BlockStateUpdaters.updateBlockState(blockState, blockState.getInt("version"));
-                int fullId = GlobalBlockPalette.getLegacyFullId(ProtocolInfo.CURRENT_LEVEL_PROTOCOL, blockState);
-                block = Block.get(fullId >> Block.DATA_BITS, fullId & Block.DATA_MASK);
+                BlockStateSnapshot snapshot = BlockStateMapping.get().getBlockState(CompoundTag2NbtMap.compoundTag2NbtMap(blockState));
+                block = snapshot.getBlock();
             } else if (entry.contains("tileID")) {
                 block = Block.get(entry.getByte("tileID") & 0xff);
             }
@@ -1002,7 +1001,7 @@ public class LevelDBProvider implements LevelProvider {
         for (BlockUpdateEntry entry : entries) {
             Block block = entry.block;
 
-            CompoundTag blockTag = GlobalBlockPalette.getState(ProtocolInfo.CURRENT_LEVEL_PROTOCOL, block.getFullId());
+            CompoundTag blockTag = GlobalBlockPalette.getState(CURRENT_LEVEL_PROTOCOL, block.getFullId());
             Vector3 pos = entry.pos;
             int priority = entry.priority;
 

@@ -2,6 +2,7 @@ package cn.nukkit.level.format.leveldb.serializer;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
+import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
 import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
 import io.netty.buffer.ByteBuf;
@@ -38,7 +39,7 @@ public class ChunkSectionSerializerV7 implements ChunkSectionSerializer {
         NibbleArray blockData = new NibbleArray(blockDataArray);
         StateBlockStorage storage = new StateBlockStorage();
         for (int i = 0; i < SUB_CHUNK_SIZE; ++i) {
-            storage.set(i, blocks[i] << Block.DATA_BITS | blockData.get(i));
+            storage.set(i, BlockStateMapping.get().getBlockState(blocks[i] << Block.DATA_BITS, blockData.get(i)));
         }
         return storage;
     }

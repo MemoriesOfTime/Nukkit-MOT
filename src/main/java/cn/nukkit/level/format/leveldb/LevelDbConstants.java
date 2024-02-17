@@ -1,6 +1,7 @@
 package cn.nukkit.level.format.leveldb;
 
 import cn.nukkit.nbt.tag.IntTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Binary;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
@@ -31,11 +32,14 @@ public final class LevelDbConstants {
     public static final byte[] FINALISATION_POPULATION_SAVE_DATA = Binary.writeLInt(FINALISATION_NEEDS_POPULATION);
     public static final byte[] FINALISATION_DONE_SAVE_DATA = Binary.writeLInt(FINALISATION_DONE);
 
+
+    public static final int CURRENT_LEVEL_PROTOCOL = ProtocolInfo.v1_20_10;
+
     public static final int STATE_MAYOR_VERSION = 1;
     public static final int STATE_MINOR_VERSION = 20;
     public static final int STATE_PATCH_VERSION = 10;
 
-    public static final List<IntTag> CURRENT_COMPATIBLE_CLIENT_VERSION = Collections.unmodifiableList(ObjectArrayList.of(
+    public static final List<IntTag> CURRENT_LEVEL_VERSION = Collections.unmodifiableList(ObjectArrayList.of(
             new IntTag("", STATE_MAYOR_VERSION), // major
             new IntTag("", STATE_MINOR_VERSION), // minor
             new IntTag("", STATE_PATCH_VERSION), // patch
