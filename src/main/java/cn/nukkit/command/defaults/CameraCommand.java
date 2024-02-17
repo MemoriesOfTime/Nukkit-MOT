@@ -6,6 +6,7 @@ import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
@@ -31,7 +32,7 @@ public class CameraCommand extends VanillaCommand {
     public static final String[] EASE_TYPES = Arrays.stream(CameraEase.values()).map(CameraEase::getSerializeName).toArray(String[]::new);
 
     public CameraCommand(String name) {
-        super(name, "commands.camera.description");
+        super(name, "%nukkit.command.camera.description");
         this.setPermission("nukkit.command.camera");
         this.commandParameters.clear();
         this.commandParameters.put("clear", new CommandParameter[]{
@@ -143,10 +144,9 @@ public class CameraCommand extends VanillaCommand {
         CameraInstructionPacket pk = new CameraInstructionPacket();
         Player player = Server.getInstance().getPlayer(args[0]);
         if (player == null) {
-            sender.sendMessage("unable to find player " + args[0]);
+            sender.sendMessage(new TranslationContainer("nukkit.camera.unknownPlayer"));
             return false;
         }
-        // todo: add messages to notice sender & add translations & add args checks
         switch (args[1]) {
             case "clear" -> {
                 pk.setClear(OptionalBoolean.of(true));
@@ -166,6 +166,7 @@ public class CameraCommand extends VanillaCommand {
             case "set-default" -> {
                 CameraPreset preset = CameraPresetManager.getPreset(args[2]);
                 if (preset == null) {
+                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
                     return false;
                 }
                 pk.setSetInstruction(new CameraSetInstruction());
@@ -173,6 +174,7 @@ public class CameraCommand extends VanillaCommand {
             case "set-rot" -> {
                 CameraPreset preset = CameraPresetManager.getPreset(args[2]);
                 if (preset == null) {
+                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
                     return false;
                 }
                 pk.setSetInstruction(new CameraSetInstruction());
@@ -182,6 +184,7 @@ public class CameraCommand extends VanillaCommand {
             case "set-pos" -> {
                 CameraPreset preset = CameraPresetManager.getPreset(args[2]);
                 if (preset == null) {
+                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
                     return false;
                 }
                 Position position = new Position(Double.parseDouble(args[3]), Double.parseDouble(args[4]), Double.parseDouble(args[5]));
@@ -192,6 +195,7 @@ public class CameraCommand extends VanillaCommand {
             case "set-pos-rot" -> {
                 CameraPreset preset = CameraPresetManager.getPreset(args[2]);
                 if (preset == null) {
+                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
                     return false;
                 }
                 Position position = new Position(Double.parseDouble(args[3]), Double.parseDouble(args[4]), Double.parseDouble(args[5]));
@@ -203,6 +207,7 @@ public class CameraCommand extends VanillaCommand {
             case "set-ease-default" -> {
                 CameraPreset preset = CameraPresetManager.getPreset(args[2]);
                 if (preset == null) {
+                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
                     return false;
                 }
                 float easeTime = Float.parseFloat(args[4]);
@@ -213,6 +218,7 @@ public class CameraCommand extends VanillaCommand {
             case "set-ease-rot" -> {
                 CameraPreset preset = CameraPresetManager.getPreset(args[2]);
                 if (preset == null) {
+                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
                     return false;
                 }
                 float easeTime = Float.parseFloat(args[4]);
@@ -225,6 +231,7 @@ public class CameraCommand extends VanillaCommand {
             case "set-ease-pos" -> {
                 CameraPreset preset = CameraPresetManager.getPreset(args[2]);
                 if (preset == null) {
+                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
                     return false;
                 }
                 float easeTime = Float.parseFloat(args[4]);
@@ -238,6 +245,7 @@ public class CameraCommand extends VanillaCommand {
             case "set-ease-pos-rot" -> {
                 CameraPreset preset = CameraPresetManager.getPreset(args[2]);
                 if (preset == null) {
+                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
                     return false;
                 }
                 float easeTime = Float.parseFloat(args[4]);
@@ -251,6 +259,7 @@ public class CameraCommand extends VanillaCommand {
             }
         }
         player.dataPacket(pk);
+        player.sendMessage(new TranslationContainer("nukkit.camera.success", commandLabel));
         return true;
     }
 }

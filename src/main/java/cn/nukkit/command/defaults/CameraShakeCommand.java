@@ -5,12 +5,13 @@ import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.network.protocol.CameraShakePacket;
 
 public class CameraShakeCommand extends VanillaCommand {
 
     public CameraShakeCommand(String name) {
-        super(name, "commands.screenshake.description");
+        super(name, "%nukkit.command.camerashake.description");
         this.setPermission("nukkit.command.camerashake");
         this.commandParameters.clear();
         this.commandParameters.put("add", new CommandParameter[]{
@@ -32,7 +33,6 @@ public class CameraShakeCommand extends VanillaCommand {
             return false;
         }
         switch (args[0]) {
-            // todo: add messages to notice sender & add translations
             case "add" -> {
                 if (args.length != 5) {
                     return false;
@@ -54,6 +54,9 @@ public class CameraShakeCommand extends VanillaCommand {
                 Player player = Server.getInstance().getPlayer(players_str);
                 if (player != null) {
                     player.dataPacket(packet);
+                } else {
+                    sender.sendMessage(new TranslationContainer("nukkit.camerashake.unknownPlayer"));
+                    return false;
                 }
             }
             case "stop" -> {
@@ -70,6 +73,9 @@ public class CameraShakeCommand extends VanillaCommand {
                 Player player = Server.getInstance().getPlayer(players_str);
                 if (player != null) {
                     player.dataPacket(packet);
+                } else {
+                    sender.sendMessage(new TranslationContainer("nukkit.camerashake.unknownPlayer"));
+                    return false;
                 }
             }
         }
