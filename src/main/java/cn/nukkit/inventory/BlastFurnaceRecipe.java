@@ -11,7 +11,7 @@ public class BlastFurnaceRecipe extends FurnaceRecipe {
 
     @Override
     public void registerToCraftingManager(CraftingManager manager) {
-        manager.registerBlastFurnaceRecipe(ProtocolInfo.v1_11_0, this);
+        manager.registerBlastFurnaceRecipe(this);
     }
 
     @Override
