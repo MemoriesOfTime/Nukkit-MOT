@@ -1,5 +1,7 @@
 package cn.nukkit.command.defaults;
 
+import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
@@ -139,8 +141,13 @@ public class CameraCommand extends VanillaCommand {
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
         CameraInstructionPacket pk = new CameraInstructionPacket();
+        Player player = Server.getInstance().getPlayer(args[0]);
+        if (player == null) {
+            sender.sendMessage("unable to find player " + args[0]);
+            return false;
+        }
         // todo: add messages to notice sender & add translations & add args checks
-        switch (args[0]) {
+        switch (args[1]) {
             case "clear" -> {
                 pk.setClear(OptionalBoolean.of(true));
             }
@@ -177,7 +184,7 @@ public class CameraCommand extends VanillaCommand {
                 if (preset == null) {
                     return false;
                 }
-                Position position = new Position();
+                Position position = new Position(Double.parseDouble(args[3]), Double.parseDouble(args[4]), Double.parseDouble(args[5]));
                 pk.setSetInstruction(new CameraSetInstruction());
                 pk.getSetInstruction().setPreset(preset);
                 pk.getSetInstruction().setPos(new Vector3f((float) position.getX(), (float) position.getY(), (float) position.getZ()));
@@ -243,6 +250,7 @@ public class CameraCommand extends VanillaCommand {
                 pk.getSetInstruction().setRot(new Vector2f(Float.parseFloat(args[9]), Float.parseFloat(args[10])));
             }
         }
+        player.dataPacket(pk);
         return true;
     }
 }
