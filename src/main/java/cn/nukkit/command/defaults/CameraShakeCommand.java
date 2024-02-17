@@ -54,7 +54,7 @@ public class CameraShakeCommand extends VanillaCommand {
                 Player player = Server.getInstance().getPlayer(players_str);
                 if (player != null) {
                     player.dataPacket(packet);
-                    sender.sendMessage(new TranslationContainer("nukkit.screenshake.success", players_str));
+                    sender.sendMessage(new TranslationContainer("nukkit.camerashake.success", players_str));
                 } else {
                     sender.sendMessage(new TranslationContainer("nukkit.camerashake.unknownPlayer"));
                     return false;
@@ -74,7 +74,7 @@ public class CameraShakeCommand extends VanillaCommand {
                 Player player = Server.getInstance().getPlayer(players_str);
                 if (player != null) {
                     player.dataPacket(packet);
-                    sender.sendMessage(new TranslationContainer("nukkit.screenshake.successStop", players_str));
+                    sender.sendMessage(new TranslationContainer("nukkit.camerashake.successStop", players_str));
                 } else {
                     sender.sendMessage(new TranslationContainer("nukkit.camerashake.unknownPlayer"));
                     return false;
