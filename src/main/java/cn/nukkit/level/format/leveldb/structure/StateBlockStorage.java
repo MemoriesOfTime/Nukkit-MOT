@@ -240,7 +240,7 @@ public class StateBlockStorage {
             int id = fullId >> Block.DATA_BITS;
             int meta = fullId & Block.DATA_MASK;
             if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
-                fullId = Block.STONE;
+                fullId = Block.STONE << Block.DATA_BITS;
             }
             int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, id, meta);
             palettedBlockStorage.setBlock(i, runtimeId);

@@ -6,6 +6,7 @@ import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BinaryStream;
+import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
@@ -15,8 +16,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static cn.nukkit.level.format.generic.EmptyChunkSection.*;
 
+@Log4j2
 public class LevelDBChunkSection implements ChunkSection {
-    protected static final StateBlockStorage[] EMPTY = new StateBlockStorage[0];
 
     private LevelDBChunk parent;
 
@@ -110,7 +111,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 return BlockID.AIR;
             }
 
-            return (this.storages[layer].get(x, y, z)) >> Block.DATA_MASK;
+            return (this.storages[layer].get(x, y, z)) >> Block.DATA_BITS;
         } finally {
             this.readLock.unlock();
         }
@@ -363,6 +364,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Deprecated
     @Override
     public byte[] getIdExtraArray(int layer) {
+        log.error("Deprecated method called: getIdExtraArray");
         // no longer supported
         return EMPTY_ID_ARRAY;
     }
@@ -370,6 +372,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Deprecated
     @Override
     public byte[] getIdArray(int layer) {
+        log.error("Deprecated method called: getIdArray");
         // no longer supported
         return EMPTY_ID_ARRAY;
     }
@@ -377,6 +380,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Deprecated
     @Override
     public byte[] getIdArray() {
+        log.error("Deprecated method called: getIdArray");
         // no longer supported
         return EMPTY_ID_ARRAY;
     }
@@ -384,6 +388,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Deprecated
     @Override
     public byte[] getDataArray() {
+        log.error("Deprecated method called: getDataArray");
         // no longer supported
         return EMPTY_DATA_ARRAY;
     }
@@ -391,6 +396,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Deprecated
     @Override
     public byte[] getDataArray(int layer) {
+        log.error("Deprecated method called: getDataArray");
         // no longer supported
         return EMPTY_DATA_ARRAY;
     }
@@ -398,6 +404,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Deprecated
     @Override
     public byte[] getDataExtraArray(int layer) {
+        log.error("Deprecated method called: getDataExtraArray");
         // no longer supported
         return EMPTY_DATA_ARRAY;
     }
@@ -449,6 +456,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Deprecated
     @Override
     public byte[] getBytes(int protocolId) {
+        log.error("Deprecated method called: getBytes");
         return new byte[0];
     }
 
@@ -460,6 +468,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Deprecated
     @Override
     public CompoundTag toNBT() {
+        log.error("Deprecated method called: toNBT");
         return null;
     }
 
