@@ -1,6 +1,7 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class BlastFurnaceRecipe extends FurnaceRecipe {
 
@@ -10,7 +11,7 @@ public class BlastFurnaceRecipe extends FurnaceRecipe {
 
     @Override
     public void registerToCraftingManager(CraftingManager manager) {
-        manager.registerBlastFurnaceRecipe(this);
+        manager.registerBlastFurnaceRecipe(ProtocolInfo.v1_11_0, this);
     }
 
     @Override
