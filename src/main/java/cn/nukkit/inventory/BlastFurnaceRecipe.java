@@ -1,6 +1,7 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class BlastFurnaceRecipe extends FurnaceRecipe {
 
