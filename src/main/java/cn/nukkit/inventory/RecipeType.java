@@ -8,6 +8,8 @@ public enum RecipeType {
     SHAPED(1),
     FURNACE(2),
     FURNACE_DATA(3),
+    BLAST_FURNACE(2),
+    BLAST_FURNACE_DATA(3),
     MULTI(4),
     SHULKER_BOX(5),
     SHAPELESS_CHEMISTRY(6),
