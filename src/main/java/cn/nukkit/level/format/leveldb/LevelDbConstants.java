@@ -31,10 +31,14 @@ public final class LevelDbConstants {
     public static final byte[] FINALISATION_POPULATION_SAVE_DATA = Binary.writeLInt(FINALISATION_NEEDS_POPULATION);
     public static final byte[] FINALISATION_DONE_SAVE_DATA = Binary.writeLInt(FINALISATION_DONE);
 
+    public static final int STATE_MAYOR_VERSION = 1;
+    public static final int STATE_MINOR_VERSION = 20;
+    public static final int STATE_PATCH_VERSION = 10;
+
     public static final List<IntTag> CURRENT_COMPATIBLE_CLIENT_VERSION = Collections.unmodifiableList(ObjectArrayList.of(
-            new IntTag("", 1), // major
-            new IntTag("", 18), // minor
-            new IntTag("", 30), // patch
+            new IntTag("", STATE_MAYOR_VERSION), // major
+            new IntTag("", STATE_MINOR_VERSION), // minor
+            new IntTag("", STATE_PATCH_VERSION), // patch
             new IntTag("", 0), // revision
             new IntTag("", 0))); // beta
 
