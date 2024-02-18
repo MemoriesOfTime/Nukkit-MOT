@@ -56,10 +56,10 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     public LevelDBChunkSection(int y, @Nullable StateBlockStorage[] storages) {
-        this(null, y, storages);
+        this(null, y, storages, null, null, null, false, false);
     }
 
-    public LevelDBChunkSection(LevelDBChunk parent, int y, @Nullable StateBlockStorage[] storages) {
+    public LevelDBChunkSection(LevelDBChunk parent, int y, @Nullable StateBlockStorage[] storages, byte[] blockLight, byte[] skyLight, byte[] compressedLight, boolean hasBlockLight, boolean hasSkyLight) {
         this.parent = parent;
         this.y = y;
 
@@ -95,6 +95,12 @@ public class LevelDBChunkSection implements ChunkSection {
         }
 
         this.storages = Arrays.copyOf(this.storages, count);
+
+        this.blockLight = blockLight;
+        this.skyLight = skyLight;
+        this.compressedLight = compressedLight;
+        this.hasBlockLight = hasBlockLight;
+        this.hasSkyLight = hasSkyLight;
     }
 
     @Nullable
@@ -724,7 +730,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 }
                 storages[i] = storage.copy();
             }
-            return new LevelDBChunkSection(null, this.y, storages);
+            return new LevelDBChunkSection(null, this.y, storages, this.blockLight, this.skyLight, this.compressedLight, this.hasBlockLight, this.hasSkyLight);
         } finally {
             this.readLock.unlock();
         }
