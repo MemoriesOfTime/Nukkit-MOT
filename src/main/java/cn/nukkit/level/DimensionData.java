@@ -22,7 +22,7 @@ public class DimensionData {
     }
 
     public int getSectionOffset() {
-        return -this.minHeight >> 4;
+        return -this.getMinSectionY();
     }
 
     public int getMinSectionY() {

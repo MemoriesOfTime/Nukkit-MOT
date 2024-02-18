@@ -8,6 +8,7 @@ import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseChunk;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.tag.CompoundTag;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
@@ -31,10 +32,10 @@ public class LevelDBChunk extends BaseChunk {
     private final DimensionData dimensionData;
 
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ) {
-        this(level, chunkX, chunkZ, null, new int[SUB_CHUNK_2D_SIZE], null, null, null, null);
+        this(level, chunkX, chunkZ, new LevelDBChunkSection[0], new int[SUB_CHUNK_2D_SIZE], null, null, null, null);
     }
 
-    public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ, @Nullable ChunkSection[] sections,
+    public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ, @NotNull ChunkSection[] sections,
                         @Nullable int[] heightmap, @Nullable byte[] biomes2d, @Nullable PalettedBlockStorage[] biomes3d,
                         @Nullable List<CompoundTag> entities, @Nullable List<CompoundTag> blockEntities) {
         this.ioLock = new ReentrantLock();
@@ -45,20 +46,14 @@ public class LevelDBChunk extends BaseChunk {
         int minSectionY = this.dimensionData.getMinSectionY();
         int maxSectionY = this.dimensionData.getMaxSectionY();
         this.sections = new LevelDBChunkSection[this.dimensionData.getHeight() >> 4];
-        if (sections != null) {
-            for (int i = minSectionY; i <= maxSectionY; i++) {
-                int sectionsY = i + this.dimensionData.getSectionOffset();
-                if (sectionsY >= sections.length || sections[sectionsY] == null) {
-                    this.sections[sectionsY] = new LevelDBChunkSection(this, sectionsY);
-                } else {
-                    ChunkSection section = sections[sectionsY];
-                    ((LevelDBChunkSection) section).setParent(this);
-                    this.sections[sectionsY] = section;
-                }
-            }
-        } else {
-            for (int i = 0; i < this.sections.length; i++) {
-                this.sections[i] = new LevelDBChunkSection(this, i);
+        for (int i = minSectionY; i <= maxSectionY; i++) {
+            int sectionsY = i + this.dimensionData.getSectionOffset();
+            if (sectionsY >= sections.length || sections[sectionsY] == null) {
+                this.sections[sectionsY] = new LevelDBChunkSection(this, i);
+            } else {
+                ChunkSection section = sections[sectionsY];
+                ((LevelDBChunkSection) section).setParent(this);
+                this.sections[sectionsY] = section;
             }
         }
 

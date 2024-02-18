@@ -269,7 +269,7 @@ public class LevelDBProvider implements LevelProvider {
         long timestamp = chunk.getChanges();
 
         if (this.getServer().asyncChunkSending) {
-            final BaseChunk chunkClone = chunk.fullClone();
+            final BaseChunk chunkClone = chunk.cloneForChunkSending();
             this.level.getAsyncChuckExecutor().execute(() -> {
                 NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
                     getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),

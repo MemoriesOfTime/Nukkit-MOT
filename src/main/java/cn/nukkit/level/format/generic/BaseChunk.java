@@ -42,10 +42,8 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
     }
 
     @Override
-    public BaseChunk fullClone() {
-        BaseChunk chunk = (BaseChunk) super.fullClone();
-        if (this.biomes != null) chunk.biomes = this.biomes.clone();
-        chunk.heightMap = this.getHeightMapArray().clone();
+    public BaseChunk cloneForChunkSending() {
+        BaseChunk chunk = (BaseChunk) super.cloneForChunkSending();
         if (sections != null && sections[0] != null) {
             chunk.sections = new ChunkSection[sections.length];
             for (int i = 0; i < sections.length; i++) {

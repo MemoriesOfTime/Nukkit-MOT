@@ -103,28 +103,12 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return chunk;
     }
 
-    protected BaseFullChunk fullClone() {
+    protected BaseFullChunk cloneForChunkSending() {
         BaseFullChunk chunk;
         try {
             chunk = (BaseFullChunk)super.clone();
         } catch (CloneNotSupportedException e) {
             return null;
-        }
-        if (this.biomes != null) {
-            chunk.biomes = this.biomes.clone();
-        }
-
-        if (this.blocks != null) {
-            chunk.blocks = this.blocks.clone();
-        }
-
-        if (this.heightMap != null) {
-            chunk.heightMap = this.heightMap.clone();
-        }
-
-        if (this.entities != null) {
-            chunk.entities = new Long2ObjectNonBlockingMap<>();
-            chunk.entities.putAll(this.entities);
         }
 
         if (this.tiles != null) {
@@ -132,9 +116,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             chunk.tiles.putAll(this.tiles);
         }
 
+        chunk.entities = null;
         chunk.tileList = null;
         chunk.NBTentities = null;
         chunk.NBTtiles = null;
+        chunk.extraData = null;
         return chunk;
     }
 
