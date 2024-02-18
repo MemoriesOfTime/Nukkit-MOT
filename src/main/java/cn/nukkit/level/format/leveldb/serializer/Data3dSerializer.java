@@ -11,9 +11,6 @@ import io.netty.buffer.Unpooled;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 
-/**
- * @author LT_Name
- */
 public class Data3dSerializer {
 
     public static void serializer(WriteBatch writeBatch, Chunk chunk) {

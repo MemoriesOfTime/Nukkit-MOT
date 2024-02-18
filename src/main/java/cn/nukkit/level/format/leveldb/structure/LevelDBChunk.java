@@ -134,36 +134,43 @@ public class LevelDBChunk extends BaseChunk {
         return null;
     }
 
-    public int getBiomeId(int x, int y, int z) {
-        return this.biomes[index2d(x, z)] & 0xff;
-//        return this.biomes3d[0].get(x, 0, z);
-    }
-
-    public void setBiomeId(int x, int y, int z, byte biomeId) {
-        int index = index2d(x, z);
-        if (this.biomes[index] == biomeId) {
-            return;
-        }
-        this.biomes[index] = biomeId;
-//        this.biomes3d[0].set(x, 0, z, biomeId);
-
-        this.heightmapOrBiomesDirty = true;
-        this.setChanged();
-    }
-
     @Override
     public int getBlockSkyLight(int x, int y, int z) {
-        return this.getHighestBlockAt(x, z) >= y ? 15 : 0;
+        ChunkSection section = this.getSection(y >> 4);
+        if (section instanceof LevelDBChunkSection levelDBChunkSection) {
+            if (levelDBChunkSection.skyLight != null) {
+                return section.getBlockSkyLight(x, y & 0x0f, z);
+            } else if (!levelDBChunkSection.hasSkyLight) {
+                return 0;
+            } else {
+                int height = getHighestBlockAt(x, z);
+                if (height < y) {
+                    return 15;
+                } else if (height == y) {
+                    return Block.transparent[getBlockId(x, y, z)] ? 15 : 0;
+                } else {
+                    return section.getBlockSkyLight(x, y & 0x0f, z);
+                }
+            }
+        } else {
+            return section.getBlockSkyLight(x, y & 0x0f, z);
+        }
     }
 
     @Override
     public int getBlockLight(int x, int y, int z) {
-        return Block.light[this.getBlockId(0, x, y, z)];
-    }
-
-    @Override
-    public void populateSkyLight() {
-        //TODO
+        ChunkSection section = this.getSection(y >> 4);
+        if (section instanceof LevelDBChunkSection levelDBChunkSection) {
+            if (levelDBChunkSection.blockLight != null) {
+                return section.getBlockLight(x, y & 0x0f, z);
+            } else if (!levelDBChunkSection.hasBlockLight) {
+                return 0;
+            } else {
+                return section.getBlockLight(x, y & 0x0f, z);
+            }
+        } else {
+            return section.getBlockLight(x, y & 0x0f, z);
+        }
     }
 
     @Override

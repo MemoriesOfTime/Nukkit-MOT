@@ -6,9 +6,6 @@ import org.cloudburstmc.nbt.NbtMap;
 import org.cloudburstmc.nbt.NbtMapBuilder;
 import org.cloudburstmc.nbt.NbtType;
 
-/**
- * @author LT_Name
- */
 public class CompoundTag2NbtMap {
 
     public static NbtMap compoundTag2NbtMap(CompoundTag compoundTag) {

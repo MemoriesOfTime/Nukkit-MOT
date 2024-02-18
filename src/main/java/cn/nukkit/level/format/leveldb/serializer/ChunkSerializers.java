@@ -7,9 +7,6 @@ import io.netty.util.collection.IntObjectMap;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 
-/**
- * @author LT_Name
- */
 public class ChunkSerializers {
 
     private static final IntObjectMap<ChunkSerializer> serializers = new IntObjectHashMap<>();

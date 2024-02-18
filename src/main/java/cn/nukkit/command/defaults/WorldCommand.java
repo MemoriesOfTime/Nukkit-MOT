@@ -9,11 +9,6 @@ import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.format.leveldb.LevelDBProvider;
-import cn.nukkit.level.generator.Normal;
-
-import java.util.HashMap;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class WorldCommand extends Command {
 
@@ -31,8 +26,6 @@ public class WorldCommand extends Command {
         if (!this.testPermission(sender)) {
             return true;
         }
-
-        Server.getInstance().generateLevel("leveldbtest", ThreadLocalRandom.current().nextInt(), Normal.class, new HashMap<>(), LevelDBProvider.class);
 
         if (args.length == 0) {
             sender.sendMessage(new TranslationContainer("nukkit.command.world.list"));

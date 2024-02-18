@@ -20,9 +20,6 @@ import java.util.List;
 
 import static cn.nukkit.level.format.leveldb.LevelDBKey.ENTITIES;
 
-/**
- * @author LT_Name
- */
 public class EntitySerializer {
 
     public static void serializer(WriteBatch writeBatch, LevelDBChunk chunk) {

@@ -17,9 +17,6 @@ import org.iq80.leveldb.WriteBatch;
 
 import static cn.nukkit.level.format.leveldb.LevelDbConstants.CURRENT_LEVEL_SUBCHUNK_VERSION;
 
-/**
- * @author LT_Name
- */
 public class ChunkSerializerV3 implements ChunkSerializer {
 
     public static final ChunkSerializer INSTANCE = new ChunkSerializerV3();

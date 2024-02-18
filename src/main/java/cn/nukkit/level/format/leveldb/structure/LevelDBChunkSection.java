@@ -3,18 +3,24 @@ package cn.nukkit.level.format.leveldb.structure;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.format.ChunkSection;
-import cn.nukkit.level.format.anvil.util.NibbleArray;
+import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.Utils;
+import cn.nukkit.utils.Zlib;
 import lombok.extern.log4j.Log4j2;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static cn.nukkit.level.format.generic.EmptyChunkSection.*;
+import static cn.nukkit.level.format.generic.EmptyChunkSection.EMPTY_DATA_ARRAY;
+import static cn.nukkit.level.format.generic.EmptyChunkSection.EMPTY_ID_ARRAY;
 
 @Log4j2
 public class LevelDBChunkSection implements ChunkSection {
@@ -23,13 +29,21 @@ public class LevelDBChunkSection implements ChunkSection {
 
     protected final int y;
     protected StateBlockStorage[] storages;
-    protected NibbleArray skyLight; //TODO: lighting
-    protected NibbleArray blockLight; //TODO: lighting
+
+
+    protected byte[] blockLight;
+    protected byte[] skyLight;
+    protected byte[] compressedLight;
+    protected boolean hasBlockLight;
+    protected boolean hasSkyLight;
+
+
     protected boolean dirty;
 
     protected ReadWriteLock lock = new ReentrantReadWriteLock();
     protected Lock readLock = lock.readLock();
     protected Lock writeLock = lock.writeLock();
+    private final ReentrantLock skyLightLock = new ReentrantLock();
 
     public LevelDBChunkSection(int y) {
         this(null, y);
@@ -340,25 +354,80 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int getBlockSkyLight(int x, int y, int z) {
-        //TODO: lighting
-        return this.parent != null && ((this.y << 4) | y) >= this.parent.getHighestBlockAt(x, z) ? 15 : 0;
+        if (this.skyLight == null) {
+            if (!hasSkyLight) {
+                return 0;
+            } else if (compressedLight == null) {
+                return 15;
+            }
+        }
+        this.skyLight = getSkyLightArray();
+        int sl = this.skyLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
+        if ((x & 1) == 0) {
+            return sl & 0x0f;
+        }
+        return sl >> 4;
     }
 
     @Override
     public void setBlockSkyLight(int x, int y, int z, int level) {
-        //TODO: lighting
-
+        this.skyLightLock.lock();
+        try {
+            if (this.skyLight == null) {
+                if (hasSkyLight && compressedLight != null) {
+                    this.skyLight = getSkyLightArray();
+                } else if (level == (hasSkyLight ? 15 : 0)) {
+                    return;
+                } else {
+                    this.skyLight = new byte[2048];
+                    if (hasSkyLight) {
+                        Arrays.fill(this.skyLight, (byte) 0xFF);
+                    }
+                }
+            }
+            int i = (y << 7) | (z << 3) | (x >> 1);
+            int old = this.skyLight[i] & 0xff;
+            if ((x & 1) == 0) {
+                this.skyLight[i] = (byte) ((old & 0xf0) | (level & 0x0f));
+            } else {
+                this.skyLight[i] = (byte) (((level & 0x0f) << 4) | (old & 0x0f));
+            }
+        } finally {
+            this.skyLightLock.unlock();
+        }
     }
 
     @Override
     public int getBlockLight(int x, int y, int z) {
-        //TODO: lighting
-        return Block.light[this.getBlockId(x, y, z, 0)];
+        if (blockLight == null && !hasBlockLight) {
+            return 0;
+        }
+        this.blockLight = getLightArray();
+        int l = blockLight[(y << 7) | (z << 3) | (x >> 1)] & 0xff;
+        if ((x & 1) == 0) {
+            return l & 0x0f;
+        }
+        return l >> 4;
     }
 
     @Override
     public void setBlockLight(int x, int y, int z, int level) {
-        //TODO: lighting
+        if (this.blockLight == null) {
+            if (hasBlockLight) {
+                this.blockLight = getLightArray();
+            } else if (level == 0) {
+                return;
+            } else {
+                this.blockLight = new byte[2048];
+            }
+        }
+        int i = (y << 7) | (z << 3) | (x >> 1);
+        int old = this.blockLight[i] & 0xff;
+        if ((x & 1) == 0) {
+            this.blockLight[i] = (byte) ((old & 0xf0) | (level & 0x0f));
+        } else {
+            this.blockLight[i] = (byte) (((level & 0x0f) << 4) | (old & 0x0f));
+        }
     }
 
     @Deprecated
@@ -411,14 +480,57 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public byte[] getSkyLightArray() {
-        //TODO: lighting
-        return EMPTY_SKY_LIGHT_ARR;
+        if (skyLight != null) {
+            return skyLight.clone();
+        }
+
+        if (!hasSkyLight) {
+            return new byte[EmptyChunkSection.EMPTY_LIGHT_ARR.length];
+        }
+
+        if (compressedLight != null && inflate() && skyLight != null) {
+            return skyLight.clone();
+        }
+
+        return EmptyChunkSection.EMPTY_SKY_LIGHT_ARR.clone();
+    }
+
+    private boolean inflate() {
+        try {
+            if (compressedLight != null && compressedLight.length != 0) {
+                byte[] inflated = Zlib.inflate(compressedLight);
+                blockLight = Arrays.copyOfRange(inflated, 0, 2048);
+                if (inflated.length > 2048) {
+                    skyLight = Arrays.copyOfRange(inflated, 2048, 4096);
+                } else {
+                    skyLight = new byte[2048];
+                    if (hasSkyLight) {
+                        Arrays.fill(skyLight, (byte) 0xFF);
+                    }
+                }
+                compressedLight = null;
+            } else {
+                blockLight = new byte[2048];
+                skyLight = new byte[2048];
+                if (hasSkyLight) {
+                    Arrays.fill(skyLight, (byte) 0xFF);
+                }
+            }
+            return true;
+        } catch (IOException e) {
+            log.error("Failed to decompress a chunk section", e);
+            return false;
+        }
     }
 
     @Override
     public byte[] getLightArray() {
-        //TODO: lighting
-        return EMPTY_LIGHT_ARR;
+        if (this.blockLight != null) return this.blockLight;
+        if (this.hasBlockLight) {
+            this.inflate();
+            if (this.blockLight != null) return this.blockLight;
+        }
+        return EmptyChunkSection.EMPTY_LIGHT_ARR;
     }
 
     @Override
@@ -554,7 +666,44 @@ public class LevelDBChunkSection implements ChunkSection {
                     }
                 }
             }
+
+            if (blockLight != null) {
+                byte[] arr1 = blockLight;
+                hasBlockLight = !Utils.isByteArrayEmpty(arr1);
+                byte[] arr2;
+                this.skyLightLock.lock();
+                try {
+                    if (skyLight != null) {
+                        arr2 = skyLight;
+                        hasSkyLight = !Utils.isByteArrayEmpty(arr2);
+                    } else if (hasSkyLight) {
+                        arr2 = EmptyChunkSection.EMPTY_SKY_LIGHT_ARR;
+                    } else {
+                        arr2 = EmptyChunkSection.EMPTY_LIGHT_ARR;
+                    }
+                    skyLight = null;
+                } finally {
+                    this.skyLightLock.unlock();
+                }
+                blockLight = null;
+                byte[] toDeflate = null;
+                if (hasBlockLight && hasSkyLight && arr2 != EmptyChunkSection.EMPTY_SKY_LIGHT_ARR) {
+                    toDeflate = Binary.appendBytes(arr1, arr2);
+                } else if (hasBlockLight) {
+                    toDeflate = arr1;
+                }
+                if (toDeflate != null) {
+                    try {
+                        compressedLight = Zlib.deflate(toDeflate, 1);
+                        dirty = true;
+                    } catch (Exception e) {
+                        log.error("Error compressing the light data", e);
+                    }
+                }
+            }
+
             this.dirty |= dirty;
+
             return dirty;
         } finally {
             this.writeLock.unlock();

@@ -50,10 +50,6 @@ import static cn.nukkit.level.format.leveldb.LevelDBKey.*;
 import static cn.nukkit.level.format.leveldb.LevelDbConstants.*;
 import static net.daporkchop.ldbjni.LevelDB.PROVIDER;
 
-/**
- * author: MagicDroidX
- * Nukkit Project
- */
 @Log4j2
 public class LevelDBProvider implements LevelProvider {
 

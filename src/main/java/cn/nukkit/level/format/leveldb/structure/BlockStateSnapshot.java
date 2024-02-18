@@ -5,9 +5,6 @@ import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import org.cloudburstmc.nbt.NbtMap;
 
 
-/**
- * @author LT_Name
- */
 public class BlockStateSnapshot {
 
     private final NbtMap vanillaState;
