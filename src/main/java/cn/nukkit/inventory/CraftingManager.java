@@ -820,7 +820,7 @@ public class CraftingManager {
         return this.furnaceRecipesOld;
     }
 
-    public Map<Integer, BlastFurnaceRecipe> getBlastFurnaceRecipes(int protocol) {
+    public Map<Integer, BlastFurnaceRecipe> getBlastFurnaceRecipes() {
         return this.blastFurnaceRecipes;
     }
 
@@ -857,8 +857,8 @@ public class CraftingManager {
         return recipe;
     }
 
-    public FurnaceRecipe matchBlastFurnaceRecipe(int protocol, Item input) {
-        Map<Integer, BlastFurnaceRecipe> recipes = this.getBlastFurnaceRecipes(protocol);
+    public FurnaceRecipe matchBlastFurnaceRecipe(Item input) {
+        Map<Integer, BlastFurnaceRecipe> recipes = this.getBlastFurnaceRecipes();
         if (recipes == null) {
             return null;
         }
@@ -887,20 +887,16 @@ public class CraftingManager {
 
     public void registerFurnaceRecipe(int protocol, FurnaceRecipe recipe) {
         if (recipe instanceof BlastFurnaceRecipe) {
-            this.registerBlastFurnaceRecipe(protocol, (BlastFurnaceRecipe) recipe);
+            this.registerBlastFurnaceRecipe((BlastFurnaceRecipe) recipe);
             return;
         }
         this.getFurnaceRecipes(protocol).put(getItemHash(recipe.getInput()), recipe);
     }
 
     public void registerBlastFurnaceRecipe(BlastFurnaceRecipe recipe) {
-        Server.mvw("CraftingManager#registerBlastFurnaceRecipe()");
-        this.registerBlastFurnaceRecipe(ProtocolInfo.CURRENT_PROTOCOL, recipe);
+        this.getBlastFurnaceRecipes().put(getItemHash(recipe.getInput()), recipe);
     }
 
-    public void registerBlastFurnaceRecipe(int protocol, BlastFurnaceRecipe recipe) {
-        this.getBlastFurnaceRecipes(protocol).put(getItemHash(recipe.getInput()), recipe);
-    }
 
     public void registerCampfireRecipe(CampfireRecipe recipe) {
         Item input = recipe.getInput();
@@ -1003,7 +999,7 @@ public class CraftingManager {
                 this.registerShapelessRecipe(protocol, (ShapelessRecipe) recipe);
             }
         } else if (recipe instanceof BlastFurnaceRecipe blastFurnaceRecipe) {
-            this.registerBlastFurnaceRecipe(protocol, blastFurnaceRecipe);
+            this.registerBlastFurnaceRecipe(blastFurnaceRecipe);
         } else if (recipe instanceof FurnaceRecipe furnaceRecipe) {
             this.registerFurnaceRecipe(protocol, furnaceRecipe);
         }
