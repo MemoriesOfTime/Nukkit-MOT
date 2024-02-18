@@ -403,6 +403,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[DARKOAK_WALL_SIGN] = BlockDarkOakWallSign.class; //448
             list[LECTERN] = BlockLectern.class; //449
 
+            list[BLAST_FURNACE] = BlockBlastFurnace.class; //451
+
             list[SMITHING_TABLE] = BlockSmithingTable.class; //457
             list[BARREL] = BlockBarrel.class; //458
 
@@ -412,6 +414,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[CAMPFIRE_BLOCK] = BlockCampfire.class; //464
             list[WOOD_BARK] = BlockWoodBark.class; //467
             list[COMPOSTER] = BlockComposter.class; //468
+            list[LIT_BLAST_FURNACE] = BlockBlastFurnaceLit.class; //469
 
             list[PISTON_HEAD_STICKY] = BlockPistonHeadSticky.class; //472
 
