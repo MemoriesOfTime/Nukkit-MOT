@@ -77,6 +77,7 @@ public class ChunkSerializerV3 implements ChunkSerializer {
                     stateBlockStorageArray[1] = new StateBlockStorage();
                 }
 
+                //TODO 解析extraBlocks
                 /*if (extraBlocks != null) {
                     for (int i3 = 0; i3 < 16; ++i3) {
                         for (int i4 = 0; i4 < 16; ++i4) {

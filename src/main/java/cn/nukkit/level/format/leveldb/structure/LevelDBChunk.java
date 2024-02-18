@@ -6,6 +6,7 @@ import cn.nukkit.level.DimensionEnum;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseChunk;
+import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.tag.CompoundTag;
 import org.jetbrains.annotations.NotNull;
@@ -130,8 +131,22 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     public PalettedBlockStorage getBiomeStorage(int y) {
-        //TODO
-        return null;
+        int index = y + this.dimensionData.getSectionOffset();
+        if (index >= this.biomes3d.length) {
+            index = 0;
+        }
+        if (this.biomes3d[index] == null) {
+            for (int i = index; i >= 0; i--) {
+                if (this.biomes3d[i] != null) {
+                    this.biomes3d[index] = this.biomes3d[i].copy();
+                    break;
+                }
+            }
+            if (this.biomes3d[index] == null) {
+                this.biomes3d[index] = PalettedBlockStorage.createWithDefaultState(BitArrayVersion.V0, 0);
+            }
+        }
+        return this.biomes3d[index];
     }
 
     @Override
