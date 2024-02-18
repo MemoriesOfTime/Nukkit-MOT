@@ -1040,7 +1040,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                     if (meta.isPresent()) {
                         item.setDamage(meta.getAsInt());
                     }
-                    return item;
+                    // Avoid the upcoming changes to the original item object
+                    return item.clone();
                 } catch (Exception e) {
                     log.warn("Could not create a new instance of {} using the namespaced id {}", constructor, namespacedId, e);
                 }
