@@ -41,7 +41,7 @@ public class BlockStateSnapshot {
     }
 
     public int getLegacyId() {
-        if (this.legacyId == -1) {
+        if (this.legacyId != -1) {
             return this.legacyId;
         }
 

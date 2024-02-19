@@ -193,7 +193,7 @@ public class StateBlockStorage {
         return this.palette.indexOf(id);
     }
 
-    public void writeToDisk(ByteBuf byteBuf) {
+    public void writeToStorage(ByteBuf byteBuf) {
         int paletteSize = this.palette.size();
         BitArrayVersion version = paletteSize <= 1 ? BitArrayVersion.V0 : bitArray.getVersion();
         byteBuf.writeByte(getPaletteHeader(version, false));
@@ -355,7 +355,7 @@ public class StateBlockStorage {
         return new StateBlockStorage(this.bitArray.copy(), new ObjectArrayList<>(this.palette));
     }
 
-    protected static int elementIndex(int x, int y, int z) {
+    public static int elementIndex(int x, int y, int z) {
         int index = (x << 8) | (z << 4) | y;
         if (index < 0 || index >= SUB_CHUNK_SIZE) {
             throw new IllegalArgumentException("Invalid index: " + x + ", " + y + ", " + z );

@@ -1,38 +1,36 @@
 package cn.nukkit.level.format.leveldb.serializer;
 
 import cn.nukkit.level.DimensionData;
-import cn.nukkit.level.format.Chunk;
 import cn.nukkit.level.format.leveldb.LevelDBKey;
 import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
+import cn.nukkit.level.format.leveldb.structure.LevelDBChunk;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
+import cn.nukkit.utils.Utils;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 
 public class Data3dSerializer {
 
-    public static void serializer(WriteBatch writeBatch, Chunk chunk) {
-        //TODO
-        /*DimensionData dimensionData = levelDBChunk.getProvider().getLevel().getDimensionData();
+    public static void serializer(WriteBatch writeBatch, LevelDBChunk chunk) {
+        DimensionData dimensionData = chunk.getProvider().getLevel().getDimensionData();
         ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
         try {
-            byte[] byArray;
-            for (byte by : byArray = levelDBChunk.getHeightMapArray()) {
-                byteBuf.writeShortLE(by);
+            byte[] bytes;
+            for (byte b : bytes = chunk.getHeightMapArray()) {
+                byteBuf.writeShortLE(b);
             }
             for (int i2 = 0; i2 < dimensionData.getHeight() >> 4; ++i2) {
-                PalettedBlockStorage palettedBlockStorage = levelDBChunk.getBiomeStorage(i2);
+                PalettedBlockStorage palettedBlockStorage = chunk.getBiomeStorage(i2);
                 palettedBlockStorage.writeToStorage(byteBuf);
             }
-            byte[] byArray2 = new byte[byteBuf.readableBytes()];
-            byteBuf.readBytes(byArray2);
-            writeBatch.put(LevelDBKey.DATA_3D.a(levelDBChunk.getX(), levelDBChunk.getZ(), levelDBChunk.getProvider().getLevel().getDimension()), byArray2);
-        }
-        finally {
+            writeBatch.put(LevelDBKey.DATA_3D.getKey(chunk.getX(), chunk.getZ(), dimensionData), Utils.convertByteBuf2Array(byteBuf));
+        } finally {
             byteBuf.release();
-        }*/
+        }
     }
 
     public static void deserialize(DB db, ChunkBuilder chunkBuilder) {

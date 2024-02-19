@@ -79,12 +79,14 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_19_80.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_20_0.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_20_10.INSTANCE);
-        //TODO
+
         //blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
+
         if (Boolean.parseBoolean(System.getProperty("Dleveldb-chunker"))) {
             blockStateUpdaters.add(BlockStateUpdaterChunker.INSTANCE);
             log.warn("Enabled chunker.app LevelDB updater. This may impact chunk loading performance!");
         }
+
         CompoundTagUpdaterContext context = new CompoundTagUpdaterContext();
         blockStateUpdaters.forEach(updater -> updater.registerUpdaters(context));
         CONTEXT = context;

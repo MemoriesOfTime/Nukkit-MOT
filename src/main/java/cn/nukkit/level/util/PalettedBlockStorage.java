@@ -5,9 +5,9 @@ import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
-import it.unimi.dsi.fastutil.ints.Int2IntFunction;
 import cn.nukkit.utils.ChunkException;
 import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.ints.Int2IntFunction;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 
@@ -115,6 +115,23 @@ public class PalettedBlockStorage {
             if (runtimeId < 0) {
                 Server.getInstance().getLogger().warning("Invalid block runtime ID: " + runtimeId + ", palette: " + palette);
             }
+        }
+    }
+
+    public void writeToStorage(ByteBuf byteBuf) {
+        int paletteSize = this.palette.size();
+        BitArrayVersion version = paletteSize <= 1 ? BitArrayVersion.V0 : this.bitArray.getVersion();
+        byteBuf.writeByte(this.getPaletteHeader(version, false));
+
+        if (version != BitArrayVersion.V0) {
+            for (int i : this.bitArray.getWords()) {
+                byteBuf.writeIntLE(i);
+            }
+            byteBuf.writeIntLE(paletteSize);
+        }
+
+        for (int id : this.palette) {
+            byteBuf.writeIntLE(id);
         }
     }
 
