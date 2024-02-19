@@ -662,7 +662,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 if (storage == null) {
                     continue;
                 }
-                //dirty |= storage.compress();
+                dirty |= storage.compress();
 
                 if (checkRemove) {
                     if (storage.isEmpty() && i > 0) {

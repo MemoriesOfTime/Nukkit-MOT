@@ -19,7 +19,7 @@ public class Data2dSerializer {
             byteBuf.writeShortLE(b);
         }
         byteBuf.writeBytes(biomeIdArray);
-        writeBatch.put(LevelDBKey.DATA_2D.getKey(levelDBChunk.getX(), levelDBChunk.getZ(), levelDBChunk.getProvider().getLevel().getDimension()), byArray);
+        writeBatch.put(LevelDBKey.DATA_2D.getKey(levelDBChunk.getX(), levelDBChunk.getZ(), levelDBChunk.getProvider().getLevel().getDimensionData()), byArray);
     }
 
     public static void deserialize(DB dB, ChunkBuilder chunkBuilder) {

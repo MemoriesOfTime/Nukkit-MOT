@@ -1,6 +1,7 @@
 package cn.nukkit.level.format.leveldb.structure;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
@@ -32,7 +33,7 @@ public class StateBlockStorage {
 
     private static final int SIZE = 16 * 16 * 16;
 
-    private final List<BlockStateSnapshot> palette;
+    private List<BlockStateSnapshot> palette;
     private BitArray bitArray;
 
     public StateBlockStorage() {
@@ -292,6 +293,7 @@ public class StateBlockStorage {
 
     /**
      * @return dirty
+     */
     public boolean compress() {
         if (this.palette.isEmpty()) {
             return false;
@@ -349,7 +351,7 @@ public class StateBlockStorage {
         this.bitArray = newArray;
         this.palette = newPalette;
         return true;
-    }*/
+    }
 
     public StateBlockStorage copy() {
         return new StateBlockStorage(this.bitArray.copy(), new ObjectArrayList<>(this.palette));

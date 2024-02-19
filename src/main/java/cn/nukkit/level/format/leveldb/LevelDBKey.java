@@ -2,7 +2,6 @@ package cn.nukkit.level.format.leveldb;
 
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.DimensionEnum;
-import cn.nukkit.level.Level;
 
 public enum LevelDBKey {
     DATA_3D('+'),
@@ -47,33 +46,36 @@ public enum LevelDBKey {
                 (byte) ((chunkZ >>> 8) & 0xff),
                 (byte) ((chunkZ >>> 16) & 0xff),
                 (byte) ((chunkZ >>> 24) & 0xff),
-                this.encoded,
+                this.encoded
         };
     }
 
     public byte[] getKey(int chunkX, int chunkZ, DimensionData dimension) {
-        return getKey(chunkX, chunkZ, dimension.getDimensionId());
-    }
-
-    public byte[] getKey(int chunkX, int chunkZ, int dimension) {
-        if (dimension == Level.DIMENSION_OVERWORLD) {
+        if (dimension.equals(DimensionEnum.OVERWORLD.getDimensionData())) {
             return getKey(chunkX, chunkZ);
+        } else {
+            byte dimensionId = (byte) dimension.getDimensionId();
+            return new byte[]{
+                    (byte) (chunkX & 0xff),
+                    (byte) ((chunkX >>> 8) & 0xff),
+                    (byte) ((chunkX >>> 16) & 0xff),
+                    (byte) ((chunkX >>> 24) & 0xff),
+                    (byte) (chunkZ & 0xff),
+                    (byte) ((chunkZ >>> 8) & 0xff),
+                    (byte) ((chunkZ >>> 16) & 0xff),
+                    (byte) ((chunkZ >>> 24) & 0xff),
+                    (byte) (dimensionId & 0xff),
+                    (byte) ((dimensionId >>> 8) & 0xff),
+                    (byte) ((dimensionId >>> 16) & 0xff),
+                    (byte) ((dimensionId >>> 24) & 0xff),
+                    this.encoded
+            };
         }
-        return new byte[]{
-                (byte) (chunkX & 0xff),
-                (byte) ((chunkX >>> 8) & 0xff),
-                (byte) ((chunkX >>> 16) & 0xff),
-                (byte) ((chunkX >>> 24) & 0xff),
-                (byte) (chunkZ & 0xff),
-                (byte) ((chunkZ >>> 8) & 0xff),
-                (byte) ((chunkZ >>> 16) & 0xff),
-                (byte) ((chunkZ >>> 24) & 0xff),
-                (byte) (dimension & 0xff),
-                this.encoded,
-        };
     }
 
-    public byte[] getSubKey(int chunkX, int chunkZ, int chunkY) {
+    public byte[] getKey(int chunkX, int chunkZ, int chunkSectionY) {
+        if (this.encoded != CHUNK_SECTION_PREFIX.encoded)
+            throw new IllegalArgumentException("The method must be used with CHUNK_SECTION_PREFIX!");
         return new byte[]{
                 (byte) (chunkX & 0xff),
                 (byte) ((chunkX >>> 8) & 0xff),
@@ -84,26 +86,7 @@ public enum LevelDBKey {
                 (byte) ((chunkZ >>> 16) & 0xff),
                 (byte) ((chunkZ >>> 24) & 0xff),
                 this.encoded,
-                (byte) (chunkY & 0xff),
-        };
-    }
-
-    public byte[] getSubKey(int chunkX, int chunkZ, int dimension, int chunkY) {
-        if (dimension == Level.DIMENSION_OVERWORLD) {
-            return getSubKey(chunkX, chunkZ, chunkY);
-        }
-        return new byte[]{
-                (byte) (chunkX & 0xff),
-                (byte) ((chunkX >>> 8) & 0xff),
-                (byte) ((chunkX >>> 16) & 0xff),
-                (byte) ((chunkX >>> 24) & 0xff),
-                (byte) (chunkZ & 0xff),
-                (byte) ((chunkZ >>> 8) & 0xff),
-                (byte) ((chunkZ >>> 16) & 0xff),
-                (byte) ((chunkZ >>> 24) & 0xff),
-                (byte) (dimension & 0xff),
-                this.encoded,
-                (byte) (chunkY & 0xff),
+                (byte) chunkSectionY
         };
     }
 

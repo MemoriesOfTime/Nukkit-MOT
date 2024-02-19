@@ -419,9 +419,9 @@ public class LevelDBProvider implements LevelProvider {
 
     @Nullable
     public LevelDBChunk readChunk(int chunkX, int chunkZ) {
-        byte[] versionData = this.db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimension()));
+        byte[] versionData = this.db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimensionData()));
         if (versionData == null || versionData.length != 1) {
-            versionData = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimension()));
+            versionData = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimensionData()));
             if (versionData == null || versionData.length != 1) {
                 return null;
             }
@@ -429,7 +429,7 @@ public class LevelDBProvider implements LevelProvider {
 
         ChunkBuilder chunkBuilder = new ChunkBuilder(chunkX, chunkZ, this);
 
-        byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimension()));
+        byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData()));
         if (finalized == null) {
             chunkBuilder.state(ChunkState.FINISHED);
         } else {
@@ -508,7 +508,7 @@ public class LevelDBProvider implements LevelProvider {
         chunk.setChanged(false);
 
         try (WriteBatch writeBatch = this.db.createWriteBatch()) {
-            writeBatch.put(VERSION.getKey(chunkX, chunkZ, this.getLevel().getDimension()), CHUNK_VERSION_SAVE_DATA);
+            writeBatch.put(VERSION.getKey(chunkX, chunkZ, this.getLevel().getDimensionData()), CHUNK_VERSION_SAVE_DATA);
 
             chunk.ioLock.lock();
 
@@ -524,7 +524,7 @@ public class LevelDBProvider implements LevelProvider {
                 }
             }
 
-            writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimension()), chunk.isPopulated() ? FINALISATION_DONE_SAVE_DATA
+            writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData()), chunk.isPopulated() ? FINALISATION_DONE_SAVE_DATA
                     : chunk.isGenerated() ? FINALISATION_POPULATION_SAVE_DATA : FINALISATION_GENERATION_SAVE_DATA);
 
             BlockEntitySerializer.serializer(writeBatch, chunk);

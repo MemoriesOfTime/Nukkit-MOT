@@ -36,8 +36,8 @@ public class ChunkSerializerV3 implements ChunkSerializer {
                 byteBuf.writeByte(CURRENT_LEVEL_SUBCHUNK_VERSION);
                 ChunkSectionSerializers.serializer(byteBuf, section.getStorages(), ySection, CURRENT_LEVEL_SUBCHUNK_VERSION);
                 writeBatch.put(
-                        LevelDBKey.CHUNK_SECTION_PREFIX.getSubKey(
-                                chunk.getX(), chunk.getZ(), ySection, chunk.getProvider().getLevel().getDimension()
+                        LevelDBKey.CHUNK_SECTION_PREFIX.getKey(
+                                chunk.getX(), chunk.getZ(), ySection, dimensionData
                         ), Utils.convertByteBuf2Array(byteBuf));
             } finally {
                 byteBuf.release();
