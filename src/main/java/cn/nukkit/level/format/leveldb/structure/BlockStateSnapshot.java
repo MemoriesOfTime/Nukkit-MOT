@@ -80,8 +80,10 @@ public class BlockStateSnapshot {
         private int runtimeId;
         private int version;
         private boolean custom;
-        private int legacyId;
-        private int legacyData;
+        private int legacyId = -1;
+        private boolean hasLegacyId = false;
+        private int legacyData = -1;
+        private boolean hasLegacyData = false;
 
         public BlockStateSnapshotBuilder() {
         }
@@ -108,16 +110,26 @@ public class BlockStateSnapshot {
 
         public BlockStateSnapshotBuilder legacyId(int legacyId) {
             this.legacyId = legacyId;
+            this.hasLegacyId = true;
             return this;
         }
 
         public BlockStateSnapshotBuilder legacyData(int legacyData) {
             this.legacyData = legacyData;
+            this.hasLegacyData = true;
             return this;
         }
 
         public BlockStateSnapshot build() {
-            return new BlockStateSnapshot(this.vanillaState, this.runtimeId, this.version, this.custom, this.legacyId, this.legacyData);
+            int lId = this.legacyId;
+            if (!hasLegacyId) {
+                lId = -1;
+            }
+            int lData = this.legacyData;
+            if (!hasLegacyData) {
+                lData = -1;
+            }
+            return new BlockStateSnapshot(this.vanillaState, this.runtimeId, this.version, this.custom, lId, lData);
         }
     }
 }

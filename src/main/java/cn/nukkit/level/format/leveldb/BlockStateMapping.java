@@ -3,6 +3,7 @@ package cn.nukkit.level.format.leveldb;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterChunker;
+import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterVanilla;
 import com.nukkitx.network.util.Preconditions;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -80,7 +81,7 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_20_0.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_20_10.INSTANCE);
 
-        //blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
 
         if (Boolean.parseBoolean(System.getProperty("Dleveldb-chunker"))) {
             blockStateUpdaters.add(BlockStateUpdaterChunker.INSTANCE);

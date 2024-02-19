@@ -2,6 +2,7 @@ package cn.nukkit.level.format.leveldb.serializer;
 
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.format.Chunk;
+import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.format.leveldb.LevelDBKey;
 import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
 import cn.nukkit.level.format.leveldb.structure.LevelDBChunkSection;
