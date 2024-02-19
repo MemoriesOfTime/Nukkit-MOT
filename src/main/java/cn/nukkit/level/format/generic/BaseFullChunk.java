@@ -265,10 +265,6 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     @Override
-    public void setBiomeIdAndColor(int x, int z, int idAndColor) {
-    }
-
-    @Override
     public void setBiomeColor(int x, int z, int r, int g, int b) {
     }
 

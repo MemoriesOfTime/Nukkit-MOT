@@ -67,6 +67,18 @@ public class PalettedBlockStorage {
         return (x << 8) | (z << 4) | y;
     }
 
+    public int getBlock(int index) {
+        return this.palette.getInt(this.bitArray.get(index));
+    }
+
+    public int getBlock(int x, int y, int z) {
+        return this.getBlock(getIndex(x, y, z));
+    }
+
+    public int getBlock(BlockVector3 pos) {
+        return this.getBlock(getIndex(pos.x, pos.y, pos.z));
+    }
+
     public void setBlock(int x, int y, int z, int runtimeId) {
         this.setBlock(this.getIndex(x, y, z), runtimeId);
     }

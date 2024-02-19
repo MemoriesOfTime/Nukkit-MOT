@@ -3,6 +3,7 @@ package cn.nukkit.level.format.leveldb.structure;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.DimensionEnum;
+import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseChunk;
@@ -130,6 +131,7 @@ public class LevelDBChunk extends BaseChunk {
         return this.biomes3d != null && this.biomes3d.length > 0;
     }
 
+    @Override
     public PalettedBlockStorage getBiomeStorage(int y) {
         int index = y + this.dimensionData.getSectionOffset();
         if (index >= this.biomes3d.length) {
@@ -147,6 +149,79 @@ public class LevelDBChunk extends BaseChunk {
             }
         }
         return this.biomes3d[index];
+    }
+
+    @Override
+    public int getBiomeId(int x, int y, int z) {
+        if (this.has3dBiomes()) {
+            return this.getBiomeStorage(y >> 4).getBlock(x, y & 0xf, z);
+        }
+        return super.getBiomeId(x, z);
+    }
+
+    @Override
+    public int getBiomeId(int x, int z) {
+        return this.getBiomeId(x, 0, z);
+    }
+
+    @Override
+    public void setBiomeId(int x, int y, int z, int biomeId) {
+        if (!this.has3dBiomes()) {
+            this.convert2DBiomesTo3D(this.biomes);
+        }
+        this.getBiomeStorage(y >> 4).setBlock(x, y & 0xf, z, biomeId);
+        this.setChanged();
+    }
+
+    @Override
+    public void setBiomeId(int x, int z, int biomeId)  {
+        for (int sectionIndex = 0; sectionIndex < this.sections.length; sectionIndex++) {
+            int sectionStartY = (sectionIndex - this.getSectionOffset()) << 4;
+            for (int y = 0; y < 16; y++) {
+                this.setBiomeId(x, sectionStartY + y, z, biomeId);
+            }
+        }
+    }
+
+    @Override
+    public void setBiomeId(int x, int y, int z, byte biomeId) {
+        this.setBiomeId(x, y, z, biomeId & 0xff);
+    }
+
+    @Override
+    public void setBiomeId(int x, int z, byte biomeId) {
+        this.setBiomeId(x, z, biomeId & 0xff);
+    }
+
+    @Override
+    public void setBiome(int x, int y, int z, cn.nukkit.level.biome.Biome biome) {
+        this.setBiomeId(x, y, z, biome.getId());
+    }
+
+    @Override
+    public void setBiome(int x, int z, cn.nukkit.level.biome.Biome biome) {
+        setBiomeId(x, z, biome.getId());
+    }
+
+    protected void convert2DBiomesTo3D(byte[] biomes) {
+        PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createWithDefaultState(BitArrayVersion.V0, Biome.getBiomeIdOrCorrect(biomes[0] & 0xFF));
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                int biome = biomes[x << 4 | z] & 0xFF;
+                for (int y = 0; y < 16; y++) {
+                    palettedBlockStorage.setBlock(x, y, z, biome);
+                }
+            }
+        }
+
+        int sectionCount = this.provider == null ? this.sections.length : this.provider.getLevel().getDimensionData().getHeight() >> 4;
+        PalettedBlockStorage[] storages = new PalettedBlockStorage[sectionCount];
+        for (int i = 0; i < sectionCount; i++) {
+            storages[i] = palettedBlockStorage.copy();
+        }
+
+        this.biomes3d = storages;
+        this.setChanged();
     }
 
     @Override

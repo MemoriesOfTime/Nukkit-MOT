@@ -76,9 +76,7 @@ public class NetworkChunkSerializer {
             byte[] biomePalettes = null;
             int writtenSections = protocolSubChunkCount;
             if (protocolId >= ProtocolInfo.v1_18_0) {
-                // In 1.18 3D biome palettes were introduced. However, current world format
-                // used internally doesn't support them, so we need to convert from legacy 2D
-                biomePalettes = convert2DBiomesTo3D(protocolId, chunk, maxDimensionSections);
+                biomePalettes = getBiomePalettes(chunk, protocolId, maxDimensionSections);
 
                 stream = ThreadCache.binaryStream.get().reset();
 
@@ -122,6 +120,21 @@ public class NetworkChunkSerializer {
         }
     }
 
+    private static byte[] getBiomePalettes(BaseChunk chunk, int protocolId, int maxDimensionSections) {
+        if (chunk.has3dBiomes()) {
+            BinaryStream binaryStream = ThreadCache.binaryStream.get().reset();
+            for (int y = 0; y < maxDimensionSections; y++) {
+                PalettedBlockStorage storage = chunk.getBiomeStorage(y);
+                storage.writeTo(binaryStream, id -> Biome.getBiomeIdOrCorrect(protocolId, id));
+            }
+            return binaryStream.getBuffer();
+        } else {
+            // In 1.18 3D biome palettes were introduced. However, current world format
+            // used internally doesn't support them, so we need to convert from legacy 2D
+            return convert2DBiomesTo3D(protocolId, chunk, maxDimensionSections);
+        }
+    }
+
     private static byte[] serializeEntities(BaseChunk chunk, int protocol) {
         List<CompoundTag> tagList = new ObjectArrayList<>();
         for (BlockEntity blockEntity : chunk.getBlockEntities().values()) {
@@ -148,7 +161,7 @@ public class NetworkChunkSerializer {
         }
 
         BinaryStream stream = ThreadCache.binaryStream.get().reset();
-        palette.writeTo(stream, Biome::getBiomeIdOrCorrect);
+        palette.writeTo(stream, id -> Biome.getBiomeIdOrCorrect(protocolId, id));
         byte[] bytes = stream.getBuffer();
         stream.reset();
 
