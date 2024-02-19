@@ -7,10 +7,12 @@ import org.cloudburstmc.blockstateupdater.util.tagupdater.CompoundTagUpdaterCont
 
 import static cn.nukkit.level.format.leveldb.LevelDbConstants.*;
 
+/**
+ * This is updater for worlds converted using chunker.app
+ */
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class BlockStateUpdaterChunker implements BlockStateUpdater {
 
-    // This is updater for worlds converted using chunker.app
     public static final BlockStateUpdater INSTANCE = new BlockStateUpdaterChunker();
 
     @Override
