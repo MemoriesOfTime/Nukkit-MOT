@@ -44,8 +44,8 @@ public class Chunk extends BaseChunk {
     }
 
     @Override
-    public Chunk fullClone() {
-        return (Chunk) super.fullClone();
+    public Chunk cloneForChunkSending() {
+        return (Chunk) super.cloneForChunkSending();
     }
 
     public Chunk(LevelProvider level) {

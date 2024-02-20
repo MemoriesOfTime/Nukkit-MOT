@@ -20,4 +20,16 @@ public class DimensionData {
         }
         this.height = height;
     }
+
+    public int getSectionOffset() {
+        return -this.getMinSectionY();
+    }
+
+    public int getMinSectionY() {
+        return this.minHeight >> 4;
+    }
+
+    public int getMaxSectionY() {
+        return this.maxHeight >> 4;
+    }
 }

@@ -1,9 +1,12 @@
 package cn.nukkit.level.util;
 
+import cn.nukkit.Server;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.ChunkException;
+import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.Int2IntFunction;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -53,11 +56,27 @@ public class PalettedBlockStorage {
     }
 
     protected int getPaletteHeader(BitArrayVersion version) {
-        return (version.getId() << 1) | 1;
+        return getPaletteHeader(version, true);
+    }
+
+    protected int getPaletteHeader(BitArrayVersion version, boolean runtime) {
+        return (version.getId() << 1) | (runtime ? 1 : 0);
     }
 
     protected int getIndex(int x, int y, int z) {
         return (x << 8) | (z << 4) | y;
+    }
+
+    public int getBlock(int index) {
+        return this.palette.getInt(this.bitArray.get(index));
+    }
+
+    public int getBlock(int x, int y, int z) {
+        return this.getBlock(getIndex(x, y, z));
+    }
+
+    public int getBlock(BlockVector3 pos) {
+        return this.getBlock(getIndex(pos.x, pos.y, pos.z));
     }
 
     public void setBlock(int x, int y, int z, int runtimeId) {
@@ -75,6 +94,57 @@ public class PalettedBlockStorage {
 
     public void setBlock(BlockVector3 pos, int value) {
         this.setBlock(getIndex(pos.x, pos.y, pos.z), value);
+    }
+
+    public void readFromStorage(ByteBuf byteBuf) {
+        short header = byteBuf.readUnsignedByte();
+
+        BitArrayVersion version  = BitArrayVersion.get(header >> 1, true);
+
+        this.palette.clear();
+
+        int paletteSize = 1;
+        if (version == BitArrayVersion.V0) {
+            this.bitArray = version.createPalette(SIZE, null);
+        } else {
+            int expectedWordSize = version.getWordsForSize(SIZE);
+            int[] words = new int[expectedWordSize];
+            int i2 = 0;
+            for (int i = 0; i < expectedWordSize; ++i) {
+                words[i] = byteBuf.readIntLE();
+            }
+            this.bitArray = version.createPalette(SIZE, words);
+            paletteSize = byteBuf.readIntLE();
+        }
+
+        if (version.getMaxEntryValue() < paletteSize - 1) {
+            throw new ChunkException("Invalid paletteSize size: " + paletteSize + ", max: " + version.getMaxEntryValue());
+        }
+
+        for (int i = 0; i < paletteSize; i++) {
+            int runtimeId = byteBuf.readIntLE();
+            this.palette.add(runtimeId);
+            if (runtimeId < 0) {
+                Server.getInstance().getLogger().warning("Invalid runtimeId: " + runtimeId + ", palette: " + palette);
+            }
+        }
+    }
+
+    public void writeToStorage(ByteBuf byteBuf) {
+        int paletteSize = this.palette.size();
+        BitArrayVersion version = paletteSize <= 1 ? BitArrayVersion.V0 : this.bitArray.getVersion();
+        byteBuf.writeByte(this.getPaletteHeader(version, false));
+
+        if (version != BitArrayVersion.V0) {
+            for (int i : this.bitArray.getWords()) {
+                byteBuf.writeIntLE(i);
+            }
+            byteBuf.writeIntLE(paletteSize);
+        }
+
+        for (int id : this.palette) {
+            byteBuf.writeIntLE(id);
+        }
     }
 
     public void writeTo(BinaryStream stream) {

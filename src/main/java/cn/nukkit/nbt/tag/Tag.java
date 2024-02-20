@@ -35,6 +35,10 @@ public abstract class Tag {
 
     public abstract byte getId();
 
+    protected Tag() {
+
+    }
+
     protected Tag(String name) {
         if (name == null) {
             this.name = "";
