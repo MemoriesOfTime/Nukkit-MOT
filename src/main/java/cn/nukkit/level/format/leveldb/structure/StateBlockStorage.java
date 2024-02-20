@@ -269,9 +269,9 @@ public class StateBlockStorage {
             BitArrayVersion next = version.next();
             if (next != null) {
                 this.grow(next);
-            }/* else if (!this.compress()) {
+            } else if (!this.compress()) {
                 throw new IndexOutOfBoundsException("too many elements");
-            }*/
+            }
         }
         this.palette.add(snapshot);
         return index;

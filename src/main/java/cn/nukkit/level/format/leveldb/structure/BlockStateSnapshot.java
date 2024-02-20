@@ -65,10 +65,10 @@ public class BlockStateSnapshot {
     }
 
     public Block getBlock() {
-        if (block == null) {
-            return Block.get(this.getLegacyId(), this.getLegacyData());
+        if (this.block == null) {
+            this.block = Block.get(this.getLegacyId(), this.getLegacyData());
         }
-        return block;
+        return this.block;
     }
 
     public static BlockStateSnapshotBuilder builder() {

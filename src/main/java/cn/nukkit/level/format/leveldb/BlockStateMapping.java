@@ -152,7 +152,7 @@ public class BlockStateMapping {
     }
 
     public BlockStateSnapshot getBlockStateFromRuntimeId(int runtimeId) {
-        BlockStateSnapshot blockStateSnapshot = (BlockStateSnapshot)this.runtimeIdToSnapshot.get(runtimeId);
+        BlockStateSnapshot blockStateSnapshot = this.runtimeIdToSnapshot.get(runtimeId);
         if (blockStateSnapshot == null) {
             log.warn("Unknown runtime ID: " + runtimeId);
             return this.getUnknownBlockState();
