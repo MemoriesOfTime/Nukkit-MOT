@@ -11,7 +11,6 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.format.leveldb.serializer.*;
 import cn.nukkit.level.format.leveldb.structure.*;
-import cn.nukkit.level.format.leveldb.updater.CompoundTag2NbtMap;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
@@ -20,10 +19,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.*;
 import com.google.common.collect.ImmutableMap;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufOutputStream;
-import io.netty.buffer.Unpooled;
+import io.netty.buffer.*;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -969,36 +965,35 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     protected void loadBlockTickingQueue(byte[] data, boolean tickingQueueTypeIsRandom) {
-        CompoundTag ticks;
+        NbtMap ticks;
         try {
-            ticks = NBTIO.read(data, ByteOrder.LITTLE_ENDIAN);
+            ticks = (NbtMap) NbtUtils.createReaderLE(new ByteBufInputStream(Unpooled.wrappedBuffer(data))).readTag();
         } catch (IOException e) {
             throw new ChunkException("Corrupted block ticking data", e);
         }
 
         int currentTick = ticks.getInt("currentTick");
-        for (CompoundTag entry : ticks.getList("tickList", CompoundTag.class).getAllUnsafe()) {
+        for (NbtMap blockState : ticks.getList("tickList", NbtType.COMPOUND)) {
             Block block = null;
 
-            CompoundTag blockState = entry;
-            if (blockState.contains("name")) {
-                BlockStateSnapshot snapshot = BlockStateMapping.get().getBlockState(CompoundTag2NbtMap.compoundTag2NbtMap(blockState));
+            if (blockState.containsKey("name")) {
+                BlockStateSnapshot snapshot = BlockStateMapping.get().getBlockState(blockState);
                 block = snapshot.getBlock();
-            } else if (entry.contains("tileID")) {
-                block = Block.get(entry.getByte("tileID") & 0xff);
+            } else if (blockState.containsKey("tileID")) {
+                block = Block.get(blockState.getByte("tileID") & 0xff);
             }
 
             if (block == null) {
-                log.debug("Unavailable block ticking entry skipped: {}", entry);
+                log.debug("Unavailable block ticking entry skipped: {}", blockState);
                 continue;
             }
-            block.x = entry.getInt("x");
-            block.y = entry.getInt("y");
-            block.z = entry.getInt("z");
+            block.x = blockState.getInt("x");
+            block.y = blockState.getInt("y");
+            block.z = blockState.getInt("z");
             block.level = level;
 
-            int delay = (int) (entry.getLong("time") - currentTick);
-            int priority = entry.getInt("p"); // Nukkit only
+            int delay = (int) (blockState.getLong("time") - currentTick);
+            int priority = blockState.getInt("p"); // Nukkit only
 
             if (!tickingQueueTypeIsRandom) {
                 level.scheduleUpdate(block, block, delay, priority, false);
