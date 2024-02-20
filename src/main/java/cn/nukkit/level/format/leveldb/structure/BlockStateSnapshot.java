@@ -77,7 +77,7 @@ public class BlockStateSnapshot {
 
     public static class BlockStateSnapshotBuilder {
         private NbtMap vanillaState;
-        private int runtimeId;
+        private int runtimeId = -1;
         private int version;
         private boolean custom;
         private int legacyId = -1;
@@ -121,6 +121,12 @@ public class BlockStateSnapshot {
         }
 
         public BlockStateSnapshot build() {
+            if (this.vanillaState == null) {
+                throw new IllegalStateException("vanillaState is not set");
+            }
+            if (this.runtimeId == -1) {
+                throw new IllegalStateException("runtimeId is not set");
+            }
             int lId = this.legacyId;
             if (!hasLegacyId) {
                 lId = -1;
