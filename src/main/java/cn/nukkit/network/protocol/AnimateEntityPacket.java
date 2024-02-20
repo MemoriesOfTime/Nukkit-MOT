@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -62,5 +63,42 @@ public class AnimateEntityPacket extends DataPacket {
     public void setEntityRuntimeIds(List<Long> entityRuntimeIds) {
         this.entityRuntimeIds.clear();
         this.entityRuntimeIds.addAll(entityRuntimeIds);
+    }
+
+    /**
+     * 从 {@link Animation} 对象中解析数据并写入到包
+     */
+    public void parseFromAnimation(Animation ani) {
+        this.animation = ani.animation;
+        this.nextState = ani.nextState;
+        this.blendOutTime = ani.blendOutTime;
+        this.stopExpression = ani.stopExpression;
+        this.controller = ani.controller;
+        this.stopExpressionVersion = ani.stopExpressionVersion;
+    }
+
+    /**
+     * 包含一个实体动画的信息的记录类<br/>
+     * 用于{@link cn.nukkit.network.protocol.AnimateEntityPacket}网络包
+     */
+    @Builder
+    public static class Animation {
+        public static final float DEFAULT_BLEND_OUT_TIME = 0.0f;
+        public static final String DEFAULT_STOP_EXPRESSION = "query.any_animation_finished";
+        public static final String DEFAULT_CONTROLLER = "__runtime_controller";
+        public static final String DEFAULT_NEXT_STATE = "default";
+        public static final int DEFAULT_STOP_EXPRESSION_VERSION = 16777216;
+
+        private String animation;
+        @Builder.Default
+        private String nextState = DEFAULT_NEXT_STATE;
+        @Builder.Default
+        private float blendOutTime = DEFAULT_BLEND_OUT_TIME;
+        @Builder.Default
+        private String stopExpression = DEFAULT_STOP_EXPRESSION;
+        @Builder.Default
+        private String controller = DEFAULT_CONTROLLER;
+        @Builder.Default
+        private int stopExpressionVersion = DEFAULT_STOP_EXPRESSION_VERSION;
     }
 }
