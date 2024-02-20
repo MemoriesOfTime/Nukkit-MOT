@@ -1,7 +1,7 @@
 package cn.nukkit.level;
 
 import cn.nukkit.Server;
-import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
@@ -169,6 +169,78 @@ public class GameRules {
 
             setGameRules(gameRule.get(), nbt.getString(key));
         }
+    }
+
+    public void writeBedrockNBT(CompoundTag nbt) {
+        gameRules.forEach((gameRule, value) -> {
+            String name = gameRule.getName().toLowerCase();
+            switch (value.type) {
+                case BOOLEAN:
+                    nbt.putBoolean(name, value.getValueAsBoolean());
+                    break;
+                case INTEGER:
+                    nbt.putInt(name, value.getValueAsInteger());
+                    break;
+                case FLOAT:
+                    nbt.putFloat(name, value.getValueAsFloat());
+                    break;
+                case UNKNOWN:
+                default:
+                    nbt.putString(name, value.value.toString());
+                    break;
+            }
+        });
+    }
+
+    public void readBedrockNBT(CompoundTag nbt) {
+        gameRules.forEach((gameRule, value) -> {
+            String name = gameRule.name().toLowerCase();
+            Tag tag = nbt.get(name);
+            if (tag == null) {
+                return;
+            }
+
+            switch (value.type) {
+                case BOOLEAN:
+                    if (tag instanceof ByteTag) {
+                        setGameRule(gameRule, ((ByteTag) tag).data != 0);
+                    } else if (tag instanceof StringTag) {
+                        String data = ((StringTag) tag).data;
+                        if (data.equalsIgnoreCase("true") || data.equals("1")) {
+                            setGameRule(gameRule, true);
+                        } else if (data.equalsIgnoreCase("false") || data.equals("0")) {
+                            setGameRule(gameRule, false);
+                        } else {
+                            Server.getInstance().getLogger().warning("Invalid boolean game rule '" + name + "' value: " + data);
+                        }
+                    }
+                    break;
+                case INTEGER:
+                    if (tag instanceof IntTag) {
+                        setGameRule(gameRule, ((IntTag) tag).data);
+                    } else if (tag instanceof StringTag) {
+                        String data = ((StringTag) tag).data;
+                        try {
+                            setGameRule(gameRule, Integer.parseInt(data));
+                        } catch (Exception e) {
+                            Server.getInstance().getLogger().warning("Invalid integer game rule '" + name + "' value: " + data);
+                        }
+                    }
+                    break;
+                case FLOAT:
+                    if (tag instanceof FloatTag) {
+                        setGameRule(gameRule, ((FloatTag) tag).data);
+                    } else if (tag instanceof StringTag) {
+                        String data = ((StringTag) tag).data;
+                        try {
+                            setGameRule(gameRule, Float.parseFloat(data));
+                        } catch (Exception e) {
+                            Server.getInstance().getLogger().warning("Invalid float game rule '" + name + "' value: " + data);
+                        }
+                    }
+                    break;
+            }
+        });
     }
 
     public enum Type {
