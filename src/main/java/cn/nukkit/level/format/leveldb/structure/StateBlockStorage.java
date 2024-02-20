@@ -9,7 +9,6 @@ import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.math.BlockVector3;
-import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.ChunkException;
 import io.netty.buffer.ByteBuf;
@@ -111,44 +110,6 @@ public class StateBlockStorage {
         }
     }
 
-    /*public static StateBlockStorage ofBiome(int biomeId) {
-        return new StateBlockStorage(BitArrayVersion.V0, biomeId);
-    }
-
-    public static StateBlockStorage ofBiome(BitArrayVersion version, int biomeId) {
-        return new StateBlockStorage(version, biomeId);
-    }
-
-    @Nullable
-    public static StateBlockStorage ofBiome(BinaryStream stream) {
-        byte header = stream.getSingedByte();
-
-        if (header == -1) {
-            return null;
-        }
-
-        BitArrayVersion version = BitArrayVersion.get(header >> 1, true);
-        int expectedWordSize = version.getWordsForSize(SUB_CHUNK_SIZE);
-        int[] words = new int[expectedWordSize];
-        for (int i = 0; i < expectedWordSize; ++i) {
-            words[i] = stream.getLInt();
-        }
-        BitArray bitArray = version.createPalette(SUB_CHUNK_SIZE, words);
-
-        int paletteSize = stream.getLInt();
-        int[] palette = new int[paletteSize];
-        for (int i = 0; i < paletteSize; ++i) {
-            palette[i] = stream.getLInt();
-        }
-
-        if (paletteSize == 0) {
-            // corrupted
-            return ofBiome(EnumBiome.OCEAN.id);
-        }
-
-        return new StateBlockStorage(bitArray, IntArrayList.wrap(palette));
-    }*/
-
     private static int getPaletteHeader(BitArrayVersion version, boolean runtime) {
         return (version.getId() << 1) | (runtime ? 1 : 0);
     }
@@ -209,9 +170,8 @@ public class StateBlockStorage {
 
         NBTOutputStream outputStream = null;
         try {
-            outputStream =NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
+            outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
 
-            List<CompoundTag> tagList = new ObjectArrayList<>();
             for (int i = 0; i < paletteSize; i++) {
                 BlockStateSnapshot snapshot = this.palette.get(i);
                 outputStream.writeTag(snapshot.getVamillaState());
@@ -360,7 +320,7 @@ public class StateBlockStorage {
     public static int elementIndex(int x, int y, int z) {
         int index = (x << 8) | (z << 4) | y;
         if (index < 0 || index >= SUB_CHUNK_SIZE) {
-            throw new IllegalArgumentException("Invalid index: " + x + ", " + y + ", " + z );
+            throw new IllegalArgumentException("Invalid index: " + x + ", " + y + ", " + z);
         }
         return index;
     }

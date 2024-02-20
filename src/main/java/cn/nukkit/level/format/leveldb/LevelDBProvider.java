@@ -3,7 +3,6 @@ package cn.nukkit.level.format.leveldb;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GameRules;
-import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
@@ -21,12 +20,16 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.*;
 import com.google.common.collect.ImmutableMap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
+import org.cloudburstmc.nbt.*;
 import org.iq80.leveldb.*;
 import org.iq80.leveldb.impl.Iq80DBFactory;
 
@@ -524,15 +527,15 @@ public class LevelDBProvider implements LevelProvider {
                 }
             }
 
-            writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData()), chunk.isPopulated() ? FINALISATION_DONE_SAVE_DATA
-                    : chunk.isGenerated() ? FINALISATION_POPULATION_SAVE_DATA : FINALISATION_GENERATION_SAVE_DATA);
+            writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData()), Binary.writeLInt(chunk.getState().ordinal()));
 
             BlockEntitySerializer.serializer(writeBatch, chunk);
 
             EntitySerializer.serializer(writeBatch, chunk);
 
             Collection<BlockUpdateEntry> blockUpdateEntries = null;
-            Collection<BlockUpdateEntry> randomBlockUpdateEntries = null;
+            // TODO randomBlockUpdate
+            //Collection<BlockUpdateEntry> randomBlockUpdateEntries = null;
             long currentTick = 0;
 
             LevelProvider provider;
@@ -546,13 +549,12 @@ public class LevelDBProvider implements LevelProvider {
 
             byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ);
             if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
-                CompoundTag ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
+                NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
                 if (ticks != null) {
-                    try {
-                        writeBatch.put(pendingScheduledTicksKey, NBTIO.write(ticks, ByteOrder.LITTLE_ENDIAN));
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
+                    ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+                    NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
+                    outputStream.writeTag(ticks);
+                    writeBatch.put(pendingScheduledTicksKey, Utils.convertByteBuf2Array(byteBuf));
                 } else {
                     writeBatch.delete(pendingScheduledTicksKey);
                 }
@@ -560,7 +562,7 @@ public class LevelDBProvider implements LevelProvider {
                 writeBatch.delete(pendingScheduledTicksKey);
             }
 
-            byte[] pendingRandomTicksKey = PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ);
+           /* byte[] pendingRandomTicksKey = PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ);
             if (randomBlockUpdateEntries != null && !randomBlockUpdateEntries.isEmpty()) {
                 CompoundTag ticks = saveBlockTickingQueue(randomBlockUpdateEntries, currentTick);
                 if (ticks != null) {
@@ -574,21 +576,7 @@ public class LevelDBProvider implements LevelProvider {
                 }
             } else {
                 writeBatch.delete(pendingRandomTicksKey);
-            }
-
-            /*stream.reuse();
-            stream.putInt(CURRENT_NUKKIT_DATA_VERSION);
-            stream.putLLong(NUKKIT_DATA_MAGIC);
-            CompoundTag nbt = new CompoundTag();
-            // baked lighting
-//                nbt.putByteArray("BlockLight", chunk.getBlockLightArray());
-//                nbt.putByteArray("SkyLight", chunk.getBlockSkyLightArray());
-            try {
-                stream.put(NBTIO.write(nbt, ByteOrder.LITTLE_ENDIAN));
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            batch.put(NUKKIT_DATA.getKey(chunkX, chunkZ), stream.getBuffer());*/
+            }*/
 
             writeBatch.delete(DATA_2D_LEGACY.getKey(chunkX, chunkZ));
             writeBatch.delete(LEGACY_TERRAIN.getKey(chunkX, chunkZ));
@@ -901,9 +889,39 @@ public class LevelDBProvider implements LevelProvider {
         rules.writeBedrockNBT(this.levelData);
     }
 
+    private int lastPosition = 0;
+
     @Override
     public void doGarbageCollection() {
-        //TODO: compress sub chunks
+        //leveldb不需要回收regions
+    }
+
+    @Override
+    public void doGarbageCollection(long time) {
+        long start = System.currentTimeMillis();
+        int maxIterations = this.chunks.size();
+        if (lastPosition > maxIterations) lastPosition = 0;
+        int i;
+        synchronized (chunks) {
+            Iterator<LevelDBChunk> iter = chunks.values().iterator();
+            if (lastPosition != 0) {
+                int tmpI = lastPosition;
+                while (tmpI-- != 0 && iter.hasNext()) iter.next();
+            }
+            for (i = 0; i < maxIterations; i++) {
+                if (!iter.hasNext()) {
+                    iter = chunks.values().iterator();
+                }
+                if (!iter.hasNext()) break;
+                BaseFullChunk chunk = iter.next();
+                if (chunk == null) continue;
+                if (chunk.isGenerated() && chunk.isPopulated()) {
+                    chunk.compress();
+                    if (System.currentTimeMillis() - start >= time) break;
+                }
+            }
+        }
+        lastPosition += i;
     }
 
     public CompoundTag getLevelData() {
@@ -953,7 +971,6 @@ public class LevelDBProvider implements LevelProvider {
     protected void loadBlockTickingQueue(byte[] data, boolean tickingQueueTypeIsRandom) {
         CompoundTag ticks;
         try {
-            //TODO 使用NbtMap
             ticks = NBTIO.read(data, ByteOrder.LITTLE_ENDIAN);
         } catch (IOException e) {
             throw new ChunkException("Corrupted block ticking data", e);
@@ -983,25 +1000,25 @@ public class LevelDBProvider implements LevelProvider {
             int delay = (int) (entry.getLong("time") - currentTick);
             int priority = entry.getInt("p"); // Nukkit only
 
-            //if (!tickingQueueTypeIsRandom) {
+            if (!tickingQueueTypeIsRandom) {
                 level.scheduleUpdate(block, block, delay, priority, false);
-            /*} else {
+            }/* else {
                 level.scheduleRandomUpdate(block, block, delay, priority, false);
             }*/
         }
     }
 
     @Nullable
-    protected CompoundTag saveBlockTickingQueue(Collection<BlockUpdateEntry> entries, long currentTick) {
-        ListTag<CompoundTag> tickList = new ListTag<>("tickList");
+    protected NbtMap saveBlockTickingQueue(Collection<BlockUpdateEntry> entries, long currentTick) {
+        NbtList<NbtMap> list = new NbtList<>(NbtType.COMPOUND);
         for (BlockUpdateEntry entry : entries) {
             Block block = entry.block;
 
-            CompoundTag blockTag = GlobalBlockPalette.getState(CURRENT_LEVEL_PROTOCOL, block.getFullId());
+            NbtMap blockTag = BlockStateMapping.get().getBlockStateFromFullId(block.getFullId()).getVamillaState();
             Vector3 pos = entry.pos;
             int priority = entry.priority;
 
-            CompoundTag tag = new CompoundTag()
+            NbtMapBuilder tag = NbtMap.builder()
                     .putInt("x", pos.getFloorX())
                     .putInt("y", pos.getFloorY())
                     .putInt("z", pos.getFloorZ())
@@ -1012,12 +1029,12 @@ public class LevelDBProvider implements LevelProvider {
                 tag.putInt("p", priority); // Nukkit only
             }
 
-            tickList.add(tag);
+            list.add(tag.build());
         }
 
-        return tickList.isEmpty() ? null : new CompoundTag()
+        return list.isEmpty() ? null : NbtMap.builder()
                 .putInt("currentTick", 0)
-                .putList(tickList);
+                .putList("tickList", NbtType.COMPOUND, list).build();
     }
 
     public void forEachChunks(Function<FullChunk, Boolean> action) {

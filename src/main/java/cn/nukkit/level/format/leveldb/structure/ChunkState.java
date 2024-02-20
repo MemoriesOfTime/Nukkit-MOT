@@ -5,8 +5,4 @@ public enum ChunkState {
     GENERATED,
     POPULATED,
     FINISHED;
-
-    public boolean canSend() {
-        return this.ordinal() >= 2;
-    }
 }

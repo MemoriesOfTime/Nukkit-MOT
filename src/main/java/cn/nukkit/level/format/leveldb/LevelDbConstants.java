@@ -2,7 +2,6 @@ package cn.nukkit.level.format.leveldb;
 
 import cn.nukkit.nbt.tag.IntTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.utils.Binary;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.Collections;
@@ -28,9 +27,6 @@ public final class LevelDbConstants {
     public static final long NUKKIT_DATA_MAGIC = 0x20221231fe0100ffL;
 
     public static final byte[] CHUNK_VERSION_SAVE_DATA = new byte[]{CURRENT_LEVEL_CHUNK_VERSION};
-    public static final byte[] FINALISATION_GENERATION_SAVE_DATA = Binary.writeLInt(FINALISATION_NEEDS_INSTATICKING);
-    public static final byte[] FINALISATION_POPULATION_SAVE_DATA = Binary.writeLInt(FINALISATION_NEEDS_POPULATION);
-    public static final byte[] FINALISATION_DONE_SAVE_DATA = Binary.writeLInt(FINALISATION_DONE);
 
 
     public static final int CURRENT_LEVEL_PROTOCOL = ProtocolInfo.v1_20_10;

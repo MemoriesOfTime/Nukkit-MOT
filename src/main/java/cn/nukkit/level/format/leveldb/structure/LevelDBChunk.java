@@ -23,15 +23,13 @@ import static cn.nukkit.level.format.leveldb.LevelDbConstants.SUB_CHUNK_2D_SIZE;
 public class LevelDBChunk extends BaseChunk {
     protected PalettedBlockStorage[] biomes3d; //TODO
 
-    protected boolean terrainGenerated;
-    protected boolean terrainPopulated;
-
     protected boolean subChunksDirty;
     protected boolean heightmapOrBiomesDirty;
 
     public final Lock ioLock;
 
     private final DimensionData dimensionData;
+    private ChunkState state;
 
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ) {
         this(level, chunkX, chunkZ, new LevelDBChunkSection[0], new int[SUB_CHUNK_2D_SIZE], null, null, null, null);
@@ -39,7 +37,7 @@ public class LevelDBChunk extends BaseChunk {
 
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ, @NotNull ChunkSection[] sections,
                         @Nullable int[] heightmap, @Nullable byte[] biomes2d, @Nullable PalettedBlockStorage[] biomes3d,
-                        @Nullable List<CompoundTag> entities, @Nullable List<CompoundTag> blockEntities) {
+                        @Nullable List<CompoundTag> entities, @Nullable List<CompoundTag> blockEntities, @NotNull ChunkState state) {
         this.ioLock = new ReentrantLock();
         this.provider = level;
         this.setPosition(chunkX, chunkZ);
@@ -78,6 +76,8 @@ public class LevelDBChunk extends BaseChunk {
 
         this.NBTentities = entities;
         this.NBTtiles = blockEntities;
+
+        this.state = state;
     }
 
     @Override
@@ -85,9 +85,17 @@ public class LevelDBChunk extends BaseChunk {
         return this.dimensionData.getSectionOffset();
     }
 
+    public void setState(@NotNull ChunkState state) {
+        this.state = state;
+    }
+
+    public ChunkState getState() {
+        return state;
+    }
+
     @Override
     public boolean isGenerated() {
-        return this.terrainGenerated || this.terrainPopulated;
+        return this.state.ordinal() >= ChunkState.GENERATED.ordinal();
     }
 
     @Override
@@ -96,10 +104,14 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @Override
-    public void setGenerated(boolean state) {
-        if (this.terrainGenerated != state) {
-            this.terrainGenerated = state;
-            this.setChanged();
+    public void setGenerated(boolean newState) {
+        if (newState) {
+            if (this.state.ordinal() < ChunkState.GENERATED.ordinal()) {
+                this.setState(ChunkState.GENERATED);
+                this.setChanged();
+            }
+        } else if (this.state.ordinal() >= ChunkState.GENERATED.ordinal()) {
+            this.setState(ChunkState.NEW);
         }
     }
 
@@ -110,7 +122,7 @@ public class LevelDBChunk extends BaseChunk {
 
     @Override
     public boolean isPopulated() {
-        return this.terrainPopulated;
+        return this.state.ordinal() >= ChunkState.POPULATED.ordinal();
     }
 
     @Override
@@ -119,10 +131,14 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @Override
-    public void setPopulated(boolean state) {
-        if (this.terrainPopulated != state) {
-            this.terrainPopulated = state;
-            this.setChanged();
+    public void setPopulated(boolean newState) {
+        if (newState) {
+            if (this.state.ordinal() < ChunkState.POPULATED.ordinal()) {
+                this.setState(ChunkState.POPULATED);
+                this.setChanged();
+            }
+        } else if (this.state.ordinal() >= ChunkState.POPULATED.ordinal()) {
+            this.setState(ChunkState.GENERATED);
         }
     }
 

@@ -10,8 +10,8 @@ import org.iq80.leveldb.WriteBatch;
 
 public class Data2dSerializer {
     public static void serializer(WriteBatch writeBatch, LevelDBChunk levelDBChunk) {
-        byte[] byArray = new byte[768];
-        ByteBuf byteBuf = Unpooled.wrappedBuffer(byArray);
+        byte[] bytes = new byte[768];
+        ByteBuf byteBuf = Unpooled.wrappedBuffer(bytes);
         byteBuf.writerIndex(0);
         byte[] heightmap = levelDBChunk.getHeightMapArray();
         byte[] biomeIdArray = levelDBChunk.getBiomeIdArray();
@@ -19,7 +19,7 @@ public class Data2dSerializer {
             byteBuf.writeShortLE(b);
         }
         byteBuf.writeBytes(biomeIdArray);
-        writeBatch.put(LevelDBKey.DATA_2D.getKey(levelDBChunk.getX(), levelDBChunk.getZ(), levelDBChunk.getProvider().getLevel().getDimensionData()), byArray);
+        writeBatch.put(LevelDBKey.DATA_2D.getKey(levelDBChunk.getX(), levelDBChunk.getZ(), levelDBChunk.getProvider().getLevel().getDimensionData()), bytes);
     }
 
     public static void deserialize(DB dB, ChunkBuilder chunkBuilder) {
@@ -28,8 +28,8 @@ public class Data2dSerializer {
         byte[] biomeIdArray = new byte[256];
         if (maps2d != null) {
             ByteBuf byteBuf = Unpooled.wrappedBuffer(maps2d);
-            for (int i2 = 0; i2 < 256; ++i2) {
-                heightmap[i2] = byteBuf.readUnsignedShortLE();
+            for (int i = 0; i < 256; ++i) {
+                heightmap[i] = byteBuf.readUnsignedShortLE();
             }
             byteBuf.readBytes(biomeIdArray);
         }

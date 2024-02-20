@@ -23,8 +23,8 @@ public class Data3dSerializer {
             for (byte b : bytes = chunk.getHeightMapArray()) {
                 byteBuf.writeShortLE(b);
             }
-            for (int i2 = 0; i2 < dimensionData.getHeight() >> 4; ++i2) {
-                PalettedBlockStorage palettedBlockStorage = chunk.getBiomeStorage(i2);
+            for (int i = 0; i < dimensionData.getHeight() >> 4; ++i) {
+                PalettedBlockStorage palettedBlockStorage = chunk.getBiomeStorage(i);
                 palettedBlockStorage.writeToStorage(byteBuf);
             }
             writeBatch.put(LevelDBKey.DATA_3D.getKey(chunk.getX(), chunk.getZ(), dimensionData), Utils.convertByteBuf2Array(byteBuf));

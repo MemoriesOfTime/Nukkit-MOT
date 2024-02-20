@@ -116,7 +116,8 @@ public class ChunkBuilder {
         if (entities == null) entities = new ArrayList<>();
         if (blockEntities == null) blockEntities = new ArrayList<>();
         if (extraData == null) extraData = new CompoundTag();
-        return new LevelDBChunk(
+        if (state == null) state = ChunkState.NEW;
+        LevelDBChunk levelDBChunk = new LevelDBChunk(
                 levelProvider,
                 chunkX,
                 chunkZ,
@@ -125,13 +126,10 @@ public class ChunkBuilder {
                 biome2d,
                 biomeStorage,
                 entities,
-                blockEntities
+                blockEntities,
+                state
         );
+        return levelDBChunk;
     }
-
-    /*public Chunk emptyChunk(int chunkX, int chunkZ) {
-        Preconditions.checkNotNull(levelProvider);
-        return new Chunk(chunkX, chunkZ, levelProvider);
-    }*/
 
 }
