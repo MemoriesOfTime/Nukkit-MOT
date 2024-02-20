@@ -80,9 +80,7 @@ public class NetworkChunkSerializer {
 
                 stream = ThreadCache.binaryStream.get().reset();
 
-                if (sections.length < dimensionData.getHeight() >> 4 //完整支持348世界高度的不需要额外填充负区块
-                        && dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD
-                        && protocolSubChunkCount < maxDimensionSections) {
+                if (dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD && sections.length < maxDimensionSections) {
                     stream.put(negativeSubChunks);
                     writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
                 }
