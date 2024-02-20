@@ -539,14 +539,6 @@ public class GlobalBlockPalette {
         return getLegacyFullId(ProtocolInfo.CURRENT_PROTOCOL, runtimeId);
     }
 
-    public static CompoundTag getState(int protocolId, int fullId) {
-        BlockPalette blockPalette = getPaletteByProtocol(protocolId);
-        if (blockPalette != null) {
-            return blockPalette.getState(fullId);
-        }
-        throw new IllegalArgumentException("Tried to get state for unsupported protocol version: " + protocolId);
-    }
-
     @SuppressWarnings("unused")
     private static class TableEntry {
         private int id;
