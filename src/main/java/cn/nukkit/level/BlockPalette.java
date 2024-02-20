@@ -11,13 +11,14 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -29,7 +30,7 @@ public class BlockPalette {
     private final int protocol;
     private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
-    private final Map<CompoundTag, Integer> stateToLegacy = new HashMap<>();
+    private final Int2ObjectMap<CompoundTag> legacyToState = new Int2ObjectOpenHashMap<>();
 
     private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
@@ -62,11 +63,19 @@ public class BlockPalette {
             int data = state.getShort("data");
             int runtimeId = state.getInt("runtimeId");
             int legacyId = id << 6 | data;
-            legacyToRuntimeId.put(legacyId, runtimeId);
-            if (!runtimeIdToLegacy.containsKey(runtimeId)) {
-                runtimeIdToLegacy.put(runtimeId, legacyId);
+            if (data >= 0) {
+                legacyToRuntimeId.put(legacyId, runtimeId);
+                if (!runtimeIdToLegacy.containsKey(runtimeId)) {
+                    runtimeIdToLegacy.put(runtimeId, legacyId);
+                }
             }
-            stateToLegacy.put(state, legacyId);
+            CompoundTag vState = state.copy()
+                    .remove("stateOverload")
+                    .remove("data")
+                    .remove("id")
+                    .remove("runtimeId")
+                    .remove("version");
+            legacyToState.put(legacyId, vState);
         }
     }
 
@@ -98,7 +107,7 @@ public class BlockPalette {
     public void clearStates() {
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
-        this.stateToLegacy.clear();
+        this.legacyToState.clear();
     }
 
     public int getRuntimeId(int id) {
@@ -129,8 +138,8 @@ public class BlockPalette {
         return runtimeIdToLegacy.get(runtimeId);
     }
 
-    public int getLegacyFullId(CompoundTag compoundTag) {
-        return stateToLegacy.getOrDefault(compoundTag, -1);
+    public CompoundTag getState(int legacyFullId) {
+        return legacyToState.get(legacyFullId);
     }
 
 }

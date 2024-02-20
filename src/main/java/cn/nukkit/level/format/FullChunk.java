@@ -4,6 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.level.util.PalettedBlockStorage;
 
 import java.io.IOException;
 import java.util.Map;
@@ -115,15 +116,42 @@ public interface FullChunk extends Cloneable {
 
     void populateSkyLight();
 
+    default public boolean has3dBiomes() {
+        return false;
+    }
+
+    default PalettedBlockStorage getBiomeStorage(int y) {
+        return null;
+    }
+
+    default int getBiomeId(int x, int y, int z) {
+        return getBiomeId(x, z);
+    }
+
     int getBiomeId(int x, int z);
 
-    void setBiomeIdAndColor(int x, int z, int idAndColor);
+    @Deprecated
+    default void setBiomeIdAndColor(int x, int z, int idAndColor) {
+
+    }
+
+    default void setBiomeId(int x, int y, int z, int biomeId) {
+        this.setBiomeId(x, z, biomeId);
+    }
 
     default void setBiomeId(int x, int z, int biomeId)  {
         setBiomeId(x, z, (byte) biomeId);
     }
 
+    default void setBiomeId(int x, int y, int z, byte biomeId) {
+        this.setBiomeId(x, z, biomeId);
+    }
+
     void setBiomeId(int x, int z, byte biomeId);
+
+    default void setBiome(int x, int y, int z, cn.nukkit.level.biome.Biome biome) {
+        setBiomeId(x, z, biome.getId());
+    }
 
     default void setBiome(int x, int z, cn.nukkit.level.biome.Biome biome) {
         setBiomeId(x, z, (byte) biome.getId());

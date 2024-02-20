@@ -11,28 +11,20 @@ public enum BitArrayVersion {
     V2(2, 16, V3),
     V1(1, 32, V2),
     /**
-     * 1 element.
      * @since 1.18.0
      */
-    V0(0, 1, V2),
-    /**
-     * No element. mainly used for 3D biomes.
-     * @since 1.18.0
-     */
-    EMPTY(-1, -1, V0);
+    V0(0, 0, V1);
 
     final byte bits;
     final byte entriesPerWord;
     final int maxEntryValue;
     final BitArrayVersion next;
-    final int wordsForSize;
 
     BitArrayVersion(int bits, int entriesPerWord, BitArrayVersion next) {
         this.bits = (byte) bits;
         this.entriesPerWord = (byte) entriesPerWord;
         this.maxEntryValue = (1 << this.bits) - 1;
         this.next = next;
-        this.wordsForSize = getWordsForSize(4096);
     }
 
     public static BitArrayVersion get(int version, boolean read) {
@@ -45,7 +37,7 @@ public enum BitArrayVersion {
     }
 
     public BitArray createPalette() {
-        return this.createPalette(4096, new int[wordsForSize]);
+        return this.createPalette(4096, new int[getWordsForSize(4096)]);
     }
 
     public BitArray createPalette(int size) {
@@ -60,7 +52,11 @@ public enum BitArrayVersion {
     }
 
     public int getWordsForSize(int size) {
-        return this == V0 ? 0 : (size / entriesPerWord) + (size % entriesPerWord == 0 ? 0 : 1);
+        return this == V0 ? 0 : this.getWordsForSizeInternal(size);
+    }
+
+    private int getWordsForSizeInternal(int size) {
+        return (size / entriesPerWord) + (size % entriesPerWord == 0 ? 0 : 1);
     }
 
     public int getMaxEntryValue() {
@@ -81,5 +77,9 @@ public enum BitArrayVersion {
         } else {
             return new Pow2BitArray(this, size, words);
         }
+    }
+
+    public boolean isSingleton() {
+        return this == V0 || this == V1;
     }
 }
