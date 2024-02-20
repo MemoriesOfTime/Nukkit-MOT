@@ -4440,7 +4440,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public final boolean isYInRange(int y) {
-        return y >= getMinBlockY() && y < getMaxBlockY();
+        return y >= getMinBlockY() && y <= getMaxBlockY();
     }
 
     public int getMinBlockY() {
