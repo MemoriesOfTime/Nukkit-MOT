@@ -125,7 +125,7 @@ public class PalettedBlockStorage {
             int runtimeId = byteBuf.readIntLE();
             this.palette.add(runtimeId);
             if (runtimeId < 0) {
-                Server.getInstance().getLogger().warning("Invalid block runtime ID: " + runtimeId + ", palette: " + palette);
+                Server.getInstance().getLogger().warning("Invalid runtimeId: " + runtimeId + ", palette: " + palette);
             }
         }
     }
