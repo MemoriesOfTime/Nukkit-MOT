@@ -432,7 +432,7 @@ public class LevelDBProvider implements LevelProvider {
         if (finalized == null) {
             chunkBuilder.state(ChunkState.FINISHED);
         } else {
-            chunkBuilder.state(ChunkState.values()[Unpooled.wrappedBuffer(finalized).readIntLE() + 1]);
+            chunkBuilder.state(ChunkState.values()[Unpooled.wrappedBuffer(finalized).readIntLE()]);
         }
 
         byte chunkVersion = versionData[0];
@@ -975,9 +975,11 @@ public class LevelDBProvider implements LevelProvider {
         int currentTick = ticks.getInt("currentTick");
         for (NbtMap blockState : ticks.getList("tickList", NbtType.COMPOUND)) {
             Block block = null;
+            //noinspection ResultOfMethodCallIgnored
+            blockState.hashCode();
 
             if (blockState.containsKey("name")) {
-                BlockStateSnapshot snapshot = BlockStateMapping.get().getBlockState(blockState);
+                BlockStateSnapshot snapshot = BlockStateMapping.get().getOrUpdateBlockState(blockState);
                 block = snapshot.getBlock();
             } else if (blockState.containsKey("tileID")) {
                 block = Block.get(blockState.getByte("tileID") & 0xff);
@@ -1005,7 +1007,7 @@ public class LevelDBProvider implements LevelProvider {
 
     @Nullable
     protected NbtMap saveBlockTickingQueue(Collection<BlockUpdateEntry> entries, long currentTick) {
-        NbtList<NbtMap> list = new NbtList<>(NbtType.COMPOUND);
+        ArrayList<NbtMap> list = new ArrayList<>();
         for (BlockUpdateEntry entry : entries) {
             Block block = entry.block;
 

@@ -46,7 +46,7 @@ public class BlockStateUpdaterVanilla implements BlockStateUpdater {
                     helper.replaceWith("wall_connection_type_west", "none");
                 })
                 .edit("wall_post_bit", helper -> {
-                    helper.replaceWith("wall_post_bit", 0);
+                    helper.replaceWith("wall_post_bit", (byte) 0);
                 });
     }
 

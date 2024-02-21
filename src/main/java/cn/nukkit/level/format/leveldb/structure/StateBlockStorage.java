@@ -88,11 +88,9 @@ public class StateBlockStorage {
                 BlockStateSnapshot stateSnapshot;
                 try {
                     tag = (NbtMap) inputStream.readTag();
+                    //noinspection ResultOfMethodCallIgnored
                     tag.hashCode();
-                    stateSnapshot = BlockStateMapping.get().getBlockStateOriginal(tag);
-                    if (stateSnapshot == null) {
-                        stateSnapshot = BlockStateMapping.get().getBlockState(tag, BlockStateMapping.get().updateBlockState(tag));
-                    }
+                    stateSnapshot = BlockStateMapping.get().getOrUpdateBlockState(tag);
                 } catch (IOException e) {
                     throw new ChunkException("Invalid blockstate NBT at offset " + i + " in paletted storage", e);
                 }

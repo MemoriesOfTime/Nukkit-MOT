@@ -163,8 +163,8 @@ public class BlockStateMapping {
     public BlockStateSnapshot getBlockState(NbtMap nbtMap) {
         BlockStateSnapshot blockStateSnapshot = this.stateToSnapshot.get(nbtMap);
         if (blockStateSnapshot == null) {
-            log.warn("Unknown block state: " + nbtMap);
-            return this.getUnknownBlockState();
+            log.debug("Unknown block state: " + nbtMap);
+            return BlockStateSnapshot.builder().vanillaState(nbtMap).runtimeId(this.getUnknownBlockState().getRuntimeId()).version(this.protocol).custom(true).build();
         }
         return blockStateSnapshot;
     }
@@ -178,7 +178,16 @@ public class BlockStateMapping {
         if (blockStateSnapshot != null) {
             return blockStateSnapshot;
         }
+        log.debug("Unknown block state: " + tag);
         return BlockStateSnapshot.builder().vanillaState(tag).runtimeId(this.getUnknownBlockState().getRuntimeId()).version(this.protocol).custom(true).build();
+    }
+
+    public BlockStateSnapshot getOrUpdateBlockState(NbtMap nbtMap) {
+        BlockStateSnapshot stateSnapshot = this.getBlockStateOriginal(nbtMap);
+        if (stateSnapshot == null || stateSnapshot.getLegacyId() == Block.INFO_UPDATE) {
+            stateSnapshot = this.getBlockState(BlockStateMapping.get().updateBlockState(nbtMap));
+        }
+        return stateSnapshot;
     }
 
     public int getLegacyId(int runtimeId) {
