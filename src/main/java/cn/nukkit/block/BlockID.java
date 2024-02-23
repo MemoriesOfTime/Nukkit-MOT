@@ -475,5 +475,17 @@ public interface BlockID {
 
     int OCHRE_FROGLIGHT = 726;
 
+    int MANGROVE_PLANKS = 741;
+
+    int BAMBOO_PLANKS = 765;
+
+    int CHERRY_PLANKS = 792;
+
     int DECORATED_POT = 806;
+
+    int DARK_OAK_PLANKS = 998;
+    int ACACIA_PLANKS = 997;
+    int JUNGLE_PLANKS = 996;
+    int BIRCH_PLANKS = 995;
+    int SPRUCE_PLANKS = 994;
 }
