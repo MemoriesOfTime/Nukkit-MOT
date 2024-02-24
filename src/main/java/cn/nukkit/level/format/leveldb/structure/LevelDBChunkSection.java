@@ -208,7 +208,7 @@ public class LevelDBChunkSection implements ChunkSection {
 
             StateBlockStorage storage = this.storages[layer];
             int previous = storage.get(x, y, z);
-            int fullId = (previous & Block.DATA_BITS) | (data & Block.DATA_MASK);
+            int fullId = (previous & ~Block.DATA_MASK) | (data & Block.DATA_MASK);
 
             if (previous == fullId) {
                 return;
