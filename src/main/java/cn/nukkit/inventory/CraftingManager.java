@@ -696,8 +696,8 @@ public class CraftingManager {
         for (SmithingRecipe recipe : this.getSmithingRecipes(protocol).values()) {
             pk.addShapelessRecipe(recipe);
         }
-        //TODO Fix 1.13.0 - 1.14.0 client crash
-        if (protocol != ProtocolInfo.v1_13_0) {
+        //TODO Fix 1.10.0 - 1.14.0 client crash
+        if (protocol < ProtocolInfo.v1_10_0 || protocol > ProtocolInfo.v1_13_0) {
             for (FurnaceRecipe recipe : this.getFurnaceRecipes(protocol).values()) {
                 pk.addFurnaceRecipe(recipe);
             }
@@ -897,7 +897,6 @@ public class CraftingManager {
         this.getBlastFurnaceRecipes().put(getItemHash(recipe.getInput()), recipe);
     }
 
-
     public void registerCampfireRecipe(CampfireRecipe recipe) {
         Item input = recipe.getInput();
         this.campfireRecipes.put(getItemHash(input), recipe);
@@ -987,7 +986,9 @@ public class CraftingManager {
     }
 
     public void registerRecipe(int protocol, Recipe recipe) {
-        if (recipe instanceof SmithingRecipe smithingRecipe) {
+        if (recipe instanceof FurnaceRecipe furnaceRecipe) {  // FurnaceRecipe implements SmeltingRecipe
+            this.registerFurnaceRecipe(protocol, furnaceRecipe);
+        } else if (recipe instanceof SmithingRecipe smithingRecipe) {
             this.registerSmithingRecipe(protocol, smithingRecipe);
         } else if (recipe instanceof CraftingRecipe) {
             UUID id = Utils.dataToUUID(String.valueOf(++RECIPE_COUNT), String.valueOf(recipe.getResult().getId()), String.valueOf(recipe.getResult().getDamage()), String.valueOf(recipe.getResult().getCount()), Arrays.toString(recipe.getResult().getCompoundTag()));
@@ -998,12 +999,9 @@ public class CraftingManager {
             } else if (recipe instanceof ShapelessRecipe) {
                 this.registerShapelessRecipe(protocol, (ShapelessRecipe) recipe);
             }
-        } else if (recipe instanceof BlastFurnaceRecipe blastFurnaceRecipe) {
-            this.registerBlastFurnaceRecipe(blastFurnaceRecipe);
-        } else if (recipe instanceof FurnaceRecipe furnaceRecipe) {
-            this.registerFurnaceRecipe(protocol, furnaceRecipe);
+        } else {
+            recipe.registerToCraftingManager(this);
         }
-        recipe.registerToCraftingManager(this);
     }
 
     public Map<Integer, Map<UUID, ShapelessRecipe>> getShapelessRecipes(int protocol) {
