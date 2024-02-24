@@ -4,6 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
@@ -22,6 +23,7 @@ import org.cloudburstmc.nbt.NbtMap;
 import org.cloudburstmc.nbt.NbtUtils;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 import static cn.nukkit.level.format.anvil.util.BlockStorage.SECTION_SIZE;
@@ -35,6 +37,10 @@ public class StateBlockStorage {
     private List<BlockStateSnapshot> palette;
     private BitArray bitArray;
 
+    //用于兼容1.13以下版本
+    private final byte[] blockIds;
+    private final NibbleArray blockData;
+
     public StateBlockStorage() {
         this(BitArrayVersion.V2);
     }
@@ -43,11 +49,16 @@ public class StateBlockStorage {
         this.bitArray = version.createPalette();
         this.palette = new ObjectArrayList<>(16);
         this.palette.add(BlockStateMapping.get().getBlockState(0, 0));
+
+        this.blockIds = new byte[SIZE];
+        this.blockData = new NibbleArray(SECTION_SIZE);
     }
 
-    public StateBlockStorage(BitArray bitArray, List<BlockStateSnapshot> palette) {
+    protected StateBlockStorage(BitArray bitArray, List<BlockStateSnapshot> palette, byte[] blockIds, NibbleArray blockData) {
         this.palette = palette;
         this.bitArray = bitArray;
+        this.blockIds = blockIds;
+        this.blockData = blockData;
     }
 
     public void readFrom(ByteBuf byteBuf, ChunkBuilder chunkBuilder) {
@@ -97,6 +108,12 @@ public class StateBlockStorage {
 
                 this.palette.add(stateSnapshot);
             }
+
+            for (int i = 0; i < this.bitArray.size(); i++) {
+                int fullId = this.get(i);
+                this.blockIds[i] = (byte) ((fullId >> Block.DATA_BITS) & 0xff);
+                this.blockData.set(i, (byte) (fullId & 0xf));
+            }
         } finally {
             try {
                 if (inputStream != null) {
@@ -129,6 +146,9 @@ public class StateBlockStorage {
         try {
             int paletteIndex = this.getOrAdd(value);
             this.bitArray.set(index, paletteIndex);
+
+            this.blockIds[index] = (byte) (value.getLegacyId() & 0xff);
+            this.blockData.set(index, (byte) (value.getLegacyData() & 0xf));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unable to set value: " + value + ", palette: " + palette, e);
         }
@@ -249,6 +269,22 @@ public class StateBlockStorage {
         return true;
     }
 
+    public byte[] getBlockIds() {
+        if (!this.isEmpty()) {
+            return Arrays.copyOf(blockIds, blockIds.length);
+        } else {
+            return new byte[SECTION_SIZE];
+        }
+    }
+
+    public byte[] getBlockData() {
+        if (!this.isEmpty()) {
+            return blockData.getData();
+        } else {
+            return new byte[2048];
+        }
+    }
+
     /**
      * @return dirty
      */
@@ -312,7 +348,11 @@ public class StateBlockStorage {
     }
 
     public StateBlockStorage copy() {
-        return new StateBlockStorage(this.bitArray.copy(), new ObjectArrayList<>(this.palette));
+        return new StateBlockStorage(
+                this.bitArray.copy(),
+                new ObjectArrayList<>(this.palette),
+                blockIds.clone(),
+                this.blockData.copy());
     }
 
     public static int elementIndex(int x, int y, int z) {

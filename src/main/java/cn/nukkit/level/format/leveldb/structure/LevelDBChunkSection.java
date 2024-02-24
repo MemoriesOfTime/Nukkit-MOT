@@ -571,11 +571,21 @@ public class LevelDBChunkSection implements ChunkSection {
         }
     }
 
-    @Deprecated
     @Override
     public byte[] getBytes(int protocolId) {
-        log.error("Deprecated method called: getBytes");
-        return new byte[0];
+        try {
+            this.readLock.lock();
+
+            //TODO: properly mv support
+            byte[] ids = this.storages[0].getBlockIds();
+            byte[] data = this.storages[0].getBlockData();
+            byte[] merged = new byte[ids.length + data.length];
+            System.arraycopy(ids, 0, merged, 0, ids.length);
+            System.arraycopy(data, 0, merged, ids.length, data.length);
+            return merged;
+        } finally {
+            this.readLock.unlock();
+        }
     }
 
     @Override
