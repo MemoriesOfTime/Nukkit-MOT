@@ -596,7 +596,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Deprecated
     @Override
     public CompoundTag toNBT() {
-        log.error("Deprecated method called: toNBT");
+        log.error("Deprecated method called: LevelDBChunkSection#toNBT()");
         return null;
     }
 

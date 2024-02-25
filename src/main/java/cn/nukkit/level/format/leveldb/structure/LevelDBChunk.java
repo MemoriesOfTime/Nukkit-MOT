@@ -290,9 +290,9 @@ public class LevelDBChunk extends BaseChunk {
     public void onSubChunkBlockChanged(LevelDBChunkSection subChunk, int x, int y, int z, int layer, int previousId, int newId) {
         assert previousId != newId;
 
-        subChunksDirty = true;
+        this.subChunksDirty = true;
 
-        if (layer != 0) {
+        /*if (layer != 0) {
             return;
         }
 
@@ -302,13 +302,10 @@ public class LevelDBChunk extends BaseChunk {
             return;
         }
 
-        //TODO
-        if (true) return;
-        boolean lightBlocking = false;
-        /*boolean lightBlocking = Block.lightBlocking[newBlockId];
+        boolean lightBlocking = Block.lightBlocking[newBlockId];
         if (lightBlocking == Block.lightBlocking[previousBlockId]) {
             return;
-        }*/
+        }
 
         if (lightBlocking) {
             int height = getHeightMap(x, z);
@@ -322,9 +319,9 @@ public class LevelDBChunk extends BaseChunk {
             int height = getHeightMap(x, z);
             if (height == (worldY + 1)) {
                 for (int localY = y; localY >= 0; localY--) {
-                    /*if (!Block.lightBlocking[subChunk.getBlockId(0, x, localY, z)]) {
+                    *//*if (!Block.lightBlocking[subChunk.getBlockId(0, x, localY, z)]) {
                         continue;
-                    }*/
+                    }*//*
                     this.setHeightMap(x, z, ((subChunkY << 4) | localY) + 1);
                     return;
                 }
@@ -335,9 +332,9 @@ public class LevelDBChunk extends BaseChunk {
                 for (int chunkY = subChunkY - 1; chunkY >= 0; chunkY--) {
                     ChunkSection section = this.getSection(chunkY);
                     for (int localY = 15; localY >= 0; localY--) {
-                        /*if (!Block.lightBlocking[section.getBlockId(0, x, localY, z)]) {
+                        *//*if (!Block.lightBlocking[section.getBlockId(0, x, localY, z)]) {
                             continue;
-                        }*/
+                        }*//*
                         this.setHeightMap(x, z, ((chunkY << 4) | localY) + 1);
                         hasColumn = true;
                         break SUB_CHUNKS;
@@ -348,7 +345,7 @@ public class LevelDBChunk extends BaseChunk {
                     this.setHeightMap(x, z, 0);
                 }
             }
-        }
+        }*/
     }
 
     public boolean isSubChunksDirty() {

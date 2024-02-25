@@ -438,13 +438,10 @@ public class LevelDBProvider implements LevelProvider {
         byte chunkVersion = versionData[0];
 
         if (chunkVersion < 7) {
-            //TODO 设置需要更新
-            //chunkBuilder.
+            chunkBuilder.setNeedUpdate();
         }
 
-        ChunkSerializers.deserialize(this.db, chunkBuilder, (int)chunkVersion);
-
-        boolean hasBeenUpgraded = chunkVersion < CURRENT_LEVEL_CHUNK_VERSION;
+        ChunkSerializers.deserialize(this.db, chunkBuilder, chunkVersion);
 
         Data3dSerializer.deserialize(this.db, chunkBuilder);
         if (!chunkBuilder.hasBiome3d()) {
@@ -464,27 +461,8 @@ public class LevelDBProvider implements LevelProvider {
             loadBlockTickingQueue(randomTickingData, true);
         }
 
-        int finalisation;
-        byte[] finalisationData = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ));
-        if (randomTickingData != null && randomTickingData.length != 0) {
-            finalisation = Binary.readLInt(finalisationData);
-        } else {
-            finalisation = FINALISATION_DONE; //older versions didn't have this tag
-        }
-
         LevelDBChunk chunk = chunkBuilder.build();
 
-        if (finalisation == FINALISATION_DONE) {
-            chunk.setGenerated();
-            chunk.setPopulated();
-        } else if (finalisation == FINALISATION_NEEDS_POPULATION) {
-            chunk.setGenerated();
-        }
-
-        if (hasBeenUpgraded) {
-            //TODO
-            //chunk.setAllSubChunksDirty(); //trigger rewriting chunk to disk if it was converted from an older format
-        }
         if (chunkVersion <= 2) {
             chunk.setHeightmapOrBiomesDirty();
         }
@@ -677,8 +655,8 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     @Override
-    public BaseFullChunk getEmptyChunk(int x, int z) {
-        return null;
+    public BaseFullChunk getEmptyChunk(int chunkX, int chunkZ) {
+        return LevelDBChunk.getEmptyChunk(chunkX, chunkZ, this);
     }
 
     public DB getDatabase() {

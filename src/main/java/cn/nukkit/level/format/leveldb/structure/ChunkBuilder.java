@@ -20,6 +20,7 @@ public class ChunkBuilder {
     @Getter
     int chunkX;
     LevelProvider levelProvider;
+    private boolean needUpdate;
     ChunkSection[] sections;
     int[] heightMap;
     byte[] biome2d;
@@ -71,6 +72,10 @@ public class ChunkBuilder {
 
     public ChunkSection[] getSections() {
         return sections;
+    }
+
+    public void setNeedUpdate() {
+        this.needUpdate = true;
     }
 
     public ChunkBuilder heightMap(int[] heightMap) {
@@ -129,6 +134,9 @@ public class ChunkBuilder {
                 blockEntities,
                 state
         );
+        if (this.needUpdate) {
+            levelDBChunk.setChanged();
+        }
         return levelDBChunk;
     }
 
