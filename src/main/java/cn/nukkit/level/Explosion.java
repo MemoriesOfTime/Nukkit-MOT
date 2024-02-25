@@ -1,7 +1,6 @@
 package cn.nukkit.level;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockTNT;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityShulkerBox;
@@ -17,7 +16,7 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityExplodeEvent;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.particle.HugeExplodeSeedParticle;
 import cn.nukkit.math.*;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
@@ -177,9 +176,9 @@ public class Explosion {
             }
         }
 
-        ItemBlock air = new ItemBlock(Block.get(BlockID.AIR));
+        ItemTool netheritePickaxe = (ItemTool) Item.get(Item.NETHERITE_PICKAXE);
+        netheritePickaxe.setUnbreakable(true);
         BlockEntity container;
-
         for (Block block : this.affectedBlocks) {
             if (block.getId() == Block.TNT) {
                 ((BlockTNT) block).prime(Utils.rand(10, 30), this.what instanceof Entity ? (Entity) this.what : null);
@@ -199,7 +198,7 @@ public class Explosion {
                     }
                 }
             } else if (Math.random() * 100 < yield) {
-                for (Item drop : block.getDrops(air)) {
+                for (Item drop : block.getDrops(netheritePickaxe)) {
                     this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
                 }
             }
