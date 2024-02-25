@@ -57,12 +57,14 @@ public class NetworkChunkSerializer {
             ChunkSection[] sections = chunk.getSections();
             for (int i = sections.length - 1; i >= 0; i--) {
                 if (!sections[i].isEmpty()) {
-                    if (i < chunk.getSectionOffset() && protocolId < ProtocolInfo.v1_18_0) {
-                        continue;
-                    }
                     subChunkCount = i + 1;
                     break;
                 }
+            }
+
+            // 忽略负数高度区块
+            if (protocolId < ProtocolInfo.v1_18_0) {
+                subChunkCount = Math.max(1, subChunkCount - chunk.getSectionOffset());
             }
 
             int protocolSubChunkCount = subChunkCount;
@@ -89,12 +91,11 @@ public class NetworkChunkSerializer {
                 }
             }
 
-            for (int i = 0; i < protocolSubChunkCount; i++) {
+            int offset = protocolId < ProtocolInfo.v1_18_0 ? chunk.getSectionOffset() : 0;
+            for (int i = offset; i < protocolSubChunkCount + offset; i++) {
                 if (protocolId < ProtocolInfo.v1_13_0) {
-                    if (i >= chunk.getSectionOffset()) {
-                        stream.putByte((byte) 0);
-                        stream.put(sections[i].getBytes(protocolId));
-                    }
+                    stream.putByte((byte) 0);
+                    stream.put(sections[i].getBytes(protocolId));
                 } else {
                     sections[i].writeTo(protocolId, stream, antiXray);
                 }
