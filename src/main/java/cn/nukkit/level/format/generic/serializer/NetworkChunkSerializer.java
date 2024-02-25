@@ -57,6 +57,9 @@ public class NetworkChunkSerializer {
             ChunkSection[] sections = chunk.getSections();
             for (int i = sections.length - 1; i >= 0; i--) {
                 if (!sections[i].isEmpty()) {
+                    if (i < chunk.getSectionOffset() && protocolId < ProtocolInfo.v1_18_0) {
+                        continue;
+                    }
                     subChunkCount = i + 1;
                     break;
                 }
@@ -88,9 +91,11 @@ public class NetworkChunkSerializer {
 
             for (int i = 0; i < protocolSubChunkCount; i++) {
                 if (protocolId < ProtocolInfo.v1_13_0) {
-                    stream.putByte((byte) 0);
-                    stream.put(sections[i].getBytes(protocolId));
-                }else {
+                    if (i >= chunk.getSectionOffset()) {
+                        stream.putByte((byte) 0);
+                        stream.put(sections[i].getBytes(protocolId));
+                    }
+                } else {
                     sections[i].writeTo(protocolId, stream, antiXray);
                 }
             }
