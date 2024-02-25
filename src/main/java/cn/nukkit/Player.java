@@ -2054,6 +2054,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected void resetClientMovement() {
         this.newPosition = null;
         this.positionChanged = false;
+        this.clientMovements.clear();
     }
 
     protected void revertClientMotion(Location originalPos) {
