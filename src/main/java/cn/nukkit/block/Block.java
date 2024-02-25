@@ -7,6 +7,7 @@ import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.item.customitem.ItemCustomTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
@@ -925,7 +926,39 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     private double toolBreakTimeBonus0(Item item) {
+        if (item instanceof ItemCustomTool itemCustomTool && itemCustomTool.getSpeed() != null) {
+            return customToolBreakTimeBonus(customToolType(item), itemCustomTool.getSpeed());
+        }
         return toolBreakTimeBonus0(toolType0(item, getId()), item.getTier(), this.getId() == BlockID.WOOL, this.getId() == BlockID.COBWEB);
+    }
+
+    private double customToolBreakTimeBonus(int toolType, @org.jetbrains.annotations.Nullable Integer speed) {
+        if (speed != null) return speed;
+        else if (toolType == ItemTool.TYPE_SWORD) {
+            if (this instanceof BlockCobweb) {
+                return 15.0;
+            } else if (this instanceof BlockBamboo) {
+                return 30.0;
+            } else return 1.0;
+        } else if (toolType == ItemTool.TYPE_SHEARS) {
+            if (this instanceof BlockWool || this instanceof BlockLeaves) {
+                return 5.0;
+            } else if (this instanceof BlockCobweb) {
+                return 15.0;
+            } else return 1.0;
+        } else if (toolType == ItemTool.TYPE_NONE) return 1.0;
+        return 0;
+    }
+
+    private int customToolType(Item item) {
+        if (this instanceof BlockLeaves && item.isHoe()) return ItemTool.TYPE_SHEARS;
+        if (item.isSword()) return ItemTool.TYPE_SWORD;
+        if (item.isShovel()) return ItemTool.TYPE_SHOVEL;
+        if (item.isPickaxe()) return ItemTool.TYPE_PICKAXE;
+        if (item.isAxe()) return ItemTool.TYPE_AXE;
+        if (item.isHoe()) return ItemTool.TYPE_HOE;
+        if (item.isShears()) return ItemTool.TYPE_SHEARS;
+        return ItemTool.TYPE_NONE;
     }
 
     private static double toolBreakTimeBonus0(int toolType, int toolTier, boolean isWoolBlock, boolean isCobweb) {
