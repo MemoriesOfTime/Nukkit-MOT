@@ -5,17 +5,12 @@ import cn.nukkit.network.protocol.types.SortOrder;
 import cn.nukkit.scoreboard.displayer.IScoreboardViewer;
 import cn.nukkit.scoreboard.scorer.FakeScorer;
 import cn.nukkit.scoreboard.scorer.IScorer;
-import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import javax.annotation.Nullable;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Getter
@@ -35,18 +30,18 @@ public class Scoreboard implements IScoreboard {
         }
     }
 
-    public Scoreboard(String objectiveName, String displayName) {
+    public Scoreboard(@NotNull String objectiveName, @NotNull String displayName) {
         this(objectiveName, displayName, "dummy");
     }
 
-    public Scoreboard(String objectiveName, String displayName, String criteriaName) {
+    public Scoreboard(@NotNull String objectiveName, @NotNull String displayName, @NotNull String criteriaName) {
         this(objectiveName, displayName, criteriaName, SortOrder.ASCENDING);
     }
 
-    public Scoreboard(String objectiveName, String displayName, String criteriaName, SortOrder sortOrder) {
-        this.objectiveName = objectiveName;
-        this.displayName = displayName;
-        this.criteriaName = criteriaName;
+    public Scoreboard(@NotNull String objectiveName, @NotNull String displayName, @NotNull String criteriaName, SortOrder sortOrder) {
+        this.objectiveName = Objects.requireNonNull(objectiveName);
+        this.displayName = Objects.requireNonNull(displayName);
+        this.criteriaName = Objects.requireNonNull(criteriaName);
         this.sortOrder = sortOrder;
     }
 
