@@ -68,7 +68,10 @@ public class FloatingTextParticle extends Particle {
                 .putLong(Entity.DATA_LEAD_HOLDER_EID,-1)
                 .putFloat(Entity.DATA_SCALE, 0.01f)
                 .putFloat(Entity.DATA_BOUNDING_BOX_HEIGHT, 0.01f)
-                .putFloat(Entity.DATA_BOUNDING_BOX_WIDTH, 0.01f);
+                .putFloat(Entity.DATA_BOUNDING_BOX_WIDTH, 0.01f)
+                .putBoolean(Entity.DATA_FLAG_IMMOBILE, true)
+                .putBoolean(Entity.DATA_FLAG_CAN_SHOW_NAMETAG, true)
+                .putBoolean(Entity.DATA_ALWAYS_SHOW_NAMETAG, true);
         if (!Strings.isNullOrEmpty(title)) {
             metadata.putString(Entity.DATA_NAMETAG, title);
         }
@@ -128,6 +131,8 @@ public class FloatingTextParticle extends Particle {
         } else {
             RemoveEntityPacket pk = new RemoveEntityPacket();
             pk.eid = this.entityId;
+            pk.protocol = protocol;
+            pk.tryEncode();
 
             packets.add(pk);
         }

@@ -12,7 +12,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.log4j.Log4j2;
@@ -184,18 +183,7 @@ public class Network {
         return hardWareNetworkInterfaces;
     }
 
-    public void processBatch(BatchPacket packet, Player player) {
-        ObjectArrayList<DataPacket> packets = new ObjectArrayList<>();
-        try {
-            this.processBatch(packet.payload, packets, player.getNetworkSession().getCompression(), player.raknetProtocol, player);
-            this.processPackets(player, packets);
-        } catch (Exception e) {
-            log.error("Error whilst decoding batch packet from " + player.getName(), e);
-            player.close("", "Error whilst decoding batch packet");
-        }
-    }
-
-    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) throws ProtocolException {
+    public void processBatch(byte[] payload, Collection<DataPacket> packets, CompressionProvider compression, int raknetProtocol, Player player) {
         int maxSize = 3145728; // 3 * 1024 * 1024
         if (player != null && player.getSkin() == null) {
             maxSize = 6291456; // 6 * 1024 * 1024
@@ -269,17 +257,7 @@ public class Network {
         }
     }
 
-    /**
-     * Process packets obtained from batch packets
-     * Required to perform additional analyses and filter unnecessary packets
-     *
-     * @param packets packets
-     */
-    public void processPackets(Player player, List<DataPacket> packets) {
-        if (packets.isEmpty()) return;
-        packets.forEach(player::handleDataPacket);
-    }
-
+    @Deprecated
     public DataPacket getPacket(byte id) {
         Class<? extends DataPacket> clazz = this.packetPool.get(id & 0xff);
         if (clazz != null) {
@@ -371,6 +349,7 @@ public class Network {
         this.registerPacket(ProtocolInfo.MAP_INFO_REQUEST_PACKET, MapInfoRequestPacket.class);
         this.registerPacket(ProtocolInfo.MOB_ARMOR_EQUIPMENT_PACKET, MobArmorEquipmentPacket.class);
         this.registerPacket(ProtocolInfo.MOB_EQUIPMENT_PACKET, MobEquipmentPacket.class);
+        this.registerPacket(ProtocolInfo.PHOTO_TRANSFER_PACKET, PhotoTransferPacket.class);
         this.registerPacket(ProtocolInfo.MODAL_FORM_REQUEST_PACKET, ModalFormRequestPacket.class);
         this.registerPacket(ProtocolInfo.MODAL_FORM_RESPONSE_PACKET, ModalFormResponsePacket.class);
         this.registerPacket(ProtocolInfo.MOVE_ENTITY_ABSOLUTE_PACKET, MoveEntityAbsolutePacket.class);
@@ -441,6 +420,8 @@ public class Network {
         this.registerPacket(ProtocolInfo.PLAYER_AUTH_INPUT_PACKET, PlayerAuthInputPacket.class);
         this.registerPacket(ProtocolInfo.CREATIVE_CONTENT_PACKET, CreativeContentPacket.class);
         this.registerPacket(ProtocolInfo.DEBUG_INFO_PACKET, DebugInfoPacket.class);
+        this.registerPacket(ProtocolInfo.POS_TRACKING_CLIENT_REQUEST_PACKET, PositionTrackingDBClientRequestPacket.class);
+        this.registerPacket(ProtocolInfo.POS_TRACKING_SERVER_BROADCAST_PACKET, PositionTrackingDBServerBroadcastPacket.class);
         this.registerPacket(ProtocolInfo.EMOTE_LIST_PACKET, EmoteListPacket.class);
         this.registerPacket(ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET, PacketViolationWarningPacket.class);
         this.registerPacket(ProtocolInfo.PLAYER_ARMOR_DAMAGE_PACKET, PlayerArmorDamagePacket.class);
@@ -456,18 +437,30 @@ public class Network {
         this.registerPacket(ProtocolInfo.ITEM_COMPONENT_PACKET, ItemComponentPacket.class);
         this.registerPacket(ProtocolInfo.FILTER_TEXT_PACKET, FilterTextPacket.class);
         this.registerPacket(ProtocolInfo.SYNC_ENTITY_PROPERTY_PACKET, SyncEntityPropertyPacket.class);
+        this.registerPacket(ProtocolInfo.ADD_VOLUME_ENTITY_PACKET, AddVolumeEntityPacket.class);
         this.registerPacket(ProtocolInfo.NPC_DIALOGUE_PACKET, NPCDialoguePacket.class);
+        this.registerPacket(ProtocolInfo.CREATE_PHOTO_PACKET, CreatePhotoPacket.class);
+        this.registerPacket(ProtocolInfo.UPDATE_SUB_CHUNK_BLOCKS_PACKET, UpdateSubChunkBlocksPacket.class);
+        this.registerPacket(ProtocolInfo.PHOTO_INFO_REQUEST_PACKET, PhotoInfoRequestPacket.class);
+        this.registerPacket(ProtocolInfo.PLAYER_START_ITEM_COOLDOWN_PACKET, PlayerStartItemCoolDownPacket.class);
+        this.registerPacket(ProtocolInfo.TICKING_AREAS_LOAD_STATUS_PACKET, TickingAreasLoadStatusPacket.class);
+        this.registerPacket(ProtocolInfo.DIMENSION_DATA_PACKET, DimensionDataPacket.class);
+        this.registerPacket(ProtocolInfo.CHANGE_MOB_PROPERTY_PACKET, ChangeMobPropertyPacket.class);
+
         this.registerPacket(ProtocolInfo.TOAST_REQUEST_PACKET, ToastRequestPacket.class);
         this.registerPacket(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET, RequestNetworkSettingsPacket.class);
         this.registerPacket(ProtocolInfo.UPDATE_CLIENT_INPUT_LOCKS, UpdateClientInputLocksPacket.class);
         this.registerPacket(ProtocolInfo.CAMERA_PRESETS_PACKET, CameraPresetsPacket.class);
+        this.registerPacket(ProtocolInfo.UNLOCKED_RECIPES_PACKET, UnlockedRecipesPacket.class);
 
         this.registerPacketNew(ProtocolInfo.CAMERA_INSTRUCTION_PACKET, CameraInstructionPacket.class);
-        this.registerPacketNew(ProtocolInfo.TRIM_DATA, TrimDataPacket.class);
-        this.registerPacketNew(ProtocolInfo.OPEN_SIGN, OpenSignPacket.class);
-        this.registerPacketNew(ProtocolInfo.AGENT_ANIMATION, AgentAnimationPacket.class);
-        this.registerPacketNew(ProtocolInfo.REFRESH_ENTITLEMENTS, RefreshEntitlementsPacket.class);
-        this.registerPacketNew(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST, ToggleCrafterSlotRequestPacket.class);
+        this.registerPacketNew(ProtocolInfo.TRIM_DATA_PACKET, TrimDataPacket.class);
+        this.registerPacketNew(ProtocolInfo.OPEN_SIGN_PACKET, OpenSignPacket.class);
+        this.registerPacketNew(ProtocolInfo.AGENT_ANIMATION_PACKET, AgentAnimationPacket.class);
+        this.registerPacketNew(ProtocolInfo.REFRESH_ENTITLEMENTS_PACKET, RefreshEntitlementsPacket.class);
+        this.registerPacketNew(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST_PACKET, ToggleCrafterSlotRequestPacket.class);
+        this.registerPacketNew(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class);
+        this.registerPacketNew(ProtocolInfo.SET_HUD_PACKET, SetHudPacket.class);
     }
 
     @AllArgsConstructor

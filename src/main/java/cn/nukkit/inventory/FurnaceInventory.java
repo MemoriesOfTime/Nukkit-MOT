@@ -11,7 +11,11 @@ import cn.nukkit.item.Item;
 public class FurnaceInventory extends ContainerInventory {
 
     public FurnaceInventory(BlockEntityFurnace furnace) {
-        super(furnace, InventoryType.FURNACE);
+        this(furnace, InventoryType.FURNACE);
+    }
+
+    public FurnaceInventory(BlockEntityFurnace furnace, InventoryType type) {
+        super(furnace, type);
     }
 
     @Override

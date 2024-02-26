@@ -65,4 +65,9 @@ public class BlockTerracotta extends BlockSolidMeta {
     public TerracottaColor getDyeColor() {
         return TerracottaColor.getByTerracottaData(getDamage());
     }
+
+    @Override
+    public boolean canHarvestWithHand(){
+        return false;
+    }
 }

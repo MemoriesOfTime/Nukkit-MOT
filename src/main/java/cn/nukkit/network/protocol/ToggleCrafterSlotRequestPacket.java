@@ -10,7 +10,7 @@ import lombok.ToString;
 @ToString(doNotUseGetters = true)
 public class ToggleCrafterSlotRequestPacket extends DataPacket {
 
-    public static final int NETWORK_ID = ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST;
+    public static final int NETWORK_ID = ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST_PACKET;
 
     @Setter
     @Getter
@@ -22,7 +22,7 @@ public class ToggleCrafterSlotRequestPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__TOGGLE_CRAFTER_SLOT_REQUEST;
+        return ProtocolInfo.__INTERNAL__TOGGLE_CRAFTER_SLOT_REQUEST_PACKET;
     }
 
     @Override

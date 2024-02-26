@@ -51,10 +51,7 @@ public class PluginManager {
     }
 
     public Plugin getPlugin(String name) {
-        if (this.plugins.containsKey(name)) {
-            return this.plugins.get(name);
-        }
-        return null;
+        return this.plugins.get(name);
     }
 
     public boolean registerInterface(Class<? extends PluginLoader> loaderClass) {

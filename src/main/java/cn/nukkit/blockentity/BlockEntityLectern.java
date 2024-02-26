@@ -79,6 +79,7 @@ public class BlockEntityLectern extends BlockEntitySpawnable {
     public void setBook(Item item) {
         if (item.getId() == Item.WRITTEN_BOOK || item.getId() == Item.BOOK_AND_QUILL) {
             this.namedTag.putCompound("book", NBTIO.putItemHelper(item));
+            this.namedTag.putInt("page", 0);
         } else {
             this.namedTag.remove("book");
             this.namedTag.remove("page");

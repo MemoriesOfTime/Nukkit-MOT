@@ -990,6 +990,7 @@
   "minecraft:glistering_melon_slice": 382,
   "minecraft:totem_of_undying": 450,
   "minecraft:scute": 468,
+  "minecraft:turtle_scute": 468,
   "minecraft:raw_iron": 520,
   "minecraft:raw_gold": 521,
   "minecraft:raw_copper": 522,
@@ -1029,5 +1030,8 @@
   "minecraft:music_disc_5": 636,
   "minecraft:disc_fragment_5": 637,
   "minecraft:glow_berries": 654,
-  "minecraft:music_disc_relic": 701
+  "minecraft:music_disc_relic": 701,
+  "minecraft:decorated_pot": -551,
+  "minecraft:bamboo_planks": -510,
+  "minecraft:cherry_planks": -537
 }

@@ -15,6 +15,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Identifier;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.NonNull;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -28,19 +29,39 @@ import java.util.function.Consumer;
  * <p>
  * CustomBlockDefinition is used to get the data of the item behavior_pack sent to the client. The methods provided in {@link CustomItemDefinition.SimpleBuilder} control the data sent to the client, if you need to control some of the server-side behavior, please override the methods in {@link cn.nukkit.item.Item Item}.
  */
+@Log4j2
 public class CustomItemDefinition {
     private static final ConcurrentHashMap<String, Integer> INTERNAL_ALLOCATION_ID_MAP = new ConcurrentHashMap<>();
     private static final AtomicInteger nextRuntimeId = new AtomicInteger(10000);
 
     private final String identifier;
-    private final CompoundTag nbt; //465
+    private final CompoundTag nbt; //649
+    private final CompoundTag nbt465;
     private final CompoundTag nbt419;
 
     private CustomItemDefinition(String identifier, CompoundTag nbt) {
         this.identifier = identifier;
         this.nbt = nbt;
 
-        this.nbt419 = nbt.clone();
+        this.nbt465  = nbt.clone();
+        CompoundTag components465 = this.nbt465.getCompound("components");
+        components465
+                .getCompound("item_properties")
+                .getCompound("minecraft:icon")
+                .remove("textures")
+                .putString("texture", this.getTexture());
+        if (this.nbt465.getCompound("item_properties").getInt("damage") > 0
+                && !components465.containsCompound("minecraft:weapon")) {
+            components465.putCompound(new CompoundTag("minecraft:weapon"));
+        }
+        if (components465.contains("minecraft:wearable")) {
+            CompoundTag wearable465 = components465.getCompound("minecraft:wearable");
+            this.nbt465.putCompound("minecraft:armor", new CompoundTag()
+                    .putInt("protection", wearable465.getInt("protection")));
+            wearable465.remove("protection");
+        }
+
+        this.nbt419 = this.nbt465.clone();
         this.nbt419.getCompound("components").getCompound("item_properties").remove("minecraft:icon");
         this.nbt419.getCompound("components").putCompound("minecraft:icon", new CompoundTag().putString("texture", this.getTexture()));
     }
@@ -54,8 +75,10 @@ public class CustomItemDefinition {
     }
 
     public CompoundTag getNbt(int protocol) {
-        if (protocol >= ProtocolInfo.v1_17_30) {
+        if (protocol >= ProtocolInfo.v1_20_60) {
             return this.nbt;
+        } else if (protocol >= ProtocolInfo.v1_17_30) {
+            return this.nbt465;
         }
         return this.nbt419;
     }
@@ -128,7 +151,11 @@ public class CustomItemDefinition {
     }
 
     public String getTexture() {
-        return this.nbt.getCompound("components").getCompound("item_properties").getCompound("minecraft:icon").getString("texture");
+        return this.nbt.getCompound("components")
+                .getCompound("item_properties")
+                .getCompound("minecraft:icon")
+                .getCompound("textures")
+                .getString("default");
     }
 
     public int getRuntimeId() {
@@ -154,7 +181,7 @@ public class CustomItemDefinition {
             this.nbt.getCompound("components")
                     .getCompound("item_properties")
                     .getCompound("minecraft:icon")
-                    .putString("texture", customItem.getTextureName());
+                    .putCompound("textures", new CompoundTag().putString("default", customItem.getTextureName()));
 
             //定义显示名
             if (item.getName() != null && !item.getName().equals(Item.UNKNOWN_STR)) {
@@ -216,7 +243,7 @@ public class CustomItemDefinition {
          */
         public SimpleBuilder creativeGroup(String creativeGroup) {
             if (creativeGroup.isBlank()) {
-                System.out.println("creativeGroup has an invalid value!");
+                log.warn("creativeGroup has an invalid value!");
                 return this;
             }
             this.nbt.getCompound("components")
@@ -325,7 +352,7 @@ public class CustomItemDefinition {
          */
         protected SimpleBuilder addRepairs(@NotNull List<String> repairItemNames, String molang) {
             if (molang.isBlank()) {
-                System.out.println("repairAmount has an invalid value!");
+                log.warn("repairAmount has an invalid value!");
                 return this;
             }
 
@@ -381,7 +408,9 @@ public class CustomItemDefinition {
             var shovelBlocks = new Object2ObjectOpenHashMap<String, DigProperty>();
             var hoeBlocks = new Object2ObjectOpenHashMap<String, DigProperty>();
             var swordBlocks = new Object2ObjectOpenHashMap<String, DigProperty>();
-            for (var name : List.of("minecraft:ice", "minecraft:undyed_shulker_box", "minecraft:shulker_box", "minecraft:prismarine", "minecraft:stone_slab4", "minecraft:prismarine_bricks_stairs", "minecraft:prismarine_stairs", "minecraft:dark_prismarine_stairs", "minecraft:anvil", "minecraft:bone_block", "minecraft:iron_trapdoor", "minecraft:nether_brick_fence", "minecraft:crying_obsidian", "minecraft:magma", "minecraft:smoker", "minecraft:lit_smoker", "minecraft:hopper", "minecraft:redstone_block", "minecraft:mob_spawner", "minecraft:netherite_block", "minecraft:smooth_stone", "minecraft:diamond_block", "minecraft:lapis_block", "minecraft:emerald_block", "minecraft:enchanting_table", "minecraft:end_bricks", "minecraft:cracked_polished_blackstone_bricks", "minecraft:nether_brick", "minecraft:cracked_nether_bricks", "minecraft:purpur_block", "minecraft:purpur_stairs", "minecraft:end_brick_stairs", "minecraft:stone_slab", "minecraft:stone_slab2", "minecraft:stone_slab3", "minecraft:stone_brick_stairs", "minecraft:mossy_stone_brick_stairs", "minecraft:polished_blackstone_bricks", "minecraft:polished_blackstone_stairs", "minecraft:blackstone_wall", "minecraft:blackstone_wall", "minecraft:polished_blackstone_wall", "minecraft:sandstone", "minecraft:grindstone", "minecraft:smooth_stone", "minecraft:brewing_stand", "minecraft:chain", "minecraft:lantern", "minecraft:soul_lantern", "minecraft:ancient_debris", "minecraft:quartz_ore", "minecraft:netherrack", "minecraft:basalt", "minecraft:polished_basalt", "minecraft:stonebrick", "minecraft:warped_nylium", "minecraft:crimson_nylium", "minecraft:end_stone", "minecraft:ender_chest", "minecraft:quartz_block", "minecraft:quartz_stairs", "minecraft:quartz_bricks", "minecraft:quartz_stairs", "minecraft:nether_gold_ore", "minecraft:furnace", "minecraft:blast_furnace", "minecraft:lit_furnace", "minecraft:blast_furnace", "minecraft:blackstone", "minecraft:concrete", "minecraft:deepslate_copper_ore", "minecraft:deepslate_lapis_ore", "minecraft:chiseled_deepslate", "minecraft:cobbled_deepslate", "minecraft:cobbled_deepslate_double_slab", "minecraft:cobbled_deepslate_slab", "minecraft:cobbled_deepslate_stairs", "minecraft:cobbled_deepslate_wall", "minecraft:cracked_deepslate_bricks", "minecraft:cracked_deepslate_tiles", "minecraft:deepslate", "minecraft:deepslate_brick_double_slab", "minecraft:deepslate_brick_slab", "minecraft:deepslate_brick_stairs", "minecraft:deepslate_brick_wall", "minecraft:deepslate_bricks", "minecraft:deepslate_tile_double_slab", "minecraft:deepslate_tile_slab", "minecraft:deepslate_tile_stairs", "minecraft:deepslate_tile_wall", "minecraft:deepslate_tiles", "minecraft:infested_deepslate", "minecraft:polished_deepslate", "minecraft:polished_deepslate_double_slab", "minecraft:polished_deepslate_slab", "minecraft:polished_deepslate_stairs", "minecraft:polished_deepslate_wall", "minecraft:calcite", "minecraft:amethyst_block", "minecraft:amethyst_cluster", "minecraft:budding_amethyst", "minecraft:raw_copper_block", "minecraft:raw_gold_block", "minecraft:raw_iron_block", "minecraft:copper_ore", "minecraft:copper_block", "minecraft:cut_copper", "minecraft:cut_copper_slab", "minecraft:cut_copper_stairs", "minecraft:double_cut_copper_slab", "minecraft:exposed_copper", "minecraft:exposed_cut_copper", "minecraft:exposed_cut_copper_slab", "minecraft:exposed_cut_copper_stairs", "minecraft:exposed_double_cut_copper_slab", "minecraft:oxidized_copper", "minecraft:oxidized_cut_copper", "minecraft:oxidized_cut_copper_slab", "minecraft:oxidized_cut_copper_stairs", "minecraft:oxidized_double_cut_copper_slab", "minecraft:weathered_copper", "minecraft:weathered_cut_copper", "minecraft:weathered_cut_copper_slab", "minecraft:weathered_cut_copper_stairs", "minecraft:weathered_double_cut_copper_slab", "minecraft:waxed_copper", "minecraft:waxed_cut_copper", "minecraft:waxed_cut_copper_slab", "minecraft:waxed_cut_copper_stairs", "minecraft:waxed_double_cut_copper_slab", "minecraft:waxed_exposed_copper", "minecraft:waxed_exposed_cut_copper", "minecraft:waxed_exposed_cut_copper_slab", "minecraft:waxed_exposed_cut_copper_stairs", "minecraft:waxed_exposed_double_cut_copper_slab", "minecraft:waxed_oxidized_copper", "minecraft:waxed_oxidized_cut_copper", "minecraft:waxed_oxidized_cut_copper_slab", "minecraft:waxed_oxidized_cut_copper_stairs", "minecraft:waxed_oxidized_double_cut_copper_slab", "minecraft:waxed_weathered_copper", "minecraft:waxed_weathered_cut_copper", "minecraft:waxed_weathered_cut_copper_slab", "minecraft:waxed_weathered_cut_copper_stairs", "minecraft:waxed_weathered_double_cut_copper_slab", "minecraft:dripstone_block", "minecraft:pointed_dripstone", "minecraft:lightning_rod", "minecraft:basalt", "minecraft:tuff", "minecraft:double_stone_slab", "minecraft:double_stone_slab2", "minecraft:double_stone_slab3", "minecraft:double_stone_slab4", "minecraft:blackstone_double_slab", "minecraft:polished_blackstone_brick_double_slab", "minecraft:polished_blackstone_double_slab", "minecraft:mossy_cobblestone_stairs", "minecraft:stonecutter", "minecraft:stonecutter_block", "minecraft:red_nether_brick", "minecraft:red_nether_brick_stairs", "minecraft:normal_stone_stairs", "minecraft:smooth_basalt", "minecraft:stone", "minecraft:cobblestone", "minecraft:mossy_cobblestone", "minecraft:dripstone_block", "minecraft:brick_block", "minecraft:stone_stairs", "minecraft:stone_block_slab", "minecraft:stone_block_slab2", "minecraft:stone_block_slab3", "minecraft:stone_block_slab4", "minecraft:cobblestone_wall", "minecraft:gold_block", "minecraft:iron_block", "minecraft:cauldron", "minecraft:iron_bars", "minecraft:obsidian", "minecraft:coal_ore", "minecraft:deepslate_coal_ore", "minecraft:deepslate_diamond_ore", "minecraft:deepslate_emerald_ore", "minecraft:deepslate_gold_ore", "minecraft:deepslate_iron_ore", "minecraft:deepslate_redstone_ore", "minecraft:lit_deepslate_redstone_ore", "minecraft:diamond_ore", "minecraft:emerald_ore", "minecraft:gold_ore", "minecraft:iron_ore", "minecraft:lapis_ore", "minecraft:redstone_ore", "minecraft:lit_redstone_ore", "minecraft:raw_iron_block", "minecraft:raw_gold_block", "minecraft:raw_copper_block", "minecraft:mud_brick_double_slab", "minecraft:mud_brick_slab", "minecraft:mud_brick_stairs", "minecraft:mud_brick_wall", "minecraft:mud_bricks", "minecraft:hardened_clay", "minecraft:stained_hardened_clay", "minecraft:polished_diorite_stairs", "minecraft:andesite_stairs", "minecraft:polished_andesite_stairs", "minecraft:granite_stairs", "minecraft:polished_granite_stairs", "minecraft:polished_blackstone", "minecraft:chiseled_polished_blackstone", "minecraft:polished_blackstone_brick_stairs", "minecraft:blackstone_stairs", "minecraft:polished_blackstone_brick_wall", "minecraft:gilded_blackstone", "minecraft:coal_block")) {
+            for (var name : List.of("minecraft:ice", "minecraft:undyed_shulker_box", "minecraft:shulker_box", "minecraft:prismarine", "minecraft:stone_slab4", "minecraft:prismarine_bricks_stairs", "minecraft:prismarine_stairs", "minecraft:dark_prismarine_stairs", "minecraft:anvil", "minecraft:bone_block", "minecraft:iron_trapdoor", "minecraft:nether_brick_fence", "minecraft:crying_obsidian", "minecraft:magma", "minecraft:smoker", "minecraft:lit_smoker", "minecraft:hopper", "minecraft:redstone_block", "minecraft:mob_spawner", "minecraft:netherite_block", "minecraft:smooth_stone", "minecraft:diamond_block", "minecraft:lapis_block", "minecraft:emerald_block", "minecraft:enchanting_table", "minecraft:end_bricks", "minecraft:cracked_polished_blackstone_bricks", "minecraft:nether_brick", "minecraft:cracked_nether_bricks", "minecraft:purpur_block", "minecraft:purpur_stairs", "minecraft:end_brick_stairs", "minecraft:stone_slab", "minecraft:stone_slab2", "minecraft:stone_slab3", "minecraft:stone_brick_stairs", "minecraft:mossy_stone_brick_stairs", "minecraft:polished_blackstone_bricks", "minecraft:polished_blackstone_stairs", "minecraft:blackstone_wall", "minecraft:blackstone_wall", "minecraft:polished_blackstone_wall", "minecraft:sandstone", "minecraft:grindstone", "minecraft:smooth_stone", "minecraft:brewing_stand", "minecraft:chain", "minecraft:lantern", "minecraft:soul_lantern", "minecraft:ancient_debris", "minecraft:quartz_ore", "minecraft:netherrack", "minecraft:basalt", "minecraft:polished_basalt", "minecraft:stonebrick", "minecraft:warped_nylium", "minecraft:crimson_nylium", "minecraft:end_stone", "minecraft:ender_chest", "minecraft:quartz_block", "minecraft:quartz_stairs", "minecraft:quartz_bricks", "minecraft:quartz_stairs", "minecraft:nether_gold_ore", "minecraft:furnace", "minecraft:blast_furnace", "minecraft:lit_furnace", "minecraft:blast_furnace", "minecraft:blackstone", "minecraft:concrete", "minecraft:deepslate_copper_ore", "minecraft:deepslate_lapis_ore", "minecraft:chiseled_deepslate", "minecraft:cobbled_deepslate", "minecraft:cobbled_deepslate_double_slab", "minecraft:cobbled_deepslate_slab", "minecraft:cobbled_deepslate_stairs", "minecraft:cobbled_deepslate_wall", "minecraft:cracked_deepslate_bricks", "minecraft:cracked_deepslate_tiles", "minecraft:deepslate", "minecraft:deepslate_brick_double_slab", "minecraft:deepslate_brick_slab", "minecraft:deepslate_brick_stairs", "minecraft:deepslate_brick_wall", "minecraft:deepslate_bricks", "minecraft:deepslate_tile_double_slab", "minecraft:deepslate_tile_slab", "minecraft:deepslate_tile_stairs", "minecraft:deepslate_tile_wall", "minecraft:deepslate_tiles", "minecraft:infested_deepslate", "minecraft:polished_deepslate", "minecraft:polished_deepslate_double_slab", "minecraft:polished_deepslate_slab", "minecraft:polished_deepslate_stairs", "minecraft:polished_deepslate_wall", "minecraft:calcite", "minecraft:amethyst_block", "minecraft:amethyst_cluster", "minecraft:budding_amethyst", "minecraft:raw_copper_block", "minecraft:raw_gold_block", "minecraft:raw_iron_block", "minecraft:copper_ore", "minecraft:copper_block", "minecraft:cut_copper", "minecraft:cut_copper_slab", "minecraft:cut_copper_stairs", "minecraft:double_cut_copper_slab", "minecraft:exposed_copper", "minecraft:exposed_cut_copper", "minecraft:exposed_cut_copper_slab", "minecraft:exposed_cut_copper_stairs", "minecraft:exposed_double_cut_copper_slab", "minecraft:oxidized_copper", "minecraft:oxidized_cut_copper", "minecraft:oxidized_cut_copper_slab", "minecraft:oxidized_cut_copper_stairs", "minecraft:oxidized_double_cut_copper_slab", "minecraft:weathered_copper", "minecraft:weathered_cut_copper", "minecraft:weathered_cut_copper_slab", "minecraft:weathered_cut_copper_stairs", "minecraft:weathered_double_cut_copper_slab", "minecraft:waxed_copper", "minecraft:waxed_cut_copper", "minecraft:waxed_cut_copper_slab", "minecraft:waxed_cut_copper_stairs", "minecraft:waxed_double_cut_copper_slab", "minecraft:waxed_exposed_copper", "minecraft:waxed_exposed_cut_copper", "minecraft:waxed_exposed_cut_copper_slab", "minecraft:waxed_exposed_cut_copper_stairs", "minecraft:waxed_exposed_double_cut_copper_slab", "minecraft:waxed_oxidized_copper", "minecraft:waxed_oxidized_cut_copper", "minecraft:waxed_oxidized_cut_copper_slab", "minecraft:waxed_oxidized_cut_copper_stairs", "minecraft:waxed_oxidized_double_cut_copper_slab", "minecraft:waxed_weathered_copper", "minecraft:waxed_weathered_cut_copper", "minecraft:waxed_weathered_cut_copper_slab", "minecraft:waxed_weathered_cut_copper_stairs", "minecraft:waxed_weathered_double_cut_copper_slab", "minecraft:dripstone_block", "minecraft:pointed_dripstone", "minecraft:lightning_rod", "minecraft:basalt", "minecraft:tuff", "minecraft:double_stone_slab", "minecraft:double_stone_slab2", "minecraft:double_stone_slab3", "minecraft:double_stone_slab4", "minecraft:blackstone_double_slab", "minecraft:polished_blackstone_brick_double_slab", "minecraft:polished_blackstone_double_slab", "minecraft:mossy_cobblestone_stairs", "minecraft:stonecutter", "minecraft:stonecutter_block", "minecraft:red_nether_brick", "minecraft:red_nether_brick_stairs", "minecraft:normal_stone_stairs", "minecraft:smooth_basalt", "minecraft:stone", "minecraft:cobblestone", "minecraft:mossy_cobblestone", "minecraft:dripstone_block", "minecraft:brick_block", "minecraft:stone_stairs", "minecraft:stone_block_slab", "minecraft:stone_block_slab2", "minecraft:stone_block_slab3", "minecraft:stone_block_slab4", "minecraft:cobblestone_wall", "minecraft:gold_block", "minecraft:iron_block", "minecraft:cauldron", "minecraft:iron_bars", "minecraft:obsidian", "minecraft:coal_ore", "minecraft:deepslate_coal_ore", "minecraft:deepslate_diamond_ore", "minecraft:deepslate_emerald_ore", "minecraft:deepslate_gold_ore", "minecraft:deepslate_iron_ore", "minecraft:deepslate_redstone_ore", "minecraft:lit_deepslate_redstone_ore", "minecraft:diamond_ore", "minecraft:emerald_ore", "minecraft:gold_ore", "minecraft:iron_ore", "minecraft:lapis_ore", "minecraft:redstone_ore", "minecraft:lit_redstone_ore", "minecraft:raw_iron_block", "minecraft:raw_gold_block", "minecraft:raw_copper_block", "minecraft:mud_brick_double_slab", "minecraft:mud_brick_slab", "minecraft:mud_brick_stairs", "minecraft:mud_brick_wall", "minecraft:mud_bricks", "minecraft:hardened_clay", "minecraft:stained_hardened_clay", "minecraft:polished_diorite_stairs", "minecraft:andesite_stairs", "minecraft:polished_andesite_stairs", "minecraft:granite_stairs", "minecraft:polished_granite_stairs", "minecraft:polished_blackstone", "minecraft:chiseled_polished_blackstone", "minecraft:polished_blackstone_brick_stairs", "minecraft:blackstone_stairs", "minecraft:polished_blackstone_brick_wall", "minecraft:gilded_blackstone", "minecraft:coal_block",
+                    /* 带釉陶瓦 */ "minecraft:white_glazed_terracotta", "minecraft:orange_glazed_terracotta", "minecraft:magenta_glazed_terracotta", "minecraft:light_blue_glazed_terracotta", "minecraft:yellow_glazed_terracotta", "minecraft:lime_glazed_terracotta", "minecraft:pink_glazed_terracotta", "minecraft:gray_glazed_terracotta", "minecraft:silver_glazed_terracotta", "minecraft:cyan_glazed_terracotta", "minecraft:purple_glazed_terracotta", "minecraft:blue_glazed_terracotta", "minecraft:brown_glazed_terracotta", "minecraft:green_glazed_terracotta", "minecraft:red_glazed_terracotta", "minecraft:black_glazed_terracotta",
+                    /* 珊瑚块  */"minecraft:coral_block", "minecraft:tube_coral_block", "minecraft:brain_coral_block", "minecraft:brain_coral_block", "minecraft:brain_coral_block", "minecraft:brain_coral_block", "minecraft:brain_coral_block", "minecraft:dead_brain_coral_block", "minecraft:dead_brain_coral_block", "minecraft:dead_brain_coral_block", "minecraft:dead_brain_coral_block")) {
                 pickaxeBlocks.put(name, new DigProperty());
             }
             toolBlocks.put(ItemTag.IS_PICKAXE, pickaxeBlocks);
@@ -447,7 +476,7 @@ public class CustomItemDefinition {
          */
         public ToolBuilder speed(int speed) {
             if (speed < 0) {
-                System.out.println("speed has an invalid value!");
+                log.warn("speed has an invalid value!");
                 return this;
             }
             if (item.isPickaxe() || item.isShovel() || item.isHoe() || item.isAxe() || item.isShears()) {
@@ -467,7 +496,7 @@ public class CustomItemDefinition {
          */
         public ToolBuilder addExtraBlock(@NotNull String blockName, int speed) {
             if (speed < 0) {
-                System.out.println("speed has an invalid value!");
+                log.warn("speed has an invalid value!");
                 return this;
             }
             this.blocks.add(new CompoundTag()
@@ -491,7 +520,7 @@ public class CustomItemDefinition {
         public ToolBuilder addExtraBlocks(@NotNull Map<String, Integer> blocks) {
             blocks.forEach((blockName, speed) -> {
                 if (speed < 0) {
-                    System.out.println("speed has an invalid value!");
+                    log.warn("speed has an invalid value!");
                     return;
                 }
                 this.blocks.add(new CompoundTag()
@@ -516,7 +545,7 @@ public class CustomItemDefinition {
          */
         public ToolBuilder addExtraBlocks(@NotNull String blockName, DigProperty property) {
             if (property.getSpeed() != null && property.getSpeed() < 0) {
-                System.out.println("speed has an invalid value!");
+                log.warn("speed has an invalid value!");
                 return this;
             }
             this.blocks.add(new CompoundTag()
@@ -530,16 +559,19 @@ public class CustomItemDefinition {
         }
 
         /**
+         * @deprecated  在1.20.60更改，会导致客户端收到错误数据包
+         *
          * 物品的攻击力必须大于0才能生效<p>
          * 标记这个物品是否为武器，如果是，会在物品描述中提示{@code "+X 攻击伤害"}的信息
          * <p>
          * The item's attack damage must be greater than 0<p>
          * define the item is a weapon or not, and if so, it will prompt {@code "+X attack damage"} in the item description
          */
+        @Deprecated
         public ToolBuilder isWeapon() {
-            if (this.item.getAttackDamage() > 0 && !this.nbt.getCompound("components").containsCompound("minecraft:weapon")) {
+            /*if (this.item.getAttackDamage() > 0 && !this.nbt.getCompound("components").containsCompound("minecraft:weapon")) {
                 this.nbt.getCompound("components").putCompound(new CompoundTag("minecraft:weapon"));
-            }
+            }*/
             return this;
         }
 
@@ -580,39 +612,39 @@ public class CustomItemDefinition {
             Identifier type = null;
             if (item.isPickaxe()) {
                 //添加可挖掘方块Tags
-                this.blockTags.addAll(List.of("'stone'", "'metal'", "'diamond_pick_diggable'", "'mob_spawner'", "'rail'", "'slab_block'", "'stair_block'", "'smooth stone slab'", "'sandstone slab'", "'cobblestone slab'", "'brick slab'", "'stone bricks slab'", "'quartz slab'", "'nether brick slab'"));
+                this.blockTags.addAll(List.of("'stone'", "'metal'", "'diamond_pick_diggable'", "'mob_spawner'", "'rail'", "'slab_block'", "'stair_block'", "'smooth stone slab'", "'sandstone slab'", "'cobblestone slab'", "'brick slab'", "'stone bricks slab'", "'quartz slab'", "'nether brick slab'", "'glazed terracotta'", "coral"));
                 //添加可挖掘方块
                 type = ItemTag.IS_PICKAXE;
                 //附加附魔信息
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "pickaxe");
                 this.tag("minecraft:is_pickaxe");
-                this.isWeapon();
+                //this.isWeapon();
             } else if (item.isAxe()) {
                 this.blockTags.addAll(List.of("'wood'", "'pumpkin'", "'plant'"));
                 type = ItemTag.IS_AXE;
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "axe");
                 this.tag("minecraft:is_axe");
-                this.isWeapon();
+                //this.isWeapon();
             } else if (item.isShovel()) {
                 this.blockTags.addAll(List.of("'sand'", "'dirt'", "'gravel'", "'grass'", "'snow'"));
                 type = ItemTag.IS_SHOVEL;
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "shovel");
                 this.tag("minecraft:is_shovel");
-                this.isWeapon();
+                //this.isWeapon();
             } else if (item.isHoe()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "hoe");
                 type = ItemTag.IS_HOE;
                 this.tag("minecraft:is_hoe");
-                this.isWeapon();
+                //this.isWeapon();
             } else if (item.isSword()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "sword");
                 type = ItemTag.IS_SWORD;
-                this.isWeapon();
+                //this.isWeapon();
             } else {
                 if (this.nbt.getCompound("components").contains("item_tags")) {
                     var list = this.nbt.getCompound("components").getList("item_tags", StringTag.class).getAll();
@@ -696,34 +728,34 @@ public class CustomItemDefinition {
         @Override
         public CustomItemDefinition build() {
             this.nbt.getCompound("components")
-                    .putCompound("minecraft:armor", new CompoundTag()
-                            .putInt("protection", item.getArmorPoints()))
                     .putCompound("minecraft:durability", new CompoundTag()
-                            .putInt("max_durability", item.getMaxDurability()));
+                            .putInt("max_durability", item.getMaxDurability()))
+                    .putCompound("minecraft:wearable", new CompoundTag()
+                            .putInt("protection", item.getArmorPoints()));
             if (item.isHelmet()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "armor_head");
                 this.nbt.getCompound("components")
-                        .putCompound("minecraft:wearable", new CompoundTag()
-                                .putString("slot", "slot.armor.head"));
+                        .getCompound("minecraft:wearable")
+                                .putString("slot", "slot.armor.head");
             } else if (item.isChestplate()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "armor_torso");
                 this.nbt.getCompound("components")
-                        .putCompound("minecraft:wearable", new CompoundTag()
-                                .putString("slot", "slot.armor.chest"));
+                        .getCompound("minecraft:wearable")
+                        .putString("slot", "slot.armor.chest");
             } else if (item.isLeggings()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "armor_legs");
                 this.nbt.getCompound("components")
-                        .putCompound("minecraft:wearable", new CompoundTag()
-                                .putString("slot", "slot.armor.legs"));
+                        .getCompound("minecraft:wearable")
+                                .putString("slot", "slot.armor.legs");
             } else if (item.isBoots()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "armor_feet");
                 this.nbt.getCompound("components")
-                        .putCompound("minecraft:wearable", new CompoundTag()
-                                .putString("slot", "slot.armor.feet"));
+                        .getCompound("minecraft:wearable")
+                                .putString("slot", "slot.armor.feet");
             }
             return calculateID();
         }

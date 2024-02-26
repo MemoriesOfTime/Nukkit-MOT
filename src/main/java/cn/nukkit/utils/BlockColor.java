@@ -25,6 +25,10 @@ public class BlockColor  {
     public static final BlockColor WATER_BLOCK_COLOR = new BlockColor(0x40, 0x40, 0xff);
     public static final BlockColor LAVA_BLOCK_COLOR = TNT_BLOCK_COLOR;
     public static final BlockColor WOOD_BLOCK_COLOR = new BlockColor(0x8f, 0x77, 0x48);
+    public static final BlockColor BAMBOO_BLOCK_COLOR = new BlockColor(0xe5, 0xe5, 0x33);
+    public static final BlockColor CHERRY_BLOCK_COLOR = new BlockColor(0xd1, 0xb1, 0xa1);
+    public static final BlockColor MANGROVE_BLOCK_COLOR = new BlockColor(0x99, 0x33, 0x33);
+
     public static final BlockColor QUARTZ_BLOCK_COLOR = new BlockColor(0xff, 0xfc, 0xf5);
     public static final BlockColor ADOBE_BLOCK_COLOR = new BlockColor(0xd8, 0x7f, 0x33);
 
