@@ -3715,8 +3715,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             break;
                         }
                         if (this.protocol >= 407) {
-                            Optional<Inventory> topWindow = this.getTopWindow();
-                            if (!this.inventoryOpen && !(topWindow.isPresent() && topWindow.get().getViewers().contains(this))) {
+                            //Optional<Inventory> topWindow = this.getTopWindow();
+                            if (!this.inventoryOpen/* && !(topWindow.isPresent() && topWindow.get().getViewers().contains(this))*/) {
                                 this.inventoryOpen = this.inventory.open(this);
                             }
                         }
