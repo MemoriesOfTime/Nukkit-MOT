@@ -82,11 +82,17 @@ public class Network {
 
     public double getUpload() {
         //return upload;
+        if (netWorkStatisticDataList.size() < 2) {
+            return 0;
+        }
         return netWorkStatisticDataList.get(1).upload - netWorkStatisticDataList.get(0).upload;
     }
 
     public double getDownload() {
         //return download;
+        if (netWorkStatisticDataList.size() < 2) {
+            return 0;
+        }
         return netWorkStatisticDataList.get(1).download - netWorkStatisticDataList.get(0).download;
     }
 
