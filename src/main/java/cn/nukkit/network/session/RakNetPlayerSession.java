@@ -9,6 +9,7 @@ import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.DisconnectPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
 import com.nukkitx.natives.sha256.Sha256;
@@ -38,6 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionListener {
 
     private static final ThreadLocal<Sha256> HASH_LOCAL = ThreadLocal.withInitial(Natives.SHA_256);
+    private static final ThreadLocal<byte[]> CHECKSUM_LOCAL = ThreadLocal.withInitial(() -> new byte[8]);
 
     private final RakNetInterface server;
     private final RakNetServerSession session;
@@ -56,7 +58,8 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
     private SecretKey encryptionKey;
     private Cipher encryptionCipher;
     private Cipher decryptionCipher;
-    private final AtomicLong sentEncryptedPacketCount = new AtomicLong();
+    private final AtomicLong encryptCounter = new AtomicLong();
+    private final AtomicLong decryptCounter = new AtomicLong();
 
     public RakNetPlayerSession(RakNetInterface server, RakNetServerSession session) {
         this.server = server;
@@ -91,7 +94,31 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
                     this.compressionIn = CompressionProvider.byPrefix(buffer.readByte(), this.session.getProtocolVersion());
                 }
 
-                //TODO 校验数据包
+                // Verify the checksum
+                buffer.markReaderIndex();
+                int trailerIndex = buffer.writerIndex() - 8;
+                byte[] checksum = CHECKSUM_LOCAL.get();
+                try {
+                    buffer.readerIndex(trailerIndex);
+                    buffer.readBytes(checksum);
+                } catch (Exception e) {
+                    this.disconnect("Bad checksum");
+                    log.debug("Unable to verify checksum", e);
+                    return;
+                }
+                ByteBuf payload = buffer.slice(1, trailerIndex - 1);
+                long count = this.decryptCounter.getAndIncrement();
+                byte[] expected = this.calculateChecksum(count, payload);
+                for (int i = 0; i < 8; i++) {
+                    if (checksum[i] != expected[i]) {
+                        this.disconnect("Invalid checksum");
+                        log.debug("Encrypted packet {} has invalid checksum (expected {}, got {})",
+                                count, Binary.bytesToHexString(expected), Binary.bytesToHexString(checksum));
+                        return;
+                    }
+                }
+                buffer.resetReaderIndex();
+
                 packetBuffer = new byte[buffer.readableBytes() - 8];
             } else {
                 if (ci) {
@@ -273,7 +300,7 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
                     System.arraycopy(compressedPayload, 0, fullPayload, 1, compressedPayload.length);
                 }
                 ByteBuf compressed = Unpooled.wrappedBuffer(fullPayload);
-                ByteBuffer trailer = ByteBuffer.wrap(this.generateTrailer(compressed));
+                ByteBuffer trailer = ByteBuffer.wrap(this.calculateChecksum(this.encryptCounter.getAndIncrement(), compressed));
                 ByteBuffer outBuffer = finalPayload.internalNioBuffer(1, compressed.readableBytes() + 8);
                 ByteBuffer inBuffer = compressed.internalNioBuffer(compressed.readerIndex(), compressed.readableBytes());
                 this.encryptionCipher.update(inBuffer, outBuffer);
@@ -331,14 +358,14 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
         this.decryptionCipher = decryptionCipher;
     }
 
-    private byte[] generateTrailer(ByteBuf buf) {
+    private byte[] calculateChecksum(long count, ByteBuf payload) {
         Sha256 hash = HASH_LOCAL.get();
         ByteBuf counterBuf = ByteBufAllocator.DEFAULT.directBuffer(8);
         try {
-            counterBuf.writeLongLE(this.sentEncryptedPacketCount.getAndIncrement());
+            counterBuf.writeLongLE(count);
             ByteBuffer keyBuffer = ByteBuffer.wrap(this.encryptionKey.getEncoded());
             hash.update(counterBuf.internalNioBuffer(0, 8));
-            hash.update(buf.internalNioBuffer(buf.readerIndex(), buf.readableBytes()));
+            hash.update(payload.internalNioBuffer(payload.readerIndex(), payload.readableBytes()));
             hash.update(keyBuffer);
             byte[] digested = hash.digest();
             return Arrays.copyOf(digested, 8);
