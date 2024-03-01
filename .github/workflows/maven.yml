@@ -29,3 +29,15 @@ jobs:
       with:
         name: Nukkit
         path: staging
+    - name: Update MineBBS infomation
+      uses: fjogeleit/http-request-action@v1
+      if: success() && github.event_name == 'push' && github.repository == 'MemoriesOfTime/Nukkit-MOT' && (contains(github.ref_name, 'master'))
+      with:
+        url: 'https://api.minebbs.com/api/openapi/v1/resources/5934/update'
+        method: 'POST'
+        customHeaders: '{"Authorization": "Bearer ${{ secrets.MINEBBS_API_KEY }}"}'
+        contentType: 'application/json'
+        data: '{"title": "${{ github.ref_name }}-${{ steps.vars.outputs.sha_short }}", "description": "${{ steps.get-changelog.outputs.value }}", "new_version": "${{ steps.time.outputs.time }}", "file_url": "https://motci.cn/job/Nukkit-MOT/"}'
+        escapeData: 'true'
+        preventFailureOnNoResponse: 'true'
+        ignoreStatusCodes: '400,404,401,403,500,502,503,504'
