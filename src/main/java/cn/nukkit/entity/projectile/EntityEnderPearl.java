@@ -9,10 +9,10 @@ import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.player.PlayerTeleportEvent.TeleportCause;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.sound.EndermanTeleportSound;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.Utils;
 
 import java.util.List;
@@ -121,6 +121,8 @@ public class EntityEnderPearl extends EntityProjectile {
             return;
         }
 
+        this.level.addLevelEvent(this.shootingEntity.add(0.5, 0.5, 0.5), LevelEventPacket.EVENT_SOUND_ENDERMAN_TELEPORT);
+
         this.shootingEntity.teleport(new Vector3(NukkitMath.floorDouble(this.x) + 0.5, this.y, NukkitMath.floorDouble(this.z) + 0.5), TeleportCause.ENDER_PEARL);
 
         int gamemode = ((Player) this.shootingEntity).getGamemode();
@@ -128,6 +130,7 @@ public class EntityEnderPearl extends EntityProjectile {
             this.shootingEntity.attack(new EntityDamageByEntityEvent(this, shootingEntity, EntityDamageEvent.DamageCause.FALL, 5f, 0f));
         }
 
-        this.level.addSound(new EndermanTeleportSound(this));
+        this.level.addLevelEvent(this, LevelEventPacket.EVENT_PARTICLE_ENDERMAN_TELEPORT);
+        this.level.addLevelEvent(this.shootingEntity.add(0.5, 0.5, 0.5), LevelEventPacket.EVENT_SOUND_ENDERMAN_TELEPORT);
     }
 }
