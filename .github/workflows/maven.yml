@@ -34,15 +34,13 @@ jobs:
       id: vars
       run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
     - name: Format ChangeLog
-      uses: mkungla/actions-set-text-output@v1
       id: get-changelog
       if: success() && github.event_name == 'push' && github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
-      with:
-        text: ${{ github.event.commits[0].message }}
+      run: echo "changelog=${{ github.event.commits[0].message }}" >> $GITHUB_OUTPUT
     - name: Get Time
       id: time
       uses: nanzm/get-time-action@v1.1
-      if: github.repository == 'PowerNukkitX/PowerNukkitX' && (!contains(github.ref_name, 'patch')) && (!contains(github.ref_name, 'feature'))
+      if: github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
       with:
         timeZone: 8
         format: 'YYYY/MM/DD-HH:mm:ss'
@@ -55,7 +53,7 @@ jobs:
         method: 'POST'
         customHeaders: '{"Authorization": "Bearer ${{ secrets.MINEBBS_API_KEY }}"}'
         contentType: 'application/json'
-        data: '{"title": "${{ github.ref_name }}-${{ steps.vars.outputs.sha_short }}", "description": "${{ steps.get-changelog.outputs.value }}", "new_version": "${{ steps.time.outputs.time }}", "file_url": "https://motci.cn/job/Nukkit-MOT/"}'
+        data: '{"title": "${{ github.ref_name }}-${{ steps.vars.outputs.sha_short }}", "description": "${{ steps.get-changelog.outputs.changelog }}", "new_version": "${{ steps.time.outputs.time }}", "file_url": "https://motci.cn/job/Nukkit-MOT/"}'
         escapeData: 'true'
         preventFailureOnNoResponse: 'true'
         ignoreStatusCodes: '400,404,401,403,500,502,503,504'
