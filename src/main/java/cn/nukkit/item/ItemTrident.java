@@ -52,6 +52,11 @@ public class ItemTrident extends ItemTool {
     }
 
     @Override
+    public boolean canRelease() {
+        return true;
+    }
+
+    @Override
     public boolean onRelease(Player player, int ticksUsed) {
         if (this.hasEnchantment(Enchantment.ID_TRIDENT_RIPTIDE)) {
             return true;

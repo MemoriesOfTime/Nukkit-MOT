@@ -4552,7 +4552,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     }
 
                                     if (!this.isUsingItem()) {
-                                        this.setUsingItem(true);
+                                        this.setUsingItem(/*true*/ item.canRelease());
                                         break packetswitch;
                                     }
 
