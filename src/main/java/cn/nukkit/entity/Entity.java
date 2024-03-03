@@ -1688,8 +1688,11 @@ public abstract class Entity extends Location implements Metadatable {
         boolean hasUpdate = false;
 
         this.checkBlockCollision();
-
-        if (this.y <= -16 && this.isAlive()) {
+        int minY = level.getMinBlockY() - 18;
+        if (this.isPlayer && ((Player) this).protocol < ProtocolInfo.v1_18_0) {
+            minY = -18;
+        }
+        if (this.y <= minY && this.isAlive()) {
             if (this.isPlayer) {
                 if (((Player) this).getGamemode() != Player.CREATIVE) this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
             } else {
@@ -2440,17 +2443,22 @@ public abstract class Entity extends Location implements Metadatable {
 
             this.blocksAround = new ArrayList<>();
 
-            if (this.level.isYInRange(minY) || this.level.isYInRange(maxY)) {
-                minY = Math.max(minY, this.level.getMinBlockY());
-                maxY = Math.min(maxY, this.level.getMaxBlockY());
-                for (int z = minZ; z <= maxZ; ++z) {
-                    for (int x = minX; x <= maxX; ++x) {
-                        for (int y = minY; y <= maxY; ++y) {
-                            Block block = this.level.getBlock(x, y, z, false);
-                            this.blocksAround.add(block);
+            try {
+                if (this.level.isYInRange(minY) || this.level.isYInRange(maxY)) {
+                    minY = Math.max(minY, this.level.getMinBlockY());
+                    maxY = Math.min(maxY, this.level.getMaxBlockY());
+                    for (int z = minZ; z <= maxZ; ++z) {
+                        for (int x = minX; x <= maxX; ++x) {
+                            for (int y = minY; y <= maxY; ++y) {
+                                Block block = this.level.getBlock(x, y, z, false);
+                                this.blocksAround.add(block);
+                            }
                         }
                     }
                 }
+            } catch (NullPointerException e) {
+                // 异步传送导致空指针 忽略结果
+                return new ArrayList<>();
             }
         }
 
@@ -3179,4 +3187,36 @@ public abstract class Entity extends Location implements Metadatable {
 
         return new PropertySyncData(intArray, floatArray);
     }
+
+    /**
+     * Batch play animation on entity groups<br/>
+     * This method is recommended if you need to play the same animation on a large number of entities at the same time, as it only sends packets once for each player, which greatly reduces bandwidth pressure
+     * <p>
+     * 在实体群上批量播放动画<br/>
+     * 若你需要同时在大量实体上播放同一动画，建议使用此方法，因为此方法只会针对每个玩家发送一次包，这能极大地缓解带宽压力
+     *
+     * @param animation 动画对象 Animation objects
+     * @param entities  需要播放动画的实体群 Group of entities that need to play animations
+     * @param players   可视玩家 Visible Player
+     */
+    public static void playAnimationOnEntities(AnimateEntityPacket.Animation animation, Collection<Entity> entities, Collection<Player> players) {
+        var pk = new AnimateEntityPacket();
+        pk.parseFromAnimation(animation);
+        entities.forEach(entity -> pk.getEntityRuntimeIds().add(entity.getId()));
+        pk.encode();
+        Server.broadcastPacket(players, pk);
+    }
+
+    /**
+     * @see #playAnimationOnEntities(AnimateEntityPacket.Animation, Collection, Collection)
+     */
+    public static void playAnimationOnEntities(AnimateEntityPacket.Animation animation, Collection<Entity> entities) {
+        var viewers = new HashSet<Player>();
+        entities.forEach(entity -> {
+            viewers.addAll(entity.getViewers().values());
+            if (entity.isPlayer) viewers.add((Player) entity);
+        });
+        playAnimationOnEntities(animation, entities, viewers);
+    }
+
 }

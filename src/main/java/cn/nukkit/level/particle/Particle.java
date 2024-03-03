@@ -50,8 +50,8 @@ public abstract class Particle extends Vector3 {
     public static final int TYPE_DRIP_HONEY = dynamic(30);
     public static final int TYPE_STALACTITE_DRIP_WATER = dynamic(31);
     public static final int TYPE_STALACTITE_DRIP_LAVA = dynamic(32);
-    public static final int TYPE_FALLING_DUST = dynamic(33), TYPE_DUST = dynamic(34);
-    public static final int TYPE_MOB_SPELL = dynamic(35);
+    public static final int TYPE_FALLING_DUST = dynamic(33), TYPE_DUST = dynamic(33);
+    public static final int TYPE_MOB_SPELL = dynamic(34);
     public static final int TYPE_MOB_SPELL_AMBIENT = dynamic(35);
     public static final int TYPE_MOB_SPELL_INSTANTANEOUS = dynamic(36);
     public static final int TYPE_INK = dynamic(37);

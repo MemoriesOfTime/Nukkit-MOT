@@ -62,6 +62,11 @@ public class NetworkChunkSerializer {
                 }
             }
 
+            // 忽略负数高度区块
+            if (protocolId < ProtocolInfo.v1_18_0) {
+                subChunkCount = Math.max(1, subChunkCount - chunk.getSectionOffset());
+            }
+
             int protocolSubChunkCount = subChunkCount;
             int maxDimensionSections = dimensionData.getHeight() >> 4;
             if (protocolId >= ProtocolInfo.v1_18_0) {
@@ -76,23 +81,22 @@ public class NetworkChunkSerializer {
             byte[] biomePalettes = null;
             int writtenSections = protocolSubChunkCount;
             if (protocolId >= ProtocolInfo.v1_18_0) {
-                // In 1.18 3D biome palettes were introduced. However, current world format
-                // used internally doesn't support them, so we need to convert from legacy 2D
-                biomePalettes = convert2DBiomesTo3D(protocolId, chunk, maxDimensionSections);
+                biomePalettes = getBiomePalettes(chunk, protocolId, maxDimensionSections);
 
                 stream = ThreadCache.binaryStream.get().reset();
 
-                if (dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD && protocolSubChunkCount < maxDimensionSections) {
+                if (dimensionData.getDimensionId() == Level.DIMENSION_OVERWORLD && sections.length < maxDimensionSections) {
                     stream.put(negativeSubChunks);
                     writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
                 }
             }
 
-            for (int i = 0; i < protocolSubChunkCount; i++) {
+            int offset = protocolId < ProtocolInfo.v1_18_0 ? chunk.getSectionOffset() : 0;
+            for (int i = offset; i < protocolSubChunkCount + offset; i++) {
                 if (protocolId < ProtocolInfo.v1_13_0) {
                     stream.putByte((byte) 0);
                     stream.put(sections[i].getBytes(protocolId));
-                }else {
+                } else {
                     sections[i].writeTo(protocolId, stream, antiXray);
                 }
             }
@@ -117,6 +121,21 @@ public class NetworkChunkSerializer {
             stream.put(blockEntities);
 
             callback.accept(new NetworkChunkSerializerCallback(protocolId, stream, writtenSections));
+        }
+    }
+
+    private static byte[] getBiomePalettes(BaseChunk chunk, int protocolId, int maxDimensionSections) {
+        if (chunk.has3dBiomes()) {
+            BinaryStream binaryStream = ThreadCache.binaryStream.get().reset();
+            for (int y = 0; y < maxDimensionSections; y++) {
+                PalettedBlockStorage storage = chunk.getBiomeStorage(y);
+                storage.writeTo(binaryStream, id -> Biome.getBiomeIdOrCorrect(protocolId, id));
+            }
+            return binaryStream.getBuffer();
+        } else {
+            // In 1.18 3D biome palettes were introduced. However, current world format
+            // used internally doesn't support them, so we need to convert from legacy 2D
+            return convert2DBiomesTo3D(protocolId, chunk, maxDimensionSections);
         }
     }
 
@@ -146,7 +165,7 @@ public class NetworkChunkSerializer {
         }
 
         BinaryStream stream = ThreadCache.binaryStream.get().reset();
-        palette.writeTo(stream, Biome::getBiomeIdOrCorrect);
+        palette.writeTo(stream, id -> Biome.getBiomeIdOrCorrect(protocolId, id));
         byte[] bytes = stream.getBuffer();
         stream.reset();
 

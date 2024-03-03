@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol.types.camera;
 
 import cn.nukkit.math.Vector3f;
+import cn.nukkit.utils.CameraPresetManager;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

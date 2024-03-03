@@ -1127,7 +1127,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public Vector3 adjustPosToNearbyEntity(Vector3 pos) {
         pos.y = this.getHighestBlockAt(pos.getFloorX(), pos.getFloorZ());
-        AxisAlignedBB axisalignedbb = new SimpleAxisAlignedBB(pos.x, pos.y, pos.z, pos.getX(), 255, pos.getZ()).expand(3, 3, 3);
+        AxisAlignedBB axisalignedbb = new SimpleAxisAlignedBB(pos.x, pos.y, pos.z, pos.getX(), this.getMaxBlockY(), pos.getZ()).expand(3, 3, 3);
         List<Entity> list = new ArrayList<>();
 
         for (Entity entity : this.getCollidingEntities(axisalignedbb)) {
@@ -1372,7 +1372,7 @@ public class Level implements ChunkManager, Metadatable {
                                     int z = lcg >>> 16 & 0x0f;
 
                                     int blockId = section.getBlockId(x, y, z);
-                                    if (blockId <= Block.MAX_BLOCK_ID && randomTickBlocks[blockId]) {
+                                    if (blockId >= 0 && blockId <= Block.MAX_BLOCK_ID && randomTickBlocks[blockId]) {
                                         Block block = Block.get(blockId, section.getBlockData(x, y, z), this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
                                         block.onUpdate(BLOCK_UPDATE_RANDOM);
                                     }
@@ -1597,7 +1597,7 @@ public class Level implements ChunkManager, Metadatable {
         int minZ = (chunk.getZ() << 4) - 2;
         int maxZ = minZ + 18;
 
-        return this.getPendingBlockUpdates(new SimpleAxisAlignedBB(minX, 0, minZ, maxX, 256, maxZ));
+        return this.getPendingBlockUpdates(new SimpleAxisAlignedBB(minX, 0, minZ, maxX, this.getMaxBlockY(), maxZ));
     }
 
     public Set<BlockUpdateEntry> getPendingBlockUpdates(AxisAlignedBB boundingBox) {
@@ -1876,7 +1876,7 @@ public class Level implements ChunkManager, Metadatable {
 
     public Block getBlock(FullChunk chunk, int x, int y, int z, int layer, boolean load) {
         int[] fullState;
-        if (y >= 0 && y < 256) {
+        if (isYInRange(y)) {
             int cx = x >> 4;
             int cz = z >> 4;
             if (chunk == null || chunk.getX() != cx || chunk.getZ() != cz) {
@@ -2086,7 +2086,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean setBlock(int x, int y, int z, int layer, Block block, boolean direct, boolean update) {
-        if (y < 0 || y >= 256 || layer < 0 || layer > this.requireProvider().getMaximumLayer()) {
+        if (!isYInRange(y) || layer < 0 || layer > this.requireProvider().getMaximumLayer()) {
             return false;
         }
         BaseFullChunk chunk = this.getChunk(x >> 4, z >> 4, true);
@@ -2568,11 +2568,7 @@ public class Level implements ChunkManager, Metadatable {
             block = target;
         }
 
-        if (block.y > 255 || block.y < 0) {
-            return null;
-        }
-
-        if (block.y > 127 && this.getDimension() == DIMENSION_NETHER) {
+        if (!isYInRange(block.getFloorY())) {
             return null;
         }
 
@@ -3930,7 +3926,7 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
 
-            for (; y >= 0 && y < 255; y++) {
+            for (; y >= 0 && y < this.getMaxBlockY(); y++) {
                 int[] b = chunk.getBlockState(x, y + 1, z);
                 Block block = Block.get(b[0], b[1]);
                 if (!this.isFullBlock(block)) {
@@ -4440,7 +4436,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public final boolean isYInRange(int y) {
-        return y >= getMinBlockY() && y < getMaxBlockY();
+        return y >= getMinBlockY() && y <= getMaxBlockY();
     }
 
     public int getMinBlockY() {
@@ -4522,7 +4518,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean isAreaLoaded(AxisAlignedBB bb) {
-        if (bb.getMaxY() < 0 || bb.getMinY() >= 256) {
+        if (bb.getMaxY() < this.getMinBlockY() || bb.getMinY() >= this.getMaxBlockY()) {
             return false;
         }
         int minX = NukkitMath.floorDouble(bb.getMinX()) >> 4;

@@ -2,12 +2,21 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityFurnace;
 import cn.nukkit.blockentity.BlockEntityHopper;
+import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.item.EntityItem;
+import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.ContainerInventory;
+import cn.nukkit.inventory.FurnaceInventory;
+import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemHopper;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.Position;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -186,5 +195,138 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
     @Override
     public BlockFace getBlockFace() {
         return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
+    }
+
+    public interface IHopper extends InventoryHolder {
+
+        Position getPosition();
+
+        boolean isOnTransferCooldown();
+
+        void setTransferCooldown(int transferCooldown);
+
+        default boolean pullItems() {
+            Inventory inventory = this.getInventory();
+
+            if (inventory.isFull()) {
+                return false;
+            }
+
+            BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(this.getPosition().up());
+            if (blockEntity instanceof BlockEntityFurnace) {
+                FurnaceInventory inv = ((BlockEntityFurnace) blockEntity).getInventory();
+                Item item = inv.getResult();
+
+                if (!item.isNull()) {
+                    Item itemToAdd = item.clone();
+                    itemToAdd.count = 1;
+
+                    if (!inventory.canAddItem(itemToAdd)) {
+                        return false;
+                    }
+
+                    InventoryMoveItemEvent ev = new InventoryMoveItemEvent(inv, inventory, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
+                    ev.call();
+
+                    if (ev.isCancelled()) {
+                        return false;
+                    }
+
+                    Item[] items = inventory.addItem(itemToAdd);
+
+                    if (items.length <= 0) {
+                        item.count--;
+                        inv.setResult(item);
+                        return true;
+                    }
+                }
+            } else if (blockEntity instanceof InventoryHolder) {
+                Inventory inv = ((InventoryHolder) blockEntity).getInventory();
+
+                for (int i = 0; i < inv.getSize(); i++) {
+                    Item item = inv.getItem(i);
+
+                    if (!item.isNull()) {
+                        Item itemToAdd = item.clone();
+                        itemToAdd.count = 1;
+
+                        if (!inventory.canAddItem(itemToAdd)) {
+                            continue;
+                        }
+
+                        InventoryMoveItemEvent ev = new InventoryMoveItemEvent(inv, inventory, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
+                        ev.call();
+
+                        if (ev.isCancelled()) {
+                            continue;
+                        }
+
+                        Item[] items = inventory.addItem(itemToAdd);
+
+                        if (items.length >= 1) {
+                            continue;
+                        }
+
+                        item.count--;
+
+                        inv.setItem(i, item);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        default boolean pickupItems(AxisAlignedBB pickupArea) {
+            Inventory inventory = this.getInventory();
+            if (inventory.isFull()) {
+                return false;
+            }
+
+            boolean pickedUpItem = false;
+
+            for (Entity entity : this.getPosition().getLevel().getCollidingEntities(pickupArea)) {
+                if (entity.isClosed() || !(entity instanceof EntityItem)) {
+                    continue;
+                }
+
+                EntityItem itemEntity = (EntityItem) entity;
+                Item item = itemEntity.getItem();
+
+                if (item.isNull()) {
+                    continue;
+                }
+
+                int originalCount = item.getCount();
+
+                if (!inventory.canAddItem(item)) {
+                    continue;
+                }
+
+                InventoryMoveItemEvent ev = new InventoryMoveItemEvent(null, inventory, this, item, InventoryMoveItemEvent.Action.PICKUP);
+                ev.call();
+
+                if (ev.isCancelled()) {
+                    continue;
+                }
+
+                Item[] items = inventory.addItem(item);
+
+                if (items.length == 0) {
+                    entity.close();
+                    pickedUpItem = true;
+                    continue;
+                }
+
+                if (items[0].getCount() != originalCount) {
+                    pickedUpItem = true;
+                    item.setCount(items[0].getCount());
+                }
+            }
+
+            return pickedUpItem;
+        }
+
+        boolean pushItems();
     }
 }

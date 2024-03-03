@@ -30,6 +30,11 @@ public class ListTag<T extends Tag> extends Tag {
         this.list = list;
     }
 
+    public ListTag(int type, Collection<T> tags) {
+        this.type = (byte) type;
+        this.list.addAll(tags);
+    }
+
     @Override
     void write(NBTOutputStream dos) throws IOException {
         if (!list.isEmpty()) type = list.get(0).getId();

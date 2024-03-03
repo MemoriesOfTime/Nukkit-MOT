@@ -44,8 +44,8 @@ public class Chunk extends BaseChunk {
     }
 
     @Override
-    public Chunk fullClone() {
-        return (Chunk) super.fullClone();
+    public Chunk cloneForChunkSending() {
+        return (Chunk) super.cloneForChunkSending();
     }
 
     public Chunk(LevelProvider level) {
@@ -337,8 +337,8 @@ public class Chunk extends BaseChunk {
             nbt.putList(tileTickTag);
         }
 
-        BinaryStream extraData = new BinaryStream();
         Map<Integer, Integer> extraDataArray = this.getBlockExtraDataArray();
+        BinaryStream extraData = new BinaryStream(4 + extraDataArray.size() * 6);
         extraData.putInt(extraDataArray.size());
         for (Map.Entry<Integer, Integer> entry : extraDataArray.entrySet()) {
             extraData.putInt(entry.getKey());
@@ -425,8 +425,8 @@ public class Chunk extends BaseChunk {
             nbt.putList(tileTickTag);
         }
 
-        BinaryStream extraData = new BinaryStream();
         Map<Integer, Integer> extraDataArray = this.getBlockExtraDataArray();
+        BinaryStream extraData = new BinaryStream(4 + extraDataArray.size() * 6);
         extraData.putInt(extraDataArray.size());
         for (Map.Entry<Integer, Integer> entry : extraDataArray.entrySet()) {
             extraData.putInt(entry.getKey());

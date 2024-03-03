@@ -11,7 +11,9 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.network.protocol.ContainerOpenPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
 
@@ -133,6 +135,15 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable, Bloc
         }
         Item currentBook = lectern.getBook();
         if (!currentBook.isNull()) {
+            if (player != null && player.protocol >= ProtocolInfo.v1_20_60) {
+                ContainerOpenPacket pk = new ContainerOpenPacket();
+                pk.windowId = Player.LECTERN_WINDOW_ID;
+                pk.type = ContainerOpenPacket.TYPE_LECTERN;
+                pk.x = this.getFloorX();
+                pk.y = this.getFloorY();
+                pk.z = this.getFloorZ();
+                player.dataPacket(pk);
+            }
             return true;
         }
 

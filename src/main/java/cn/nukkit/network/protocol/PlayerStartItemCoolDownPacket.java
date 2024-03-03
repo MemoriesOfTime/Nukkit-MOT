@@ -1,9 +1,8 @@
 package cn.nukkit.network.protocol;
 
-/**
- * @author PowerNukkitX Project Team
- * <a href="https://github.com/PowerNukkitX/PowerNukkitX/blob/master/src/main/java/cn/nukkit/network/protocol/PlayerStartItemCoolDownPacket.java">powernukkitx original file</a>
- */
+import lombok.ToString;
+
+@ToString
 public class PlayerStartItemCoolDownPacket extends DataPacket {
     private String itemCategory;
     private int coolDownDuration;

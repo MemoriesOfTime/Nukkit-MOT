@@ -412,6 +412,8 @@ public interface BlockID {
     int CAMPFIRE_BLOCK = 464;
     int WOOD_BARK = 467;
     int COMPOSTER = 468;
+    int LIT_BLAST_FURNACE = 469;
+
     int PISTON_HEAD_STICKY = 472;
     int BEE_NEST = 473;
     int BEEHIVE = 474;
@@ -473,5 +475,17 @@ public interface BlockID {
 
     int OCHRE_FROGLIGHT = 726;
 
+    int MANGROVE_PLANKS = 741;
+
+    int BAMBOO_PLANKS = 765;
+
+    int CHERRY_PLANKS = 792;
+
     int DECORATED_POT = 806;
+
+    int DARK_OAK_PLANKS = 998;
+    int ACACIA_PLANKS = 997;
+    int JUNGLE_PLANKS = 996;
+    int BIRCH_PLANKS = 995;
+    int SPRUCE_PLANKS = 994;
 }

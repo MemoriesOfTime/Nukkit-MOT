@@ -1,5 +1,8 @@
 package cn.nukkit.nbt.stream;
 
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.VarInt;
 
 import java.io.DataOutput;
@@ -8,6 +11,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author MagicDroidX
@@ -18,6 +23,7 @@ public class NBTOutputStream implements DataOutput, AutoCloseable {
     private final DataOutputStream stream;
     private final ByteOrder endianness;
     private final boolean network;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
 
     public NBTOutputStream(OutputStream stream) {
         this(stream, ByteOrder.BIG_ENDIAN);
@@ -145,8 +151,67 @@ public class NBTOutputStream implements DataOutput, AutoCloseable {
         this.stream.write(bytes);
     }
 
+    public void writeTag(Tag tag) throws IOException {
+        this.writeTag(tag, 16);
+    }
+
+    public void writeTag(Tag tag, int maxDepth) throws IOException {
+        Objects.requireNonNull(tag, "tag");
+        if (this.closed.get()) {
+            throw new IllegalStateException("closed");
+        } else {
+            int type = tag.getId();
+            this.writeByte(type);
+            this.writeUTF("");
+            this.serialize(tag, type, maxDepth);
+        }
+    }
+
+    private void serialize(Tag tag, int type, int maxDepth) throws IOException {
+        if (maxDepth < 0) {
+            throw new IllegalArgumentException("Reached depth limit");
+        } else {
+            switch (type) {
+                case Tag.TAG_Byte -> this.writeByte((Integer) tag.parseValue());
+                case Tag.TAG_Short -> this.writeShort((Integer) tag.parseValue());
+                case Tag.TAG_Int -> this.writeInt((Integer) tag.parseValue());
+                case Tag.TAG_Long -> this.writeLong((Long) tag.parseValue());
+                case Tag.TAG_Float -> this.writeFloat((Float) tag.parseValue());
+                case Tag.TAG_Double -> this.writeDouble((Double) tag.parseValue());
+                case Tag.TAG_Byte_Array -> {
+                    byte[] byteArray = (byte[]) tag.parseValue();
+                    this.writeInt(byteArray.length);
+                    this.write(byteArray);
+                }
+                case Tag.TAG_String -> {
+                    String string = (String) tag.parseValue();
+                    this.writeUTF(string);
+                }
+                case Tag.TAG_Compound -> {
+                    CompoundTag map = (CompoundTag) tag;
+                    for (var e : map.getTags().entrySet()) {
+                        this.writeByte(e.getValue().getId());
+                        this.writeUTF(e.getKey());
+                        this.serialize(e.getValue(), e.getValue().getId(), maxDepth - 1);
+                    }
+                    this.writeByte(0);// End tag
+                }
+                case Tag.TAG_List -> {
+                    ListTag<? extends Tag> list = (ListTag<? extends Tag>) tag;
+                    this.writeByte(list.type);
+                    this.writeInt(list.size());
+                    for (var t : list.getAll()) {
+                        this.serialize(t, list.type, maxDepth - 1);
+                    }
+                }
+                default -> {}
+            }
+        }
+    }
+
     @Override
     public void close() throws IOException {
+        this.closed.set(true);
         this.stream.close();
     }
 }

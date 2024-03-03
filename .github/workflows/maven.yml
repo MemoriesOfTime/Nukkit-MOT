@@ -29,3 +29,31 @@ jobs:
       with:
         name: Nukkit
         path: staging
+    # 生成信息
+    - name: Get Short SHA
+      id: vars
+      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+    - name: Format ChangeLog
+      id: get-changelog
+      if: success() && github.event_name == 'push' && github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
+      run: echo "changelog=${{ github.event.commits[0].message }}" >> $GITHUB_OUTPUT
+    - name: Get Time
+      id: time
+      uses: nanzm/get-time-action@v1.1
+      if: github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
+      with:
+        timeZone: 8
+        format: 'YYYY/MM/DD-HH:mm:ss'
+    # 推送到minebbs    
+    - name: Update MineBBS infomation
+      uses: fjogeleit/http-request-action@v1
+      if: success() && github.event_name == 'push' && github.repository == 'MemoriesOfTime/Nukkit-MOT' && contains(github.ref_name, 'master')
+      with:
+        url: 'https://api.minebbs.com/api/openapi/v1/resources/5934/update'
+        method: 'POST'
+        customHeaders: '{"Authorization": "Bearer ${{ secrets.MINEBBS_API_KEY }}"}'
+        contentType: 'application/json'
+        data: '{"title": "${{ github.ref_name }}-${{ steps.vars.outputs.sha_short }}", "description": "${{ steps.get-changelog.outputs.changelog }}", "new_version": "${{ steps.time.outputs.time }}", "file_url": "https://motci.cn/job/Nukkit-MOT/"}'
+        escapeData: 'true'
+        preventFailureOnNoResponse: 'true'
+        ignoreStatusCodes: '400,404,401,403,500,502,503,504'

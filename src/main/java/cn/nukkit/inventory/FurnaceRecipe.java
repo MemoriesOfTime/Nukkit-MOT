@@ -8,9 +8,9 @@ import cn.nukkit.item.Item;
  */
 public class FurnaceRecipe implements SmeltingRecipe {
 
-    private final Item output;
+    protected final Item output;
 
-    private Item ingredient;
+    protected Item ingredient;
 
     public FurnaceRecipe(Item result, Item ingredient) {
         this.output = result.clone();

@@ -271,4 +271,5 @@ public class CameraInstructionPacket extends DataPacket {
                 (int) (this.getLFloat() * 255)
         );
     }
+
 }
