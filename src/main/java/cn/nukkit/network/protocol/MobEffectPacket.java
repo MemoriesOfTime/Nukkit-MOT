@@ -26,6 +26,10 @@ public class MobEffectPacket extends DataPacket {
     public int amplifier = 0;
     public boolean particles = true;
     public int duration = 0;
+    /**
+     * @since v662
+     */
+    private long tick;
 
     @Override
     public void decode() {
@@ -40,5 +44,8 @@ public class MobEffectPacket extends DataPacket {
         this.putVarInt(this.amplifier);
         this.putBoolean(this.particles);
         this.putVarInt(this.duration);
+        if (protocol >= ProtocolInfo.v1_20_70) {
+            this.putUnsignedVarLong(this.tick);
+        }
     }
 }
