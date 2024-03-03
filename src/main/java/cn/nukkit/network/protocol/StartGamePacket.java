@@ -181,12 +181,14 @@ public class StartGamePacket extends DataPacket {
         if (protocol >= 332) {
             this.putBoolean(this.hasConfirmedPlatformLockedContent);
         }
-        this.putBoolean(this.multiplayerGame);
-        this.putBoolean(this.broadcastToLAN);
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            this.putBoolean(this.multiplayerGame);
+            this.putBoolean(this.broadcastToLAN);
+        }
         if (protocol >= 332) {
             this.putVarInt(this.xblBroadcastIntent);
             this.putVarInt(this.platformBroadcastIntent);
-        } else {
+        } else if (protocol >= ProtocolInfo.v1_2_0) {
             this.putBoolean(this.broadcastToXboxLive);
         }
         this.putBoolean(this.commandsEnabled);
@@ -205,16 +207,18 @@ public class StartGamePacket extends DataPacket {
                 this.putBoolean(false); // Were experiments previously toggled
             }
         }
-        this.putBoolean(this.bonusChest);
-        if (protocol > 201) {
-            this.putBoolean(this.hasStartWithMapEnabled);
-        }
-        if (protocol < 332) {
-            this.putBoolean(this.trustPlayers);
-        }
-        this.putVarInt(this.permissionLevel);
-        if (protocol < 332) {
-            this.putVarInt(this.gamePublish);
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            this.putBoolean(this.bonusChest);
+            if (protocol > 201) {
+                this.putBoolean(this.hasStartWithMapEnabled);
+            }
+            if (protocol < 332) {
+                this.putBoolean(this.trustPlayers);
+            }
+            this.putVarInt(this.permissionLevel);
+            if (protocol < 332) {
+                this.putVarInt(this.gamePublish);
+            }
         }
         if (protocol >= 201) {
             this.putLInt(this.serverChunkTickRange);
@@ -283,7 +287,9 @@ public class StartGamePacket extends DataPacket {
             }
         }
         this.putLLong(this.currentTick);
-        this.putVarInt(this.enchantmentSeed);
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            this.putVarInt(this.enchantmentSeed);
+        }
         if (protocol > ProtocolInfo.v1_5_0) {
             if (protocol >= ProtocolInfo.v1_16_100) {
                 this.putUnsignedVarInt(0); // Custom blocks

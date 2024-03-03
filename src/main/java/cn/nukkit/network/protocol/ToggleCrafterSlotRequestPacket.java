@@ -22,7 +22,7 @@ public class ToggleCrafterSlotRequestPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__TOGGLE_CRAFTER_SLOT_REQUEST_PACKET;
+        throw new UnsupportedOperationException("Not supported.");
     }
 
     @Override

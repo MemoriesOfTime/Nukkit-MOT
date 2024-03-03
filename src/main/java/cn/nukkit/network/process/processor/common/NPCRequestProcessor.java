@@ -1,4 +1,4 @@
-package cn.nukkit.network.process.processor;
+package cn.nukkit.network.process.processor.common;
 
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
@@ -14,6 +14,9 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import org.jetbrains.annotations.NotNull;
 
 public class NPCRequestProcessor extends DataPacketProcessor<NPCRequestPacket> {
+
+    public static final NPCRequestProcessor INSTANCE = new NPCRequestProcessor();
+
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull NPCRequestPacket pk) {
         Player player = playerHandle.player;

@@ -184,7 +184,7 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
             log.warn("Wrong protocol used for {}! expected {} got{}", packet.getClass().getSimpleName(), this.player.protocol, packet.protocol);
         }
 
-        if (packet.pid() != ProtocolInfo.BATCH_PACKET) {
+        if (packet.packetId() != ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET)) {
             packet.tryEncode();
         }
         this.outbound.offer(packet);

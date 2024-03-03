@@ -1,4 +1,4 @@
-package cn.nukkit.network.process.processor;
+package cn.nukkit.network.process.processor.v340;
 
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.block.Block;
@@ -12,7 +12,10 @@ import cn.nukkit.network.protocol.LecternUpdatePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import org.jetbrains.annotations.NotNull;
 
-public class LecternUpdateProcessor extends DataPacketProcessor<LecternUpdatePacket> {
+public class LecternUpdateProcessor_v340 extends DataPacketProcessor<LecternUpdatePacket> {
+
+    public static final LecternUpdateProcessor_v340 INSTANCE = new LecternUpdateProcessor_v340();
+
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull LecternUpdatePacket pk) {
         BlockVector3 blockPosition = pk.blockPosition;
@@ -42,5 +45,10 @@ public class LecternUpdateProcessor extends DataPacketProcessor<LecternUpdatePac
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.LECTERN_UPDATE_PACKET);
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_10_0;
     }
 }

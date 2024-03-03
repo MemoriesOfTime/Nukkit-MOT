@@ -34,6 +34,10 @@ public final class PlayerHandle {
         this.player = player;
     }
 
+    public int getProtocol() {
+        return player.protocol;
+    }
+
     public NetworkPlayerSession getNetworkSession() {
         return player.networkSession;
     }
@@ -469,5 +473,9 @@ public final class PlayerHandle {
 
     public void doFirstSpawn() {
         player.doFirstSpawn();
+    }
+
+    public boolean isLoginPacketReceived() {
+        return player.loginPacketReceived;
     }
 }

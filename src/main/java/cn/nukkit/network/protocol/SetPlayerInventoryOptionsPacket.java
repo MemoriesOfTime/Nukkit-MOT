@@ -21,7 +21,7 @@ public class SetPlayerInventoryOptionsPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__SET_PLAYER_INVENTORY_OPTIONS_PACKET;
+        throw new UnsupportedOperationException("Not supported.");
     }
 
     @Override

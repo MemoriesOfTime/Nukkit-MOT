@@ -1,4 +1,4 @@
-package cn.nukkit.network.process.processor;
+package cn.nukkit.network.process.processor.v527;
 
 import cn.nukkit.AdventureSettings;
 import cn.nukkit.Player;
@@ -13,7 +13,10 @@ import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 @Log4j2
-public class RequestAbilityProcessor extends DataPacketProcessor<RequestAbilityPacket> {
+public class RequestAbilityProcessor_v527 extends DataPacketProcessor<RequestAbilityPacket> {
+
+    public static final RequestAbilityProcessor_v527 INSTANCE = new RequestAbilityProcessor_v527();
+
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull RequestAbilityPacket pk) {
         Player player = playerHandle.player;
@@ -47,5 +50,10 @@ public class RequestAbilityProcessor extends DataPacketProcessor<RequestAbilityP
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_ABILITY_PACKET);
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_19_0_29;
     }
 }

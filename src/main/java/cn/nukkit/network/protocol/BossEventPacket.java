@@ -48,27 +48,29 @@ public class BossEventPacket extends DataPacket {
     public void decode() {
         this.bossEid = this.getEntityUniqueId();
         this.type = (int) this.getUnsignedVarInt();
-        switch (this.type) {
-            case TYPE_REGISTER_PLAYER:
-            case TYPE_UNREGISTER_PLAYER:
-            case TYPE_QUERY:
-                this.playerEid = this.getEntityUniqueId();
-                break;
-            case TYPE_SHOW:
-                this.title = this.getString();
-                this.healthPercent = this.getLFloat();
-            case TYPE_UPDATE_PROPERTIES:
-                this.unknown = (short) this.getShort();
-            case TYPE_TEXTURE:
-                this.color = (int) this.getUnsignedVarInt();
-                this.overlay = (int) this.getUnsignedVarInt();
-                break;
-            case TYPE_HEALTH_PERCENT:
-                this.healthPercent = this.getLFloat();
-                break;
-            case TYPE_TITLE:
-                this.title = this.getString();
-                break;
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            switch (this.type) {
+                case TYPE_REGISTER_PLAYER:
+                case TYPE_UNREGISTER_PLAYER:
+                case TYPE_QUERY:
+                    this.playerEid = this.getEntityUniqueId();
+                    break;
+                case TYPE_SHOW:
+                    this.title = this.getString();
+                    this.healthPercent = this.getLFloat();
+                case TYPE_UPDATE_PROPERTIES:
+                    this.unknown = (short) this.getShort();
+                case TYPE_TEXTURE:
+                    this.color = (int) this.getUnsignedVarInt();
+                    this.overlay = (int) this.getUnsignedVarInt();
+                    break;
+                case TYPE_HEALTH_PERCENT:
+                    this.healthPercent = this.getLFloat();
+                    break;
+                case TYPE_TITLE:
+                    this.title = this.getString();
+                    break;
+            }
         }
     }
 
@@ -77,27 +79,29 @@ public class BossEventPacket extends DataPacket {
         this.reset();
         this.putEntityUniqueId(this.bossEid);
         this.putUnsignedVarInt(this.type);
-        switch (this.type) {
-            case TYPE_REGISTER_PLAYER:
-            case TYPE_UNREGISTER_PLAYER:
-            case TYPE_QUERY:
-                this.putEntityUniqueId(this.playerEid);
-                break;
-            case TYPE_SHOW:
-                this.putString(this.title);
-                this.putLFloat(this.healthPercent);
-            case TYPE_UPDATE_PROPERTIES:
-                this.putShort(this.unknown);
-            case TYPE_TEXTURE:
-                this.putUnsignedVarInt(this.color);
-                this.putUnsignedVarInt(this.overlay);
-                break;
-            case TYPE_HEALTH_PERCENT:
-                this.putLFloat(this.healthPercent);
-                break;
-            case TYPE_TITLE:
-                this.putString(this.title);
-                break;
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            switch (this.type) {
+                case TYPE_REGISTER_PLAYER:
+                case TYPE_UNREGISTER_PLAYER:
+                case TYPE_QUERY:
+                    this.putEntityUniqueId(this.playerEid);
+                    break;
+                case TYPE_SHOW:
+                    this.putString(this.title);
+                    this.putLFloat(this.healthPercent);
+                case TYPE_UPDATE_PROPERTIES:
+                    this.putShort(this.unknown);
+                case TYPE_TEXTURE:
+                    this.putUnsignedVarInt(this.color);
+                    this.putUnsignedVarInt(this.overlay);
+                    break;
+                case TYPE_HEALTH_PERCENT:
+                    this.putLFloat(this.healthPercent);
+                    break;
+                case TYPE_TITLE:
+                    this.putString(this.title);
+                    break;
+            }
         }
     }
 }

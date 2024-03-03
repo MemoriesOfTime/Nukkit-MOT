@@ -15,7 +15,7 @@ public class AgentAnimationPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__AGENT_ANIMATION_PACKET;
+        throw new UnsupportedOperationException("Not supported.");
     }
 
     @Override
