@@ -35,7 +35,7 @@ public abstract class Particle extends Vector3 {
     /**
      * @since 649 1.20.60
      */
-    public static final int TYPE_WIND_EXPLOSION = dynamic(18);
+    public static final int TYPE_BREEZE_WIND_EXPLOSION = dynamic(18);
     public static final int TYPE_MOB_FLAME = dynamic(19);
     public static final int TYPE_HEART = dynamic(20);
     public static final int TYPE_TERRAIN = dynamic(21);
@@ -107,6 +107,8 @@ public abstract class Particle extends Vector3 {
     public static final int TYPE_CHERRY_LEAVES = dynamic(87);
     public static final int TYPE_DUST_PLUME = dynamic(88);
     public static final int TYPE_WHITE_SMOKE = dynamic(89);
+    public static final int TYPE_VAULT_CONNECTION = dynamic(90);
+    public static final int TYPE_WIND_EXPLOSION = dynamic(91);
 
     public Particle() {
         super(0, 0, 0);
@@ -131,6 +133,9 @@ public abstract class Particle extends Vector3 {
 
     public static int getMultiversionId(int protocol, int particle) {
         int id = particle;
+        if (protocol < ProtocolInfo.v1_20_70 && id == 91) {
+            id = 18;
+        }
         if (protocol < ProtocolInfo.v1_20_60 && id >= 19) {
             id -= 1;
         }
