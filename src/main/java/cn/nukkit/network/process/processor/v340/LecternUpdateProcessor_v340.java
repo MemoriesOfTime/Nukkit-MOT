@@ -10,8 +10,11 @@ import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.LecternUpdatePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LecternUpdateProcessor_v340 extends DataPacketProcessor<LecternUpdatePacket> {
 
     public static final LecternUpdateProcessor_v340 INSTANCE = new LecternUpdateProcessor_v340();

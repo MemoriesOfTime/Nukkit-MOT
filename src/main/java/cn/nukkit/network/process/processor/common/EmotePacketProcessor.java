@@ -5,12 +5,15 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.EmotePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author glorydark
  * @date {2024/1/10} {12:21}
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class EmotePacketProcessor extends DataPacketProcessor<EmotePacket> {
 
     public static final EmotePacketProcessor INSTANCE = new EmotePacketProcessor();

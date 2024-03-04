@@ -1,10 +1,13 @@
 package cn.nukkit.network.process.processor.common;
 
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LevelSoundEventProcessorV2 extends LevelSoundEventProcessor {
 
     public static final LevelSoundEventProcessorV2 INSTANCE = new LevelSoundEventProcessorV2();

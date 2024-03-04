@@ -5,12 +5,15 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.RespawnPacket;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author glorydark
  * @date {2024/1/10} {12:34}
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RespawnProcessor extends DataPacketProcessor<RespawnPacket> {
 
     public static final RespawnProcessor INSTANCE = new RespawnProcessor();

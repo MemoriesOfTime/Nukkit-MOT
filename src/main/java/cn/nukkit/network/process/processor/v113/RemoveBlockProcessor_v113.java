@@ -12,12 +12,15 @@ import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.UpdateBlockPacket;
 import cn.nukkit.network.protocol.v113.RemoveBlockPacketV113;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Log4j2
 public class RemoveBlockProcessor_v113 extends DataPacketProcessor<RemoveBlockPacketV113> {
 

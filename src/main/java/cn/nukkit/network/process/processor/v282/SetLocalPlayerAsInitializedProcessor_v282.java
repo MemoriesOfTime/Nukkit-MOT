@@ -5,8 +5,11 @@ import cn.nukkit.event.player.PlayerLocallyInitializedEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.SetLocalPlayerAsInitializedPacket;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SetLocalPlayerAsInitializedProcessor_v282 extends DataPacketProcessor<SetLocalPlayerAsInitializedPacket> {
 
     public static final SetLocalPlayerAsInitializedProcessor_v282 INSTANCE = new SetLocalPlayerAsInitializedProcessor_v282();

@@ -5,12 +5,15 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.FilterTextPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author glorydark
  * @date {2024/1/10} {12:30}
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class FilterTextProcessor extends DataPacketProcessor<FilterTextPacket> {
 
     public static final FilterTextProcessor INSTANCE = new FilterTextProcessor();

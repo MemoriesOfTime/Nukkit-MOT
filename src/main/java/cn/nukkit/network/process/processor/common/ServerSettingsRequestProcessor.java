@@ -7,6 +7,8 @@ import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.ServerSettingsRequestPacket;
 import cn.nukkit.network.protocol.ServerSettingsResponsePacket;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
@@ -15,6 +17,7 @@ import java.util.HashMap;
  * @author glorydark
  * @date {2024/1/10} {12:36}
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ServerSettingsRequestProcessor extends DataPacketProcessor<ServerSettingsRequestPacket> {
 
     public static final ServerSettingsRequestProcessor INSTANCE = new ServerSettingsRequestProcessor();

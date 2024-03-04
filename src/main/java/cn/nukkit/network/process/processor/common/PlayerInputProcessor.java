@@ -7,11 +7,14 @@ import cn.nukkit.math.NukkitMath;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.PlayerInputPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PlayerInputProcessor extends DataPacketProcessor<PlayerInputPacket> {
 
     public static final PlayerInputProcessor INSTANCE = new PlayerInputProcessor();

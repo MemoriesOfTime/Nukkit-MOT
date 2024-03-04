@@ -6,12 +6,15 @@ import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.PlayerHotbarPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author glorydark
  * @date {2024/1/10} {12:40}
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PlayerHotbarProcessor extends DataPacketProcessor<PlayerHotbarPacket> {
 
     public static final PlayerHotbarProcessor INSTANCE = new PlayerHotbarProcessor();

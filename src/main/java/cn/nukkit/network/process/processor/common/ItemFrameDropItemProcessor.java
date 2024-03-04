@@ -8,12 +8,15 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ItemFrameDropItemPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author glorydark
  * @date {2024/1/10} {12:47}
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ItemFrameDropItemProcessor extends DataPacketProcessor<ItemFrameDropItemPacket> {
 
     public static final ItemFrameDropItemProcessor INSTANCE = new ItemFrameDropItemProcessor();
