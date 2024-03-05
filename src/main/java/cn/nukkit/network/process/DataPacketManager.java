@@ -36,10 +36,11 @@ public final class DataPacketManager {
         }
         map.trim();
 
-        PROTOCOL_PROCESSORS_KEYS.clear();
-        PROTOCOL_PROCESSORS_KEYS.addAll(PROTOCOL_PROCESSORS.keySet());
-        PROTOCOL_PROCESSORS_KEYS.add(0); // 0 是例外的基础版本
-        PROTOCOL_PROCESSORS_KEYS.sort(Comparator.reverseOrder());
+        if (PROTOCOL_PROCESSORS_KEYS.size() != PROTOCOL_PROCESSORS.size()) {
+            PROTOCOL_PROCESSORS_KEYS.clear();
+            PROTOCOL_PROCESSORS_KEYS.addAll(PROTOCOL_PROCESSORS.keySet());
+            PROTOCOL_PROCESSORS_KEYS.sort(Comparator.reverseOrder());
+        }
 
         UNREGISTERED_PACKETS.clear();
     }
@@ -65,10 +66,8 @@ public final class DataPacketManager {
             }
 
             processor = getProcessor0(p, packetId);
-            if (processor != null && (p == 0 || processor.isSupported(p))) {
-                if (p != protocol) {
-                    registerProcessor(protocol, processor);
-                }
+            if (processor != null && processor.isSupported(protocol)) {
+                registerProcessor(protocol, processor);
                 return processor;
             }
         }
