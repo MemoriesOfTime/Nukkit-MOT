@@ -3,6 +3,8 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityDecoratedPot;
+import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.particle.GenericParticle;
 import cn.nukkit.level.particle.Particle;
@@ -114,6 +116,19 @@ public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable,
             level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_DECORATED_POT_INSERT_FAILED);
         }
         return true;
+    }
+
+    @Override
+    public boolean hasEntityCollision() {
+        return true;
+    }
+
+    @Override
+    public void onEntityCollide(Entity entity) {
+        if (entity instanceof EntityProjectile) {
+            entity.close();
+            this.level.useBreakOn(this);
+        }
     }
 
     @Override
