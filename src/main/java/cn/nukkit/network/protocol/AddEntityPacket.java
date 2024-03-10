@@ -112,7 +112,7 @@ public class AddEntityPacket extends DataPacket {
         mapping.put(EntityBlueWitherSkull.NETWORK_ID, "minecraft:wither_skull_dangerous");
         mapping.put(EntityBoat.NETWORK_ID, "minecraft:boat");
         mapping.put(EntityLightning.NETWORK_ID, "minecraft:lightning_bolt");
-        mapping.put(EntityBlazeFireBall.NETWORK_ID, "minecraft:small_fireball");
+        mapping.put(EntitySmallFireBall.NETWORK_ID, "minecraft:small_fireball");
         mapping.put(EntityLlamaSpit.NETWORK_ID, "minecraft:llama_spit");
         mapping.put(95, "minecraft:area_effect_cloud");
         mapping.put(EntityPotionLingering.NETWORK_ID, "minecraft:lingering_potion");

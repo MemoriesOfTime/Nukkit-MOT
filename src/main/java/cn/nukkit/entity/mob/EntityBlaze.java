@@ -4,7 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
-import cn.nukkit.entity.projectile.EntityBlazeFireBall;
+import cn.nukkit.entity.projectile.EntitySmallFireBall;
 import cn.nukkit.event.entity.ProjectileLaunchEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Location;
@@ -82,7 +82,7 @@ public class EntityBlaze extends EntityFlyingMob {
                 return;
             }
 
-            EntityBlazeFireBall fireball = (EntityBlazeFireBall) Entity.createEntity("BlazeFireBall", pos, this);
+            EntitySmallFireBall fireball = (EntitySmallFireBall) Entity.createEntity("SmallFireBall", pos, this);
 
             fireball.setMotion(new Vector3(-Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f, -Math.sin(FastMath.toRadians(pitch)) * f * f,
                     Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f));
