@@ -4424,7 +4424,7 @@ public class Level implements ChunkManager, Metadatable {
         if (players == null) {
             players = this.getPlayers().values();
         }
-        this.sendWeather(players.toArray(new Player[0]));
+        this.sendWeather(players.toArray(Player.EMPTY_ARRAY));
     }
 
     public DimensionData getDimensionData() {
@@ -4439,20 +4439,16 @@ public class Level implements ChunkManager, Metadatable {
         return y >= getMinBlockY() && y <= getMaxBlockY();
     }
 
+    public final boolean isYInRange(double y) {
+        return y >= getMinBlockY() && y <= getMaxBlockY();
+    }
+
     public int getMinBlockY() {
-        int minHeight = this.dimensionData.getMinHeight();
-        if (minHeight < 0) {
-            return 0; //TODO 支持-64高度时移除
-        }
-        return minHeight;
+        return this.requireProvider().getMinBlockY();
     }
 
     public int getMaxBlockY() {
-        int maxHeight = this.dimensionData.getMaxHeight();
-        if (maxHeight > 255) {
-            return 255; //TODO 支持319世界高度时移除
-        }
-        return maxHeight;
+        return this.requireProvider().getMaxBlockY();
     }
 
     public boolean canBlockSeeSky(Vector3 pos) {
