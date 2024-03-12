@@ -9,7 +9,9 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import org.jetbrains.annotations.NotNull;
 
+import javax.annotation.Nonnegative;
 import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
@@ -246,9 +248,14 @@ public class Utils {
         return result & 0xFFFFFFFFL;
     }
 
-    public static Object[][] splitArray(Object[] arrayToSplit, int chunkSize) {
+    @NotNull
+    public static Object[][] splitArray(Object[] arrayToSplit, @Nonnegative int chunkSize) {
         if (chunkSize <= 0) {
-            return null;
+            return new Object[0][];
+        }
+
+        if (arrayToSplit.length <= chunkSize) {
+            return new Object[][] { arrayToSplit };
         }
 
         int rest = arrayToSplit.length % chunkSize;

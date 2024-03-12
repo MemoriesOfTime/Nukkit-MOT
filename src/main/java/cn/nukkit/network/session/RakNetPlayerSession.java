@@ -272,10 +272,18 @@ public class RakNetPlayerSession implements NetworkPlayerSession, RakNetSessionL
             }
 
             byte[] buf = packet.getBuffer();
+            if (batched.getCount() + buf.length > 3145728) { // 3 * 1024 * 1024
+                this.sendPackets(batched);
+                batched = new BinaryStream();
+            }
             batched.putUnsignedVarInt(buf.length);
             batched.put(buf);
         }
 
+        this.sendPackets(batched);
+    }
+
+    private void sendPackets(BinaryStream batched) {
         try {
             this.sendPacket(this.compressionOut.compress(batched, Server.getInstance().networkCompressionLevel), RakNetPriority.MEDIUM);
         } catch (Exception e) {
