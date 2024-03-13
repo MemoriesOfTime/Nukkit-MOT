@@ -16,7 +16,7 @@ public class SetEntityMotionPacket extends DataPacket {
     public float motionY;
     public float motionZ;
     /**
-     * @since v662
+     * @since v662 1.20.70
      */
     private long tick;
 

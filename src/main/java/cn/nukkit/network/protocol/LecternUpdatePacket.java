@@ -11,6 +11,9 @@ public class LecternUpdatePacket extends DataPacket {
     public int page;
     public int totalPages;
     public BlockVector3 blockPosition;
+    /**
+     * @deprecated since v662 1.20.70
+     */
     public boolean dropBook;
 
     @Override

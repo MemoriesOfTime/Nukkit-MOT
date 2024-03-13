@@ -41,7 +41,7 @@ public class PlayerAuthInputPacket extends DataPacket {
      */
     public long predictedVehicle;
     /**
-     * @since 662
+     * @since v662 1.20.70
      */
     private Vector2f vehicleRotation;
 

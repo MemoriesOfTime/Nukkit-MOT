@@ -16,7 +16,7 @@ public class ResourcePacksInfoPacket extends DataPacket {
 
     public boolean mustAccept;
     /**
-     * @since v662
+     * @since v662 1.20.70
      */
     private boolean hasAddonPacks;
     public boolean scripting;

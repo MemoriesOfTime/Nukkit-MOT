@@ -27,7 +27,7 @@ public class MobEffectPacket extends DataPacket {
     public boolean particles = true;
     public int duration = 0;
     /**
-     * @since v662
+     * @since v662 1.20.70
      */
     private long tick;
 
