@@ -5,11 +5,14 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class LevelSoundEventProcessor extends DataPacketProcessor<LevelSoundEventPacket> {
 
     public static final LevelSoundEventProcessor INSTANCE = new LevelSoundEventProcessor();

@@ -1,7 +1,6 @@
 package cn.nukkit.network.process;
 
 import cn.nukkit.PlayerHandle;
-import cn.nukkit.Server;
 import cn.nukkit.network.process.processor.common.*;
 import cn.nukkit.network.process.processor.v113.ContainerSetSlotProcessor_v113;
 import cn.nukkit.network.process.processor.v113.DropItemProcessor_v113;
@@ -16,12 +15,16 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Comparator;
+import java.util.LinkedList;
+
 /**
  * DataPacketManager is a static class to manage DataPacketProcessors and process DataPackets.
  */
 @SuppressWarnings("rawtypes")
 public final class DataPacketManager {
     private static final Int2ObjectOpenHashMap<Int2ObjectOpenHashMap<DataPacketProcessor>> PROTOCOL_PROCESSORS = new Int2ObjectOpenHashMap<>();
+    private static final LinkedList<Integer> PROTOCOL_PROCESSORS_KEYS = new LinkedList<>();
     private static final IntOpenHashSet REGISTERED_PACKETS = new IntOpenHashSet();
     private static final IntOpenHashSet UNREGISTERED_PACKETS = new IntOpenHashSet();
 
@@ -32,6 +35,13 @@ public final class DataPacketManager {
             map.put(processor.getPacketId(), processor);
         }
         map.trim();
+
+        if (PROTOCOL_PROCESSORS_KEYS.size() != PROTOCOL_PROCESSORS.size()) {
+            PROTOCOL_PROCESSORS_KEYS.clear();
+            PROTOCOL_PROCESSORS_KEYS.addAll(PROTOCOL_PROCESSORS.keySet());
+            PROTOCOL_PROCESSORS_KEYS.sort(Comparator.reverseOrder());
+        }
+
         UNREGISTERED_PACKETS.clear();
     }
 
@@ -40,32 +50,39 @@ public final class DataPacketManager {
     }
 
     public static DataPacketProcessor getProcessor(int protocol, int packetId) {
-        return getProcessor(protocol, protocol, packetId);
-    }
-
-    private static DataPacketProcessor getProcessor(int protocol, int originProtocol, int packetId) {
         int index = getIndex(protocol, packetId);
         if (!REGISTERED_PACKETS.contains(packetId) || UNREGISTERED_PACKETS.contains(index)) {
             return null;
         }
 
-        DataPacketProcessor processor;
-        protocol++;
-        do {
-            protocol--;
-            Int2ObjectOpenHashMap<DataPacketProcessor> map = PROTOCOL_PROCESSORS.get(protocol);
-            processor = map != null ? map.get(packetId) : null;
-        } while ((processor == null || !processor.isSupported(originProtocol)) && protocol >= Server.getInstance().minimumProtocol);
-
-        if (processor != null && processor.isSupported(originProtocol)) {
-            if (protocol != originProtocol) {
-                registerProcessor(originProtocol, processor);
-            }
+        DataPacketProcessor processor = getProcessor0(protocol, packetId);
+        if (processor != null) {
             return processor;
+        }
+
+        for (int p : PROTOCOL_PROCESSORS_KEYS) {
+            if (p > protocol) {
+                continue;
+            }
+
+            processor = getProcessor0(p, packetId);
+            if (processor != null && processor.isSupported(protocol)) {
+                registerProcessor(protocol, processor);
+                return processor;
+            }
         }
 
         UNREGISTERED_PACKETS.add(index);
         return null;
+    }
+
+    private static DataPacketProcessor getProcessor0(int protocol, int packetId) {
+        Int2ObjectOpenHashMap<DataPacketProcessor> map = PROTOCOL_PROCESSORS.get(protocol);
+        if (map == null) {
+            return null;
+        }
+
+        return map.get(packetId);
     }
 
     private static int getIndex(int protocol, int packetId) {

@@ -177,7 +177,7 @@ public class EntityEnderman extends EntityWalkingMob {
         int previousY1 = -1;
         int previousY2 = -1;
         if (chunk != null && chunk.isGenerated()) {
-            for (int y = Math.min(255, (int) pos.y); y >= 0; y--) {
+            for (int y = Math.min(this.level.getMaxBlockY(), (int) pos.y); y >= 0; y--) {
                 if (previousY1 > -1 && previousY2 > -1) {
                     if (Block.solid[chunk.getBlockId(x, y, z)] && chunk.getBlockId(x, previousY1, z) == 0 && chunk.getBlockId(x, previousY2, z) == 0) {
                         return new Location(pos.x + 0.5, previousY1 + 0.1, pos.z + 0.5, this.level);

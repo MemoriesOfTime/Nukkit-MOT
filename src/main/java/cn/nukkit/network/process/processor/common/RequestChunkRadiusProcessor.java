@@ -6,11 +6,14 @@ import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ChunkRadiusUpdatedPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.RequestChunkRadiusPacket;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RequestChunkRadiusProcessor extends DataPacketProcessor<RequestChunkRadiusPacket> {
 
     public static final RequestChunkRadiusProcessor INSTANCE = new RequestChunkRadiusProcessor();

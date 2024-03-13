@@ -8,12 +8,15 @@ import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.SetDifficultyPacket;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author glorydark
  * @date {2024/1/10} {12:28}
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SetDifficultyProcessor extends DataPacketProcessor<SetDifficultyPacket> {
 
     public static final SetDifficultyProcessor INSTANCE = new SetDifficultyProcessor();

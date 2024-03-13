@@ -4,11 +4,14 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ClientToServerHandshakePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ClientToServerHandshakeProcessor extends DataPacketProcessor<ClientToServerHandshakePacket> {
 
     public static final ClientToServerHandshakeProcessor INSTANCE = new ClientToServerHandshakeProcessor();

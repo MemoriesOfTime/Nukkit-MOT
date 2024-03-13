@@ -59,7 +59,7 @@ public abstract class AbstractEntitySpawner implements EntitySpawner {
                 }
 
                 pos.y = SpawnerTask.getSafeYCoord(level, pos);
-                if (pos.y < 1.0 || pos.y > 255.0 || level.getDimension() == 1 && pos.y > 125.0) {
+                if (pos.y < level.getMinBlockY() + 1 || pos.y > level.getMaxBlockY() || level.getDimension() == 1 && pos.y > 125.0) {
                     return;
                 }
 

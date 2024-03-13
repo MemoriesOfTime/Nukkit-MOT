@@ -208,7 +208,7 @@ public class BlockVine extends BlockTransparentMeta {
                 int faceMeta = getMetaFromFace(face);
                 int meta = this.getDamage();
 
-                if (this.y < 255 && face == BlockFace.UP && block.getId() == AIR) {
+                if (this.y < this.level.getMaxBlockY() && face == BlockFace.UP && block.getId() == AIR) {
                     if (this.canSpread()) {
                         for (BlockFace horizontalFace : BlockFace.Plane.HORIZONTAL) {
                             if (random.nextBoolean() || !this.getSide(horizontalFace).getSide(face).isSolid()) {

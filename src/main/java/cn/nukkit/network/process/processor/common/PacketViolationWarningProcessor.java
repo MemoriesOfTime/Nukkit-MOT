@@ -4,6 +4,8 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.PacketViolationWarningPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Field;
@@ -14,6 +16,7 @@ import java.util.stream.Stream;
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PacketViolationWarningProcessor extends DataPacketProcessor<PacketViolationWarningPacket> {
 
     public static final PacketViolationWarningProcessor INSTANCE = new PacketViolationWarningProcessor();

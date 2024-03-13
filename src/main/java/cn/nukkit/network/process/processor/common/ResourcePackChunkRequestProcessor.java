@@ -7,6 +7,8 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.ResourcePackChunkDataPacket;
 import cn.nukkit.network.protocol.ResourcePackChunkRequestPacket;
 import cn.nukkit.resourcepacks.ResourcePack;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 import static cn.nukkit.Player.RESOURCE_PACK_CHUNK_SIZE;
@@ -14,6 +16,7 @@ import static cn.nukkit.Player.RESOURCE_PACK_CHUNK_SIZE;
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ResourcePackChunkRequestProcessor extends DataPacketProcessor<ResourcePackChunkRequestPacket> {
 
     public static final ResourcePackChunkRequestProcessor INSTANCE = new ResourcePackChunkRequestProcessor();

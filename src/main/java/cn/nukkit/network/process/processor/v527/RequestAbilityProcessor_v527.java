@@ -9,10 +9,13 @@ import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.RequestAbilityPacket;
 import cn.nukkit.network.protocol.types.PlayerAbility;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 @Log4j2
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RequestAbilityProcessor_v527 extends DataPacketProcessor<RequestAbilityPacket> {
 
     public static final RequestAbilityProcessor_v527 INSTANCE = new RequestAbilityProcessor_v527();

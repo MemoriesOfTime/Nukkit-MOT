@@ -9,12 +9,15 @@ import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.SetPlayerGameTypePacket;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author glorydark
  * @date {2024/1/10} {12:49}
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SetPlayerGameTypeProcessor extends DataPacketProcessor<SetPlayerGameTypePacket> {
 
     public static final SetPlayerGameTypeProcessor INSTANCE = new SetPlayerGameTypeProcessor();

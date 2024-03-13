@@ -6,11 +6,14 @@ import cn.nukkit.entity.item.EntityBoat;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.MoveEntityAbsolutePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MoveEntityAbsoluteProcessor extends DataPacketProcessor<MoveEntityAbsolutePacket> {
 
     public static final MoveEntityAbsoluteProcessor INSTANCE = new MoveEntityAbsoluteProcessor();

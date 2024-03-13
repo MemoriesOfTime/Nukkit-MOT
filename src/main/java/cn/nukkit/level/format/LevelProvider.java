@@ -118,4 +118,12 @@ public interface LevelProvider {
     default int getMaximumLayer() {
         return 0;
     }
+
+    default int getMinBlockY() {
+        return Math.max(this.getLevel().getDimensionData().getMinHeight(), 0);
+    }
+
+    default int getMaxBlockY() {
+        return Math.min(this.getLevel().getDimensionData().getMaxHeight(), 255);
+    }
 }

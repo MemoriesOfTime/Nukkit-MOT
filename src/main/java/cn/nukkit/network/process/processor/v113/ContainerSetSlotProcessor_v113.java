@@ -13,11 +13,14 @@ import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<ContainerSetSlotPacketV113> {
     
     public static final ContainerSetSlotProcessor_v113 INSTANCE = new ContainerSetSlotProcessor_v113();

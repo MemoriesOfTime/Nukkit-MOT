@@ -338,18 +338,30 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private boolean needSpawnToAll;
 
     /**
+     * Packets that can be received before the player has logged verified
+     */
+    private static final List<Integer> PRE_LOGIN_VERIFIED_PACKETS = Arrays.asList(
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.LOGIN_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET)
+    );
+
+    /**
      * Packets that can be received before the player has logged in
      */
-    private static final List<Byte> PRE_LOGIN_PACKETS = Arrays.asList(
-            ProtocolInfo.BATCH_PACKET, ProtocolInfo.LOGIN_PACKET,
-            ProtocolInfo.REQUEST_CHUNK_RADIUS_PACKET,
-            ProtocolInfo.SET_LOCAL_PLAYER_AS_INITIALIZED_PACKET,
-            ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET,
-            ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET,
-            ProtocolInfo.CLIENT_CACHE_STATUS_PACKET,
-            ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET,
-            ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET,
-            ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET);
+    private static final List<Integer> PRE_LOGIN_PACKETS = Arrays.asList(
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.LOGIN_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_CHUNK_RADIUS_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.SET_LOCAL_PLAYER_AS_INITIALIZED_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CLIENT_RESPONSE_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.CLIENT_CACHE_STATUS_PACKET),
+            ProtocolInfo.toNewProtocolID(ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET)
+    );
 
     @Getter
     @Setter
@@ -2802,8 +2814,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        byte pid = packet.pid();
-        if (!loginVerified && pid != ProtocolInfo.LOGIN_PACKET && pid != ProtocolInfo.BATCH_PACKET && pid != ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET && pid != ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET) {
+        int pid = packet.packetId();
+        if (!loginVerified && !PRE_LOGIN_VERIFIED_PACKETS.contains(pid)) {
             server.getLogger().warning("Ignoring " + packet.getClass().getSimpleName() + " from " + getAddress() + " due to player not verified yet");
             if (unverifiedPackets++ > 100) {
                 this.close("", "Too many failed login attempts");
@@ -2835,8 +2847,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
+        byte pidOld;
+        try {
+            pidOld = packet.pid();
+        } catch (UnsupportedOperationException e) {
+            return;
+        }
         packetswitch:
-        switch (pid) {
+        switch (pidOld) {
             case ProtocolInfo.LOGIN_PACKET:
                 if (this.loginPacketReceived) {
                     this.close("", "Invalid login packet");
@@ -4554,6 +4572,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             handItem = this.level.useBreakOn(blockPos.asVector3(), face, handItem, this, true);
             if (handItem == null) {
                 this.level.sendBlocks(new Player[]{this}, new Vector3[]{blockPos.asVector3()}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
+
+                BlockEntity blockEntity = this.level.getBlockEntity(blockPos.asVector3());
+                if (blockEntity instanceof BlockEntitySpawnable) {
+                    ((BlockEntitySpawnable) blockEntity).spawnTo(this);
+                }
             } else if (this.isSurvival()) {
                 this.getFoodData().updateFoodExpLevel(0.005);
                 if (handItem.equals(clone) && handItem.getCount() == clone.getCount()) {

@@ -908,6 +908,21 @@ public class LevelDBProvider implements LevelProvider {
         }
     }
 
+    @Override
+    public int getMaximumLayer() {
+        return 1;
+    }
+
+    @Override
+    public int getMinBlockY() {
+        return this.level.getDimensionData().getMinHeight();
+    }
+
+    @Override
+    public int getMaxBlockY() {
+        return this.level.getDimensionData().getMaxHeight();
+    }
+
     protected static BlockVector3 deserializeExtraDataKey(int chunkVersion, int key) {
         return chunkVersion >= 3 ? new BlockVector3((key >> 12) & 0xf, key & 0xff, (key >> 8) & 0xf)
                 // pre-1.0, 7 bits were used because the build height limit was lower

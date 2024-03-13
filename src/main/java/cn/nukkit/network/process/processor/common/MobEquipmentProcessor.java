@@ -8,11 +8,14 @@ import cn.nukkit.item.Item;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacket> {
 
     public static final MobEquipmentProcessor INSTANCE = new MobEquipmentProcessor();

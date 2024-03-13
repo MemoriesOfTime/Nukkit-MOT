@@ -10,11 +10,14 @@ import cn.nukkit.form.window.FormWindowCustom;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.ModalFormResponsePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ModalFormResponseProcessor extends DataPacketProcessor<ModalFormResponsePacket> {
     
     public static final ModalFormResponseProcessor INSTANCE = new ModalFormResponseProcessor();

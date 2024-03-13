@@ -9,11 +9,14 @@ import cn.nukkit.item.ItemBookWritten;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.BookEditPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BookEditProcessor extends DataPacketProcessor<BookEditPacket> {
 
     public static final BookEditProcessor INSTANCE = new BookEditProcessor();

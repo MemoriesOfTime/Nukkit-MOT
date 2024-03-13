@@ -8,6 +8,8 @@ import cn.nukkit.network.protocol.NetworkSettingsPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
 import cn.nukkit.network.protocol.types.PacketCompressionAlgorithm;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
@@ -15,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
  * @author LT_Name
  */
 @Log4j2
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<RequestNetworkSettingsPacket> {
 
     public static final RequestNetworkSettingsProcessor_v554 INSTANCE = new RequestNetworkSettingsProcessor_v554();

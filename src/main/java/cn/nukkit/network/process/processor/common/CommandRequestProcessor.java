@@ -6,11 +6,14 @@ import cn.nukkit.event.player.PlayerCommandPreprocessEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.CommandRequestPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class CommandRequestProcessor extends DataPacketProcessor<CommandRequestPacket> {
 
     public static final CommandRequestProcessor INSTANCE = new CommandRequestProcessor();

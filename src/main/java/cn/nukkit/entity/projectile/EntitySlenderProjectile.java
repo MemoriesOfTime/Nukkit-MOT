@@ -181,7 +181,7 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
             this.server.getPluginManager().callEvent(hitEvent);
             if (!hitEvent.isCancelled()) {
                 this.onHit();
-                this.onHitGround(getPosition());
+                this.onHitGround(getPosition().add(dirVector.x, dirVector.y, dirVector.z));
             }
         }
 

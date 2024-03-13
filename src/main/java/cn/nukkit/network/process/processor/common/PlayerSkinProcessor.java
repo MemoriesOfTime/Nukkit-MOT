@@ -8,6 +8,8 @@ import cn.nukkit.event.player.PlayerChangeSkinEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.PlayerSkinPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.TimeUnit;
@@ -15,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * @author LT_Name
  */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PlayerSkinProcessor extends DataPacketProcessor<PlayerSkinPacket> {
 
     public static final PlayerSkinProcessor INSTANCE = new PlayerSkinProcessor();
