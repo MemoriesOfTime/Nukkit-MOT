@@ -1,4 +1,36 @@
 {
+  "minecraft:double_wooden_slab": {
+    "0": "minecraft:oak_double_slab",
+    "1": "minecraft:spruce_double_slab",
+    "2": "minecraft:birch_double_slab",
+    "3": "minecraft:jungle_double_slab",
+    "4": "minecraft:acacia_double_slab",
+    "5": "minecraft:dark_oak_double_slab"
+  },
+  "minecraft:wooden_slab": {
+    "0": "minecraft:oak_slab",
+    "1": "minecraft:spruce_slab",
+    "2": "minecraft:birch_slab",
+    "3": "minecraft:jungle_slab",
+    "4": "minecraft:acacia_slab",
+    "5": "minecraft:dark_oak_slab"
+  },
+  "minecraft:leaves": {
+    "0": "minecraft:oak_leaves",
+    "1": "minecraft:spruce_leaves",
+    "2": "minecraft:birch_leaves",
+    "3": "minecraft:jungle_leaves"
+  },
+  "minecraft:leaves2": {
+    "0": "minecraft:acacia_leaves",
+    "1": "minecraft:dark_oak_leaves"
+  },
+  "minecraft:grass": {
+    "0": "minecraft:grass_block"
+  },
+  "minecraft:scute": {
+    "0": "minecraft:turtle_scute"
+  },
   "minecraft:stone": {
     "0": "minecraft:stone",
     "1": "minecraft:granite",

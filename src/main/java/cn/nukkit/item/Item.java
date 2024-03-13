@@ -483,6 +483,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     private static final List<Item> creative622 = new ObjectArrayList<>();
     private static final List<Item> creative630 = new ObjectArrayList<>();
     private static final List<Item> creative649 = new ObjectArrayList<>();
+    private static final List<Item> creative662 = new ObjectArrayList<>();
 
     @SuppressWarnings("unchecked")
     private static void initCreativeItems() {
@@ -520,6 +521,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCreativeItemsNew(ProtocolInfo.v1_20_40, ProtocolInfo.v1_20_40, creative622);
         registerCreativeItemsNew(ProtocolInfo.v1_20_50, ProtocolInfo.v1_20_50, creative630);
         registerCreativeItemsNew(ProtocolInfo.v1_20_60, ProtocolInfo.v1_20_60, creative649);
+        registerCreativeItemsNew(ProtocolInfo.v1_20_70, ProtocolInfo.v1_20_70, creative662);
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -691,6 +693,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 return new ArrayList<>(Item.creative630);
             case v1_20_60:
                 return new ArrayList<>(Item.creative649);
+            case v1_20_70:
+                return new ArrayList<>(Item.creative662);
             // TODO Multiversion
             default:
                 throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
@@ -733,6 +737,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_20_40 -> Item.creative622.add(item.clone());
             case v1_20_50 -> Item.creative630.add(item.clone());
             case v1_20_60 -> Item.creative649.add(item.clone());
+            case v1_20_70 -> Item.creative662.add(item.clone());
             // TODO Multiversion
             default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
