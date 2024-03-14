@@ -35,7 +35,6 @@ import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseFullChunk;
-import cn.nukkit.level.format.generic.BaseLevelProvider;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.generic.serializer.NetworkChunkSerializer;
 import cn.nukkit.level.generator.Generator;
@@ -1427,9 +1426,7 @@ public class Level implements ChunkManager, Metadatable {
         levelProvider.setCurrentTick(this.levelCurrentTick);
         levelProvider.setGameRules(this.gameRules);
         this.saveChunks();
-        if (levelProvider instanceof BaseLevelProvider) {
-            levelProvider.saveLevelData();
-        }
+        levelProvider.saveLevelData();
 
         return true;
     }
