@@ -1257,11 +1257,14 @@ public class Server {
                         p.getSkin(),
                         p.getLoginChainData().getXUID()))
                 .toArray(PlayerListPacket.Entry[]::new);
-        for (PlayerListPacket.Entry[] a : (PlayerListPacket.Entry[][]) Utils.splitArray(array, 50)) {
-            PlayerListPacket pk = new PlayerListPacket();
-            pk.type = PlayerListPacket.TYPE_ADD;
-            pk.entries = a;
-            player.dataPacket(pk);
+        Object[][] splitArray = Utils.splitArray(array, 50);
+        if (splitArray != null) {
+            for (Object[] a : splitArray) {
+                PlayerListPacket pk = new PlayerListPacket();
+                pk.type = PlayerListPacket.TYPE_ADD;
+                pk.entries = (PlayerListPacket.Entry[]) a;
+                player.dataPacket(pk);
+            }
         }
     }
 
