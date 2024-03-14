@@ -29,7 +29,7 @@ public class MobEffectPacket extends DataPacket {
     /**
      * @since v662 1.20.70
      */
-    private long tick;
+    public long tick;
 
     @Override
     public void decode() {
@@ -45,7 +45,7 @@ public class MobEffectPacket extends DataPacket {
         this.putBoolean(this.particles);
         this.putVarInt(this.duration);
         if (protocol >= ProtocolInfo.v1_20_70) {
-            this.putUnsignedVarLong(this.tick);
+            this.putLLong(this.tick);
         }
     }
 }
