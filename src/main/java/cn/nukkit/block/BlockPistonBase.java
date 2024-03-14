@@ -269,7 +269,10 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
     }
 
     public static boolean canPush(Block block, BlockFace face, boolean destroyBlocks, boolean extending) {
-        if (block.getY() >= 0 && (face != BlockFace.DOWN || block.getY() != 0) && block.getY() <= 255 && (face != BlockFace.UP || block.getY() != 255)) {
+        Level level = block.getLevel();
+        int minBlockY = level.getMinBlockY();
+        int maxBlockY = level.getMaxBlockY();
+        if (block.getY() >= minBlockY && (face != BlockFace.DOWN || block.getY() != minBlockY) && block.getY() <= maxBlockY && (face != BlockFace.UP || block.getY() != maxBlockY)) {
             if (extending && !block.canBePushed() || !extending && !block.canBePulled()) {
                 return false;
             }

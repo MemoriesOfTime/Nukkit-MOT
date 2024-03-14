@@ -3066,7 +3066,7 @@ public abstract class Entity extends Location implements Metadatable {
         int px = this.getFloorX();
         int py = this.getFloorY();
         int pz = this.getFloorZ();
-        for (int i = 255; i >= py; i--) {
+        for (int i = this.level.getMaxBlockY(); i >= py; i--) {
             if (level.getBlockIdAt(chunk, px, i, pz) != 0) {
                 return false;
             }

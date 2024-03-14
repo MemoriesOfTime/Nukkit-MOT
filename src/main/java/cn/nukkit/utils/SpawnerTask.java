@@ -273,8 +273,8 @@ public class SpawnerTask implements Runnable {
         if (level.getBlockIdAt(chunk, x, y, z) == Block.AIR) {
             while (true) {
                 y--;
-                if (y > 255) {
-                    y = 256;
+                if (y > level.getMaxBlockY()) {
+                    y = level.getMaxBlockY() + 1;
                     break;
                 }
                 if (y < 1) {
@@ -287,7 +287,7 @@ public class SpawnerTask implements Runnable {
                     while (true) {
                         checkY++;
                         checkNeedDegree--;
-                        if (checkY > 255 || level.getBlockIdAt(chunk, x, checkY, z) != Block.AIR) {
+                        if (checkY > level.getMaxBlockY() || level.getBlockIdAt(chunk, x, checkY, z) != Block.AIR) {
                             break;
                         }
                         if (checkNeedDegree <= 0) {
@@ -299,8 +299,8 @@ public class SpawnerTask implements Runnable {
         } else {
             while (true) {
                 y++;
-                if (y > 255) {
-                    y = 256;
+                if (y > level.getMaxBlockY()) {
+                    y = level.getMaxBlockY() + 1;
                     break;
                 }
                 if (y < 1) {

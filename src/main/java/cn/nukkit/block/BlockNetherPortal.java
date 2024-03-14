@@ -280,7 +280,7 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
 
         for (int xx = -128; xx <= 128; xx++) {
             for (int zz = -128; zz <= 128; zz++) {
-                for (int y = 0; y  < 255; y++) {
+                for (int y = 0; y  < level.getMaxBlockY(); y++) {
                     int x = pos.getFloorX() + xx, z = pos.getFloorZ() + zz;
                     if (level.getBlockIdAt(x, y, z) == NETHER_PORTAL) {
                         found = new Position(x, y, z, level);
