@@ -15,6 +15,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
     public static final byte NETWORK_ID = ProtocolInfo.RESOURCE_PACKS_INFO_PACKET;
 
     public boolean mustAccept;
+    /**
+     * @since v662 1.20.70
+     */
+    private boolean hasAddonPacks;
     public boolean scripting;
     public boolean forceServerPacks;
     public ResourcePack[] behaviourPackEntries = ResourcePack.EMPTY_ARRAY;
@@ -34,6 +38,9 @@ public class ResourcePacksInfoPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putBoolean(this.mustAccept);
+        if (protocol >= ProtocolInfo.v1_20_70) {
+            this.putBoolean(this.hasAddonPacks);
+        }
         if (protocol >= ProtocolInfo.v1_9_0) {
             this.putBoolean(this.scripting);
             if (protocol >= ProtocolInfo.v1_17_10) {
