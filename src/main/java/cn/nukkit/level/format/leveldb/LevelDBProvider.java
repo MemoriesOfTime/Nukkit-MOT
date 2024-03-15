@@ -250,7 +250,7 @@ public class LevelDBProvider implements LevelProvider {
             stream.write(Binary.writeLInt(data.length));
             stream.write(data);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Unable to save level.dat: " + path, e);
         }
     }
 
@@ -906,6 +906,21 @@ public class LevelDBProvider implements LevelProvider {
         if (!this.getName().equals(name)) {
             this.levelData.putString("LevelName", name);
         }
+    }
+
+    @Override
+    public int getMaximumLayer() {
+        return 1;
+    }
+
+    @Override
+    public int getMinBlockY() {
+        return this.level.getDimensionData().getMinHeight();
+    }
+
+    @Override
+    public int getMaxBlockY() {
+        return this.level.getDimensionData().getMaxHeight();
     }
 
     protected static BlockVector3 deserializeExtraDataKey(int chunkVersion, int key) {

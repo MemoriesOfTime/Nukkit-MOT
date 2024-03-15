@@ -8,6 +8,8 @@ import static cn.nukkit.api.API.Definition.UNIVERSAL;
 import static cn.nukkit.api.API.Usage.DEPRECATED;
 
 /**
+ * @deprecated Removed in 1.19.30 (553). Use {@link UpdateAbilitiesPacket} and {@link UpdateAdventureSettingsPacket} instead.
+ *
  * @author Nukkit Project Team
  */
 @ToString
@@ -64,20 +66,24 @@ public class AdventureSettingsPacket extends DataPacket {
     public void decode() {
         this.flags = getUnsignedVarInt();
         this.commandPermission = getUnsignedVarInt();
-        this.flags2 = getUnsignedVarInt();
-        this.playerPermission = getUnsignedVarInt();
-        this.customFlags = getUnsignedVarInt();
-        this.entityUniqueId = getLLong();
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            this.flags2 = getUnsignedVarInt();
+            this.playerPermission = getUnsignedVarInt();
+            this.customFlags = getUnsignedVarInt();
+            this.entityUniqueId = getLLong();
+        }
     }
 
     public void encode() {
         this.reset();
         this.putUnsignedVarInt(this.flags);
         this.putUnsignedVarInt(this.commandPermission);
-        this.putUnsignedVarInt(this.flags2);
-        this.putUnsignedVarInt(this.playerPermission);
-        this.putUnsignedVarInt(this.customFlags);
-        this.putLLong(this.entityUniqueId);
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            this.putUnsignedVarInt(this.flags2);
+            this.putUnsignedVarInt(this.playerPermission);
+            this.putUnsignedVarInt(this.customFlags);
+            this.putLLong(this.entityUniqueId);
+        }
     }
 
     public boolean getFlag(int flag) {

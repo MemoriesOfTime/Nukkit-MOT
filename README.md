@@ -19,7 +19,7 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 4. Write a command to run: `java -jar file.jar` (change `file` to the name of the file you downloaded)
 
 ## Links
-- __🌐 Download: [Jenkins](https://ci.lanink.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
+- __🌐 Download: [Jenkins](https://motci.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
 - __💬 [Discord](https://discord.gg/pJjQDQC)__
 - __🔌 [Nukkit Plugins](https://cloudburstmc.org/resources/categories/nukkit-plugins.1/)__
 - __🐞 [Report a Bug](https://github.com/MemoriesOfTime/Nukkit-MOT/issues/new/choose)__
@@ -53,3 +53,6 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 This project is based on [Nukkit](https://github.com/CloudburstMC/Nukkit), so you should abide by [Nukkit](https://github.com/CloudburstMC/Nukkit)'s License
+
+Thanks to [jetbrains](https://jb.gg/OpenSourceSupport) for providing development tools for this project for free!  
+[<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" width="200"/>](https://jb.gg/OpenSourceSupport)

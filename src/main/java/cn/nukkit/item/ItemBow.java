@@ -54,6 +54,11 @@ public class ItemBow extends ItemTool {
     }
 
     @Override
+    public boolean canRelease() {
+        return true;
+    }
+
+    @Override
     public boolean onRelease(Player player, int ticksUsed) {
         Item itemArrow = Item.get(Item.ARROW, 0, 1);
 

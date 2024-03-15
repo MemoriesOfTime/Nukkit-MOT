@@ -22,7 +22,7 @@ public class OpenSignPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return ProtocolInfo.__INTERNAL__OPEN_SIGN_PACKET;
+        throw new UnsupportedOperationException("Not supported.");
     }
 
     @Override

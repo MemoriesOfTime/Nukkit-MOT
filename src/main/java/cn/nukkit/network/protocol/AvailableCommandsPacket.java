@@ -165,9 +165,28 @@ public class AvailableCommandsPacket extends DataPacket {
             .insert(35, CommandParam.PERMISSION_ELEMENT)
             .insert(36, CommandParam.PERMISSION_ELEMENTS)
             .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_594 = COMMAND_PARAMS_582.toBuilder()
+            .insert(134217728, CommandParam.CHAINED_COMMAND)
+            .build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS_662 = COMMAND_PARAMS_594.toBuilder()
+            .shift(24, 4)
+            .insert(24, CommandParam.RATIONAL_RANGE_VAL)
+            .insert(25, CommandParam.RATIONAL_RANGE_POST_VAL)
+            .insert(26, CommandParam.RATIONAL_RANGE)
+            .insert(27, CommandParam.RATIONAL_RANGE_FULL)
+            .shift(48, 8)
+            .insert(48, CommandParam.PROPERTY_VALUE)
+            .insert(49, CommandParam.HAS_PROPERTY_PARAM_VALUE)
+            .insert(50, CommandParam.HAS_PROPERTY_PARAM_ENUM_VALUE)
+            .insert(51, CommandParam.HAS_PROPERTY_ARG)
+            .insert(52, CommandParam.HAS_PROPERTY_ARGS)
+            .insert(53, CommandParam.HAS_PROPERTY_ELEMENT)
+            .insert(54, CommandParam.HAS_PROPERTY_ELEMENTS)
+            .insert(55, CommandParam.HAS_PROPERTY_SELECTOR)
+            .build();
 
     //TODO Multiversion 保持最新版
-    private static final TypeMap<CommandParam> COMMAND_PARAMS = COMMAND_PARAMS_582.toBuilder().build();
+    private static final TypeMap<CommandParam> COMMAND_PARAMS = COMMAND_PARAMS_662.toBuilder().build();
 
     //兼容nk插件
     public static final int ARG_TYPE_UNKNOWN = COMMAND_PARAMS.getId(CommandParam.UNKNOWN);
@@ -196,7 +215,11 @@ public class AvailableCommandsPacket extends DataPacket {
 
     public static TypeMap<CommandParam> getCommandParams(int protocol) {
         //TODO Multiversion
-        if (protocol >= ProtocolInfo.v1_19_80) {
+        if (protocol >= ProtocolInfo.v1_20_70) {
+            return COMMAND_PARAMS_662;
+        } else if (protocol >= ProtocolInfo.v1_20_10_21) {
+            return COMMAND_PARAMS_594;
+        } else if (protocol >= ProtocolInfo.v1_19_80) {
             return COMMAND_PARAMS_582;
         } else if (protocol >= ProtocolInfo.v1_19_70_24) {
             return COMMAND_PARAMS_575;

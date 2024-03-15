@@ -71,4 +71,9 @@ public abstract class ItemEdible extends Item {
         }
         return true;
     }
+
+    @Override
+    public boolean canRelease() {
+        return true;
+    }
 }

@@ -430,6 +430,7 @@ public class Utils {
      */
     public static String getVersionByProtocol(int protocol) {
         return switch (protocol) {
+            case ProtocolInfo.v1_1_0 -> "1.1.0";
             case ProtocolInfo.v1_2_0 -> "1.2.0";
             case ProtocolInfo.v1_2_5_11, ProtocolInfo.v1_2_5 -> "1.2.5";
             case ProtocolInfo.v1_2_6 -> "1.2.6";
@@ -481,6 +482,7 @@ public class Utils {
             case ProtocolInfo.v1_20_40 -> "1.20.40";
             case ProtocolInfo.v1_20_50 -> "1.20.50";
             case ProtocolInfo.v1_20_60 -> "1.20.60";
+            case ProtocolInfo.v1_20_70 -> "1.20.70";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };

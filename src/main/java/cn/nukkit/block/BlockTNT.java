@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityPrimedTNT;
 import cn.nukkit.entity.projectile.EntityArrow;
+import cn.nukkit.entity.projectile.EntitySmallFireBall;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -131,7 +132,7 @@ public class BlockTNT extends BlockSolid {
     
     @Override
     public void onEntityCollide(Entity entity) {
-        if (entity instanceof EntityArrow && entity.isOnFire()) {
+        if ((entity instanceof EntityArrow && entity.isOnFire()) || entity instanceof EntitySmallFireBall) {
             entity.close();
             this.prime();
         }

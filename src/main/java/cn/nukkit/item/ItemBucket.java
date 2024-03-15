@@ -24,6 +24,19 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class ItemBucket extends Item {
 
+    public static final int EMPTY_BUCKET = 0;
+    public static final int MILK_BUCKET = 1;
+    public static final int COD_BUCKET = 2;
+    public static final int SALMON_BUCKET = 3;
+    public static final int TROPICAL_FISH_BUCKET = 4;
+    public static final int PUFFERFISH_BUCKET = 5;
+    public static final int WATER_BUCKET = 8;
+    public static final int LAVA_BUCKET = 10;
+    public static final int POWDER_SNOW_BUCKET = 11;
+    public static final int AXOLOTL_BUCKET = 12;
+    public static final int TADPOLE_BUCKET = 13;
+    public static final int UNDEFINED_BUCKET = 14;
+
     public ItemBucket() {
         this(0, 1);
     }
@@ -82,7 +95,7 @@ public class ItemBucket extends Item {
 
     @Override
     public int getMaxStackSize() {
-        return this.meta == 0 ? 16 : 1;
+        return this.meta == EMPTY_BUCKET ? 16 : 1;
     }
 
     @Override
@@ -259,12 +272,12 @@ public class ItemBucket extends Item {
 
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
-        return this.getDamage() == 1; // Milk
+        return this.getDamage() == MILK_BUCKET;
     }
 
     @Override
     public boolean onUse(Player player, int ticksUsed) {
-        if (player.isSpectator() || this.getDamage() != 1) {
+        if (player.isSpectator() || this.getDamage() != MILK_BUCKET) {
             return false;
         }
 
@@ -282,5 +295,10 @@ public class ItemBucket extends Item {
 
         player.removeAllEffects();
         return true;
+    }
+
+    @Override
+    public boolean canRelease() {
+        return this.getDamage() == MILK_BUCKET;
     }
 }

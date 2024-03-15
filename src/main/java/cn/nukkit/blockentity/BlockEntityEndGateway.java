@@ -137,7 +137,7 @@ public class BlockEntityEndGateway extends BlockEntitySpawnable {
         
         for (int x = exitPortal.getX() - 5; x <= exitPortal.getX() + 5; x++) {
             for (int z = exitPortal.getZ() - 5; z <= exitPortal.getZ() + 5; z++) {
-                for (int y = 255; y > Math.max(0, exitPortal.getY() + 2); y--) {
+                for (int y = this.level.getMaxBlockY(); y > Math.max(0, exitPortal.getY() + 2); y--) {
                     if (this.getLevel().getBlockIdAt(x, y, z) != Block.BEDROCK) {
                         if (this.getLevel().getBlockIdAt(x, y, z) != Block.BEDROCK) {
                             return new BlockVector3(x, y + 1, z);

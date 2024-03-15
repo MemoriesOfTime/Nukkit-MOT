@@ -38,9 +38,11 @@ public enum GameRule {
     DO_LIMITED_CRAFTING("doLimitedCrafting");
 
     private final String name;
+    private final String bedrockName;
 
     GameRule(String name) {
         this.name = name;
+        this.bedrockName = name.toLowerCase();
     }
 
     public static Optional<GameRule> parseString(String gameRuleString) {
@@ -70,5 +72,9 @@ public enum GameRule {
 
     public String getName() {
         return name;
+    }
+
+    public String getBedrockName() {
+        return bedrockName;
     }
 }

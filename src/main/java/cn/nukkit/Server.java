@@ -1263,7 +1263,9 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_20_60) {
+        if (player.protocol >= ProtocolInfo.v1_20_70) {
+            player.dataPacket(CraftingManager.packet662);
+        } else if (player.protocol >= ProtocolInfo.v1_20_60) {
             player.dataPacket(CraftingManager.packet649);
         } else if (player.protocol >= ProtocolInfo.v1_20_50) {
             player.dataPacket(CraftingManager.packet630);
@@ -2781,6 +2783,9 @@ public class Server {
         Entity.registerEntity("ThrownExpBottle", EntityExpBottle.class);
         Entity.registerEntity("ThrownPotion", EntityPotion.class);
         Entity.registerEntity("Egg", EntityEgg.class);
+        Entity.registerEntity("SmallFireBall", EntitySmallFireBall.class);
+        // 和原版名称不一样，已弃用
+        // The name is different from the vanilla version and has been deprecated
         Entity.registerEntity("BlazeFireBall", EntityBlazeFireBall.class);
         Entity.registerEntity("GhastFireBall", EntityGhastFireBall.class);
         Entity.registerEntity("ShulkerBullet", EntityShulkerBullet.class);

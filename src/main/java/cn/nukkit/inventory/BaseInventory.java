@@ -12,6 +12,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 
@@ -569,6 +571,10 @@ public abstract class BaseInventory implements Inventory {
         pk.slot = index;
         pk.item = this.getItem(index).clone();
 
+        ContainerSetSlotPacketV113 pk2 = new ContainerSetSlotPacketV113();
+        pk2.slot = index;
+        pk2.item = pk.item.clone();
+
         for (Player player : players) {
             int id = player.getWindowId(this);
             if (id == -1) {
@@ -576,7 +582,12 @@ public abstract class BaseInventory implements Inventory {
                 continue;
             }
             pk.inventoryId = id;
-            player.dataPacket(pk);
+            pk2.windowid = id;
+            if (player.protocol >= ProtocolInfo.v1_2_0) {
+                player.dataPacket(pk);
+            } else {
+                player.dataPacket(pk2);
+            }
         }
     }
 
