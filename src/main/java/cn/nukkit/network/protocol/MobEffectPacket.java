@@ -29,7 +29,7 @@ public class MobEffectPacket extends DataPacket {
     /**
      * @since v662 1.20.70
      */
-    private long tick;
+    public long tick;
 
     @Override
     public void decode() {

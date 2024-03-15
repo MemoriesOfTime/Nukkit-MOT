@@ -39,7 +39,7 @@ public class PlayerAuthInputPacket extends DataPacket {
     /**
      * @since 649
      */
-    public long predictedVehicle;
+    private long predictedVehicle;
     /**
      * @since v662 1.20.70
      */

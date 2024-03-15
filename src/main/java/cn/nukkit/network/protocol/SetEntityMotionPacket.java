@@ -18,7 +18,7 @@ public class SetEntityMotionPacket extends DataPacket {
     /**
      * @since v662 1.20.70
      */
-    private long tick;
+    public long tick;
 
     @Override
     public byte pid() {

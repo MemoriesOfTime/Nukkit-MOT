@@ -18,7 +18,7 @@ public class ResourcePacksInfoPacket extends DataPacket {
     /**
      * @since v662 1.20.70
      */
-    private boolean hasAddonPacks;
+    public boolean hasAddonPacks;
     public boolean scripting;
     public boolean forceServerPacks;
     public ResourcePack[] behaviourPackEntries = ResourcePack.EMPTY_ARRAY;
