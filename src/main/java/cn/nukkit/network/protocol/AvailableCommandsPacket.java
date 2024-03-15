@@ -166,7 +166,8 @@ public class AvailableCommandsPacket extends DataPacket {
             .insert(36, CommandParam.PERMISSION_ELEMENTS)
             .build();
     private static final TypeMap<CommandParam> COMMAND_PARAMS_594 = COMMAND_PARAMS_582.toBuilder()
-            .insert(134217728, CommandParam.CHAINED_COMMAND)
+            //TODO solve memory usage problem
+            //.insert(134217728, CommandParam.CHAINED_COMMAND)
             .build();
     private static final TypeMap<CommandParam> COMMAND_PARAMS_662 = COMMAND_PARAMS_594.toBuilder()
             .shift(24, 4)
