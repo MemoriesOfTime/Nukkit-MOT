@@ -7,6 +7,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ClientboundMapItemDataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.MainLogger;
+import com.nukkitx.network.util.Preconditions;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
@@ -145,5 +146,24 @@ public class ItemMap extends Item {
     @Override
     public int getMaxStackSize() {
         return 1;
+    }
+
+    public int getScale() {
+        return getNamedTag().getInt("map_scale");
+    }
+
+    public void setScale(int level) {
+        Preconditions.checkArgument(level >= 0 && level <= 3);
+        CompoundTag compoundTag = new CompoundTag();
+        if (this.hasCompoundTag()) {
+            compoundTag = this.getNamedTag();
+        }
+        compoundTag.putInt("map_scale", level);
+        compoundTag.putBoolean("map_is_scaling", true);
+        this.setCompoundTag(compoundTag);
+    }
+
+    public boolean canUpgrade() {
+        return this.getScale() < 3;
     }
 }
