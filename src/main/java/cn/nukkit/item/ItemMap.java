@@ -7,7 +7,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ClientboundMapItemDataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.MainLogger;
-import com.nukkitx.network.util.Preconditions;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
