@@ -147,23 +147,4 @@ public class ItemMap extends Item {
     public int getMaxStackSize() {
         return 1;
     }
-
-    public int getScale() {
-        return getNamedTag().getInt("map_scale");
-    }
-
-    public void setScale(int level) {
-        Preconditions.checkArgument(level >= 0 && level <= 3);
-        CompoundTag compoundTag = new CompoundTag();
-        if (this.hasCompoundTag()) {
-            compoundTag = this.getNamedTag();
-        }
-        compoundTag.putInt("map_scale", level);
-        compoundTag.putBoolean("map_is_scaling", true);
-        this.setCompoundTag(compoundTag);
-    }
-
-    public boolean canUpgrade() {
-        return this.getScale() < 3;
-    }
 }
