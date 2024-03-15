@@ -61,13 +61,7 @@ public class MultiRecipe implements Recipe {
         return false;
     }
 
-    public Recipe toRecipe(Player player, Item outputItem, List<Item> inputs) {
+    public Recipe toRecipe(Item outputItem, List<Item> inputs) {
         return new ShapelessRecipe(outputItem, inputs);
-    }
-
-    public void executeExtra(Player player, CraftingTransaction craftingTransaction) {
-        // todo:
-        //  Quite weird that there are so many packets whilst cloning a map or a written book.
-        //  This method is used to cope with some strange circumstances mentioned above.
     }
 }

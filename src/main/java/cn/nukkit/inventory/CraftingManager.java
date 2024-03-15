@@ -2,8 +2,6 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.inventory.special.BookCloningRecipe;
-import cn.nukkit.inventory.special.MapCloningRecipe;
 import cn.nukkit.inventory.special.RepairItemRecipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
@@ -122,14 +120,7 @@ public class CraftingManager {
     @SuppressWarnings("unchecked")
     public CraftingManager() {
         MainLogger.getLogger().debug("Loading recipes...");
-
-        // Register multi-recipes internally
-        // todo:
-        //  Book cloning recipe may require a further fix
-        //  because we only use the simplest way to solve problem of original book vanishing.
         this.registerMultiRecipe(new RepairItemRecipe());
-        this.registerMultiRecipe(new BookCloningRecipe());
-        this.registerMultiRecipe(new MapCloningRecipe());
 
         ConfigSection recipes_649_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes649.json")).getRootSection();
         ConfigSection recipes_419_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes419.json")).getRootSection();
