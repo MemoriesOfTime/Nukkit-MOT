@@ -1,13 +1,16 @@
 package cn.nukkit.utils;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.scheduler.Task;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import lombok.val;
 
 import java.io.*;
 import java.lang.management.ManagementFactory;
@@ -16,11 +19,10 @@ import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.SplittableRandom;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
  * This class contains miscellaneous stuff used in other parts of the program.
@@ -42,7 +44,7 @@ public class Utils {
      * An empty damage array used when mobs have no attack damage.
      */
     @Deprecated
-    public static final int[] emptyDamageArray = new int[] { 0, 0, 0, 0 };
+    public static final int[] emptyDamageArray = new int[]{0, 0, 0, 0};
     /**
      * List of network ids of monsters. Currently used for example to check which entities will make players unable to sleep when nearby the bed.
      */
@@ -69,9 +71,9 @@ public class Utils {
     }
 
     public static int[] getEmptyDamageArray() {
-        return new int[] { 0, 0, 0, 0 };
+        return new int[]{0, 0, 0, 0};
     }
-    
+
     public static void writeFile(String fileName, String content) throws IOException {
         writeFile(fileName, new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
     }
@@ -283,7 +285,7 @@ public class Utils {
         return newArray;
     }
 
-    public static <T,U,V> Map<U,V> getOrCreate(Map<T, Map<U, V>> map, T key) {
+    public static <T, U, V> Map<U, V> getOrCreate(Map<T, Map<U, V>> map, T key) {
         Map<U, V> existing = map.get(key);
         if (existing == null) {
             ConcurrentHashMap<U, V> toPut = new ConcurrentHashMap<>();
@@ -345,16 +347,16 @@ public class Utils {
             if (h == -1 || l == -1)
                 throw new IllegalArgumentException("contains illegal character for hexBinary: " + s);
 
-            out[(i >> 1)] = (byte)((h << 4) + l);
+            out[(i >> 1)] = (byte) ((h << 4) + l);
         }
 
         return out;
     }
 
-    private static int hexToBin( char ch ) {
-        if ('0' <= ch && ch <= '9')    return ch - '0';
-        if ('A' <= ch && ch <= 'F')    return ch - 'A' + 10;
-        if ('a' <= ch && ch <= 'f')    return ch - 'a' + 10;
+    private static int hexToBin(char ch) {
+        if ('0' <= ch && ch <= '9') return ch - '0';
+        if ('A' <= ch && ch <= 'F') return ch - 'A' + 10;
+        if ('a' <= ch && ch <= 'f') return ch - 'a' + 10;
         return -1;
     }
 
@@ -383,14 +385,14 @@ public class Utils {
         if (min == max) {
             return max;
         }
-        return min + random.nextDouble() * (max-min);
+        return min + random.nextDouble() * (max - min);
     }
 
     public static float rand(float min, float max) {
         if (min == max) {
             return max;
         }
-        return min + (float) Math.random() * (max-min);
+        return min + (float) Math.random() * (max - min);
     }
 
     /**
@@ -482,7 +484,7 @@ public class Utils {
      * @return operating system/device name
      */
     public static String getOS(Player player) {
-        switch(player.getLoginChainData().getDeviceOS()) {
+        switch (player.getLoginChainData().getDeviceOS()) {
             case 1:
                 return "Android";
             case 2:
@@ -543,6 +545,27 @@ public class Utils {
             e.printStackTrace();
         }
         return (T) clazz1;
+    }
+
+    public static void functionRunTask(int tick,
+                                       Runnable initRun,
+                                       Consumer<AtomicInteger> getDelay,
+                                       Runnable overRun,
+                                       boolean async) {
+        Optional.ofNullable(initRun).ifPresent(Runnable::run);
+        Server.getInstance().getScheduler().scheduleRepeatingTask(new Task() {
+            private final AtomicInteger mainSec = new AtomicInteger(tick);
+            @Override
+            public void onRun(int currentTick) {
+                val i = mainSec.getAndDecrement();
+                if (i < 1) {
+                    Optional.ofNullable(overRun).ifPresent(Runnable::run);
+                    this.cancel();
+                    return;
+                }
+                getDelay.accept(mainSec);
+            }
+        }, 1, async);
     }
 
 }
