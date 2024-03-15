@@ -4021,7 +4021,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     return;
                 } else if (this.craftingTransaction != null) {
-                    if (craftingTransaction.checkForCraftingPart(actions)) {
+                    MultiRecipe multiRecipe = Server.getInstance().getCraftingManager().getMultiRecipe(this, this.craftingTransaction.getPrimaryOutput(), this.craftingTransaction.getInputList());
+                    if (craftingTransaction.checkForCraftingPart(actions) || multiRecipe != null) {
                         for (InventoryAction action : actions) {
                             craftingTransaction.addAction(action);
                         }
