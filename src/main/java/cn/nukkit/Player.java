@@ -4997,7 +4997,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.perm = null;
         }
 
-        this.inventory = null;
+        this.inventory = new PlayerInventory(null);
         this.chunk = null;
 
         this.server.removePlayer(this);
