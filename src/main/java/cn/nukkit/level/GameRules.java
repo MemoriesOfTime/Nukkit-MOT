@@ -173,7 +173,7 @@ public class GameRules {
 
     public void writeBedrockNBT(CompoundTag nbt) {
         gameRules.forEach((gameRule, value) -> {
-            String name = gameRule.getName().toLowerCase();
+            String name = gameRule.getBedrockName();
             switch (value.type) {
                 case BOOLEAN:
                     nbt.putBoolean(name, value.getValueAsBoolean());
@@ -194,7 +194,7 @@ public class GameRules {
 
     public void readBedrockNBT(CompoundTag nbt) {
         gameRules.forEach((gameRule, value) -> {
-            String name = gameRule.name().toLowerCase();
+            String name = gameRule.getBedrockName();
             Tag tag = nbt.get(name);
             if (tag == null) {
                 return;

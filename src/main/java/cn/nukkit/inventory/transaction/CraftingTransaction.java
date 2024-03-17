@@ -98,19 +98,22 @@ public class CraftingTransaction extends InventoryTransaction {
     public boolean canExecute() {
         CraftingManager craftingManager = source.getServer().getCraftingManager();
         Inventory inventory;
-        switch (craftingType) {
-            case Player.CRAFTING_SMITHING -> {
-                inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
-                if (inventory instanceof SmithingInventory smithingInventory) {
-                    addInventory(inventory);
-                    SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
-                    if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment(), smithingInventory.getTemplate()), true, true)) {
-                        setTransactionRecipe(smithingRecipe);
-                    }
+        if (craftingType == Player.CRAFTING_SMITHING) {
+            inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
+            if (inventory instanceof SmithingInventory smithingInventory) {
+                addInventory(inventory);
+                SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
+                if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment(), smithingInventory.getTemplate()), true, true)) {
+                    setTransactionRecipe(smithingRecipe);
                 }
             }
-            default ->
+        } else {
+            MultiRecipe multiRecipe = Server.getInstance().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
+            if (multiRecipe != null) {
+                setTransactionRecipe(multiRecipe.toRecipe(this.getPrimaryOutput(), this.getInputList()));
+            } else {
                 setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
+            }
         }
         return this.getTransactionRecipe() != null && super.canExecute();
     }

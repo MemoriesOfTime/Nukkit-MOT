@@ -15,6 +15,10 @@ public class SetEntityMotionPacket extends DataPacket {
     public float motionX;
     public float motionY;
     public float motionZ;
+    /**
+     * @since v662 1.20.70
+     */
+    public long tick;
 
     @Override
     public byte pid() {
@@ -30,5 +34,8 @@ public class SetEntityMotionPacket extends DataPacket {
         this.reset();
         this.putEntityRuntimeId(this.eid);
         this.putVector3f(this.motionX, this.motionY, this.motionZ);
+        if (protocol >= ProtocolInfo.v1_20_70) {
+            this.putUnsignedVarLong(this.tick);
+        }
     }
 }

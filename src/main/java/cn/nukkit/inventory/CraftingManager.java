@@ -1,6 +1,8 @@
 package cn.nukkit.inventory;
 
+import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.inventory.special.RepairItemRecipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
 import cn.nukkit.item.ItemID;
@@ -59,6 +61,7 @@ public class CraftingManager {
     public static DataPacket packet622;
     public static DataPacket packet630;
     public static DataPacket packet649;
+    public static DataPacket packet662;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -118,6 +121,8 @@ public class CraftingManager {
     @SuppressWarnings("unchecked")
     public CraftingManager() {
         MainLogger.getLogger().debug("Loading recipes...");
+        this.registerMultiRecipe(new RepairItemRecipe());
+
         ConfigSection recipes_649_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes649.json")).getRootSection();
         ConfigSection recipes_419_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes419.json")).getRootSection();
         List<Map> recipes_388 = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes388.json")).getRootSection().getMapList("recipes");
@@ -721,6 +726,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet662 = packetFor(ProtocolInfo.v1_20_70).compress(Deflater.BEST_COMPRESSION);
         packet649 = packetFor(ProtocolInfo.v1_20_60).compress(Deflater.BEST_COMPRESSION);
         packet630 = packetFor(ProtocolInfo.v1_20_50).compress(Deflater.BEST_COMPRESSION);
         packet622 = packetFor(ProtocolInfo.v1_20_40).compress(Deflater.BEST_COMPRESSION);
@@ -843,6 +849,10 @@ public class CraftingManager {
             return this.multiRecipes;
         }
         throw new IllegalArgumentException("Multi recipes are not supported for protocol " + protocol + " (< 407)");
+    }
+
+    public MultiRecipe getMultiRecipe(Player player, Item outputItem, List<Item> inputs) {
+        return this.multiRecipes.values().stream().filter(multiRecipe -> multiRecipe.canExecute(player, outputItem, inputs)).findFirst().orElse(null);
     }
 
     public FurnaceRecipe matchFurnaceRecipe(Item input) {

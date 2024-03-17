@@ -59,7 +59,7 @@ public class ClientboundMapItemDataPacket extends DataPacket {
         if (eids.length > 0) {
             update |= ENTITIES_UPDATE;
         }
-        if (decorators.length > 0) {
+        if (decorators.length > 0 || trackedEntities.length > 0) {
             update |= DECORATIONS_UPDATE;
         }
 
@@ -100,7 +100,6 @@ public class ClientboundMapItemDataPacket extends DataPacket {
             }
 
             this.putUnsignedVarInt(decorators.length);
-
             for (MapDecorator decorator : decorators) {
                 this.putByte(decorator.icon);
                 this.putByte(decorator.rotation);
@@ -141,7 +140,7 @@ public class ClientboundMapItemDataPacket extends DataPacket {
         public byte icon;
         public byte offsetX;
         public byte offsetZ;
-        public String label;
+        public String label = "";
         public Color color;
     }
 

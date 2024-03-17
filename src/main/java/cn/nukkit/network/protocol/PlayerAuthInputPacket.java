@@ -39,7 +39,11 @@ public class PlayerAuthInputPacket extends DataPacket {
     /**
      * @since 649
      */
-    public long predictedVehicle;
+    private long predictedVehicle;
+    /**
+     * @since v662 1.20.70
+     */
+    private Vector2f vehicleRotation;
 
     @Override
     public byte pid() {
@@ -99,6 +103,9 @@ public class PlayerAuthInputPacket extends DataPacket {
 
         if (protocol >= ProtocolInfo.v1_19_70_24) {
             if (protocol >= ProtocolInfo.v1_20_60 && this.inputData.contains(AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE)) {
+                if (protocol >= ProtocolInfo.v1_20_70) {
+                    this.vehicleRotation = this.getVector2f();
+                }
                 this.predictedVehicle = this.getVarLong();
             }
 

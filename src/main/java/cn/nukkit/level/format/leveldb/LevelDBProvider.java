@@ -250,7 +250,7 @@ public class LevelDBProvider implements LevelProvider {
             stream.write(Binary.writeLInt(data.length));
             stream.write(data);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Unable to save level.dat: " + path, e);
         }
     }
 
