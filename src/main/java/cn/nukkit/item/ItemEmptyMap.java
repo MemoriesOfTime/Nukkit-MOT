@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.nbt.tag.CompoundTag;
 
 public class ItemEmptyMap extends Item {
 
@@ -27,19 +28,26 @@ public class ItemEmptyMap extends Item {
 
     @Override
     public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
-        if (!player.isCreative()) {
-            this.count--;
-        }
-        player.getInventory().addItem(Item.get(Item.MAP));
+        this.giveMap(player);
         return true;
     }
 
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
+        this.giveMap(player);
+        return true;
+    }
+
+    protected void giveMap(Player player) {
         if (!player.isCreative()) {
             this.count--;
         }
-        player.getInventory().addItem(Item.get(Item.MAP));
-        return true;
+        Item map = Item.get(Item.MAP);
+        if (this.getDamage() == 2) {
+            CompoundTag tag = map.hasCompoundTag() ? map.getNamedTag() : new CompoundTag();
+            tag.putBoolean("map_display_players", true);
+            map.setNamedTag(tag);
+        }
+        player.getInventory().addItem(map);
     }
 }
