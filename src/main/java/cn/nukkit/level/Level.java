@@ -3351,7 +3351,7 @@ public class Level implements ChunkManager, Metadatable {
 
     protected Block getMapColoredBlockAt(int x, int z) {
         int y = getHighestBlockAt(x, z);
-        while (y > 0) {
+        while (y > this.getMinBlockY()) {
             Block block = getBlock(new Vector3(x, y, z));
             if (block.getColor() == null) return null;
             if (block.getColor().getAlpha() == 0x00 || block instanceof BlockWater) {
