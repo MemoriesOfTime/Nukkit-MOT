@@ -185,19 +185,20 @@ public abstract class EntityProjectile extends Entity {
             this.move(this.motionX, this.motionY, this.motionZ);
 
             if (this.isCollided && !this.hadCollision) { //collide with block
-                this.hadCollision = true;
-
-                this.motionX = 0;
-                this.motionY = 0;
-                this.motionZ = 0;
-
                 ProjectileHitEvent hitEvent = new ProjectileHitEvent(this, MovingObjectPosition.fromBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ(), -1, this));
                 this.server.getPluginManager().callEvent(hitEvent);
                 if (!hitEvent.isCancelled()) {
+                    this.hadCollision = true;
+
+                    this.motionX = 0;
+                    this.motionY = 0;
+                    this.motionZ = 0;
+
                     this.onHit();
                     this.onHitGround(moveVector);
+
+                    return true;
                 }
-                return true;
             } else if (!this.isCollided && this.hadCollision) {
                 this.hadCollision = false;
             }
