@@ -1238,7 +1238,7 @@ public class Server {
     }
 
     public void removePlayerListData(UUID uuid, Collection<Player> players) {
-        this.removePlayerListData(uuid, players.toArray(new Player[0]));
+        this.removePlayerListData(uuid, players.toArray(Player.EMPTY_ARRAY));
     }
 
     public void removePlayerListData(UUID uuid, Player player) {
@@ -1249,9 +1249,7 @@ public class Server {
     }
 
     public void sendFullPlayerListData(Player player) {
-        PlayerListPacket pk = new PlayerListPacket();
-        pk.type = PlayerListPacket.TYPE_ADD;
-        pk.entries = this.playerList.values().stream()
+        PlayerListPacket.Entry[] array = this.playerList.values().stream()
                 .map(p -> new PlayerListPacket.Entry(
                         p.getUniqueId(),
                         p.getId(),
@@ -1259,7 +1257,15 @@ public class Server {
                         p.getSkin(),
                         p.getLoginChainData().getXUID()))
                 .toArray(PlayerListPacket.Entry[]::new);
-        player.dataPacket(pk);
+        Object[][] splitArray = Utils.splitArray(array, 50);
+        if (splitArray != null) {
+            for (Object[] a : splitArray) {
+                PlayerListPacket pk = new PlayerListPacket();
+                pk.type = PlayerListPacket.TYPE_ADD;
+                pk.entries = (PlayerListPacket.Entry[]) a;
+                player.dataPacket(pk);
+            }
+        }
     }
 
     public void sendRecipeList(Player player) {
