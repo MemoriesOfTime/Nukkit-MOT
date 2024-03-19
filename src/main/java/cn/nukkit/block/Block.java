@@ -914,6 +914,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         this.boundingBox = null;
     }
 
+    public boolean canDropRaw(Player player) {
+        return true;
+    }
+
     public Item[] getDrops(Item item) {
         if (this.getId() < 0 || this.getId() > list.length) {
             return Item.EMPTY_ARRAY;
