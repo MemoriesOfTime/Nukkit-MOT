@@ -3,7 +3,6 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemRawGold;
 import cn.nukkit.item.ItemRawIron;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -52,7 +51,7 @@ public class BlockOreIron extends BlockSolid {
     }
 
     @Override
-    public boolean isDropOre(Player player) {
+    public boolean isDropOriginal(Player player) {
         return player.protocol < ProtocolInfo.v1_17_0;
     }
 

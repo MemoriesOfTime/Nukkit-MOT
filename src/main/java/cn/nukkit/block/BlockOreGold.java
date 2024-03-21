@@ -51,7 +51,7 @@ public class BlockOreGold extends BlockSolid {
     }
 
     @Override
-    public boolean isDropOre(Player player) {
+    public boolean isDropOriginal(Player player) {
         return player.protocol < ProtocolInfo.v1_17_0;
     }
 
