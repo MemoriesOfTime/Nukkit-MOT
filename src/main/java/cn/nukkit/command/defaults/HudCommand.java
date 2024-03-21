@@ -31,7 +31,7 @@ public class HudCommand extends VanillaCommand {
                 return true;
             }
 
-            if (args.length >= 3) {
+            if (args.length == 3) {
                 HudVisibility visibility = switch (args[1]) {
                     case "hide" -> HudVisibility.HIDE;
                     case "reset" -> HudVisibility.RESET;
