@@ -24,49 +24,50 @@ public class HudCommand extends VanillaCommand {
 
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (args.length < 3) {
+        if (args.length >= 1) {
+            Player player = Server.getInstance().getPlayerExact(args[0]);
+            if (player == null) {
+                sender.sendMessage("Player + " + args[0] + " + not found");
+                return true;
+            }
+
+            HudVisibility visibility = switch (args[1]) {
+                case "hide" -> HudVisibility.HIDE;
+                case "reset" -> HudVisibility.RESET;
+                default -> null;
+            };
+
+            if (args.length >= 3) {
+                HudElement element = switch (args[2]) {
+                    case "armor" -> HudElement.ARMOR;
+                    case "air_bubbles_bar" -> HudElement.AIR_BUBBLES_BAR;
+                    case "crosshair" -> HudElement.CROSSHAIR;
+                    case "food_bar" -> HudElement.FOOD_BAR;
+                    case "health" -> HudElement.HEALTH;
+                    case "hotbar" -> HudElement.HOTBAR;
+                    case "paper_doll" -> HudElement.PAPER_DOLL;
+                    case "tool_tips" -> HudElement.TOOL_TIPS;
+                    case "progress_bar" -> HudElement.PROGRESS_BAR;
+                    case "touch_controls" -> HudElement.TOUCH_CONTROLS;
+                    case "vehicle_health" -> HudElement.VEHICLE_HEALTH;
+
+                    default -> null;
+                };
+
+                if(visibility == null || element == null) {
+                    sender.sendMessage("Invalid visibility or element");
+                    return false;
+                }
+
+                SetHudPacket packet = new SetHudPacket();
+                packet.elements.add(element);
+                packet.visibility = visibility;
+                player.dataPacket(packet);
+
+                sender.sendMessage("HUD element " + element.name() + " is now " + visibility.name() + " for " + player.getName());
+            }
             return false;
         }
-
-        Player player = Server.getInstance().getPlayerExact(args[0]);
-        if (player == null) {
-            sender.sendMessage("Player + " + args[0] + " + not found");
-            return true;
-        }
-
-        HudVisibility visibility = switch (args[1]) {
-            case "hide" -> HudVisibility.HIDE;
-            case "reset" -> HudVisibility.RESET;
-            default -> null;
-        };
-
-        HudElement element = switch (args[2]) {
-            case "armor" -> HudElement.ARMOR;
-            case "air_bubbles_bar" -> HudElement.AIR_BUBBLES_BAR;
-            case "crosshair" -> HudElement.CROSSHAIR;
-            case "food_bar" -> HudElement.FOOD_BAR;
-            case "health" -> HudElement.HEALTH;
-            case "hotbar" -> HudElement.HOTBAR;
-            case "paper_doll" -> HudElement.PAPER_DOLL;
-            case "tool_tips" -> HudElement.TOOL_TIPS;
-            case "progress_bar" -> HudElement.PROGRESS_BAR;
-            case "touch_controls" -> HudElement.TOUCH_CONTROLS;
-            case "vehicle_health" -> HudElement.VEHICLE_HEALTH;
-
-            default -> null;
-        };
-
-        if(visibility == null || element == null) {
-            sender.sendMessage("Invalid visibility or element");
-            return false;
-        }
-
-        SetHudPacket packet = new SetHudPacket();
-        packet.elements.add(element);
-        packet.visibility = visibility;
-        player.dataPacket(packet);
-
-        sender.sendMessage("HUD element " + element.name() + " is now " + visibility.name() + " for " + player.getName());
 
         return true;
     }
