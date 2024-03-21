@@ -46019,6 +46019,26 @@
     {
       "block": "blast_furnace",
       "input": {
+        "id": "minecraft:raw_iron",
+        "damage": -1
+      },
+      "output": {
+        "id": 265
+      }
+    },
+    {
+      "block": "blast_furnace",
+      "input": {
+        "id": "minecraft:raw_gold",
+        "damage": -1
+      },
+      "output": {
+        "id": 266
+      }
+    },
+    {
+      "block": "blast_furnace",
+      "input": {
         "id": 153,
         "damage": -1
       },
@@ -46567,6 +46587,28 @@
       "output": {
         "id": 266
       }
+    },
+    {
+      "type": 3,
+      "input": {
+        "id": "minecraft:raw_iron",
+        "damage": -1
+      },
+      "output": {
+        "id": 265
+      },
+      "block": "furnace"
+    },
+    {
+      "type": 3,
+      "input": {
+        "id": "minecraft:raw_gold",
+        "damage": -1
+      },
+      "output": {
+        "id": 266
+      },
+      "block": "furnace"
     },
     {
       "block": "furnace",

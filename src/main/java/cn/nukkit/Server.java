@@ -525,6 +525,11 @@ public class Server {
 
     public boolean useNativeLevelDB;
 
+    /**
+     * Enable Raw Drop of Iron and Gold
+     */
+    public boolean enableRawOres;
+
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
         currentThread = Thread.currentThread(); // Saves the current thread instance as a reference, used in Server#isPrimaryThread()
@@ -3092,6 +3097,7 @@ public class Server {
         }
 
         this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
+        this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
     }
 
     /**
@@ -3235,6 +3241,7 @@ public class Server {
             put("hastebin-token", "");
 
             put("use-native-leveldb", false);
+            put("enable-raw-ores", true);
         }
     }
 

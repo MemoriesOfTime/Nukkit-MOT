@@ -914,6 +914,18 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         this.boundingBox = null;
     }
 
+    /**
+     * 是否直接掉落方块物品
+     * Whether to drop block items directly
+     *
+     * @param player 玩家
+     * @return true - 直接掉落方块物品, false - 通过getDrops方法获取掉落物品
+     *         true - Drop block items directly, false - Get dropped items through the getDrops method
+     */
+    public boolean isDropOriginal(Player player) {
+        return false;
+    }
+
     public Item[] getDrops(Item item) {
         if (this.getId() < 0 || this.getId() > list.length) {
             return Item.EMPTY_ARRAY;
