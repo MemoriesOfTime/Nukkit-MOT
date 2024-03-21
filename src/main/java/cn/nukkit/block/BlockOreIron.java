@@ -1,7 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemRawGold;
 import cn.nukkit.item.ItemRawIron;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -56,29 +58,31 @@ public class BlockOreIron extends BlockSolid {
 
     @Override
     public Item[] getDrops(Item item) {
-        if (item.isPickaxe() && item.getTier() >= this.getToolTier()) {
-            if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
-                return new Item[]{this.toItem()};
-            }
-            int count = 1;
-            Enchantment fortune = item.getEnchantment(Enchantment.ID_FORTUNE_DIGGING);
-            if (fortune != null && fortune.getLevel() >= 1) {
-                int i = Utils.random.nextInt(fortune.getLevel() + 2) - 1;
+        if (Server.getInstance().enableRawOres) {
+            if (item.isPickaxe() && item.getTier() >= this.getToolTier()) {
+                if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
+                    return new Item[]{this.toItem()};
+                }
+                int count = 1;
+                Enchantment fortune = item.getEnchantment(Enchantment.ID_FORTUNE_DIGGING);
+                if (fortune != null && fortune.getLevel() >= 1) {
+                    int i = Utils.random.nextInt(fortune.getLevel() + 2) - 1;
 
-                if (i < 0) {
-                    i = 0;
+                    if (i < 0) {
+                        i = 0;
+                    }
+
+                    count = i + 1;
                 }
 
-                count = i + 1;
+                Item rawGold = new ItemRawGold();
+                rawGold.setCount(count);
+                return new Item[]{
+                        rawGold
+                };
+            } else {
+                return Item.EMPTY_ARRAY;
             }
-
-            Item rawIron = new ItemRawIron();
-            rawIron.setCount(count);
-            return new Item[]{
-                    rawIron
-            };
-        } else {
-            return Item.EMPTY_ARRAY;
-        }
+        } else return new Item[]{this.toItem()};
     }
 }
