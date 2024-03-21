@@ -3235,7 +3235,7 @@ public class Server {
             put("hastebin-token", "");
 
             put("use-native-leveldb", false);
-            put("enable-raw-ores", false);
+            put("enable-raw-ores", true);
         }
     }
 
