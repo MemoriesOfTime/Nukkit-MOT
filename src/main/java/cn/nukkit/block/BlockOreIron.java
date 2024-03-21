@@ -50,8 +50,8 @@ public class BlockOreIron extends BlockSolid {
     }
 
     @Override
-    public boolean canDropRaw(Player player) {
-        return player.protocol >= ProtocolInfo.v1_17_0;
+    public boolean isDropOre(Player player) {
+        return player.protocol < ProtocolInfo.v1_17_0;
     }
 
     @Override

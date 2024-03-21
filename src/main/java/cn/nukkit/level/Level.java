@@ -2440,7 +2440,7 @@ public class Level implements ChunkManager, Metadatable {
             Item[] eventDrops;
             if (!player.isSurvival()) {
                 eventDrops = Item.EMPTY_ARRAY;
-            } else if (isSilkTouch && target.canSilkTouch() || !target.canDropRaw(player)) {
+            } else if (isSilkTouch && target.canSilkTouch() || target.isDropOre(player)) {
                 eventDrops = new Item[]{target.toItem()};
             } else {
                 eventDrops = target.getDrops(item);

@@ -914,8 +914,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         this.boundingBox = null;
     }
 
-    public boolean canDropRaw(Player player) {
-        return true;
+    public boolean isDropOre(Player player) {
+        return false;
     }
 
     public Item[] getDrops(Item item) {
