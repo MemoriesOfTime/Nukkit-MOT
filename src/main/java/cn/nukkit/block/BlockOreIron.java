@@ -75,10 +75,10 @@ public class BlockOreIron extends BlockSolid {
                     count = i + 1;
                 }
 
-                Item rawGold = new ItemRawGold();
-                rawGold.setCount(count);
+                Item rawIron = new ItemRawIron();
+                rawIron.setCount(count);
                 return new Item[]{
-                        rawGold
+                        rawIron
                 };
             } else {
                 return Item.EMPTY_ARRAY;
