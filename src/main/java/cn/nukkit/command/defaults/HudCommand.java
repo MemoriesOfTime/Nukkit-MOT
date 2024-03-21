@@ -31,13 +31,13 @@ public class HudCommand extends VanillaCommand {
                 return true;
             }
 
-            HudVisibility visibility = switch (args[1]) {
-                case "hide" -> HudVisibility.HIDE;
-                case "reset" -> HudVisibility.RESET;
-                default -> null;
-            };
-
             if (args.length >= 3) {
+                HudVisibility visibility = switch (args[1]) {
+                    case "hide" -> HudVisibility.HIDE;
+                    case "reset" -> HudVisibility.RESET;
+                    default -> null;
+                };
+
                 HudElement element = switch (args[2]) {
                     case "armor" -> HudElement.ARMOR;
                     case "air_bubbles_bar" -> HudElement.AIR_BUBBLES_BAR;
