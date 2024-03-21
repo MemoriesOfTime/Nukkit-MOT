@@ -60,16 +60,16 @@ public class WhitelistCommand extends VanillaCommand {
                 case "on" -> {
                     sender.getServer().setPropertyBoolean("white-list", true);
                     sender.getServer().setWhitelisted(true);
-                    broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.enabled"));
-                }
-                case "off" -> {
-                    sender.getServer().setPropertyBoolean("white-list", false);
-                    sender.getServer().setWhitelisted(false);
 
                     for (Player player : Server.getInstance().getOnlinePlayers().values()) {
                         if (!Server.getInstance().isWhitelisted(player.getName().toLowerCase())) player.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, Server.getInstance().whitelistReason);
                     }
 
+                    broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.enabled"));
+                }
+                case "off" -> {
+                    sender.getServer().setPropertyBoolean("white-list", false);
+                    sender.getServer().setWhitelisted(false);
                     broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.disabled"));
                 }
                 case "list" -> {
@@ -98,11 +98,11 @@ public class WhitelistCommand extends VanillaCommand {
 
         switch (args[0].toLowerCase()) {
             case "add" -> {
-                sender.getServer().getOfflinePlayer(args[1]).setWhitelisted(true);
+                sender.getServer().getOfflinePlayer(args[1].toLowerCase()).setWhitelisted(true);
                 broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.add.success", args[1]));
             }
             case "remove" -> {
-                sender.getServer().getOfflinePlayer(args[1]).setWhitelisted(false);
+                sender.getServer().getOfflinePlayer(args[1].toLowerCase()).setWhitelisted(false);
                 broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.remove.success", args[1]));
             }
         }
