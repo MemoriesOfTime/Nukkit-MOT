@@ -24,13 +24,14 @@ public class HudCommand extends VanillaCommand {
 
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+        if (args.length < 3) {
+            return false;
+        }
+
         Player player = Server.getInstance().getPlayerExact(args[0]);
         if (player == null) {
             sender.sendMessage("Player + " + args[0] + " + not found");
             return true;
-        }
-        if (args.length < 3) {
-            return false;
         }
 
         HudVisibility visibility = switch (args[1]) {
