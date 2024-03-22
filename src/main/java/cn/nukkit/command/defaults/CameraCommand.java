@@ -225,7 +225,7 @@ public class CameraCommand extends VanillaCommand {
                 pk.getSetInstruction().setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
             }
             case "set-ease-rot" -> {
-                if (args.length != 8) {
+                if (args.length != 9) {
                     return false;
                 }
                 CameraPreset preset = CameraPresetManager.getPreset(args[2]);
@@ -244,13 +244,13 @@ public class CameraCommand extends VanillaCommand {
                 if (args.length != 9) {
                     return false;
                 }
-                if (setInstructionV2(sender, args, pk)) return false;
+                if (!setInstructionV2(sender, args, pk)) return false;
             }
             case "set-ease-pos-rot" -> {
                 if (args.length != 11) {
                     return false;
                 }
-                if (setInstructionV2(sender, args, pk)) return false;
+                if (!setInstructionV2(sender, args, pk)) return false;
                 pk.getSetInstruction().setRot(new Vector2f(Float.parseFloat(args[9]), Float.parseFloat(args[10])));
             }
         }
@@ -270,7 +270,7 @@ public class CameraCommand extends VanillaCommand {
         CameraPreset preset = CameraPresetManager.getPreset(args[2]);
         if (preset == null) {
             sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
-            return true;
+            return false;
         }
         float easeTime = Float.parseFloat(args[4]);
         CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase());
@@ -279,6 +279,6 @@ public class CameraCommand extends VanillaCommand {
         pk.getSetInstruction().setPreset(preset);
         pk.getSetInstruction().setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
         pk.getSetInstruction().setPos(position);
-        return false;
+        return true;
     }
 }
