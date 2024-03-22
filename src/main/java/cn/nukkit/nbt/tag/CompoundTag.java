@@ -202,8 +202,53 @@ public class CompoundTag extends Tag implements Cloneable {
         return tags.get(name) instanceof CompoundTag;
     }
 
+    public boolean containsString(String name) {
+        return tags.get(name) instanceof StringTag;
+    }
+
+    public boolean containsIntArray(String name) {
+        return tags.get(name) instanceof IntArrayTag;
+    }
+
+    public boolean containsByteArray(String name) {
+        return tags.get(name) instanceof ByteArrayTag;
+    }
+
+    public boolean containsNumber(String name) {
+        return tags.get(name) instanceof NumberTag;
+    }
+
+    public boolean containsList(String name) {
+        return tags.get(name) instanceof ListTag;
+    }
+
+    public boolean containsList(String name, byte type) {
+        Tag tag = tags.get(name);
+        if (!(tag instanceof ListTag<?> list)) {
+            return false;
+        }
+        byte listType = list.type;
+        return listType == 0 || listType == type;
+    }
+
+    public boolean containsByte(String name) {
+        return tags.get(name) instanceof ByteTag;
+    }
+
     public boolean containsShort(String name) {
         return tags.get(name) instanceof ShortTag;
+    }
+
+    public boolean containsInt(String name) {
+        return tags.get(name) instanceof IntTag;
+    }
+
+    public boolean containsDouble(String name) {
+        return tags.get(name) instanceof DoubleTag;
+    }
+
+    public boolean containsFloat(String name) {
+        return tags.get(name) instanceof FloatTag;
     }
 
     public CompoundTag remove(String name) {
@@ -306,6 +351,7 @@ public class CompoundTag extends Tag implements Cloneable {
         return (((NumberTag) tags.get(name)).getData().intValue()) != 0;
     }
 
+    @Override
     public String toString() {
         StringJoiner joiner = new StringJoiner(",\n\t");
         tags.forEach((key, tag) -> joiner.add('\'' + key + "' : " + tag.toString().replace("\n", "\n\t")));
@@ -319,6 +365,7 @@ public class CompoundTag extends Tag implements Cloneable {
         return "{" + joiner + "}";
     }
 
+    @Override
     public String toSNBT(int space) {
         StringBuilder addSpace = new StringBuilder();
         addSpace.append(" ".repeat(Math.max(0, space)));
@@ -327,6 +374,7 @@ public class CompoundTag extends Tag implements Cloneable {
         return "{\n" + addSpace + joiner + "\n}";
     }
 
+    @Override
     public void print(String prefix, PrintStream out) {
         super.print(prefix, out);
         out.println(prefix + '{');
@@ -342,6 +390,7 @@ public class CompoundTag extends Tag implements Cloneable {
         return tags.isEmpty();
     }
 
+    @Override
     public CompoundTag copy() {
         CompoundTag tag = new CompoundTag(getName());
         for (Entry<String, Tag> entry : tags.entrySet()) {
