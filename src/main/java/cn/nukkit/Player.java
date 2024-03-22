@@ -2496,7 +2496,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         for (Player p : new ArrayList<>(this.server.playerList.values())) {
             if (p != this && p.username != null) {
                 if (p.username.equalsIgnoreCase(this.username) || this.getUniqueId().equals(p.getUniqueId())) {
-                    p.close("", "disconnectionScreen.loggedinOtherLocation");
+                    PlayerDuplicateLoginEvent event = new PlayerDuplicateLoginEvent(this, p);
+                    event.call();
+
+                    if (!event.isCancelled()) {
+                        p.close("", "disconnectionScreen.loggedinOtherLocation");
+                    } else {
+                        this.close("", "disconnectionScreen.loggedinOtherLocation");
+                        return;
+                    }
                     break;
                 }
             }
