@@ -62,7 +62,7 @@ public class SparkInstaller {
                 Files.copy(in, sparkFile.toPath());
                 server.getPluginManager().loadPlugin(sparkFile);
                 log.info("Spark has been installed.");
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 log.warn("Failed to download spark: " + e.getMessage(), e);
             }
         }

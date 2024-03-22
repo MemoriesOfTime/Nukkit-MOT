@@ -152,7 +152,7 @@ public class Server {
     private final CraftingManager craftingManager;
     private final ResourcePackManager resourcePackManager;
     private final ConsoleCommandSender consoleSender;
-    private IScoreboardManager scoreboardManager;
+    private final IScoreboardManager scoreboardManager;
 
     private int maxPlayers;
     private boolean autoSave = true;
