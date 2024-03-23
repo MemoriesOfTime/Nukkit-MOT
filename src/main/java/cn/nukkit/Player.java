@@ -2848,6 +2848,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         switch (pidOld) {
             case ProtocolInfo.LOGIN_PACKET:
                 LoginPacket loginPacket = (LoginPacket) packet;
+
+                if (this.loginPacketReceived) {
+                    this.close("", "Invalid login packet");
+                    return;
+                }
+
+                this.loginPacketReceived = true;
+
                 for (Player p : new ArrayList<>(this.server.playerList.values())) {
                     if (p != this && p.username != null) {
                         if (p.username.equalsIgnoreCase(loginPacket.username) || loginPacket.clientUUID.equals(p.getUniqueId())) {
@@ -2864,13 +2872,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                     }
                 }
-
-                if (this.loginPacketReceived) {
-                    this.close("", "Invalid login packet");
-                    return;
-                }
-
-                this.loginPacketReceived = true;
 
                 this.protocol = loginPacket.getProtocol();
 
