@@ -10,6 +10,7 @@ import cn.nukkit.item.ItemMap;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.MapInfoRequestPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.AsyncTask;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -63,7 +64,7 @@ public class MapInfoRequestProcessor extends DataPacketProcessor<MapInfoRequestP
                 }
 
                 ItemMap finalMapItem = mapItem;
-                player.getServer().getScheduler().scheduleAsyncTask(new AsyncTask() {
+                player.getServer().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new AsyncTask() {
                     @Override
                     public void onRun() {
                         finalMapItem.renderMap(player.getLevel(), (player.getFloorX() / 128) << 7, (player.getFloorZ() / 128) << 7, 1);

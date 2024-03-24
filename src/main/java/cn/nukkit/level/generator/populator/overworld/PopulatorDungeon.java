@@ -16,6 +16,7 @@ import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.plugin.InternalPlugin;
 
 public class PopulatorDungeon extends Populator {
     private static final int[] MOBS = {EntitySkeleton.NETWORK_ID, EntityZombie.NETWORK_ID, EntityZombie.NETWORK_ID, EntitySpider.NETWORK_ID};
@@ -115,7 +116,7 @@ public class PopulatorDungeon extends Populator {
                                 final ListTag<CompoundTag> items = new ListTag<>("Items");
                                 DungeonChest.get().create(items, random);
                                 chest.putList(items);
-                                Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), chest));
+                                Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), chest));
                                 break;
                             }
                         }
@@ -123,7 +124,7 @@ public class PopulatorDungeon extends Populator {
                 }
 
                 level.setBlockAt(x, y, z, BlockID.MONSTER_SPAWNER);
-                Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(),
+                Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(),
                     BlockEntity.getDefaultCompound(new Vector3(x, y, z), BlockEntity.MOB_SPAWNER)
                         .putInt("EntityId", MOBS[random.nextBoundedInt(MOBS.length)])));
             }

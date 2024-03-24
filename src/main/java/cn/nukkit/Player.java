@@ -2959,7 +2959,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (this.isEnableNetworkEncryption()) {
-                    this.server.getScheduler().scheduleAsyncTask(new PrepareEncryptionTask(this) {
+                    this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PrepareEncryptionTask(this) {
                         @Override
                         public void onCompletion(Server server) {
                             if (!Player.this.isConnected()) {
@@ -6743,7 +6743,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         if (animate) {
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_BLOCKED_USING_DAMAGED_SHIELD, true);
-            this.getServer().getScheduler().scheduleTask(null, () -> {
+            this.getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
                 if (this.isOnline()) {
                     this.setDataFlag(DATA_FLAGS, DATA_FLAG_BLOCKED_USING_DAMAGED_SHIELD, false);
                 }
@@ -6804,7 +6804,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         };
 
-        this.server.getScheduler().scheduleAsyncTask(this.preLoginEventTask);
+        this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, this.preLoginEventTask);
         this.processLogin();
     }
 

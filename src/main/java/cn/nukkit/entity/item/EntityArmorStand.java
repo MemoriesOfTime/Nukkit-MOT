@@ -22,6 +22,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.network.protocol.SetEntityDataPacket;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.Task;
 
 import java.util.Collection;
@@ -198,7 +199,7 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
             } else {
                 this.equipmentInventory.setItem(slot, handItem);
             }
-            Server.getInstance().getScheduler().scheduleDelayedTask(new Hack(player, item, player.getInventory().getHeldItemIndex()), 1);
+            Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new Hack(player, item, player.getInventory().getHeldItemIndex()), 1);
         }
     }
 

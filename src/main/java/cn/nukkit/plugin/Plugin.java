@@ -2,6 +2,7 @@ package cn.nukkit.plugin;
 
 import cn.nukkit.Server;
 import cn.nukkit.command.CommandExecutor;
+import cn.nukkit.scheduler.PluginTaskScheduler;
 import cn.nukkit.utils.Config;
 
 import java.io.File;
@@ -285,4 +286,12 @@ public interface Plugin extends CommandExecutor {
      * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     PluginLoader getPluginLoader();
+
+    /**
+     * 返回这个插件的调度器为{@link PluginTaskScheduler}对象。<br>
+     * Returns the scheduler of this plugin as a {@link PluginTaskScheduler} object.
+     *
+     * @return  这个插件的调度器。<br>The scheduler of this plugin.
+     */
+    PluginTaskScheduler getScheduler();
 }

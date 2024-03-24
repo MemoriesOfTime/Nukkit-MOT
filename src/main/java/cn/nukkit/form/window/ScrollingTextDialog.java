@@ -2,6 +2,7 @@ package cn.nukkit.form.window;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.Task;
 
 public class ScrollingTextDialog implements Dialog{
@@ -70,13 +71,13 @@ public class ScrollingTextDialog implements Dialog{
         this.cursor = cursor;
     }
 
-    public void startScrolling(){
+    public void startScrolling() {
         this.scrolling = true;
-        Server.getInstance().getScheduler().scheduleRepeatingTask(this.scrollingTask,this.scrollingSpeed);
+        Server.getInstance().getScheduler().scheduleRepeatingTask(InternalPlugin.INSTANCE, this.scrollingTask, this.scrollingSpeed);
     }
 
     @Override
-    public void send(Player p){
+    public void send(Player p) {
         this.startScrolling();
     }
 

@@ -64,10 +64,7 @@ import cn.nukkit.permission.BanEntry;
 import cn.nukkit.permission.BanList;
 import cn.nukkit.permission.DefaultPermissions;
 import cn.nukkit.permission.Permissible;
-import cn.nukkit.plugin.JavaPluginLoader;
-import cn.nukkit.plugin.Plugin;
-import cn.nukkit.plugin.PluginLoadOrder;
-import cn.nukkit.plugin.PluginManager;
+import cn.nukkit.plugin.*;
 import cn.nukkit.plugin.service.NKServiceManager;
 import cn.nukkit.plugin.service.ServiceManager;
 import cn.nukkit.potion.Effect;
@@ -597,7 +594,7 @@ public class Server {
             }
         }
 
-        ServerScheduler.WORKERS = (int) poolSize;
+        ServerScheduler.init(this, (int) poolSize);
 
         Zlib.setProvider(this.getPropertyInt("zlib-provider", 2));
 
@@ -798,7 +795,7 @@ public class Server {
         if (this.getPropertyBoolean("entity-auto-spawn-task", true)) {
             this.spawnerTask = new SpawnerTask();
             int spawnerTicks = Math.max(this.getPropertyInt("ticks-per-entity-spawns", 200), 2) >> 1; // Run the spawner on 2x speed but spawn only either monsters or animals
-            this.scheduler.scheduleDelayedRepeatingTask(this.spawnerTask, spawnerTicks, spawnerTicks);
+            this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask, spawnerTicks, spawnerTicks);
         }
 
         if (this.getPropertyBoolean("bstats-metrics", true)) {
@@ -1071,6 +1068,9 @@ public class Server {
             this.getLogger().debug("Stopping all tasks...");
             this.scheduler.cancelAllTasks();
             this.scheduler.mainThreadHeartbeat(Integer.MAX_VALUE);
+            // InternalPlugin无法被卸载，所以这里手动调用
+            InternalPlugin.INSTANCE.getScheduler().cancelAllTasks();
+            InternalPlugin.INSTANCE.getScheduler().mainThreadHeartbeat(Integer.MAX_VALUE);
 
             this.getLogger().debug("Closing console...");
             this.consoleThread.interrupt();
@@ -1428,6 +1428,7 @@ public class Server {
         }
 
         this.scheduler.mainThreadHeartbeat(this.tickCounter);
+        this.pluginManager.tickSchedulers(this.tickCounter);
 
         this.checkTickUpdates(this.tickCounter);
 
@@ -1945,7 +1946,7 @@ public class Server {
             }
 
             if (async) {
-                this.getScheduler().scheduleTask(new Task() {
+                this.getScheduler().scheduleTask(InternalPlugin.INSTANCE, new Task() {
                     boolean hasRun = false;
 
                     @Override

@@ -23,6 +23,7 @@ import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.plugin.InternalPlugin;
 import com.google.common.collect.Lists;
 
 import java.util.List;
@@ -348,7 +349,7 @@ public final class MineshaftPieces {
                     MineshaftChest.get().create(itemList, random);
                     nbt.putList(itemList);
 
-                    Server.getInstance().getScheduler().scheduleTask(new ActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+                    Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new ActorSpawnTask(chunk.getProvider().getLevel(), nbt));
                 }
 
             }
@@ -400,7 +401,7 @@ public final class MineshaftPieces {
 
                         final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
                         if (chunk != null) {
-                            Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(),
+                            Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(),
                                 BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.MOB_SPAWNER)
                                     .putInt("EntityId", EntityCaveSpider.NETWORK_ID)));
                         }

@@ -507,6 +507,8 @@ public class PluginManager {
             }
 
             this.server.getScheduler().cancelTask(plugin);
+            plugin.getScheduler().cancelAllTasks();
+            plugin.getScheduler().mainThreadHeartbeat(Integer.MAX_VALUE);
             HandlerList.unregisterAll(plugin);
             for (Permission permission : plugin.getDescription().getPermissions()) {
                 this.removePermission(permission);
@@ -521,6 +523,14 @@ public class PluginManager {
         this.permissions.clear();
         this.defaultPerms.clear();
         this.defaultPermsOp.clear();
+    }
+
+    public void tickSchedulers(int currentTick) {
+        for (Plugin plugin : this.plugins.values()) {
+            if (plugin.isEnabled()) {
+                plugin.getScheduler().mainThreadHeartbeat(currentTick);
+            }
+        }
     }
 
     public void callEvent(Event event) {

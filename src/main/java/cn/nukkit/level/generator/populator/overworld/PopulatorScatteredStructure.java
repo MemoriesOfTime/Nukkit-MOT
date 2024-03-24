@@ -11,6 +11,7 @@ import cn.nukkit.level.generator.structure.StructureBoundingBox;
 import cn.nukkit.level.generator.task.CallbackableScatteredGenerationTask;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.NukkitRandom;
+import cn.nukkit.plugin.InternalPlugin;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
@@ -46,7 +47,7 @@ public abstract class PopulatorScatteredStructure extends Populator {
 
                 if (!chunks.isEmpty()) {
                     waitingChunks.put(Level.chunkHash(chunkX, chunkZ), indexes);
-                    chunks.forEach(ck -> Server.getInstance().getScheduler().scheduleAsyncTask(new CallbackableScatteredGenerationTask(world, ck, this, piece, level, chunkX, chunkZ)));
+                    chunks.forEach(ck -> Server.getInstance().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new CallbackableScatteredGenerationTask(world, ck, this, piece, level, chunkX, chunkZ)));
                     return;
                 }
             }

@@ -4,6 +4,7 @@ import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.plugin.PluginDescription;
 import cn.nukkit.scheduler.AsyncTask;
@@ -31,7 +32,7 @@ public class DebugPasteCommand extends VanillaCommand {
 
         Server server = Server.getInstance();
         sender.sendMessage("Uploading...");
-        server.getScheduler().scheduleAsyncTask(new DebugPasteTask(server, sender));
+        server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new DebugPasteTask(server, sender));
         return true;
     }
 
