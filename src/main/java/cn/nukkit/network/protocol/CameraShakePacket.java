@@ -1,5 +1,8 @@
 package cn.nukkit.network.protocol;
 
+import lombok.ToString;
+
+@ToString
 public class CameraShakePacket extends DataPacket {
     public float intensity;
     public float duration;

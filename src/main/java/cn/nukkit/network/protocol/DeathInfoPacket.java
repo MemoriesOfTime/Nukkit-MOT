@@ -1,8 +1,11 @@
 package cn.nukkit.network.protocol;
 
+import lombok.ToString;
+
 /**
  * @since 534
  */
+@ToString
 public class DeathInfoPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.DEATH_INFO_PACKET;

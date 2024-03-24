@@ -3,7 +3,9 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.network.protocol.types.inventory.InventoryLayout;
 import cn.nukkit.network.protocol.types.inventory.InventoryTabLeft;
 import cn.nukkit.network.protocol.types.inventory.InventoryTabRight;
+import lombok.ToString;
 
+@ToString
 public class SetPlayerInventoryOptionsPacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET;
