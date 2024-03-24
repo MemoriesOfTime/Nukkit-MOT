@@ -3037,13 +3037,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
+                // 传送玩家后，可能会由于网络延迟接收错误数据包
+                // 在这种情况下为了避免错误调整玩家视角，直接忽略移动数据包
+                if (this.lastTeleportTick + 10 > this.server.getTick()
+                        && newPos.distance(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) > 5) {
+                    break;
+                }
+
                 if (dis > 100) {
-                    // 传送玩家后，可能会由于网络延迟接收错误数据包
-                    // 在这种情况下为了避免错误调整玩家视角，直接忽略移动数据包
-                    if (this.lastTeleportTick + 20 < this.server.getTick()
-                            && newPos.distance(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) > 5) {
-                        this.sendPosition(this, movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
-                    }
+                    this.sendPosition(this, movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
                     break;
                 }
 
@@ -3285,13 +3287,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
+                // 传送玩家后，可能会由于网络延迟接收错误数据包
+                // 在这种情况下为了避免错误调整玩家视角，直接忽略移动数据包
+                if (this.lastTeleportTick + 10 > this.server.getTick()
+                        && clientPosition.distance(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) > 5) {
+                    break;
+                }
+
                 if (distSqrt > 100) {
-                    // 传送玩家后，可能会由于网络延迟接收错误数据包
-                    // 在这种情况下为了避免错误调整玩家视角，直接忽略移动数据包
-                    if (this.lastTeleportTick + 20 < this.server.getTick()
-                            && clientPosition.distance(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) > 5) {
-                        this.sendPosition(this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
-                    }
+                    this.sendPosition(this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
                     break;
                 }
 
