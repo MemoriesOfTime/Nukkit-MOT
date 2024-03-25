@@ -19,6 +19,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.*;
 import org.jetbrains.annotations.NotNull;
 
@@ -200,7 +201,7 @@ public class BlockBed extends BlockTransparentMeta implements Faceable, BlockEnt
                 this.getLevel().setBlock(next, Block.get(BED_BLOCK, meta | 0x08), true, true);
 
                 // HACK: Make bed color to update for the player
-                Server.getInstance().getScheduler().scheduleDelayedTask(() -> {
+                Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
                     createBlockEntity(this, item.getDamage());
                     createBlockEntity(next, item.getDamage());
                 }, 2);

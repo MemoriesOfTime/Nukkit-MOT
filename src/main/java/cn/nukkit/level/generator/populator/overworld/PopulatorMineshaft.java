@@ -11,6 +11,7 @@ import cn.nukkit.level.generator.structure.MineshaftPieces;
 import cn.nukkit.level.generator.structure.StructureStart;
 import cn.nukkit.level.generator.task.CallbackableChunkGenerationTask;
 import cn.nukkit.math.NukkitRandom;
+import cn.nukkit.plugin.InternalPlugin;
 
 public class PopulatorMineshaft extends Populator {
     protected static final int PROBABILITY = 4;
@@ -110,7 +111,7 @@ public class PopulatorMineshaft extends Populator {
                             } else {
                                 final int f_cx = cx;
                                 final int f_cz = cz;
-                                Server.getInstance().getScheduler().scheduleAsyncTask(new CallbackableChunkGenerationTask<>(
+                                Server.getInstance().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new CallbackableChunkGenerationTask<>(
                                     chunk.getProvider().getLevel(), ck, start,
                                     structure -> structure.postProcess(level, rand, new BoundingBox(x, z, x + 15, z + 15), f_cx, f_cz)));
                             }

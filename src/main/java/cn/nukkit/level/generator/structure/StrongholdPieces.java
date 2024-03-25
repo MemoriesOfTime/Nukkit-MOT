@@ -17,6 +17,7 @@ import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.plugin.InternalPlugin;
 import com.google.common.collect.Lists;
 
 import java.util.Iterator;
@@ -574,7 +575,7 @@ public final class StrongholdPieces {
                         final ListTag<CompoundTag> itemList = new ListTag<>("Items");
                         StrongholdCorridorChest.get().create(itemList, random);
                         nbt.putList(itemList);
-                        Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+                        Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
                     }
                 }
             }
@@ -856,7 +857,7 @@ public final class StrongholdPieces {
                             final ListTag<CompoundTag> itemList = new ListTag<>("Items");
                             StrongholdCrossingChest.get().create(itemList, random);
                             nbt.putList(itemList);
-                            Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+                            Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
                         }
                     }
                 }
@@ -1055,7 +1056,7 @@ public final class StrongholdPieces {
 					final ListTag<CompoundTag> itemList = new ListTag<>("Items");
 					StrongholdLibraryChest.get().create(itemList, random);
 					nbt.putList(itemList);
-					Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+					Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
 				}
 			}
 
@@ -1071,7 +1072,7 @@ public final class StrongholdPieces {
 						final ListTag<CompoundTag> itemList = new ListTag<>("Items");
 						StrongholdLibraryChest.get().create(itemList, random);
 						nbt.putList(itemList);
-						Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+						Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
 					}
 				}
 			}
@@ -1284,7 +1285,7 @@ public final class StrongholdPieces {
 
 					final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
 					if (chunk != null) {
-						Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.MOB_SPAWNER).putInt("EntityId", EntitySilverfish.NETWORK_ID)));
+						Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.MOB_SPAWNER).putInt("EntityId", EntitySilverfish.NETWORK_ID)));
 					}
 				}
 			}

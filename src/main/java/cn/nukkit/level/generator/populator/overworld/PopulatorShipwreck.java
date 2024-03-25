@@ -20,6 +20,7 @@ import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.plugin.InternalPlugin;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
@@ -128,21 +129,21 @@ public class PopulatorShipwreck extends Populator implements CallbackableTemplat
                         ListTag<CompoundTag> itemList = new ListTag<>("Items");
                         ShipwreckSupplyChest.get().create(itemList, random);
 
-                        Server.getInstance().getScheduler().scheduleDelayedTask(new LootSpawnTask(chunk.getProvider().getLevel(),
+                        Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new LootSpawnTask(chunk.getProvider().getLevel(),
                             new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
                         break;
                     case "mapChest":
                         itemList = new ListTag<>("Items");
                         ShipwreckMapChest.get().create(itemList, random);
 
-                        Server.getInstance().getScheduler().scheduleDelayedTask(new LootSpawnTask(chunk.getProvider().getLevel(),
+                        Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new LootSpawnTask(chunk.getProvider().getLevel(),
                             new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
                         break;
                     case "treasureChest":
                         itemList = new ListTag<>("Items");
                         ShipwreckTreasureChest.get().create(itemList, random);
 
-                        Server.getInstance().getScheduler().scheduleDelayedTask(new LootSpawnTask(chunk.getProvider().getLevel(),
+                        Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new LootSpawnTask(chunk.getProvider().getLevel(),
                             new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
                         break;
                 }
@@ -213,7 +214,7 @@ public class PopulatorShipwreck extends Populator implements CallbackableTemplat
             if (!chunks.isEmpty()) {
                 waitingChunks.put(Level.chunkHash(chunkX, chunkZ), indexes);
                 for (final BaseFullChunk ck : chunks) {
-                    Server.getInstance().getScheduler().scheduleAsyncTask(new CallbackableChunkGenerationTask<>(
+                    Server.getInstance().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new CallbackableChunkGenerationTask<>(
                         chunk.getProvider().getLevel(), ck, this,
                         populator -> populator.generateChunkCallback(template, seed, level, chunkX, chunkZ, y, ck.getX(), ck.getZ())));
                 }

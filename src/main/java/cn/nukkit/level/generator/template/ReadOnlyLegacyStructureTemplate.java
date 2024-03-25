@@ -14,6 +14,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.IntTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.plugin.InternalPlugin;
 
 import java.util.Comparator;
 import java.util.function.Consumer;
@@ -93,7 +94,7 @@ public class ReadOnlyLegacyStructureTemplate extends AbstractLegacyStructureTemp
                 nbt.putInt("z", pos.z);
 
                 if (entry.getId() != BlockID.STRUCTURE_BLOCK) {
-                    Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+                    Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
                 }
 
                 if (blockActorProcessor != null) {
@@ -140,7 +141,7 @@ public class ReadOnlyLegacyStructureTemplate extends AbstractLegacyStructureTemp
                 nbt.putInt("z", vec.z);
 
                 if (entry.getId() != BlockID.STRUCTURE_BLOCK) {
-                    Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+                    Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
                 }
 
                 if (blockActorProcessor != null) {
@@ -184,7 +185,7 @@ public class ReadOnlyLegacyStructureTemplate extends AbstractLegacyStructureTemp
                 nbt.putInt("z", vec.z);
 
                 if (entry.getId() != BlockID.STRUCTURE_BLOCK) {
-                    Server.getInstance().getScheduler().scheduleTask(new BlockActorSpawnTask(world, nbt));
+                    Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(world, nbt));
                 }
 
                 if (blockActorProcessor != null) {
@@ -208,7 +209,7 @@ public class ReadOnlyLegacyStructureTemplate extends AbstractLegacyStructureTemp
             posTag.add(new DoubleTag("", pos.z));
             nbt.putList(posTag);
 
-            Server.getInstance().getScheduler().scheduleTask(new ActorSpawnTask(level, nbt));
+            Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new ActorSpawnTask(level, nbt));
         }
     }
 }

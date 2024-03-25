@@ -23,6 +23,7 @@ import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.Utils;
 
 import java.util.function.Consumer;
@@ -70,17 +71,17 @@ public class PopulatorPillagerOutpost extends Populator {
                     case "topChest" -> {
                         final ListTag<CompoundTag> itemList = new ListTag<>("Items");
                         PillagerOutpostChest.get().create(itemList, random);
-                        Server.getInstance().getScheduler().scheduleDelayedTask(new LootSpawnTask(chunk.getProvider().getLevel(),
+                        Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new LootSpawnTask(chunk.getProvider().getLevel(),
                             new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
                     }
-                    case "pillager" -> Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
+                    case "pillager" -> Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new ActorSpawnTask(chunk.getProvider().getLevel(),
                         Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
                             .putString("id", String.valueOf(EntityPillager.NETWORK_ID))), 2);
-                    case "captain" -> Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
+                    case "captain" -> Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new ActorSpawnTask(chunk.getProvider().getLevel(),
                         Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
                             .putString("id", String.valueOf(EntityPillager.NETWORK_ID))
                             .putBoolean("PatrolLeader", true)), 2);
-                    case "cage" -> Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
+                    case "cage" -> Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new ActorSpawnTask(chunk.getProvider().getLevel(),
                         Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
                             .putString("id", String.valueOf(EntityIronGolem.NETWORK_ID))), 2);
                 }
@@ -138,7 +139,7 @@ public class PopulatorPillagerOutpost extends Populator {
         final int seed = random.nextInt();
 
         if (!chunk.isGenerated()) {
-            Server.getInstance().getScheduler().scheduleAsyncTask(new CallbackableChunkGenerationTask<>(
+            Server.getInstance().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new CallbackableChunkGenerationTask<>(
                 chunk.getProvider().getLevel(), chunk, this,
                 populator -> populator.placeFeature(template, chunk, seed)));
         } else {
