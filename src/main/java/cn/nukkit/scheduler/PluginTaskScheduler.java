@@ -90,7 +90,7 @@ public class PluginTaskScheduler extends BaseScheduler {
     }
 
     public void mainThreadHeartbeat(int currentTick) {
-        if (this.plugin.isDisabled()) {
+        if (this.plugin.isDisabled() && currentTick != Integer.MAX_VALUE) {
             throw new PluginException("Cannot run heartbeat on a disabled scheduler");
         }
         super.mainThreadHeartbeat(currentTick);

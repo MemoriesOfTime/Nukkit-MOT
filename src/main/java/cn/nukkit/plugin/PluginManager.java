@@ -29,7 +29,7 @@ public class PluginManager {
 
     private final SimpleCommandMap commandMap;
 
-    protected final Map<String, Plugin> plugins = new LinkedHashMap<>();
+    protected final Map<String, Plugin> plugins = new ConcurrentHashMap<>();
 
     protected final Map<String, Permission> permissions = new ConcurrentHashMap<>();
 
