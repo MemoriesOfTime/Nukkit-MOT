@@ -11,6 +11,7 @@ import cn.nukkit.utils.BinaryStream;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import org.cloudburstmc.protocol.common.util.OptionalBoolean;
 
 import java.io.IOException;
@@ -19,6 +20,7 @@ import java.util.List;
 
 @Getter
 @Setter
+@ToString
 public class CameraPresetsPacket extends DataPacket {
 
     private final List<CameraPreset> presets = new ObjectArrayList<>();

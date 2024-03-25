@@ -14,6 +14,7 @@ import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.CameraPresetManager;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 import org.cloudburstmc.protocol.common.NamedDefinition;
 import org.cloudburstmc.protocol.common.util.DefinitionUtils;
 import org.cloudburstmc.protocol.common.util.OptionalBoolean;
@@ -25,6 +26,7 @@ import java.nio.ByteOrder;
 
 @Getter
 @Setter
+@ToString
 public class CameraInstructionPacket extends DataPacket {
 
     private CameraSetInstruction setInstruction;

@@ -1,10 +1,12 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.network.protocol.types.ScorerType;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.List;
 
+@ToString
 public class SetScorePacket extends DataPacket {
     public Action action;
     public List<ScoreInfo> infos = new ArrayList<>();
@@ -45,6 +47,7 @@ public class SetScorePacket extends DataPacket {
         REMOVE
     }
 
+    @ToString
     public static class ScoreInfo {
         public long scoreboardId;
         public String objectiveId;

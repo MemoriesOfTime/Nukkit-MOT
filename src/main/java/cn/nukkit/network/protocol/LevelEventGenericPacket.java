@@ -2,10 +2,12 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import lombok.ToString;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
 
+@ToString
 public class LevelEventGenericPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.LEVEL_EVENT_GENERIC_PACKET;
