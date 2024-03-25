@@ -3045,7 +3045,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (dis > 100) {
-                    this.sendPosition(this, movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
+                    if (this.lastTeleportTick + 30 < this.server.getTick()) {
+                        this.sendPosition(this, movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
+                    }
                     break;
                 }
 
@@ -3295,7 +3297,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (distSqrt > 100) {
-                    this.sendPosition(this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
+                    if (this.lastTeleportTick + 30 < this.server.getTick()) {
+                        this.sendPosition(this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
+                    }
                     break;
                 }
 
