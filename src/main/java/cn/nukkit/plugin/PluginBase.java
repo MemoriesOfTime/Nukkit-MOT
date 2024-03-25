@@ -4,7 +4,6 @@ import cn.nukkit.Server;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.PluginIdentifiableCommand;
-import cn.nukkit.scheduler.PluginTaskScheduler;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.Utils;
 import com.google.common.base.Preconditions;
@@ -42,7 +41,6 @@ abstract public class PluginBase implements Plugin {
     private File configFile;
     private File file;
     private PluginLogger logger;
-    private PluginTaskScheduler scheduler;
 
 
     public void onLoad() {
@@ -139,7 +137,6 @@ abstract public class PluginBase implements Plugin {
             this.file = file;
             this.configFile = new File(this.dataFolder, "config.yml");
             this.logger = new PluginLogger(this);
-            this.scheduler = new PluginTaskScheduler(this);
         }
     }
 
@@ -298,10 +295,5 @@ abstract public class PluginBase implements Plugin {
     @Override
     public PluginLoader getPluginLoader() {
         return this.loader;
-    }
-
-    @Override
-    public PluginTaskScheduler getScheduler() {
-        return this.scheduler;
     }
 }

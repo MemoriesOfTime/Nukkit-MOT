@@ -594,7 +594,7 @@ public class Server {
             }
         }
 
-        ServerScheduler.init(this, (int) poolSize);
+        ServerScheduler.WORKERS = (int) poolSize;
 
         Zlib.setProvider(this.getPropertyInt("zlib-provider", 2));
 
@@ -1068,9 +1068,6 @@ public class Server {
             this.getLogger().debug("Stopping all tasks...");
             this.scheduler.cancelAllTasks();
             this.scheduler.mainThreadHeartbeat(Integer.MAX_VALUE);
-            // InternalPlugin无法被卸载，所以这里手动调用
-            InternalPlugin.INSTANCE.getScheduler().cancelAllTasks();
-            InternalPlugin.INSTANCE.getScheduler().mainThreadHeartbeat(Integer.MAX_VALUE);
 
             this.getLogger().debug("Closing console...");
             this.consoleThread.interrupt();
@@ -1428,7 +1425,6 @@ public class Server {
         }
 
         this.scheduler.mainThreadHeartbeat(this.tickCounter);
-        this.pluginManager.tickSchedulers(this.tickCounter);
 
         this.checkTickUpdates(this.tickCounter);
 
