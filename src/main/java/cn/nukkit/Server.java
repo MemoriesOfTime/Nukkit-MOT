@@ -527,6 +527,11 @@ public class Server {
      */
     public boolean enableRawOres;
 
+    /**
+     * Enable query auth by token
+     */
+    public boolean queryAuth;
+
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
         currentThread = Thread.currentThread(); // Saves the current thread instance as a reference, used in Server#isPrimaryThread()
@@ -3095,6 +3100,7 @@ public class Server {
 
         this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
         this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
+        this.queryAuth = this.getPropertyBoolean("query-auth", false);
     }
 
     /**
@@ -3163,8 +3169,11 @@ public class Server {
             put("force-language", false);
             put("shutdown-message", "§cServer closed");
             put("save-player-data", true);
+
             put("enable-query", true);
+            put("query-auth", false);
             put("query-plugins", false);
+
             put("debug-level", 1);
             put("async-workers", "auto");
 

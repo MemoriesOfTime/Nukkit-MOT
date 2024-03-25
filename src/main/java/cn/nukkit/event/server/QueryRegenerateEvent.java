@@ -7,6 +7,7 @@ import cn.nukkit.event.HandlerList;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.plugin.PluginDescription;
 import cn.nukkit.utils.Binary;
+import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -49,7 +50,7 @@ public class QueryRegenerateEvent extends ServerEvent {
         this.serverName = server.getMotd();
         this.listPlugins = server.queryPlugins;
         this.plugins = server.getPluginManager().getPlugins().values().toArray(new Plugin[0]);
-        this.players = server.getOnlinePlayers().values().toArray(new Player[0]);
+        this.players = server.getOnlinePlayers().values().toArray(Player.EMPTY_ARRAY);
         this.gameType = server.getGamemode() == 1 ? "CMP" : "SMP";
         this.version = server.getVersion();
         this.map = server.getDefaultLevel() == null ? "unknown" : server.getDefaultLevel().getName();
@@ -141,19 +142,7 @@ public class QueryRegenerateEvent extends ServerEvent {
         query.put((byte) 128);
         query.put((byte) 0x00);
 
-        LinkedHashMap<String, String> KVdata = new LinkedHashMap<>();
-        KVdata.put("hostname", this.serverName);
-        KVdata.put("gametype", this.gameType);
-        KVdata.put("game_id", "MINECRAFTPE");
-        KVdata.put("version", this.version);
-        KVdata.put("server_engine", Nukkit.NUKKIT);
-        KVdata.put("plugins", plist.toString());
-        KVdata.put("map", this.map);
-        KVdata.put("numplayers", String.valueOf(this.numPlayers));
-        KVdata.put("maxplayers", String.valueOf(this.maxPlayers));
-        KVdata.put("whitelist", this.whitelist);
-        KVdata.put("hostip", this.ip);
-        KVdata.put("hostport", String.valueOf(this.port));
+        LinkedHashMap<String, String> KVdata = getPresetQuery(plist);
 
         for (Map.Entry<String, String> entry : KVdata.entrySet()) {
             query.put(entry.getKey().getBytes(StandardCharsets.UTF_8));
@@ -171,6 +160,24 @@ public class QueryRegenerateEvent extends ServerEvent {
 
         query.put((byte) 0x00);
         return Arrays.copyOf(query.array(), query.position());
+    }
+
+    @NotNull
+    private LinkedHashMap<String, String> getPresetQuery(StringBuilder plist) {
+        LinkedHashMap<String, String> KVdata = new LinkedHashMap<>();
+        KVdata.put("hostname", this.serverName);
+        KVdata.put("gametype", this.gameType);
+        KVdata.put("game_id", "MINECRAFTPE");
+        KVdata.put("version", this.version);
+        KVdata.put("server_engine", Nukkit.NUKKIT);
+        KVdata.put("plugins", plist.toString());
+        KVdata.put("map", this.map);
+        KVdata.put("numplayers", String.valueOf(this.numPlayers));
+        KVdata.put("maxplayers", String.valueOf(this.maxPlayers));
+        KVdata.put("whitelist", this.whitelist);
+        KVdata.put("hostip", this.ip);
+        KVdata.put("hostport", String.valueOf(this.port));
+        return KVdata;
     }
 
     public byte[] getShortQuery() {

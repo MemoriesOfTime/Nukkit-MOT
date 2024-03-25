@@ -74,40 +74,51 @@ public class QueryHandler {
         short packetId = packet.readUnsignedByte();
         int sessionId = packet.readInt();
 
-        switch (packetId) {
-            case HANDSHAKE -> {
-                ByteBuf reply = PooledByteBufAllocator.DEFAULT.ioBuffer(10); // 1 + 4 + 4 + 1
-                reply.writeByte(HANDSHAKE);
-                reply.writeInt(sessionId);
-                reply.writeBytes(getTokenString(this.token, address.getAddress()));
-                reply.writeByte(0);
+        if (this.server.queryAuth) {
+            switch (packetId) {
+                case HANDSHAKE -> {
+                    ByteBuf reply = PooledByteBufAllocator.DEFAULT.ioBuffer(10); // 1 + 4 + 4 + 1
+                    reply.writeByte(HANDSHAKE);
+                    reply.writeInt(sessionId);
+                    reply.writeBytes(getTokenString(this.token, address.getAddress()));
+                    reply.writeByte(0);
 
-                this.server.getNetwork().sendPacket(address, reply);
+                    this.server.getNetwork().sendPacket(address, reply);
+                }
+                case STATISTICS -> {
+                    byte[] token = new byte[4];
+                    packet.readBytes(token);
+
+                    if (!Arrays.equals(token, getTokenString(this.token, address.getAddress())) &&
+                            !Arrays.equals(token, getTokenString(this.lastToken, address.getAddress()))) {
+                        break;
+                    }
+
+                    if (this.timeout < System.currentTimeMillis()) {
+                        this.regenerateInfo();
+                    }
+
+                    ByteBuf reply = PooledByteBufAllocator.DEFAULT.directBuffer(64);
+                    reply.writeByte(STATISTICS);
+                    reply.writeInt(sessionId);
+                    if (packet.readableBytes() == 8) {
+                        reply.writeBytes(this.longData);
+                    } else {
+                        reply.writeBytes(this.shortData);
+                    }
+
+                    this.server.getNetwork().sendPacket(address, reply);
+                }
             }
-            case STATISTICS -> {
-                byte[] token = new byte[4];
-                packet.readBytes(token);
-
-                if (!Arrays.equals(token, getTokenString(this.token, address.getAddress())) &&
-                    !Arrays.equals(token, getTokenString(this.lastToken, address.getAddress()))) {
-                    break;
-                }
-
-                if (this.timeout < System.currentTimeMillis()) {
-                    this.regenerateInfo();
-                }
-
-                ByteBuf reply = PooledByteBufAllocator.DEFAULT.directBuffer(64);
-                reply.writeByte(STATISTICS);
-                reply.writeInt(sessionId);
-                if (packet.readableBytes() == 8) {
-                    reply.writeBytes(this.longData);
-                } else {
-                    reply.writeBytes(this.shortData);
-                }
-
-                this.server.getNetwork().sendPacket(address, reply);
+        } else {
+            if (this.timeout < System.currentTimeMillis()) {
+                this.regenerateInfo();
             }
+
+            ByteBuf reply = PooledByteBufAllocator.DEFAULT.directBuffer(64);
+            reply.writeByte(STATISTICS);
+            reply.writeInt(sessionId);
+            reply.writeBytes(this.longData);
         }
     }
 }
