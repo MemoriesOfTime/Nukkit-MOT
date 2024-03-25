@@ -119,6 +119,8 @@ public class QueryHandler {
             reply.writeByte(STATISTICS);
             reply.writeInt(sessionId);
             reply.writeBytes(this.longData);
+
+            this.server.getNetwork().sendPacket(address, reply);
         }
     }
 }
