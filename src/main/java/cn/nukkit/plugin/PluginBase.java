@@ -302,6 +302,6 @@ abstract public class PluginBase implements Plugin {
 
     @Override
     public PluginTaskScheduler getScheduler() {
-        return null;
+        return this.scheduler;
     }
 }
