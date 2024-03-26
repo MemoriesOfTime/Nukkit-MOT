@@ -436,6 +436,7 @@ public interface BlockID {
     int SOUL_SOIL = 491;
     int SOUL_FIRE = 492;
     int NETHER_SPROUTS_BLOCK = 493;
+    int NETHER_SPROUTS = 493;
     int TARGET = 494;
     int STRIPPED_CRIMSON_STEM = 495;
     int STRIPPED_WARPED_STEM = 496;
@@ -465,6 +466,10 @@ public interface BlockID {
     int SOUL_CAMPFIRE_BLOCK = 545;
 
     int COPPER_ORE = 566;
+
+    int DIRT_WITH_ROOTS = 573;
+
+    int MOSS_BLOCK = 575;
 
     int RAW_IRON_BLOCK = 706;
 

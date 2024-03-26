@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockColor;
+
 public class BlockStairsWarped extends BlockStairsWood {
 
     public BlockStairsWarped() {
@@ -17,7 +19,7 @@ public class BlockStairsWarped extends BlockStairsWood {
 
     @Override
     public String getName() {
-        return "Warped Wood Stairs";
+        return "Warped Stairs";
     }
 
     @Override
@@ -28,5 +30,10 @@ public class BlockStairsWarped extends BlockStairsWood {
     @Override
     public int getBurnAbility() {
         return 0;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.WARPED_STEM_BLOCK_COLOR;
     }
 }
