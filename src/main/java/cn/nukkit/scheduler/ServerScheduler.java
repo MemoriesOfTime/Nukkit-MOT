@@ -3,6 +3,7 @@ package cn.nukkit.scheduler;
 import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.PluginException;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 import java.util.Optional;
@@ -42,35 +43,44 @@ public class ServerScheduler {
         this.asyncPool = new AsyncPool(Server.getInstance(), WORKERS);
     }
 
-    public TaskHandler scheduleTask(Task task) {
+    @Deprecated
+    public TaskHandler scheduleTask(@NotNull Task task) {
         return addTask(task, 0, 0, false);
     }
 
-    public TaskHandler scheduleTask(Runnable task) {
+    public TaskHandler scheduleTask(@NotNull PluginTask<Plugin> task) {
+        return addTask(task, 0, 0, false);
+    }
+
+    @Deprecated
+    public TaskHandler scheduleTask(@NotNull Runnable task) {
         return addTask(null, task, 0, 0, false);
     }
 
-    public TaskHandler scheduleTask(Plugin plugin, Runnable task) {
+    public TaskHandler scheduleTask(@NotNull Plugin plugin, @NotNull Runnable task) {
         return addTask(plugin, task, 0, 0, false);
     }
 
-    public TaskHandler scheduleTask(Runnable task, boolean asynchronous) {
+    @Deprecated
+    public TaskHandler scheduleTask(@NotNull Runnable task, boolean asynchronous) {
         return addTask(null, task, 0, 0, asynchronous);
     }
 
-    public TaskHandler scheduleTask(Plugin plugin, Runnable task, boolean asynchronous) {
+    public TaskHandler scheduleTask(@NotNull Plugin plugin, @NotNull Runnable task, boolean asynchronous) {
         return addTask(plugin, task, 0, 0, asynchronous);
     }
 
-    public TaskHandler scheduleAsyncTask(AsyncTask task) {
+    @Deprecated
+    public TaskHandler scheduleAsyncTask(@NotNull AsyncTask task) {
         return addTask(null, task, 0, 0, true);
     }
 
-    public TaskHandler scheduleAsyncTask(Plugin plugin, AsyncTask task) {
+    public TaskHandler scheduleAsyncTask(@NotNull Plugin plugin, @NotNull AsyncTask task) {
         return addTask(plugin, task, 0, 0, true);
     }
 
-    public void scheduleAsyncTaskToWorker(AsyncTask task, int worker) {
+    @Deprecated
+    public void scheduleAsyncTaskToWorker(@NotNull AsyncTask task, int worker) {
         scheduleAsyncTask(task);
     }
 
@@ -78,75 +88,111 @@ public class ServerScheduler {
         return asyncPool.getCorePoolSize();
     }
 
-    public TaskHandler scheduleDelayedTask(Task task, int delay) {
+    @Deprecated
+    public TaskHandler scheduleDelayedTask(@NotNull Task task, int delay) {
         return this.addTask(task, delay, 0, false);
     }
 
-    public TaskHandler scheduleDelayedTask(Task task, int delay, boolean asynchronous) {
+    public TaskHandler scheduleDelayedTask(@NotNull PluginTask<Plugin> task, int delay) {
+        return this.addTask(task, delay, 0, false);
+    }
+
+    @Deprecated
+    public TaskHandler scheduleDelayedTask(@NotNull Task task, int delay, boolean asynchronous) {
         return this.addTask(task, delay, 0, asynchronous);
     }
 
-    public TaskHandler scheduleDelayedTask(Runnable task, int delay) {
+    public TaskHandler scheduleDelayedTask(@NotNull PluginTask<Plugin> task, int delay, boolean asynchronous) {
+        return this.addTask(task, delay, 0, asynchronous);
+    }
+
+    @Deprecated
+    public TaskHandler scheduleDelayedTask(@NotNull Runnable task, int delay) {
         return addTask(null, task, delay, 0, false);
     }
 
-    public TaskHandler scheduleDelayedTask(Plugin plugin, Runnable task, int delay) {
+    public TaskHandler scheduleDelayedTask(@NotNull Plugin plugin, @NotNull Runnable task, int delay) {
         return addTask(plugin, task, delay, 0, false);
     }
 
-    public TaskHandler scheduleDelayedTask(Runnable task, int delay, boolean asynchronous) {
+    @Deprecated
+    public TaskHandler scheduleDelayedTask(@NotNull Runnable task, int delay, boolean asynchronous) {
         return addTask(null, task, delay, 0, asynchronous);
     }
 
-    public TaskHandler scheduleDelayedTask(Plugin plugin, Runnable task, int delay, boolean asynchronous) {
+    public TaskHandler scheduleDelayedTask(@NotNull Plugin plugin, @NotNull Runnable task, int delay, boolean asynchronous) {
         return addTask(plugin, task, delay, 0, asynchronous);
     }
 
-    public TaskHandler scheduleRepeatingTask(Runnable task, int period) {
+    @Deprecated
+    public TaskHandler scheduleRepeatingTask(@NotNull Runnable task, int period) {
         return addTask(null, task, 0, period, false);
     }
 
-    public TaskHandler scheduleRepeatingTask(Plugin plugin, Runnable task, int period) {
+    public TaskHandler scheduleRepeatingTask(@NotNull Plugin plugin, @NotNull Runnable task, int period) {
         return addTask(plugin, task, 0, period, false);
     }
 
-    public TaskHandler scheduleRepeatingTask(Runnable task, int period, boolean asynchronous) {
+    @Deprecated
+    public TaskHandler scheduleRepeatingTask(@NotNull Runnable task, int period, boolean asynchronous) {
         return addTask(null, task, 0, period, asynchronous);
     }
 
-    public TaskHandler scheduleRepeatingTask(Plugin plugin, Runnable task, int period, boolean asynchronous) {
+    public TaskHandler scheduleRepeatingTask(@NotNull Plugin plugin, @NotNull Runnable task, int period, boolean asynchronous) {
         return addTask(plugin, task, 0, period, asynchronous);
     }
 
-    public TaskHandler scheduleRepeatingTask(Task task, int period) {
+    @Deprecated
+    public TaskHandler scheduleRepeatingTask(@NotNull Task task, int period) {
         return addTask(task, 0, period, false);
     }
 
-    public TaskHandler scheduleRepeatingTask(Task task, int period, boolean asynchronous) {
+    public TaskHandler scheduleRepeatingTask(@NotNull PluginTask<Plugin> task, int period) {
+        return addTask(task, 0, period, false);
+    }
+
+    @Deprecated
+    public TaskHandler scheduleRepeatingTask(@NotNull Task task, int period, boolean asynchronous) {
         return addTask(task, 0, period, asynchronous);
     }
 
-    public TaskHandler scheduleDelayedRepeatingTask(Task task, int delay, int period) {
+    public TaskHandler scheduleRepeatingTask(@NotNull PluginTask<Plugin> task, int period, boolean asynchronous) {
+        return addTask(task, 0, period, asynchronous);
+    }
+
+    @Deprecated
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull Task task, int delay, int period) {
         return addTask(task, delay, period, false);
     }
 
-    public TaskHandler scheduleDelayedRepeatingTask(Task task, int delay, int period, boolean asynchronous) {
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull PluginTask<Plugin> task, int delay, int period) {
+        return addTask(task, delay, period, false);
+    }
+
+    @Deprecated
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull Task task, int delay, int period, boolean asynchronous) {
         return addTask(task, delay, period, asynchronous);
     }
 
-    public TaskHandler scheduleDelayedRepeatingTask(Runnable task, int delay, int period) {
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull PluginTask<Plugin> task, int delay, int period, boolean asynchronous) {
+        return addTask(task, delay, period, asynchronous);
+    }
+
+    @Deprecated
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull Runnable task, int delay, int period) {
         return addTask(null, task, delay, period, false);
     }
 
-    public TaskHandler scheduleDelayedRepeatingTask(Plugin plugin, Runnable task, int delay, int period) {
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull Plugin plugin, @NotNull Runnable task, int delay, int period) {
         return addTask(plugin, task, delay, period, false);
     }
 
-    public TaskHandler scheduleDelayedRepeatingTask(Runnable task, int delay, int period, boolean asynchronous) {
+    @Deprecated
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull Runnable task, int delay, int period, boolean asynchronous) {
         return addTask(null, task, delay, period, asynchronous);
     }
 
-    public TaskHandler scheduleDelayedRepeatingTask(Plugin plugin, Runnable task, int delay, int period, boolean asynchronous) {
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull Plugin plugin, @NotNull Runnable task, int delay, int period, boolean asynchronous) {
         return addTask(plugin, task, delay, period, asynchronous);
     }
 
@@ -160,7 +206,7 @@ public class ServerScheduler {
         }
     }
 
-    public void cancelTask(Plugin plugin) {
+    public void cancelTask(@NotNull Plugin plugin) {
         if (plugin == null) {
             throw new NullPointerException("Plugin cannot be null!");
         }

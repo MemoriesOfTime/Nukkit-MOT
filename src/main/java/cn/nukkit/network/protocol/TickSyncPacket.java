@@ -1,6 +1,5 @@
 package cn.nukkit.network.protocol;
 
-import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 @ToString

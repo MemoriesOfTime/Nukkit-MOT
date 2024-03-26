@@ -11,6 +11,7 @@ import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.plugin.InternalPlugin;
 
 import java.util.Map;
 import java.util.Map.Entry;
@@ -59,7 +60,7 @@ public class StructureBuilder {
         if (data != null) {
             data.getTags().forEach(nbt::put);
         }
-        Server.getInstance().getScheduler().scheduleTask(new BlockEntitySyncTask(id, chunk, nbt));
+        Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockEntitySyncTask(id, chunk, nbt));
     }
 
     public void setBlock(final BlockVector3 pos, final int id) {

@@ -1,7 +1,9 @@
 package cn.nukkit.network.protocol;
 
+import lombok.ToString;
 import org.jetbrains.annotations.NotNull;
 
+@ToString
 public class RemoveObjectivePacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.REMOVE_OBJECTIVE_PACKET;

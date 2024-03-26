@@ -2708,9 +2708,6 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean teleport(Location location, PlayerTeleportEvent.TeleportCause cause) {
-        double yaw = location.yaw;
-        double pitch = location.pitch;
-
         Location from = this.getLocation();
         Location to = location;
         if (cause != null) {
@@ -2732,7 +2729,7 @@ public abstract class Entity extends Location implements Metadatable {
             this.setMotion(this.temporalVector.setComponents(0, 0, 0));
         }
 
-        if (this.setPositionAndRotation(to, yaw, pitch)) {
+        if (this.setPositionAndRotation(to, to.yaw, to.pitch, to.headYaw)) {
             this.resetFallDistance();
             this.onGround = !this.isNoClip();
 

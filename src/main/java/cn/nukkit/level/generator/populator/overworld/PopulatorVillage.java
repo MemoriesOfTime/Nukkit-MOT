@@ -12,6 +12,7 @@ import cn.nukkit.level.generator.structure.StructureStart;
 import cn.nukkit.level.generator.structure.VillagePieces;
 import cn.nukkit.level.generator.task.CallbackableChunkGenerationTask;
 import cn.nukkit.math.NukkitRandom;
+import cn.nukkit.plugin.InternalPlugin;
 
 import java.util.List;
 
@@ -59,7 +60,7 @@ public class PopulatorVillage extends Populator {
                             } else {
                                 final int f_cx = cx;
                                 final int f_cz = cz;
-                                Server.getInstance().getScheduler().scheduleAsyncTask(new CallbackableChunkGenerationTask<>(chunk.getProvider().getLevel(), ck, start, structure -> structure.postProcess(level, rand, new BoundingBox(x, z, x + 15, z + 15), f_cx, f_cz)));
+                                Server.getInstance().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new CallbackableChunkGenerationTask<>(chunk.getProvider().getLevel(), ck, start, structure -> structure.postProcess(level, rand, new BoundingBox(x, z, x + 15, z + 15), f_cx, f_cz)));
                             }
                         }
                     }

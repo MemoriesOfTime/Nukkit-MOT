@@ -211,6 +211,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected Vector3 teleportPosition = null;
 
+    protected int lastTeleportTick = -1;
+
     protected boolean connected = true;
     protected final InetSocketAddress rawSocketAddress;
     protected InetSocketAddress socketAddress;
@@ -1364,7 +1366,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         this.sleeping = pos.clone();
-        this.teleport(new Location(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5, this.yaw, this.pitch, this.level), null);
+        this.teleport(new Location(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5, this.yaw, this.pitch, this.headYaw, this.level), null);
 
         this.setDataProperty(new IntPositionEntityData(DATA_PLAYER_BED_POSITION, (int) pos.x, (int) pos.y, (int) pos.z));
         this.setDataFlag(DATA_PLAYER_FLAGS, DATA_PLAYER_FLAG_SLEEP, true);
@@ -1963,7 +1965,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         // 瞬移检测
-        Location source = new Location(this.lastX, this.lastY, this.lastZ, this.lastYaw, this.lastPitch, this.level);
+        Location source = new Location(this.lastX, this.lastY, this.lastZ, this.lastYaw, this.lastHeadYaw, this.lastPitch, this.level);
         Location target = this.getLocation();
         double delta = Math.pow(this.lastX - target.getX(), 2) + Math.pow(this.lastY - target.getY(), 2) + Math.pow(this.lastZ - target.getZ(), 2);
         double deltaAngle = Math.abs(this.lastYaw - target.getYaw()) + Math.abs(this.lastPitch - target.getPitch());
@@ -1994,7 +1996,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.teleport(event.getTo(), null);
                     } else {
                         //1.19.0-
-                        this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.yaw,
+                        this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
                                 this.getViewers().values()
                                         .stream()
                                         .filter(p -> p.protocol < ProtocolInfo.v1_19_0)
@@ -2967,7 +2969,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (this.isEnableNetworkEncryption()) {
-                    this.server.getScheduler().scheduleAsyncTask(new PrepareEncryptionTask(this) {
+                    this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PrepareEncryptionTask(this) {
                         @Override
                         public void onCompletion(Server server) {
                             if (!Player.this.isConnected()) {
@@ -3043,8 +3045,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
+                // 传送玩家后，可能会由于网络延迟接收错误数据包
+                // 在这种情况下为了避免错误调整玩家视角，直接忽略移动数据包
+                if (this.lastTeleportTick + 10 > this.server.getTick()
+                        && newPos.distance(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) < 5) {
+                    break;
+                }
+
                 if (dis > 100) {
-                    this.sendPosition(this, movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
+                    if (this.lastTeleportTick + 30 < this.server.getTick()) {
+                        this.sendPosition(this, movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
+                    }
                     break;
                 }
 
@@ -3059,13 +3070,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 } else {
 
                     movePlayerPacket.yaw %= 360;
+                    movePlayerPacket.headYaw %= 360;
                     movePlayerPacket.pitch %= 360;
 
                     if (movePlayerPacket.yaw < 0) {
                         movePlayerPacket.yaw += 360;
                     }
+                    if (movePlayerPacket.headYaw < 0) {
+                        movePlayerPacket.headYaw += 360;
+                    }
 
-                    this.setRotation(movePlayerPacket.yaw, movePlayerPacket.pitch);
+                    this.setRotation(movePlayerPacket.yaw, movePlayerPacket.pitch, movePlayerPacket.headYaw);
                     this.newPosition = newPos;
                     this.clientMovements.offer(newPos);
                     this.forceMovement = null;
@@ -3282,8 +3297,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
+                // 传送玩家后，可能会由于网络延迟接收错误数据包
+                // 在这种情况下为了避免错误调整玩家视角，直接忽略移动数据包
+                if (this.lastTeleportTick + 10 > this.server.getTick()
+                        && clientPosition.distance(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) < 5) {
+                    break;
+                }
+
                 if (distSqrt > 100) {
-                    this.sendPosition(this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
+                    if (this.lastTeleportTick + 30 < this.server.getTick()) {
+                        this.sendPosition(this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
+                    }
                     break;
                 }
 
@@ -3297,12 +3321,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.sendPosition(this.forceMovement, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
                 } else {
                     float yaw = authPacket.getYaw() % 360;
+                    float headYaw = authPacket.getHeadYaw() % 360;
                     float pitch = authPacket.getPitch() % 360;
                     if (yaw < 0) {
                         yaw += 360;
                     }
+                    if (headYaw < 0) {
+                        headYaw += 360;
+                    }
 
-                    this.setRotation(yaw, pitch);
+                    this.setRotation(yaw, pitch, headYaw);
                     this.newPosition = clientPosition;
                     this.clientMovements.offer(clientPosition);
                     this.forceMovement = null;
@@ -5787,6 +5815,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             //this.removeAllWindows();
             //this.formOpen = false;
 
+            this.lastTeleportTick = this.server.getTick();
             this.teleportPosition = this;
             if (cause != PlayerTeleportEvent.TeleportCause.ENDER_PEARL) {
                 this.forceMovement = this.teleportPosition;
@@ -6751,7 +6780,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         if (animate) {
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_BLOCKED_USING_DAMAGED_SHIELD, true);
-            this.getServer().getScheduler().scheduleTask(null, () -> {
+            this.getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
                 if (this.isOnline()) {
                     this.setDataFlag(DATA_FLAGS, DATA_FLAG_BLOCKED_USING_DAMAGED_SHIELD, false);
                 }
@@ -6812,7 +6841,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         };
 
-        this.server.getScheduler().scheduleAsyncTask(this.preLoginEventTask);
+        this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, this.preLoginEventTask);
         this.processLogin();
     }
 

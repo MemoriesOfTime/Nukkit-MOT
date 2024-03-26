@@ -54,6 +54,7 @@ import cn.nukkit.metadata.Metadatable;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.scheduler.BlockUpdateScheduler;
@@ -3790,7 +3791,7 @@ public class Level implements ChunkManager, Metadatable {
         chunk.initChunk();
 
         if (!chunk.isLightPopulated() && chunk.isPopulated() && this.server.lightUpdates) {
-            this.server.getScheduler().scheduleAsyncTask(new LightPopulationTask(this, chunk));
+            this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new LightPopulationTask(this, chunk));
         }
 
         if (this.isChunkInUse(index)) {
@@ -4019,7 +4020,7 @@ public class Level implements ChunkManager, Metadatable {
                         }
                     }
 
-                    this.server.getScheduler().scheduleAsyncTask(new PopulationTask(this, chunk));
+                    this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new PopulationTask(this, chunk));
                 }
             }
             return false;
@@ -4041,7 +4042,7 @@ public class Level implements ChunkManager, Metadatable {
         if (!this.chunkGenerationQueue.containsKey(index)) {
             this.chunkGenerationQueue.put(index, Boolean.TRUE);
             GenerationTask task = new GenerationTask(this, this.getChunk(x, z, true));
-            this.server.getScheduler().scheduleAsyncTask(task);
+            this.server.getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, task);
         }
     }
 

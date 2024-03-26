@@ -2,7 +2,9 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.network.protocol.types.DisplaySlot;
 import cn.nukkit.network.protocol.types.SortOrder;
+import lombok.ToString;
 
+@ToString
 public class SetDisplayObjectivePacket extends DataPacket {
 
     public DisplaySlot displaySlot;

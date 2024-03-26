@@ -1,8 +1,11 @@
 package cn.nukkit.network.protocol;
 
+import lombok.ToString;
+
 /**
  * @since 594
  */
+@ToString
 public class AgentAnimationPacket extends DataPacket {
     public static final int NETWORK_ID = ProtocolInfo.AGENT_ANIMATION_PACKET;
 

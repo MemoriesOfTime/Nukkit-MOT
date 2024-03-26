@@ -1,5 +1,8 @@
 package cn.nukkit.network.protocol;
 
+import lombok.ToString;
+
+@ToString
 public class MapCreateLockedCopyPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.MAP_CREATE_LOCKED_COPY_PACKET;

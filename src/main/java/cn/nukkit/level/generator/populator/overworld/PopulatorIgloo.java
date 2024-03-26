@@ -21,6 +21,7 @@ import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.plugin.InternalPlugin;
 
 import java.util.function.Consumer;
 
@@ -43,13 +44,13 @@ public class PopulatorIgloo extends Populator {
                     case "chest" -> {
                         final ListTag<CompoundTag> itemList = new ListTag<>("Items");
                         IglooChest.get().create(itemList, random);
-                        Server.getInstance().getScheduler().scheduleDelayedTask(new LootSpawnTask(chunk.getProvider().getLevel(),
+                        Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new LootSpawnTask(chunk.getProvider().getLevel(),
                             new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
                     }
-                    case "Villager" -> Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
+                    case "Villager" -> Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new ActorSpawnTask(chunk.getProvider().getLevel(),
                         Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
                             .putString("id", String.valueOf(EntityVillager.NETWORK_ID))), 2);
-                    case "Zombie Villager" -> Server.getInstance().getScheduler().scheduleDelayedTask(new ActorSpawnTask(chunk.getProvider().getLevel(),
+                    case "Zombie Villager" -> Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new ActorSpawnTask(chunk.getProvider().getLevel(),
                         Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
                             .putString("id", String.valueOf(EntityZombieVillager.NETWORK_ID))), 2);
                 }

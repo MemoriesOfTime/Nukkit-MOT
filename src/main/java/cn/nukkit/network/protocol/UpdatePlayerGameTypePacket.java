@@ -1,10 +1,12 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.network.protocol.types.GameType;
+import lombok.ToString;
 
 /**
  * @since v407
  */
+@ToString
 public class UpdatePlayerGameTypePacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.UPDATE_PLAYER_GAME_TYPE_PACKET;

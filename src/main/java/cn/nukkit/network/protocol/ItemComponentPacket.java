@@ -8,6 +8,7 @@ import lombok.ToString;
 import java.io.IOException;
 import java.nio.ByteOrder;
 
+@ToString
 public class ItemComponentPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.ITEM_COMPONENT_PACKET;

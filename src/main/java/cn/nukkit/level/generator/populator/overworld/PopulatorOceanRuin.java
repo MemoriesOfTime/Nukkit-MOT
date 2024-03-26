@@ -20,6 +20,7 @@ import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.plugin.InternalPlugin;
 import com.google.common.collect.Lists;
 
 import java.util.List;
@@ -115,7 +116,7 @@ public class PopulatorOceanRuin extends Populator {
                 tag.putList(items);
 
                 chunk.setBlock(pos.x & 0xf, pos.y, pos.z & 0xf, BlockID.CHEST, 2);
-                Server.getInstance().getScheduler().scheduleDelayedTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), tag), 2);
+                Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), tag), 2);
             }
         };
     }
@@ -131,7 +132,7 @@ public class PopulatorOceanRuin extends Populator {
                 tag.putList(items);
 
                 chunk.setBlock(pos.x & 0xf, pos.y, pos.z & 0xf, BlockID.CHEST, 2);
-                Server.getInstance().getScheduler().scheduleDelayedTask(new BlockActorSpawnTask(chunk.getProvider().getLevel(), tag), 2);
+                Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), tag), 2);
             }
         };
     }
@@ -190,7 +191,7 @@ public class PopulatorOceanRuin extends Populator {
         final int seed = random.nextInt();
 
         if (!chunk.isGenerated()) {
-            Server.getInstance().getScheduler().scheduleAsyncTask(new CallbackableChunkGenerationTask<>(
+            Server.getInstance().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new CallbackableChunkGenerationTask<>(
                 chunk.getProvider().getLevel(), chunk, this,
                 populator -> populator.placeRuin(template, chunk, seed, false, index)));
         } else {

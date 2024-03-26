@@ -1,7 +1,9 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.item.Item;
+import lombok.ToString;
 
+@ToString
 public class CreativeContentPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.CREATIVE_CONTENT_PACKET;
