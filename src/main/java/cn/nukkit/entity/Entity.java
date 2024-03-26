@@ -2231,15 +2231,8 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfWater() {
-        /*Block block = this.level.getBlock(this.temporalVector.setComponents(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(this.y), NukkitMath.floorDouble(this.z)));
-
-        if (block instanceof BlockWater) {
-            return this.y < (block.y + 0.9);
-        }
-
-        return false;*/
-        int bid = level.getBlockIdAt(chunk, this.getFloorX(), this.getFloorY(), this.getFloorZ());
-        return Block.hasWater(bid);
+        Block block = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+        return block.isWater() || block.getWaterloggingLevel() > 0 && block.getLevelBlockAtLayer(1).isWater();
     }
 
     public boolean isInsideOfSolid() {

@@ -340,6 +340,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[RECORD_WAIT] = ItemRecordWait.class; //511
             list[SHIELD] = ItemShield.class; //513
             list[RECORD_5] = ItemRecord5.class; //636
+            list[DISC_FRAGMENT_5] = ItemDiscFragment5.class; //637
             list[OAK_CHEST_BOAT] = ItemChestBoatOak.class; //638
             list[BIRCH_CHEST_BOAT] = ItemChestBoatBirch.class; //639
             list[JUNGLE_CHEST_BOAT] = ItemChestBoatJungle.class; //640
@@ -374,6 +375,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[WARPED_DOOR] = ItemDoorWarped.class; //756
             list[WARPED_FUNGUS_ON_A_STICK] = ItemWarpedFungusOnAStick.class; //757
             list[RECORD_PIGSTEP] = ItemRecordPigstep.class; //759
+            list[NETHER_SPROUTS] = ItemNetherSprouts.class; //760
 
             list[AMETHYST_SHARD] = ItemAmethystShard.class; //771
             list[SPYGLASS] = ItemSpyglass.class; //772
@@ -1854,6 +1856,14 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return runtimeMapping.getNamespacedIdByNetworkId(this.getNetworkId(protocolId));
     }
 
+    /**
+     * 返回物品是否支持指定版本
+     * <p>
+     * Returns whether the item supports the specified version
+     *
+     * @param protocolId 协议版本 protocol version
+     * @return 是否支持 whether supported
+     */
     public boolean isSupportedOn(int protocolId) {
         return true;
     }

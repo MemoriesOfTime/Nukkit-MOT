@@ -64,6 +64,11 @@ public class BlockCake extends BlockTransparentMeta {
     }
 
     @Override
+    public boolean isSolid() {
+        return false;
+    }
+
+    @Override
     protected AxisAlignedBB recalculateBoundingBox() {
         return new SimpleAxisAlignedBB(
                 this.x + ((1 + (this.getDamage() << 1)) >> 4),
