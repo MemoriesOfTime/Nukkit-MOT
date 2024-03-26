@@ -437,6 +437,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[SOUL_SOIL] = BlockSoulSoil.class; //491
 
+            list[NETHER_SPROUTS_BLOCK] = BlockNetherSprout.class; //493
+
             list[STRIPPED_CRIMSON_STEM] = BlockStemStrippedCrimson.class; //495
             list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
             list[CRIMSON_PLANKS] = BlockPlanksCrimson.class; //497
@@ -450,6 +452,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[WARPED_STANDING_SIGN] = BlockWarpedSignPost.class; //506
             list[CRIMSON_WALL_SIGN] = BlockCrimsonWallSign.class; //507
             list[WARPED_WALL_SIGN] = BlockWarpedWallSign.class; //508
+            list[CRIMSON_STAIRS] = BlockStairsCrimson.class; //509
+            list[WARPED_STAIRS] = BlockStairsWarped.class; //510
 
             list[SOUL_TORCH] = BlockSoulTorch.class; //523
             list[SOUL_LANTERN] = BlockSoulLantern.class; //524

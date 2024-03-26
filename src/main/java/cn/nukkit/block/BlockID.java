@@ -450,6 +450,8 @@ public interface BlockID {
     int WARPED_STANDING_SIGN = 506;
     int CRIMSON_WALL_SIGN = 507;
     int WARPED_WALL_SIGN = 508;
+    int CRIMSON_STAIRS = 509;
+    int WARPED_STAIRS = 510;
 
     int SOUL_TORCH = 523;
     int SOUL_LANTERN = 524;
