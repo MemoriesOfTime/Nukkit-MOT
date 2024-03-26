@@ -2,11 +2,12 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+
+import static cn.nukkit.item.ItemID.NETHER_SPROUTS;
 
 public class BlockNetherSprouts extends BlockRoots {
 
@@ -16,7 +17,7 @@ public class BlockNetherSprouts extends BlockRoots {
 
     @Override
     public int getId() {
-        return NETHER_SPROUTS;
+        return NETHER_SPROUTS_BLOCK;
     }
 
     @Override
@@ -63,7 +64,7 @@ public class BlockNetherSprouts extends BlockRoots {
 
     @Override
     public Item toItem() {
-        return Item.get(ItemID.NETHER_SPROUTS);
+        return Item.get(NETHER_SPROUTS);
     }
 
     @Override
