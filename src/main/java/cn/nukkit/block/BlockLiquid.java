@@ -508,6 +508,11 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
     }
 
     @Override
+    public boolean isLiquid() {
+        return true;
+    }
+
+    @Override
     public boolean isLiquidSource() {
         return this.getDamage() == 0;
     }

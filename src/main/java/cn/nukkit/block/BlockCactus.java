@@ -64,6 +64,11 @@ public class BlockCactus extends BlockTransparentMeta {
     }
 
     @Override
+    public boolean isSolid() {
+        return false;
+    }
+
+    @Override
     protected AxisAlignedBB recalculateBoundingBox() {
         return new SimpleAxisAlignedBB(this.x + 0.0625, this.y + 0.0625, this.z + 0.0625, this.x + 0.9375, this.y + 0.9375, this.z + 0.9375);
     }

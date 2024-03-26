@@ -97,4 +97,14 @@ public class BlockWater extends BlockLiquid {
     public boolean usesWaterLogging() {
         return true;
     }
+
+    @Override
+    public boolean isWater() {
+        return true;
+    }
+
+    @Override
+    public boolean isWaterSource() {
+        return isLiquidSource();
+    }
 }

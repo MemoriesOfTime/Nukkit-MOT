@@ -437,7 +437,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[SOUL_SOIL] = BlockSoulSoil.class; //491
 
-            list[NETHER_SPROUTS_BLOCK] = BlockNetherSprout.class; //493
+            list[NETHER_SPROUTS_BLOCK] = BlockNetherSprouts.class; //493
 
             list[STRIPPED_CRIMSON_STEM] = BlockStemStrippedCrimson.class; //495
             list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
@@ -1468,10 +1468,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return new ItemBlock(this, this.getDamage(), 1);
     }
 
-    public boolean canSilkTouch() {
-       return false;
-    }
-
     public Optional<Block> firstInLayers(Predicate<Block> condition) {
         return firstInLayers(0, condition);
     }
@@ -1488,14 +1484,36 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return Optional.empty();
     }
 
+    public boolean canSilkTouch() {
+        return false;
+    }
+
+    public boolean isAir() {
+        return false;
+    }
+
+    public boolean isLiquid() {
+        return false;
+    }
+
     public boolean isLiquidSource() {
         return false;
     }
 
+    public boolean isWater() {
+        return false;
+    }
+
+    public boolean isWaterSource() {
+        return false;
+    }
+
+    @Deprecated
     public static boolean hasWater(int id) {
         return id == WATER || id == STILL_WATER || usesFakeWater[id];
     }
 
+    @Deprecated
     public static boolean usesFakeWater(int id) {
         return usesFakeWater[id];
     }
