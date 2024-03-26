@@ -1856,6 +1856,14 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return runtimeMapping.getNamespacedIdByNetworkId(this.getNetworkId(protocolId));
     }
 
+    /**
+     * 返回物品是否支持指定版本
+     * <p>
+     * Returns whether the item supports the specified version
+     *
+     * @param protocolId 协议版本 protocol version
+     * @return 是否支持 whether supported
+     */
     public boolean isSupportedOn(int protocolId) {
         return true;
     }
