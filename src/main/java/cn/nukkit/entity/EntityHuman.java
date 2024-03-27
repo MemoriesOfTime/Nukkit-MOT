@@ -17,6 +17,7 @@ import cn.nukkit.utils.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -336,14 +337,14 @@ public class EntityHuman extends EntityHumanType {
             pk.speedZ = (float) this.motionZ;
             pk.yaw = (float) this.yaw;
             pk.pitch = (float) this.pitch;
-            pk.item = this.getInventory().getItemInHand();
+            pk.item = Objects.requireNonNullElse(player.inventory, BaseEntity.EMPTY_INVENTORY).getItemInHand();
             pk.metadata = this.dataProperties.clone();
             player.dataPacket(pk);
 
             if (this.isPlayer) {
-                this.inventory.sendArmorContents(player);
+                Objects.requireNonNullElse(this.inventory, BaseEntity.EMPTY_INVENTORY).sendArmorContents(player);
             } else {
-                this.inventory.sendArmorContentsIfNotAr(player);
+                Objects.requireNonNullElse(this.inventory, BaseEntity.EMPTY_INVENTORY).sendArmorContentsIfNotAr(player);
             }
             this.offhandInventory.sendContents(player);
 
