@@ -3,6 +3,7 @@ package cn.nukkit.scheduler;
 import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.utils.PluginException;
+import lombok.val;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
 /**
  * @author Nukkit Project Team
@@ -68,6 +70,18 @@ public class ServerScheduler {
 
     public TaskHandler scheduleTask(@NotNull Plugin plugin, @NotNull Runnable task, boolean asynchronous) {
         return addTask(plugin, task, 0, 0, asynchronous);
+    }
+
+    public TaskHandler scheduleTask(@NotNull Plugin plugin,
+                                    @NotNull BiConsumer<Task, Integer> task,
+                                    boolean asynchronous) {
+        val pt = new PluginTask<>(plugin) {
+            @Override
+            public void onRun(int currentTick) {
+                task.accept(this, currentTick);
+            }
+        };
+        return addTask(plugin, pt, 0, 0, asynchronous);
     }
 
     @Deprecated
@@ -196,6 +210,20 @@ public class ServerScheduler {
         return addTask(plugin, task, delay, period, asynchronous);
     }
 
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull Plugin plugin,
+                                                    @NotNull BiConsumer<Task, Integer> task,
+                                                    int delay,
+                                                    int period,
+                                                    boolean asynchronous) {
+        val pt = new PluginTask<>(plugin) {
+            @Override
+            public void onRun(int currentTick) {
+                task.accept(this, currentTick);
+            }
+        };
+        return addTask(plugin, pt, delay, period, asynchronous);
+    }
+
     public void cancelTask(int taskId) {
         if (taskMap.containsKey(taskId)) {
             try {
@@ -207,9 +235,9 @@ public class ServerScheduler {
     }
 
     public void cancelTask(@NotNull Plugin plugin) {
-        if (plugin == null) {
-            throw new NullPointerException("Plugin cannot be null!");
-        }
+//        if (plugin == null) {
+//            throw new NullPointerException("Plugin cannot be null!");
+//        }
         for (Map.Entry<Integer, TaskHandler> entry : taskMap.entrySet()) {
             TaskHandler taskHandler = entry.getValue();
             if (taskHandler.getPlugin() == null || plugin.equals(taskHandler.getPlugin())) {
