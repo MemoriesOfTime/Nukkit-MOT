@@ -25,7 +25,7 @@ public class EntitySerializer {
     public static void serializer(WriteBatch writeBatch, LevelDBChunk chunk) {
         List<CompoundTag> entities = new ObjectArrayList<>();
         for (Entity entity : chunk.getEntities().values()) {
-            if (!(entity instanceof Player) && !entity.closed) {
+            if (!(entity instanceof Player) && !entity.closed && entity.canBeSavedWithChunk()) {
                 entity.saveNBT();
                 entities.add(entity.namedTag);
             }
