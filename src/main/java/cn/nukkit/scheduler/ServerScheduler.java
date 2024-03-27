@@ -11,6 +11,8 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
  * @author Nukkit Project Team
@@ -118,6 +120,16 @@ public class ServerScheduler {
         return addTask(plugin, task, 0, period, asynchronous);
     }
 
+    public TaskHandler scheduleRepeatingTask(Plugin plugin, BiConsumer<Task, Integer> task, int period, boolean asynchronous) {
+        Task t = new Task() {
+            @Override
+            public void onRun(int currentTick) {
+                task.accept(this, currentTick);
+            }
+        };
+        return addTask(plugin, t, 0, period, asynchronous);
+    }
+
     public TaskHandler scheduleRepeatingTask(Task task, int period) {
         return addTask(task, 0, period, false);
     }
@@ -148,6 +160,16 @@ public class ServerScheduler {
 
     public TaskHandler scheduleDelayedRepeatingTask(Plugin plugin, Runnable task, int delay, int period, boolean asynchronous) {
         return addTask(plugin, task, delay, period, asynchronous);
+    }
+
+    public TaskHandler scheduleDelayedRepeatingTask(Plugin plugin, BiConsumer<Task, Integer> task, int delay, int period, boolean asynchronous) {
+        Task t = new Task() {
+            @Override
+            public void onRun(int currentTick) {
+                task.accept(this, currentTick);
+            }
+        };
+        return addTask(plugin, t, delay, period, asynchronous);
     }
 
     public void cancelTask(int taskId) {

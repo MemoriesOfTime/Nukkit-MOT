@@ -7,6 +7,7 @@ import cn.nukkit.entity.mob.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.plugin.Plugin;
 import cn.nukkit.scheduler.Task;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -545,27 +546,6 @@ public class Utils {
             e.printStackTrace();
         }
         return (T) clazz1;
-    }
-
-    public static void functionRunTask(int tick,
-                                       Runnable initRun,
-                                       Consumer<AtomicInteger> getDelay,
-                                       Runnable overRun,
-                                       boolean async) {
-        Optional.ofNullable(initRun).ifPresent(Runnable::run);
-        Server.getInstance().getScheduler().scheduleRepeatingTask(new Task() {
-            private final AtomicInteger mainSec = new AtomicInteger(tick);
-            @Override
-            public void onRun(int currentTick) {
-                val i = mainSec.getAndDecrement();
-                if (i < 1) {
-                    Optional.ofNullable(overRun).ifPresent(Runnable::run);
-                    this.cancel();
-                    return;
-                }
-                getDelay.accept(mainSec);
-            }
-        }, 1, async);
     }
 
 }
