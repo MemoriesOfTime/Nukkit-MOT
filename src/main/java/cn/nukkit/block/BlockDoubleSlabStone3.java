@@ -76,7 +76,7 @@ public class BlockDoubleSlabStone3 extends BlockDoubleSlabStone {
             drop.setCount(2);
             return new Item[]{ drop };
         } else {
-            return new Item[0];
+            return Item.EMPTY_ARRAY;
         }
     }
 

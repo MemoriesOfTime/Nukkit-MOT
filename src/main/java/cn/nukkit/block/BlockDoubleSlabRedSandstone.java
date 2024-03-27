@@ -71,7 +71,7 @@ public class BlockDoubleSlabRedSandstone extends BlockSolidMeta {
                     Item.get(Item.RED_SANDSTONE_SLAB, this.getDamage() & 0x07, 2)
             };
         } else {
-            return new Item[0];
+            return Item.EMPTY_ARRAY;
         }
     }
 

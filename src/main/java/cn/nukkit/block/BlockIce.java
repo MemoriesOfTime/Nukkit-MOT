@@ -71,7 +71,7 @@ public class BlockIce extends BlockTransparent {
         if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
             return new Item[]{this.toItem()};
         }
-        return new Item[0];
+        return Item.EMPTY_ARRAY;
     }
 
     @Override

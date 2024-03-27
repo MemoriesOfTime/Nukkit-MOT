@@ -120,10 +120,7 @@ public abstract class BaseInventory implements Inventory {
     @Override
     public void setContents(Map<Integer, Item> items) {
         if (items.size() > this.size) {
-            TreeMap<Integer, Item> newItems = new TreeMap<>();
-            for (Map.Entry<Integer, Item> entry : items.entrySet()) {
-                newItems.put(entry.getKey(), entry.getValue());
-            }
+            TreeMap<Integer, Item> newItems = new TreeMap<>(items);
             items = newItems;
             newItems = new TreeMap<>();
             int i = 0;
@@ -544,7 +541,7 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public void sendContents(Collection<Player> players) {
-        this.sendContents(players.toArray(new Player[0]));
+        this.sendContents(players.toArray(Player.EMPTY_ARRAY));
     }
 
     @Override
@@ -593,7 +590,7 @@ public abstract class BaseInventory implements Inventory {
 
     @Override
     public void sendSlot(int index, Collection<Player> players) {
-        this.sendSlot(index, players.toArray(new Player[0]));
+        this.sendSlot(index, players.toArray(Player.EMPTY_ARRAY));
     }
 
     @Override

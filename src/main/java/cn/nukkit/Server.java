@@ -2091,7 +2091,7 @@ public class Server {
             }
         }
 
-        return matchedPlayer.toArray(new Player[0]);
+        return matchedPlayer.toArray(Player.EMPTY_ARRAY);
     }
 
     /**

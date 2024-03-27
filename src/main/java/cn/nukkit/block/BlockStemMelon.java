@@ -80,7 +80,7 @@ public class BlockStemMelon extends BlockCrops {
 
     @Override
     public Item[] getDrops(Item item) {
-        if (this.getDamage() < 4) return new Item[0];
+        if (this.getDamage() < 4) return Item.EMPTY_ARRAY;
         return new Item[]{
                 new ItemSeedsMelon(0, Utils.rand(0, 48) >> 4)
         };

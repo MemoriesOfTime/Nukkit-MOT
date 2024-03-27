@@ -49,7 +49,7 @@ public class QueryRegenerateEvent extends ServerEvent {
         this.serverName = server.getMotd();
         this.listPlugins = server.queryPlugins;
         this.plugins = server.getPluginManager().getPlugins().values().toArray(new Plugin[0]);
-        this.players = server.getOnlinePlayers().values().toArray(new Player[0]);
+        this.players = server.getOnlinePlayers().values().toArray(Player.EMPTY_ARRAY);
         this.gameType = server.getGamemode() == 1 ? "CMP" : "SMP";
         this.version = server.getVersion();
         this.map = server.getDefaultLevel() == null ? "unknown" : server.getDefaultLevel().getName();

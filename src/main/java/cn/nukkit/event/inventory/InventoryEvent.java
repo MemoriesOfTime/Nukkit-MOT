@@ -21,6 +21,6 @@ public abstract class InventoryEvent extends Event {
     }
 
     public Player[] getViewers() {
-        return this.inventory.getViewers().toArray(new Player[0]);
+        return this.inventory.getViewers().toArray(Player.EMPTY_ARRAY);
     }
 }
