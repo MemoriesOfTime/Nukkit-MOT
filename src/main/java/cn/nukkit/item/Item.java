@@ -487,7 +487,6 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     private static final List<Item> creative649 = new ObjectArrayList<>();
     private static final List<Item> creative662 = new ObjectArrayList<>();
 
-    @SuppressWarnings("unchecked")
     private static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
         clearCreativeItems();
@@ -1303,7 +1302,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public Enchantment[] getEnchantments() {
         if (!this.hasEnchantments()) {
-            return new Enchantment[0];
+            return Enchantment.EMPTY_ARRAY;
         }
 
         List<Enchantment> enchantments = new ArrayList<>();
@@ -1317,7 +1316,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             }
         }
 
-        return enchantments.toArray(new Enchantment[0]);
+        return enchantments.toArray(Enchantment.EMPTY_ARRAY);
     }
 
     public boolean hasEnchantment(int id) {

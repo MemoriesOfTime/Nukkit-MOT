@@ -122,7 +122,7 @@ public class BlockCoralBlock extends BlockSolidMeta {
                 return new Item[]{ new ItemBlock(this.clone(), this.getDamage() | 0x8) };
             }
         } else {
-            return new Item[0];
+            return Item.EMPTY_ARRAY;
         }
     }
 

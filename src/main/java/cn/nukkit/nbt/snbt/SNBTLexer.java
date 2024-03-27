@@ -528,9 +528,7 @@ public class SNBTLexer implements SNBTConstants {
                         if (content instanceof StringBuilder) {
                             ((StringBuilder) content).append((char) '\n');
                         } else {
-                            StringBuilder buf = new StringBuilder(content);
-                            buf.append('\n');
-                            content = buf.toString();
+                            content = String.valueOf(content) + '\n';
                         }
                     }
                 }
