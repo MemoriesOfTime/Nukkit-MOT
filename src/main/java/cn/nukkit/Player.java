@@ -3819,7 +3819,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             case ProtocolInfo.INVENTORY_TRANSACTION_PACKET:
                 if (!this.spawned || !this.isAlive()) {
                     log.debug("Player {} sent inventory transaction packet while not spawned or not alive", this.username);
-                    break packetswitch;
+                    break;
                 }
 
                 if (this.isSpectator()) {

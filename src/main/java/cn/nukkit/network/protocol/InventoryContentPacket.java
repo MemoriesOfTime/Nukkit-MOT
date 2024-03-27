@@ -26,11 +26,11 @@ public class InventoryContentPacket extends DataPacket {
 
     public int inventoryId;
     public int networkId;
-    public Item[] slots = new Item[0];
+    public Item[] slots = Item.EMPTY_ARRAY;
 
     @Override
     public DataPacket clean() {
-        this.slots = new Item[0];
+        this.slots = Item.EMPTY_ARRAY;
         return super.clean();
     }
 

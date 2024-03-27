@@ -41,7 +41,6 @@ public class AdventureSettingsProcessor extends DataPacketProcessor<AdventureSet
         } else {
             player.getAdventureSettings().set(AdventureSettings.Type.FLYING, playerToggleFlightEvent.isFlying());
         }
-        return;
     }
 
     @Override

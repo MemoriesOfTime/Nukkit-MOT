@@ -3,6 +3,8 @@ package cn.nukkit.level.format.anvil.util;
 
 import com.google.common.base.Preconditions;
 
+import java.util.Arrays;
+
 public class NibbleArray implements Cloneable {
 
     private final byte[] data;
@@ -57,9 +59,7 @@ public class NibbleArray implements Cloneable {
     public void fill(byte value) {
         Preconditions.checkArgument(value >= 0 && value < 16, "Nibbles must have a value between 0 and 15.");
         value &= 0xf;
-        for (int i = 0; i < data.length; i++) {
-            data[i] = (byte) ((value << 4) | value);
-        }
+        Arrays.fill(data, (byte) ((value << 4) | value));
     }
 
     public void copyFrom(byte[] bytes) {

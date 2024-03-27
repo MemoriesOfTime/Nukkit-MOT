@@ -102,7 +102,7 @@ public class BlockEntityCauldron extends BlockEntitySpawnable {
         if (color != namedTag.getInt("CustomColor")) {
             namedTag.putInt("CustomColor", color);
             Block block = getBlock();
-            Player[] pl = level.getChunkPlayers(getChunkX(), getChunkZ()).values().toArray(new Player[0]);
+            Player[] pl = level.getChunkPlayers(getChunkX(), getChunkZ()).values().toArray(Player.EMPTY_ARRAY);
             for (Player p : pl) {
                 UpdateBlockPacket air = new UpdateBlockPacket();
                 air.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(p.protocol, 0);

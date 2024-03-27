@@ -40,9 +40,9 @@ public class BlockBricks extends BlockSolid {
             return new Item[]{
                     Item.get(Item.BRICKS_BLOCK, 0, 1)
             };
-        } else {
-            return new Item[0];
         }
+
+        return Item.EMPTY_ARRAY;
     }
 
     @Override

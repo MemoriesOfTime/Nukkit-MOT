@@ -31,7 +31,6 @@ import java.util.*;
  * Nukkit Project
  */
 @Log4j2
-@SuppressWarnings("unchecked")
 public class Network {
 
     public static final byte CHANNEL_NONE = 0;
@@ -287,13 +286,13 @@ public class Network {
         }
     }
 
-    @Deprecated
     /**
      * Process packets obtained from batch packets
      * Required to perform additional analyses and filter unnecessary packets
      *
      * @param packets packets
      */
+    @Deprecated
     public void processPackets(Player player, List<DataPacket> packets) {
         if (packets.isEmpty()) return;
         packets.forEach(player::handleDataPacket);
