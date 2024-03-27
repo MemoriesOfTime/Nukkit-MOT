@@ -235,9 +235,11 @@ public class ServerScheduler {
     }
 
     public void cancelTask(@NotNull Plugin plugin) {
-//        if (plugin == null) {
-//            throw new NullPointerException("Plugin cannot be null!");
-//        }
+        //兼容旧插件
+        //noinspection ConstantConditions
+        if (plugin == null) {
+            throw new NullPointerException("Plugin cannot be null!");
+        }
         for (Map.Entry<Integer, TaskHandler> entry : taskMap.entrySet()) {
             TaskHandler taskHandler = entry.getValue();
             if (taskHandler.getPlugin() == null || plugin.equals(taskHandler.getPlugin())) {
