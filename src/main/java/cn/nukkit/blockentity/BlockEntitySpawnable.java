@@ -38,7 +38,7 @@ public abstract class BlockEntitySpawnable extends BlockEntity {
     }
 
     public BlockEntityDataPacket createSpawnPacket(int protocol) {
-        CompoundTag tag = this.getSpawnCompound();
+        CompoundTag tag = this.getSpawnCompound(protocol);
         BlockEntityDataPacket pk = new BlockEntityDataPacket();
         pk.x = (int) this.x;
         pk.y = (int) this.y;
