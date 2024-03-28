@@ -2647,7 +2647,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.forceMovement = this.teleportPosition = this.getPosition();
 
         ResourcePacksInfoPacket infoPacket = new ResourcePacksInfoPacket();
-        infoPacket.resourcePackEntries = this.server.getResourcePackManager().getResourceStack();
+
+        for (ResourcePack pack : this.server.getResourcePackManager().getResourceStack()) {
+            switch (pack.getPackName()) {
+                case "<1.19.70":
+                    if (protocol >= ProtocolInfo.v1_19_60) {
+                        infoPacket.resourcePackEntries = new ResourcePack[]{pack};
+                    }
+                    break;
+                case ">1.19.70":
+                    if (protocol < ProtocolInfo.v1_19_60) {
+                        infoPacket.resourcePackEntries = new ResourcePack[]{pack};
+                    }
+                    break;
+                default:
+                    infoPacket.resourcePackEntries = this.server.getResourcePackManager().getResourceStack();
+                    break;
+            }
+        }
+
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
     }
