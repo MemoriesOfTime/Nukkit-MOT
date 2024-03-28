@@ -1,8 +1,10 @@
 package cn.nukkit.form.window;
 
+import cn.nukkit.Server;
 import cn.nukkit.form.element.*;
 import cn.nukkit.form.response.FormResponseCustom;
 import cn.nukkit.form.response.FormResponseData;
+import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 
 import java.util.ArrayList;
@@ -75,7 +77,13 @@ public class FormWindowCustom extends FormWindow {
             return;
         }
 
-        List<String> elementResponses = GSON.fromJson(data, new ListTypeToken().getType());
+        List<String> elementResponses;
+        try {
+            elementResponses = GSON.fromJson(data, new ListTypeToken().getType());
+        } catch (JsonSyntaxException e) {
+            Server.getInstance().getLogger().error("An error occurred while deserializing the form");
+            return;
+        }
 
         int i = 0;
 
