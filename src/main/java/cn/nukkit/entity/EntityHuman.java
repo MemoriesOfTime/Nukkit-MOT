@@ -337,7 +337,7 @@ public class EntityHuman extends EntityHumanType {
             pk.speedZ = (float) this.motionZ;
             pk.yaw = (float) this.yaw;
             pk.pitch = (float) this.pitch;
-            pk.item = Objects.requireNonNullElse(player.inventory, BaseEntity.EMPTY_INVENTORY).getItemInHand();
+            pk.item = Objects.requireNonNullElse(this.inventory, BaseEntity.EMPTY_INVENTORY).getItemInHand();
             pk.metadata = this.dataProperties.clone();
             player.dataPacket(pk);
 
