@@ -1,9 +1,12 @@
 package cn.nukkit.command.defaults;
 
+import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.event.player.PlayerKickEvent;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.utils.TextFormat;
 
@@ -57,6 +60,11 @@ public class WhitelistCommand extends VanillaCommand {
                 case "on" -> {
                     sender.getServer().setPropertyBoolean("white-list", true);
                     sender.getServer().setWhitelisted(true);
+
+                    for (Player player : Server.getInstance().getOnlinePlayers().values()) {
+                        if (!Server.getInstance().isWhitelisted(player.getName().toLowerCase())) player.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, Server.getInstance().whitelistReason);
+                    }
+
                     broadcastCommandMessage(sender, new TranslationContainer("commands.allowlist.enabled"));
                 }
                 case "off" -> {
