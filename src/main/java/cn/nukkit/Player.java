@@ -2495,15 +2495,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        for (Player p : new ArrayList<>(this.server.playerList.values())) {
-            if (p != this && p.username != null) {
-                if (p.username.equalsIgnoreCase(this.username) || this.getUniqueId().equals(p.getUniqueId())) {
-                    p.close("", "disconnectionScreen.loggedinOtherLocation");
-                    break;
-                }
-            }
-        }
-
         CompoundTag nbt;
         File legacyDataFile = new File(server.getDataPath() + "players/" + lowerName + ".dat");
         File dataFile = new File(server.getDataPath() + "players/" + this.uuid.toString() + ".dat");
@@ -2876,6 +2867,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         packetswitch:
         switch (pidOld) {
             case ProtocolInfo.LOGIN_PACKET:
+                LoginPacket loginPacket = (LoginPacket) packet;
+
                 if (this.loginPacketReceived) {
                     this.close("", "Invalid login packet");
                     return;
@@ -2883,7 +2876,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.loginPacketReceived = true;
 
-                LoginPacket loginPacket = (LoginPacket) packet;
+                for (Player p : new ArrayList<>(this.server.playerList.values())) {
+                    if (p != this && p.username != null) {
+                        if (p.username.equalsIgnoreCase(loginPacket.username) || loginPacket.clientUUID.equals(p.getUniqueId())) {
+                            PlayerDuplicateLoginEvent event = new PlayerDuplicateLoginEvent(this, p);
+                            event.call();
+
+                            if (!event.isCancelled()) {
+                                p.close("", "disconnectionScreen.loggedinOtherLocation");
+                            } else {
+                                this.close("", "disconnectionScreen.loggedinOtherLocation");
+                                return;
+                            }
+                            break;
+                        }
+                    }
+                }
 
                 this.protocol = loginPacket.getProtocol();
 
