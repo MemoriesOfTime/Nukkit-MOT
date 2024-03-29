@@ -2895,7 +2895,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.protocol = loginPacket.getProtocol();
 
-                this.username = TextFormat.clean(loginPacket.username);
+                if (protocol >= ProtocolInfo.v1_16_0) {
+                    this.username = TextFormat.clean(loginPacket.username)
+                            .replace(" ", "_");
+                } else {
+                    this.username = TextFormat.clean(loginPacket.username);
+                }
 
                 if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
                     this.close("", "You are running unsupported Minecraft version");
@@ -5051,7 +5056,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.perm = null;
         }
 
-        this.inventory = null;
         this.chunk = null;
 
         this.server.removePlayer(this);
