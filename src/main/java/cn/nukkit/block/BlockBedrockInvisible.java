@@ -1,7 +1,6 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemBlock;
 import cn.nukkit.utils.BlockColor;
 
 /**
@@ -55,12 +54,12 @@ public class BlockBedrockInvisible extends BlockSolid {
     }
 
     @Override
-    public boolean canBePulled() {
-        return false;
+    public Item toItem() {
+        return Item.get(0);
     }
 
     @Override
-    public Item toItem() {
-        return new ItemBlock(Block.get(BlockID.AIR));
+    public boolean canBePulled() {
+        return false;
     }
 }

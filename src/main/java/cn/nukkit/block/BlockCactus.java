@@ -7,7 +7,6 @@ import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.event.entity.EntityDamageByBlockEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemCactus;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
@@ -152,7 +151,7 @@ public class BlockCactus extends BlockTransparentMeta {
     @Override
     public Item[] getDrops(Item item) {
         return new Item[]{
-            new ItemCactus(0, 1)
+                Item.get(Item.CACTUS, 0, 1)
         };
     }
 }

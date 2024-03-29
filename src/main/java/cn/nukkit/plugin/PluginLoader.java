@@ -10,7 +10,6 @@ import java.util.regex.Pattern;
  * @author iNevet(code) @ Nukkit Project
  * @author 粉鞋大妈(javadoc) @ Nukkit Project
  * @see JavaPluginLoader
- * @since Nukkit 1.0 | Nukkit API 1.0.0
  */
 public interface PluginLoader {
 
@@ -32,7 +31,6 @@ public interface PluginLoader {
      * @throws java.lang.Exception 插件加载失败所抛出的异常。<br>Thrown when an error occurred.
      * @see #loadPlugin(File)
      * @see cn.nukkit.plugin.PluginBase#init(PluginLoader, cn.nukkit.Server, PluginDescription, File, File)
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     Plugin loadPlugin(String filename) throws Exception;
 
@@ -54,7 +52,6 @@ public interface PluginLoader {
      * @throws java.lang.Exception 插件加载失败所抛出的异常。<br>Thrown when an error occurred.
      * @see #loadPlugin(String)
      * @see cn.nukkit.plugin.PluginBase#init(PluginLoader, cn.nukkit.Server, PluginDescription, File, File)
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     Plugin loadPlugin(File file) throws Exception;
 
@@ -69,7 +66,6 @@ public interface PluginLoader {
      * @return 描述这个插件的 {@code PluginDescription}对象。<br>
      * A {@code PluginDescription} object describes the plugin.
      * @see #getPluginDescription(File)
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     PluginDescription getPluginDescription(String filename);
 
@@ -84,7 +80,6 @@ public interface PluginLoader {
      * @return 描述这个插件的 {@code PluginDescription}对象。<br>
      * A {@code PluginDescription} object describes the plugin.
      * @see #getPluginDescription(String)
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     PluginDescription getPluginDescription(File file);
 
@@ -109,7 +104,6 @@ public interface PluginLoader {
      *
      * @return 表达这个插件加载器支持的文件类型的正则表达式数组。<br>
      * An array of regular expressions, that describes what kind of file this plugin loader supports.
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     Pattern[] getPluginFilters();
 
@@ -119,7 +113,6 @@ public interface PluginLoader {
      *
      * @param plugin 要被启用的插件。<br>The plugin to enable.
      * @see #disablePlugin
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     void enablePlugin(Plugin plugin);
 
@@ -129,7 +122,6 @@ public interface PluginLoader {
      *
      * @param plugin 要被停用的插件。<br>The plugin to disable.
      * @see #enablePlugin
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     void disablePlugin(Plugin plugin);
 }

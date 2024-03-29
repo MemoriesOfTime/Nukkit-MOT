@@ -6,11 +6,11 @@ package cn.nukkit.permission;
  */
 public class PermissionAttachmentInfo {
 
-    private Permissible permissible;
+    private final Permissible permissible;
 
-    private String permission;
+    private final String permission;
 
-    private PermissionAttachment attachment;
+    private final PermissionAttachment attachment;
 
     private boolean value;
 
@@ -39,5 +39,14 @@ public class PermissionAttachmentInfo {
 
     public boolean getValue() {
         return value;
+    }
+
+    /**
+     * Set value.
+     *
+     * @param value value
+     */
+    public void setValue(boolean value) {
+        this.value = value;
     }
 }
