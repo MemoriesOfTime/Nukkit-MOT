@@ -94,6 +94,9 @@ public class BlockBanner extends BlockTransparentMeta implements Faceable, Block
             if (face == BlockFace.UP) {
                 this.setDamage(NukkitMath.floorDouble(((player.yaw + 180) * 16 / 360) + 0.5) & 0x0f);
                 this.getLevel().setBlock(block, this, true);
+            } else if (target.canBeReplaced()) {
+                this.setDamage(NukkitMath.floorDouble(((player.yaw + 180) * 16 / 360) + 0.5) & 0x0f);
+                this.getLevel().setBlock(target, this, true);
             } else {
                 this.setDamage(face.getIndex());
                 this.getLevel().setBlock(block, Block.get(WALL_BANNER, this.getDamage()), true);

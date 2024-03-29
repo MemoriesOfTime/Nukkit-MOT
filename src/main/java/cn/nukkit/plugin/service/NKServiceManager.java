@@ -13,9 +13,9 @@ public class NKServiceManager implements ServiceManager {
 
     @Override
     public <T> boolean register(Class<T> service, T provider, Plugin plugin, ServicePriority priority) {
-        Preconditions.checkNotNull(provider);
-        Preconditions.checkNotNull(priority);
-        Preconditions.checkNotNull(service);
+        Preconditions.checkNotNull(provider, "provider");
+        Preconditions.checkNotNull(priority, "priority");
+        Preconditions.checkNotNull(service, "service");
 
         // build-in service provider needn't plugin param
         if (plugin == null && provider.getClass().getClassLoader() != Server.class.getClassLoader()) {

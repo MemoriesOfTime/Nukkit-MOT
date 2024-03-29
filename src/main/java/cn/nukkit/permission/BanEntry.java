@@ -99,8 +99,7 @@ public class BanEntry {
     }
 
     public static BanEntry fromString(String str) {
-        Map<String, String> map = new Gson().fromJson(str, new TypeToken<TreeMap<String, String>>() {
-        }.getType());
+        Map<String, String> map = new Gson().fromJson(str, new TreeMapTypeToken().getType());
         BanEntry banEntry = new BanEntry(map.get("name"));
         try {
             banEntry.setCreationDate(new SimpleDateFormat(format).parse(map.get("creationDate")));
@@ -111,5 +110,8 @@ public class BanEntry {
         banEntry.setSource(map.get("source"));
         banEntry.setReason(map.get("reason"));
         return banEntry;
+    }
+
+    private static class TreeMapTypeToken extends TypeToken<TreeMap<String, String>> {
     }
 }

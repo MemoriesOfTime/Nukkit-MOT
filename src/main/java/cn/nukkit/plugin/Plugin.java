@@ -19,7 +19,6 @@ import java.io.InputStream;
  * @author 粉鞋大妈(javadoc) @ Nukkit Project
  * @see cn.nukkit.plugin.PluginBase
  * @see cn.nukkit.plugin.PluginDescription
- * @since Nukkit 1.0 | Nukkit API 1.0.0
  */
 public interface Plugin extends CommandExecutor {
     /**
@@ -29,7 +28,6 @@ public interface Plugin extends CommandExecutor {
      * 应该填写加载插件时需要作出的动作。例如：初始化数组、初始化数据库连接。<br>
      * Use this to init a Nukkit plugin, such as init arrays or init database connections.
      *
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     void onLoad();
 
@@ -44,7 +42,6 @@ public interface Plugin extends CommandExecutor {
      * Notes that there may be plugin manager plugins,
      * this method can be called many times when a plugin is restarted many times.
      *
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     void onEnable();
 
@@ -53,7 +50,6 @@ public interface Plugin extends CommandExecutor {
      * Whether this Nukkit plugin is enabled.
      *
      * @return 这个插件是否已经启用。<br>Whether this plugin is enabled.
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     boolean isEnabled();
 
@@ -69,7 +65,6 @@ public interface Plugin extends CommandExecutor {
      * Notes that there may be plugin manager plugins,
      * this method can be called many times when a plugin is restarted many times.
      *
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     void onDisable();
 
@@ -78,7 +73,6 @@ public interface Plugin extends CommandExecutor {
      * Whether this Nukkit plugin is disabled.
      *
      * @return 这个插件是否已经停用。<br>Whether this plugin is disabled.
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     boolean isDisabled();
 
@@ -91,7 +85,6 @@ public interface Plugin extends CommandExecutor {
      * and is placed in the 'plugins' folder inside the nukkit installation directory.
      *
      * @return 这个插件的数据文件夹。<br>The data folder of this plugin.
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     File getDataFolder();
 
@@ -104,7 +97,6 @@ public interface Plugin extends CommandExecutor {
      *
      * @return 这个插件的描述。<br>A description of this plugin.
      * @see cn.nukkit.plugin.PluginDescription
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     PluginDescription getDescription();
 
@@ -125,7 +117,6 @@ public interface Plugin extends CommandExecutor {
      * @param filename 要读取的资源文件名字。<br>The name of the resource file to read.
      * @return 读取的资源文件的 {@code InputStream}对象。若错误会返回{@code null}<br>
      * The resource as an {@code InputStream} object, or {@code null} when an error occurred.
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     InputStream getResource(String filename);
 
@@ -151,7 +142,6 @@ public interface Plugin extends CommandExecutor {
      * @return 保存是否成功。<br>true if the saving action is successful.
      * @see cn.nukkit.plugin.Plugin#saveDefaultConfig
      * @see cn.nukkit.plugin.Plugin#saveResource(String, boolean)
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     boolean saveResource(String filename);
 
@@ -171,7 +161,6 @@ public interface Plugin extends CommandExecutor {
      * @param replace  是否替换目标文件。<br>if true, Nukkit will replace the target resource file.
      * @return 保存是否成功。<br>true if the saving action is successful.
      * @see cn.nukkit.plugin.Plugin#saveResource(String)
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
 
     boolean saveResource(String filename, boolean replace);
@@ -187,7 +176,6 @@ public interface Plugin extends CommandExecutor {
      *
      * @return 插件的配置文件。<br>The configuration of this plugin.
      * @see cn.nukkit.plugin.Plugin#getDataFolder
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     Config getConfig();
 
@@ -196,7 +184,6 @@ public interface Plugin extends CommandExecutor {
      * Saves the plugin config.
      *
      * @see cn.nukkit.plugin.Plugin#getDataFolder
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     void saveConfig();
 
@@ -217,7 +204,6 @@ public interface Plugin extends CommandExecutor {
      *
      * @see cn.nukkit.plugin.Plugin#getDataFolder
      * @see cn.nukkit.plugin.Plugin#saveResource
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     void saveDefaultConfig();
 
@@ -231,7 +217,6 @@ public interface Plugin extends CommandExecutor {
      * for plugin user who changes the config and needs to use new config at once.
      *
      * @see cn.nukkit.plugin.Plugin#getDataFolder
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     void reloadConfig();
 
@@ -240,7 +225,6 @@ public interface Plugin extends CommandExecutor {
      * Gets the server which is running this plugin, and returns as a {@link cn.nukkit.Server} object.
      *
      * @see cn.nukkit.Server
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     Server getServer();
 
@@ -252,7 +236,6 @@ public interface Plugin extends CommandExecutor {
      * Nukkit will read plugin name from plugin description.
      *
      * @see cn.nukkit.plugin.Plugin#getDescription
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     String getName();
 
@@ -264,7 +247,6 @@ public interface Plugin extends CommandExecutor {
      * You can use a plugin logger to output messages to the console and log file.
      *
      * @see cn.nukkit.plugin.PluginLogger
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     PluginLogger getLogger();
 
@@ -273,7 +255,6 @@ public interface Plugin extends CommandExecutor {
      * Returns the {@code File} object of this plugin itself. For jar-packed plugins, it is the jar file itself.
      *
      * @return 这个插件的文件 {@code File}对象。<br>The {@code File} object of this plugin itself.
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     File getFile();
 
@@ -282,7 +263,6 @@ public interface Plugin extends CommandExecutor {
      * Returns the loader of this plugin as a {@link cn.nukkit.plugin.PluginLoader} object.
      *
      * @see cn.nukkit.plugin.PluginLoader
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     PluginLoader getPluginLoader();
 }

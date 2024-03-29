@@ -81,7 +81,8 @@ public class BlockDirt extends BlockSolidMeta {
 
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{new ItemBlock(Block.get(BlockID.DIRT))};
+        int damage = this.getDamage() & 0x01;
+        return new Item[]{new ItemBlock(Block.get(BlockID.DIRT, damage), damage)};
     }
 
     @Override

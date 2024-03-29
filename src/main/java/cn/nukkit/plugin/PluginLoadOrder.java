@@ -12,7 +12,6 @@ package cn.nukkit.plugin;
  * @author MagicDroidX(code) @ Nukkit Project
  * @author iNevet(code) @ Nukkit Project
  * @author 粉鞋大妈(javadoc) @ Nukkit Project
- * @since Nukkit 1.0 | Nukkit API 1.0.0
  */
 public enum PluginLoadOrder {
     /**
@@ -20,7 +19,6 @@ public enum PluginLoadOrder {
      * Indicates that the plugin will be loaded at startup.
      *
      * @see cn.nukkit.plugin.PluginLoadOrder
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     STARTUP,
     /**
@@ -28,7 +26,6 @@ public enum PluginLoadOrder {
      * Indicates that the plugin will be loaded after the first/default world was created.
      *
      * @see cn.nukkit.plugin.PluginLoadOrder
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     POSTWORLD
 }
