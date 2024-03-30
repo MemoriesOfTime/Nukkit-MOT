@@ -1848,8 +1848,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.portalPos = portalPos;
             }
 
+            EntityPortalEnterEvent ev = new EntityPortalEnterEvent(this, EntityPortalEnterEvent.PortalType.NETHER);
+            boolean isSpawn = Objects.equals(this.getLevel().getName(), Server.getInstance().getDefaultLevel().getName());
+            if (isSpawn && this.inPortalTicks == 1) {
+                ev = new EntityPortalEnterEvent(this, EntityPortalEnterEvent.PortalType.NETHER);
+                this.getServer().getPluginManager().callEvent(ev);
+                if (ev.isCancelled()) {
+                    this.portalPos = null;
+                    return;
+                }
+            }
+
             if (this.inPortalTicks == 80 || (this.server.vanillaPortals && this.inPortalTicks == 25 && this.gamemode == CREATIVE)) {
-                EntityPortalEnterEvent ev = new EntityPortalEnterEvent(this, EntityPortalEnterEvent.PortalType.NETHER);
                 this.getServer().getPluginManager().callEvent(ev);
 
                 if (ev.isCancelled()) {
