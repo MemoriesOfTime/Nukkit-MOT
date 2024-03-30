@@ -45,8 +45,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
+import static cn.nukkit.level.format.leveldb.LevelDBConstants.*;
 import static cn.nukkit.level.format.leveldb.LevelDBKey.*;
-import static cn.nukkit.level.format.leveldb.LevelDbConstants.*;
 import static net.daporkchop.ldbjni.LevelDB.PROVIDER;
 
 @Log4j2

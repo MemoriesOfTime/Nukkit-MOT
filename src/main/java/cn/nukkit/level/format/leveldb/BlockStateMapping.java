@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-import static cn.nukkit.level.format.leveldb.LevelDbConstants.CURRENT_LEVEL_PROTOCOL;
+import static cn.nukkit.level.format.leveldb.LevelDBConstants.CURRENT_LEVEL_PROTOCOL;
 
 @Log4j2
 public class BlockStateMapping {

@@ -7,7 +7,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public final class LevelDbConstants {
+public final class LevelDBConstants {
     public static final int SUB_CHUNK_2D_SIZE = 16 * 16;
     public static final int SUB_CHUNK_SIZE = 16 * SUB_CHUNK_2D_SIZE;
 
@@ -44,7 +44,7 @@ public final class LevelDbConstants {
 
     public static final String DEFAULT_FLAT_WORLD_LAYERS = "{\"biome_id\":1,\"block_layers\":[{\"block_name\":\"minecraft:bedrock\",\"count\":1},{\"block_name\":\"minecraft:dirt\",\"count\":2},{\"block_name\":\"minecraft:grass\",\"count\":1}],\"encoding_version\":6,\"structure_options\":null,\"world_version\":\"version.post_1_18\"}";
 
-    private LevelDbConstants() {
+    private LevelDBConstants() {
         throw new IllegalStateException();
     }
 }

@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static cn.nukkit.level.format.leveldb.LevelDbConstants.SUB_CHUNK_2D_SIZE;
+import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_2D_SIZE;
 
 public class LevelDBChunk extends BaseChunk {
     protected PalettedBlockStorage[] biomes3d; //TODO

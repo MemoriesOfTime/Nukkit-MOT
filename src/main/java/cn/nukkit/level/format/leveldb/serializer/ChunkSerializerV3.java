@@ -16,7 +16,7 @@ import it.unimi.dsi.fastutil.ints.Int2ShortOpenHashMap;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 
-import static cn.nukkit.level.format.leveldb.LevelDbConstants.CURRENT_LEVEL_SUBCHUNK_VERSION;
+import static cn.nukkit.level.format.leveldb.LevelDBConstants.CURRENT_LEVEL_SUBCHUNK_VERSION;
 
 public class ChunkSerializerV3 implements ChunkSerializer {
 

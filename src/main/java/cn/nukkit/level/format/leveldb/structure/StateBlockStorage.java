@@ -27,7 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static cn.nukkit.level.format.anvil.util.BlockStorage.SECTION_SIZE;
-import static cn.nukkit.level.format.leveldb.LevelDbConstants.SUB_CHUNK_SIZE;
+import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
 
 @Log4j2
 public class StateBlockStorage {
