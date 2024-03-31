@@ -7,7 +7,7 @@ import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
 import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
 import io.netty.buffer.ByteBuf;
 
-import static cn.nukkit.level.format.leveldb.LevelDbConstants.SUB_CHUNK_SIZE;
+import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
 
 public class ChunkSectionSerializerV7 implements ChunkSectionSerializer {
 

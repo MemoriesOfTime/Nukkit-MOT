@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
-import static cn.nukkit.level.format.leveldb.LevelDbConstants.CURRENT_LEVEL_PROTOCOL;
+import static cn.nukkit.level.format.leveldb.LevelDBConstants.CURRENT_LEVEL_PROTOCOL;
 
 public class NukkitLegacyMapper implements LegacyStateMapper {
 

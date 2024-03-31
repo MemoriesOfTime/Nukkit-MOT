@@ -3158,6 +3158,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 }
 
+                boolean ignoreCoordinateMove = false;
                 if (this.riding instanceof EntityMinecartAbstract) {
                     double inputY = authPacket.getMotion().getY();
                     if (inputY >= -1.001 && inputY <= 1.001) {
@@ -3167,6 +3168,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (this.riding.getId() == authPacket.getPredictedVehicle() && this.riding.isControlling(this)) {
                         if (this.temporalVector.setComponents(authPacket.getPosition().getX(), authPacket.getPosition().getY(), authPacket.getPosition().getZ()).distanceSquared(this.riding) < 100) {
                             ((EntityBoat) this.riding).onInput(authPacket.getPosition().getX(), authPacket.getPosition().getY(), authPacket.getPosition().getZ(), authPacket.getHeadYaw());
+                            ignoreCoordinateMove = true;
                         }
                     }
                 }
@@ -3364,8 +3366,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
 
                     this.setRotation(yaw, pitch, headYaw);
-                    this.newPosition = clientPosition;
-                    this.clientMovements.offer(clientPosition);
+                    if (!ignoreCoordinateMove) {
+                        this.newPosition = clientPosition;
+                        this.clientMovements.offer(clientPosition);
+                    }
                     this.forceMovement = null;
                 }
                 break;

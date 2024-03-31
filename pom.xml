@@ -61,7 +61,7 @@
         <dependency>
             <groupId>com.nukkitx.network</groupId>
             <artifactId>raknet</artifactId>
-            <version>1.6.28-MOT-SNAPSHOT</version>
+            <version>1.6.28.1-MOT</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -79,6 +79,10 @@
                 <exclusion>
                     <groupId>org.cloudburstmc.math</groupId>
                     <artifactId>immutable</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-buffer</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -109,7 +113,7 @@
         <dependency>
             <groupId>org.snakeyaml</groupId>
             <artifactId>snakeyaml-engine</artifactId>
-            <version>2.6</version>
+            <version>2.7</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -144,7 +148,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.22</version>
+            <version>1.18.30</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
