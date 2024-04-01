@@ -3,11 +3,12 @@ package cn.nukkit.block;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockAncientDebris extends BlockSolid {
-    @Override
-    public String getName() {
-        return "Ancient Debris";
+
+    public BlockAncientDebris() {
+        super();
     }
 
     @Override
@@ -16,8 +17,8 @@ public class BlockAncientDebris extends BlockSolid {
     }
 
     @Override
-    public double getHardness() {
-        return 30;
+    public String getName() {
+        return "Ancient Debris";
     }
 
     @Override
@@ -31,11 +32,21 @@ public class BlockAncientDebris extends BlockSolid {
     }
 
     @Override
+    public double getHardness() {
+        return 30;
+    }
+
+    @Override
     public Item[] getDrops(final Item item) {
         if (item.isPickaxe()) {
             return new Item[]{new ItemBlock(this, 0, 1)};
         }
         return Item.EMPTY_ARRAY;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.BLACK_BLOCK_COLOR;
     }
 
     @Override

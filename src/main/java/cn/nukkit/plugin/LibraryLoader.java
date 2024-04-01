@@ -18,7 +18,7 @@ public class LibraryLoader {
 
     static {
         if (BASE_FOLDER.mkdir()) {
-            LOGGER.info("Created libraries folder.");
+            LOGGER.info("[LibraryLoader] Created libraries folder");
         }
     }
 

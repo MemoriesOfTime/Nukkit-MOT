@@ -12,6 +12,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
 /**
  * @author Nukkit Project Team
@@ -68,6 +69,18 @@ public class ServerScheduler {
 
     public TaskHandler scheduleTask(@NotNull Plugin plugin, @NotNull Runnable task, boolean asynchronous) {
         return addTask(plugin, task, 0, 0, asynchronous);
+    }
+
+    public TaskHandler scheduleTask(@NotNull Plugin plugin,
+                                    @NotNull BiConsumer<Task, Integer> task,
+                                    boolean asynchronous) {
+        PluginTask<Plugin> pluginTask = new PluginTask<>(plugin) {
+            @Override
+            public void onRun(int currentTick) {
+                task.accept(this, currentTick);
+            }
+        };
+        return addTask(plugin, pluginTask, 0, 0, asynchronous);
     }
 
     @Deprecated
@@ -196,6 +209,20 @@ public class ServerScheduler {
         return addTask(plugin, task, delay, period, asynchronous);
     }
 
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull Plugin plugin,
+                                                    @NotNull BiConsumer<Task, Integer> task,
+                                                    int delay,
+                                                    int period,
+                                                    boolean asynchronous) {
+        PluginTask<Plugin> pluginTask = new PluginTask<>(plugin) {
+            @Override
+            public void onRun(int currentTick) {
+                task.accept(this, currentTick);
+            }
+        };
+        return addTask(plugin, pluginTask, delay, period, asynchronous);
+    }
+
     public void cancelTask(int taskId) {
         if (taskMap.containsKey(taskId)) {
             try {
@@ -207,6 +234,8 @@ public class ServerScheduler {
     }
 
     public void cancelTask(@NotNull Plugin plugin) {
+        //兼容旧插件
+        //noinspection ConstantConditions
         if (plugin == null) {
             throw new NullPointerException("Plugin cannot be null!");
         }

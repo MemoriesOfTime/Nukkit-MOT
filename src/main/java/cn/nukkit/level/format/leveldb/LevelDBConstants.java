@@ -7,7 +7,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public final class LevelDbConstants {
+public final class LevelDBConstants {
     public static final int SUB_CHUNK_2D_SIZE = 16 * 16;
     public static final int SUB_CHUNK_SIZE = 16 * SUB_CHUNK_2D_SIZE;
 
@@ -29,7 +29,10 @@ public final class LevelDbConstants {
     public static final byte[] CHUNK_VERSION_SAVE_DATA = new byte[]{CURRENT_LEVEL_CHUNK_VERSION};
 
 
-    public static final int CURRENT_LEVEL_PROTOCOL = ProtocolInfo.v1_20_10;
+    /**
+     * This is protocol version if block palette used in storage
+     */
+    public static final int PALETTE_VERSION = ProtocolInfo.v1_20_10;
 
     public static final int STATE_MAYOR_VERSION = 1;
     public static final int STATE_MINOR_VERSION = 20;
@@ -44,7 +47,7 @@ public final class LevelDbConstants {
 
     public static final String DEFAULT_FLAT_WORLD_LAYERS = "{\"biome_id\":1,\"block_layers\":[{\"block_name\":\"minecraft:bedrock\",\"count\":1},{\"block_name\":\"minecraft:dirt\",\"count\":2},{\"block_name\":\"minecraft:grass\",\"count\":1}],\"encoding_version\":6,\"structure_options\":null,\"world_version\":\"version.post_1_18\"}";
 
-    private LevelDbConstants() {
+    private LevelDBConstants() {
         throw new IllegalStateException();
     }
 }

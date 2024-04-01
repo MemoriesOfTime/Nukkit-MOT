@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.leveldb.structure;
 
+import cn.nukkit.Nukkit;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -11,7 +12,6 @@ import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.utils.BinaryStream;
-import cn.nukkit.utils.ChunkException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufOutputStream;
@@ -27,7 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static cn.nukkit.level.format.anvil.util.BlockStorage.SECTION_SIZE;
-import static cn.nukkit.level.format.leveldb.LevelDbConstants.SUB_CHUNK_SIZE;
+import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
 
 @Log4j2
 public class StateBlockStorage {
@@ -48,7 +48,7 @@ public class StateBlockStorage {
     public StateBlockStorage(BitArrayVersion version) {
         this.bitArray = version.createPalette();
         this.palette = new ObjectArrayList<>(16);
-        this.palette.add(BlockStateMapping.get().getBlockState(0, 0));
+        this.palette.add(BlockStateMapping.get().getState(0, 0));
 
         this.blockIds = new byte[SIZE];
         this.blockData = new NibbleArray(SECTION_SIZE);
@@ -61,8 +61,45 @@ public class StateBlockStorage {
         this.blockData = blockData;
     }
 
-    public void readFrom(ByteBuf byteBuf, ChunkBuilder chunkBuilder) {
-        short header = byteBuf.readUnsignedByte();
+    private static int getPaletteHeader(BitArrayVersion version, boolean runtime) {
+        return (version.getId() << 1) | (runtime ? 1 : 0);
+    }
+
+    public void writeToStorage(ByteBuf byteBuf) {
+        int paletteSize = this.palette.size();
+        BitArrayVersion version = paletteSize <= 1 ? BitArrayVersion.V0 : bitArray.getVersion();
+        byteBuf.writeByte(getPaletteHeader(version, false));
+
+        if (version != BitArrayVersion.V0) {
+            for (int word : bitArray.getWords()) {
+                byteBuf.writeIntLE(word);
+            }
+
+            byteBuf.writeIntLE(paletteSize);
+        }
+
+        NBTOutputStream outputStream = null;
+        try {
+            outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
+
+            for (BlockStateSnapshot state : this.palette) {
+                outputStream.writeTag(state.getVanillaState());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        } finally {
+            if (outputStream != null) {
+                try {
+                    outputStream.close();
+                } catch (IOException e) {
+                    log.error("Failed to close NBT stream", e);
+                }
+            }
+        }
+    }
+
+    public void readFromStorage(ByteBuf buffer, ChunkBuilder chunkBuilder) {
+        short header = buffer.readUnsignedByte();
 
         if (header == -1) {
             return;
@@ -72,41 +109,57 @@ public class StateBlockStorage {
 
         BitArrayVersion version = BitArrayVersion.get(header >> 1, true);
 
-        int paletteSize;
+        int paletteSize = 1;
         if (version == BitArrayVersion.V0) {
             this.bitArray = version.createPalette(SUB_CHUNK_SIZE, null);
-            paletteSize = 1;
         } else {
             int expectedWordSize = version.getWordsForSize(SUB_CHUNK_SIZE);
             int[] words = new int[expectedWordSize];
-            int i2 = 0;
             for (int i = 0; i < expectedWordSize; ++i) {
-                words[i] = byteBuf.readIntLE();
+                words[i] = buffer.readIntLE();
             }
+            paletteSize = buffer.readIntLE();
             this.bitArray = version.createPalette(SUB_CHUNK_SIZE, words);
-            paletteSize = byteBuf.readIntLE();
         }
 
         if (version.getMaxEntryValue() < paletteSize - 1) {
-            throw new ChunkException("Invalid paletteSize size: " + paletteSize + ", max: " + version.getMaxEntryValue());
+            throw new IllegalArgumentException(
+                    chunkBuilder.debugString() + " Palette (version " + version.name() + ") is too large. Max size " + version.getMaxEntryValue() + ". Actual size " + paletteSize
+            );
         }
 
         NBTInputStream inputStream = null;
         try {
-            inputStream = NbtUtils.createReaderLE(new ByteBufInputStream(byteBuf));
+            inputStream = NbtUtils.createReaderLE(new ByteBufInputStream(buffer));
             for (int i = 0; i < paletteSize; ++i) {
-                NbtMap tag;
-                BlockStateSnapshot stateSnapshot;
                 try {
-                    tag = (NbtMap) inputStream.readTag();
+                    NbtMap state = (NbtMap) inputStream.readTag();
                     //noinspection ResultOfMethodCallIgnored
-                    tag.hashCode();
-                    stateSnapshot = BlockStateMapping.get().getOrUpdateBlockState(tag);
-                } catch (IOException e) {
-                    throw new ChunkException("Invalid blockstate NBT at offset " + i + " in paletted storage", e);
-                }
+                    state.hashCode(); // cache hashCode
 
-                this.palette.add(stateSnapshot);
+                    BlockStateSnapshot blockState = BlockStateMapping.get().getStateUnsafe(state);
+                    if (blockState == null) {
+                        NbtMap updatedState = BlockStateMapping.get().updateVanillaState(state);
+                        blockState = BlockStateMapping.get().getUpdatedOrCustom(state, updatedState);
+                        if (!blockState.isCustom()) {
+                            if (Nukkit.DEBUG > 1) {
+                                log.info("[{}] Updated unmapped block state: {} => {}", chunkBuilder.debugString(), state, blockState.getVanillaState());
+                            }
+                            chunkBuilder.dirty();
+                        }
+
+                        if (Nukkit.DEBUG > 1 && blockState.getRuntimeId() == BlockStateMapping.get().getDefaultRuntimeId()) {
+                            log.info("[{}] Chunk contains unknown block {}  => {}", chunkBuilder.debugString(), state, updatedState);
+                        }
+                    }
+
+                    if (Nukkit.DEBUG > 1 && this.palette.contains(blockState)) {
+                        log.info("[{}] Palette contains block state twice: {}", chunkBuilder.debugString(), state);
+                    }
+                    this.palette.add(blockState);
+                } catch (Exception e) {
+                    log.error("[" + chunkBuilder.debugString() + "] Unable to deserialize chunk block state", e);
+                }
             }
 
             for (int i = 0; i < this.bitArray.size(); i++) {
@@ -123,10 +176,6 @@ public class StateBlockStorage {
                 log.error("Failed to close NBT stream", e);
             }
         }
-    }
-
-    private static int getPaletteHeader(BitArrayVersion version, boolean runtime) {
-        return (version.getId() << 1) | (runtime ? 1 : 0);
     }
 
     public int get(int index) {
@@ -171,40 +220,6 @@ public class StateBlockStorage {
 
     public int indexOf(int id) {
         return this.palette.indexOf(id);
-    }
-
-    public void writeToStorage(ByteBuf byteBuf) {
-        int paletteSize = this.palette.size();
-        BitArrayVersion version = paletteSize <= 1 ? BitArrayVersion.V0 : bitArray.getVersion();
-        byteBuf.writeByte(getPaletteHeader(version, false));
-
-        if (version != BitArrayVersion.V0) {
-            for (int word : bitArray.getWords()) {
-                byteBuf.writeIntLE(word);
-            }
-
-            byteBuf.writeIntLE(paletteSize);
-        }
-
-        NBTOutputStream outputStream = null;
-        try {
-            outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
-
-            for (int i = 0; i < paletteSize; i++) {
-                BlockStateSnapshot snapshot = this.palette.get(i);
-                outputStream.writeTag(snapshot.getVamillaState());
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        } finally {
-            if (outputStream != null) {
-                try {
-                    outputStream.close();
-                } catch (IOException e) {
-                    log.error("Failed to close NBT stream", e);
-                }
-            }
-        }
     }
 
     public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {

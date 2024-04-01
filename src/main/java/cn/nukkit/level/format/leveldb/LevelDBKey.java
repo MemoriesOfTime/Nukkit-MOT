@@ -1,8 +1,5 @@
 package cn.nukkit.level.format.leveldb;
 
-import cn.nukkit.level.DimensionData;
-import cn.nukkit.level.DimensionEnum;
-
 public enum LevelDBKey {
     DATA_3D('+'),
     DATA_2D('-'),
@@ -18,10 +15,14 @@ public enum LevelDBKey {
     BLOCK_EXTRA_DATA('4'),
     BIOME_STATE('5'),
     STATE_FINALIZATION('6'),
+
     BORDER_BLOCKS('8'),
     HARDCODED_SPAWNERS('9'),
+
     PENDING_RANDOM_TICKS(':'),
+
     FLAGS('f'),
+
     VERSION_OLD('v'),
     VERSION(',')
     ;
@@ -36,94 +37,57 @@ public enum LevelDBKey {
         return this.encoded;
     }
 
-    public byte[] getKey(int chunkX, int chunkZ) {
-        return new byte[]{
-                (byte) (chunkX & 0xff),
-                (byte) ((chunkX >>> 8) & 0xff),
-                (byte) ((chunkX >>> 16) & 0xff),
-                (byte) ((chunkX >>> 24) & 0xff),
-                (byte) (chunkZ & 0xff),
-                (byte) ((chunkZ >>> 8) & 0xff),
-                (byte) ((chunkZ >>> 16) & 0xff),
-                (byte) ((chunkZ >>> 24) & 0xff),
-                this.encoded
-        };
-    }
-
-    public byte[] getKey(int chunkX, int chunkZ, DimensionData dimension) {
-        if (dimension.equals(DimensionEnum.OVERWORLD.getDimensionData())) {
-            return getKey(chunkX, chunkZ);
+    public byte[] getKey(int chunkX, int chunkZ, int dimension) {
+        if (dimension == 0) {
+            return this.getKey(chunkX, chunkZ, false, 0);
         } else {
-            byte dimensionId = (byte) dimension.getDimensionId();
-            return new byte[]{
-                    (byte) (chunkX & 0xff),
-                    (byte) ((chunkX >>> 8) & 0xff),
-                    (byte) ((chunkX >>> 16) & 0xff),
-                    (byte) ((chunkX >>> 24) & 0xff),
-                    (byte) (chunkZ & 0xff),
-                    (byte) ((chunkZ >>> 8) & 0xff),
-                    (byte) ((chunkZ >>> 16) & 0xff),
-                    (byte) ((chunkZ >>> 24) & 0xff),
-                    (byte) (dimensionId & 0xff),
-                    (byte) ((dimensionId >>> 8) & 0xff),
-                    (byte) ((dimensionId >>> 16) & 0xff),
-                    (byte) ((dimensionId >>> 24) & 0xff),
-                    this.encoded
-            };
+            return this.getKey(chunkX, chunkZ, dimension, false, 0);
         }
     }
 
-    public byte[] getKey(int chunkX, int chunkZ, int chunkSectionY) {
-        if (this.encoded != CHUNK_SECTION_PREFIX.encoded)
-            throw new IllegalArgumentException("The method must be used with CHUNK_SECTION_PREFIX!");
-        return new byte[]{
-                (byte) (chunkX & 0xff),
-                (byte) ((chunkX >>> 8) & 0xff),
-                (byte) ((chunkX >>> 16) & 0xff),
-                (byte) ((chunkX >>> 24) & 0xff),
-                (byte) (chunkZ & 0xff),
-                (byte) ((chunkZ >>> 8) & 0xff),
-                (byte) ((chunkZ >>> 16) & 0xff),
-                (byte) ((chunkZ >>> 24) & 0xff),
-                this.encoded,
-                (byte) chunkSectionY
-        };
+    public byte[] getKey(int chunkX, int chunkZ, int y, int dimension) {
+        if (dimension == 0) {
+            return this.getKey(chunkX, chunkZ, true, y);
+        } else {
+            return this.getKey(chunkX, chunkZ, dimension, true, y);
+        }
     }
 
-    public byte[] getKey(int chunkX, int chunkZ, int chunkSectionY, DimensionData dimension) {
-        if (this.encoded != CHUNK_SECTION_PREFIX.encoded)
-            throw new IllegalArgumentException("The method must be used with CHUNK_SECTION_PREFIX!");
-        if (dimension.equals(DimensionEnum.OVERWORLD.getDimensionData())) {
-            return new byte[]{
-                    (byte) (chunkX & 0xff),
-                    (byte) ((chunkX >>> 8) & 0xff),
-                    (byte) ((chunkX >>> 16) & 0xff),
-                    (byte) ((chunkX >>> 24) & 0xff),
-                    (byte) (chunkZ & 0xff),
-                    (byte) ((chunkZ >>> 8) & 0xff),
-                    (byte) ((chunkZ >>> 16) & 0xff),
-                    (byte) ((chunkZ >>> 24) & 0xff),
-                    this.encoded,
-                    (byte) chunkSectionY
-            };
-        } else {
-            byte dimensionId = (byte) dimension.getDimensionId();
-            return new byte[]{
-                    (byte) (chunkX & 0xff),
-                    (byte) ((chunkX >>> 8) & 0xff),
-                    (byte) ((chunkX >>> 16) & 0xff),
-                    (byte) ((chunkX >>> 24) & 0xff),
-                    (byte) (chunkZ & 0xff),
-                    (byte) ((chunkZ >>> 8) & 0xff),
-                    (byte) ((chunkZ >>> 16) & 0xff),
-                    (byte) ((chunkZ >>> 24) & 0xff),
-                    (byte) (dimensionId & 0xff),
-                    (byte) ((dimensionId >>> 8) & 0xff),
-                    (byte) ((dimensionId >>> 16) & 0xff),
-                    (byte) ((dimensionId >>> 24) & 0xff),
-                    this.encoded,
-                    (byte) chunkSectionY
-            };
+    private byte[] getKey(int chunkX, int chunkZ, boolean extend, int y) {
+        byte[] bytes = new byte[extend ? 10 : 9];
+        bytes[0] = (byte) (chunkX & 0xff);
+        bytes[1] = (byte) ((chunkX >>> 8) & 0xff);
+        bytes[2] = (byte) ((chunkX >>> 16) & 0xff);
+        bytes[3] = (byte) ((chunkX >>> 24) & 0xff);
+        bytes[4] = (byte) (chunkZ & 0xff);
+        bytes[5] = (byte) ((chunkZ >>> 8) & 0xff);
+        bytes[6] = (byte) ((chunkZ >>> 16) & 0xff);
+        bytes[7] = (byte) ((chunkZ >>> 24) & 0xff);
+        bytes[8] = this.encoded;
+        if (extend) {
+            bytes[9] = (byte) y;
         }
+        return bytes;
+    }
+
+    private byte[] getKey(int chunkX, int chunkZ, int dimension, boolean extend, int y) {
+        byte[] bytes = new byte[extend ? 14 : 13];
+        bytes[0] = (byte) (chunkX & 0xff);
+        bytes[1] = (byte) ((chunkX >>> 8) & 0xff);
+        bytes[2] = (byte) ((chunkX >>> 16) & 0xff);
+        bytes[3] = (byte) ((chunkX >>> 24) & 0xff);
+        bytes[4] = (byte) (chunkZ & 0xff);
+        bytes[5] = (byte) ((chunkZ >>> 8) & 0xff);
+        bytes[6] = (byte) ((chunkZ >>> 16) & 0xff);
+        bytes[7] = (byte) ((chunkZ >>> 24) & 0xff);
+        bytes[8] = (byte) (dimension & 0xff);
+        bytes[9] = (byte) ((dimension >>> 8) & 0xff);
+        bytes[10] = (byte) ((dimension >>> 16) & 0xff);
+        bytes[11] = (byte) ((dimension >>> 24) & 0xff);
+        bytes[12] = this.encoded;
+        if (extend) {
+            bytes[13] = (byte) y;
+        }
+        return bytes;
     }
 }

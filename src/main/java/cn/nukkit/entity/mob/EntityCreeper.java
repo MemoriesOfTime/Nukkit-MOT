@@ -19,6 +19,7 @@ import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
@@ -226,7 +227,7 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
             level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_IGNITE);
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, true);
             level.addSound(new TNTPrimeSound(this.add(0, getEyeHeight())));
-            level.getServer().getScheduler().scheduleDelayedTask(null, this::explode, 30);
+            level.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, this::explode, 30);
             return true;
         }
 

@@ -1,7 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemAcaciaSign;
+import cn.nukkit.item.ItemID;
 
 public class BlockAcaciaWallSign extends BlockWallSign {
 
@@ -14,8 +14,18 @@ public class BlockAcaciaWallSign extends BlockWallSign {
     }
 
     @Override
+    public String getName() {
+        return "Acacia Wall Sign";
+    }
+
+    @Override
     public int getId() {
         return ACACIA_WALL_SIGN;
+    }
+
+    @Override
+    public Item toItem() {
+        return Item.get(ItemID.ACACIA_SIGN);
     }
 
     @Override
@@ -24,12 +34,7 @@ public class BlockAcaciaWallSign extends BlockWallSign {
     }
 
     @Override
-    public String getName() {
-        return "Acacia Wall Sign";
-    }
-
-    @Override
-    public Item toItem() {
-        return new ItemAcaciaSign();
+    public int getWallId() {
+        return ACACIA_WALL_SIGN;
     }
 }
