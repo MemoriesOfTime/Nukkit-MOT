@@ -35,7 +35,7 @@ public class BlockStateMapping {
 
     private LegacyStateMapper legacyMapper;
 
-    private int defaultRuntimeId;
+    private int defaultRuntimeId = -1;
     private BlockStateSnapshot defaultState;
 
     private static final ExpiringMap<NbtMap, NbtMap> BLOCK_UPDATE_CACHE = ExpiringMap.builder()
