@@ -83,7 +83,7 @@ public class BlockStateMapping {
 
         blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
 
-        if (Boolean.parseBoolean(System.getProperty("Dleveldb-chunker"))) {
+        if (Boolean.parseBoolean(System.getProperty("leveldb-chunker"))) {
             blockStateUpdaters.add(BlockStateUpdaterChunker.INSTANCE);
             log.warn("Enabled chunker.app LevelDB updater. This may impact chunk loading performance!");
         }
