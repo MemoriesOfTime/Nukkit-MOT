@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.entity.data.IntPositionEntityData;
 import cn.nukkit.entity.data.Skin;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemShield;
 import cn.nukkit.level.format.FullChunk;
@@ -324,6 +325,8 @@ public class EntityHuman extends EntityHumanType {
                 this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.skin, new Player[]{player});
             }
 
+            PlayerInventory playerInventory = Objects.requireNonNullElse(this.inventory, BaseEntity.EMPTY_INVENTORY);
+
             AddPlayerPacket pk = new AddPlayerPacket();
             pk.uuid = this.uuid;
             pk.username = this.getName();
@@ -337,14 +340,14 @@ public class EntityHuman extends EntityHumanType {
             pk.speedZ = (float) this.motionZ;
             pk.yaw = (float) this.yaw;
             pk.pitch = (float) this.pitch;
-            pk.item = Objects.requireNonNullElse(this.inventory, BaseEntity.EMPTY_INVENTORY).getItemInHand();
+            pk.item = playerInventory.getItemInHand();
             pk.metadata = this.dataProperties.clone();
             player.dataPacket(pk);
 
             if (this.isPlayer) {
-                Objects.requireNonNullElse(this.inventory, BaseEntity.EMPTY_INVENTORY).sendArmorContents(player);
+                playerInventory.sendArmorContents(player);
             } else {
-                Objects.requireNonNullElse(this.inventory, BaseEntity.EMPTY_INVENTORY).sendArmorContentsIfNotAr(player);
+                playerInventory.sendArmorContentsIfNotAr(player);
             }
             this.offhandInventory.sendContents(player);
 
