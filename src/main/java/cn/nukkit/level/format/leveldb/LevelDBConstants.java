@@ -29,7 +29,10 @@ public final class LevelDBConstants {
     public static final byte[] CHUNK_VERSION_SAVE_DATA = new byte[]{CURRENT_LEVEL_CHUNK_VERSION};
 
 
-    public static final int CURRENT_LEVEL_PROTOCOL = ProtocolInfo.v1_20_10;
+    /**
+     * This is protocol version if block palette used in storage
+     */
+    public static final int PALETTE_VERSION = ProtocolInfo.v1_20_10;
 
     public static final int STATE_MAYOR_VERSION = 1;
     public static final int STATE_MINOR_VERSION = 20;

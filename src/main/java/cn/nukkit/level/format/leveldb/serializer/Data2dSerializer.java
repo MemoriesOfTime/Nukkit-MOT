@@ -19,11 +19,11 @@ public class Data2dSerializer {
             byteBuf.writeShortLE(b);
         }
         byteBuf.writeBytes(biomeIdArray);
-        writeBatch.put(LevelDBKey.DATA_2D.getKey(levelDBChunk.getX(), levelDBChunk.getZ(), levelDBChunk.getProvider().getLevel().getDimensionData()), bytes);
+        writeBatch.put(LevelDBKey.DATA_2D.getKey(levelDBChunk.getX(), levelDBChunk.getZ(), levelDBChunk.getProvider().getLevel().getDimension()), bytes);
     }
 
     public static void deserialize(DB dB, ChunkBuilder chunkBuilder) {
-        byte[] maps2d = dB.get(LevelDBKey.DATA_2D.getKey(chunkBuilder.getChunkX(), chunkBuilder.getChunkZ(), chunkBuilder.getDimensionData()));
+        byte[] maps2d = dB.get(LevelDBKey.DATA_2D.getKey(chunkBuilder.getChunkX(), chunkBuilder.getChunkZ(), chunkBuilder.getDimensionData().getDimensionId()));
         int[] heightmap = new int[512];
         byte[] biomeIdArray = new byte[256];
         if (maps2d != null) {

@@ -30,7 +30,7 @@ public class EntitySerializer {
                 entities.add(entity.namedTag);
             }
         }
-        byte[] entitiesKey = ENTITIES.getKey(chunk.getX(), chunk.getZ());
+        byte[] entitiesKey = ENTITIES.getKey(chunk.getX(), chunk.getZ(), chunk.getProvider().getLevel().getDimension());
         if (entities.isEmpty()) {
             writeBatch.delete(entitiesKey);
         } else {
@@ -44,7 +44,7 @@ public class EntitySerializer {
 
     public static void deserialize(DB db, ChunkBuilder chunkBuilder) {
         List<CompoundTag> entities = new ObjectArrayList<>();
-        byte[] entityData = db.get(ENTITIES.getKey(chunkBuilder.getChunkX(), chunkBuilder.getChunkZ()));
+        byte[] entityData = db.get(ENTITIES.getKey(chunkBuilder.getChunkX(), chunkBuilder.getChunkZ(), chunkBuilder.getDimensionData().getDimensionId()));
         if (entityData != null && entityData.length != 0) {
             try (NBTInputStream nbtStream = new NBTInputStream(new ByteArrayInputStream(entityData), ByteOrder.LITTLE_ENDIAN, false)) {
                 while (nbtStream.available() > 0) {

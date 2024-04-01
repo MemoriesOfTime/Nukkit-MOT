@@ -19,8 +19,7 @@ public class ChunkBuilder {
     int chunkZ;
     @Getter
     int chunkX;
-    LevelProvider levelProvider;
-    private boolean needUpdate;
+    LevelProvider provider;
     ChunkSection[] sections;
     int[] heightMap;
     byte[] biome2d;
@@ -30,14 +29,12 @@ public class ChunkBuilder {
     List<CompoundTag> blockEntities;
     CompoundTag extraData;
 
-    private ChunkBuilder() {
-
-    }
+    private boolean dirty;
 
     public ChunkBuilder(int chunkX, int chunkZ, LevelDBProvider levelDBProvider) {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
-        this.levelProvider = Preconditions.checkNotNull(levelDBProvider, "levelProvider");
+        this.provider = Preconditions.checkNotNull(levelDBProvider, "levelProvider");
     }
 
     public ChunkBuilder chunkX(int chunkX) {
@@ -55,14 +52,19 @@ public class ChunkBuilder {
         return this;
     }
 
+    public ChunkBuilder dirty() {
+        this.dirty = true;
+        return this;
+    }
+
     public ChunkBuilder levelProvider(LevelProvider levelProvider) {
-        this.levelProvider = levelProvider;
+        this.provider = levelProvider;
         return this;
     }
 
     public DimensionData getDimensionData() {
-        Preconditions.checkNotNull(levelProvider);
-        return levelProvider.getLevel().getDimensionData();
+        Preconditions.checkNotNull(provider);
+        return provider.getLevel().getDimensionData();
     }
 
     public ChunkBuilder sections(ChunkSection[] sections) {
@@ -72,10 +74,6 @@ public class ChunkBuilder {
 
     public ChunkSection[] getSections() {
         return sections;
-    }
-
-    public void setNeedUpdate() {
-        this.needUpdate = true;
     }
 
     public ChunkBuilder heightMap(int[] heightMap) {
@@ -114,16 +112,17 @@ public class ChunkBuilder {
     }
 
     public LevelDBChunk build() {
-        Preconditions.checkNotNull(levelProvider);
+        Preconditions.checkNotNull(provider);
         if (state == null) state = ChunkState.NEW;
-        if (sections == null) sections = new ChunkSection[levelProvider.getLevel().getDimensionData().getHeight()];
+        if (sections == null) sections = new ChunkSection[provider.getLevel().getDimensionData().getHeight()];
         if (heightMap == null) heightMap = new int[256];
         if (entities == null) entities = new ArrayList<>();
         if (blockEntities == null) blockEntities = new ArrayList<>();
         if (extraData == null) extraData = new CompoundTag();
         if (state == null) state = ChunkState.NEW;
+
         LevelDBChunk levelDBChunk = new LevelDBChunk(
-                levelProvider,
+                provider,
                 chunkX,
                 chunkZ,
                 sections,
@@ -134,10 +133,16 @@ public class ChunkBuilder {
                 blockEntities,
                 state
         );
-        if (this.needUpdate) {
+
+        if (this.dirty) {
             levelDBChunk.setChanged();
         }
+
         return levelDBChunk;
+    }
+
+    public String debugString() {
+        return this.provider.getName() + "(x=" + this.chunkX + ", z=" + this.chunkZ + ")";
     }
 
 }

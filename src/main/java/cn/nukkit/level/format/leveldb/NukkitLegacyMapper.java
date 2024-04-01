@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 
-import static cn.nukkit.level.format.leveldb.LevelDBConstants.CURRENT_LEVEL_PROTOCOL;
+import static cn.nukkit.level.format.leveldb.LevelDBConstants.PALETTE_VERSION;
 
 public class NukkitLegacyMapper implements LegacyStateMapper {
 
@@ -30,7 +30,7 @@ public class NukkitLegacyMapper implements LegacyStateMapper {
             //生成并缓存hashCode
             //noinspection ResultOfMethodCallIgnored
             nbtMap.hashCode();
-            blockStateMapping.registerMapping(i, nbtMap);
+            blockStateMapping.registerState(i, nbtMap);
         }
     }
 
@@ -48,24 +48,24 @@ public class NukkitLegacyMapper implements LegacyStateMapper {
     }
 
     @Override
-    public int getRuntimeId(int id, int meta) {
-        return GlobalBlockPalette.getOrCreateRuntimeId(CURRENT_LEVEL_PROTOCOL, id, meta);
+    public int legacyToRuntime(int legacyId, int meta) {
+        return GlobalBlockPalette.getOrCreateRuntimeId(PALETTE_VERSION, legacyId, meta);
     }
 
     @Override
-    public int getLegacyFullId(int runtimeId) {
-        return GlobalBlockPalette.getLegacyFullId(CURRENT_LEVEL_PROTOCOL, runtimeId);
+    public int runtimeToFullId(int runtimeId) {
+        return GlobalBlockPalette.getLegacyFullId(PALETTE_VERSION, runtimeId);
     }
 
     @Override
-    public int getBlockId(int runtimeId) {
-        int fullId = this.getLegacyFullId(runtimeId);
+    public int runtimeToLegacyId(int runtimeId) {
+        int fullId = this.runtimeToFullId(runtimeId);
         return fullId == -1 ? -1 : fullId >> Block.DATA_BITS;
     }
 
     @Override
-    public int getBlockData(int runtimeId) {
-        int fullId = this.getLegacyFullId(runtimeId);
+    public int runtimeToLegacyData(int runtimeId) {
+        int fullId = this.runtimeToFullId(runtimeId);
         return fullId == -1 ? -1 : fullId & Block.DATA_MASK;
     }
 

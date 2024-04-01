@@ -30,7 +30,7 @@ public class BlockEntitySerializer {
             }
         }
 
-        byte[] blockEntitiesKey = BLOCK_ENTITIES.getKey(chunk.getX(), chunk.getZ(), chunk.getProvider().getLevel().getDimensionData());
+        byte[] blockEntitiesKey = BLOCK_ENTITIES.getKey(chunk.getX(), chunk.getZ(), chunk.getProvider().getLevel().getDimension());
         if (blockEntities.isEmpty()) {
             writeBatch.delete(blockEntitiesKey);
         } else {
@@ -44,7 +44,7 @@ public class BlockEntitySerializer {
 
     public static void deserialize(DB db, ChunkBuilder chunkBuilder) {
         List<CompoundTag> blockEntities = new ObjectArrayList<>();
-        byte[] blockEntityData = db.get(BLOCK_ENTITIES.getKey(chunkBuilder.getChunkX(), chunkBuilder.getChunkZ()));
+        byte[] blockEntityData = db.get(BLOCK_ENTITIES.getKey(chunkBuilder.getChunkX(), chunkBuilder.getChunkZ(), chunkBuilder.getDimensionData().getDimensionId()));
         if (blockEntityData != null && blockEntityData.length != 0) {
             try (NBTInputStream nbtStream = new NBTInputStream(new ByteArrayInputStream(blockEntityData), ByteOrder.LITTLE_ENDIAN, false)) {
                 while (nbtStream.available() > 0) {

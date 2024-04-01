@@ -2,12 +2,12 @@ package cn.nukkit.level.format.leveldb;
 
 public interface LegacyStateMapper {
 
-    int getRuntimeId(int id, int meta);
+    int legacyToRuntime(int legacyId, int meta);
 
-    int getLegacyFullId(int runtimeId);
+    int runtimeToFullId(int runtimeId);
 
-    int getBlockId(int runtimeId);
+    int runtimeToLegacyId(int runtimeId);
 
-    int getBlockData(int runtimeId);
+    int runtimeToLegacyData(int runtimeId);
 
 }

@@ -39,7 +39,7 @@ public class ChunkSectionSerializerV7 implements ChunkSectionSerializer {
         NibbleArray blockData = new NibbleArray(blockDataArray);
         StateBlockStorage storage = new StateBlockStorage();
         for (int i = 0; i < SUB_CHUNK_SIZE; ++i) {
-            storage.set(i, BlockStateMapping.get().getBlockState(blocks[i] << Block.DATA_BITS, blockData.get(i)));
+            storage.set(i, BlockStateMapping.get().getState(blocks[i] << Block.DATA_BITS, blockData.get(i)));
         }
         return storage;
     }
