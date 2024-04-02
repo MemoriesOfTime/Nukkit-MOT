@@ -10,7 +10,7 @@ import lombok.ToString;
 import java.util.*;
 import java.util.function.ObjIntConsumer;
 
-import static com.nukkitx.network.util.Preconditions.checkArgument;
+import static org.cloudburstmc.protocol.common.util.Preconditions.checkArgument;
 
 /**
  * @author MagicDroidX
