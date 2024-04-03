@@ -4,7 +4,6 @@ import cn.nukkit.block.Block;
 import cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterChunker;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterVanilla;
-import com.nukkitx.network.util.Preconditions;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -16,6 +15,7 @@ import net.jodah.expiringmap.ExpiringMap;
 import org.cloudburstmc.blockstateupdater.*;
 import org.cloudburstmc.blockstateupdater.util.tagupdater.CompoundTagUpdaterContext;
 import org.cloudburstmc.nbt.NbtMap;
+import org.cloudburstmc.protocol.common.util.Preconditions;
 
 import java.util.ArrayList;
 import java.util.List;

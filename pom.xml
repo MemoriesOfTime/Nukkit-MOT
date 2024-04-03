@@ -59,9 +59,15 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.nukkitx.network</groupId>
-            <artifactId>raknet</artifactId>
-            <version>1.6.28.2-MOT</version>
+            <groupId>org.cloudburstmc.netty</groupId>
+            <artifactId>netty-transport-raknet</artifactId>
+            <version>1.0.0.CR1-20240330.101522-15</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport-native-epoll</artifactId>
+            <version>4.1.101.Final</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -95,7 +101,7 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>32.1.2-jre</version>
+            <version>33.1.0-jre</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
