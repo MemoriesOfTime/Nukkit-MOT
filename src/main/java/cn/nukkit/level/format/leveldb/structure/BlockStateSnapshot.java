@@ -10,9 +10,12 @@ public class BlockStateSnapshot {
     private final NbtMap vanillaState;
     private final int runtimeId;
     private final int version;
-    private boolean custom;
+
+    private boolean custom = false;
+
     private int legacyId;
     private int legacyData;
+
     private Block block;
 
     private BlockStateSnapshot(NbtMap vanillaState, int runtimeId, int version, boolean custom, int legacyId, int legacy) {
@@ -24,7 +27,7 @@ public class BlockStateSnapshot {
         this.legacyData = legacy;
     }
 
-    public NbtMap getVamillaState() {
+    public NbtMap getVanillaState() {
         return this.vanillaState;
     }
 
@@ -46,7 +49,7 @@ public class BlockStateSnapshot {
         }
 
         int id = BlockStateMapping.get().getLegacyId(this.runtimeId);
-        if (this.version == BlockStateMapping.get().getProtocol()) {
+        if (this.version == BlockStateMapping.get().getVersion()) {
             this.legacyId = id;
         }
         return id;
@@ -58,7 +61,7 @@ public class BlockStateSnapshot {
         }
 
         int meta = BlockStateMapping.get().getLegacyData(this.runtimeId);
-        if (this.version == BlockStateMapping.get().getProtocol()) {
+        if (this.version == BlockStateMapping.get().getVersion()) {
             this.legacyData = meta;
         }
         return meta;

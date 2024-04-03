@@ -17,7 +17,7 @@ public class ChunkSectionSerializerV1 implements ChunkSectionSerializer {
     public StateBlockStorage[] deserialize(ByteBuf byteBuf, ChunkBuilder chunkBuilder) {
         StateBlockStorage[] storages = new StateBlockStorage[2];
         storages[0] = new StateBlockStorage();
-        storages[0].readFrom(byteBuf, chunkBuilder);
+        storages[0].readFromStorage(byteBuf, chunkBuilder);
         return storages;
     }
 }

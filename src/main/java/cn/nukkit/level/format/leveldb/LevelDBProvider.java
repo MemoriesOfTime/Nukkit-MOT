@@ -170,8 +170,8 @@ public class LevelDBProvider implements LevelProvider {
     public static void updateLevelData(CompoundTag levelData) {
         levelData.putLong("LastPlayed", System.currentTimeMillis() / 1000)
                 .putString("baseGameVersion", "*")
-                .putString("InventoryVersion", Utils.getVersionByProtocol(CURRENT_LEVEL_PROTOCOL))
-                .putInt("NetworkVersion", CURRENT_LEVEL_PROTOCOL)
+                .putString("InventoryVersion", Utils.getVersionByProtocol(PALETTE_VERSION))
+                .putInt("NetworkVersion", PALETTE_VERSION)
                 .putList(new ListTag<>("MinimumCompatibleClientVersion", CURRENT_LEVEL_VERSION))
                 .putList(new ListTag<>("lastOpenedWithVersion", CURRENT_LEVEL_VERSION))
                 .putInt("StorageVersion", CURRENT_STORAGE_VERSION)
@@ -418,9 +418,9 @@ public class LevelDBProvider implements LevelProvider {
 
     @Nullable
     public LevelDBChunk readChunk(int chunkX, int chunkZ) {
-        byte[] versionData = this.db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimensionData()));
+        byte[] versionData = this.db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
         if (versionData == null || versionData.length != 1) {
-            versionData = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimensionData()));
+            versionData = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
             if (versionData == null || versionData.length != 1) {
                 return null;
             }
@@ -428,7 +428,7 @@ public class LevelDBProvider implements LevelProvider {
 
         ChunkBuilder chunkBuilder = new ChunkBuilder(chunkX, chunkZ, this);
 
-        byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData()));
+        byte[] finalized = this.db.get(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()));
         if (finalized == null) {
             chunkBuilder.state(ChunkState.FINISHED);
         } else {
@@ -438,7 +438,7 @@ public class LevelDBProvider implements LevelProvider {
         byte chunkVersion = versionData[0];
 
         if (chunkVersion < 7) {
-            chunkBuilder.setNeedUpdate();
+            chunkBuilder.dirty();
         }
 
         ChunkSerializers.deserialize(this.db, chunkBuilder, chunkVersion);
@@ -451,12 +451,12 @@ public class LevelDBProvider implements LevelProvider {
         BlockEntitySerializer.deserialize(this.db, chunkBuilder);
         EntitySerializer.deserialize(this.db, chunkBuilder);
 
-        byte[] tickingData = this.db.get(PENDING_TICKS.getKey(chunkX, chunkZ));
+        byte[] tickingData = this.db.get(PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (tickingData != null && tickingData.length != 0) {
             loadBlockTickingQueue(tickingData, false);
         }
 
-        byte[] randomTickingData = this.db.get(PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ));
+        byte[] randomTickingData = this.db.get(PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (randomTickingData != null && randomTickingData.length != 0) {
             loadBlockTickingQueue(randomTickingData, true);
         }
@@ -485,7 +485,7 @@ public class LevelDBProvider implements LevelProvider {
         chunk.setChanged(false);
 
         try (WriteBatch writeBatch = this.db.createWriteBatch()) {
-            writeBatch.put(VERSION.getKey(chunkX, chunkZ, this.getLevel().getDimensionData()), CHUNK_VERSION_SAVE_DATA);
+            writeBatch.put(VERSION.getKey(chunkX, chunkZ, this.getLevel().getDimensionData().getDimensionId()), CHUNK_VERSION_SAVE_DATA);
 
             chunk.ioLock.lock();
 
@@ -501,7 +501,7 @@ public class LevelDBProvider implements LevelProvider {
                 }
             }
 
-            writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData()), Binary.writeLInt(chunk.getState().ordinal()));
+            writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()), Binary.writeLInt(chunk.getState().ordinal()));
 
             BlockEntitySerializer.serializer(writeBatch, chunk);
 
@@ -521,7 +521,7 @@ public class LevelDBProvider implements LevelProvider {
                 //randomBlockUpdateEntries = level.getPendingRandomBlockUpdates(chunk);
             }
 
-            byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ);
+            byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension());
             if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
                 NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
                 if (ticks != null) {
@@ -552,8 +552,8 @@ public class LevelDBProvider implements LevelProvider {
                 writeBatch.delete(pendingRandomTicksKey);
             }*/
 
-            writeBatch.delete(DATA_2D_LEGACY.getKey(chunkX, chunkZ));
-            writeBatch.delete(LEGACY_TERRAIN.getKey(chunkX, chunkZ));
+            writeBatch.delete(DATA_2D_LEGACY.getKey(chunkX, chunkZ, this.level.getDimension()));
+            writeBatch.delete(LEGACY_TERRAIN.getKey(chunkX, chunkZ, this.level.getDimension()));
 
             this.db.write(writeBatch);
         } catch (IOException e) {
@@ -692,9 +692,9 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private boolean chunkExists(int chunkX, int chunkZ) {
-        byte[] data = this.db.get(VERSION.getKey(chunkX, chunkZ));
+        byte[] data = this.db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (data == null || data.length == 0) {
-            data = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ));
+            data = this.db.get(VERSION_OLD.getKey(chunkX, chunkZ, this.level.getDimension()));
         }
         return data != null && data.length != 0;
     }
@@ -930,7 +930,7 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     protected StateBlockStorage[] deserializeLegacyExtraData(int chunkX, int chunkZ, int chunkVersion) {
-        byte[] extraRawData = this.db.get(BLOCK_EXTRA_DATA.getKey(chunkX, chunkZ));
+        byte[] extraRawData = this.db.get(BLOCK_EXTRA_DATA.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (extraRawData == null || extraRawData.length == 0) {
             return null;
         }
@@ -966,29 +966,33 @@ public class LevelDBProvider implements LevelProvider {
         }
 
         int currentTick = ticks.getInt("currentTick");
-        for (NbtMap blockState : ticks.getList("tickList", NbtType.COMPOUND)) {
+        for (NbtMap state : ticks.getList("tickList", NbtType.COMPOUND)) {
             Block block = null;
             //noinspection ResultOfMethodCallIgnored
-            blockState.hashCode();
+            state.hashCode();
 
-            if (blockState.containsKey("name")) {
-                BlockStateSnapshot snapshot = BlockStateMapping.get().getOrUpdateBlockState(blockState);
-                block = snapshot.getBlock();
-            } else if (blockState.containsKey("tileID")) {
-                block = Block.get(blockState.getByte("tileID") & 0xff);
+            if (state.containsKey("name")) {
+                BlockStateSnapshot blockState = BlockStateMapping.get().getStateUnsafe(state);
+                if (blockState == null) {
+                    NbtMap updatedState = BlockStateMapping.get().updateVanillaState(state);
+                    blockState = BlockStateMapping.get().getUpdatedOrCustom(state, updatedState);
+                }
+                block = blockState.getBlock();
+            } else if (state.containsKey("tileID")) {
+                block = Block.get(state.getByte("tileID") & 0xff);
             }
 
             if (block == null) {
-                log.debug("Unavailable block ticking entry skipped: {}", blockState);
+                log.debug("Unavailable block ticking entry skipped: {}", state);
                 continue;
             }
-            block.x = blockState.getInt("x");
-            block.y = blockState.getInt("y");
-            block.z = blockState.getInt("z");
+            block.x = state.getInt("x");
+            block.y = state.getInt("y");
+            block.z = state.getInt("z");
             block.level = level;
 
-            int delay = (int) (blockState.getLong("time") - currentTick);
-            int priority = blockState.getInt("p"); // Nukkit only
+            int delay = (int) (state.getLong("time") - currentTick);
+            int priority = state.getInt("p"); // Nukkit only
 
             if (!tickingQueueTypeIsRandom) {
                 level.scheduleUpdate(block, block, delay, priority, false);
@@ -1004,7 +1008,7 @@ public class LevelDBProvider implements LevelProvider {
         for (BlockUpdateEntry entry : entries) {
             Block block = entry.block;
 
-            NbtMap blockTag = BlockStateMapping.get().getBlockStateFromFullId(block.getFullId()).getVamillaState();
+            NbtMap blockTag = BlockStateMapping.get().getBlockStateFromFullId(block.getFullId()).getVanillaState();
             Vector3 pos = entry.pos;
             int priority = entry.priority;
 

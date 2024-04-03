@@ -5469,29 +5469,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     @Override
-    public void setHealth(float health) {
-        if (health < 1) {
-            health = 0;
+    public void setHealth(float newHealth) {
+        if (newHealth < 1) {
+            newHealth = 0;
         }
 
-        super.setHealth(health);
+        super.setHealth(newHealth);
 
         // HACK: solve the client-side absorption bug
         if (this.spawned) {
             UpdateAttributesPacket pk = new UpdateAttributesPacket();
-            pk.entries = new Attribute[]{Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getAbsorption() % 2 != 0 ? this.getMaxHealth() + 1 : this.getMaxHealth()).setValue(health > 0 ? (health < getMaxHealth() ? health : getMaxHealth()) : 0)};
+            pk.entries = new Attribute[]{Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getAbsorption() % 2 != 0 ? this.getMaxHealth() + 1 : this.getMaxHealth()).setValue(this.health > 0 ? (this.health < getMaxHealth() ? this.health : getMaxHealth()) : 0)};
             pk.entityId = this.id;
             this.dataPacket(pk);
         }
     }
 
     @Override
-    public void setMaxHealth(int maxHealth) {
-        super.setMaxHealth(maxHealth);
+    public void setMaxHealth(int newMaxHealth) {
+        super.setMaxHealth(newMaxHealth);
 
         if (this.spawned) {
             UpdateAttributesPacket pk = new UpdateAttributesPacket();
-            pk.entries = new Attribute[]{Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getAbsorption() % 2 != 0 ? this.getMaxHealth() + 1 : this.getMaxHealth()).setValue(health > 0 ? (health < getMaxHealth() ? health : getMaxHealth()) : 0)};
+            pk.entries = new Attribute[]{Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getAbsorption() % 2 != 0 ? this.getMaxHealth() + 1 : this.getMaxHealth()).setValue(this.health > 0 ? (this.health < getMaxHealth() ? this.health : getMaxHealth()) : 0)};
             pk.entityId = this.id;
             this.dataPacket(pk);
         }

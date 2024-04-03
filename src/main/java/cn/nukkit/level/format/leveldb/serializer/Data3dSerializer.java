@@ -27,7 +27,7 @@ public class Data3dSerializer {
                 PalettedBlockStorage palettedBlockStorage = chunk.getBiomeStorage(i);
                 palettedBlockStorage.writeToStorage(byteBuf);
             }
-            writeBatch.put(LevelDBKey.DATA_3D.getKey(chunk.getX(), chunk.getZ(), dimensionData), Utils.convertByteBuf2Array(byteBuf));
+            writeBatch.put(LevelDBKey.DATA_3D.getKey(chunk.getX(), chunk.getZ(), dimensionData.getDimensionId()), Utils.convertByteBuf2Array(byteBuf));
         } finally {
             byteBuf.release();
         }
@@ -37,7 +37,7 @@ public class Data3dSerializer {
         ByteBuf heightAndBiomesBuffer = null;
         try {
             DimensionData dimensionData = chunkBuilder.getDimensionData();
-            byte[] bytes = db.get(LevelDBKey.DATA_3D.getKey(chunkBuilder.getChunkX(), chunkBuilder.getChunkZ(), dimensionData));
+            byte[] bytes = db.get(LevelDBKey.DATA_3D.getKey(chunkBuilder.getChunkX(), chunkBuilder.getChunkZ(), dimensionData.getDimensionId()));
             if (bytes != null) {
                 heightAndBiomesBuffer = Unpooled.wrappedBuffer(bytes);
                 int[] heights = new int[256];
