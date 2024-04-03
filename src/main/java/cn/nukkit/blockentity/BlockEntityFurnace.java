@@ -6,13 +6,11 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.event.inventory.FurnaceBurnEvent;
 import cn.nukkit.event.inventory.FurnaceSmeltEvent;
-import cn.nukkit.inventory.FurnaceInventory;
-import cn.nukkit.inventory.InventoryHolder;
-import cn.nukkit.inventory.InventoryType;
-import cn.nukkit.inventory.SmeltingRecipe;
+import cn.nukkit.inventory.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -30,14 +28,14 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
 
     protected FurnaceInventory inventory;
 
-    private int burnTime;
-    private int burnDuration;
-    private int cookTime;
-    private int maxTime;
+    protected int burnTime;
+    protected int burnDuration;
+    protected int cookTime;
+    protected int maxTime;
 
-    private int crackledTime;
+    protected int crackledTime;
 
-    protected float storedXP;
+    protected float experience;
 
     public BlockEntityFurnace(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -49,7 +47,13 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
 
     @Override
     protected void initBlockEntity() {
-        this.inventory = new FurnaceInventory(this, this.getInventoryType());
+        if (this instanceof BlockEntityBlastFurnace) {
+            this.inventory = new BlastFurnaceInventory((BlockEntityBlastFurnace) this);
+        } else if (this instanceof BlockEntitySmoker) {
+            this.inventory = new SmokerInventory((BlockEntitySmoker) this);
+        } else {
+            this.inventory = new FurnaceInventory(this);
+        }
 
         if (!this.namedTag.contains("Items") || !(this.namedTag.get("Items") instanceof ListTag)) {
             this.namedTag.putList(new ListTag<CompoundTag>("Items"));
@@ -90,9 +94,9 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
         }
 
         if (this.namedTag.contains("StoredXpInt")) {
-            storedXP = this.namedTag.getShort("StoredXpInt");
+            experience = this.namedTag.getShort("StoredXpInt");
         } else {
-            storedXP = 0;
+            experience = 0;
         }
 
         if (burnTime > 0) {
@@ -147,11 +151,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
             level.dropItem(this, content);
         }
         inventory.clearAll();
-        int xp = calculateXpDrop();
-        if (xp > 0) {
-            setStoredXP(0);
-            level.dropExpOrb(this, xp);
-        }
+        this.releaseExperience();
     }
 
     @Override
@@ -165,7 +165,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
         this.namedTag.putShort("BurnTime", burnTime);
         this.namedTag.putShort("BurnDuration", burnDuration);
         this.namedTag.putShort("MaxTime", maxTime);
-        this.namedTag.putShort("StoredXpInt", (int) storedXP);
+        this.namedTag.putShort("StoredXpInt", (int) experience);
     }
 
     @Override
@@ -317,11 +317,11 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
                     this.server.getPluginManager().callEvent(ev);
                     if (!ev.isCancelled()) {
                         this.inventory.setResult(ev.getResult());
+                        this.experience += ev.getXp();
                         raw.setCount(raw.getCount() - 1);
                         if (raw.getCount() == 0) {
                             raw = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
                         }
-                        this.storedXP += ev.getXp();
                         this.inventory.setSmelting(raw);
                     }
 
@@ -344,25 +344,29 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
         }
 
         if (Server.getInstance().getTick() % 4 == 0) {
-            for (Player player : this.inventory.getViewers()) {
-                int windowId = player.getWindowId(this.inventory);
-                if (windowId > 0) {
-                    ContainerSetDataPacket pk = new ContainerSetDataPacket();
-                    pk.windowId = windowId;
-                    pk.property = ContainerSetDataPacket.PROPERTY_FURNACE_TICK_COUNT;
-                    pk.value = cookTime;
-                    player.dataPacket(pk);
-
-                    pk = new ContainerSetDataPacket();
-                    pk.windowId = windowId;
-                    pk.property = ContainerSetDataPacket.PROPERTY_FURNACE_LIT_TIME;
-                    pk.value = burnDuration;
-                    player.dataPacket(pk);
-                }
-            }
+            this.sendPacket();
         }
 
         return ret;
+    }
+
+    protected void sendPacket() {
+        for (Player player : this.inventory.getViewers()) {
+            int windowId = player.getWindowId(this.inventory);
+            if (windowId > 0) {
+                ContainerSetDataPacket pk = new ContainerSetDataPacket();
+                pk.windowId = windowId;
+                pk.property = ContainerSetDataPacket.PROPERTY_FURNACE_TICK_COUNT;
+                pk.value = cookTime;
+                player.dataPacket(pk);
+
+                pk = new ContainerSetDataPacket();
+                pk.windowId = windowId;
+                pk.property = ContainerSetDataPacket.PROPERTY_FURNACE_LIT_TIME;
+                pk.value = burnDuration;
+                player.dataPacket(pk);
+            }
+        }
     }
 
     @Override
@@ -415,16 +419,19 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
         this.maxTime = maxTime;
     }
 
-    public float getStoredXP() {
-        return storedXP;
+    public float getExperience() {
+        return experience;
     }
 
-    public void setStoredXP(float storedXP) {
-        this.storedXP = storedXP;
+    public void setExperience(float experience) {
+        this.experience = experience;
     }
 
-    public short calculateXpDrop() {
-        return (short) (Math.floor(this.storedXP) + (ThreadLocalRandom.current().nextFloat() < (this.storedXP % 1) ? 1 : 0));
+    public void releaseExperience() {
+        int experience = NukkitMath.floorDouble(this.experience);
+        if (experience >= 1) {
+            this.experience = 0;
+            this.level.dropExpOrb(this, experience);
+        }
     }
-
 }

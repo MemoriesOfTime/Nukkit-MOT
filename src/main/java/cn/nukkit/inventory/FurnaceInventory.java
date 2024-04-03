@@ -57,11 +57,7 @@ public class FurnaceInventory extends ContainerInventory {
     public boolean setItemByPlayer(Player player, int index, Item item, boolean send) {
         if (index == 2 && (item.getId() == 0 || item.getCount() == 0)) {
             BlockEntityFurnace holder = getHolder();
-            int xp = holder.calculateXpDrop();
-            if (xp > 0) {
-                holder.setStoredXP(0);
-                holder.level.dropExpOrb(player, xp);
-            }
+            holder.releaseExperience();
         }
         return setItem(index, item, send);
     }

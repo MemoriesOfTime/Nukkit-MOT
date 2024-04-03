@@ -16,7 +16,7 @@ import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.function.BiConsumer;
 
-import static com.nukkitx.network.util.Preconditions.*;
+import static org.cloudburstmc.protocol.common.util.Preconditions.*;
 
 public final class TypeMap<T> {
 

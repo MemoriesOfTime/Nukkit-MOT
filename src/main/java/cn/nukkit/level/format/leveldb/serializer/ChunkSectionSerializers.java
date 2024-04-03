@@ -2,8 +2,8 @@ package cn.nukkit.level.format.leveldb.serializer;
 
 import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
 import cn.nukkit.level.format.leveldb.structure.StateBlockStorage;
-import com.nukkitx.network.util.Preconditions;
 import io.netty.buffer.ByteBuf;
+import org.cloudburstmc.protocol.common.util.Preconditions;
 
 public class ChunkSectionSerializers {
     private static final ChunkSectionSerializer[] serializers;

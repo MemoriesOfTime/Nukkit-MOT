@@ -60,6 +60,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public AxisAlignedBB boundingBox = null;
     public int layer = 0;
 
+    /**
+     * A commonly used block face pattern
+     */
+    protected static final int[] FACES2534 = {2, 5, 3, 4};
+
     protected Block() {}
 
     public static void init() {
@@ -403,9 +408,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[DARKOAK_STANDING_SIGN] = BlockDarkOakSignPost.class; //447
             list[DARKOAK_WALL_SIGN] = BlockDarkOakWallSign.class; //448
             list[LECTERN] = BlockLectern.class; //449
-
+            list[GRINDSTONE] = BlockGrindstone.class; //450
             list[BLAST_FURNACE] = BlockBlastFurnace.class; //451
-
+            list[SMOKER] = BlockSmoker.class; //453
+            list[LIT_SMOKER] = BlockSmokerLit.class; //454
+            list[CARTOGRAPHY_TABLE] = BlockCartographyTable.class; //455
+            list[FLETCHING_TABLE] = BlockFletchingTable.class; //456
             list[SMITHING_TABLE] = BlockSmithingTable.class; //457
             list[BARREL] = BlockBarrel.class; //458
 
