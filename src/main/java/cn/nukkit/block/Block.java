@@ -403,7 +403,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[DARKOAK_STANDING_SIGN] = BlockDarkOakSignPost.class; //447
             list[DARKOAK_WALL_SIGN] = BlockDarkOakWallSign.class; //448
             list[LECTERN] = BlockLectern.class; //449
-
+            list[GRINDSTONE] = BlockGrindstone.class; //450
             list[BLAST_FURNACE] = BlockBlastFurnace.class; //451
 
             list[SMITHING_TABLE] = BlockSmithingTable.class; //457
