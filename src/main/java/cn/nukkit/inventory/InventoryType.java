@@ -12,6 +12,7 @@ public enum InventoryType {
     PLAYER(40, "Player", -1), //36 CONTAINER, 4 ARMOR
     FURNACE(3, "Furnace", 2), //1 INPUT/OUTPUT, 1 FUEL
     BLAST_FURNACE(3, "Blast Furnace", 27),  //1 INPUT/OUTPUT, 1 FUEL
+    SMOKER(3, "Smoker", 28), //1 INPUT/OUTPUT, 1 FUEL
     CAMPFIRE(4, "Campfire", -1),
     CRAFTING(5, "Crafting", 1), //4 CRAFTING SLOTS, 1 RESULT
     WORKBENCH(10, "Crafting", 1), //9 CRAFTING SLOTS, 1 RESULT

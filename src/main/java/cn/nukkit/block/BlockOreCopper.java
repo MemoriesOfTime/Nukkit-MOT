@@ -1,7 +1,6 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemRawCopper;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.utils.Utils;
@@ -60,7 +59,7 @@ public class BlockOreCopper extends BlockSolid {
                 count = i + 1;
             }
 
-            ItemRawCopper rawCopper = new ItemRawCopper();
+            Item rawCopper = Item.fromString("minecraft:raw_copper");
             rawCopper.setCount(count);
             return new Item[]{
                     rawCopper

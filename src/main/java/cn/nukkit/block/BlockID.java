@@ -399,7 +399,7 @@ public interface BlockID {
     int BLAST_FURNACE = 451;
     int STONECUTTER_BLOCK = 452;
     int SMOKER = 453;
-
+    int LIT_SMOKER = 454;
     int CARTOGRAPHY_TABLE = 455;
     int FLETCHING_TABLE = 456;
 
