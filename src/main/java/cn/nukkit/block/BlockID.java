@@ -351,15 +351,22 @@ public interface BlockID {
     int CORAL_FAN_HANG3 = 392;
     int BLOCK_KELP = 393;
     int DRIED_KELP_BLOCK = 394;
-
+    int ACACIA_BUTTON = 395;
     int ACACIA_TRAPDOOR = 400;
     int BIRCH_TRAPDOOR = 401;
     int DARK_OAK_TRAPDOOR = 402;
     int JUNGLE_TRAPDOOR = 403;
     int SPRUCE_TRAPDOOR = 404;
-
+    int ACACIA_PRESSURE_PLATE = 405;
+    int BIRCH_PRESSURE_PLATE = 406;
+    int DARK_OAK_PRESSURE_PLATE = 407;
+    int JUNGLE_PRESSURE_PLATE = 408;
+    int SPRUCE_PRESSURE_PLATE = 409;
     int CARVED_PUMPKIN = 410;
     int SEA_PICKLE = 411;
+    int CONDUIT = 412;
+    // 413 not yet in Minecraft
+    int TURTLE_EGG = 414;
     int BUBBLE_COLUMN = 415;
     int BARRIER = 416;
     int STONE_SLAB3 = 417;

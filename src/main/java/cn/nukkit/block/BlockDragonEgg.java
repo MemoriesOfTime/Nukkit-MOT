@@ -106,4 +106,9 @@ public class BlockDragonEgg extends BlockFallable {
             }
         }
     }
+
+    @Override
+    public boolean alwaysDropsOnExplosion() {
+        return true;
+    }
 }

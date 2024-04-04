@@ -117,4 +117,9 @@ public class BlockBeacon extends BlockTransparent implements BlockEntityHolder<B
     public BlockColor getColor() {
         return BlockColor.DIAMOND_BLOCK_COLOR;
     }
+
+    @Override
+    public boolean alwaysDropsOnExplosion() {
+        return true;
+    }
 }

@@ -177,4 +177,9 @@ public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockE
         }
         return bb;
     }
+
+    @Override
+    public boolean alwaysDropsOnExplosion() {
+        return true;
+    }
 }

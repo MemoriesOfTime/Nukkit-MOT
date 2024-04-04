@@ -197,7 +197,7 @@ public class Explosion {
                         ((InventoryHolder) container).getInventory().clearAll();
                     }
                 }
-            } else if (Math.random() * 100 < yield) {
+            } else if (block.alwaysDropsOnExplosion() || Math.random() * 100 < yield) {
                 for (Item drop : block.getDrops(netheritePickaxe)) {
                     this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
                 }
