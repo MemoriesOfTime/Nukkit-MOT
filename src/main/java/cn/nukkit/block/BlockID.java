@@ -478,6 +478,9 @@ public interface BlockID {
 
     int MOSS_BLOCK = 575;
 
+    int AZALEA_LEAVES = 579;
+    int AZALEA_LEAVES_FLOWERED = 580;
+
     int RAW_IRON_BLOCK = 706;
 
     int RAW_COPPER_BLOCK = 707;
@@ -494,7 +497,14 @@ public interface BlockID {
 
     int BAMBOO_PLANKS = 765;
 
+    int STRIPPED_CHERRY_LOG = 790;
+    int CHERRY_LOG = 791;
     int CHERRY_PLANKS = 792;
+
+    int STRIPPED_CHERRY_WOOD = 800;
+    int CHERRY_WOOD = 801;
+    int CHERRY_SAPLING = 802;
+    int CHERRY_LEAVES = 803;
 
     int DECORATED_POT = 806;
 

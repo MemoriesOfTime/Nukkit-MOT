@@ -18,13 +18,13 @@ public class BlockWood extends BlockSolidMeta {
     public static final int BIRCH = 2;
     public static final int JUNGLE = 3;
 
-    private static final short[] faces = new short[]{
+    public static final short[] faces = new short[]{
+            0, //y
             0,
-            0,
-            0b1000,
+            0b1000, //z
             0b1000,
             0b0100,
-            0b0100
+            0b0100 //x
     };
 
     public BlockWood() {
