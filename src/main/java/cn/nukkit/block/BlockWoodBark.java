@@ -7,6 +7,8 @@ import cn.nukkit.math.BlockFace;
 
 public class BlockWoodBark extends BlockWood {
 
+    public static final int STRIPPED_BIT = 0b1000;
+
     public BlockWoodBark() {
         this(0);
     }
@@ -48,7 +50,7 @@ public class BlockWoodBark extends BlockWood {
     
     @Override
     protected int getStrippedDamage() {
-        return getDamage() | 0x8;
+        return getDamage() | STRIPPED_BIT;
     }
     
     @Override

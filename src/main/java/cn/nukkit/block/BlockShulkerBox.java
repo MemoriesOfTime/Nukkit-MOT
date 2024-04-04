@@ -172,4 +172,9 @@ public class BlockShulkerBox extends BlockTransparentMeta {
     public int getFullId() {
         return (this.getId() << DATA_BITS) + this.getDamage();
     }
+
+    @Override
+    public boolean alwaysDropsOnExplosion() {
+        return true;
+    }
 }

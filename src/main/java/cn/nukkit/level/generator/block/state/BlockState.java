@@ -20,7 +20,7 @@ public class BlockState {
     }
 
     public static BlockState fromFullId(final int fullId) {
-        return new BlockState(fullId >> 4, fullId & 0xf);
+        return new BlockState(fullId >> Block.DATA_BITS, fullId & Block.DATA_MASK);
     }
 
     public static BlockState fromHash(final int hash) {
@@ -36,7 +36,7 @@ public class BlockState {
     }
 
     public int getFullId() {
-        return id << 4 | meta & 0xf;
+        return id << Block.DATA_BITS | meta & Block.DATA_MASK;
     }
 
     public int getRuntimeId() {

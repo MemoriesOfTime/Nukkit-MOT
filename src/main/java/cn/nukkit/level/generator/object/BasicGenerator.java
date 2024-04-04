@@ -18,6 +18,10 @@ public abstract class BasicGenerator {
         setBlock(level, pos, state);
     }
 
+    protected void setBlockAndNotifyAdequately(ChunkManager level, int x, int y, int z, Block state) {
+        level.setBlockAt(x, y, z, state.getId(), state.getDamage());
+    }
+
     protected void setBlock(ChunkManager level, Vector3 v, Block b) {
         level.setBlockAt((int) v.x, (int) v.y, (int) v.z, b.getId(), b.getDamage());
     }

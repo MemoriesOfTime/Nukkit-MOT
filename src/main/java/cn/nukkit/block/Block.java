@@ -41,6 +41,7 @@ import static cn.nukkit.utils.Utils.dynamic;
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
     public static final int MAX_BLOCK_ID = dynamic(810);
     public static final int DATA_BITS = dynamic(6);
+    public static final int ID_MASK = 0xfff; //max 4095
     public static final int DATA_SIZE = dynamic(1 << DATA_BITS);
     public static final int DATA_MASK = dynamic(DATA_SIZE - 1);
 
@@ -338,7 +339,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[HARD_GLASS] = BlockHardGlass.class; //253
             list[HARD_STAINED_GLASS] = BlockHardGlassStained.class; //254
             list[RESERVED6] = BlockReserved6.class; //255
-
+            // 256 not yet in Minecraft
             list[PRISMARINE_STAIRS] = BlockStairsPrismarine.class; //257
             list[DARK_PRISMARINE_STAIRS] = BlockStairsDarkPrismarine.class; //258
             list[PRISMARINE_BRICKS_STAIRS] = BlockStairsPrismarineBrick.class; //259
@@ -360,16 +361,22 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[CORAL_FAN_HANG3] = BlockCoralFanHang3.class; //392
             list[BLOCK_KELP] = BlockKelp.class; //393
             list[DRIED_KELP_BLOCK] = BlockDriedKelpBlock.class; //394
-
+            list[ACACIA_BUTTON] = BlockButtonAcacia.class; //395
             list[ACACIA_TRAPDOOR] = BlockTrapdoorAcacia.class; //400
             list[BIRCH_TRAPDOOR] = BlockTrapdoorBirch.class; //401
             list[DARK_OAK_TRAPDOOR] = BlockTrapdoorDarkOak.class; //402
             list[JUNGLE_TRAPDOOR] = BlockTrapdoorJungle.class; //403
             list[SPRUCE_TRAPDOOR] = BlockTrapdoorSpruce.class; //404
-
+            list[ACACIA_PRESSURE_PLATE] = BlockPressurePlateAcacia.class; //405
+            list[BIRCH_PRESSURE_PLATE] = BlockPressurePlateBirch.class; //406
+            list[DARK_OAK_PRESSURE_PLATE] = BlockPressurePlateDarkOak.class; //407
+            list[JUNGLE_PRESSURE_PLATE] = BlockPressurePlateJungle.class; //408
+            list[SPRUCE_PRESSURE_PLATE] = BlockPressurePlateSpruce.class; //409
             list[CARVED_PUMPKIN] = BlockCarvedPumpkin.class; //410
             list[SEA_PICKLE] = BlockSeaPickle.class; //411
-
+            list[CONDUIT] = BlockConduit.class; //412
+            // 413 not yet in Minecraft
+            list[TURTLE_EGG] = BlockTurtleEgg.class; //414
             list[BUBBLE_COLUMN] = BlockBubbleColumn.class; //415
             list[BARRIER] = BlockBarrier.class; //416
             list[STONE_SLAB3] = BlockSlabStone3.class; //417
@@ -391,14 +398,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[END_BRICK_STAIRS] = BlockStairsEndBrick.class; //433
             list[MOSSY_COBBLESTONE_STAIRS] = BlockStairsMossyCobblestone.class; //434
             list[NORMAL_STONE_STAIRS] = BlockStairsStone.class; //435
-
+            list[SPRUCE_STANDING_SIGN] = BlockSpruceSignPost.class; //436
+            list[SPRUCE_WALL_SIGN] = BlockSpruceWallSign.class; //437
             list[SMOOTH_STONE] = BlockSmoothStone.class; //438
             list[RED_NETHER_BRICK_STAIRS] = BlockStairsRedNetherBrick.class; //439
             list[SMOOTH_QUARTZ_STAIRS] = BlockStairsSmoothQuartz.class; //440
-
-            list[SPRUCE_STANDING_SIGN] = BlockSpruceSignPost.class; //436
-            list[SPRUCE_WALL_SIGN] = BlockSpruceWallSign.class; //437
-
             list[BIRCH_STANDING_SIGN] = BlockBirchSignPost.class; //441
             list[BIRCH_WALL_SIGN] = BlockBirchWallSign.class; //442
             list[JUNGLE_STANDING_SIGN] = BlockJungleSignPost.class; //443
@@ -484,11 +488,18 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[VERDANT_FROGLIGHT] = BlockFrogLightVerdant.class; //725
             list[OCHRE_FROGLIGHT] = BlockFrogLightOchre.class; //726
 
-            list[MANGROVE_PLANKS] = BlockPlanksMangrove.class;// 741
+            list[MANGROVE_PLANKS] = BlockPlanksMangrove.class; //741
 
-            list[BAMBOO_PLANKS] = BlockPlanksBamboo.class;// 765
+            list[BAMBOO_PLANKS] = BlockPlanksBamboo.class; //765
 
-            list[CHERRY_PLANKS] = BlockPlanksCherry.class;// 792
+            list[STRIPPED_CHERRY_LOG] = BlockLogStrippedCherry.class; //790
+            list[CHERRY_LOG] = BlockCherryLog.class; //791
+            list[CHERRY_PLANKS] = BlockPlanksCherry.class; //792
+
+            list[STRIPPED_CHERRY_WOOD] = BlockWoodStrippedCherry.class;//800
+            list[CHERRY_WOOD] = BlockWoodCherry.class; //801
+            list[CHERRY_SAPLING] = BlockCherrySapling.class; //802
+            list[CHERRY_LEAVES] = BlockCherryLeaves.class; //803
 
             list[DECORATED_POT] = BlockDecoratedPot.class; //806
 
@@ -1513,6 +1524,37 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public boolean isWaterSource() {
+        return false;
+    }
+
+    protected static boolean canStayOnFullSolid(Block down) {
+        if (down.isTransparent()) {
+            switch (down.getId()) {
+                case BEACON:
+                case ICE:
+                case GLASS:
+                case STAINED_GLASS:
+                case HARD_GLASS:
+                case HARD_STAINED_GLASS:
+                case SCAFFOLDING:
+                case BARRIER:
+                case GLOWSTONE:
+                case SEA_LANTERN:
+                case HOPPER_BLOCK:
+                    return true;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 被爆炸破坏时必定掉落<br>
+     * Drop when destroyed by explosion
+     *
+     * @return 是否必定掉落<br>Whether to drop
+     */
+    public boolean alwaysDropsOnExplosion() {
         return false;
     }
 
