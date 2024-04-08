@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemRawIron;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -73,7 +74,7 @@ public class BlockOreIron extends BlockSolid {
                     count = i + 1;
                 }
 
-                Item rawIron = Item.fromString("minecraft:raw_iron");
+                Item rawIron = new ItemRawIron();
                 rawIron.setCount(count);
                 return new Item[]{
                         rawIron

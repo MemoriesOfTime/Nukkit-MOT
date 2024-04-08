@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemRawGold;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -73,7 +74,7 @@ public class BlockOreGold extends BlockSolid {
                     count = i + 1;
                 }
 
-                Item rawGold = Item.fromString("minecraft:raw_gold");
+                Item rawGold = new ItemRawGold();
                 rawGold.setCount(count);
                 return new Item[]{
                         rawGold
