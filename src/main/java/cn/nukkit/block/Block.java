@@ -428,9 +428,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[WOOD_BARK] = BlockWoodBark.class; //467
             list[COMPOSTER] = BlockComposter.class; //468
             list[LIT_BLAST_FURNACE] = BlockBlastFurnaceLit.class; //469
-
+            list[LIGHT_BLOCK] = BlockLightBlock.class; //470
+            list[WITHER_ROSE] = BlockWitherRose.class; //471
             list[PISTON_HEAD_STICKY] = BlockPistonHeadSticky.class; //472
-
             list[BEE_NEST] = BlockBeeNest.class; //473
             list[BEEHIVE] = BlockBeehive.class; //474
 

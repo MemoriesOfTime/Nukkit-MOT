@@ -421,7 +421,8 @@ public interface BlockID {
     int WOOD_BARK = 467;
     int COMPOSTER = 468;
     int LIT_BLAST_FURNACE = 469;
-
+    int LIGHT_BLOCK = 470;
+    int WITHER_ROSE = 471;
     int PISTON_HEAD_STICKY = 472;
     int BEE_NEST = 473;
     int BEEHIVE = 474;
