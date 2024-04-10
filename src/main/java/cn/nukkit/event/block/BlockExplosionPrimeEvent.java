@@ -10,7 +10,10 @@ import javax.annotation.Nullable;
 /**
  * @author joserobjr
  * @since 2020-10-06
+ *
+ * @deprecated use {@link BlockExplodeEvent}
  */
+@Deprecated
 public class BlockExplosionPrimeEvent extends BlockEvent implements Cancellable {
 
     private static final HandlerList handlers = new HandlerList();

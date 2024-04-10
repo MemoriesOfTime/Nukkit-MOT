@@ -8,6 +8,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
+import cn.nukkit.event.block.BlockExplodeEvent;
 import cn.nukkit.event.block.BlockUpdateEvent;
 import cn.nukkit.event.entity.EntityDamageByBlockEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
@@ -133,7 +134,16 @@ public class Explosion {
 
         if (this.what instanceof Entity) {
             EntityExplodeEvent ev = new EntityExplodeEvent((Entity) this.what, this.source, this.affectedBlocks, yield);
-            this.level.getServer().getPluginManager().callEvent(ev);
+            ev.call();
+            if (ev.isCancelled()) {
+                return false;
+            } else {
+                yield = ev.getYield();
+                this.affectedBlocks = ev.getBlockList();
+            }
+        } else if (this.what instanceof Block) {
+            BlockExplodeEvent ev = new BlockExplodeEvent((Block) this.what, this.source, this.affectedBlocks, yield);
+            ev.call();
             if (ev.isCancelled()) {
                 return false;
             } else {
