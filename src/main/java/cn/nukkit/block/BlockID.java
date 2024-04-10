@@ -425,7 +425,8 @@ public interface BlockID {
     int WOOD_BARK = 467;
     int COMPOSTER = 468;
     int LIT_BLAST_FURNACE = 469;
-
+    int LIGHT_BLOCK = 470;
+    int WITHER_ROSE = 471;
     int PISTON_HEAD_STICKY = 472;
     int BEE_NEST = 473;
     int BEEHIVE = 474;
@@ -482,6 +483,9 @@ public interface BlockID {
 
     int MOSS_BLOCK = 575;
 
+    int AZALEA_LEAVES = 579;
+    int AZALEA_LEAVES_FLOWERED = 580;
+
     int RAW_IRON_BLOCK = 706;
 
     int RAW_COPPER_BLOCK = 707;
@@ -498,7 +502,14 @@ public interface BlockID {
 
     int BAMBOO_PLANKS = 765;
 
+    int STRIPPED_CHERRY_LOG = 790;
+    int CHERRY_LOG = 791;
     int CHERRY_PLANKS = 792;
+
+    int STRIPPED_CHERRY_WOOD = 800;
+    int CHERRY_WOOD = 801;
+    int CHERRY_SAPLING = 802;
+    int CHERRY_LEAVES = 803;
 
     int DECORATED_POT = 806;
 

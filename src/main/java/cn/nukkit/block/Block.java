@@ -41,6 +41,7 @@ import static cn.nukkit.utils.Utils.dynamic;
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
     public static final int MAX_BLOCK_ID = dynamic(810);
     public static final int DATA_BITS = dynamic(6);
+    public static final int ID_MASK = 0xfff; //max 4095
     public static final int DATA_SIZE = dynamic(1 << DATA_BITS);
     public static final int DATA_MASK = dynamic(DATA_SIZE - 1);
 
@@ -431,9 +432,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[WOOD_BARK] = BlockWoodBark.class; //467
             list[COMPOSTER] = BlockComposter.class; //468
             list[LIT_BLAST_FURNACE] = BlockBlastFurnaceLit.class; //469
-
+            list[LIGHT_BLOCK] = BlockLightBlock.class; //470
+            list[WITHER_ROSE] = BlockWitherRose.class; //471
             list[PISTON_HEAD_STICKY] = BlockPistonHeadSticky.class; //472
-
             list[BEE_NEST] = BlockBeeNest.class; //473
             list[BEEHIVE] = BlockBeehive.class; //474
 
@@ -491,11 +492,18 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[VERDANT_FROGLIGHT] = BlockFrogLightVerdant.class; //725
             list[OCHRE_FROGLIGHT] = BlockFrogLightOchre.class; //726
 
-            list[MANGROVE_PLANKS] = BlockPlanksMangrove.class;// 741
+            list[MANGROVE_PLANKS] = BlockPlanksMangrove.class; //741
 
-            list[BAMBOO_PLANKS] = BlockPlanksBamboo.class;// 765
+            list[BAMBOO_PLANKS] = BlockPlanksBamboo.class; //765
 
-            list[CHERRY_PLANKS] = BlockPlanksCherry.class;// 792
+            list[STRIPPED_CHERRY_LOG] = BlockLogStrippedCherry.class; //790
+            list[CHERRY_LOG] = BlockCherryLog.class; //791
+            list[CHERRY_PLANKS] = BlockPlanksCherry.class; //792
+
+            list[STRIPPED_CHERRY_WOOD] = BlockWoodStrippedCherry.class;//800
+            list[CHERRY_WOOD] = BlockWoodCherry.class; //801
+            list[CHERRY_SAPLING] = BlockCherrySapling.class; //802
+            list[CHERRY_LEAVES] = BlockCherryLeaves.class; //803
 
             list[DECORATED_POT] = BlockDecoratedPot.class; //806
 
