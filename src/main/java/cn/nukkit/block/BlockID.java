@@ -352,6 +352,10 @@ public interface BlockID {
     int BLOCK_KELP = 393;
     int DRIED_KELP_BLOCK = 394;
     int ACACIA_BUTTON = 395;
+    int BIRCH_BUTTON = 396;
+    int DARK_OAK_BUTTON = 397;
+    int JUNGLE_BUTTON = 398;
+    int SPRUCE_BUTTON = 399;
     int ACACIA_TRAPDOOR = 400;
     int BIRCH_TRAPDOOR = 401;
     int DARK_OAK_TRAPDOOR = 402;
@@ -467,7 +471,7 @@ public interface BlockID {
     int ANCIENT_DEBRIS = 526;
     int RESPAWN_ANCHOR = 527;
     int BLACKSTONE = 528;
-
+    int TWISTING_VINES = 542;
     int NETHER_GOLD_ORE = 543;
     int CRYING_OBSIDIAN = 544;
     int SOUL_CAMPFIRE_BLOCK = 545;
