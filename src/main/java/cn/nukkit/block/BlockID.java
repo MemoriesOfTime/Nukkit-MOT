@@ -482,6 +482,8 @@ public interface BlockID {
     int AZALEA_LEAVES = 579;
     int AZALEA_LEAVES_FLOWERED = 580;
 
+    int AMETHYST_BLOCK = 582;
+
     int RAW_IRON_BLOCK = 706;
 
     int RAW_COPPER_BLOCK = 707;
