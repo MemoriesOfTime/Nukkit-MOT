@@ -10,7 +10,7 @@ public class BlockAmethyst extends BlockSolid {
 
     @Override
     public String getName() {
-        return "Amethyst Block";
+        return "Block of Amethyst";
     }
 
     @Override
