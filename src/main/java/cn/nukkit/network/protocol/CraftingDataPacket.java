@@ -154,6 +154,9 @@ public class CraftingDataPacket extends DataPacket {
                             this.putString(CRAFTING_TAG_CRAFTING_TABLE);
                             if (protocol >= 361) {
                                 this.putVarInt(shaped.getPriority());
+                                if (this.protocol >= ProtocolInfo.v1_20_80) {
+                                    this.putBoolean(shaped.isAssumeSymetry());
+                                }
                                 if (protocol >= 407) {
                                     this.putUnsignedVarInt(shaped.getNetworkId());
                                 }

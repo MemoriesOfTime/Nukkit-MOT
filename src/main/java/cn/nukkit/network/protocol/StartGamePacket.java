@@ -126,6 +126,10 @@ public class StartGamePacket extends DataPacket {
      * @since v588
      */
     public NetworkPermissions networkPermissions = NetworkPermissions.DEFAULT;
+    /**
+     * @since v671
+     */
+    public boolean hardcore;
 
     @Override
     public void decode() {
@@ -154,6 +158,9 @@ public class StartGamePacket extends DataPacket {
         this.putVarInt(this.dimension);
         this.putVarInt(this.generator);
         this.putVarInt(this.worldGamemode);
+        if (this.protocol >= ProtocolInfo.v1_20_80) {
+            this.putBoolean(this.hardcore);
+        }
         this.putVarInt(this.difficulty);
         this.putBlockVector3(this.spawnX, this.spawnY, this.spawnZ);
         this.putBoolean(this.hasAchievementsDisabled);

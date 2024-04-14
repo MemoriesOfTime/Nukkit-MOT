@@ -26,6 +26,11 @@ public class ShapedRecipe implements CraftingRecipe {
 
     private final int networkId;
 
+    /**
+     * @since v671
+     */
+    private final boolean assumeSymetry = false;//TODO
+
     public ShapedRecipe(Item primaryResult, String[] shape, Map<Character, Item> ingredients, List<Item> extraResults) {
         this(null, 1, primaryResult, shape, ingredients, extraResults);
     }
@@ -306,6 +311,10 @@ public class ShapedRecipe implements CraftingRecipe {
 
     public int getNetworkId() {
         return this.networkId;
+    }
+
+    public boolean isAssumeSymetry() {
+        return this.assumeSymetry;
     }
 
     public static class Entry {

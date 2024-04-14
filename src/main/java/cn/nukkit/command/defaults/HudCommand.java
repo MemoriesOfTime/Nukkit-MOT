@@ -51,6 +51,8 @@ public class HudCommand extends VanillaCommand {
             case "progress_bar" -> HudElement.PROGRESS_BAR;
             case "touch_controls" -> HudElement.TOUCH_CONTROLS;
             case "vehicle_health" -> HudElement.VEHICLE_HEALTH;
+            case "effects_bar" -> HudElement.EFFECTS_BAR;
+            case "item_text_popup" -> HudElement.ITEM_TEXT_POPUP;
 
             default -> null;
         };
