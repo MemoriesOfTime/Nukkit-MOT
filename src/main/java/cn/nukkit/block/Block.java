@@ -474,6 +474,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[RESPAWN_ANCHOR] = BlockRespawnAnchor.class; //527
             list[BLACKSTONE] = BlockBlackstone.class; //528
 
+            list[CHAIN_BLOCK] = BlockChain.class; //541
+
             list[NETHER_GOLD_ORE] = BlockOreGoldNether.class; //543
             list[CRYING_OBSIDIAN] = BlockCryingObsidian.class; //544
             list[SOUL_CAMPFIRE_BLOCK] = BlockCampfireSoul.class; //545
