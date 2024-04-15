@@ -12,10 +12,12 @@ public class BlockSuspiciousSand extends BlockFallableMeta {
         super(meta);
     }
 
+    @Override
     public int getId() {
         return Block.SUSPICIOUS_SAND;
     }
 
+    @Override
     public String getName() {
         return "Suspicious Sand";
     }
