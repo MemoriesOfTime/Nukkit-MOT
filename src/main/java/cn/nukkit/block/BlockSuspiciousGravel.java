@@ -2,7 +2,15 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 
-public class BlockSuspiciousGravel extends BlockFallable {
+public class BlockSuspiciousGravel extends BlockFallableMeta {
+
+    public BlockSuspiciousGravel() {
+        this(0);
+    }
+
+    protected BlockSuspiciousGravel(int meta) {
+        super(meta);
+    }
 
     public int getId() {
         return Block.SUSPICIOUS_GRAVEL;
