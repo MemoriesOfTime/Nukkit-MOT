@@ -469,6 +469,8 @@ public interface BlockID {
     int RESPAWN_ANCHOR = 527;
     int BLACKSTONE = 528;
 
+    int CHAIN_BLOCK = 541;
+
     int NETHER_GOLD_ORE = 543;
     int CRYING_OBSIDIAN = 544;
     int SOUL_CAMPFIRE_BLOCK = 545;
