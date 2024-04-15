@@ -500,6 +500,8 @@ public interface BlockID {
 
     int BAMBOO_PLANKS = 765;
 
+    int SUSPICIOUS_SAND = 784;
+
     int STRIPPED_CHERRY_LOG = 790;
     int CHERRY_LOG = 791;
     int CHERRY_PLANKS = 792;
@@ -510,6 +512,8 @@ public interface BlockID {
     int CHERRY_LEAVES = 803;
 
     int DECORATED_POT = 806;
+
+    int SUSPICIOUS_GRAVEL = 828;
 
     int DARK_OAK_PLANKS = 998;
     int ACACIA_PLANKS = 997;
