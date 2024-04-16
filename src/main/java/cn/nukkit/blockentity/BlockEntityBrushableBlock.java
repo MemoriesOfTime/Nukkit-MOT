@@ -75,7 +75,7 @@ public class BlockEntityBrushableBlock extends BlockEntitySpawnable implements B
 
     @Override
     public String getName() {
-        return this.hasName() ? this.namedTag.getString("CustomName") : "Enchanting Table";
+        return this.hasName() ? this.namedTag.getString("CustomName") : "Brushable Block";
     }
 
     @Override
