@@ -10,18 +10,16 @@ import org.jetbrains.annotations.Nullable;
  * @author lt_name
  */
 public abstract class ItemCustomTool extends StringItemToolBase implements ItemDurable, CustomItem {
-    private final String id;
+
     private final String textureName;
 
     public ItemCustomTool(@NotNull String id, @Nullable String name) {
         super(id, StringItem.notEmpty(name));
-        this.id = id;
         this.textureName = name;
     }
 
     public ItemCustomTool(@NotNull String id, @Nullable String name, @NotNull String textureName) {
         super(id, StringItem.notEmpty(name));
-        this.id = id;
         this.textureName = textureName;
     }
 
@@ -33,16 +31,6 @@ public abstract class ItemCustomTool extends StringItemToolBase implements ItemD
     @Override
     public String getTextureName() {
         return textureName;
-    }
-
-    @Override
-    public String getNamespaceId() {
-        return id;
-    }
-
-    @Override
-    public String getNamespaceId(int protocolId) {
-        return this.getNamespaceId();
     }
 
     @Nullable

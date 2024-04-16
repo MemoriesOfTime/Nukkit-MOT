@@ -21,31 +21,6 @@ public class StringItemToolBase extends ItemTool implements ItemDurable, StringI
     }
 
     @Override
-    public boolean isTool() {
-        return true;
-    }
-
-    /**
-     * No damage to item when it's used to attack entities
-     *
-     * @return whether the item should take damage when used to attack entities
-     */
-    @Override
-    public boolean noDamageOnAttack() {
-        return true;
-    }
-
-    /**
-     * No damage to item when it's used to break blocks
-     *
-     * @return whether the item should take damage when used to break blocks
-     */
-    @Override
-    public boolean noDamageOnBreak() {
-        return true;
-    }
-
-    @Override
     public String getNamespaceId() {
         return this.id;
     }
