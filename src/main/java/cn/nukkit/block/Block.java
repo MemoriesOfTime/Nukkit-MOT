@@ -1575,4 +1575,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static boolean usesFakeWater(int id) {
         return usesFakeWater[id];
     }
+
+    public boolean isSuspiciousBlock() {
+        return false;
+    }
 }
