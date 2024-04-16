@@ -11,7 +11,13 @@ import java.util.Random;
 /**
  * @author glorydark
  */
-public class BlockEntitySuspiciousBlock extends BlockEntitySpawnable implements BlockEntityNameable {
+public class BlockEntityBrushableBlock extends BlockEntitySpawnable implements BlockEntityNameable {
+
+    private static final int BRUSH_COOLDOWN_TICKS = 10;
+
+    private static final int BRUSH_RESET_TICKS = 40;
+
+    private static final int REQUIRED_BRUSHES_TO_BREAK = 10;
 
     private Item item;
 
@@ -19,9 +25,13 @@ public class BlockEntitySuspiciousBlock extends BlockEntitySpawnable implements 
 
     private int brushCount;
 
+    private long brushCountResetsAtTick;
+
+    private long coolDownEndsAtTick;
+
     private boolean rare = false;
 
-    public BlockEntitySuspiciousBlock(FullChunk chunk, CompoundTag nbt) {
+    public BlockEntityBrushableBlock(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
     }
 
@@ -106,6 +116,16 @@ public class BlockEntitySuspiciousBlock extends BlockEntitySpawnable implements 
             return "loot_tables/entities/trail_ruins_brushable_block_rare.json";
         } else {
             return "loot_tables/entities/trail_ruins_brushable_block_common.json";
+        }
+    }
+
+    private int getCompletionState() {
+        if (this.brushCount == 0) {
+            return 0;
+        } else if (this.brushCount < 3) {
+            return 1;
+        } else {
+            return this.brushCount < 6 ? 2 : 3;
         }
     }
 }
