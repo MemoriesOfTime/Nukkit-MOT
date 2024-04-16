@@ -51,7 +51,6 @@ public abstract class BlockEntity extends Position {
     public static final String BELL = "Bell";
     public static final String END_GATEWAY = "EndGateway";
     public static final String DECORATED_POT = "DecoratedPot";
-
     public static final String BRUSHABLE_BLOCK = "BrushableBlock";
 
     public static long count = 1;

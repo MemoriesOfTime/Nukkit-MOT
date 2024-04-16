@@ -61,7 +61,12 @@ public class StringItemToolBase extends ItemTool implements ItemDurable, StringI
     }
 
     @Override
-    public StringItemBase clone() {
-        return (StringItemBase) super.clone();
+    public StringItemToolBase clone() {
+        return (StringItemToolBase) super.clone();
+    }
+
+    @Override
+    public boolean isSupportedOn(int protocolId) {
+        return protocolId >= ProtocolInfo.v1_16_100;
     }
 }

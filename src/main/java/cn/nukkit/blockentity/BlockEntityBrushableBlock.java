@@ -5,8 +5,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
-
-import java.util.Random;
+import cn.nukkit.utils.Utils;
 
 /**
  * @author glorydark
@@ -100,13 +99,13 @@ public class BlockEntityBrushableBlock extends BlockEntitySpawnable implements B
     @Override
     public CompoundTag getSpawnCompound() {
         return new CompoundTag()
-                .putString("id", BlockEntity.DECORATED_POT)
+                .putString("id", BlockEntity.BRUSHABLE_BLOCK)
                 .putInt("x", (int) this.x)
                 .putInt("y", (int) this.y)
                 .putInt("z", (int) this.z)
                 .putCompound("item", NBTIO.putItemHelper(this.item))
                 .putList("type", namedTag.getList(getBlock().toItem().getNamespaceId()))
-                .putInt("LootTableSeed", new Random().nextInt())
+                .putInt("LootTableSeed", Utils.random.nextInt())
                 .putString("LootTable", getLootTablePath());
     }
 
