@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntityItemFrame;
 import cn.nukkit.event.Cancellable;
 import cn.nukkit.item.Item;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Event for Item Frame drops.
@@ -24,14 +25,18 @@ public class ItemFrameDropItemEvent extends ItemFrameUseEvent implements Cancell
         super(player, block, itemFrame, item, Action.DROP);
     }
 
+    @Override
     public Player getPlayer() {
         return player;
     }
 
+    @Override
+    @NotNull
     public BlockEntityItemFrame getItemFrame() {
         return itemFrame;
     }
 
+    @Override
     public Item getItem() {
         return item;
     }

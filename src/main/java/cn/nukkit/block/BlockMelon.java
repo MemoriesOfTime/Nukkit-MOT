@@ -19,10 +19,12 @@ public class BlockMelon extends BlockSolid {
         return MELON_BLOCK;
     }
 
+    @Override
     public String getName() {
         return "Melon Block";
     }
 
+    @Override
     public double getHardness() {
         return 1;
     }

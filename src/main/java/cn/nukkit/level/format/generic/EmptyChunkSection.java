@@ -209,6 +209,7 @@ public class EmptyChunkSection implements ChunkSection {
         return true;
     }
 
+    @Override
     public boolean hasLayer(int layer) {
         return false;
     }

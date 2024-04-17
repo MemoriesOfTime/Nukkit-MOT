@@ -191,6 +191,7 @@ public interface Node extends Comparable<Node> {
      * @param n the Node to compare to
      * @return typical Comparator semantics
      */
+    @Override
     default int compareTo(Node n) {
         if (this == n) return 0;
         int diff = this.getBeginLine() - n.getBeginLine();
@@ -658,20 +659,24 @@ public interface Node extends Comparable<Node> {
             private int current = -1;
             private boolean justModified;
 
+            @Override
             public boolean hasNext() {
                 return current + 1 < getChildCount();
             }
 
+            @Override
             public Node next() {
                 justModified = false;
                 return getChild(++current);
             }
 
+            @Override
             public Node previous() {
                 justModified = false;
                 return getChild(--current);
             }
 
+            @Override
             public void remove() {
                 if (justModified) throw new IllegalStateException();
                 removeChild(current);
@@ -679,24 +684,29 @@ public interface Node extends Comparable<Node> {
                 justModified = true;
             }
 
+            @Override
             public void add(Node n) {
                 if (justModified) throw new IllegalStateException();
                 addChild(current + 1, n);
                 justModified = true;
             }
 
+            @Override
             public boolean hasPrevious() {
                 return current > 0;
             }
 
+            @Override
             public int nextIndex() {
                 return current + 1;
             }
 
+            @Override
             public int previousIndex() {
                 return current;
             }
 
+            @Override
             public void set(Node n) {
                 setChild(current, n);
             }

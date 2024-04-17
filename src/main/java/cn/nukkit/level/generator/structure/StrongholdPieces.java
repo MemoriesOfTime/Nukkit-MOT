@@ -1296,7 +1296,8 @@ public final class StrongholdPieces {
 
 	static class SmoothStoneSelector extends StructurePiece.BlockSelector {
 
-		public void next(final NukkitRandom random, final int x, final int y, final int z, final boolean hasNext) {
+		@Override
+        public void next(final NukkitRandom random, final int x, final int y, final int z, final boolean hasNext) {
 			if (hasNext) {
 				final int chance = random.nextBoundedInt(100);
 				if (chance < 20) {
