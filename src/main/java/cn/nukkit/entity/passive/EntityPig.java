@@ -119,10 +119,12 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
         return drops.toArray(Item.EMPTY_ARRAY);
     }
 
+    @Override
     public int getKillExperience() {
         return this.isBaby() ? 0 : Utils.rand(1, 3);
     }
 
+    @Override
     public boolean mountEntity(Entity entity, byte mode) {
         Objects.requireNonNull(entity, "The target of the mounting entity can't be null");
 

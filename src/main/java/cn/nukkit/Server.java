@@ -3276,6 +3276,7 @@ public class Server {
             return new AccessControlContext(new ProtectionDomain[]{new ProtectionDomain(null, permissions)});
         }
 
+        @Override
         @SuppressWarnings("removal")
         public ForkJoinWorkerThread newThread(final ForkJoinPool pool) {
             return AccessController.doPrivileged((PrivilegedAction<ForkJoinWorkerThread>) () -> new ComputeThread(pool, threadCount), ACC);

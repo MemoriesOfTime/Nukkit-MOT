@@ -197,6 +197,7 @@ public final class MineshaftPieces {
             return true;
         }
 
+        @Override
         public void move(final int x, final int y, final int z) {
             super.move(x, y, z);
             for (final BoundingBox childEntranceBox : childEntranceBoxes) {

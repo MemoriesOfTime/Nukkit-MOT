@@ -236,6 +236,7 @@ public class EntityBoat extends EntityVehicle {
         return hasUpdate || !this.onGround || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001;
     }
 
+    @Override
     public void updatePassengers() {
         updatePassengers(false);
     }

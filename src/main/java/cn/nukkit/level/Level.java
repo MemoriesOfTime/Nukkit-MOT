@@ -3030,6 +3030,7 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    @Override
     public void setBlockAt(int x, int y, int z, int id, int data) {
         this.setBlockAtLayer(x, y, z, 0, id, data);
     }

@@ -48,6 +48,7 @@ public class StrongExplosion extends Explosion {
         this.what = what;
     }
 
+    @Override
     public boolean explodeA() {
         if (what instanceof EntityExplosive && ((Entity) what).isInsideOfWater()) {
             this.doesDamage = false;
@@ -106,6 +107,7 @@ public class StrongExplosion extends Explosion {
         return true;
     }
 
+    @Override
     public boolean explodeB() {
         LongArraySet updateBlocks = new LongArraySet();
         double yield = (1d / this.size) * 100d;

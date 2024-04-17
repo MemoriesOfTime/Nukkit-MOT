@@ -196,10 +196,12 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
         return BlockColor.WOOD_BLOCK_COLOR;
     }
 
+    @Override
     public boolean hasComparatorInputOverride() {
         return true;
     }
 
+    @Override
     public int getComparatorInputOverride() {
         BlockEntity blockEntity = this.level.getBlockEntity(this);
 

@@ -95,6 +95,7 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
         return BlockFace.fromIndex(this.getDamage() & FACE_BIT);
     }
 
+    @Override
     public void setBlockFace(BlockFace face) {
         this.setDamage(face.getIndex() & FACE_BIT | this.getDamage() & POWERED_BIT);
     }

@@ -54,6 +54,7 @@ public class EntityOcelot extends EntityTameableAnimal {
         return id == Item.RAW_FISH || id == Item.RAW_SALMON;
     }
 
+    @Override
     public int getKillExperience() {
         return this.isBaby() ? 0 : Utils.rand(1, 3);
     }

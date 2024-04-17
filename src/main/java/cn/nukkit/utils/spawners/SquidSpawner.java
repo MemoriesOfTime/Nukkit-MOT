@@ -16,6 +16,7 @@ public class SquidSpawner extends AbstractEntitySpawner {
         super(spawnTask);
     }
 
+    @Override
     public void spawn(Player player, Position pos, Level level) {
         if (Utils.rand(1, 3) != 1) {
             return;

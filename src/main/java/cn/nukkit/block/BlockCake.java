@@ -133,10 +133,12 @@ public class BlockCake extends BlockTransparentMeta {
         return BlockColor.AIR_BLOCK_COLOR;
     }
 
+    @Override
     public int getComparatorInputOverride() {
         return (7 - this.getDamage()) << 1;
     }
 
+    @Override
     public boolean hasComparatorInputOverride() {
         return true;
     }

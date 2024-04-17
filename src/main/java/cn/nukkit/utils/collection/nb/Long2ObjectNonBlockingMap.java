@@ -249,6 +249,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      *
      * @return the number of key-value mappings in this map
      */
+    @Override
     public int size() {
         return (_val_1 == TOMBSTONE ? 0 : 1) + _chm.size();
     }
@@ -369,6 +370,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
     /**
      * Removes all of the mappings from this map.
      */
+    @Override
     public void clear() {         // Smack a new empty table down
         CHM newchm = new CHM(this, new ConcurrentAutoLongTable(), MIN_SIZE_LOG);
         while (!CAS(_chm_handler, _chm, newchm)) { /*Spin until the clear works*/}
@@ -390,6 +392,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * @return <tt>true</tt> if this Map maps one or more keys to the specified value
      * @throws NullPointerException if the specified value is null
      */
+    @Override
     public boolean containsValue(Object val) {
         if (val == null) return false;
         if (val == _val_1) return true; // Key 0
@@ -427,6 +430,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
     /**
      * Auto-boxing version of {@link #get(long)}.
      */
+    @Override
     public TypeV get(Object key) {
         return (key instanceof Long) ? get(((Long) key).longValue()) : null;
     }
@@ -434,6 +438,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
     /**
      * Auto-boxing version of {@link #remove(long)}.
      */
+    @Override
     public TypeV remove(Object key) {
         return (key instanceof Long) ? remove(((Long) key).longValue()) : null;
     }
@@ -441,6 +446,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
     /**
      * Auto-boxing version of {@link #remove(long, Object)}.
      */
+    @Override
     public boolean remove(Object key, Object Val) {
         return (key instanceof Long) && remove(((Long) key).longValue(), Val);
     }
@@ -448,6 +454,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
     /**
      * Auto-boxing version of {@link #containsKey(long)}.
      */
+    @Override
     public boolean containsKey(Object key) {
         return (key instanceof Long) && containsKey(((Long) key).longValue());
     }
@@ -455,6 +462,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
     /**
      * Auto-boxing version of {@link #putIfAbsent}.
      */
+    @Override
     public TypeV putIfAbsent(Long key, TypeV val) {
         return putIfAbsent(key.longValue(), val);
     }
@@ -462,6 +470,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
     /**
      * Auto-boxing version of {@link #replace}.
      */
+    @Override
     public TypeV replace(Long key, TypeV Val) {
         return replace(key.longValue(), Val);
     }
@@ -469,6 +478,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
     /**
      * Auto-boxing version of {@link #put}.
      */
+    @Override
     public TypeV put(Long key, TypeV val) {
         return put(key.longValue(), val);
     }
@@ -476,6 +486,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
     /**
      * Auto-boxing version of {@link #replace}.
      */
+    @Override
     public boolean replace(Long key, TypeV oldValue, TypeV newValue) {
         return replace(key.longValue(), oldValue, newValue);
     }
@@ -1130,10 +1141,12 @@ public class Long2ObjectNonBlockingMap<TypeV>
         private long _nextK, _prevK; // Last 2 keys found
         private TypeV _nextV, _prevV; // Last 2 values found
 
+        @Override
         public boolean hasNext() {
             return _nextV != null;
         }
 
+        @Override
         public TypeV next() {
             // 'next' actually knows what the next value will be - it had to
             // figure that out last go 'round lest 'hasNext' report true and
@@ -1174,10 +1187,12 @@ public class Long2ObjectNonBlockingMap<TypeV>
             removeKey();
         }
 
+        @Override
         public TypeV nextElement() {
             return next();
         }
 
+        @Override
         public boolean hasMoreElements() {
             return hasNext();
         }
@@ -1210,20 +1225,25 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * and may (but is not guaranteed to) reflect any modifications subsequent
      * to construction.
      */
+    @Override
     public Collection<TypeV> values() {
         return new AbstractCollection<>() {
+            @Override
             public void clear() {
                 Long2ObjectNonBlockingMap.this.clear();
             }
 
+            @Override
             public int size() {
                 return Long2ObjectNonBlockingMap.this.size();
             }
 
+            @Override
             public boolean contains(Object v) {
                 return Long2ObjectNonBlockingMap.this.containsValue(v);
             }
 
+            @Override
             public Iterator<TypeV> iterator() {
                 return new SnapshotV();
             }
@@ -1250,6 +1270,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
         /**
          * Remove last key returned by {@link #next} or {@link #nextLong}.
          */
+        @Override
         public void remove() {
             _ss.removeKey();
         }
@@ -1257,6 +1278,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
         /**
          * <strong>Auto-box</strong> and return the next key.
          */
+        @Override
         public Long next() {
             _ss.next();
             return _ss._prevK;
@@ -1265,6 +1287,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
         /**
          * Return the next key as a primitive {@code long}.
          */
+        @Override
         public long nextLong() {
             _ss.next();
             return _ss._prevK;
@@ -1273,6 +1296,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
         /**
          * True if there are more keys to iterate over.
          */
+        @Override
         public boolean hasNext() {
             return _ss.hasNext();
         }
@@ -1280,6 +1304,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
         /**
          * <strong>Auto-box</strong> and return the next key.
          */
+        @Override
         public Long nextElement() {
             return next();
         }
@@ -1287,6 +1312,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
         /**
          * True if there are more keys to iterate over.
          */
+        @Override
         public boolean hasMoreElements() {
             return hasNext();
         }
@@ -1323,24 +1349,30 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * and may (but is not guaranteed to) reflect any modifications subsequent
      * to construction.
      */
+    @Override
     public LongSet keySet() {
         return new AbstractLongSet() {
+            @Override
             public LongIterator iterator() {
                 return new IteratorLong();
             }
 
+            @Override
             public void clear() {
                 Long2ObjectNonBlockingMap.this.clear();
             }
 
+            @Override
             public int size() {
                 return Long2ObjectNonBlockingMap.this.size();
             }
 
+            @Override
             public boolean contains(long k) {
                 return Long2ObjectNonBlockingMap.this.containsKey(k);
             }
 
+            @Override
             public boolean remove(long k) {
                 return Long2ObjectNonBlockingMap.this.remove(k) != null;
             }
@@ -1376,6 +1408,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
             return v;
         }
 
+        @Override
         public TypeV setValue(final TypeV val) {
             if (val == null) throw new NullPointerException();
             v = val;
@@ -1395,6 +1428,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
             _ss = new SnapshotV();
         }
 
+        @Override
         public void remove() {
             // NOTE: it would seem logical that entry removal will semantically mean
             // removing the matching pair <k,v>, but the JDK always removes by key,
@@ -1402,11 +1436,13 @@ public class Long2ObjectNonBlockingMap<TypeV>
             _ss.removeKey();
         }
 
+        @Override
         public LongObjectEntry<TypeV> next() {
             _ss.next();
             return new NBHMLEntry(_ss._prevK, _ss._prevV);
         }
 
+        @Override
         public boolean hasNext() {
             return _ss.hasNext();
         }
@@ -1419,6 +1455,7 @@ public class Long2ObjectNonBlockingMap<TypeV>
             _ss = new SnapshotV();
         }
 
+        @Override
         public void remove() {
             // NOTE: it would seem logical that entry removal will semantically mean
             // removing the matching pair <k,v>, but the JDK always removes by key,
@@ -1426,11 +1463,13 @@ public class Long2ObjectNonBlockingMap<TypeV>
             _ss.removeKey();
         }
 
+        @Override
         public Entry<Long, TypeV> next() {
             _ss.next();
             return new NBHMLEntry(_ss._prevK, _ss._prevV);
         }
 
+        @Override
         public boolean hasNext() {
             return _ss.hasNext();
         }
@@ -1459,27 +1498,33 @@ public class Long2ObjectNonBlockingMap<TypeV>
      * {@link Map#keySet} or {@link Map#values} will be more efficient.  In addition,
      * this version requires <strong>auto-boxing</strong> the keys.
      */
+    @Override
     public Set<Entry<Long, TypeV>> entrySet() {
         return new AbstractSet<>() {
+            @Override
             public void clear() {
                 Long2ObjectNonBlockingMap.this.clear();
             }
 
+            @Override
             public int size() {
                 return Long2ObjectNonBlockingMap.this.size();
             }
 
+            @Override
             public boolean remove(final Object o) {
                 if (!(o instanceof final Map.Entry<?, ?> e)) return false;
                 return Long2ObjectNonBlockingMap.this.remove(e.getKey(), e.getValue());
             }
 
+            @Override
             public boolean contains(final Object o) {
                 if (!(o instanceof final Map.Entry<?, ?> e)) return false;
                 TypeV v = get(e.getKey());
                 return v != null && v.equals(e.getValue());
             }
 
+            @Override
             public Iterator<Entry<Long, TypeV>> iterator() {
                 return new SnapshotESlow();
             }
@@ -1488,25 +1533,30 @@ public class Long2ObjectNonBlockingMap<TypeV>
 
     public Set<LongObjectEntry<TypeV>> fastEntrySet() {
         return new AbstractSet<>() {
+            @Override
             public void clear() {
                 Long2ObjectNonBlockingMap.this.clear();
             }
 
+            @Override
             public int size() {
                 return Long2ObjectNonBlockingMap.this.size();
             }
 
+            @Override
             public boolean remove(final Object o) {
                 if (!(o instanceof final Map.Entry<?, ?> e)) return false;
                 return Long2ObjectNonBlockingMap.this.remove(e.getKey(), e.getValue());
             }
 
+            @Override
             public boolean contains(final Object o) {
                 if (!(o instanceof final Map.Entry<?, ?> e)) return false;
                 TypeV v = get(e.getKey());
                 return v != null && v.equals(e.getValue());
             }
 
+            @Override
             public Iterator<LongObjectEntry<TypeV>> iterator() {
                 return new SnapshotE();
             }
