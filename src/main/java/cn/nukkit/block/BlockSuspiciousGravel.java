@@ -36,4 +36,9 @@ public class BlockSuspiciousGravel extends BlockFallableMeta {
     public Item[] getDrops(Item item) {
         return new Item[]{Item.AIR_ITEM};
     }
+
+    @Override
+    public boolean isSuspiciousBlock() {
+        return true;
+    }
 }

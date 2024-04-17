@@ -108,14 +108,16 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
         }
         this.close();
 
-        EntityExplosionPrimeEvent ev = new EntityExplosionPrimeEvent(this, 1.2);
-        this.server.getPluginManager().callEvent(ev);
-        if (!ev.isCancelled()) {
-            WeakExplosion explosion = new WeakExplosion(this, (float) ev.getForce(), this.shootingEntity);
-            if (ev.isBlockBreaking() && this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
-                explosion.explodeA();
+        if (this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
+            EntityExplosionPrimeEvent ev = new EntityExplosionPrimeEvent(this, 1.2);
+            this.server.getPluginManager().callEvent(ev);
+            if (!ev.isCancelled()) {
+                WeakExplosion explosion = new WeakExplosion(this, (float) ev.getForce(), this.shootingEntity);
+                if (ev.isBlockBreaking() && this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
+                    explosion.explodeA();
+                }
+                explosion.explodeB();
             }
-            explosion.explodeB();
         }
     }
 }
