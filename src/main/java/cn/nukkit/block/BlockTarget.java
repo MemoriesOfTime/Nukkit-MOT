@@ -114,7 +114,7 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
             ticks = 20;
         }
         Position position = entity.getPosition();
-        Vector3 motion = entity.getMotion();
+        Vector3 motion = position.add(new Vector3(entity.lastMotionX, entity.lastMotionY, entity.lastMotionZ));
         MovingObjectPosition intercept = calculateIntercept(position, position.add(motion.multiply(2)));
         // todo: intercept was doomed to be zero anyway, and eventually it will return at line 124;
         if (intercept == null) {
