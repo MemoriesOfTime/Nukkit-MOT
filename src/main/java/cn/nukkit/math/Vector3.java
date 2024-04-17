@@ -427,4 +427,12 @@ public class Vector3 implements Cloneable {
     public BlockVector3 asBlockVector3() {
         return new BlockVector3(this.getFloorX(), this.getFloorY(), this.getFloorZ());
     }
+
+    public double getAxis(BlockFace.Axis axis) {
+        return switch (axis) {
+            case X -> x;
+            case Y -> y;
+            default -> z;
+        };
+    }
 }
