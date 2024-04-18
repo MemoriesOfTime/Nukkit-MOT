@@ -17,7 +17,7 @@ import javax.annotation.Nullable;
 
 public class BlockCandle extends BlockFlowable {
 
-    public static final int LIT_BIT = 0x01;
+    public static final int LIT_BIT = 0x04;
 
     public static final int CANDLES_BIT = 0x03;
 
@@ -36,17 +36,17 @@ public class BlockCandle extends BlockFlowable {
     @Override
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @Nullable Player player) {
         if (target.getId() == BlockID.CAKE_BLOCK && target.getDamage() == 0) {//必须是完整的蛋糕才能插蜡烛
-            target.getLevel().setBlock(target, this.toCakeForm(), true, true);
+            target.getLevel().setBlock(target, toCakeForm(), true, true);
             return true;
         }
-        if (target.up().getId() == getId()) {
+        if (target.up().getId() == this.getId()) {
             target = target.up();
         }
-        if (target.getId() == this.getId()) {
-            if (this.getCandles() < 3) {
-                if (target instanceof BlockCandle blockCandle) {
-                    blockCandle.setDamage(CANDLES_BIT, blockCandle.getCandles() + 1);
-                    this.getLevel().setBlock(blockCandle, blockCandle, true, true);
+        if (target.getId() == getId()) {
+            if (target instanceof BlockMeta candle) {
+                if (candle.getDamage(CANDLES_BIT) < 3) {
+                    candle.setDamage(CANDLES_BIT, candle.getDamage(CANDLES_BIT) + 1);
+                    this.getLevel().setBlock(target, target, true, true);
                     return true;
                 }
             }
@@ -55,7 +55,7 @@ public class BlockCandle extends BlockFlowable {
             return false;
         }
 
-        target.setDamage(target.getDamage() & LIT_BIT);
+        this.setCandles(0);
         this.getLevel().setBlock(this, this, true, true);
 
         return true;
@@ -112,17 +112,11 @@ public class BlockCandle extends BlockFlowable {
     }
 
     public void setLit(boolean lit) {
-        if (lit == isLit()) {
-            return;
-        }
-        this.setDamage((lit? 1: 0) << 2 | getCandles());
+        this.setDamage(LIT_BIT, lit ? 1: 0);
     }
 
     public void setCandles(int candles) {
-        if (candles == getCandles()) {
-            return;
-        }
-        this.setDamage((this.isLit()? 1: 0) << 2 | candles);
+        this.setDamage(CANDLES_BIT, candles);
     }
 
     @Override
