@@ -14,6 +14,7 @@ public class EndermanSpawner extends AbstractEntitySpawner {
         super(spawnTask);
     }
 
+    @Override
     public void spawn(Player player, Position pos, Level level) {
         boolean nether = level.getDimension() == Level.DIMENSION_NETHER;
         boolean end = level.getDimension() == Level.DIMENSION_THE_END;

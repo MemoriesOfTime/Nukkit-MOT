@@ -43,6 +43,7 @@ public class BlockStructureBlock extends BlockSolid {
         return false;
     }
 
+    @Override
     public int getToolType() {
         return ItemTool.TYPE_PICKAXE;
     }

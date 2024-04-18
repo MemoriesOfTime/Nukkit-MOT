@@ -118,6 +118,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
         return true;
     }
 
+    @Override
     public boolean hasComparatorInputOverride() {
         return true;
     }

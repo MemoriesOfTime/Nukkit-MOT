@@ -120,6 +120,7 @@ public class SequencedHashSet<E> implements List<E> {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public E get(int index) {
         return this.inverse.get(index);
     }

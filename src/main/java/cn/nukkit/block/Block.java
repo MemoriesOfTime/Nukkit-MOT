@@ -1204,10 +1204,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getHardness() != -1;
     }
 
+    @Override
     public Block getSide(BlockFace face) {
         return this.getSide(face, 1);
     }
 
+    @Override
     public Block getSide(BlockFace face, int step) {
         return this.getSideAtLayer(layer, face, step);
     }
@@ -1235,10 +1237,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return block;
     }
 
+    @Override
     public Block up() {
         return up(1);
     }
 
+    @Override
     public Block up(int step) {
         return getSide(BlockFace.UP, step);
     }
@@ -1247,10 +1251,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getSideAtLayer(layer, BlockFace.UP, step);
     }
 
+    @Override
     public Block down() {
         return down(1);
     }
 
+    @Override
     public Block down(int step) {
         return getSide(BlockFace.DOWN, step);
     }
@@ -1259,10 +1265,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getSideAtLayer(layer, BlockFace.DOWN, step);
     }
 
+    @Override
     public Block north() {
         return north(1);
     }
 
+    @Override
     public Block north(int step) {
         return getSide(BlockFace.NORTH, step);
     }
@@ -1271,10 +1279,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getSideAtLayer(layer, BlockFace.NORTH, step);
     }
 
+    @Override
     public Block south() {
         return south(1);
     }
 
+    @Override
     public Block south(int step) {
         return getSide(BlockFace.SOUTH, step);
     }
@@ -1283,10 +1293,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getSideAtLayer(layer, BlockFace.SOUTH, step);
     }
 
+    @Override
     public Block east() {
         return east(1);
     }
 
+    @Override
     public Block east(int step) {
         return getSide(BlockFace.EAST, step);
     }
@@ -1295,10 +1307,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getSideAtLayer(layer, BlockFace.EAST, step);
     }
 
+    @Override
     public Block west() {
         return west(1);
     }
 
+    @Override
     public Block west(int step) {
         return getSide(BlockFace.WEST, step);
     }
@@ -1337,26 +1351,32 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         //return new AxisAlignedBB(this.x, this.y, this.z, this.x + 1.0D, this.y + 1.0D, this.z + 1.0D);
     }
 
+    @Override
     public double getMinX() {
         return this.x;
     }
 
+    @Override
     public double getMinY() {
         return this.y;
     }
 
+    @Override
     public double getMinZ() {
         return this.z;
     }
 
+    @Override
     public double getMaxX() {
         return this.x + 1;
     }
 
+    @Override
     public double getMaxY() {
         return this.y + 1;
     }
 
+    @Override
     public double getMaxZ() {
         return this.z + 1;
     }
@@ -1365,6 +1385,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return getBoundingBox();
     }
 
+    @Override
     public MovingObjectPosition calculateIntercept(Vector3 pos1, Vector3 pos2) {
         AxisAlignedBB bb = this.getBoundingBox();
         if (bb == null) {
@@ -1485,6 +1506,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return clone();
     }
 
+    @Override
     public Block clone() {
         return (Block) super.clone();
     }
@@ -1609,5 +1631,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     @Deprecated
     public static boolean usesFakeWater(int id) {
         return usesFakeWater[id];
+    }
+
+    public boolean isSuspiciousBlock() {
+        return false;
     }
 }

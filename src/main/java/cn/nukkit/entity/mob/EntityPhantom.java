@@ -50,6 +50,7 @@ public class EntityPhantom extends EntityFlyingMob implements EntitySmite {
         this.setDamage(new int[] { 0, 4, 6, 9 });
     }
 
+    @Override
     public boolean targetOption(EntityCreature creature, double distance) {
         if (creature instanceof Player player) {
             return player.spawned && player.isAlive() && !player.closed && (player.isSurvival() || player.isAdventure()) && distance <= 1024;

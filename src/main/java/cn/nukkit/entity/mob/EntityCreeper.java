@@ -68,6 +68,7 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
         }
     }
 
+    @Override
     public void explode() {
         if (this.closed) return;
 
@@ -190,6 +191,7 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
         return true;
     }
 
+    @Override
     public void attackEntity(Entity player) {}
 
     @Override

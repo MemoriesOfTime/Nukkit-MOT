@@ -56,6 +56,7 @@ public class BlockEndRod extends BlockTransparentMeta implements Faceable {
         return ItemTool.TYPE_PICKAXE;
     }
 
+    @Override
     protected AxisAlignedBB recalculateBoundingBox() {
         return new SimpleAxisAlignedBB(this.x + 0.4, this.y, this.z + 0.4, this.x + 0.6, this.y + 1, this.z + 0.6);
     }

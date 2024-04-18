@@ -30,6 +30,7 @@ public class ObjectEndSpike extends BasicGenerator {
         this.hasIronBars = hasIronBars;
     }
 
+    @Override
     public boolean generate(ChunkManager level, NukkitRandom rand, Vector3 position) {
         this.position = position;
         return this.generate(level, rand);
