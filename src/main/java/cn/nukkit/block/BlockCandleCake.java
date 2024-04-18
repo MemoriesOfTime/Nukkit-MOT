@@ -16,12 +16,12 @@ public class BlockCandleCake extends BlockTransparentMeta {
 
     public static final int LIT_BIT = 0x01;
 
-    public BlockCandleCake(int meta) {
-        super(meta);
-    }
-
     public BlockCandleCake() {
         this(0);
+    }
+
+    public BlockCandleCake(int meta) {
+        super(meta);
     }
 
     @Override

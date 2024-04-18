@@ -1,12 +1,13 @@
 package cn.nukkit.block;
 
 public class BlockCandleCakeOrange extends BlockCandleCake {
-    public BlockCandleCakeOrange(int meta) {
-        super(meta);
-    }
 
     public BlockCandleCakeOrange() {
         this(0);
+    }
+
+    public BlockCandleCakeOrange(int meta) {
+        super(meta);
     }
 
     @Override
