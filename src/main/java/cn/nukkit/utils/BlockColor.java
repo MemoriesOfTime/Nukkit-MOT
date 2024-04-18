@@ -13,7 +13,8 @@ public class BlockColor  {
     public static final BlockColor AIR_BLOCK_COLOR = TRANSPARENT_BLOCK_COLOR;
     public static final BlockColor GRASS_BLOCK_COLOR = new BlockColor(0x7f, 0xb2, 0x38);
     public static final BlockColor SAND_BLOCK_COLOR = new BlockColor(0xf7, 0xe9, 0xa3);
-    public static final BlockColor CLOTH_BLOCK_COLOR = new BlockColor(0xc7, 0xc7, 0xc7);
+    public static final BlockColor WOOL_BLOCK_COLOR = new BlockColor(0xc7, 0xc7, 0xc7);
+    public static final BlockColor CLOTH_BLOCK_COLOR = WOOL_BLOCK_COLOR;
     public static final BlockColor TNT_BLOCK_COLOR = new BlockColor(0xff, 0x00, 0x00);
     public static final BlockColor ICE_BLOCK_COLOR = new BlockColor(0xa0, 0xa0, 0xff);
     public static final BlockColor IRON_BLOCK_COLOR = new BlockColor(0xa7, 0xa7, 0xa7);

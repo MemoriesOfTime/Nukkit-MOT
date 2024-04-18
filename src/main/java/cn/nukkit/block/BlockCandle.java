@@ -17,9 +17,8 @@ import javax.annotation.Nullable;
 
 public class BlockCandle extends BlockFlowable {
 
-    public static final int LIT_BIT = 0x04;
-
     public static final int CANDLES_BIT = 0x03;
+    public static final int LIT_BIT = 0x04;
 
     public BlockCandle() {
         super(0);
@@ -104,7 +103,7 @@ public class BlockCandle extends BlockFlowable {
     }
 
     public boolean isLit() {
-        return (this.getDamage(LIT_BIT)) != 0;
+        return this.getDamage(LIT_BIT) != 0;
     }
 
     public int getCandles() {
