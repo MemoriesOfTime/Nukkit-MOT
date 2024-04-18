@@ -450,6 +450,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[SOUL_SOIL] = BlockSoulSoil.class; //491
 
             list[NETHER_SPROUTS_BLOCK] = BlockNetherSprouts.class; //493
+            list[TARGET] = BlockTarget.class; //494
 
             list[STRIPPED_CRIMSON_STEM] = BlockStemStrippedCrimson.class; //495
             list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
