@@ -5,7 +5,7 @@ public class BlockCandleCakeLightGray extends BlockCandleCake {
     public BlockCandleCakeLightGray() {
         this(0);
     }
-    
+
     public BlockCandleCakeLightGray(int meta) {
         super(meta);
     }

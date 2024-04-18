@@ -10,9 +10,13 @@ import cn.nukkit.utils.BlockColor;
 
 public class BlockCandlePurple extends BlockCandle {
 
-    public BlockCandlePurple() { this(0); }
+    public BlockCandlePurple() {
+        this(0);
+    }
 
-    public BlockCandlePurple(int meta) { super(meta); }
+    public BlockCandlePurple(int meta) {
+        super(meta);
+    }
 
     @Override
     public int getId() {

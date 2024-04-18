@@ -107,12 +107,12 @@ public class BlockCandle extends BlockFlowable {
         return this.getDamage(LIT_BIT) != 0;
     }
 
-    public int getCandles() {
-        return this.getDamage(CANDLES_BIT);
+    public void setLit(boolean lit) {
+        this.setDamage(LIT_BIT, lit ? 1 : 0);
     }
 
-    public void setLit(boolean lit) {
-        this.setDamage(LIT_BIT, lit ? 1: 0);
+    public int getCandles() {
+        return this.getDamage(CANDLES_BIT);
     }
 
     public void setCandles(int candles) {
