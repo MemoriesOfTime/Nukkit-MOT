@@ -6,8 +6,6 @@ import cn.nukkit.utils.BlockColor;
  * @author Gabriel8579
  * @since 2021-08-13
  */
-
-
 public class BlockCandleGreen extends BlockCandle {
 
     public BlockCandleGreen() {

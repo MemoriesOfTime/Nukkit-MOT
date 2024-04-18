@@ -14,7 +14,6 @@ import javax.annotation.Nullable;
  * @author Gabriel8579
  * @since 2021-07-14
  */
-
 public class BlockCandle extends BlockFlowable {
 
     public static final int CANDLES_BIT = 0x03;
