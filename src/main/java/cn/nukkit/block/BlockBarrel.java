@@ -177,6 +177,7 @@ public class BlockBarrel extends BlockSolidMeta implements Faceable, BlockEntity
     }
 
 
+    @Override
     public boolean hasComparatorInputOverride() {
         return true;
     }

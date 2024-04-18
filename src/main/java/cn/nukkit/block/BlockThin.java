@@ -18,6 +18,7 @@ public abstract class BlockThin extends BlockTransparent {
         return false;
     }
 
+    @Override
     protected AxisAlignedBB recalculateBoundingBox() {
         double f = 0.4375;
         double f1 = 0.5625;

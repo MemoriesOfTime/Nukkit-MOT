@@ -20,6 +20,7 @@ public class TradeInventory extends BaseInventory {
         super(holder, InventoryType.TRADING);
     }
     
+    @Override
     public void onOpen(Player who) {
         super.onOpen(who);
         EntityVillager villager = this.getHolder();
@@ -54,6 +55,7 @@ public class TradeInventory extends BaseInventory {
         this.sendContents(who);
     }
     
+    @Override
     public void onClose(Player who) {
         for (int i = 0; i <= 1; i++) {
             Item item = getItem(i);
@@ -70,6 +72,7 @@ public class TradeInventory extends BaseInventory {
         this.getHolder().setTradingPlayer(0L);
     }
     
+    @Override
     public EntityVillager getHolder() {
         return (EntityVillager) this.holder;
     }

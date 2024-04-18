@@ -1809,6 +1809,7 @@ public abstract class Entity extends Location implements Metadatable {
         Server.broadcastPacket(hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_19_0).collect(Collectors.toList()), pk);
     }
 
+    @Override
     public Vector3 getDirectionVector() {
         Vector3 vector = super.getDirectionVector();
         return this.temporalVector.setComponents(vector.x, vector.y, vector.z);

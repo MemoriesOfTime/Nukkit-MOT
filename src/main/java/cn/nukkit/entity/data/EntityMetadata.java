@@ -125,6 +125,7 @@ public class EntityMetadata {
         return this;
     }
 
+    @Override
     public EntityMetadata clone() {
         return new EntityMetadata().replace(this.getMap());
     }

@@ -24,6 +24,7 @@ public class BlockLeaves2 extends BlockLeaves {
         super(meta);
     }
 
+    @Override
     public String getName() {
         return names[this.getDamage() & 0x01];
     }

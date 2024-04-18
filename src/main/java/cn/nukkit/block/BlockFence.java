@@ -68,6 +68,7 @@ public class BlockFence extends BlockTransparentMeta {
         return names[this.getDamage() & 0x07];
     }
 
+    @Override
     protected AxisAlignedBB recalculateBoundingBox() {
         boolean north = this.canConnect(this.north());
         boolean south = this.canConnect(this.south());

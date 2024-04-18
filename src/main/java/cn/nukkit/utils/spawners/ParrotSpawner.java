@@ -15,6 +15,7 @@ public class ParrotSpawner extends AbstractEntitySpawner {
         super(spawnTask);
     }
 
+    @Override
     public void spawn(Player player, Position pos, Level level) {
         if (pos.y < 70 || Utils.rand(1, 3) != 1) {
             return;
