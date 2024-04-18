@@ -4,8 +4,8 @@ import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemID;
-import cn.nukkit.level.Sound;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -35,6 +35,7 @@ public class BlockCandle extends BlockFlowable {
     @Override
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @Nullable Player player) {
         if (target.getId() == BlockID.CAKE_BLOCK && target.getDamage() == 0) {//必须是完整的蛋糕才能插蜡烛
+            target.getLevel().addLevelSoundEvent(target, LevelSoundEventPacket.SOUND_CAKE_ADD_CANDLE);
             target.getLevel().setBlock(target, toCakeForm(), true, true);
             return true;
         }
@@ -67,12 +68,12 @@ public class BlockCandle extends BlockFlowable {
         }
         if (this.isLit() && item.getId() != ItemID.FLINT_AND_STEEL) {
             this.setLit(false);
-            this.getLevel().addSound(this, Sound.RANDOM_FIZZ);
+            this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EXTINGUISH_CANDLE);
             this.getLevel().setBlock(this, this, true, true);
             return true;
         } else if (!this.isLit() && item.getId() == ItemID.FLINT_AND_STEEL) {
             this.setLit(true);
-            this.getLevel().addSound(this, Sound.FIRE_IGNITE);
+            this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_IGNITE);
             this.getLevel().setBlock(this, this, true, true);
             return true;
         }

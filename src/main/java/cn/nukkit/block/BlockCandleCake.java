@@ -5,8 +5,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemCake;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.Sound;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
@@ -128,12 +128,12 @@ public class BlockCandleCake extends BlockTransparentMeta {
     public boolean onActivate(@NotNull Item item, Player player) {
         if (this.isLit() && item.getId() != ItemID.FLINT_AND_STEEL) {
             this.setDamage(LIT_BIT, 0);
-            this.getLevel().addSound(this, Sound.RANDOM_FIZZ);
+            this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EXTINGUISH_CANDLE);
             this.getLevel().setBlock(this, this, true, true);
             return true;
         } else if (!this.isLit() && item.getId() == ItemID.FLINT_AND_STEEL) {
             this.setDamage(LIT_BIT, 1);
-            this.getLevel().addSound(this, Sound.FIRE_IGNITE);
+            this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_IGNITE);
             this.getLevel().setBlock(this, this, true, true);
             return true;
         } else if (player != null && (player.getFoodData().getLevel() < player.getFoodData().getMaxLevel() || player.isCreative() || player.getServer().getDifficulty() == 0)) {
