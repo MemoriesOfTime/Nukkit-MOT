@@ -2641,7 +2641,9 @@ public class Level implements ChunkManager, Metadatable {
             return null;
         }
 
-        if (!(block.canBeReplaced() || (hand instanceof BlockSlab && block instanceof BlockSlab))) {
+        if (!(block.canBeReplaced()
+                || (hand instanceof BlockSlab && block instanceof BlockSlab)
+                || (block instanceof BlockCandle && hand.getId() == block.getId()))) {
             return null;
         }
 
