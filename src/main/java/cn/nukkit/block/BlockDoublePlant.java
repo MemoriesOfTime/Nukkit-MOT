@@ -172,6 +172,7 @@ public class BlockDoublePlant extends BlockFlowable {
         return false;
     }
 
+    @Override
     public Item toItem() {
         return new ItemBlock(this, this.getDamage() & 0x07, 1);
     }

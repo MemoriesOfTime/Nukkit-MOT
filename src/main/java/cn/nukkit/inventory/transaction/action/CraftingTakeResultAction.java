@@ -14,6 +14,7 @@ public class CraftingTakeResultAction extends InventoryAction {
         super(sourceItem, targetItem);
     }
 
+    @Override
     public void onAddToTransaction(InventoryTransaction transaction) {
         if (transaction instanceof CraftingTransaction) {
             ((CraftingTransaction) transaction).setPrimaryOutput(this.getSourceItem());

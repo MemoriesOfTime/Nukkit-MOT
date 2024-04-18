@@ -221,10 +221,12 @@ public class BlockRedstoneWire extends BlockFlowable {
         return (b.isSolid() && !b.isTransparent() && b.getId() != GLOWSTONE) || b.getId() == HOPPER_BLOCK;
     }
 
+    @Override
     public int getStrongPower(BlockFace side) {
         return !this.canProvidePower ? 0 : getWeakPower(side);
     }
 
+    @Override
     public int getWeakPower(BlockFace side) {
         if (!this.canProvidePower) {
             return 0;

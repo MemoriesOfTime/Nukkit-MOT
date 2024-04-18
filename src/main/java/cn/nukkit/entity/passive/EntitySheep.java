@@ -71,6 +71,7 @@ public class EntitySheep extends EntityWalkingAnimal {
         }
     }
 
+    @Override
     public void saveNBT() {
         super.saveNBT();
 

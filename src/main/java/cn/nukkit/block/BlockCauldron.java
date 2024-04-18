@@ -58,6 +58,7 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
         return BlockEntityCauldron.class;
     }
 
+    @Override
     public String getName() {
         return "Cauldron Block";
     }
@@ -371,10 +372,12 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
         return new ItemCauldron();
     }
 
+    @Override
     public boolean hasComparatorInputOverride() {
         return true;
     }
 
+    @Override
     public int getComparatorInputOverride() {
         return getFillLevel();
     }

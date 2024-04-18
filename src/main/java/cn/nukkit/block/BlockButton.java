@@ -108,10 +108,12 @@ public abstract class BlockButton extends BlockFlowable implements Faceable {
         return true;
     }
 
+    @Override
     public int getWeakPower(BlockFace side) {
         return isActivated() ? 15 : 0;
     }
 
+    @Override
     public int getStrongPower(BlockFace side) {
         return !isActivated() ? 0 : (getFacing() == side ? 15 : 0);
     }

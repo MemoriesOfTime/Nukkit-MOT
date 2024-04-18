@@ -315,6 +315,7 @@ public enum BlockFace {
             return name;
         }
 
+        @Override
         public boolean test(BlockFace face) {
             return face != null && face.getAxis() == this;
         }
@@ -360,10 +361,12 @@ public enum BlockFace {
             return faces[rand.nextBoundedInt(faces.length)];
         }
 
+        @Override
         public boolean test(BlockFace face) {
             return face != null && face.getAxis().getPlane() == this;
         }
 
+        @Override
         public Iterator<BlockFace> iterator() {
             return Iterators.forArray(faces);
         }

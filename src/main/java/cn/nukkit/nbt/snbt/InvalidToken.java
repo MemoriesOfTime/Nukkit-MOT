@@ -10,6 +10,7 @@ public class InvalidToken extends Token {
         super(TokenType.INVALID, tokenSource, beginOffset, endOffset);
     }
 
+    @Override
     public String getNormalizedText() {
         return "Lexically Invalid Input:" + getImage();
     }

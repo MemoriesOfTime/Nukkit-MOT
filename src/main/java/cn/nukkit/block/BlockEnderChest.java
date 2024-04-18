@@ -225,6 +225,7 @@ public class BlockEnderChest extends BlockTransparentMeta implements Faceable, B
         return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
     }
 
+    @Override
     public void setBlockFace(BlockFace face) {
         if (face.getIndex() > 1) {
             this.setDamage(FACES[face.getHorizontalIndex()]);

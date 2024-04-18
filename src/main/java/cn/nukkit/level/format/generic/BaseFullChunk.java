@@ -149,6 +149,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         // Does nothing here
     }
 
+    @Override
     public void initChunk() {
         if (this.getProvider() != null && !this.isInit) {
             boolean changed = false;
@@ -219,11 +220,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         this.hash = Level.chunkHash(x, z);
     }
 
+    @Override
     public final void setX(int x) {
         this.x = x;
         this.hash = Level.chunkHash(x, z);
     }
 
+    @Override
     public final void setZ(int z) {
         this.z = z;
         this.hash = Level.chunkHash(x, z);

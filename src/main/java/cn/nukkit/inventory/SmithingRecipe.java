@@ -132,6 +132,7 @@ public class SmithingRecipe extends ShapelessRecipe {
         return ingredient;
     }
 
+    @Override
     public List<Item> getIngredientsAggregate() {
         return ingredientsAggregate;
     }

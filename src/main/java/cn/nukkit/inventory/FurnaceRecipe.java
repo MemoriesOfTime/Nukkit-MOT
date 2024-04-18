@@ -21,6 +21,7 @@ public class FurnaceRecipe implements SmeltingRecipe {
         this.ingredient = item.clone();
     }
 
+    @Override
     public Item getInput() {
         return this.ingredient.clone();
     }

@@ -902,6 +902,7 @@ public class LevelDBProvider implements LevelProvider {
         return levelData;
     }
 
+    @Override
     public void updateLevelName(String name) {
         if (!this.getName().equals(name)) {
             this.levelData.putString("LevelName", name);

@@ -29,6 +29,7 @@ public class BlockNetherrack extends BlockSolid {
         return ItemTool.TYPE_PICKAXE;
     }
 
+    @Override
     public int getToolTier() {
         return ItemTool.TIER_WOODEN;
     }

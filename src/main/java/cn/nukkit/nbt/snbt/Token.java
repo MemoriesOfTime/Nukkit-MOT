@@ -68,6 +68,7 @@ public class Token implements SNBTConstants, Node {
      * programmer would use this method. It needs to
      * be public because it is part of the cn.nukkit.nbt.snbt.Node interface.
      */
+    @Override
     public void setBeginOffset(int beginOffset) {
         this.beginOffset = beginOffset;
     }
@@ -77,6 +78,7 @@ public class Token implements SNBTConstants, Node {
      * programmer would use this method. It needs to
      * be public because it is part of the cn.nukkit.nbt.snbt.Node interface.
      */
+    @Override
     public void setEndOffset(int endOffset) {
         this.endOffset = endOffset;
     }
@@ -85,6 +87,7 @@ public class Token implements SNBTConstants, Node {
      * @return the SNBTLexer object that handles
      * location info for the tokens.
      */
+    @Override
     public SNBTLexer getTokenSource() {
         SNBTLexer flm = this.tokenSource;
         // If this is null and we have chained tokens,
@@ -104,6 +107,7 @@ public class Token implements SNBTConstants, Node {
      * It should be exceedingly rare that an application
      * programmer needs to use this method.
      */
+    @Override
     public void setTokenSource(SNBTLexer tokenSource) {
         this.tokenSource = tokenSource;
     }
@@ -133,10 +137,12 @@ public class Token implements SNBTConstants, Node {
         return false;
     }
 
+    @Override
     public int getBeginOffset() {
         return beginOffset;
     }
 
+    @Override
     public int getEndOffset() {
         return endOffset;
     }
@@ -216,6 +222,7 @@ public class Token implements SNBTConstants, Node {
         return result;
     }
 
+    @Override
     public String getSource() {
         if (type == TokenType.EOF) return "";
         SNBTLexer flm = getTokenSource();
@@ -232,14 +239,17 @@ public class Token implements SNBTConstants, Node {
         this.endOffset = endOffset;
     }
 
+    @Override
     public boolean isUnparsed() {
         return unparsed;
     }
 
+    @Override
     public void setUnparsed(boolean unparsed) {
         this.unparsed = unparsed;
     }
 
+    @Override
     public void clearChildren() {
     }
 
@@ -261,10 +271,12 @@ public class Token implements SNBTConstants, Node {
         return new Iterator<Token>() {
             Token currentPoint = Token.this;
 
+            @Override
             public boolean hasNext() {
                 return currentPoint.previousCachedToken() != null;
             }
 
+            @Override
             public Token next() {
                 Token previous = currentPoint.previousCachedToken();
                 if (previous == null) throw new java.util.NoSuchElementException("No previous token!");
@@ -296,10 +308,12 @@ public class Token implements SNBTConstants, Node {
         return new Iterator<Token>() {
             Token currentPoint = Token.this;
 
+            @Override
             public boolean hasNext() {
                 return currentPoint.nextCachedToken() != null;
             }
 
+            @Override
             public Token next() {
                 Token next = currentPoint.nextCachedToken();
                 if (next == null) throw new java.util.NoSuchElementException("No next token!");
@@ -313,6 +327,7 @@ public class Token implements SNBTConstants, Node {
     /**
      * Copy the location info from a Node
      */
+    @Override
     public void copyLocationInfo(Node from) {
         Node.super.copyLocationInfo(from);
         if (from instanceof Token) {
@@ -323,6 +338,7 @@ public class Token implements SNBTConstants, Node {
         setTokenSource(from.getTokenSource());
     }
 
+    @Override
     public void copyLocationInfo(Node start, Node end) {
         Node.super.copyLocationInfo(start, end);
         if (start instanceof Token) {
@@ -373,46 +389,57 @@ public class Token implements SNBTConstants, Node {
         }
     }
 
+    @Override
     public String getLocation() {
         return getInputSource() + ":" + getBeginLine() + ":" + getBeginColumn();
     }
 
+    @Override
     public void setChild(int i, Node n) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public void addChild(Node n) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public void addChild(int i, Node n) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public Node removeChild(int i) {
         throw new UnsupportedOperationException();
     }
 
+    @Override
     public final int indexOf(Node n) {
         return -1;
     }
 
+    @Override
     public Node getParent() {
         return parent;
     }
 
+    @Override
     public void setParent(Node parent) {
         this.parent = parent;
     }
 
+    @Override
     public final int getChildCount() {
         return 0;
     }
 
+    @Override
     public final Node getChild(int i) {
         return null;
     }
 
+    @Override
     public final List<Node> children() {
         return Collections.emptyList();
     }

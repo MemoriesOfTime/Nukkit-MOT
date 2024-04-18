@@ -781,6 +781,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return this;
     }
 
+    @Override
     public boolean isPlayer() {
         return true;
     }
@@ -5164,6 +5165,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      *
      * @return username
      */
+    @Override
     public String getName() {
         return this.username;
     }

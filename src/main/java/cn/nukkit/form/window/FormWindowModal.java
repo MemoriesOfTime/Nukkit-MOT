@@ -52,10 +52,12 @@ public class FormWindowModal extends FormWindow {
         this.button2 = button2;
     }
 
+    @Override
     public FormResponseModal getResponse() {
         return response;
     }
 
+    @Override
     public void setResponse(String data) {
         if (data.equals("null")) {
             closed = true;

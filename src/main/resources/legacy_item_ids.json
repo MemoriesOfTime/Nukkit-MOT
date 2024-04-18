@@ -1,4 +1,15 @@
 {
+  "minecraft:suspicious_gravel": -573,
+  "minecraft:decorated_pot": -551,
+  "minecraft:cherry_leaves": -548,
+  "minecraft:cherry_sapling": -547,
+  "minecraft:cherry_wood": -546,
+  "minecraft:stripped_cherry_wood": -545,
+  "minecraft:cherry_planks": -537,
+  "minecraft:cherry_log": -536,
+  "minecraft:stripped_cherry_log": -535,
+  "minecraft:suspicious_sand": -529,
+  "minecraft:bamboo_planks": -510,
   "minecraft:mangrove_double_slab": -499,
   "minecraft:stripped_mangrove_wood": -498,
   "minecraft:mangrove_wood": -497,
@@ -1030,14 +1041,5 @@
   "minecraft:music_disc_5": 636,
   "minecraft:disc_fragment_5": 637,
   "minecraft:glow_berries": 654,
-  "minecraft:music_disc_relic": 701,
-  "minecraft:decorated_pot": -551,
-  "minecraft:bamboo_planks": -510,
-  "minecraft:stripped_cherry_log": -535,
-  "minecraft:cherry_log": -536,
-  "minecraft:cherry_planks": -537,
-  "minecraft:stripped_cherry_wood": -545,
-  "minecraft:cherry_wood": -546,
-  "minecraft:cherry_sapling": -547,
-  "minecraft:cherry_leaves": -548
+  "minecraft:music_disc_relic": 701
 }

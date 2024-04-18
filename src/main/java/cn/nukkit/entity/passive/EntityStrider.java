@@ -67,6 +67,7 @@ public class EntityStrider extends EntityWalkingAnimal implements EntityRideable
         return 1.7f;
     }
 
+    @Override
     public boolean mountEntity(Entity entity, byte mode) {
         Objects.requireNonNull(entity, "The target of the mounting entity can't be null");
 
