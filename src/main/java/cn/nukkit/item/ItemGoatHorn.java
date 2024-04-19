@@ -41,7 +41,9 @@ public class ItemGoatHorn extends StringItemBase {
             Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> banUse.set(false), coolDownTick);
             player.setItemCoolDown(coolDownTick, "goat_horn");
             return true;
-        } else return false;
+        } else {
+            return false;
+        }
     }
 
     /**
