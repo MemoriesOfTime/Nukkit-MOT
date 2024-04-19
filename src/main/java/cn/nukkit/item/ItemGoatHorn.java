@@ -16,11 +16,11 @@ public class ItemGoatHorn extends StringItemBase {
     private final AtomicBoolean banUse = new AtomicBoolean(false);
 
     public ItemGoatHorn() {
-        this(1);
+        this(0);
     }
 
-    public ItemGoatHorn(int count) {
-        this(0, 1);
+    public ItemGoatHorn(Integer meta) {
+        this(meta, 1);
     }
 
     public ItemGoatHorn(Integer meta, int count) {
@@ -36,10 +36,10 @@ public class ItemGoatHorn extends StringItemBase {
 
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
-        if (!banUse.getAndSet(true)) {
+        if (!this.banUse.getAndSet(true)) {
             playSound(player);
-            Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> banUse.set(false), coolDownTick);
-            player.setItemCoolDown(coolDownTick, "goat_horn");
+            Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> this.banUse.set(false), this.coolDownTick);
+            player.setItemCoolDown(this.coolDownTick, "goat_horn");
             return true;
         } else {
             return false;
