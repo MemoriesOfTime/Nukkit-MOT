@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.level.Sound;
 import cn.nukkit.utils.BlockColor;
 
 /**
@@ -78,5 +79,15 @@ public class BlockDoorIron extends BlockDoor {
     @Override
     public boolean canHarvestWithHand() {
         return false;
+    }
+
+    @Override
+    public void playOpenSound() {
+        level.addSound(this, Sound.OPEN_IRON_DOOR);
+    }
+
+    @Override
+    public void playCloseSound() {
+        level.addSound(this, Sound.CLOSE_IRON_DOOR);
     }
 }

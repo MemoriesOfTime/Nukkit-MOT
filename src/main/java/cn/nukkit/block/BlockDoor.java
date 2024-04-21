@@ -7,7 +7,8 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.sound.DoorSound;
+import cn.nukkit.level.Location;
+import cn.nukkit.level.Sound;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
@@ -235,7 +236,8 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
         }
 
         if (type == Level.BLOCK_UPDATE_REDSTONE) {
-            if ((!isOpen() && this.level.isBlockPowered(this.getLocation())) || (isOpen() && !this.level.isBlockPowered(this.getLocation()))) {
+            boolean powered = this.isGettingPower();
+            if ((!isOpen() && powered) || (isOpen() && !powered)) {
                 this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, isOpen() ? 15 : 0, isOpen() ? 0 : 15));
 
                 this.toggle(null);
@@ -243,6 +245,30 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
         }
 
         return 0;
+    }
+
+    public boolean isGettingPower() {
+        Location down;
+        Location up;
+        if (this.isTop()) {
+            down = down().getLocation();
+            up = getLocation();
+        } else {
+            down = getLocation();
+            up = up().getLocation();
+        }
+
+        for (BlockFace side : BlockFace.values()) {
+            Block blockDown = down.getSide(side).getLevelBlock();
+            Block blockUp = up.getSide(side).getLevelBlock();
+
+            if (this.level.isSidePowered(blockDown.getLocation(), side)
+                    || this.level.isSidePowered(blockUp.getLocation(), side)) {
+                return true;
+            }
+        }
+
+        return this.level.isBlockPowered(down) || this.level.isBlockPowered(up);
     }
 
     @Override
@@ -305,12 +331,15 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
 
     @Override
     public boolean onActivate(Item item, Player player) {
-        if (!this.toggle(player)) {
+        if (player == null) {
             return false;
         }
 
-        this.level.addSound(new DoorSound(this));
-        return true;
+        Item itemInHand = player.getInventory().getItemInHand();
+        if (player.isSneaking() && !(itemInHand.isTool() || itemInHand.isNull())) {
+            return false;
+        }
+        return toggle(player);
     }
 
     public boolean toggle(Player player) {
@@ -336,8 +365,32 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
         }
 
         this.level.setBlockDataAt(down.getFloorX(), down.getFloorY(), down.getFloorZ(), down.getDamage() ^ 0x04);
-        this.level.addSound(new DoorSound(this));
+        this.playOpenCloseSound();
         return true;
+    }
+
+    public void playOpenCloseSound() {
+        if (this.isTop() && down() instanceof BlockDoor) {
+            if (((BlockDoor) down()).isOpen()) {
+                this.playOpenSound();
+            } else {
+                this.playCloseSound();
+            }
+        } else if (up() instanceof BlockDoor) {
+            if (this.isOpen()) {
+                this.playOpenSound();
+            } else {
+                this.playCloseSound();
+            }
+        }
+    }
+
+    public void playOpenSound() {
+        this.level.addSound(this, Sound.RANDOM_DOOR_OPEN);
+    }
+
+    public void playCloseSound() {
+        this.level.addSound(this, Sound.RANDOM_DOOR_CLOSE);
     }
 
     public boolean isOpen() {
@@ -347,6 +400,7 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
             return (this.getDamage() & DOOR_OPEN_BIT) > 0;
         }
     }
+
     public boolean isTop() {
         return isTop(this.getDamage());
     }
