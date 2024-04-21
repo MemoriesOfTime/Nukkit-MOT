@@ -112,24 +112,24 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                         .filter(successful -> successful)
                         .map(success -> {
                             if (source instanceof EntityDamageByEntityEvent event) {
-                                Entity damager = event instanceof EntityDamageByChildEntityEvent ? ((EntityDamageByChildEntityEvent) event).getChild() : event.getDamager();
+                                Entity damageEntity = event instanceof EntityDamageByChildEntityEvent childDamageEvent ? childDamageEvent.getChild() : event.getDamager();
 
                                 // Critical hit
-                                if (damager instanceof Player && !damager.onGround) {
+                                if (damageEntity instanceof Player && !damageEntity.onGround) {
                                     AnimatePacket animate = new AnimatePacket();
                                     animate.action = AnimatePacket.Action.CRITICAL_HIT;
                                     animate.eid = getId();
-                                    this.getLevel().addChunkPacket(damager.getChunkX(), damager.getChunkZ(), animate);
+                                    this.getLevel().addChunkPacket(damageEntity.getChunkX(), damageEntity.getChunkZ(), animate);
                                     this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ATTACK_STRONG);
                                     source.setDamage(source.getDamage() * 1.5f);
                                 }
 
-                                if (damager.isOnFire() && !(damager instanceof Player)) {
+                                if (damageEntity.isOnFire() && !(damageEntity instanceof Player)) {
                                     this.setOnFire(this.server.getDifficulty() << 1);
                                 }
 
-                                double deltaX = this.x - damager.x;
-                                double deltaZ = this.z - damager.z;
+                                double deltaX = this.x - damageEntity.x;
+                                double deltaZ = this.z - damageEntity.z;
                                 this.knockBack(deltaX, deltaZ, event.getKnockBack());
                             }
 
@@ -156,7 +156,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                     boolean blocked = (normalizedVector.x * direction.x) + (normalizedVector.z * direction.z) < 0.0;
                     boolean knockBack = !(damageEntity instanceof EntityProjectile);
                     EntityDamageBlockedEvent event = new EntityDamageBlockedEvent(this, source, knockBack, true);
-                    if (!blocked || !source.canBeReducedByArmor() || (damageEntity instanceof EntityProjectile && ((EntityProjectile) damageEntity).piercing > 0)) {
+                    if (!blocked || !source.canBeReducedByArmor() || (damageEntity instanceof EntityProjectile projectile && projectile.piercing > 0)) {
                         event.setCancelled();
                     }
 
@@ -195,25 +195,26 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public void kill() {
         if (this.isAlive()) {
             super.kill();
-            EntityDeathEvent ev = new EntityDeathEvent(this, this.getDrops());
-            this.server.getPluginManager().callEvent(ev);
+
+            EntityDeathEvent source = new EntityDeathEvent(this, this.getDrops());
+            this.server.getPluginManager().callEvent(source);
             this.checkTameableEntityDeath();
 
             boolean doMobLoot = this.level.getGameRules().getBoolean(GameRule.DO_MOB_LOOT);
             DamageCause lastDamageCause = this.lastDamageCause != null ? this.lastDamageCause.getCause() : null;
             if (doMobLoot && lastDamageCause != null && DamageCause.VOID != lastDamageCause) {
-                if (ev.getEntity() instanceof BaseEntity baseEntity) {
+                if (source.getEntity() instanceof BaseEntity baseEntity) {
                     EntityDamageEvent lastDamageCauseEvent = baseEntity.getLastDamageCause();
-                    if (lastDamageCauseEvent instanceof EntityDamageByEntityEvent && ((EntityDamageByEntityEvent) lastDamageCauseEvent).getDamager() instanceof Player) {
+                    if (lastDamageCauseEvent instanceof EntityDamageByEntityEvent event && event.getDamager() instanceof Player) {
                         this.getLevel().dropExpOrb(this, baseEntity.getKillExperience());
                         if (!this.dropsOnNaturalDeath()) {
-                            Arrays.stream(ev.getDrops()).forEach(item -> this.getLevel().dropItem(this, item));
+                            Arrays.stream(source.getDrops()).forEach(item -> this.getLevel().dropItem(this, item));
                         }
                     }
                 }
 
                 if (this.dropsOnNaturalDeath()) {
-                    Arrays.stream(ev.getDrops()).forEach(item -> this.getLevel().dropItem(this, item));
+                    Arrays.stream(source.getDrops()).forEach(item -> this.getLevel().dropItem(this, item));
                 }
             }
         }
