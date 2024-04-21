@@ -147,12 +147,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     protected boolean blockedByShield(EntityDamageEvent source) {
         return this.isBlocking() && Optional.ofNullable(source)
-                .map(src -> src instanceof EntityDamageByChildEntityEvent ? ((EntityDamageByChildEntityEvent) src).getChild()
-                        : src instanceof EntityDamageByEntityEvent ? ((EntityDamageByEntityEvent) src).getDamager() : null)
+                .map(src -> src instanceof EntityDamageByChildEntityEvent event ? event.getChild() : src instanceof EntityDamageByEntityEvent event ? event.getDamager() : null)
                 .filter(damageEntity -> !(damageEntity instanceof EntityWeather))
                 .map(damageEntity -> {
                     Vector3 direction = this.getDirectionVector();
                     Vector3 normalizedVector = this.getPosition().subtract(damageEntity.getPosition()).normalize();
+
                     boolean blocked = (normalizedVector.x * direction.x) + (normalizedVector.z * direction.z) < 0.0;
                     boolean knockBack = !(damageEntity instanceof EntityProjectile);
                     EntityDamageBlockedEvent event = new EntityDamageBlockedEvent(this, source, knockBack, true);
@@ -162,10 +162,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
                     getServer().getPluginManager().callEvent(event);
                     if (!event.isCancelled() && event.getKnockBackAttacker() && damageEntity instanceof EntityLiving living) {
-                        double deltaX = damageEntity.getX() - this.getX();
-                        double deltaZ = damageEntity.getZ() - this.getZ();
                         living.attackTime = source.getAttackCooldown();
-                        living.knockBack(deltaX, deltaZ);
+                        living.knockBack(damageEntity.getX() - this.getX(), damageEntity.getZ() - this.getZ());
                     }
 
                     onBlock(damageEntity, source, event.getAnimation());
@@ -440,16 +438,9 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public void lookAt(Vector3 target) {
-        double dx = this.x - target.x;
-        double dy = this.y - target.y;
-        double dz = this.z - target.z;
-        double yaw = Math.asin(dx / Math.sqrt(dx * dx + dz * dz)) / Math.PI * 180.0d;
-        double asin = Math.asin(dy / Math.sqrt(dx * dx + dz * dz + dy * dy)) / Math.PI * 180.0d;
-        long pitch = Math.round(asin);
-        if (dz > 0.0d) {
-            yaw = -yaw + 180.0d;
-        }
-        this.setRotation(yaw, pitch);
+        double angleYaw = Math.atan2(target.y - y, target.z - z) * 180 / Math.PI;
+        double anglePitch = Math.atan2(target.x - x, Math.sqrt((target.y - y) * (target.y - y) + (target.z - z) * (target.z - z))) * 180 / Math.PI;
+        setRotation(angleYaw, anglePitch);
     }
 
     public EntityHuman getNearbyHuman() {
