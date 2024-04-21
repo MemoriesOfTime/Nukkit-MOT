@@ -7,9 +7,12 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.generator.math.Mth;
 import cn.nukkit.level.particle.BoneMealParticle;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.network.protocol.AnimatePacket;
 import cn.nukkit.utils.BlockColor;
 
@@ -38,6 +41,14 @@ public class BlockBamboo extends BlockTransparentMeta {
     @Override
     public String getName() {
         return "Bamboo";
+    }
+
+    @Override
+    protected AxisAlignedBB recalculateBoundingBox() {
+        double inset = 1 - (isThick() ? 3 / 16.0 : 2 / 16.0);
+        AxisAlignedBB aabb = new SimpleAxisAlignedBB(x, y, z, x + 1 - inset, y + 1, z + 1 - inset);
+        int seed = Mth.getSeed(getFloorX(), 0, getFloorZ());
+        return aabb.offset((seed % 12 + 1) / 16.0, 0, (((seed >> 8) % 12) + 1) / 16.0);
     }
 
     @Override
@@ -194,11 +205,6 @@ public class BlockBamboo extends BlockTransparentMeta {
             }
         }
         return super.onBreak(item);
-    }
-
-    @Override
-    public boolean canPassThrough() {
-        return true;
     }
 
     private boolean isSupportInvalid() {
