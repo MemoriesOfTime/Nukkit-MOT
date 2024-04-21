@@ -533,9 +533,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 if (damageEntity instanceof Player) {
                     deathMessage = new TranslationContainer("death.attack.player", killedEntity, damageEntity.getName());
                 } else {
-                    if (damageEntity instanceof EntityWolf) {
-                        ((EntityWolf) damageEntity).setAngry(false);
-                    }
+                    if (damageEntity instanceof EntityWolf wolf) wolf.setAngry(false);
                     deathMessage = new TranslationContainer("death.attack.mob", killedEntity, damageEntity.getName());
                 }
             }
