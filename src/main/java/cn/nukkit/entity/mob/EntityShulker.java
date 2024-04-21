@@ -114,8 +114,4 @@ public class EntityShulker extends EntityWalkingMob {
     public int getKillExperience() {
         return 5;
     }
-
-    @Override
-    public void knockBack(double x, double z, double base) {
-    }
 }

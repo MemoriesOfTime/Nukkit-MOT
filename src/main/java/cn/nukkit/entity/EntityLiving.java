@@ -181,7 +181,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         boolean blocked = (normalizedVector.x * direction.x) + (normalizedVector.z * direction.z) < 0.0;
         boolean knockBack = !(damager instanceof EntityProjectile);
         EntityDamageBlockedEvent event = new EntityDamageBlockedEvent(this, source, knockBack, true);
-        if (!blocked || !source.canBeReducedByArmor() || damager instanceof EntityProjectile && ((EntityProjectile) damager).piercing > 0) {
+        if (!blocked || !source.canBeReducedByArmor() || damager instanceof EntityProjectile projectile && projectile.piercing > 0) {
             event.setCancelled();
         }
 
@@ -250,14 +250,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
         if (this.level.getGameRules().getBoolean(GameRule.DO_MOB_LOOT) && this.lastDamageCause != null && DamageCause.VOID != this.lastDamageCause.getCause()) {
             if (ev.getEntity() instanceof BaseEntity baseEntity) {
-                if (baseEntity.getLastDamageCause() instanceof EntityDamageByEntityEvent) {
-                    if (((EntityDamageByEntityEvent) baseEntity.getLastDamageCause()).getDamager() instanceof Player) {
-                        this.getLevel().dropExpOrb(this, baseEntity.getKillExperience());
+                if (baseEntity.getLastDamageCause() instanceof EntityDamageByEntityEvent entity && entity.getDamager() instanceof Player) {
+                    this.getLevel().dropExpOrb(this, baseEntity.getKillExperience());
 
-                        if (!this.dropsOnNaturalDeath()) {
-                            for (cn.nukkit.item.Item item : ev.getDrops()) {
-                                this.getLevel().dropItem(this, item);
-                            }
+                    if (!this.dropsOnNaturalDeath()) {
+                        for (cn.nukkit.item.Item item : ev.getDrops()) {
+                            this.getLevel().dropItem(this, item);
                         }
                     }
                 }
@@ -467,7 +465,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                     return block;
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         return null;
     }
@@ -510,12 +509,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     private void checkTameableEntityDeath() {
-        if (this instanceof EntityTameable) {
-            if (!((EntityTameable) this).hasOwner()) {
+        if (this instanceof EntityTameable entity) {
+            if (!entity.hasOwner()) {
                 return;
             }
 
-            if (((EntityTameable) this).getOwner() == null) {
+            if (entity.getOwner() == null) {
                 return;
             }
 
@@ -528,12 +527,13 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             TranslationContainer deathMessage = new TranslationContainer("death.attack.generic", killedEntity);
-            if (this.getLastDamageCause() instanceof EntityDamageByEntityEvent) {
-                Entity damageEntity = ((EntityDamageByEntityEvent) this.getLastDamageCause()).getDamager();
+            if (this.getLastDamageCause() instanceof EntityDamageByEntityEvent event) {
+                Entity damageEntity = event.getDamager();
                 if (damageEntity instanceof Player) {
                     deathMessage = new TranslationContainer("death.attack.player", killedEntity, damageEntity.getName());
                 } else {
-                    if (damageEntity instanceof EntityWolf wolf) wolf.setAngry(false);
+                    if (damageEntity instanceof EntityWolf wolf)
+                        wolf.setAngry(false);
                     deathMessage = new TranslationContainer("death.attack.mob", killedEntity, damageEntity.getName());
                 }
             }
@@ -543,7 +543,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             tameDeathMessage.message = deathMessage.getText();
             tameDeathMessage.parameters = deathMessage.getParameters();
             tameDeathMessage.isLocalized = true;
-            ((EntityTameable) this).getOwner().dataPacket(tameDeathMessage);
+            entity.getOwner().dataPacket(tameDeathMessage);
         }
     }
 
@@ -568,8 +568,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         AxisAlignedBB bb = this.boundingBox.clone().expand(distance, distance, distance);
         EntityHuman human = null;
         for (Entity collidingEntity : this.level.getCollidingEntities(bb)) {
-            if (collidingEntity instanceof EntityHuman) {
-                human = (EntityHuman) collidingEntity;
+            if (collidingEntity instanceof EntityHuman entity) {
+                human = entity;
                 break;
             }
         }
