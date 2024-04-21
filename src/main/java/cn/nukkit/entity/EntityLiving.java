@@ -125,10 +125,10 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         }
 
         if (super.attack(source)) {
-            if (source instanceof EntityDamageByEntityEvent) {
-                Entity damager = ((EntityDamageByEntityEvent) source).getDamager();
-                if (source instanceof EntityDamageByChildEntityEvent) {
-                    damager = ((EntityDamageByChildEntityEvent) source).getChild();
+            if (source instanceof EntityDamageByEntityEvent event) {
+                Entity damager = event.getDamager();
+                if (source instanceof EntityDamageByChildEntityEvent damageByChild) {
+                    damager = damageByChild.getChild();
                 }
 
                 // Critical hit
@@ -149,7 +149,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
                 double deltaX = this.x - damager.x;
                 double deltaZ = this.z - damager.z;
-                this.knockBack(damager, source.getDamage(), deltaX, deltaZ, ((EntityDamageByEntityEvent) source).getKnockBack());
+                this.knockBack(deltaX, deltaZ, event.getKnockBack());
             }
 
             EntityEventPacket pk = new EntityEventPacket();
@@ -170,7 +170,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             return false;
         }
 
-        Entity damager = source instanceof EntityDamageByChildEntityEvent ? ((EntityDamageByChildEntityEvent) source).getChild() : source instanceof EntityDamageByEntityEvent ? ((EntityDamageByEntityEvent) source).getDamager() : null;
+        Entity damager = source instanceof EntityDamageByChildEntityEvent event ? event.getChild() : source instanceof EntityDamageByEntityEvent event ? event.getDamager() : null;
         if (damager == null || damager instanceof EntityWeather) {
             return false;
         }
@@ -190,11 +190,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             return false;
         }
 
-        if (event.getKnockBackAttacker() && damager instanceof EntityLiving) {
+        if (event.getKnockBackAttacker() && damager instanceof EntityLiving living) {
             double deltaX = damager.getX() - this.getX();
             double deltaZ = damager.getZ() - this.getZ();
-            ((EntityLiving) damager).attackTime = source.getAttackCooldown();
-            ((EntityLiving) damager).knockBack(this, 0, deltaX, deltaZ);
+            living.attackTime = source.getAttackCooldown();
+            living.knockBack(deltaX, deltaZ);
         }
 
         onBlock(damager, source, event.getAnimation());
@@ -207,11 +207,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         }
     }
 
-    public void knockBack(Entity attacker, double damage, double x, double z) {
-        this.knockBack(attacker, damage, x, z, 0.3);
+    public void knockBack(double x, double z) {
+        this.knockBack(x, z, 0.3);
     }
 
-    public void knockBack(Entity attacker, double damage, double x, double z, double base) {
+    public void knockBack(double x, double z, double base) {
         double f = Math.sqrt(x * x + z * z);
         if (f <= 0) {
             return;
@@ -249,8 +249,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         this.checkTameableEntityDeath();
 
         if (this.level.getGameRules().getBoolean(GameRule.DO_MOB_LOOT) && this.lastDamageCause != null && DamageCause.VOID != this.lastDamageCause.getCause()) {
-            if (ev.getEntity() instanceof BaseEntity) {
-                BaseEntity baseEntity = (BaseEntity) ev.getEntity();
+            if (ev.getEntity() instanceof BaseEntity baseEntity) {
                 if (baseEntity.getLastDamageCause() instanceof EntityDamageByEntityEvent) {
                     if (((EntityDamageByEntityEvent) baseEntity.getLastDamageCause()).getDamager() instanceof Player) {
                         this.getLevel().dropExpOrb(this, baseEntity.getKillExperience());
@@ -281,11 +280,10 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public boolean entityBaseTick(int tickDiff) {
         boolean inWater = this.isSubmerged();
 
-        if (this instanceof Player && !this.closed) {
-            Player p = (Player) this;
+        if (this instanceof Player player && !this.closed) {
             boolean isBreathing = !inWater;
 
-            PlayerInventory inv = p.getInventory();
+            PlayerInventory inv = player.getInventory();
             if (isBreathing && inv != null && inv.getHelmetFast() instanceof ItemTurtleShell) {
                 turtleTicks = 200;
             } else if (turtleTicks > 0) {
@@ -293,13 +291,13 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 turtleTicks--;
             }
 
-            if (p.isCreative() || p.isSpectator()) {
+            if (player.isCreative() || player.isSpectator()) {
                 isBreathing = true;
             }
 
             // HACK!
-            if (p.protocol <= 282) {
-                if (p.protocol <= 201) {
+            if (player.protocol <= 282) {
+                if (player.protocol <= 201) {
                     this.setDataFlagSelfOnly(DATA_FLAGS, 33, isBreathing);
                 } else {
                     this.setDataFlagSelfOnly(DATA_FLAGS, 34, isBreathing);
@@ -481,7 +479,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public float getMovementSpeed() {
         return this.movementSpeed;
     }
-    
+
     public int getAirTicks() {
         return this.airTicks;
     }
