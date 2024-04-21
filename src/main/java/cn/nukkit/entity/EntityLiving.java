@@ -170,18 +170,20 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             return false;
         }
 
-        Entity damager = source instanceof EntityDamageByChildEntityEvent event ? event.getChild() : source instanceof EntityDamageByEntityEvent event ? event.getDamager() : null;
-        if (damager == null || damager instanceof EntityWeather) {
+        Entity damageEntity = source instanceof EntityDamageByChildEntityEvent event ? event.getChild() :
+                source instanceof EntityDamageByEntityEvent event ? event.getDamager() : null;
+
+        if (damageEntity == null || damageEntity instanceof EntityWeather) {
             return false;
         }
 
-        Vector3 entityPos = damager.getPosition();
+        Vector3 entityPos = damageEntity.getPosition();
         Vector3 direction = this.getDirectionVector();
         Vector3 normalizedVector = this.getPosition().subtract(entityPos).normalize();
         boolean blocked = (normalizedVector.x * direction.x) + (normalizedVector.z * direction.z) < 0.0;
-        boolean knockBack = !(damager instanceof EntityProjectile);
+        boolean knockBack = !(damageEntity instanceof EntityProjectile);
         EntityDamageBlockedEvent event = new EntityDamageBlockedEvent(this, source, knockBack, true);
-        if (!blocked || !source.canBeReducedByArmor() || damager instanceof EntityProjectile projectile && projectile.piercing > 0) {
+        if (!blocked || !source.canBeReducedByArmor() || damageEntity instanceof EntityProjectile projectile && projectile.piercing > 0) {
             event.setCancelled();
         }
 
@@ -190,14 +192,14 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             return false;
         }
 
-        if (event.getKnockBackAttacker() && damager instanceof EntityLiving living) {
-            double deltaX = damager.getX() - this.getX();
-            double deltaZ = damager.getZ() - this.getZ();
+        if (event.getKnockBackAttacker() && damageEntity instanceof EntityLiving living) {
+            double deltaX = damageEntity.getX() - this.getX();
+            double deltaZ = damageEntity.getZ() - this.getZ();
             living.attackTime = source.getAttackCooldown();
             living.knockBack(deltaX, deltaZ);
         }
 
-        onBlock(damager, source, event.getAnimation());
+        onBlock(damageEntity, source, event.getAnimation());
         return true;
     }
 
@@ -254,7 +256,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                     this.getLevel().dropExpOrb(this, baseEntity.getKillExperience());
 
                     if (!this.dropsOnNaturalDeath()) {
-                        for (cn.nukkit.item.Item item : ev.getDrops()) {
+                        for (Item item : ev.getDrops()) {
                             this.getLevel().dropItem(this, item);
                         }
                     }
@@ -262,7 +264,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             if (this.dropsOnNaturalDeath()) {
-                for (cn.nukkit.item.Item item : ev.getDrops()) {
+                for (Item item : ev.getDrops()) {
                     this.getLevel().dropItem(this, item);
                 }
             }
@@ -565,15 +567,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public EntityHuman getNearbyHuman(double distance) {
-        AxisAlignedBB bb = this.boundingBox.clone().expand(distance, distance, distance);
-        EntityHuman human = null;
-        for (Entity collidingEntity : this.level.getCollidingEntities(bb)) {
-            if (collidingEntity instanceof EntityHuman entity) {
-                human = entity;
-                break;
-            }
-        }
-        return human;
+        return Arrays.stream(this.level.getCollidingEntities(this.boundingBox.clone().expand(distance, distance, distance)))
+                .filter(EntityHuman.class::isInstance)
+                .map(EntityHuman.class::cast)
+                .findFirst()
+                .orElse(null);
     }
 
 }
