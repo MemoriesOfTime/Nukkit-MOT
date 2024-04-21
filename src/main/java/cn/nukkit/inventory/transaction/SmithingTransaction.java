@@ -76,7 +76,7 @@ public class SmithingTransaction extends InventoryTransaction {
                 case 3 -> // template
                     this.templateItem = action.getTargetItem();
             }
-        } else if (action instanceof CreativeInventoryAction creativeAction) {
+        } else if (action instanceof CreativeInventoryAction creativeAction && this.source.isCreative()) {
             if (creativeAction.getActionType() == 0) {
                 switch (actions.size()) {
                     case 7:
