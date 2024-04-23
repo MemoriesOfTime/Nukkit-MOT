@@ -323,6 +323,10 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FLAG_FEELING_HAPPY = 112;
     public static final int DATA_FLAG_SEARCHING = 113;
     public static final int DATA_FLAG_CRAWLING = 114;
+    public static final int DATA_TIMER_FLAG_1 = 115;
+    public static final int DATA_TIMER_FLAG_2 = 116;
+    public static final int DATA_TIMER_FLAG_3 = 117;
+    public static final int DATA_FLAG_BODY_ROTATION_BLOCKED = 118;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
