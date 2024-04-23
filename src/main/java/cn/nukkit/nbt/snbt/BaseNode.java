@@ -9,6 +9,7 @@ import java.util.*;
 public class BaseNode implements Node {
     private SNBTLexer tokenSource;
 
+    @Override
     public SNBTLexer getTokenSource() {
         if (tokenSource == null) {
             for (Node child : children()) {
@@ -19,6 +20,7 @@ public class BaseNode implements Node {
         return tokenSource;
     }
 
+    @Override
     public void setTokenSource(SNBTLexer tokenSource) {
         this.tokenSource = tokenSource;
     }
@@ -61,69 +63,85 @@ public class BaseNode implements Node {
     private int beginOffset, endOffset;
     private boolean unparsed;
 
+    @Override
     public boolean isUnparsed() {
         return this.unparsed;
     }
 
+    @Override
     public void setUnparsed(boolean unparsed) {
         this.unparsed = unparsed;
     }
 
+    @Override
     public void setParent(Node n) {
         parent = n;
     }
 
+    @Override
     public Node getParent() {
         return parent;
     }
 
+    @Override
     public void addChild(Node n) {
         children.add(n);
         n.setParent(this);
     }
 
+    @Override
     public void addChild(int i, Node n) {
         children.add(i, n);
         n.setParent(this);
     }
 
+    @Override
     public Node getChild(int i) {
         return children.get(i);
     }
 
+    @Override
     public void setChild(int i, Node n) {
         children.set(i, n);
         n.setParent(this);
     }
 
+    @Override
     public Node removeChild(int i) {
         return children.remove(i);
     }
 
+    @Override
     public void clearChildren() {
         children.clear();
     }
 
+    @Override
     public int getChildCount() {
         return children.size();
     }
 
+    @Override
     public List<Node> children() {
         return Collections.unmodifiableList(children);
     }
 
+    @Override
     public int getBeginOffset() {
         return beginOffset;
     }
 
+    @Override
     public void setBeginOffset(int beginOffset) {
         this.beginOffset = beginOffset;
     }
 
+    @Override
     public int getEndOffset() {
         return endOffset;
     }
 
+    @Override
     public void setEndOffset(int endOffset) {
         this.endOffset = endOffset;
     }

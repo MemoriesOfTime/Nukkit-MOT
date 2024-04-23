@@ -33,6 +33,7 @@ public class BlockLantern extends BlockFlowable {
         switch (support.getId()) {
             case IRON_BARS:
             case HOPPER_BLOCK:
+            case CHAIN_BLOCK:
                 return true;
             default:
                 if (support instanceof BlockFence) {

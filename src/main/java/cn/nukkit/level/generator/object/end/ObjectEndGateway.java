@@ -15,6 +15,7 @@ import cn.nukkit.math.Vector3;
  */
 public class ObjectEndGateway extends BasicGenerator {
 
+    @Override
     public boolean generate(ChunkManager level, NukkitRandom rand, Vector3 position) {
         return this.generate(level, rand, position, null);
     }

@@ -17,6 +17,7 @@ public abstract class AsyncTask implements Runnable {
     private int taskId;
     private boolean finished = false;
 
+    @Override
     public void run() {
         this.result = null;
         this.onRun();

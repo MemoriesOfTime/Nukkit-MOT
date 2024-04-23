@@ -374,6 +374,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             list[CRIMSON_DOOR] = ItemDoorCrimson.class; //755
             list[WARPED_DOOR] = ItemDoorWarped.class; //756
             list[WARPED_FUNGUS_ON_A_STICK] = ItemWarpedFungusOnAStick.class; //757
+            list[CHAIN] = ItemChain.class; //758
             list[RECORD_PIGSTEP] = ItemRecordPigstep.class; //759
             list[NETHER_SPROUTS] = ItemNetherSprouts.class; //760
 
@@ -431,6 +432,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             registerNamespacedIdItem(ItemShelterPotterySherd.class);
             registerNamespacedIdItem(ItemSkullPotterySherd.class);
             registerNamespacedIdItem(ItemSnortPotterySherd.class);
+            registerNamespacedIdItem(ItemBrush.class);
+            registerNamespacedIdItem(ItemGoatHorn.class);
 
             // 添加原版物品到NAMESPACED_ID_ITEM
             // Add vanilla items to NAMESPACED_ID_ITEM

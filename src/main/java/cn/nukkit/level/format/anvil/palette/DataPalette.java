@@ -204,6 +204,7 @@ public final class DataPalette implements Cloneable {
         return false;
     }
 
+    @Override
     public synchronized DataPalette clone() {
         return new DataPalette(getRaw().clone());
     }

@@ -45,7 +45,7 @@ public class EntityBlueWitherSkull extends EntityWitherSkull implements EntityEx
         }
 
         if (this.age > 1200 || this.isCollided || this.hadCollision) {
-            if (this.canExplode) {
+            if (this.level.getGameRules().getBoolean(GameRule.PROJECTILES_CAN_BREAK_BLOCKS) && this.canExplode) {
                 this.explode();
             }else {
                 this.close();

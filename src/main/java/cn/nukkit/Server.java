@@ -2935,6 +2935,8 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.MOVING_BLOCK, BlockEntityMovingBlock.class);
         BlockEntity.registerBlockEntity(BlockEntity.END_GATEWAY, BlockEntityEndGateway.class);
         BlockEntity.registerBlockEntity(BlockEntity.DECORATED_POT, BlockEntityDecoratedPot.class);
+        BlockEntity.registerBlockEntity(BlockEntity.TARGET, BlockEntityTarget.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BRUSHABLE_BLOCK, BlockEntityBrushableBlock.class);
     }
 
     /**
@@ -3277,6 +3279,7 @@ public class Server {
             return new AccessControlContext(new ProtectionDomain[]{new ProtectionDomain(null, permissions)});
         }
 
+        @Override
         @SuppressWarnings("removal")
         public ForkJoinWorkerThread newThread(final ForkJoinPool pool) {
             return AccessController.doPrivileged((PrivilegedAction<ForkJoinWorkerThread>) () -> new ComputeThread(pool, threadCount), ACC);

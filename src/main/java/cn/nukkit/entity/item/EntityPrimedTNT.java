@@ -156,6 +156,7 @@ public class EntityPrimedTNT extends Entity implements EntityExplosive {
         return hasUpdate || fuse >= 0 || Math.abs(motionX) > 0.00001 || Math.abs(motionY) > 0.00001 || Math.abs(motionZ) > 0.00001;
     }
 
+    @Override
     public void explode() {
         EntityExplosionPrimeEvent event = new EntityExplosionPrimeEvent(this, 4);
         server.getPluginManager().callEvent(event);

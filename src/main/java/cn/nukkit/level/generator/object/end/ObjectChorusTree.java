@@ -14,6 +14,7 @@ import static cn.nukkit.block.BlockID.AIR;
  */
 public class ObjectChorusTree extends BasicGenerator {
 
+    @Override
     public boolean generate(ChunkManager level, NukkitRandom rand, Vector3 position) {
         return this.generate(level, rand, position, 8);
     }

@@ -63,6 +63,7 @@ public class RegisteredServiceProvider<T> implements Comparable<RegisteredServic
         return provider.hashCode();
     }
 
+    @Override
     public int compareTo(RegisteredServiceProvider<T> other) {
         return other.priority.ordinal() - priority.ordinal();
     }

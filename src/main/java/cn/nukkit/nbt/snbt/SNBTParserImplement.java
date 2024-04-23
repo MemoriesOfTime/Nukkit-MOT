@@ -1340,6 +1340,7 @@ public class SNBTParserImplement implements SNBTConstants {
             return result;
         }
 
+        @Override
         public NodeScope clone() {
             NodeScope clone = (NodeScope) super.clone();
             if (parentScope != null) {

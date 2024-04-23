@@ -35,7 +35,9 @@ public enum GameRule {
     SHOW_BORDER_EFFECT("showBorderEffect"),
     PLAYERS_SLEEPING_PERCENTAGE("playersSleepingPercentage"),
     RECIPES_UNLOCK("recipesUnlock"),
-    DO_LIMITED_CRAFTING("doLimitedCrafting");
+    DO_LIMITED_CRAFTING("doLimitedCrafting"),
+    SHOW_RECIPE_MESSAGE("showrecipemessages"),
+    PROJECTILES_CAN_BREAK_BLOCKS("projectilesCanBreakBlocks");
 
     private final String name;
     private final String bedrockName;

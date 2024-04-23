@@ -28,7 +28,6 @@ import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.inventory.transaction.action.SmithingItemAction;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemID;
 
 import java.util.List;
 
@@ -70,18 +69,22 @@ public class SmithingTransaction extends InventoryTransaction {
             switch (((SmithingItemAction) action).getType()) {
                 case 0 -> // input
                     this.equipmentItem = action.getTargetItem();
-                case 2 -> // result
-                    this.outputItem = action.getSourceItem();
                 case 1 -> // ingredient
                     this.ingredientItem = action.getTargetItem();
+                case 2 -> // result
+                    this.outputItem = action.getSourceItem();
                 case 3 -> // template
                     this.templateItem = action.getTargetItem();
             }
-        } else if (action instanceof CreativeInventoryAction creativeAction) {
-            if (creativeAction.getActionType() == 0
-                    && creativeAction.getSourceItem().isNull()
-                    && !creativeAction.getTargetItem().isNull() && creativeAction.getTargetItem().getId() == ItemID.NETHERITE_INGOT) {
-                this.ingredientItem = action.getTargetItem();
+        } else if (action instanceof CreativeInventoryAction creativeAction && this.source.isCreative()) {
+            if (creativeAction.getActionType() == 0) {
+                switch (actions.size()) {
+                    case 7:
+                        this.equipmentItem = action.getTargetItem();
+                        break;
+                    case 8:
+                        this.outputItem = action.getSourceItem();
+                }
             }
         }
     }
@@ -124,7 +127,7 @@ public class SmithingTransaction extends InventoryTransaction {
         Item equipment = equipmentItem != null? equipmentItem : air;
         Item ingredient = ingredientItem != null? ingredientItem : air;
         Item template = templateItem != null? templateItem : air;
-        SmithingTableEvent event = new SmithingTableEvent(inventory, equipment, outputItem, ingredient, templateItem, source);
+        SmithingTableEvent event = new SmithingTableEvent(inventory, equipment, outputItem, ingredient, template, source);
         this.source.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
             this.source.removeAllWindows(false);
