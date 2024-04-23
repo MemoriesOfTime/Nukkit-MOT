@@ -124,7 +124,7 @@ public class GlobalBlockPalette {
         blockPalette630 = new BlockPalette(ProtocolInfo.v1_20_50);
         blockPalette649 = new BlockPalette(ProtocolInfo.v1_20_60);
         blockPalette662 = new BlockPalette(ProtocolInfo.v1_20_70);
-        blockPalette662 = new BlockPalette(ProtocolInfo.v1_20_80);
+        blockPalette671 = new BlockPalette(ProtocolInfo.v1_20_80);
     }
 
     public static void init() {

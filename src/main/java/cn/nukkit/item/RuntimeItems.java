@@ -101,7 +101,7 @@ public class RuntimeItems {
         mapping630 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_50);
         mapping649 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_60);
         mapping662 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_70);
-        mapping662 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_80);
+        mapping671 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_80);
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {
