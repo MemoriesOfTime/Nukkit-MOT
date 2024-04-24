@@ -919,6 +919,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCustomItem(customItem, v1_20_50, addCreativeItem, v1_20_50);
         registerCustomItem(customItem, v1_20_60, addCreativeItem, v1_20_60);
         registerCustomItem(customItem, v1_20_70, addCreativeItem, v1_20_70);
+        registerCustomItem(customItem, v1_20_80, addCreativeItem, v1_20_80);
         //TODO Multiversion 添加新版本支持时修改这里
 
         return new OK<Void>(true);
@@ -957,6 +958,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             deleteCustomItem(customItem, v1_20_50, v1_20_50);
             deleteCustomItem(customItem, v1_20_60, v1_20_60);
             deleteCustomItem(customItem, v1_20_70, v1_20_70);
+            deleteCustomItem(customItem, v1_20_80, v1_20_80);
             //TODO Multiversion 添加新版本支持时修改这里
         }
     }
