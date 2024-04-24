@@ -5,7 +5,6 @@ import cn.nukkit.event.player.PlayerItemConsumeEvent;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.level.Sound;
 import cn.nukkit.math.Vector3;
-import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * @author MagicDroidX
@@ -31,13 +30,7 @@ public abstract class ItemEdible extends Item {
 
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
-        if (player.getFoodData().getLevel() < player.getFoodData().getMaxLevel() || player.isCreative() || player.getServer().getDifficulty() == 0) {
-            return true;
-        }
-        if (player.protocol > ProtocolInfo.v1_12_0) {
-            player.getFoodData().sendFoodLevel();
-        }
-        return false;
+        return player.canEat(true);
     }
 
     @Override

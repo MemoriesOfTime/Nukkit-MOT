@@ -1340,6 +1340,10 @@ public class Server {
             }
         }
 
+        for (Player p : this.getOnlinePlayers().values()) {
+            p.resetPacketCounters();
+        }
+
         // Do level ticks
         for (Level level : this.levelArray) {
             if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
