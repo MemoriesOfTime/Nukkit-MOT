@@ -274,6 +274,10 @@ public class NetworkInventoryAction {
 
                 return new DropItemAction(this.oldItem, this.newItem);
             case SOURCE_CREATIVE:
+                if (!player.isCreative()) {
+                    return null;
+                }
+
                 int type;
 
                 switch (this.inventorySlot) {

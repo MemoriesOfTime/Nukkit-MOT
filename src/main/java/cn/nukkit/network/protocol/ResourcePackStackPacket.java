@@ -24,6 +24,10 @@ public class ResourcePackStackPacket extends DataPacket {
      * v1.16.100 and above
      */
     public final List<ExperimentData> experiments = new ObjectArrayList<>();
+    /**
+     * @since v671
+     */
+    public boolean hasEditorPacks;
 
     /**
      * 兼容NK插件，MOT不使用这个字段
@@ -69,6 +73,9 @@ public class ResourcePackStackPacket extends DataPacket {
                     this.putBoolean(experimentData.isEnabled());
                 }
                 this.putBoolean(!this.experiments.isEmpty()); // Were experiments previously toggled
+                if (this.protocol >= ProtocolInfo.v1_20_80) {
+                    this.putBoolean(this.hasEditorPacks);
+                }
             }
         }
     }
