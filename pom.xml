@@ -61,7 +61,7 @@
         <dependency>
             <groupId>org.cloudburstmc.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.0.0.CR3-SNAPSHOT</version>
+            <version>1.0.0.CR1-20240330.101522-15</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -275,7 +275,7 @@
         <dependency>
             <groupId>org.bitbucket.b_c</groupId>
             <artifactId>jose4j</artifactId>
-            <version>0.9.6</version>
+            <version>0.9.4</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
