@@ -32,6 +32,8 @@ import cn.nukkit.utils.BlockIterator;
 
 import java.util.*;
 
+import java.util.stream.StreamSupport;
+
 /**
  * @author MagicDroidX
  * Nukkit Project
@@ -109,20 +111,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public boolean attack(EntityDamageEvent source) {
         return this.noDamageTicks <= 0 && this.attackTime <= 0 && !this.blockedByShield(source) &&
                 Optional.of(super.attack(source))
-                        .filter(successful -> successful)
+                        .filter(Boolean::booleanValue)
                         .map(success -> {
                             if (source instanceof EntityDamageByEntityEvent event) {
                                 Entity damageEntity = event instanceof EntityDamageByChildEntityEvent childDamageEvent ? childDamageEvent.getChild() : event.getDamager();
 
-                                // Critical hit
-                                if (damageEntity instanceof Player && !damageEntity.onGround) {
-                                    AnimatePacket animate = new AnimatePacket();
-                                    animate.action = AnimatePacket.Action.CRITICAL_HIT;
-                                    animate.eid = getId();
-                                    this.getLevel().addChunkPacket(damageEntity.getChunkX(), damageEntity.getChunkZ(), animate);
-                                    this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ATTACK_STRONG);
-                                    source.setDamage(source.getDamage() * 1.5f);
-                                }
+                                this.checkCriticalHit(damageEntity, source);
 
                                 if (damageEntity.isOnFire() && !(damageEntity instanceof Player)) {
                                     this.setOnFire(this.server.getDifficulty() << 1);
@@ -133,16 +127,31 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                                 this.knockBack(deltaX, deltaZ, event.getKnockBack());
                             }
 
-                            EntityEventPacket pk = new EntityEventPacket();
-                            pk.eid = this.getId();
-                            pk.event = this.getHealth() < 1 ? EntityEventPacket.DEATH_ANIMATION : EntityEventPacket.HURT_ANIMATION;
-                            Server.broadcastPacket(this.hasSpawned.values(), pk);
+                            this.callBroadcastAnimation();
 
                             this.attackTime = source.getAttackCooldown();
                             this.scheduleUpdate();
                             return true;
                         })
                         .orElse(false);
+    }
+
+    private void checkCriticalHit(Entity damageEntity, EntityDamageEvent source) {
+        if (damageEntity instanceof Player && !damageEntity.onGround) {
+            AnimatePacket animate = new AnimatePacket();
+            animate.action = AnimatePacket.Action.CRITICAL_HIT;
+            animate.eid = getId();
+            this.getLevel().addChunkPacket(damageEntity.getChunkX(), damageEntity.getChunkZ(), animate);
+            this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ATTACK_STRONG);
+            source.setDamage(source.getDamage() * 1.5f);
+        }
+    }
+
+    private void callBroadcastAnimation() {
+        EntityEventPacket pk = new EntityEventPacket();
+        pk.eid = this.getId();
+        pk.event = this.getHealth() < 1 ? EntityEventPacket.DEATH_ANIMATION : EntityEventPacket.HURT_ANIMATION;
+        Server.broadcastPacket(this.hasSpawned.values(), pk);
     }
 
     protected boolean blockedByShield(EntityDamageEvent source) {
@@ -183,10 +192,29 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public void knockBack(double x, double z, double base) {
-        Vector3 motion = new Vector3(x, z, 0).normalize().multiply(base).add(0, base, 0);
-        motion.y = Math.min(motion.y, base);  // Ensure y-component doesn't exceed 'base'
-        this.setMotion(motion);
+        double f = Math.sqrt(x * x + z * z);
+        if (f <= 0) {
+            return;
+        }
+
+        f = 1 / f;
+
+        Vector3 motion = new Vector3(this.motionX, this.motionY, this.motionZ);
+
+        motion.x /= 2d;
+        motion.y /= 2d;
+        motion.z /= 2d;
+        motion.x += x * f * base;
+        motion.y += base;
+        motion.z += z * f * base;
+
+        if (motion.y > base) {
+            motion.y = base;
+        }
+
         this.resetFallDistance();
+
+        this.setMotion(motion);
     }
 
     @Override
@@ -327,21 +355,15 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     public Block[] getLineOfSight(int maxDistance, int maxLength, Integer[] transparent) {
         maxDistance = Math.min(maxDistance, 120);
-        transparent = (transparent != null && transparent.length == 0) ? null : transparent;
+        transparent = transparent != null && transparent.length == 0 ? null : transparent;
+        Iterator<Block> iterator = new BlockIterator(this.level, this.getPosition(), this.getDirectionVector(), this.getEyeHeight(), maxDistance);
 
-        List<Block> blocks = new ArrayList<>();
-        BlockIterator itr = new BlockIterator(this.level, this.getPosition(), this.getDirectionVector(), this.getEyeHeight(), maxDistance);
-
-        while (itr.hasNext() && (maxLength == 0 || blocks.size() <= maxLength)) {
-            Block block = itr.next();
-            if ((transparent == null && block.getId() != 0) || (transparent != null && Arrays.binarySearch(transparent, block.getId()) < 0)) {
-                break;
-            }
-            blocks.add(block);
-            if (maxLength != 0) blocks.remove(0);
-        }
-
-        return blocks.toArray(new Block[0]);
+        Integer[] finalTransparent = transparent;
+        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, Spliterator.ORDERED), false)
+                .takeWhile(block -> (finalTransparent == null && block.getId() != 0) || (finalTransparent != null &&
+                        !Arrays.asList(finalTransparent).contains(block.getId())))
+                .limit(maxLength == 0 ? Long.MAX_VALUE : maxLength)
+                .toArray(Block[]::new);
     }
 
     public Block getTargetBlock(int maxDistance) {
