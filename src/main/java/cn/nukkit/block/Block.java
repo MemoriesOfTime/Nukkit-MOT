@@ -362,6 +362,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[BLOCK_KELP] = BlockKelp.class; //393
             list[DRIED_KELP_BLOCK] = BlockDriedKelpBlock.class; //394
             list[ACACIA_BUTTON] = BlockButtonAcacia.class; //395
+            list[BIRCH_BUTTON] = BlockButtonBirch.class; //396
+            list[DARK_OAK_BUTTON] = BlockButtonDarkOak.class; //397
+            list[JUNGLE_BUTTON] = BlockButtonJungle.class; //398
+            list[SPRUCE_BUTTON] = BlockButtonSpruce.class; //399
             list[ACACIA_TRAPDOOR] = BlockTrapdoorAcacia.class; //400
             list[BIRCH_TRAPDOOR] = BlockTrapdoorBirch.class; //401
             list[DARK_OAK_TRAPDOOR] = BlockTrapdoorDarkOak.class; //402

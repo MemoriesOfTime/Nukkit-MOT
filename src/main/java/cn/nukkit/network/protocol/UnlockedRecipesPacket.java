@@ -11,7 +11,7 @@ import java.util.List;
 public class UnlockedRecipesPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.UNLOCKED_RECIPES_PACKET;
-    public boolean unlockedNotification;
+    public ActionType action;
     public final List<String> unlockedRecipes = new ObjectArrayList<>();
 
     @Override
@@ -21,7 +21,11 @@ public class UnlockedRecipesPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.unlockedNotification = this.getBoolean();
+        if (this.protocol >= ProtocolInfo.v1_20_0_23) {
+            this.action = ActionType.values()[this.getLInt()];
+        } else {
+            this.action = this.getBoolean() ? ActionType.NEWLY_UNLOCKED : ActionType.INITIALLY_UNLOCKED;
+        }
         int count = (int) this.getUnsignedVarInt();
         for (int i = 0; i < count; i++) {
             this.unlockedRecipes.add(this.getString());
@@ -31,10 +35,22 @@ public class UnlockedRecipesPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putBoolean(this.unlockedNotification);
+        if (this.protocol >= ProtocolInfo.v1_20_0_23) {
+            this.putLInt(this.action.ordinal());
+        } else {
+            this.putBoolean(this.action == ActionType.NEWLY_UNLOCKED);
+        }
         this.putUnsignedVarInt(this.unlockedRecipes.size());
         for (String recipe : this.unlockedRecipes) {
             this.putString(recipe);
         }
+    }
+
+    public enum ActionType {
+        EMPTY,
+        INITIALLY_UNLOCKED,
+        NEWLY_UNLOCKED,
+        REMOVE_UNLOCKED,
+        REMOVE_ALL
     }
 }
