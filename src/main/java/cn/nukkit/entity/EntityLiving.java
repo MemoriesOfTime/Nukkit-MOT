@@ -460,9 +460,16 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public void lookAt(Vector3 target) {
-        double angleYaw = Math.atan2(target.y - y, target.z - z) * 180 / Math.PI;
-        double anglePitch = Math.atan2(target.x - x, Math.sqrt((target.y - y) * (target.y - y) + (target.z - z) * (target.z - z))) * 180 / Math.PI;
-        setRotation(angleYaw, anglePitch);
+        double dx = this.x - target.x;
+        double dy = this.y - target.y;
+        double dz = this.z - target.z;
+        double yaw = Math.asin(dx / Math.sqrt(dx * dx + dz * dz)) / Math.PI * 180.0d;
+        double asin = Math.asin(dy / Math.sqrt(dx * dx + dz * dz + dy * dy)) / Math.PI * 180.0d;
+        long pitch = Math.round(asin);
+        if (dz > 0.0d) {
+            yaw = -yaw + 180.0d;
+        }
+        this.setRotation(yaw, pitch);
     }
 
     public EntityHuman getNearbyHuman() {
