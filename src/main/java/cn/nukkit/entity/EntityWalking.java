@@ -121,6 +121,7 @@ public abstract class EntityWalking extends BaseEntity {
         return false;
     }
 
+    @Override
     public Vector3 updateMove(int tickDiff) {
         if (!this.isInTickingRange()) {
             return null;

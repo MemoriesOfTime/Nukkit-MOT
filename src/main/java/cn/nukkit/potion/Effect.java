@@ -2,6 +2,7 @@ package cn.nukkit.potion;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityBoss;
 import cn.nukkit.entity.EntityLiving;
@@ -246,47 +247,37 @@ public class Effect implements Cloneable {
             return;
         }
 
-        if (entity instanceof Player player) {
-            MobEffectPacket pk = new MobEffectPacket();
-            pk.eid = entity.getId();
-            pk.effectId = this.getId();
-            pk.amplifier = this.getAmplifier();
-            pk.particles = this.isVisible();
-            pk.duration = this.getDuration();
-            if (oldEffect != null) {
-                pk.eventId = MobEffectPacket.EVENT_MODIFY;
-            } else {
-                pk.eventId = MobEffectPacket.EVENT_ADD;
+        if (entity instanceof EntityLiving entityLiving) {
+            if (entity instanceof Player player) {
+                MobEffectPacket pk = new MobEffectPacket();
+                pk.eid = entity.getId();
+                pk.effectId = this.getId();
+                pk.amplifier = this.getAmplifier();
+                pk.particles = this.isVisible();
+                pk.duration = this.getDuration();
+                if (oldEffect != null) {
+                    pk.eventId = MobEffectPacket.EVENT_MODIFY;
+                } else {
+                    pk.eventId = MobEffectPacket.EVENT_ADD;
+                }
+
+                player.dataPacket(pk);
             }
 
-            player.dataPacket(pk);
-
-            if (this.id == Effect.SPEED && (oldEffect == null || oldEffect.amplifier != this.amplifier)) {
-                if (oldEffect != null) {
+            if (this.id == Effect.SPEED) {
+                /*if (oldEffect != null) {
                     player.setMovementSpeed(player.getMovementSpeed() / (1 + 0.2f * (oldEffect.amplifier + 1)), false);
                 }
-                player.setMovementSpeed(player.getMovementSpeed() * (1 + 0.2f * (this.amplifier + 1)));
+                player.setMovementSpeed(player.getMovementSpeed() * (1 + 0.2f * (this.amplifier + 1)));*/
+                entityLiving.setMovementSpeed(Player.DEFAULT_SPEED * (1 + 0.2f * (this.amplifier + 1)));
             }
 
-            if (this.id == Effect.SLOWNESS && (oldEffect == null || oldEffect.amplifier != this.amplifier)) {
-                if (oldEffect != null) {
+            if (this.id == Effect.SLOWNESS) {
+                /*if (oldEffect != null) {
                     player.setMovementSpeed(player.getMovementSpeed() / (1 - 0.15f * (oldEffect.amplifier + 1)), false);
                 }
-                player.setMovementSpeed(player.getMovementSpeed() * (1 - 0.15f * (this.amplifier + 1)));
-            }
-        } else if (entity instanceof EntityLiving entityLiving) {
-            if (this.id == Effect.SPEED && (oldEffect == null || oldEffect.amplifier != this.amplifier)) {
-                if (oldEffect != null) {
-                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 + 0.2f * (oldEffect.amplifier + 1)));
-                }
-                entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() * (1 + 0.2f * (this.amplifier + 1)));
-            }
-
-            if (this.id == Effect.SLOWNESS && (oldEffect == null || oldEffect.amplifier != this.amplifier)) {
-                if (oldEffect != null) {
-                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 - 0.15f * (oldEffect.amplifier + 1)));
-                }
-                entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() * (1 - 0.15f * (this.amplifier + 1)));
+                player.setMovementSpeed(player.getMovementSpeed() * (1 - 0.15f * (this.amplifier + 1)));*/
+                entityLiving.setMovementSpeed(Player.DEFAULT_SPEED * (1 - 0.15f * (this.amplifier + 1)));
             }
         }
 
@@ -316,13 +307,22 @@ public class Effect implements Cloneable {
                 pk.eventId = MobEffectPacket.EVENT_REMOVE;
 
                 player.dataPacket(pk);
-            }
 
-            if (this.id == Effect.SPEED) {
-                entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 + 0.2f * (this.amplifier + 1)));
-            }
-            if (this.id == Effect.SLOWNESS) {
-                entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 - 0.15f * (this.amplifier + 1)));
+                if (this.id == Effect.SPEED) {
+                    player.setMovementSpeed(player.isSprinting() ? Player.DEFAULT_SPEED * 1.3f : Player.DEFAULT_SPEED, false);
+                    player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
+                }
+                if (this.id == Effect.SLOWNESS) {
+                    player.setMovementSpeed(player.isSprinting() ? Player.DEFAULT_SPEED * 1.3f : Player.DEFAULT_SPEED, false);
+                    player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
+                }
+            } else {
+                if (this.id == Effect.SPEED) {
+                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 + 0.2f * (this.amplifier + 1)));
+                }
+                if (this.id == Effect.SLOWNESS) {
+                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 - 0.15f * (this.amplifier + 1)));
+                }
             }
             if (this.id == Effect.HEALTH_BOOST) {
                 float max = entity.getMaxHealth();

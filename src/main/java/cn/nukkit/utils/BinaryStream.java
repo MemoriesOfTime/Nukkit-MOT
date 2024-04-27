@@ -698,6 +698,7 @@ public class BinaryStream {
             if (stringId == null) {
                 throw new IllegalArgumentException("Unknown item: runtimeID=" + runtimeId + " protocol=" + protocolId);
             }
+            stringId = stringId + ":" + damage;
             id = null;
         }
 
@@ -1079,6 +1080,7 @@ public class BinaryStream {
         int damage = 0;
         if (isStringItem && !isErrorItem) {
             runtimeId = mapping.getNetworkId(item);
+            damage = item.getDamage();
         } else {
             RuntimeEntry runtimeEntry = mapping.toRuntime(id, meta);
             runtimeId = runtimeEntry.getRuntimeId();

@@ -323,6 +323,10 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FLAG_FEELING_HAPPY = 112;
     public static final int DATA_FLAG_SEARCHING = 113;
     public static final int DATA_FLAG_CRAWLING = 114;
+    public static final int DATA_TIMER_FLAG_1 = 115;
+    public static final int DATA_TIMER_FLAG_2 = 116;
+    public static final int DATA_TIMER_FLAG_3 = 117;
+    public static final int DATA_FLAG_BODY_ROTATION_BLOCKED = 118;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
@@ -1809,6 +1813,7 @@ public abstract class Entity extends Location implements Metadatable {
         Server.broadcastPacket(hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_19_0).collect(Collectors.toList()), pk);
     }
 
+    @Override
     public Vector3 getDirectionVector() {
         Vector3 vector = super.getDirectionVector();
         return this.temporalVector.setComponents(vector.x, vector.y, vector.z);

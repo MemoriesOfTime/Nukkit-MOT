@@ -145,6 +145,7 @@ public class BlockFurnaceBurning extends BlockSolidMeta implements Faceable, Blo
         }
     }
 
+    @Override
     public boolean hasComparatorInputOverride() {
         return true;
     }

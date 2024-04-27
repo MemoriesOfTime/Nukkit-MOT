@@ -39,7 +39,7 @@ import static cn.nukkit.utils.Utils.dynamic;
  */
 @Log4j2
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
-    public static final int MAX_BLOCK_ID = dynamic(810);
+    public static final int MAX_BLOCK_ID = dynamic(829);
     public static final int DATA_BITS = dynamic(6);
     public static final int ID_MASK = 0xfff; //max 4095
     public static final int DATA_SIZE = dynamic(1 << DATA_BITS);
@@ -454,6 +454,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[SOUL_SOIL] = BlockSoulSoil.class; //491
 
             list[NETHER_SPROUTS_BLOCK] = BlockNetherSprouts.class; //493
+            list[TARGET] = BlockTarget.class; //494
 
             list[STRIPPED_CRIMSON_STEM] = BlockStemStrippedCrimson.class; //495
             list[STRIPPED_WARPED_STEM] = BlockStemStrippedWarped.class; //496
@@ -478,11 +479,50 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[RESPAWN_ANCHOR] = BlockRespawnAnchor.class; //527
             list[BLACKSTONE] = BlockBlackstone.class; //528
 
+            list[CHAIN_BLOCK] = BlockChain.class; //541
+
             list[NETHER_GOLD_ORE] = BlockOreGoldNether.class; //543
             list[CRYING_OBSIDIAN] = BlockCryingObsidian.class; //544
             list[SOUL_CAMPFIRE_BLOCK] = BlockCampfireSoul.class; //545
 
             list[COPPER_ORE] = BlockOreCopper.class; // 566
+
+            list[AMETHYST_BLOCK] = BlockAmethyst.class; //582
+
+            list[CANDLE] = BlockCandle.class; //667
+            list[WHITE_CANDLE] = BlockCandleWhite.class; //668
+            list[ORANGE_CANDLE] = BlockCandleOrange.class; //669
+            list[MAGENTA_CANDLE] = BlockCandleMagenta.class; //670
+            list[LIGHT_BLUE_CANDLE] = BlockCandleLightBlue.class; //671
+            list[YELLOW_CANDLE] = BlockCandleYellow.class; //672
+            list[LIME_CANDLE] = BlockCandleLime.class; //673
+            list[PINK_CANDLE] = BlockCandlePink.class; //674
+            list[GRAY_CANDLE] = BlockCandleGray.class; //675
+            list[LIGHT_GRAY_CANDLE] = BlockCandleLightGray.class; //676
+            list[CYAN_CANDLE] = BlockCandleCyan.class; //677
+            list[PURPLE_CANDLE] = BlockCandlePurple.class; //678
+            list[BLUE_CANDLE] = BlockCandleBlue.class; //679
+            list[BROWN_CANDLE] = BlockCandleBrown.class; //680
+            list[GREEN_CANDLE] = BlockCandleGreen.class; //681
+            list[RED_CANDLE] = BlockCandleRed.class; //682
+            list[BLACK_CANDLE] = BlockCandleBlack.class; //683
+            list[CANDLE_CAKE] = BlockCandleCake.class; //684
+            list[WHITE_CANDLE_CAKE] = BlockCandleCakeWhite.class; //685
+            list[ORANGE_CANDLE_CAKE] = BlockCandleCakeOrange.class; //686
+            list[MAGENTA_CANDLE_CAKE] = BlockCandleCakeMagenta.class; //687
+            list[LIGHT_BLUE_CANDLE_CAKE] = BlockCandleCakeLightBlue.class; //688
+            list[YELLOW_CANDLE_CAKE] = BlockCandleCakeYellow.class; //689
+            list[LIME_CANDLE_CAKE] = BlockCandleCakeLime.class; //690
+            list[PINK_CANDLE_CAKE] = BlockCandleCakePink.class; //691
+            list[GRAY_CANDLE_CAKE] = BlockCandleCakeGray.class; //692
+            list[LIGHT_GRAY_CANDLE_CAKE] = BlockCandleCakeLightGray.class; //693
+            list[CYAN_CANDLE_CAKE] = BlockCandleCakeCyan.class; //694
+            list[PURPLE_CANDLE_CAKE] = BlockCandleCakePurple.class; //695
+            list[BLUE_CANDLE_CAKE] = BlockCandleCakeBlue.class; //696
+            list[BROWN_CANDLE_CAKE] = BlockCandleCakeBrown.class; //697
+            list[GREEN_CANDLE_CAKE] = BlockCandleCakeGreen.class; //698
+            list[RED_CANDLE_CAKE] = BlockCandleCakeRed.class; //699
+            list[BLACK_CANDLE_CAKE] = BlockCandleCakeBlack.class; //700
 
             list[RAW_IRON_BLOCK] = BlockRawIron.class; //706
             list[RAW_COPPER_BLOCK] = BlockRawCopper.class; //707
@@ -496,6 +536,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[BAMBOO_PLANKS] = BlockPlanksBamboo.class; //765
 
+            list[SUSPICIOUS_SAND] = BlockSuspiciousSand.class; // 784
+
             list[STRIPPED_CHERRY_LOG] = BlockLogStrippedCherry.class; //790
             list[CHERRY_LOG] = BlockCherryLog.class; //791
             list[CHERRY_PLANKS] = BlockPlanksCherry.class; //792
@@ -506,6 +548,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[CHERRY_LEAVES] = BlockCherryLeaves.class; //803
 
             list[DECORATED_POT] = BlockDecoratedPot.class; //806
+
+            list[SUSPICIOUS_GRAVEL] = BlockSuspiciousGravel.class; // 828
 
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];
@@ -1165,10 +1209,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getHardness() != -1;
     }
 
+    @Override
     public Block getSide(BlockFace face) {
         return this.getSide(face, 1);
     }
 
+    @Override
     public Block getSide(BlockFace face, int step) {
         return this.getSideAtLayer(layer, face, step);
     }
@@ -1196,10 +1242,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return block;
     }
 
+    @Override
     public Block up() {
         return up(1);
     }
 
+    @Override
     public Block up(int step) {
         return getSide(BlockFace.UP, step);
     }
@@ -1208,10 +1256,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getSideAtLayer(layer, BlockFace.UP, step);
     }
 
+    @Override
     public Block down() {
         return down(1);
     }
 
+    @Override
     public Block down(int step) {
         return getSide(BlockFace.DOWN, step);
     }
@@ -1220,10 +1270,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getSideAtLayer(layer, BlockFace.DOWN, step);
     }
 
+    @Override
     public Block north() {
         return north(1);
     }
 
+    @Override
     public Block north(int step) {
         return getSide(BlockFace.NORTH, step);
     }
@@ -1232,10 +1284,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getSideAtLayer(layer, BlockFace.NORTH, step);
     }
 
+    @Override
     public Block south() {
         return south(1);
     }
 
+    @Override
     public Block south(int step) {
         return getSide(BlockFace.SOUTH, step);
     }
@@ -1244,10 +1298,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getSideAtLayer(layer, BlockFace.SOUTH, step);
     }
 
+    @Override
     public Block east() {
         return east(1);
     }
 
+    @Override
     public Block east(int step) {
         return getSide(BlockFace.EAST, step);
     }
@@ -1256,10 +1312,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getSideAtLayer(layer, BlockFace.EAST, step);
     }
 
+    @Override
     public Block west() {
         return west(1);
     }
 
+    @Override
     public Block west(int step) {
         return getSide(BlockFace.WEST, step);
     }
@@ -1298,26 +1356,32 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         //return new AxisAlignedBB(this.x, this.y, this.z, this.x + 1.0D, this.y + 1.0D, this.z + 1.0D);
     }
 
+    @Override
     public double getMinX() {
         return this.x;
     }
 
+    @Override
     public double getMinY() {
         return this.y;
     }
 
+    @Override
     public double getMinZ() {
         return this.z;
     }
 
+    @Override
     public double getMaxX() {
         return this.x + 1;
     }
 
+    @Override
     public double getMaxY() {
         return this.y + 1;
     }
 
+    @Override
     public double getMaxZ() {
         return this.z + 1;
     }
@@ -1326,6 +1390,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return getBoundingBox();
     }
 
+    @Override
     public MovingObjectPosition calculateIntercept(Vector3 pos1, Vector3 pos2) {
         AxisAlignedBB bb = this.getBoundingBox();
         if (bb == null) {
@@ -1446,6 +1511,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return clone();
     }
 
+    @Override
     public Block clone() {
         return (Block) super.clone();
     }
@@ -1570,5 +1636,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     @Deprecated
     public static boolean usesFakeWater(int id) {
         return usesFakeWater[id];
+    }
+
+    public boolean isSuspiciousBlock() {
+        return false;
     }
 }

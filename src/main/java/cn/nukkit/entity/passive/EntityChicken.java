@@ -117,6 +117,7 @@ public class EntityChicken extends EntityWalkingAnimal {
         return super.onInteract(player, item, clickedPos);
     }
 
+    @Override
     public void saveNBT() {
         super.saveNBT();
 

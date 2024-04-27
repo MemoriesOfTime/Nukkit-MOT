@@ -13,6 +13,7 @@ public class SpiderSpawner extends AbstractEntitySpawner {
         super(spawnTask);
     }
 
+    @Override
     public void spawn(Player player, Position pos, Level level) {
         if (level.getBlockLightAt((int) pos.x, (int) pos.y, (int) pos.z) <= 7) {
             if (level.isMobSpawningAllowedByTime()) {

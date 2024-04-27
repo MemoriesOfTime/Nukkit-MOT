@@ -56,6 +56,7 @@ public class EntityIronGolem extends EntityWalkingMob {
         this.setMinDamage(new int[] { 0, 4, 7, 11 });
     }
 
+    @Override
     public void attackEntity(Entity player) {
         if (this.attackDelay > 40 && this.distanceSquared(player) < 4) {
             this.attackDelay = 0;
@@ -75,6 +76,7 @@ public class EntityIronGolem extends EntityWalkingMob {
         }
     }
 
+    @Override
     public boolean targetOption(EntityCreature creature, double distance) {
         return (!(creature instanceof Player) || creature.getId() == this.isAngryTo) && !(creature instanceof EntityWolf) && creature.isAlive() && distance <= 100;
     }

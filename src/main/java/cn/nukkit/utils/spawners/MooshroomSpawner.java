@@ -16,6 +16,7 @@ public class MooshroomSpawner extends AbstractEntitySpawner {
         super(spawnTask);
     }
 
+    @Override
     public void spawn(Player player, Position pos, Level level) {
         if (Utils.rand(0, 3) == 1) {
             return;

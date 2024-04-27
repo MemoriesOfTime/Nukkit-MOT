@@ -14,6 +14,7 @@ public class DrownedSpawner extends AbstractEntitySpawner {
         super(spawnTask);
     }
 
+    @Override
     public void spawn(Player player, Position pos, Level level) {
         final int blockId = level.getBlockIdAt((int) pos.x, (int) pos.y, (int) pos.z);
         if (blockId == Block.WATER || blockId == Block.STILL_WATER) {

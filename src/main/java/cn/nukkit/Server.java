@@ -1271,7 +1271,9 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_20_70) {
+        if (player.protocol >= ProtocolInfo.v1_20_80) {
+            player.dataPacket(CraftingManager.packet671);
+        } else if (player.protocol >= ProtocolInfo.v1_20_70) {
             player.dataPacket(CraftingManager.packet662);
         } else if (player.protocol >= ProtocolInfo.v1_20_60) {
             player.dataPacket(CraftingManager.packet649);
@@ -1336,6 +1338,10 @@ public class Server {
             for (Player p : new ArrayList<>(this.players.values())) {
                 p.onUpdate(currentTick);
             }
+        }
+
+        for (Player p : this.getOnlinePlayers().values()) {
+            p.resetPacketCounters();
         }
 
         // Do level ticks
@@ -2933,6 +2939,8 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.MOVING_BLOCK, BlockEntityMovingBlock.class);
         BlockEntity.registerBlockEntity(BlockEntity.END_GATEWAY, BlockEntityEndGateway.class);
         BlockEntity.registerBlockEntity(BlockEntity.DECORATED_POT, BlockEntityDecoratedPot.class);
+        BlockEntity.registerBlockEntity(BlockEntity.TARGET, BlockEntityTarget.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BRUSHABLE_BLOCK, BlockEntityBrushableBlock.class);
     }
 
     /**
@@ -3275,6 +3283,7 @@ public class Server {
             return new AccessControlContext(new ProtectionDomain[]{new ProtectionDomain(null, permissions)});
         }
 
+        @Override
         @SuppressWarnings("removal")
         public ForkJoinWorkerThread newThread(final ForkJoinPool pool) {
             return AccessController.doPrivileged((PrivilegedAction<ForkJoinWorkerThread>) () -> new ComputeThread(pool, threadCount), ACC);

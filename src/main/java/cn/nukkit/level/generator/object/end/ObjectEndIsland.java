@@ -12,6 +12,7 @@ import cn.nukkit.math.Vector3;
  */
 public class ObjectEndIsland extends BasicGenerator {
 
+    @Override
     public boolean generate(ChunkManager level, NukkitRandom rand, Vector3 position) {
         float n = (float) (rand.nextBoundedInt(3) + 4);
         for (int y = 0; n > 0.5f; y--) {

@@ -64,10 +64,12 @@ public class EntityLightning extends Entity implements EntityLightningStrike {
         }
     }
 
+    @Override
     public boolean isEffect() {
         return this.isEffect;
     }
 
+    @Override
     public void setEffect(boolean e) {
         this.isEffect = e;
     }

@@ -169,6 +169,7 @@ public class EntityFishingHook extends EntitySlenderProjectile {
         return hasUpdate;
     }
 
+    @Override
     protected void updateMotion() {
         //正确的浮力
         if (this.isInsideOfWater() && this.getY() < this.getWaterHeight() - 2) {

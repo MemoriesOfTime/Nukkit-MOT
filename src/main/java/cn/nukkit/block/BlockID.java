@@ -472,6 +472,8 @@ public interface BlockID {
     int ANCIENT_DEBRIS = 526;
     int RESPAWN_ANCHOR = 527;
     int BLACKSTONE = 528;
+
+    int CHAIN_BLOCK = 541;
     int TWISTING_VINES = 542;
     int NETHER_GOLD_ORE = 543;
     int CRYING_OBSIDIAN = 544;
@@ -485,6 +487,43 @@ public interface BlockID {
 
     int AZALEA_LEAVES = 579;
     int AZALEA_LEAVES_FLOWERED = 580;
+
+    int AMETHYST_BLOCK = 582;
+
+    int CANDLE = 667;
+    int WHITE_CANDLE = 668;
+    int ORANGE_CANDLE = 669;
+    int MAGENTA_CANDLE = 670;
+    int LIGHT_BLUE_CANDLE = 671;
+    int YELLOW_CANDLE = 672;
+    int LIME_CANDLE = 673;
+    int PINK_CANDLE = 674;
+    int GRAY_CANDLE = 675;
+    int LIGHT_GRAY_CANDLE = 676;
+    int CYAN_CANDLE = 677;
+    int PURPLE_CANDLE = 678;
+    int BLUE_CANDLE = 679;
+    int BROWN_CANDLE = 680;
+    int GREEN_CANDLE = 681;
+    int RED_CANDLE = 682;
+    int BLACK_CANDLE = 683;
+    int CANDLE_CAKE = 684;
+    int WHITE_CANDLE_CAKE = 685;
+    int ORANGE_CANDLE_CAKE = 686;
+    int MAGENTA_CANDLE_CAKE = 687;
+    int LIGHT_BLUE_CANDLE_CAKE = 688;
+    int YELLOW_CANDLE_CAKE = 689;
+    int LIME_CANDLE_CAKE = 690;
+    int PINK_CANDLE_CAKE = 691;
+    int GRAY_CANDLE_CAKE = 692;
+    int LIGHT_GRAY_CANDLE_CAKE = 693;
+    int CYAN_CANDLE_CAKE = 694;
+    int PURPLE_CANDLE_CAKE = 695;
+    int BLUE_CANDLE_CAKE = 696;
+    int BROWN_CANDLE_CAKE = 697;
+    int GREEN_CANDLE_CAKE = 698;
+    int RED_CANDLE_CAKE = 699;
+    int BLACK_CANDLE_CAKE = 700;
 
     int RAW_IRON_BLOCK = 706;
 
@@ -502,6 +541,8 @@ public interface BlockID {
 
     int BAMBOO_PLANKS = 765;
 
+    int SUSPICIOUS_SAND = 784;
+
     int STRIPPED_CHERRY_LOG = 790;
     int CHERRY_LOG = 791;
     int CHERRY_PLANKS = 792;
@@ -512,6 +553,8 @@ public interface BlockID {
     int CHERRY_LEAVES = 803;
 
     int DECORATED_POT = 806;
+
+    int SUSPICIOUS_GRAVEL = 828;
 
     int DARK_OAK_PLANKS = 998;
     int ACACIA_PLANKS = 997;

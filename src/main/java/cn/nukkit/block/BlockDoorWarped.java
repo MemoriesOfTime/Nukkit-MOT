@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
+import cn.nukkit.level.Sound;
 import cn.nukkit.utils.BlockColor;
 
 public class BlockDoorWarped extends BlockDoorWood {
@@ -42,5 +43,15 @@ public class BlockDoorWarped extends BlockDoorWood {
     @Override
     public int getBurnAbility() {
         return 0;
+    }
+
+    @Override
+    public void playOpenSound() {
+        this.level.addSound(this, Sound.OPEN_NETHER_WOOD_DOOR);
+    }
+
+    @Override
+    public void playCloseSound() {
+        this.level.addSound(this, Sound.CLOSE_NETHER_WOOD_DOOR);
     }
 }

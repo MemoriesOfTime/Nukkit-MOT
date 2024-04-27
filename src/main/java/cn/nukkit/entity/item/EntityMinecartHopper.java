@@ -156,6 +156,7 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
         return true;
     }
 
+    @Override
     public boolean pushItems() {
         if (this.inventory.isEmpty()) {
             return false;
@@ -255,10 +256,12 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
         return false;
     }
 
+    @Override
     public boolean isOnTransferCooldown() {
         return this.transferCooldown > 0;
     }
 
+    @Override
     public void setTransferCooldown(int transferCooldown) {
         this.transferCooldown = transferCooldown;
     }

@@ -115,6 +115,7 @@ public class BlockLever extends BlockFlowable implements Faceable {
         return isPowerOn() ? 15 : 0;
     }
 
+    @Override
     public int getStrongPower(BlockFace side) {
         if (!isPowerOn()) {
             return 0;

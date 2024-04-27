@@ -13,6 +13,7 @@ public class PhantomSpawner extends AbstractEntitySpawner {
         super(spawnTask);
     }
 
+    @Override
     public void spawn(Player player, Position pos, Level level) {
         final int biomeId = level.getBiomeId((int) pos.x, (int) pos.z);
 

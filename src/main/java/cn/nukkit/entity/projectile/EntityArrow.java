@@ -143,6 +143,7 @@ public class EntityArrow extends EntitySlenderProjectile {
         this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BOW_HIT);
     }
 
+    @Override
     public void onCollideWithEntity(Entity entity) {
         super.onCollideWithEntity(entity);
 

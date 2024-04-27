@@ -69,6 +69,14 @@ public class AdventureSettings implements Cloneable {
      * Send adventure settings values to the player
      */
     public void update() {
+        this.update(true);
+    }
+
+    /**
+     * Send adventure settings values to the player
+     * @param reset reset in air ticks
+     */
+    void update(boolean reset) {
         if (this.player.protocol >= ProtocolInfo.v1_19_30_23) {
             UpdateAbilitiesPacket packet = new UpdateAbilitiesPacket();
             packet.setEntityId(player.getId());
@@ -145,7 +153,9 @@ public class AdventureSettings implements Cloneable {
             player.dataPacket(pk);
         }
 
-        player.resetInAirTicks();
+        if (reset) {
+            player.resetInAirTicks();
+        }
     }
 
     /**
