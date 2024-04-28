@@ -2,11 +2,12 @@ package cn.nukkit.level.format.leveldb.structure;
 
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.format.ChunkSection;
-import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
+import cn.nukkit.level.format.leveldb.serializer.ChunkDataLoader;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.nbt.tag.CompoundTag;
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.Getter;
 
 import java.util.ArrayList;
@@ -19,15 +20,17 @@ public class ChunkBuilder {
     int chunkZ;
     @Getter
     int chunkX;
-    LevelProvider provider;
+    LevelDBProvider provider;
     ChunkSection[] sections;
     int[] heightMap;
     byte[] biome2d;
-    PalettedBlockStorage[] biomeStorage;
-    boolean biome3d;
+    PalettedBlockStorage[] biomes3d;
+    boolean has3dBiomes;
     List<CompoundTag> entities;
     List<CompoundTag> blockEntities;
     CompoundTag extraData;
+
+    private final List<ChunkDataLoader> chunkDataLoaders = new ObjectArrayList<>();
 
     private boolean dirty;
 
@@ -52,12 +55,18 @@ public class ChunkBuilder {
         return this;
     }
 
+    public ChunkBuilder dataLoader(ChunkDataLoader chunkDataLoader) {
+        if (chunkDataLoader == null) throw new NullPointerException();
+        this.chunkDataLoaders.add(chunkDataLoader);
+        return this;
+    }
+
     public ChunkBuilder dirty() {
         this.dirty = true;
         return this;
     }
 
-    public ChunkBuilder levelProvider(LevelProvider levelProvider) {
+    public ChunkBuilder levelProvider(LevelDBProvider levelProvider) {
         this.provider = levelProvider;
         return this;
     }
@@ -86,14 +95,14 @@ public class ChunkBuilder {
         return this;
     }
 
-    public ChunkBuilder biomeStorage(PalettedBlockStorage[] biomeStorage) {
-        this.biomeStorage = biomeStorage;
-        this.biome3d = true;
+    public ChunkBuilder biomes3d(PalettedBlockStorage[] biomeStorage) {
+        this.biomes3d = biomeStorage;
+        this.has3dBiomes = true;
         return this;
     }
 
     public boolean hasBiome3d() {
-        return biome3d;
+        return has3dBiomes;
     }
 
     public ChunkBuilder entities(List<CompoundTag> entities) {
@@ -128,11 +137,13 @@ public class ChunkBuilder {
                 sections,
                 heightMap,
                 biome2d,
-                biomeStorage,
+                biomes3d,
                 entities,
                 blockEntities,
                 state
         );
+
+        this.chunkDataLoaders.forEach(loader -> loader.initChunk(levelDBChunk, this.provider));
 
         if (this.dirty) {
             levelDBChunk.setChanged();
@@ -141,8 +152,11 @@ public class ChunkBuilder {
         return levelDBChunk;
     }
 
+    public boolean has3dBiomes() {
+        return this.has3dBiomes;
+    }
+
     public String debugString() {
         return this.provider.getName() + "(x=" + this.chunkX + ", z=" + this.chunkZ + ")";
     }
-
 }
