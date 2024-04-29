@@ -365,7 +365,11 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
     @Override
     public long getPing() {
-        return channel.rakPipeline().get(RakSessionCodec.class).getPing();
+        RakSessionCodec codec = channel.rakPipeline().get(RakSessionCodec.class);
+        if (codec == null) {
+            return -1;
+        }
+        return codec.getPing();
     }
 
     private byte[] calculateChecksum(long count, ByteBuf payload) {
