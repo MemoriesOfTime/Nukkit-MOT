@@ -113,12 +113,12 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
     public void onEntityCollide(@NotNull Entity entity) {
         int ticks = 8;
         if (entity instanceof EntityArrow || entity instanceof EntityThrownTrident || entity instanceof EntitySmallFireBall) {
+            BlockRedstoneEvent ev = new BlockRedstoneEvent(this, 15, 0);
+            PluginManager pluginManager = level.getServer().getPluginManager();
+            pluginManager.callEvent(ev);
+
             ticks = 20;
         }
-
-        BlockRedstoneEvent ev = new BlockRedstoneEvent(this, 15, 0);
-        PluginManager pluginManager = level.getServer().getPluginManager();
-        pluginManager.callEvent(ev);
 
         Position position = entity.getPosition();
         Vector3 motion = position.add(new Vector3(entity.lastMotionX, entity.lastMotionY, entity.lastMotionZ));
