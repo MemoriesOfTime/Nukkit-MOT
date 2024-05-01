@@ -6,12 +6,14 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntitySmallFireBall;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
+import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.*;
 import cn.nukkit.math.BlockFace.Axis;
+import cn.nukkit.plugin.PluginManager;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -71,6 +73,10 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
         if (power <= 0 || ticks <= 0) {
             return deactivatePower();
         }
+
+        BlockRedstoneEvent ev = new BlockRedstoneEvent(this, 15, 0);
+        PluginManager pluginManager = level.getServer().getPluginManager();
+        pluginManager.callEvent(ev);
 
         BlockEntityTarget target = getOrCreateBlockEntity();
         int previous = target.getActivePower();
