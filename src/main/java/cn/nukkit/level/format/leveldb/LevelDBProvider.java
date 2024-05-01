@@ -25,9 +25,11 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import lombok.extern.log4j.Log4j2;
+import net.daporkchop.ldbjni.DBProvider;
+import net.daporkchop.ldbjni.LevelDB;
+import net.daporkchop.lib.natives.FeatureBuilder;
 import org.cloudburstmc.nbt.*;
 import org.iq80.leveldb.*;
-import org.iq80.leveldb.impl.Iq80DBFactory;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -47,10 +49,11 @@ import java.util.function.Function;
 
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.*;
 import static cn.nukkit.level.format.leveldb.LevelDBKey.*;
-import static net.daporkchop.ldbjni.LevelDB.PROVIDER;
 
 @Log4j2
 public class LevelDBProvider implements LevelProvider {
+
+    private static final DBProvider JAVA_LDB_PROVIDER = (DBProvider) FeatureBuilder.create(LevelDBProvider.class).addJava("net.daporkchop.ldbjni.java.JavaDBProvider").build();
 
     protected final Long2ObjectMap<LevelDBChunk> chunks = new Long2ObjectOpenHashMap<>();
     protected final ThreadLocal<WeakReference<LevelDBChunk>> lastChunk = new ThreadLocal<>();
@@ -79,6 +82,7 @@ public class LevelDBProvider implements LevelProvider {
         }
 
         try (InputStream stream = Files.newInputStream(dirPath.resolve("level.dat"))) {
+            //noinspection ResultOfMethodCallIgnored
             stream.skip(8);
             this.levelData = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
         } catch (IOException e) {
@@ -163,8 +167,9 @@ public class LevelDBProvider implements LevelProvider {
         Options options = new Options()
                 .createIfMissing(true)
                 .compressionType(CompressionType.ZLIB_RAW)
+                .cacheSize(1024L * 1024L * Server.getInstance().levelDbCache)
                 .blockSize(64 * 1024);
-        return Server.getInstance().useNativeLevelDB ? PROVIDER.open(dir, options) : Iq80DBFactory.factory.open(dir, options);
+        return Server.getInstance().useNativeLevelDB ? LevelDB.PROVIDER.open(dir, options) : JAVA_LDB_PROVIDER.open(dir, options);
     }
 
     public static void updateLevelData(CompoundTag levelData) {
@@ -441,15 +446,15 @@ public class LevelDBProvider implements LevelProvider {
             chunkBuilder.dirty();
         }
 
-        ChunkSerializers.deserialize(this.db, chunkBuilder, chunkVersion);
+        ChunkSerializers.deserializeChunk(this.db, chunkBuilder, chunkVersion);
 
         Data3dSerializer.deserialize(this.db, chunkBuilder);
         if (!chunkBuilder.hasBiome3d()) {
             Data2dSerializer.deserialize(this.db, chunkBuilder);
         }
 
-        BlockEntitySerializer.deserialize(this.db, chunkBuilder);
-        EntitySerializer.deserialize(this.db, chunkBuilder);
+        BlockEntitySerializer.loadBlockEntities(this.db, chunkBuilder);
+        EntitySerializer.loadEntities(this.db, chunkBuilder);
 
         byte[] tickingData = this.db.get(PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (tickingData != null && tickingData.length != 0) {
@@ -490,22 +495,22 @@ public class LevelDBProvider implements LevelProvider {
             chunk.ioLock.lock();
 
             if (chunk.isSubChunksDirty()) {
-                ChunkSerializers.serializer(writeBatch, chunk, CURRENT_LEVEL_CHUNK_VERSION);
+                ChunkSerializers.serializeChunk(writeBatch, chunk, CURRENT_LEVEL_CHUNK_VERSION);
             }
 
             if (chunk.isHeightmapOrBiomesDirty()) {
                 if (chunk.has3dBiomes()) {
-                    Data3dSerializer.serializer(writeBatch, chunk);
+                    Data3dSerializer.serialize(writeBatch, chunk);
                 } else {
-                    Data2dSerializer.serializer(writeBatch, chunk);
+                    Data2dSerializer.serialize(writeBatch, chunk);
                 }
             }
 
             writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()), Binary.writeLInt(chunk.getState().ordinal()));
 
-            BlockEntitySerializer.serializer(writeBatch, chunk);
+            BlockEntitySerializer.saveBlockEntities(writeBatch, chunk);
 
-            EntitySerializer.serializer(writeBatch, chunk);
+            EntitySerializer.saveEntities(writeBatch, chunk);
 
             Collection<BlockUpdateEntry> blockUpdateEntries = null;
             // TODO randomBlockUpdate
@@ -1087,6 +1092,6 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     static {
-        log.info("native LevelDB provider: {}", Server.getInstance().useNativeLevelDB && PROVIDER.isNative());
+        log.info("native LevelDB provider: {}", Server.getInstance().useNativeLevelDB && LevelDB.PROVIDER.isNative());
     }
 }

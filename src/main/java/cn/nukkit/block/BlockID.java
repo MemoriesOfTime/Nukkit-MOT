@@ -555,10 +555,4 @@ public interface BlockID {
     int DECORATED_POT = 806;
 
     int SUSPICIOUS_GRAVEL = 828;
-
-    int DARK_OAK_PLANKS = 998;
-    int ACACIA_PLANKS = 997;
-    int JUNGLE_PLANKS = 996;
-    int BIRCH_PLANKS = 995;
-    int SPRUCE_PLANKS = 994;
 }

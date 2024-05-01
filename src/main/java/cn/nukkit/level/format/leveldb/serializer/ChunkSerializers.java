@@ -64,12 +64,12 @@ public class ChunkSerializers {
         return chunkSerializer;
     }
 
-    public static void deserialize(DB db, ChunkBuilder chunkBuilder, int chunkVersion) {
-        getChuckSerializer(chunkVersion).deserialize(db, chunkBuilder);
+    public static void serializeChunk(WriteBatch writeBatch, Chunk chunk, int chunkVersion) {
+        getChuckSerializer(chunkVersion).serializer(writeBatch, chunk);
     }
 
-    public static void serializer(WriteBatch writeBatch, Chunk chunk, int chunkVersion) {
-        getChuckSerializer(chunkVersion).serializer(writeBatch, chunk);
+    public static void deserializeChunk(DB db, ChunkBuilder chunkBuilder, int chunkVersion) {
+        getChuckSerializer(chunkVersion).deserialize(db, chunkBuilder);
     }
 
 }

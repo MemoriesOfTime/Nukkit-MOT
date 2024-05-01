@@ -1708,29 +1708,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     @Override
-    public boolean fastMove(double dx, double dy, double dz) {
-        this.x += dx;
-        this.y += dy;
-        this.z += dz;
-        this.recalculateBoundingBox();
-
-        this.checkChunks();
-
-        if (!this.isSpectator()) {
-            if (!this.onGround || dy != 0) {
-                AxisAlignedBB bb = this.boundingBox.clone();
-                bb.setMinY(bb.getMinY() - 0.75);
-
-                this.onGround = this.level.getCollisionBlocks(bb).length > 0;
-            }
-            this.isCollided = this.onGround;
-            this.updateFallState(this.onGround);
-        }
-
-        return true;
-    }
-
-    @Override
     protected void checkGroundState(double movX, double movY, double movZ, double dx, double dy, double dz) {
         if (!this.onGround || movX != 0 || movY != 0 || movZ != 0) {
             boolean onGround = false;
@@ -1957,7 +1934,35 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         // This should help reduce the server mis-prediction at least a bit
         diffY += this.ySize * (1 - 0.4D);
 
-        this.fastMove(diffX, diffY, diffZ);
+        // Replacement for this.fastMove(dx, dy, dz) start
+        if (this.isSpectator() || !this.level.hasCollision(this, this.boundingBox.getOffsetBoundingBox(diffX, diffY, diffZ).shrink(0.1, this.getStepHeight(), 0.1), false)) {
+            this.x = clientPos.x;
+            this.y = clientPos.y;
+            this.z = clientPos.z;
+
+            this.boundingBox.setBounds(this.x - 0.3, this.y, this.z - 0.3, this.x + 0.3, this.y + this.getHeight(), this.z + 0.3);
+        }
+
+        this.checkChunks();
+
+        if (!this.isSpectator() && (!this.onGround || diffY != 0)) {
+            AxisAlignedBB bb = this.boundingBox.clone();
+            bb.setMinY(bb.getMinY() - 0.75);
+
+            // Hack: fix fall damage from walls while falling
+            if (Math.abs(diffY) > 0.01) {
+                bb.setMinX(bb.getMinX() + 0.1);
+                bb.setMaxX(bb.getMaxX() - 0.1);
+                bb.setMinZ(bb.getMinZ() + 0.1);
+                bb.setMaxZ(bb.getMaxZ() - 0.1);
+            }
+
+            this.onGround = this.level.hasCollisionBlocks(this, bb);
+        }
+
+        this.isCollided = this.onGround;
+        this.updateFallState(this.onGround);
+        // Replacement for this.fastMove(dx, dy, dz) end
 
         double corrX = this.x - clientPos.getX();
         double corrY = this.y - clientPos.getY();

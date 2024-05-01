@@ -80,6 +80,14 @@ public class LevelDBChunk extends BaseChunk {
         this.state = state;
     }
 
+    public void setNbtBlockEntities(List<CompoundTag> blockEntities) {
+        this.NBTtiles = blockEntities;
+    }
+
+    public void setNbtEntities(List<CompoundTag> entities) {
+        this.NBTentities = entities;
+    }
+
     @Override
     public int getSectionOffset() {
         return this.dimensionData.getSectionOffset();

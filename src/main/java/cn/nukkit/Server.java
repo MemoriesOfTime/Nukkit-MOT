@@ -519,9 +519,14 @@ public class Server {
      * This is needed for structure generation
      */
     public final ForkJoinPool computeThreadPool;
-
+    /**
+     * Set LevelDB cache size.
+     */
+    public int levelDbCache;
+    /**
+     * Use native LevelDB implementation for better performance.
+     */
     public boolean useNativeLevelDB;
-
     /**
      * Enable Raw Drop of Iron and Gold
      */
@@ -3102,6 +3107,7 @@ public class Server {
             }
         }
 
+        this.levelDbCache = this.getPropertyInt("leveldb-cache-mb", 80);
         this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
         this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
     }
@@ -3246,6 +3252,7 @@ public class Server {
             put("enable-spark", false);
             put("hastebin-token", "");
 
+            put("leveldb-cache-mb", 80);
             put("use-native-leveldb", false);
             put("enable-raw-ores", true);
         }

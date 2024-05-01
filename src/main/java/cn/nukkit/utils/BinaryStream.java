@@ -710,7 +710,7 @@ public class BinaryStream {
         if (id != null && id < 256 && id != 166) { // ItemBlock
             int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, blockRuntimeId);
             if (fullId != -1) {
-                damage = fullId & 0x3f;
+                damage = fullId & Block.DATA_MASK;
             }
         }
 
@@ -1093,7 +1093,7 @@ public class BinaryStream {
 
         if (!instanceItem) {
             this.putBoolean(true);
-            this.putVarInt(1);
+            this.putVarInt(1); // Item is present
         }
 
         Block block = isBlock ? item.getBlockUnsafe() : null;
@@ -1141,8 +1141,7 @@ public class BinaryStream {
                 stream.writeLong(0);
             }
 
-            byte[] bytes = new byte[userDataBuf.readableBytes()];
-            userDataBuf.readBytes(bytes);
+            byte[] bytes = Utils.convertByteBuf2Array(userDataBuf);
             putByteArray(bytes);
         } catch (IOException e) {
             throw new IllegalStateException("Unable to write item user data", e);

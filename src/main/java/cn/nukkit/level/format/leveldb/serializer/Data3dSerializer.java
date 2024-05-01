@@ -9,76 +9,82 @@ import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.utils.Utils;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.Unpooled;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 
 public class Data3dSerializer {
 
-    public static void serializer(WriteBatch writeBatch, LevelDBChunk chunk) {
+    public static void serialize(WriteBatch db, LevelDBChunk chunk) {
         DimensionData dimensionData = chunk.getProvider().getLevel().getDimensionData();
-        ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+
+        ByteBuf buffer  = ByteBufAllocator.DEFAULT.ioBuffer();
         try {
-            byte[] bytes;
-            for (byte b : bytes = chunk.getHeightMapArray()) {
-                byteBuf.writeShortLE(b);
+            byte[] heightMap = chunk.getHeightMapArray();
+            for (int height : heightMap) {
+                buffer.writeShortLE(height);
             }
-            for (int i = 0; i < dimensionData.getHeight() >> 4; ++i) {
-                PalettedBlockStorage palettedBlockStorage = chunk.getBiomeStorage(i);
-                palettedBlockStorage.writeToStorage(byteBuf);
+
+            for (int i = 0; i < dimensionData.getHeight() >> 4; i++) {
+                PalettedBlockStorage storage = chunk.getBiomeStorage(i);
+                storage.writeToStorage(buffer);
             }
-            writeBatch.put(LevelDBKey.DATA_3D.getKey(chunk.getX(), chunk.getZ(), dimensionData.getDimensionId()), Utils.convertByteBuf2Array(byteBuf));
+
+            db.put(LevelDBKey.DATA_3D.getKey(chunk.getX(), chunk.getZ(), chunk.getProvider().getLevel().getDimension()), Utils.convertByteBuf2Array(buffer));
         } finally {
-            byteBuf.release();
+            buffer.release();
         }
     }
 
-    public static void deserialize(DB db, ChunkBuilder chunkBuilder) {
-        ByteBuf heightAndBiomesBuffer = null;
-        try {
-            DimensionData dimensionData = chunkBuilder.getDimensionData();
-            byte[] bytes = db.get(LevelDBKey.DATA_3D.getKey(chunkBuilder.getChunkX(), chunkBuilder.getChunkZ(), dimensionData.getDimensionId()));
-            if (bytes != null) {
-                heightAndBiomesBuffer = Unpooled.wrappedBuffer(bytes);
-                int[] heights = new int[256];
-                for (int i = 0; i < 256; i++) {
-                    heights[i] = heightAndBiomesBuffer.readUnsignedShortLE();
-                }
-                chunkBuilder.heightMap(heights);
+    public static void deserialize(DB db, ChunkBuilder builder) {
+        DimensionData dimensionData = builder.getDimensionData();
 
-                PalettedBlockStorage[] biomePalettes = new PalettedBlockStorage[dimensionData.getHeight() >> 4];
-                PalettedBlockStorage last = null;
-                for (int y = 0; y < biomePalettes.length; y++) {
-                    PalettedBlockStorage biomePalette = readBiomePalette(heightAndBiomesBuffer);
-                    if (biomePalette == null) {
-                        if (last != null) {
-                            biomePalette = last.copy();
-                        } else {
-                            throw new IllegalStateException("Invalid biome palette");
-                        }
-                    }
-                    last = biomePalette;
-                    biomePalettes[y] = biomePalette;
+        byte[] data3d = db.get(LevelDBKey.DATA_3D.getKey(builder.getChunkX(), builder.getChunkZ(), dimensionData.getDimensionId()));
+        if (data3d == null || data3d.length < 1) {
+            return;
+        }
+
+
+        int[] heightMap = new int[512];
+        PalettedBlockStorage[] biomes = new PalettedBlockStorage[dimensionData.getHeight() >> 4];
+
+        ByteBuf buffer = ByteBufAllocator.DEFAULT.ioBuffer(data3d.length);
+        try {
+            buffer.writeBytes(data3d);
+            for (int i = 0; i < 256; i++) {
+                heightMap[i] = buffer.readUnsignedShortLE();
+            }
+
+            for (int i = 0; i < biomes.length; i++) {
+                PalettedBlockStorage storage = readPalettedBiomes(buffer);
+                if (storage == null && i == 0) {
+                    throw new IllegalStateException("First biome palette can not point to previous!");
                 }
-                chunkBuilder.biomeStorage(biomePalettes);
+
+                if (storage == null) {
+                    storage = biomes[i - 1].copy();
+                }
+                biomes[i] = storage;
             }
         } finally {
-            if (heightAndBiomesBuffer != null) {
-                heightAndBiomesBuffer.release();
-            }
+            buffer.release();
         }
+
+        builder.heightMap(heightMap);
+        builder.biomes3d(biomes);
     }
 
-    private static PalettedBlockStorage readBiomePalette(ByteBuf byteBuf) {
-        int index = byteBuf.readerIndex();
-        int header = byteBuf.readUnsignedByte() >> 1;
-        if (header == 127) {
+    public static PalettedBlockStorage readPalettedBiomes(ByteBuf buffer) {
+        int index = buffer.readerIndex();
+        int size = buffer.readUnsignedByte() >> 1;
+        if (size == 127) {
+            // This means this paletted storage had the flag pointing to the previous one
             return null;
         }
-        byteBuf.readerIndex(index);
-        PalettedBlockStorage palette = PalettedBlockStorage.createWithDefaultState(BitArrayVersion.V0, 0);
-        palette.readFromStorage(byteBuf);
-        return palette;
+
+        buffer.readerIndex(index);
+        PalettedBlockStorage storage = PalettedBlockStorage.createWithDefaultState(BitArrayVersion.V0, 0);
+        storage.readFromStorage(buffer);
+        return storage;
     }
 
 }

@@ -220,4 +220,8 @@ public abstract class BlockEntity extends Position {
                 .putInt("y", pos.getFloorY())
                 .putInt("z", pos.getFloorZ());
     }
+
+    public boolean canSaveToStorage() {
+        return !this.closed;
+    }
 }
