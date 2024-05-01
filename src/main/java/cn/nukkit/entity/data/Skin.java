@@ -10,6 +10,7 @@ import lombok.ToString;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.*;
@@ -21,16 +22,17 @@ import java.util.*;
 @ToString(exclude = {"geometryData", "animationData"})
 public class Skin {
 
-    public static final int SINGLE_SKIN_SIZE = 8192;
-    public static final int DOUBLE_SKIN_SIZE = 16384;
-    public static final int SKIN_128_64_SIZE = 32768;
-    public static final int SKIN_128_128_SIZE = 65536;
+    private static final int PIXEL_SIZE = 4;
 
-    // Currently, Minecraft character creator's skin picture size is 256*256.
-    // Therefore, we need this to make sure Binary#getSkin() and BinaryStream#setSkin() is available for Mojang's one.
-    public static final int SKIN_256_256_SIZE = 262144;
+    public static final int SINGLE_SKIN_SIZE = 64 * 32 * PIXEL_SIZE;
+    public static final int DOUBLE_SKIN_SIZE = 64 * 64 * PIXEL_SIZE;
+    public static final int SKIN_128_64_SIZE = 128 * 64 * PIXEL_SIZE;
+    public static final int SKIN_128_128_SIZE = 128 * 128 * PIXEL_SIZE;
+    public static final int SKIN_PERSONA_SIZE = 256 * 256 * PIXEL_SIZE;
+    @Deprecated
+    public static final int SKIN_256_256_SIZE = SKIN_PERSONA_SIZE;
 
-    private static final int MAX_DATA_SIZE = 262144;
+    private static final int MAX_DATA_SIZE = SKIN_PERSONA_SIZE;
 
     public static final String GEOMETRY_CUSTOM = convertLegacyGeometryName("geometry.humanoid.custom");
     public static final String GEOMETRY_CUSTOM_SLIM = convertLegacyGeometryName("geometry.humanoid.customSlim");
@@ -168,10 +170,7 @@ public class Skin {
     }
 
     public String getSkinResourcePatch() {
-        if (this.skinResourcePatch == null) {
-            return "";
-        }
-        return skinResourcePatch;
+        return Objects.requireNonNullElse(this.skinResourcePatch, "");
     }
 
     public SerializedImage getCapeData() {
@@ -347,18 +346,21 @@ public class Skin {
     }
 
     private static SerializedImage parseBufferedImage(BufferedImage image) {
-        FastByteArrayOutputStream outputStream = new FastByteArrayOutputStream();
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                Color color = new Color(image.getRGB(x, y), true);
-                outputStream.write(color.getRed());
-                outputStream.write(color.getGreen());
-                outputStream.write(color.getBlue());
-                outputStream.write(color.getAlpha());
+        try (FastByteArrayOutputStream outputStream = new FastByteArrayOutputStream()) {
+            for (int y = 0; y < image.getHeight(); y++) {
+                for (int x = 0; x < image.getWidth(); x++) {
+                    Color color = new Color(image.getRGB(x, y), true);
+                    outputStream.write(color.getRed());
+                    outputStream.write(color.getGreen());
+                    outputStream.write(color.getBlue());
+                    outputStream.write(color.getAlpha());
+                }
             }
+            image.flush();
+            return new SerializedImage(image.getWidth(), image.getHeight(), outputStream.toByteArray());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
-        image.flush();
-        return new SerializedImage(image.getWidth(), image.getHeight(), outputStream.toByteArray());
     }
 
     private static String convertLegacyGeometryName(String geometryName) {
