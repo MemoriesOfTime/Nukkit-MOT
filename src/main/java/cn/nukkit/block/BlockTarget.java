@@ -74,10 +74,6 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
             return deactivatePower();
         }
 
-        BlockRedstoneEvent ev = new BlockRedstoneEvent(this, 15, 0);
-        PluginManager pluginManager = level.getServer().getPluginManager();
-        pluginManager.callEvent(ev);
-
         BlockEntityTarget target = getOrCreateBlockEntity();
         int previous = target.getActivePower();
         level.cancelSheduledUpdate(this, this);
@@ -119,6 +115,11 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
         if (entity instanceof EntityArrow || entity instanceof EntityThrownTrident || entity instanceof EntitySmallFireBall) {
             ticks = 20;
         }
+
+        BlockRedstoneEvent ev = new BlockRedstoneEvent(this, 15, 0);
+        PluginManager pluginManager = level.getServer().getPluginManager();
+        pluginManager.callEvent(ev);
+
         Position position = entity.getPosition();
         Vector3 motion = position.add(new Vector3(entity.lastMotionX, entity.lastMotionY, entity.lastMotionZ));
         MovingObjectPosition intercept = calculateIntercept(position, position.add(motion.multiply(2)));
