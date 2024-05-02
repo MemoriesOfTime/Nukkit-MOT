@@ -49,7 +49,7 @@ public class ServerScheduler {
         return addTask(task, 0, 0, false);
     }
 
-    public TaskHandler scheduleTask(@NotNull PluginTask<Plugin> task) {
+    public TaskHandler scheduleTask(@NotNull PluginTask task) {
         return addTask(task, 0, 0, false);
     }
 
@@ -106,7 +106,7 @@ public class ServerScheduler {
         return this.addTask(task, delay, 0, false);
     }
 
-    public TaskHandler scheduleDelayedTask(@NotNull PluginTask<Plugin> task, int delay) {
+    public TaskHandler scheduleDelayedTask(@NotNull PluginTask task, int delay) {
         return this.addTask(task, delay, 0, false);
     }
 
@@ -160,7 +160,7 @@ public class ServerScheduler {
         return addTask(task, 0, period, false);
     }
 
-    public TaskHandler scheduleRepeatingTask(@NotNull PluginTask<Plugin> task, int period) {
+    public TaskHandler scheduleRepeatingTask(@NotNull PluginTask task, int period) {
         return addTask(task, 0, period, false);
     }
 
@@ -178,7 +178,7 @@ public class ServerScheduler {
         return addTask(task, delay, period, false);
     }
 
-    public TaskHandler scheduleDelayedRepeatingTask(@NotNull PluginTask<Plugin> task, int delay, int period) {
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull PluginTask task, int delay, int period) {
         return addTask(task, delay, period, false);
     }
 
@@ -187,7 +187,7 @@ public class ServerScheduler {
         return addTask(task, delay, period, asynchronous);
     }
 
-    public TaskHandler scheduleDelayedRepeatingTask(@NotNull PluginTask<Plugin> task, int delay, int period, boolean asynchronous) {
+    public TaskHandler scheduleDelayedRepeatingTask(@NotNull PluginTask task, int delay, int period, boolean asynchronous) {
         return addTask(task, delay, period, asynchronous);
     }
 
