@@ -275,7 +275,7 @@ public abstract class Enchantment implements Cloneable {
         var identifier = enchantment.getIdentifier();
         assert identifier != null;
         for (int i = 1; i <= enchantment.getMaxLevel(); i++) {
-            var name = "§eEnchanted Book\n§7" + enchantment.getName() + " " + getLevelString(i);
+            var name = "§e%item.enchanted_book.name\n§7" + enchantment.getName() + " " + getLevelString(i);
             ClassWriter classWriter = new ClassWriter(0);
             MethodVisitor methodVisitor;
             String className = "CustomBookEnchanted" + BOOK_NUMBER;

@@ -118,6 +118,7 @@ public abstract class DefaultPermissions {
         registerPermission(new Permission("nukkit.command.generateworld", "Allows the user to generate new world", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.seed", "Allows the user to see world's seed", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.playsound", "Allows the user to play sounds", Permission.DEFAULT_OP), commands);
+        registerPermission(new Permission("nukkit.command.stopsound", "Allows the user to stop sounds", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.debug.perform", "Allows the user to create debug paste", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.gamerule", "Allows the user to change game rules", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.spawn", "Allows the user to use spawn command", Permission.DEFAULT_OP), commands);
