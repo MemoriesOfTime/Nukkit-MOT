@@ -24,4 +24,9 @@ public class EnchantmentWaterWalker extends Enchantment {
     public int getMaxLevel() {
         return 3;
     }
+
+    @Override
+    public boolean checkCompatibility(Enchantment enchantment) {
+        return super.checkCompatibility(enchantment) && enchantment.id != ID_FROST_WALKER;
+    }
 }
