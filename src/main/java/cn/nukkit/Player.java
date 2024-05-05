@@ -1990,6 +1990,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double delta = Math.pow(this.lastX - target.getX(), 2) + Math.pow(this.lastY - target.getY(), 2) + Math.pow(this.lastZ - target.getZ(), 2);
         double deltaAngle = Math.abs(this.lastYaw - target.getYaw()) + Math.abs(this.lastPitch - target.getPitch());
 
+        handleLogicInMove(invalidMotion,distance);
+        
         if (delta > 0.0005 || deltaAngle > 1) {
             boolean isFirst = this.firstMove;
             this.firstMove = false;
@@ -2066,8 +2068,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        handleLogicInMove(invalidMotion,distance);
-
         // if plugin cancel move
         if (invalidMotion) {
             this.positionChanged = false;
@@ -2086,7 +2086,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     protected void handleLogicInMove(boolean invalidMotion, double distance) {
-        if (!invalidMotion) {
+        if (!invalidMotion && (this.lastX != this.x) && (this.lastZ != this.z)) {
             //Handle frost walker enchantment
             Enchantment frostWalker = inventory.getBoots().getEnchantment(Enchantment.ID_FROST_WALKER);
             if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= 1 && this.y <= 255) {
