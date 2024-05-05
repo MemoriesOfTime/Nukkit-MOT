@@ -2095,15 +2095,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
                         Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
                         Block block = level.getBlock(coordX, this.getFloorY() - 1, coordZ);
-                        if ((block.getId() == Block.STILL_WATER || block.getId() == Block.WATER) && up.isAir()) {
-                            if (block instanceof BlockLiquid liquid){
-                                if (liquid.getFluidHeightPercent() < 0.15){
-                                    WaterFrostEvent ev = new WaterFrostEvent(block);
-                                    server.getPluginManager().callEvent(ev);
-                                    if (!ev.isCancelled()) {
-                                        level.setBlock(block, Block.get(Block.FROSTED_ICE), true, false);
-                                        level.scheduleUpdate(level.getBlock(block), ThreadLocalRandom.current().nextInt(20, 40));
-                                    }
+                        if (block instanceof BlockWater water && up.isAir()) {
+                            if (water.getFluidHeightPercent() < 0.15) {
+                                WaterFrostEvent ev = new WaterFrostEvent(block);
+                                server.getPluginManager().callEvent(ev);
+                                if (!ev.isCancelled()) {
+                                    level.setBlock(block, Block.get(Block.FROSTED_ICE), true, false);
+                                    level.scheduleUpdate(level.getBlock(block), ThreadLocalRandom.current().nextInt(20, 40));
                                 }
                             }
                         }
