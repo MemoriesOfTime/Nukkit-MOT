@@ -3108,7 +3108,7 @@ public class Server {
         }
 
         this.levelDbCache = this.getPropertyInt("leveldb-cache-mb", 80);
-        this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
+        this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", true);
         this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
     }
 
@@ -3253,7 +3253,7 @@ public class Server {
             put("hastebin-token", "");
 
             put("leveldb-cache-mb", 80);
-            put("use-native-leveldb", false);
+            put("use-native-leveldb", true);
             put("enable-raw-ores", true);
         }
     }
