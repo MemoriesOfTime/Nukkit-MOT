@@ -169,7 +169,7 @@ public class LevelDBProvider implements LevelProvider {
                 .compressionType(CompressionType.ZLIB_RAW)
                 .cacheSize(1024L * 1024L * Server.getInstance().levelDbCache)
                 .blockSize(64 * 1024);
-        return Server.getInstance().useNativeLevelDB ? LevelDB.PROVIDER.open(dir, options) : JAVA_LDB_PROVIDER.open(dir, options);
+        return Server.getInstance().useNativeLevelDB ? JAVA_LDB_PROVIDER.open(dir, options) : LevelDB.PROVIDER.open(dir, options);
     }
 
     public static void updateLevelData(CompoundTag levelData) {
@@ -534,6 +534,7 @@ public class LevelDBProvider implements LevelProvider {
                     NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
                     outputStream.writeTag(ticks);
                     writeBatch.put(pendingScheduledTicksKey, Utils.convertByteBuf2Array(byteBuf));
+                    byteBuf.release();
                 } else {
                     writeBatch.delete(pendingScheduledTicksKey);
                 }
