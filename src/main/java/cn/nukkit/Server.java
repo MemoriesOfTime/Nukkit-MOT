@@ -89,6 +89,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import lombok.extern.log4j.Log4j2;
+import org.cloudburstmc.netty.channel.raknet.RakConstants;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
@@ -531,6 +532,10 @@ public class Server {
      * Enable Raw Drop of Iron and Gold
      */
     public boolean enableRawOres;
+    /**
+     * A number of datagram packets each address can send within one RakNet tick (10ms)
+     */
+    public int rakPacketLimit;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -3110,6 +3115,7 @@ public class Server {
         this.levelDbCache = this.getPropertyInt("leveldb-cache-mb", 80);
         this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
         this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
+        this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
     }
 
     /**
@@ -3187,8 +3193,7 @@ public class Server {
             put("compression-level", 4);
             put("compression-threshold", "256");
             put("use-snappy-compression", true);
-            put("min-mtu", 576);
-            put("max-mtu", 1492);
+            put("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
             put("timeout-milliseconds", 25000);
 
             put("auto-tick-rate", true);
