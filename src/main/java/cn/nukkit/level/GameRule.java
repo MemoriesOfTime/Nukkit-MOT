@@ -36,7 +36,7 @@ public enum GameRule {
     PLAYERS_SLEEPING_PERCENTAGE("playersSleepingPercentage"),
     RECIPES_UNLOCK("recipesUnlock"),
     DO_LIMITED_CRAFTING("doLimitedCrafting"),
-    SHOW_RECIPE_MESSAGE("showrecipemessages"),
+    SHOW_RECIPE_MESSAGE("showRecipeMessages"),
     PROJECTILES_CAN_BREAK_BLOCKS("projectilesCanBreakBlocks");
 
     private final String name;
