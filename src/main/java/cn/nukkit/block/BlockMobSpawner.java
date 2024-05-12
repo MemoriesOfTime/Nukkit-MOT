@@ -49,22 +49,22 @@ public class BlockMobSpawner extends BlockSolid {
     }
 
     @Override
-    public boolean breaksWhenMoved() {
-        return true;
-    }
-
-    @Override
-    public boolean sticksToPiston() {
-        return false;
-    }
-
-    @Override
     public int getWaterloggingLevel() {
         return 1;
     }
 
     @Override
     public boolean canHarvestWithHand() {
+        return false;
+    }
+
+    @Override
+    public boolean canBePushed(){
+        return false;
+    }
+
+    @Override
+    public boolean canBePulled(){
         return false;
     }
 
@@ -77,4 +77,5 @@ public class BlockMobSpawner extends BlockSolid {
     public int getLightLevel() {
         return 3;
     }
+
 }
