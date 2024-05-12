@@ -376,14 +376,13 @@ public class LevelDBChunk extends BaseChunk {
 
     @Override
     public boolean compress() {
-        super.compress();
-
-        boolean dirty = false;
-        for (int i = 0; i < SECTION_COUNT; i++) {
-            dirty |= this.sections[i].compress();
+        boolean result = super.compress();
+        for (ChunkSection section : this.getSections()) {
+            if (section instanceof LevelDBChunkSection && !section.isEmpty()) {
+                result |= section.compress();
+            }
         }
-        this.subChunksDirty |= dirty;
-        return dirty;
+        return result;
     }
 
     @Override
