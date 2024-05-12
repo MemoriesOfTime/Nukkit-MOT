@@ -16,6 +16,7 @@ import cn.nukkit.level.GameRule;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.BVector3;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
@@ -223,9 +224,13 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
         if (this.noClip) {
             if (this.canReturnToShooter()) {
                 Entity shooter = this.shootingEntity;
+                double force = 0.05d * (double) loyaltyLevel;
                 Vector3 vector3 = new Vector3(shooter.x - this.x, shooter.y + shooter.getEyeHeight() - this.y, shooter.z - this.z);
-                this.setPosition(new Vector3(this.x, this.y + vector3.y * 0.015 * ((double) loyaltyLevel), this.z));
-                this.setMotion(this.getMotion().multiply(0.95).add(vector3.multiply(loyaltyLevel * 0.05)));
+                BVector3 bVector = BVector3.fromPos(vector3);
+                vector3 = bVector.addToPos();
+                this.setPosition(new Vector3(this.x + vector3.x * force, this.y + vector3.y * force, this.z + vector3.z * force));
+                this.setRotation(bVector.getYaw(), bVector.getPitch());
+                this.setMotion(vector3.multiply(force));
                 hasUpdate = true;
             } else {
                 if (!this.closed && level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS)) {
