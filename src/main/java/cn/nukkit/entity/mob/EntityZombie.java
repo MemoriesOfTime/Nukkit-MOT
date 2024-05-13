@@ -157,15 +157,17 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
                 drops.add(armor[Utils.rand(0, 3)]);
             }
 
+
+            if(Utils.rand(1,4)<=2.5){
+                drops.add(Item.get(Item.IRON_INGOT, 0, Utils.rand(0, 1)));
+            }
+
             if (Utils.rand(1, 3) == 1) {
                 switch (Utils.rand(1, 3)) {
                     case 1:
-                        drops.add(Item.get(Item.IRON_INGOT, 0, Utils.rand(0, 1)));
-                        break;
-                    case 2:
                         drops.add(Item.get(Item.CARROT, 0, Utils.rand(0, 1)));
                         break;
-                    case 3:
+                    case 2:
                         drops.add(Item.get(Item.POTATO, 0, Utils.rand(0, 1)));
                         break;
                 }
