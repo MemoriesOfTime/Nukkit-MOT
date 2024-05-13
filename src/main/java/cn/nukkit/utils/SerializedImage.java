@@ -44,7 +44,7 @@ public class SerializedImage {
                 return new SerializedImage(128, 64, skinData);
             case SKIN_128_128_SIZE:
                 return new SerializedImage(128, 128, skinData);
-            case SKIN_256_256_SIZE:
+            case SKIN_PERSONA_SIZE:
                 return new SerializedImage(256, 256, skinData);
         }
         throw new IllegalArgumentException("Unknown legacy skin size");

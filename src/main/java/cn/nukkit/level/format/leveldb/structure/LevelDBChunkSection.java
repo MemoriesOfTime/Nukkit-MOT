@@ -666,7 +666,8 @@ public class LevelDBChunkSection implements ChunkSection {
             }
 
             boolean dirty = false;
-            boolean checkRemove = true;
+            //TODO Optimize performance
+            /*boolean checkRemove = true;
             for (int i = this.storages.length - 1; i >= 0; i--) {
                 StateBlockStorage storage = this.storages[i];
                 if (storage == null) {
@@ -681,7 +682,7 @@ public class LevelDBChunkSection implements ChunkSection {
                         checkRemove = false;
                     }
                 }
-            }
+            }*/
 
             if (blockLight != null) {
                 byte[] arr1 = blockLight;

@@ -134,7 +134,7 @@ public abstract class BlockButton extends BlockFlowable implements Faceable {
 
     @Override
     public Item toItem() {
-        return Item.get(this.getId(), 0);
+        return Item.get(this.getItemId(), 0);
     }
 
     @Override

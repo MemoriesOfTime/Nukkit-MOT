@@ -20,6 +20,7 @@ import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
+import cn.nukkit.event.block.WaterFrostEvent;
 import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageModifier;
@@ -110,6 +111,7 @@ import java.nio.ByteOrder;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -1998,6 +2000,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double delta = Math.pow(this.lastX - target.getX(), 2) + Math.pow(this.lastY - target.getY(), 2) + Math.pow(this.lastZ - target.getZ(), 2);
         double deltaAngle = Math.abs(this.lastYaw - target.getYaw()) + Math.abs(this.lastPitch - target.getPitch());
 
+        handleLogicInMove(invalidMotion,distance);
+        
         if (delta > 0.0005 || deltaAngle > 1) {
             boolean isFirst = this.firstMove;
             this.firstMove = false;
@@ -2087,6 +2091,32 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.nextChunkOrderRun = 20;
                 }
                 this.level.antiXrayOnBlockChange(this, this, 2);
+            }
+        }
+    }
+
+    protected void handleLogicInMove(boolean invalidMotion, double distance) {
+        if (!invalidMotion && (this.lastX != this.x) && (this.lastZ != this.z)) {
+            //Handle frost walker enchantment
+            Enchantment frostWalker = inventory.getBoots().getEnchantment(Enchantment.ID_FROST_WALKER);
+            if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
+                int radius = 2 + frostWalker.getLevel();
+                for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
+                    for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
+                        Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
+                        Block block = level.getBlock(coordX, this.getFloorY() - 1, coordZ);
+                        if (block instanceof BlockWater water && up.isAir()) {
+                            if (water.getFluidHeightPercent() < 0.15) {
+                                WaterFrostEvent ev = new WaterFrostEvent(block);
+                                server.getPluginManager().callEvent(ev);
+                                if (!ev.isCancelled()) {
+                                    level.setBlock(block, Block.get(Block.FROSTED_ICE), true, false);
+                                    level.scheduleUpdate(level.getBlock(block), ThreadLocalRandom.current().nextInt(20, 40));
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
