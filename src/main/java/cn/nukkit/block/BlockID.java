@@ -430,7 +430,8 @@ public interface BlockID {
     int PISTON_HEAD_STICKY = 472;
     int BEE_NEST = 473;
     int BEEHIVE = 474;
-
+    int HONEY_BLOCK = 475;
+    int HONEYCOMB_BLOCK = 476;
     int LODESTONE = 477;
     int CRIMSON_ROOTS = 478;
     int WARPED_ROOTS = 479;
