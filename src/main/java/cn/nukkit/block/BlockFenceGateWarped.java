@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockFenceGateWarped extends BlockFenceGate {
 
@@ -21,6 +22,11 @@ public class BlockFenceGateWarped extends BlockFenceGate {
     @Override
     public String getName() {
         return "Warped Fence Gate";
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.CYAN_BLOCK_COLOR;
     }
 
     @Override

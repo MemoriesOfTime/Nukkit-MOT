@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockFenceCrimson extends BlockFence {
 
@@ -31,6 +32,11 @@ public class BlockFenceCrimson extends BlockFence {
     @Override
     public String getName() {
         return "Crimson Fence";
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.NETHERRACK_BLOCK_COLOR;
     }
 
     @Override
