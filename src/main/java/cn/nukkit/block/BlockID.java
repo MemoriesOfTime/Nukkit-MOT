@@ -466,7 +466,6 @@ public interface BlockID {
     int WARPED_WALL_SIGN = 508;
     int CRIMSON_STAIRS = 509;
     int WARPED_STAIRS = 510;
-
     int CRIMSON_FENCE = 511;
     int WARPED_FENCE = 512;
     int CRIMSON_FENCE_GATE = 513;

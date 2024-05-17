@@ -4,6 +4,15 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 
 public class BlockFenceGateWarped extends BlockFenceGate {
+
+    public BlockFenceGateWarped() {
+        this(0);
+    }
+
+    public BlockFenceGateWarped(int meta) {
+        super(meta);
+    }
+
     @Override
     public int getId() {
         return WARPED_FENCE_GATE;
@@ -12,14 +21,6 @@ public class BlockFenceGateWarped extends BlockFenceGate {
     @Override
     public String getName() {
         return "Warped Fence Gate";
-    }
-
-    public BlockFenceGateWarped() {
-        this(0);
-    }
-
-    public BlockFenceGateWarped(int meta) {
-        super(meta);
     }
 
     @Override

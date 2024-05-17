@@ -4,6 +4,15 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 
 public class BlockFenceGateCrimson extends BlockFenceGate {
+
+    public BlockFenceGateCrimson() {
+        this(0);
+    }
+
+    public BlockFenceGateCrimson(int meta) {
+        super(meta);
+    }
+
     @Override
     public int getId() {
         return CRIMSON_FENCE_GATE;
@@ -12,14 +21,6 @@ public class BlockFenceGateCrimson extends BlockFenceGate {
     @Override
     public String getName() {
         return "Crimson Fence Gate";
-    }
-
-    public BlockFenceGateCrimson() {
-        this(0);
-    }
-
-    public BlockFenceGateCrimson(int meta) {
-        super(meta);
     }
 
     @Override
