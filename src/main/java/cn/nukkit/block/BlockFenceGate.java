@@ -18,6 +18,10 @@ import cn.nukkit.utils.Faceable;
  */
 public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
 
+    public static final int DIRECTIO_BIT = 0x03;
+    public static final int OPEN_BIT = 0x04;
+    public static final int IN_WALL_BIT = 0x08;
+
     public BlockFenceGate() {
         this(0);
     }
@@ -63,10 +67,10 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
 
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
-        if ((this.getDamage() & 0x04) > 0) {
+        if (this.isOpen()) {
             return null;
         }
-        int i = this.getDamage() & 0x03;
+        int i = this.getDamage() & DIRECTIO_BIT;
         if (i == 2 || i == 0) {
             return new SimpleAxisAlignedBB(x, y, z + 0.375, x + 1, y + 1.5, z + 0.625);
         } else {
@@ -148,14 +152,14 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
             }
         }
 
-        this.setDamage(direction | ((~this.getDamage()) & 0x04));
+        this.setDamage(direction | ((~this.getDamage()) & OPEN_BIT));
         this.level.addSound(new DoorSound(this));
         this.level.setBlock(this, this, false, false);
         return true;
     }
 
     public boolean isOpen() {
-        return (this.getDamage() & 0x04) > 0;
+        return (this.getDamage() & OPEN_BIT) > 0;
     }
 
     @Override
@@ -177,7 +181,7 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
 
     @Override
     public BlockFace getBlockFace() {
-        return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
+        return BlockFace.fromHorizontalIndex(this.getDamage() & DIRECTIO_BIT);
     }
 
     @Override
