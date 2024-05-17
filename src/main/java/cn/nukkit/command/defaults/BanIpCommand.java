@@ -33,6 +33,21 @@ public class BanIpCommand extends VanillaCommand {
         });
     }
 
+    private static void processIPBan(String ip, CommandSender sender, String reason) {
+        sender.getServer().getIPBans().addBan(ip, reason, null, sender.getName());
+
+        for (Player player : sender.getServer().getOnlinePlayers().values()) {
+            if (player.getAddress().equals(ip)) {
+                player.kick(PlayerKickEvent.Reason.IP_BANNED, !reason.isEmpty() ? reason : "IP banned", true, "source=" + sender.getName() + ", reason=" + reason);
+            }
+        }
+
+        try {
+            sender.getServer().getNetwork().blockAddress(InetAddress.getByName(ip), -1);
+        } catch (UnknownHostException ignore) {
+        }
+    }
+
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
         if (!this.testPermission(sender)) {
@@ -90,19 +105,5 @@ public class BanIpCommand extends VanillaCommand {
         }
 
         return true;
-    }
-
-    private static void processIPBan(String ip, CommandSender sender, String reason) {
-        sender.getServer().getIPBans().addBan(ip, reason, null, sender.getName());
-
-        for (Player player : sender.getServer().getOnlinePlayers().values()) {
-            if (player.getAddress().equals(ip)) {
-                player.kick(PlayerKickEvent.Reason.IP_BANNED, !reason.isEmpty() ? reason : "IP banned", true, "source=" + sender.getName() + ", reason=" + reason);
-            }
-        }
-
-        try {
-            sender.getServer().getNetwork().blockAddress(InetAddress.getByName(ip), -1);
-        } catch (UnknownHostException ignore) {}
     }
 }

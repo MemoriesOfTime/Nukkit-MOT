@@ -59,9 +59,6 @@ import static cn.nukkit.utils.Utils.dynamic;
 public abstract class Entity extends Location implements Metadatable {
 
     public static final int NETWORK_ID = -1;
-
-    public abstract int getNetworkId();
-
     public static final int DATA_TYPE_BYTE = 0;
     public static final int DATA_TYPE_SHORT = 1;
     public static final int DATA_TYPE_INT = 2;
@@ -71,13 +68,11 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_TYPE_POS = 6;
     public static final int DATA_TYPE_LONG = 7;
     public static final int DATA_TYPE_VECTOR3F = 8;
-
     public static final int DATA_FLAGS = 0;
     public static final int DATA_HEALTH = 1; //int (minecart/boat)
     public static final int DATA_VARIANT = 2; //int
-    public static final int DATA_COLOR = 3, DATA_COLOUR = DATA_COLOR; //byte
     public static final int DATA_NAMETAG = 4; //string
-    public static final int DATA_OWNER_EID = 5; //long
+    public static final int DATA_OWNER_EID = 5; //long    public static final int DATA_COLOR = 3, DATA_COLOUR = DATA_COLOR; //byte
     public static final int DATA_TARGET_EID = 6; //long
     public static final int DATA_AIR = 7; //short
     public static final int DATA_POTION_COLOR = 8; //int (ARGB!)
@@ -167,10 +162,9 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_SITTING_AMOUNT = 89;
     public static final int DATA_SITTING_AMOUNT_PREVIOUS = 90;
     public static final int DATA_EATING_COUNTER = 91;
-    public static final int DATA_FLAGS_EXTENDED = 92, DATA_FLAGS2 = DATA_FLAGS_EXTENDED; //long (extended data flags)
     public static final int DATA_LAYING_AMOUNT = 93;
     public static final int DATA_LAYING_AMOUNT_PREVIOUS = 94;
-    public static final int DATA_DURATION = 95;
+    public static final int DATA_DURATION = 95;    public static final int DATA_FLAGS_EXTENDED = 92, DATA_FLAGS2 = DATA_FLAGS_EXTENDED; //long (extended data flags)
     public static final int DATA_SPAWN_TIME = 96;
     public static final int DATA_CHANGE_RATE = 97;
     public static final int DATA_CHANGE_ON_PICKUP = 98;
@@ -206,7 +200,6 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_PLAYER_LAST_DEATH_DIMENSION = 128;
     public static final int DATA_PLAYER_HAS_DIED = 129;
     public static final int DATA_COLLISION_BOX = 130; //vector3f
-
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
     public static final int DATA_FLAG_SNEAKING = 1;
@@ -224,11 +217,10 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FLAG_CRITICAL = 13;
     public static final int DATA_FLAG_CAN_SHOW_NAMETAG = 14;
     public static final int DATA_FLAG_ALWAYS_SHOW_NAMETAG = 15;
-    public static final int DATA_FLAG_IMMOBILE = 16, DATA_FLAG_NO_AI = DATA_FLAG_IMMOBILE;
     public static final int DATA_FLAG_SILENT = 17;
     public static final int DATA_FLAG_WALLCLIMBING = 18;
     public static final int DATA_FLAG_CAN_CLIMB = 19;
-    public static final int DATA_FLAG_SWIMMER = 20;
+    public static final int DATA_FLAG_SWIMMER = 20;    public static final int DATA_FLAG_IMMOBILE = 16, DATA_FLAG_NO_AI = DATA_FLAG_IMMOBILE;
     public static final int DATA_FLAG_CAN_FLY = 21;
     public static final int DATA_FLAG_WALKER = 22;
     public static final int DATA_FLAG_RESTING = 23;
@@ -327,23 +319,18 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_TIMER_FLAG_2 = 116;
     public static final int DATA_TIMER_FLAG_3 = 117;
     public static final int DATA_FLAG_BODY_ROTATION_BLOCKED = 118;
-
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
-
-    public static long entityCount = 1;
-
     private static final Map<String, Class<? extends Entity>> knownEntities = new HashMap<>();
     private static final Map<String, String> shortNames = new HashMap<>();
-
     private static final Map<Integer, String> entityRuntimeMappingOld = new HashMap<>();
     private static final Map<Integer, String> entityRuntimeMapping407 = new HashMap<>();
     private static final Map<Integer, String> entityRuntimeMapping440 = new HashMap<>();
     private static final Map<Integer, String> entityRuntimeMapping527 = new HashMap<>();
     private static final Map<Integer, String> entityRuntimeMapping589 = new HashMap<>();
-
     private static final Map<Integer, CompoundTag> entityIdentifiersMap = new HashMap<>();
     private static final Map<Integer, byte[]> entityIdentifiersCache = new HashMap<>();
+    public static long entityCount = 1;
 
     static {
         AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMappingOld, ProtocolInfo.v1_2_0);
@@ -362,13 +349,9 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final Map<Integer, Player> hasSpawned = new ConcurrentHashMap<>();
-
+    public final List<Entity> passengers = new ArrayList<>();
+    public final boolean isPlayer;
     protected final Map<Integer, Effect> effects = new ConcurrentHashMap<>();
-
-    protected UUID entityUniqueId;
-
-    protected long id;
-
     protected final EntityMetadata dataProperties = new EntityMetadata()
             .putLong(DATA_FLAGS, 0)
             .putByte(DATA_COLOR, 0)
@@ -377,37 +360,24 @@ public abstract class Entity extends Location implements Metadatable {
             .putString(DATA_NAMETAG, "")
             .putLong(DATA_LEAD_HOLDER_EID, -1)
             .putFloat(DATA_SCALE, 1f);
-
-    public final List<Entity> passengers = new ArrayList<>();
-
     public Entity riding = null;
-
     public FullChunk chunk;
-
-    protected EntityDamageEvent lastDamageCause = null;
-
     public List<Block> blocksAround = new ArrayList<>();
     public List<Block> collisionBlocks = new ArrayList<>();
-
     public double lastX;
     public double lastY;
     public double lastZ;
-
     public boolean firstMove = true;
-
     public double motionX;
     public double motionY;
     public double motionZ;
-
     public Vector3 temporalVector;
     public double lastMotionX;
     public double lastMotionY;
     public double lastMotionZ;
-
     public double lastYaw;
     public double lastPitch;
     public double lastHeadYaw;
-
     public double entityCollisionReduction = 0; // Higher than 0.9 will result a fast collisions
     public AxisAlignedBB boundingBox;
     public boolean onGround;
@@ -415,101 +385,46 @@ public abstract class Entity extends Location implements Metadatable {
     public boolean positionChanged;
     public int age = 0;
     public int ticksLived = 0;
-    protected int airTicks = 0;
-
-    protected float health = 20;
-    protected int maxHealth = 20;
-
-    protected float absorption = 0;
-
-    protected float ySize = 0;
     public boolean keepMovement = false;
-
-    protected boolean noFallDamage;
     public float fallDistance = 0;
     public int lastUpdate;
     public int fireTicks = 0;
     public int inPortalTicks = 0;
     public int inEndPortalTicks = 0;
     public Position portalPos = null;
-
     public float scale = 1;
-
     public CompoundTag namedTag;
-
     public boolean isCollided = false;
     public boolean isCollidedHorizontally = false;
     public boolean isCollidedVertically = false;
-
     public int noDamageTicks;
     public boolean justCreated;
     public boolean fireProof;
     public boolean invulnerable;
-
+    public double highestPosition;
+    public boolean closed = false;
+    public boolean noClip = false;
+    protected UUID entityUniqueId;
+    protected long id;
+    protected EntityDamageEvent lastDamageCause = null;
+    protected int airTicks = 0;
+    protected float health = 20;
+    protected int maxHealth = 20;
+    protected float absorption = 0;
+    protected float ySize = 0;
+    protected boolean noFallDamage;
+    protected Server server;
+    protected volatile boolean saveWithChunk = true;
     private boolean gliding;
     private boolean immobile;
     private boolean sprinting;
     private boolean swimming;
     private boolean sneaking;
     private boolean crawling;
-    protected Server server;
-
-    public double highestPosition;
-
-    public boolean closed = false;
-
-    public boolean noClip = false;
-
-    public final boolean isPlayer;
-
     private volatile boolean init;
     private volatile boolean initEntity;
-
-    protected volatile boolean saveWithChunk = true;
-
-    private Map<String, Integer> intProperties = new LinkedHashMap<>();
-    private Map<String, Float> floatProperties = new LinkedHashMap<>();
-
-    public float getHeight() {
-        return 0;
-    }
-
-    public float getEyeHeight() {
-        return this.getHeight() / 2 + 0.1f;
-    }
-
-    public float getWidth() {
-        return 0;
-    }
-
-    public float getLength() {
-        return 0;
-    }
-
-    protected double getStepHeight() {
-        return 0;
-    }
-
-    public boolean canCollide() {
-        return true;
-    }
-
-    public boolean canBeFollowed() {
-        return true;
-    }
-
-    protected float getGravity() {
-        return 0;
-    }
-
-    protected float getDrag() {
-        return 0;
-    }
-
-    protected float getBaseOffset() {
-        return 0;
-    }
-
+    private final Map<String, Integer> intProperties = new LinkedHashMap<>();
+    private final Map<String, Float> floatProperties = new LinkedHashMap<>();
     public Entity(FullChunk chunk, CompoundTag nbt) {
         this.isPlayer = this instanceof Player;
         if (this.isPlayer) {
@@ -518,457 +433,6 @@ public abstract class Entity extends Location implements Metadatable {
         }
         initEntityProperties();
         this.init(chunk, nbt);
-    }
-
-    protected void initEntity() {
-        if (this.initEntity) {
-            throw new RuntimeException("Entity is already initialized: " + this.getName() + " (" + this.id + ')');
-        }
-
-        this.initEntity = true;
-
-        if (this.namedTag.contains("ActiveEffects")) {
-            ListTag<CompoundTag> effects = this.namedTag.getList("ActiveEffects", CompoundTag.class);
-            for (CompoundTag e : effects.getAll()) {
-                Effect effect = Effect.getEffect(e.getByte("Id"));
-                if (effect == null) {
-                    continue;
-                }
-
-                effect.setAmplifier(e.getByte("Amplifier")).setDuration(e.getInt("Duration")).setVisible(e.getBoolean("ShowParticles"));
-
-                this.addEffect(effect);
-            }
-        }
-
-        if (this.namedTag.contains("CustomName")) {
-            this.setNameTag(this.namedTag.getString("CustomName"));
-
-            if (this.namedTag.contains("CustomNameVisible")) {
-                this.setNameTagVisible(this.namedTag.getBoolean("CustomNameVisible"));
-            }
-
-            if (this.namedTag.contains("CustomNameAlwaysVisible")) {
-                this.setNameTagAlwaysVisible(this.namedTag.getBoolean("CustomNameAlwaysVisible"));
-            }
-        }
-
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_HAS_COLLISION, true, false);
-        //this.dataProperties.put(new LongEntityData(DATA_FLAGS, this.getDataPropertyLong(DATA_FLAGS) ^ 1L << DATA_FLAG_HAS_COLLISION));
-        this.dataProperties.putFloat(DATA_BOUNDING_BOX_HEIGHT, this.getHeight());
-        this.dataProperties.putFloat(DATA_BOUNDING_BOX_WIDTH, this.getWidth());
-        this.dataProperties.putInt(DATA_HEALTH, (int) this.health);
-
-        this.scheduleUpdate();
-
-        if (this.isPlayer) {
-            this.sendData((Player) this);
-        } else {
-            if (this.namedTag.contains("uuid")) {
-                this.entityUniqueId = UUID.fromString(this.namedTag.getString("uuid"));
-            } else {
-                this.entityUniqueId = UUID.randomUUID();
-            }
-        }
-    }
-
-    protected final void init(FullChunk chunk, CompoundTag nbt) {
-        if (chunk == null || chunk.getProvider() == null) {
-            throw new ChunkException("Invalid garbage Chunk given to Entity");
-        }
-
-        if (this.init) {
-            throw new RuntimeException("Entity is already initialized: " + this.getName() + " (" + this.id + ')');
-        }
-
-        this.init = true;
-
-        this.temporalVector = new Vector3();
-
-        this.id = entityCount++;
-        this.justCreated = true;
-        this.namedTag = nbt;
-
-        this.chunk = chunk;
-        this.setLevel(chunk.getProvider().getLevel());
-        this.server = chunk.getProvider().getLevel().getServer();
-
-        this.boundingBox = new SimpleAxisAlignedBB(0, 0, 0, 0, 0, 0);
-
-        ListTag<DoubleTag> posList = this.namedTag.getList("Pos", DoubleTag.class);
-        ListTag<FloatTag> rotationList = this.namedTag.getList("Rotation", FloatTag.class);
-        ListTag<DoubleTag> motionList = this.namedTag.getList("Motion", DoubleTag.class);
-        this.setPositionAndRotation(
-                this.temporalVector.setComponents(
-                        posList.get(0).data,
-                        posList.get(1).data,
-                        posList.get(2).data
-                ),
-                rotationList.get(0).data,
-                rotationList.get(1).data
-        );
-
-        this.setMotion(this.temporalVector.setComponents(
-                motionList.get(0).data,
-                motionList.get(1).data,
-                motionList.get(2).data
-        ));
-
-        if (!this.namedTag.contains("FallDistance")) {
-            this.namedTag.putFloat("FallDistance", 0);
-        }
-        this.fallDistance = this.namedTag.getFloat("FallDistance");
-        this.highestPosition = this.y + this.namedTag.getFloat("FallDistance");
-
-        if (!this.namedTag.contains("Fire") || this.namedTag.getShort("Fire") > 32767) {
-            this.namedTag.putShort("Fire", 0);
-        }
-        this.fireTicks = this.namedTag.getShort("Fire");
-
-        if (!this.namedTag.contains("Air")) {
-            this.namedTag.putShort("Air", 300);
-        }
-        this.setDataProperty(new ShortEntityData(DATA_AIR, this.namedTag.getShort("Air")), false);
-
-        if (!this.namedTag.contains("OnGround")) {
-            this.namedTag.putBoolean("OnGround", false);
-        }
-        this.onGround = this.namedTag.getBoolean("OnGround");
-
-        if (!this.namedTag.contains("Invulnerable")) {
-            this.namedTag.putBoolean("Invulnerable", false);
-        }
-        this.invulnerable = this.namedTag.getBoolean("Invulnerable");
-
-        if (!this.namedTag.contains("Scale")) {
-            this.namedTag.putFloat("Scale", 1);
-        }
-        this.scale = this.namedTag.getFloat("Scale");
-        this.setDataProperty(new FloatEntityData(DATA_SCALE, scale), false);
-
-        this.chunk.addEntity(this);
-        this.level.addEntity(this);
-
-        this.initEntity();
-
-        this.lastUpdate = this.server.getTick();
-        this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
-
-        this.scheduleUpdate();
-    }
-
-    /**
-     * 获取该实体的标识符
-     * <p>
-     * Get the identifier of the entity
-     *
-     * @return the identifier
-     */
-    @Nullable
-    public Identifier getIdentifier() {
-        return Entity.getIdentifier(this.getNetworkId());
-    }
-
-    public boolean hasCustomName() {
-        return !this.getNameTag().isEmpty();
-    }
-
-    public String getNameTag() {
-        return this.getDataPropertyString(DATA_NAMETAG);
-    }
-
-    public boolean isNameTagVisible() {
-        return this.getDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG);
-    }
-
-    public boolean isNameTagAlwaysVisible() {
-        return this.getDataPropertyByte(DATA_ALWAYS_SHOW_NAMETAG) == 1;
-    }
-
-    public void setNameTag(String name) {
-        this.setDataProperty(new StringEntityData(DATA_NAMETAG, name));
-    }
-
-    public void setNameTagVisible() {
-        this.setNameTagVisible(true);
-    }
-
-    public void setNameTagVisible(boolean value) {
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, value);
-    }
-
-    public void setNameTagAlwaysVisible() {
-        this.setNameTagAlwaysVisible(true);
-    }
-
-    public void setNameTagAlwaysVisible(boolean value) {
-        this.setDataProperty(new ByteEntityData(DATA_ALWAYS_SHOW_NAMETAG, value ? 1 : 0));
-    }
-
-    public void setScoreTag(String score) {
-        this.setDataProperty(new StringEntityData(DATA_SCORE_TAG, score));
-    }
-
-    public String getScoreTag() {
-        return this.getDataPropertyString(DATA_SCORE_TAG);
-    }
-
-    public boolean isSneaking() {
-        return this.sneaking;
-    }
-
-    public boolean isShortSneaking() {
-        return this.sneaking && canShortSneak();
-    }
-
-    protected boolean canShortSneak() {
-        return true;
-    }
-
-    public void setSneaking() {
-        this.setSneaking(true);
-    }
-
-    public void setSneaking(boolean value) {
-        this.sneaking = value;
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_SNEAKING, value);
-        if (this.canShortSneak()) {
-            this.recalculateBoundingBox(true);
-        }
-    }
-
-    public boolean isSwimming() {
-        return this.swimming;
-    }
-
-    public void setSwimming() {
-        this.setSwimming(true);
-    }
-
-    public void setSwimming(boolean value) {
-        if (this.swimming != value) {
-            this.swimming = value;
-            this.setDataFlag(DATA_FLAGS, DATA_FLAG_SWIMMING, value);
-            this.recalculateBoundingBox(true);
-        }
-    }
-
-    public boolean isSprinting() {
-        return this.sprinting;
-    }
-
-    public void setSprinting() {
-        this.setSprinting(true);
-    }
-
-    public void setSprinting(boolean value) {
-        if (this.sprinting != value) {
-            this.sprinting = value;
-            this.setDataFlag(DATA_FLAGS, DATA_FLAG_SPRINTING, value);
-        }
-    }
-
-    public boolean isGliding() {
-        return this.gliding;
-    }
-
-    public void setGliding() {
-        this.setGliding(true);
-    }
-
-    public void setGliding(boolean value) {
-        if (this.gliding != value) {
-            this.gliding = value;
-            this.setDataFlag(DATA_FLAGS, DATA_FLAG_GLIDING, value);
-            this.recalculateBoundingBox(true);
-        }
-    }
-
-    public void setCrawling() {
-        this.setCrawling(true);
-    }
-
-    public void setCrawling(boolean value) {
-        if (this.crawling != value) {
-            this.crawling = value;
-            this.setDataFlag(DATA_FLAGS, DATA_FLAG_CRAWLING, value);
-            this.recalculateBoundingBox(true);
-        }
-    }
-
-    public boolean isCrawling() {
-        return crawling;
-    }
-
-    public boolean isImmobile() {
-        return this.immobile;
-    }
-
-    public void setImmobile() {
-        this.setImmobile(true);
-    }
-
-    public void setImmobile(boolean value) {
-        this.immobile = value;
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_IMMOBILE, value);
-    }
-
-    public boolean canClimb() {
-        return this.getDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB);
-    }
-
-    public void setCanClimb() {
-        this.setCanClimb(true);
-    }
-
-    public void setCanClimb(boolean value) {
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, value);
-    }
-
-    public boolean canClimbWalls() {
-        return this.getDataFlag(DATA_FLAGS, DATA_FLAG_WALLCLIMBING);
-    }
-
-    public void setCanClimbWalls() {
-        this.setCanClimbWalls(true);
-    }
-
-    public void setCanClimbWalls(boolean value) {
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_WALLCLIMBING, value);
-    }
-
-    public void setScale(float scale) {
-        if (this.scale != scale) {
-            this.scale = scale;
-            this.setDataProperty(new FloatEntityData(DATA_SCALE, this.scale));
-            this.recalculateBoundingBox(true);
-        }
-    }
-
-    public float getScale() {
-        return this.scale;
-    }
-
-    public List<Entity> getPassengers() {
-        return passengers;
-    }
-
-    public Entity getPassenger() {
-        return Iterables.getFirst(this.passengers, null);
-    }
-
-    public boolean isPassenger(Entity entity) {
-        return this.passengers.contains(entity);
-    }
-
-    public boolean isControlling(Entity entity) {
-        return this.passengers.indexOf(entity) == 0;
-    }
-
-    public boolean hasControllingPassenger() {
-        return !this.passengers.isEmpty() && isControlling(this.passengers.get(0));
-    }
-
-    public Entity getRiding() {
-        return riding;
-    }
-
-    public Map<Integer, Effect> getEffects() {
-        return effects;
-    }
-
-    public void removeAllEffects() {
-        for (Effect effect : this.effects.values()) {
-            this.removeEffect(effect.getId());
-        }
-    }
-
-    public void removeEffect(int effectId) {
-        if (this.effects.containsKey(effectId)) {
-            Effect effect = this.effects.get(effectId);
-            this.effects.remove(effectId);
-            effect.remove(this);
-            this.recalculateEffectColor();
-        }
-    }
-
-    public Effect getEffect(int effectId) {
-        return this.effects.getOrDefault(effectId, null);
-    }
-
-    public boolean hasEffect(int effectId) {
-        return this.effects.containsKey(effectId);
-    }
-
-    public void addEffect(Effect effect) {
-        if (effect == null) {
-            return; //here add null means add nothing
-        }
-
-        effect.add(this);
-
-        this.effects.put(effect.getId(), effect);
-
-        this.recalculateEffectColor();
-
-        if (effect.getId() == Effect.HEALTH_BOOST) {
-            this.setHealth(this.health + ((effect.getAmplifier() + 1) << 2));
-        }
-    }
-
-    public void recalculateBoundingBox() {
-        this.recalculateBoundingBox(true);
-    }
-
-    public void recalculateBoundingBox(boolean send) {
-        float height = this.getHeight();
-        double radius = (this.getWidth() * this.scale) / 2d;
-        this.boundingBox.setBounds(
-                this.x - radius,
-                this.y + this.ySize,
-                z - radius,
-                x + radius,
-                y + height * this.scale + this.ySize,
-                z + radius
-        );
-
-        if (send) {
-            FloatEntityData bbH = new FloatEntityData(DATA_BOUNDING_BOX_HEIGHT, height);
-            FloatEntityData bbW = new FloatEntityData(DATA_BOUNDING_BOX_WIDTH, this.getWidth());
-            this.dataProperties.put(bbH);
-            this.dataProperties.put(bbW);
-            sendData(this.hasSpawned.values().toArray(Player.EMPTY_ARRAY), new EntityMetadata().put(bbH).put(bbW));
-        }
-    }
-
-    protected void recalculateEffectColor() {
-        int[] color = new int[3];
-        int count = 0;
-        boolean ambient = true;
-        for (Effect effect : this.effects.values()) {
-            if (effect.isVisible()) {
-                int[] c = effect.getColor();
-                color[0] += c[0] * (effect.getAmplifier() + 1);
-                color[1] += c[1] * (effect.getAmplifier() + 1);
-                color[2] += c[2] * (effect.getAmplifier() + 1);
-                count += effect.getAmplifier() + 1;
-                if (!effect.isAmbient()) {
-                    ambient = false;
-                }
-            }
-        }
-
-        if (count > 0) {
-            int r = (color[0] / count) & 0xff;
-            int g = (color[1] / count) & 0xff;
-            int b = (color[2] / count) & 0xff;
-
-            this.setDataProperty(new IntEntityData(Entity.DATA_POTION_COLOR, (r << 16) + (g << 8) + b));
-            this.setDataProperty(new ByteEntityData(Entity.DATA_POTION_AMBIENT, ambient ? 1 : 0));
-        } else {
-            this.setDataProperty(new IntEntityData(Entity.DATA_POTION_COLOR, 0));
-            this.setDataProperty(new ByteEntityData(Entity.DATA_POTION_AMBIENT, 0));
-        }
     }
 
     public static Entity createEntity(String name, Position pos, Object... args) {
@@ -1186,6 +650,547 @@ public abstract class Entity extends Location implements Metadatable {
                         .add(new FloatTag("", pitch)));
     }
 
+    public static Entity create(Object type, Position source, Object... args) {
+        FullChunk chunk = source.getLevel().getChunk((int) source.x >> 4, (int) source.z >> 4, true);
+        if (!chunk.isGenerated()) {
+            chunk.setGenerated();
+        }
+        if (!chunk.isPopulated()) {
+            chunk.setPopulated();
+        }
+
+        CompoundTag nbt = new CompoundTag().putList(new ListTag<DoubleTag>("Pos").add(new DoubleTag("", source.x)).add(new DoubleTag("", source.y)).add(new DoubleTag("", source.z)))
+                .putList(new ListTag<DoubleTag>("Motion").add(new DoubleTag("", 0)).add(new DoubleTag("", 0)).add(new DoubleTag("", 0)))
+                .putList(new ListTag<FloatTag>("Rotation").add(new FloatTag("", source instanceof Location ? (float) ((Location) source).yaw : 0))
+                        .add(new FloatTag("", source instanceof Location ? (float) ((Location) source).pitch : 0)));
+
+        return Entity.createEntity(type.toString(), chunk, nbt, args);
+    }
+
+    /**
+     * Batch play animation on entity groups<br/>
+     * This method is recommended if you need to play the same animation on a large number of entities at the same time, as it only sends packets once for each player, which greatly reduces bandwidth pressure
+     * <p>
+     * 在实体群上批量播放动画<br/>
+     * 若你需要同时在大量实体上播放同一动画，建议使用此方法，因为此方法只会针对每个玩家发送一次包，这能极大地缓解带宽压力
+     *
+     * @param animation 动画对象 Animation objects
+     * @param entities  需要播放动画的实体群 Group of entities that need to play animations
+     * @param players   可视玩家 Visible Player
+     */
+    public static void playAnimationOnEntities(AnimateEntityPacket.Animation animation, Collection<Entity> entities, Collection<Player> players) {
+        var pk = new AnimateEntityPacket();
+        pk.parseFromAnimation(animation);
+        entities.forEach(entity -> pk.getEntityRuntimeIds().add(entity.getId()));
+        pk.encode();
+        Server.broadcastPacket(players, pk);
+    }
+
+    /**
+     * @see #playAnimationOnEntities(AnimateEntityPacket.Animation, Collection, Collection)
+     */
+    public static void playAnimationOnEntities(AnimateEntityPacket.Animation animation, Collection<Entity> entities) {
+        var viewers = new HashSet<Player>();
+        entities.forEach(entity -> {
+            viewers.addAll(entity.getViewers().values());
+            if (entity.isPlayer) viewers.add((Player) entity);
+        });
+        playAnimationOnEntities(animation, entities, viewers);
+    }
+
+    public abstract int getNetworkId();
+
+    public float getHeight() {
+        return 0;
+    }
+
+    public float getEyeHeight() {
+        return this.getHeight() / 2 + 0.1f;
+    }
+
+    public float getWidth() {
+        return 0;
+    }
+
+    public float getLength() {
+        return 0;
+    }
+
+    protected double getStepHeight() {
+        return 0;
+    }
+
+    public boolean canCollide() {
+        return true;
+    }
+
+    public boolean canBeFollowed() {
+        return true;
+    }
+
+    protected float getGravity() {
+        return 0;
+    }
+
+    protected float getDrag() {
+        return 0;
+    }
+
+    protected float getBaseOffset() {
+        return 0;
+    }
+
+    protected void initEntity() {
+        if (this.initEntity) {
+            throw new RuntimeException("Entity is already initialized: " + this.getName() + " (" + this.id + ')');
+        }
+
+        this.initEntity = true;
+
+        if (this.namedTag.contains("ActiveEffects")) {
+            ListTag<CompoundTag> effects = this.namedTag.getList("ActiveEffects", CompoundTag.class);
+            for (CompoundTag e : effects.getAll()) {
+                Effect effect = Effect.getEffect(e.getByte("Id"));
+                if (effect == null) {
+                    continue;
+                }
+
+                effect.setAmplifier(e.getByte("Amplifier")).setDuration(e.getInt("Duration")).setVisible(e.getBoolean("ShowParticles"));
+
+                this.addEffect(effect);
+            }
+        }
+
+        if (this.namedTag.contains("CustomName")) {
+            this.setNameTag(this.namedTag.getString("CustomName"));
+
+            if (this.namedTag.contains("CustomNameVisible")) {
+                this.setNameTagVisible(this.namedTag.getBoolean("CustomNameVisible"));
+            }
+
+            if (this.namedTag.contains("CustomNameAlwaysVisible")) {
+                this.setNameTagAlwaysVisible(this.namedTag.getBoolean("CustomNameAlwaysVisible"));
+            }
+        }
+
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_HAS_COLLISION, true, false);
+        //this.dataProperties.put(new LongEntityData(DATA_FLAGS, this.getDataPropertyLong(DATA_FLAGS) ^ 1L << DATA_FLAG_HAS_COLLISION));
+        this.dataProperties.putFloat(DATA_BOUNDING_BOX_HEIGHT, this.getHeight());
+        this.dataProperties.putFloat(DATA_BOUNDING_BOX_WIDTH, this.getWidth());
+        this.dataProperties.putInt(DATA_HEALTH, (int) this.health);
+
+        this.scheduleUpdate();
+
+        if (this.isPlayer) {
+            this.sendData((Player) this);
+        } else {
+            if (this.namedTag.contains("uuid")) {
+                this.entityUniqueId = UUID.fromString(this.namedTag.getString("uuid"));
+            } else {
+                this.entityUniqueId = UUID.randomUUID();
+            }
+        }
+    }
+
+    protected final void init(FullChunk chunk, CompoundTag nbt) {
+        if (chunk == null || chunk.getProvider() == null) {
+            throw new ChunkException("Invalid garbage Chunk given to Entity");
+        }
+
+        if (this.init) {
+            throw new RuntimeException("Entity is already initialized: " + this.getName() + " (" + this.id + ')');
+        }
+
+        this.init = true;
+
+        this.temporalVector = new Vector3();
+
+        this.id = entityCount++;
+        this.justCreated = true;
+        this.namedTag = nbt;
+
+        this.chunk = chunk;
+        this.setLevel(chunk.getProvider().getLevel());
+        this.server = chunk.getProvider().getLevel().getServer();
+
+        this.boundingBox = new SimpleAxisAlignedBB(0, 0, 0, 0, 0, 0);
+
+        ListTag<DoubleTag> posList = this.namedTag.getList("Pos", DoubleTag.class);
+        ListTag<FloatTag> rotationList = this.namedTag.getList("Rotation", FloatTag.class);
+        ListTag<DoubleTag> motionList = this.namedTag.getList("Motion", DoubleTag.class);
+        this.setPositionAndRotation(
+                this.temporalVector.setComponents(
+                        posList.get(0).data,
+                        posList.get(1).data,
+                        posList.get(2).data
+                ),
+                rotationList.get(0).data,
+                rotationList.get(1).data
+        );
+
+        this.setMotion(this.temporalVector.setComponents(
+                motionList.get(0).data,
+                motionList.get(1).data,
+                motionList.get(2).data
+        ));
+
+        if (!this.namedTag.contains("FallDistance")) {
+            this.namedTag.putFloat("FallDistance", 0);
+        }
+        this.fallDistance = this.namedTag.getFloat("FallDistance");
+        this.highestPosition = this.y + this.namedTag.getFloat("FallDistance");
+
+        if (!this.namedTag.contains("Fire") || this.namedTag.getShort("Fire") > 32767) {
+            this.namedTag.putShort("Fire", 0);
+        }
+        this.fireTicks = this.namedTag.getShort("Fire");
+
+        if (!this.namedTag.contains("Air")) {
+            this.namedTag.putShort("Air", 300);
+        }
+        this.setDataProperty(new ShortEntityData(DATA_AIR, this.namedTag.getShort("Air")), false);
+
+        if (!this.namedTag.contains("OnGround")) {
+            this.namedTag.putBoolean("OnGround", false);
+        }
+        this.onGround = this.namedTag.getBoolean("OnGround");
+
+        if (!this.namedTag.contains("Invulnerable")) {
+            this.namedTag.putBoolean("Invulnerable", false);
+        }
+        this.invulnerable = this.namedTag.getBoolean("Invulnerable");
+
+        if (!this.namedTag.contains("Scale")) {
+            this.namedTag.putFloat("Scale", 1);
+        }
+        this.scale = this.namedTag.getFloat("Scale");
+        this.setDataProperty(new FloatEntityData(DATA_SCALE, scale), false);
+
+        this.chunk.addEntity(this);
+        this.level.addEntity(this);
+
+        this.initEntity();
+
+        this.lastUpdate = this.server.getTick();
+        this.server.getPluginManager().callEvent(new EntitySpawnEvent(this));
+
+        this.scheduleUpdate();
+    }
+
+    /**
+     * 获取该实体的标识符
+     * <p>
+     * Get the identifier of the entity
+     *
+     * @return the identifier
+     */
+    @Nullable
+    public Identifier getIdentifier() {
+        return Entity.getIdentifier(this.getNetworkId());
+    }
+
+    public boolean hasCustomName() {
+        return !this.getNameTag().isEmpty();
+    }
+
+    public String getNameTag() {
+        return this.getDataPropertyString(DATA_NAMETAG);
+    }
+
+    public void setNameTag(String name) {
+        this.setDataProperty(new StringEntityData(DATA_NAMETAG, name));
+    }
+
+    public boolean isNameTagVisible() {
+        return this.getDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG);
+    }
+
+    public void setNameTagVisible(boolean value) {
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, value);
+    }
+
+    public boolean isNameTagAlwaysVisible() {
+        return this.getDataPropertyByte(DATA_ALWAYS_SHOW_NAMETAG) == 1;
+    }
+
+    public void setNameTagAlwaysVisible(boolean value) {
+        this.setDataProperty(new ByteEntityData(DATA_ALWAYS_SHOW_NAMETAG, value ? 1 : 0));
+    }
+
+    public void setNameTagVisible() {
+        this.setNameTagVisible(true);
+    }
+
+    public void setNameTagAlwaysVisible() {
+        this.setNameTagAlwaysVisible(true);
+    }
+
+    public String getScoreTag() {
+        return this.getDataPropertyString(DATA_SCORE_TAG);
+    }
+
+    public void setScoreTag(String score) {
+        this.setDataProperty(new StringEntityData(DATA_SCORE_TAG, score));
+    }
+
+    public boolean isSneaking() {
+        return this.sneaking;
+    }
+
+    public void setSneaking(boolean value) {
+        this.sneaking = value;
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_SNEAKING, value);
+        if (this.canShortSneak()) {
+            this.recalculateBoundingBox(true);
+        }
+    }
+
+    public boolean isShortSneaking() {
+        return this.sneaking && canShortSneak();
+    }
+
+    protected boolean canShortSneak() {
+        return true;
+    }
+
+    public void setSneaking() {
+        this.setSneaking(true);
+    }
+
+    public boolean isSwimming() {
+        return this.swimming;
+    }
+
+    public void setSwimming(boolean value) {
+        if (this.swimming != value) {
+            this.swimming = value;
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_SWIMMING, value);
+            this.recalculateBoundingBox(true);
+        }
+    }
+
+    public void setSwimming() {
+        this.setSwimming(true);
+    }
+
+    public boolean isSprinting() {
+        return this.sprinting;
+    }
+
+    public void setSprinting(boolean value) {
+        if (this.sprinting != value) {
+            this.sprinting = value;
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_SPRINTING, value);
+        }
+    }
+
+    public void setSprinting() {
+        this.setSprinting(true);
+    }
+
+    public boolean isGliding() {
+        return this.gliding;
+    }
+
+    public void setGliding(boolean value) {
+        if (this.gliding != value) {
+            this.gliding = value;
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_GLIDING, value);
+            this.recalculateBoundingBox(true);
+        }
+    }
+
+    public void setGliding() {
+        this.setGliding(true);
+    }
+
+    public void setCrawling() {
+        this.setCrawling(true);
+    }
+
+    public boolean isCrawling() {
+        return crawling;
+    }
+
+    public void setCrawling(boolean value) {
+        if (this.crawling != value) {
+            this.crawling = value;
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_CRAWLING, value);
+            this.recalculateBoundingBox(true);
+        }
+    }
+
+    public boolean isImmobile() {
+        return this.immobile;
+    }
+
+    public void setImmobile(boolean value) {
+        this.immobile = value;
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_IMMOBILE, value);
+    }
+
+    public void setImmobile() {
+        this.setImmobile(true);
+    }
+
+    public boolean canClimb() {
+        return this.getDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB);
+    }
+
+    public void setCanClimb() {
+        this.setCanClimb(true);
+    }
+
+    public void setCanClimb(boolean value) {
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, value);
+    }
+
+    public boolean canClimbWalls() {
+        return this.getDataFlag(DATA_FLAGS, DATA_FLAG_WALLCLIMBING);
+    }
+
+    public void setCanClimbWalls() {
+        this.setCanClimbWalls(true);
+    }
+
+    public void setCanClimbWalls(boolean value) {
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_WALLCLIMBING, value);
+    }
+
+    public float getScale() {
+        return this.scale;
+    }
+
+    public void setScale(float scale) {
+        if (this.scale != scale) {
+            this.scale = scale;
+            this.setDataProperty(new FloatEntityData(DATA_SCALE, this.scale));
+            this.recalculateBoundingBox(true);
+        }
+    }
+
+    public List<Entity> getPassengers() {
+        return passengers;
+    }
+
+    public Entity getPassenger() {
+        return Iterables.getFirst(this.passengers, null);
+    }
+
+    public boolean isPassenger(Entity entity) {
+        return this.passengers.contains(entity);
+    }
+
+    public boolean isControlling(Entity entity) {
+        return this.passengers.indexOf(entity) == 0;
+    }
+
+    public boolean hasControllingPassenger() {
+        return !this.passengers.isEmpty() && isControlling(this.passengers.get(0));
+    }
+
+    public Entity getRiding() {
+        return riding;
+    }
+
+    public Map<Integer, Effect> getEffects() {
+        return effects;
+    }
+
+    public void removeAllEffects() {
+        for (Effect effect : this.effects.values()) {
+            this.removeEffect(effect.getId());
+        }
+    }
+
+    public void removeEffect(int effectId) {
+        if (this.effects.containsKey(effectId)) {
+            Effect effect = this.effects.get(effectId);
+            this.effects.remove(effectId);
+            effect.remove(this);
+            this.recalculateEffectColor();
+        }
+    }
+
+    public Effect getEffect(int effectId) {
+        return this.effects.getOrDefault(effectId, null);
+    }
+
+    public boolean hasEffect(int effectId) {
+        return this.effects.containsKey(effectId);
+    }
+
+    public void addEffect(Effect effect) {
+        if (effect == null) {
+            return; //here add null means add nothing
+        }
+
+        effect.add(this);
+
+        this.effects.put(effect.getId(), effect);
+
+        this.recalculateEffectColor();
+
+        if (effect.getId() == Effect.HEALTH_BOOST) {
+            this.setHealth(this.health + ((effect.getAmplifier() + 1) << 2));
+        }
+    }
+
+    public void recalculateBoundingBox() {
+        this.recalculateBoundingBox(true);
+    }
+
+    public void recalculateBoundingBox(boolean send) {
+        float height = this.getHeight();
+        double radius = (this.getWidth() * this.scale) / 2d;
+        this.boundingBox.setBounds(
+                this.x - radius,
+                this.y + this.ySize,
+                z - radius,
+                x + radius,
+                y + height * this.scale + this.ySize,
+                z + radius
+        );
+
+        if (send) {
+            FloatEntityData bbH = new FloatEntityData(DATA_BOUNDING_BOX_HEIGHT, height);
+            FloatEntityData bbW = new FloatEntityData(DATA_BOUNDING_BOX_WIDTH, this.getWidth());
+            this.dataProperties.put(bbH);
+            this.dataProperties.put(bbW);
+            sendData(this.hasSpawned.values().toArray(Player.EMPTY_ARRAY), new EntityMetadata().put(bbH).put(bbW));
+        }
+    }
+
+    protected void recalculateEffectColor() {
+        int[] color = new int[3];
+        int count = 0;
+        boolean ambient = true;
+        for (Effect effect : this.effects.values()) {
+            if (effect.isVisible()) {
+                int[] c = effect.getColor();
+                color[0] += c[0] * (effect.getAmplifier() + 1);
+                color[1] += c[1] * (effect.getAmplifier() + 1);
+                color[2] += c[2] * (effect.getAmplifier() + 1);
+                count += effect.getAmplifier() + 1;
+                if (!effect.isAmbient()) {
+                    ambient = false;
+                }
+            }
+        }
+
+        if (count > 0) {
+            int r = (color[0] / count) & 0xff;
+            int g = (color[1] / count) & 0xff;
+            int b = (color[2] / count) & 0xff;
+
+            this.setDataProperty(new IntEntityData(Entity.DATA_POTION_COLOR, (r << 16) + (g << 8) + b));
+            this.setDataProperty(new ByteEntityData(Entity.DATA_POTION_AMBIENT, ambient ? 1 : 0));
+        } else {
+            this.setDataProperty(new IntEntityData(Entity.DATA_POTION_COLOR, 0));
+            this.setDataProperty(new ByteEntityData(Entity.DATA_POTION_AMBIENT, 0));
+        }
+    }
+
     public void saveNBT() {
         if (!this.isPlayer) {
             this.namedTag.putString("id", this.getSaveId());
@@ -1255,7 +1260,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final String getSaveId() {
-        if(this instanceof CustomEntity) {
+        if (this instanceof CustomEntity) {
             EntityDefinition entityDefinition = ((CustomEntity) this).getEntityDefinition();
             return entityDefinition == null ? "" : entityDefinition.getIdentifier();
         }
@@ -1497,14 +1502,6 @@ public abstract class Entity extends Location implements Metadatable {
         return health;
     }
 
-    public boolean isAlive() {
-        return this.health >= 1;
-    }
-
-    public boolean isClosed() {
-        return closed;
-    }
-
     public void setHealth(float health) {
         if (this.health == health) {
             return;
@@ -1523,12 +1520,20 @@ public abstract class Entity extends Location implements Metadatable {
         setDataProperty(new IntEntityData(DATA_HEALTH, (int) this.health), this.isPlayer || this instanceof EntityRideable);
     }
 
-    public void setLastDamageCause(EntityDamageEvent type) {
-        this.lastDamageCause = type;
+    public boolean isAlive() {
+        return this.health >= 1;
+    }
+
+    public boolean isClosed() {
+        return closed;
     }
 
     public EntityDamageEvent getLastDamageCause() {
         return lastDamageCause;
+    }
+
+    public void setLastDamageCause(EntityDamageEvent type) {
+        this.lastDamageCause = type;
     }
 
     public int getMaxHealth() {
@@ -1549,6 +1554,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     /**
      * 设置实体是否可以保存到区块
+     *
      * @param saveWithChunk 是否可以保存到区块
      */
     public void setCanBeSavedWithChunk(boolean saveWithChunk) {
@@ -1698,7 +1704,8 @@ public abstract class Entity extends Location implements Metadatable {
         }
         if (this.y <= minY && this.isAlive()) {
             if (this.isPlayer) {
-                if (((Player) this).getGamemode() != Player.CREATIVE) this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
+                if (((Player) this).getGamemode() != Player.CREATIVE)
+                    this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
             } else {
                 this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
                 hasUpdate = true;
@@ -1769,7 +1776,7 @@ public abstract class Entity extends Location implements Metadatable {
             this.lastHeadYaw = this.headYaw;
 
             this.positionChanged = true;
-        }else {
+        } else {
             this.positionChanged = false;
         }
 
@@ -1970,12 +1977,12 @@ public abstract class Entity extends Location implements Metadatable {
         passenger.setPosition(this.add(passenger.getSeatPosition().asVector3()));
     }
 
-    public void setSeatPosition(Vector3f pos) {
-        this.setDataProperty(new Vector3fEntityData(DATA_RIDER_SEAT_POSITION, pos));
-    }
-
     public Vector3f getSeatPosition() {
         return this.getDataPropertyVector3f(DATA_RIDER_SEAT_POSITION);
+    }
+
+    public void setSeatPosition(Vector3f pos) {
+        this.setDataProperty(new Vector3fEntityData(DATA_RIDER_SEAT_POSITION, pos));
     }
 
     public Vector3f getMountedOffset(Entity entity) {
@@ -2004,7 +2011,8 @@ public abstract class Entity extends Location implements Metadatable {
     public void setAbsorption(float absorption) {
         if (absorption != this.absorption) {
             this.absorption = absorption;
-            if (this.isPlayer) ((Player) this).setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
+            if (this.isPlayer)
+                ((Player) this).setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
         }
     }
 
@@ -2161,7 +2169,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void onPushByPiston(BlockEntityPistonArm piston, BlockFace moveDirection) {
-        if (this.closed){
+        if (this.closed) {
             return;
         }
 
@@ -2599,8 +2607,8 @@ public abstract class Entity extends Location implements Metadatable {
         // 当坐标接近int类型范围上限时，与碰撞相关的方法有可能计算出超出int表示上限的时
         // eg: Entity::getBlocksAround(), 在示例方法中，会导致服务端迅速OOM
         if (Math.abs(pos.x) > ENTITY_COORDINATES_MAX_VALUE ||
-            Math.abs(pos.y) > ENTITY_COORDINATES_MAX_VALUE ||
-            Math.abs(pos.z) > ENTITY_COORDINATES_MAX_VALUE) {
+                Math.abs(pos.y) > ENTITY_COORDINATES_MAX_VALUE ||
+                Math.abs(pos.z) > ENTITY_COORDINATES_MAX_VALUE) {
             server.getLogger().warning("Entity " + this.getName() + " is trying to set position to " + pos + " which is out of bounds!");
             return false;
         }
@@ -2892,7 +2900,7 @@ public abstract class Entity extends Location implements Metadatable {
                 flags ^= 1 << id;
                 this.setDataProperty(new ByteEntityData(propertyId, flags), send);
             } else {
-                LongEntityData longEntityData = (LongEntityData)this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
+                LongEntityData longEntityData = (LongEntityData) this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
                 long flags = longEntityData.getData() ^ 1L << id;
                 LongEntityData newLongEntityData = new LongEntityData(propertyId, flags);
                 if (propertyId == DATA_FLAGS) {
@@ -2914,7 +2922,7 @@ public abstract class Entity extends Location implements Metadatable {
                         data137 = 0L;
                     }
 
-                    newLongEntityData.dataVersions = new long[] {
+                    newLongEntityData.dataVersions = new long[]{
                             data137 ^ 1L << id137,
                             data223 ^ 1L << id223,
                             data291 ^ 1L << id291
@@ -2936,7 +2944,7 @@ public abstract class Entity extends Location implements Metadatable {
                 flags ^= 1 << id;
                 this.setDataPropertyAndSendOnlyToSelf(new ByteEntityData(propertyId, flags));
             } else {
-                LongEntityData longEntityData = (LongEntityData)this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
+                LongEntityData longEntityData = (LongEntityData) this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
                 long flags = longEntityData.getData() ^ 1L << id;
                 LongEntityData newLongEntityData = new LongEntityData(propertyId, flags);
                 if (propertyId == DATA_FLAGS) {
@@ -2958,7 +2966,7 @@ public abstract class Entity extends Location implements Metadatable {
                         data137 = 0L;
                     }
 
-                    newLongEntityData.dataVersions = new long[] {
+                    newLongEntityData.dataVersions = new long[]{
                             data137 ^ 1L << id137,
                             data223 ^ 1L << id223,
                             data291 ^ 1L << id291
@@ -3026,23 +3034,6 @@ public abstract class Entity extends Location implements Metadatable {
         return (int) (203 + this.id);
     }
 
-    public static Entity create(Object type, Position source, Object... args) {
-        FullChunk chunk = source.getLevel().getChunk((int) source.x >> 4, (int) source.z >> 4, true);
-        if (!chunk.isGenerated()) {
-            chunk.setGenerated();
-        }
-        if (!chunk.isPopulated()) {
-            chunk.setPopulated();
-        }
-
-        CompoundTag nbt = new CompoundTag().putList(new ListTag<DoubleTag>("Pos").add(new DoubleTag("", source.x)).add(new DoubleTag("", source.y)).add(new DoubleTag("", source.z)))
-                .putList(new ListTag<DoubleTag>("Motion").add(new DoubleTag("", 0)).add(new DoubleTag("", 0)).add(new DoubleTag("", 0)))
-                .putList(new ListTag<FloatTag>("Rotation").add(new FloatTag("", source instanceof Location ? (float) ((Location) source).yaw : 0))
-                        .add(new FloatTag("", source instanceof Location ? (float) ((Location) source).pitch : 0)));
-
-        return Entity.createEntity(type.toString(), chunk, nbt, args);
-    }
-
     public boolean isOnLadder() {
         int blockId = this.level.getBlockIdAt(chunk, this.getFloorX(), this.getFloorY(), this.getFloorZ());
         return blockId == Block.LADDER || blockId == Block.VINES || blockId == Block.COBWEB || blockId == Block.SCAFFOLDING;
@@ -3097,7 +3088,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     private boolean validateAndSetIntProperty(String identifier, int value) {
-        if(!intProperties.containsKey(identifier)) {
+        if (!intProperties.containsKey(identifier)) {
             return false;
         }
         intProperties.put(identifier, value);
@@ -3113,7 +3104,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final boolean setFloatEntityProperty(String identifier, float value) {
-        if(!floatProperties.containsKey(identifier)) {
+        if (!floatProperties.containsKey(identifier)) {
             return false;
         }
         floatProperties.put(identifier, value);
@@ -3121,14 +3112,14 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final boolean setEnumEntityProperty(String identifier, String value) {
-        if(!intProperties.containsKey(identifier)) return false;
+        if (!intProperties.containsKey(identifier)) return false;
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if(property.getIdentifier() == identifier && property instanceof EnumEntityProperty enumEntityProperty) {
+            if (property.getIdentifier() == identifier && property instanceof EnumEntityProperty enumEntityProperty) {
                 int index = enumEntityProperty.findIndex(value);
 
-                if(index >= 0) {
+                if (index >= 0) {
                     intProperties.put(identifier, index);
                     return true;
                 }
@@ -3139,7 +3130,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     private void initEntityProperties() {
-        if(this.getIdentifier() != null) {
+        if (this.getIdentifier() != null) {
             initEntityProperties(this.getIdentifier().toString());
         }
     }
@@ -3183,35 +3174,10 @@ public abstract class Entity extends Location implements Metadatable {
         return new PropertySyncData(intArray, floatArray);
     }
 
-    /**
-     * Batch play animation on entity groups<br/>
-     * This method is recommended if you need to play the same animation on a large number of entities at the same time, as it only sends packets once for each player, which greatly reduces bandwidth pressure
-     * <p>
-     * 在实体群上批量播放动画<br/>
-     * 若你需要同时在大量实体上播放同一动画，建议使用此方法，因为此方法只会针对每个玩家发送一次包，这能极大地缓解带宽压力
-     *
-     * @param animation 动画对象 Animation objects
-     * @param entities  需要播放动画的实体群 Group of entities that need to play animations
-     * @param players   可视玩家 Visible Player
-     */
-    public static void playAnimationOnEntities(AnimateEntityPacket.Animation animation, Collection<Entity> entities, Collection<Player> players) {
-        var pk = new AnimateEntityPacket();
-        pk.parseFromAnimation(animation);
-        entities.forEach(entity -> pk.getEntityRuntimeIds().add(entity.getId()));
-        pk.encode();
-        Server.broadcastPacket(players, pk);
-    }
 
-    /**
-     * @see #playAnimationOnEntities(AnimateEntityPacket.Animation, Collection, Collection)
-     */
-    public static void playAnimationOnEntities(AnimateEntityPacket.Animation animation, Collection<Entity> entities) {
-        var viewers = new HashSet<Player>();
-        entities.forEach(entity -> {
-            viewers.addAll(entity.getViewers().values());
-            if (entity.isPlayer) viewers.add((Player) entity);
-        });
-        playAnimationOnEntities(animation, entities, viewers);
-    }
+
+
+
+
 
 }

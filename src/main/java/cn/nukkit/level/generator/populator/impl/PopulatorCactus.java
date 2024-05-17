@@ -24,7 +24,7 @@ public class PopulatorCactus extends PopulatorSurfaceBlock {
         int range = random.nextBoundedInt(18);
         if (range >= 16) {
             height = 3;
-        }else if (range >= 11) {
+        } else if (range >= 11) {
             height = 2;
         }
         if (y > 0) {

@@ -40,47 +40,8 @@ public abstract class EntitySwimmingMob extends EntitySwimming implements Entity
     }
 
     @Override
-    public int getDamage(Integer difficulty) {
-        return Utils.rand(this.getMinDamage(difficulty), this.getMaxDamage(difficulty));
-    }
-
-    @Override
-    public int getMinDamage() {
-        return getMinDamage(null);
-    }
-
-    @Override
-    public int getMinDamage(Integer difficulty) {
-        if (difficulty == null || difficulty > 3 || difficulty < 0) {
-            difficulty = Server.getInstance().getDifficulty();
-        }
-        return this.minDamage[difficulty];
-    }
-
-    @Override
-    public int getMaxDamage() {
-        return getMaxDamage(null);
-    }
-
-    @Override
-    public int getMaxDamage(Integer difficulty) {
-        if (difficulty == null || difficulty > 3 || difficulty < 0) {
-            difficulty = Server.getInstance().getDifficulty();
-        }
-        return this.maxDamage[difficulty];
-    }
-
-    @Override
     public void setDamage(int damage) {
         this.setDamage(damage, Server.getInstance().getDifficulty());
-    }
-
-    @Override
-    public void setDamage(int damage, int difficulty) {
-        if (difficulty >= 1 && difficulty <= 3) {
-            this.minDamage[difficulty] = damage;
-            this.maxDamage[difficulty] = damage;
-        }
     }
 
     @Override
@@ -104,6 +65,16 @@ public abstract class EntitySwimmingMob extends EntitySwimming implements Entity
     }
 
     @Override
+    public int getDamage(Integer difficulty) {
+        return Utils.rand(this.getMinDamage(difficulty), this.getMaxDamage(difficulty));
+    }
+
+    @Override
+    public int getMinDamage() {
+        return getMinDamage(null);
+    }
+
+    @Override
     public void setMinDamage(int[] damage) {
         if (damage.length != 4) {
             throw new IllegalArgumentException("Invalid damage array length");
@@ -120,10 +91,16 @@ public abstract class EntitySwimmingMob extends EntitySwimming implements Entity
     }
 
     @Override
-    public void setMinDamage(int damage, int difficulty) {
-        if (difficulty >= 1 && difficulty <= 3) {
-            this.minDamage[difficulty] = Math.min(damage, this.getMaxDamage(difficulty));
+    public int getMinDamage(Integer difficulty) {
+        if (difficulty == null || difficulty > 3 || difficulty < 0) {
+            difficulty = Server.getInstance().getDifficulty();
         }
+        return this.minDamage[difficulty];
+    }
+
+    @Override
+    public int getMaxDamage() {
+        return getMaxDamage(null);
     }
 
     @Override
@@ -140,6 +117,29 @@ public abstract class EntitySwimmingMob extends EntitySwimming implements Entity
     @Override
     public void setMaxDamage(int damage) {
         this.setMaxDamage(damage, Server.getInstance().getDifficulty());
+    }
+
+    @Override
+    public int getMaxDamage(Integer difficulty) {
+        if (difficulty == null || difficulty > 3 || difficulty < 0) {
+            difficulty = Server.getInstance().getDifficulty();
+        }
+        return this.maxDamage[difficulty];
+    }
+
+    @Override
+    public void setDamage(int damage, int difficulty) {
+        if (difficulty >= 1 && difficulty <= 3) {
+            this.minDamage[difficulty] = damage;
+            this.maxDamage[difficulty] = damage;
+        }
+    }
+
+    @Override
+    public void setMinDamage(int damage, int difficulty) {
+        if (difficulty >= 1 && difficulty <= 3) {
+            this.minDamage[difficulty] = Math.min(damage, this.getMaxDamage(difficulty));
+        }
     }
 
     @Override

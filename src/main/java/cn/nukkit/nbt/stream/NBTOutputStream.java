@@ -204,7 +204,8 @@ public class NBTOutputStream implements DataOutput, AutoCloseable {
                         this.serialize(t, list.type, maxDepth - 1);
                     }
                 }
-                default -> {}
+                default -> {
+                }
             }
         }
     }

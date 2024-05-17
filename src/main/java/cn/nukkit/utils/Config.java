@@ -35,12 +35,6 @@ public class Config {
     public static final int SERIALIZED = 4; // .sl
     public static final int ENUM = 5; // .txt, .list, .enum
     public static final int ENUMERATION = Config.ENUM;
-
-    private ConfigSection config = new ConfigSection();
-    private File file;
-    private boolean correct = false;
-    private int type = Config.DETECT;
-
     /**
      * List of supported config file formats
      */
@@ -61,6 +55,11 @@ public class Config {
         format.put("list", Config.ENUM);
         format.put("enum", Config.ENUM);
     }
+
+    private ConfigSection config = new ConfigSection();
+    private File file;
+    private boolean correct = false;
+    private int type = Config.DETECT;
 
     /**
      * Constructor for Config instance with undefined file object
@@ -146,8 +145,8 @@ public class Config {
     /**
      * Try to load a config file with a given type and default content
      *
-     * @param file file path
-     * @param type file type
+     * @param file       file path
+     * @param type       file type
      * @param defaultMap default content
      * @return loaded
      */
@@ -258,7 +257,7 @@ public class Config {
     /**
      * Save configuration into provided file. Internal file object will be set to new file.
      *
-     * @param file file
+     * @param file  file
      * @param async async
      * @return save success
      */
@@ -338,7 +337,7 @@ public class Config {
     /**
      * Set a value in the config
      *
-     * @param key key
+     * @param key   key
      * @param value value
      */
     public void set(final String key, Object value) {
@@ -487,14 +486,6 @@ public class Config {
         return config.getMapList(key);
     }
 
-    public void setAll(LinkedHashMap<String, Object> map) {
-        this.config = new ConfigSection(map);
-    }
-
-    public void setAll(ConfigSection section) {
-        this.config = section;
-    }
-
     public boolean exists(String key) {
         return config.exists(key);
     }
@@ -509,6 +500,14 @@ public class Config {
 
     public Map<String, Object> getAll() {
         return this.config.getAllMap();
+    }
+
+    public void setAll(LinkedHashMap<String, Object> map) {
+        this.config = new ConfigSection(map);
+    }
+
+    public void setAll(ConfigSection section) {
+        this.config = section;
     }
 
     /**

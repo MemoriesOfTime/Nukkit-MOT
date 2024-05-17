@@ -32,29 +32,6 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public abstract class BaseEntity extends EntityCreature implements EntityAgeable {
 
-    /**
-     * Empty inventory
-     * Used to fix the problem of getting the player's hand-held item null pointer
-     */
-    protected static PlayerInventory EMPTY_INVENTORY;
-
-    public int stayTime = 0;
-    protected int moveTime = 0;
-
-    protected float moveMultiplier = 1.0f;
-
-    protected Vector3 target = null;
-    protected Entity followTarget = null;
-    protected int attackDelay = 0;
-    private short inLoveTicks = 0;
-    private short inLoveCooldown = 0;
-
-    private boolean baby = false;
-    private boolean movement = true;
-    private boolean friendly = false;
-
-    public Item[] armor;
-
     private static final Int2ObjectMap<Float> ARMOR_POINTS = new Int2ObjectOpenHashMap<>() {
         {
             put(Item.LEATHER_CAP, Float.valueOf(1));
@@ -84,6 +61,23 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             put(Item.TURTLE_SHELL, Float.valueOf(2));
         }
     };
+    /**
+     * Empty inventory
+     * Used to fix the problem of getting the player's hand-held item null pointer
+     */
+    protected static PlayerInventory EMPTY_INVENTORY;
+    public int stayTime = 0;
+    public Item[] armor;
+    protected int moveTime = 0;
+    protected float moveMultiplier = 1.0f;
+    protected Vector3 target = null;
+    protected Entity followTarget = null;
+    protected int attackDelay = 0;
+    private short inLoveTicks = 0;
+    private short inLoveCooldown = 0;
+    private boolean baby = false;
+    private boolean movement = true;
+    private boolean friendly = false;
 
     public BaseEntity(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -96,6 +90,24 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.setAirTicks(400);
     }
 
+    public static void setProjectileMotion(EntityProjectile projectile, double pitch, double yawR, double pitchR, double speed) {
+        double verticalMultiplier = Math.cos(pitchR);
+        double x = verticalMultiplier * Math.sin(-yawR);
+        double z = verticalMultiplier * Math.cos(yawR);
+        double y = Math.sin(-(FastMath.toRadians(pitch)));
+        double magnitude = Math.sqrt(x * x + y * y + z * z);
+        if (magnitude > 0) {
+            x += (x * (speed - magnitude)) / magnitude;
+            y += (y * (speed - magnitude)) / magnitude;
+            z += (z * (speed - magnitude)) / magnitude;
+        }
+        ThreadLocalRandom rand = ThreadLocalRandom.current();
+        x += rand.nextGaussian() * 0.007499999832361937 * 6;
+        y += rand.nextGaussian() * 0.007499999832361937 * 6;
+        z += rand.nextGaussian() * 0.007499999832361937 * 6;
+        projectile.setMotion(new Vector3(x, y, z));
+    }
+
     public abstract Vector3 updateMove(int tickDiff);
 
     public abstract int getKillExperience();
@@ -104,20 +116,20 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return this.friendly;
     }
 
-    public boolean isMovement() {
-        return this.movement;
-    }
-
-    public boolean isKnockback() {
-        return this.attackTime > 0;
-    }
-
     public void setFriendly(boolean bool) {
         this.friendly = bool;
     }
 
+    public boolean isMovement() {
+        return this.movement;
+    }
+
     public void setMovement(boolean value) {
         this.movement = value;
+    }
+
+    public boolean isKnockback() {
+        return this.attackTime > 0;
     }
 
     public double getSpeed() {
@@ -282,7 +294,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return true;
     }
 
-
     @Override
     public boolean attack(EntityDamageEvent source) {
         if (this.isKnockback() && source instanceof EntityDamageByEntityEvent && ((EntityDamageByEntityEvent) source).getDamager() instanceof Player) {
@@ -374,6 +385,10 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.setInLove(true);
     }
 
+    public boolean isInLove() {
+        return inLoveTicks > 0;
+    }
+
     public void setInLove(boolean inLove) {
         if (inLove && !this.isBaby()) {
             this.inLoveTicks = 600;
@@ -384,20 +399,17 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         }
     }
 
-    public boolean isInLove() {
-        return inLoveTicks > 0;
+    public boolean isInLoveCooldown() {
+        return this.inLoveCooldown > 0;
     }
 
     public void setInLoveCooldown(short inLoveCooldown) {
         this.inLoveCooldown = inLoveCooldown;
     }
 
-    public boolean isInLoveCooldown() {
-        return this.inLoveCooldown > 0;
-    }
-
     /**
      * Check if the entity can swim in the block
+     *
      * @param block block id
      * @return can swim
      */
@@ -407,6 +419,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     /**
      * Get a random set of armor
+     *
      * @return armor items
      */
     public Item[] getRandomArmor() {
@@ -613,24 +626,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.isCollidedHorizontally = (movX != dx || movZ != dz);
         this.isCollided = (this.isCollidedHorizontally || this.isCollidedVertically);
         this.onGround = (movY != dy && movY < 0);
-    }
-
-    public static void setProjectileMotion(EntityProjectile projectile, double pitch, double yawR, double pitchR, double speed) {
-        double verticalMultiplier = Math.cos(pitchR);
-        double x = verticalMultiplier * Math.sin(-yawR);
-        double z = verticalMultiplier * Math.cos(yawR);
-        double y = Math.sin(-(FastMath.toRadians(pitch)));
-        double magnitude = Math.sqrt(x * x + y * y + z * z);
-        if (magnitude > 0) {
-            x += (x * (speed - magnitude)) / magnitude;
-            y += (y * (speed - magnitude)) / magnitude;
-            z += (z * (speed - magnitude)) / magnitude;
-        }
-        ThreadLocalRandom rand = ThreadLocalRandom.current();
-        x += rand.nextGaussian() * 0.007499999832361937 * 6;
-        y += rand.nextGaussian() * 0.007499999832361937 * 6;
-        z += rand.nextGaussian() * 0.007499999832361937 * 6;
-        projectile.setMotion(new Vector3(x, y, z));
     }
 
     public boolean canTarget(Entity entity) {

@@ -55,7 +55,7 @@ public class EntitySpider extends EntityWalkingMob implements EntityArthropod {
 
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 2, 2, 3 });
+        this.setDamage(new int[]{0, 2, 2, 3});
     }
 
     @Override
@@ -76,7 +76,8 @@ public class EntitySpider extends EntityWalkingMob implements EntityArthropod {
                 this.motionY = this.getGravity() * 3;
                 return true;
             }
-        } catch (Exception ignore) {}
+        } catch (Exception ignore) {
+        }
 
         return false;
     }
@@ -103,7 +104,7 @@ public class EntitySpider extends EntityWalkingMob implements EntityArthropod {
             }
         }
     }
-    
+
     @Override
     public boolean attack(EntityDamageEvent ev) {
         super.attack(ev);

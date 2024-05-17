@@ -53,7 +53,7 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
     public Class<? extends BlockEntityChest> getBlockEntityClass() {
         return BlockEntityChest.class;
     }
-    
+
     @NotNull
     @Override
     public String getBlockEntityType() {
@@ -240,20 +240,18 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
     @Override
     public boolean canBePushed() {
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
-        if (!(blockEntity instanceof BlockEntityChest)) {
+        if (!(blockEntity instanceof BlockEntityChest chest)) {
             return super.canBePushed();
         }
-        BlockEntityChest chest = (BlockEntityChest) blockEntity;
         return chest.getInventory().getViewers().size() < 1;
     }
 
     @Override
     public boolean canBePulled() {
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
-        if (!(blockEntity instanceof BlockEntityChest)) {
+        if (!(blockEntity instanceof BlockEntityChest chest)) {
             return super.canBePulled();
         }
-        BlockEntityChest chest = (BlockEntityChest) blockEntity;
         return chest.getInventory().getViewers().size() < 1;
     }
 }

@@ -37,7 +37,8 @@ public class BaseLang {
         if (path == null) {
             path = "lang/";
             this.lang = loadLang(this.getClass().getClassLoader().getResourceAsStream(path + this.langName + "/lang.ini"));
-            if (useFallback) this.fallbackLang = loadLang(this.getClass().getClassLoader().getResourceAsStream(path + fallback + "/lang.ini"));
+            if (useFallback)
+                this.fallbackLang = loadLang(this.getClass().getClassLoader().getResourceAsStream(path + fallback + "/lang.ini"));
         } else {
             this.lang = loadLang(path + this.langName + "/lang.ini");
             if (useFallback) this.fallbackLang = loadLang(path + fallback + "/lang.ini");
@@ -46,22 +47,6 @@ public class BaseLang {
         if (this.fallbackLang == null) {
             this.fallbackLang = this.lang;
         }
-    }
-
-    public Map<String, String> getLangMap() {
-        return lang;
-    }
-
-    public Map<String, String> getFallbackLangMap() {
-        return fallbackLang;
-    }
-
-    public String getName() {
-        return this.get("language.name");
-    }
-
-    public String getLang() {
-        return langName;
     }
 
     protected static Map<String, String> loadLang(String path) {
@@ -124,6 +109,22 @@ public class BaseLang {
             Server.getInstance().getLogger().logException(e);
             return null;
         }
+    }
+
+    public Map<String, String> getLangMap() {
+        return lang;
+    }
+
+    public Map<String, String> getFallbackLangMap() {
+        return fallbackLang;
+    }
+
+    public String getName() {
+        return this.get("language.name");
+    }
+
+    public String getLang() {
+        return langName;
     }
 
     public String translateString(String str) {

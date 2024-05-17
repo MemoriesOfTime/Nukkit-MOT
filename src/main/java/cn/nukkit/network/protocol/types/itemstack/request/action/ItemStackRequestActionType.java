@@ -23,8 +23,6 @@ public enum ItemStackRequestActionType {
     CRAFT_LOOM(17),
     CRAFT_NON_IMPLEMENTED_DEPRECATED(18),
     CRAFT_RESULTS_DEPRECATED(19);
-    private final int id;
-
     private static final Int2ObjectArrayMap<ItemStackRequestActionType> VALUES = new Int2ObjectArrayMap<>();
 
     static {
@@ -33,15 +31,17 @@ public enum ItemStackRequestActionType {
         }
     }
 
+    private final int id;
+
     ItemStackRequestActionType(int id) {
         this.id = id;
     }
 
-    public int getId() {
-        return id;
-    }
-
     public static ItemStackRequestActionType fromId(int id) {
         return VALUES.get(id);
+    }
+
+    public int getId() {
+        return id;
     }
 }

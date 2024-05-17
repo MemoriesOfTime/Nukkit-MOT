@@ -30,13 +30,18 @@ public class EntityPiglin extends EntityWalkingMob {
     private int angry;
     private boolean angryFlagSet;
 
+    public EntityPiglin(FullChunk chunk, CompoundTag nbt) {
+        super(chunk, nbt);
+    }
+
+    private static boolean isWearingGold(Player p) {
+        PlayerInventory i = p.getInventory();
+        return i.getHelmetFast().getId() == Item.GOLD_HELMET || i.getChestplateFast().getId() == Item.GOLD_CHESTPLATE || i.getLeggingsFast().getId() == Item.GOLD_LEGGINGS || i.getBootsFast().getId() == Item.GOLD_BOOTS;
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
-    }
-
-    public EntityPiglin(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
     }
 
     @Override
@@ -112,11 +117,6 @@ public class EntityPiglin extends EntityWalkingMob {
         this.angry = val;
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CHARGED, val > 0);
         this.angryFlagSet = val > 0;
-    }
-
-    private static boolean isWearingGold(Player p) {
-        PlayerInventory i = p.getInventory();
-        return i.getHelmetFast().getId() == Item.GOLD_HELMET || i.getChestplateFast().getId() == Item.GOLD_CHESTPLATE || i.getLeggingsFast().getId() == Item.GOLD_LEGGINGS || i.getBootsFast().getId() == Item.GOLD_BOOTS;
     }
 
     @Override

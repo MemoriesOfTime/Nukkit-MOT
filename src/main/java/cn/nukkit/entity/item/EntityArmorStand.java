@@ -129,8 +129,7 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
             boolean flag = !item.isNull();
             boolean isArmorSlot = false;
 
-            if (flag && item instanceof ItemArmor) {
-                ItemArmor itemArmor = (ItemArmor) item;
+            if (flag && item instanceof ItemArmor itemArmor) {
                 i = getArmorSlot(itemArmor);
                 isArmorSlot = true;
             }
@@ -274,10 +273,8 @@ public class EntityArmorStand extends Entity implements InventoryHolder, EntityI
             this.vibrateTimer = 20;
             this.vibrating = true;
 
-            if (source instanceof EntityDamageByEntityEvent) {
-                EntityDamageByEntityEvent event = (EntityDamageByEntityEvent) source;
-                if (event.getDamager() instanceof Player) {
-                    Player player = (Player) event.getDamager();
+            if (source instanceof EntityDamageByEntityEvent event) {
+                if (event.getDamager() instanceof Player player) {
                     if (player.isCreative()) {
                         this.close();
                         return true;

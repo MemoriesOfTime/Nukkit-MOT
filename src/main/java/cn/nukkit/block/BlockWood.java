@@ -96,7 +96,7 @@ public class BlockWood extends BlockSolidMeta {
             return WOOD_BARK;
         }
 
-        int[] strippedIds = new int[] {
+        int[] strippedIds = new int[]{
                 STRIPPED_OAK_LOG,
                 STRIPPED_SPRUCE_LOG,
                 STRIPPED_BIRCH_LOG,

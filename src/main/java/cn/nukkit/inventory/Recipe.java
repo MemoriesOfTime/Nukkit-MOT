@@ -11,12 +11,6 @@ import java.util.List;
  */
 public interface Recipe {
 
-    Item getResult();
-
-    void registerToCraftingManager(CraftingManager manager);
-
-    RecipeType getType();
-
     static boolean matchItemList(List<Item> haveItems, List<Item> needItems) {
         for (Item needItem : new ArrayList<>(needItems)) {
             for (Item haveItem : new ArrayList<>(haveItems)) {
@@ -36,4 +30,10 @@ public interface Recipe {
         }
         return haveItems.isEmpty() && needItems.isEmpty();
     }
+
+    Item getResult();
+
+    void registerToCraftingManager(CraftingManager manager);
+
+    RecipeType getType();
 }

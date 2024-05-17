@@ -25,9 +25,8 @@ import static cn.nukkit.level.format.generic.EmptyChunkSection.EMPTY_ID_ARRAY;
 @Log4j2
 public class LevelDBChunkSection implements ChunkSection {
 
-    private LevelDBChunk parent;
-
     protected final int y;
+    private final ReentrantLock skyLightLock = new ReentrantLock();
     protected StateBlockStorage[] storages;
 
 
@@ -43,7 +42,7 @@ public class LevelDBChunkSection implements ChunkSection {
     protected ReadWriteLock lock = new ReentrantReadWriteLock();
     protected Lock readLock = lock.readLock();
     protected Lock writeLock = lock.writeLock();
-    private final ReentrantLock skyLightLock = new ReentrantLock();
+    private LevelDBChunk parent;
 
     public LevelDBChunkSection(int y) {
         this(null, y);
@@ -52,7 +51,7 @@ public class LevelDBChunkSection implements ChunkSection {
     public LevelDBChunkSection(LevelDBChunk parent, int y) {
         this.parent = parent;
         this.y = y;
-        this.storages = new StateBlockStorage[]{ new StateBlockStorage(), new StateBlockStorage() };
+        this.storages = new StateBlockStorage[]{new StateBlockStorage(), new StateBlockStorage()};
     }
 
     public LevelDBChunkSection(int y, @Nullable StateBlockStorage[] storages) {
@@ -64,7 +63,7 @@ public class LevelDBChunkSection implements ChunkSection {
         this.y = y;
 
         if (storages == null || storages.length == 0) {
-            this.storages = new StateBlockStorage[]{ new StateBlockStorage(), new StateBlockStorage() };
+            this.storages = new StateBlockStorage[]{new StateBlockStorage(), new StateBlockStorage()};
             return;
         }
 
@@ -85,7 +84,7 @@ public class LevelDBChunkSection implements ChunkSection {
         }
 
         if (maxLayer == -1) {
-            this.storages = new StateBlockStorage[]{ new StateBlockStorage(), new StateBlockStorage() };
+            this.storages = new StateBlockStorage[]{new StateBlockStorage(), new StateBlockStorage()};
             return;
         }
 
@@ -178,7 +177,7 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     @Override
-    public int getBlockData( int x, int y, int z, int layer) {
+    public int getBlockData(int x, int y, int z, int layer) {
         try {
             this.readLock.lock();
 
@@ -246,7 +245,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Override
     public int[] getBlockState(int x, int y, int z, int layer) {
         int full = this.getFullBlock(x, y, z, layer);
-        return new int[] { full >> Block.DATA_BITS, full & Block.DATA_MASK };
+        return new int[]{full >> Block.DATA_BITS, full & Block.DATA_MASK};
     }
 
     @Override
@@ -355,7 +354,7 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     public boolean setBlock(int x, int y, int z, int layer, int blockId, int meta) {
-        return setFullBlockId( x, y, z, layer, (blockId << Block.DATA_BITS) | (meta & Block.DATA_MASK));
+        return setFullBlockId(x, y, z, layer, (blockId << Block.DATA_BITS) | (meta & Block.DATA_MASK));
     }
 
     @Override

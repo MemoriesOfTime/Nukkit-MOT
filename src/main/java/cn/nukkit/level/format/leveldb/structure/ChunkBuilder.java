@@ -15,6 +15,7 @@ import java.util.List;
 
 public class ChunkBuilder {
 
+    private final List<ChunkDataLoader> chunkDataLoaders = new ObjectArrayList<>();
     ChunkState state;
     @Getter
     int chunkZ;
@@ -29,9 +30,6 @@ public class ChunkBuilder {
     List<CompoundTag> entities;
     List<CompoundTag> blockEntities;
     CompoundTag extraData;
-
-    private final List<ChunkDataLoader> chunkDataLoaders = new ObjectArrayList<>();
-
     private boolean dirty;
 
     public ChunkBuilder(int chunkX, int chunkZ, LevelDBProvider levelDBProvider) {

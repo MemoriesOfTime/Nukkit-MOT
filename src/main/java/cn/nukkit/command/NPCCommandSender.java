@@ -19,9 +19,9 @@ import java.util.Map;
 
 public class NPCCommandSender implements CommandSender {
 
-    protected PermissibleBase perm = new PermissibleBase(this);
     private final Player initiator;
     private final EntityNPCEntity npc;
+    protected PermissibleBase perm = new PermissibleBase(this);
 
     public NPCCommandSender(EntityNPCEntity npc, Player initiator) {
         this.npc = npc;
@@ -145,5 +145,6 @@ public class NPCCommandSender implements CommandSender {
     }
 
     @Override
-    public void setOp(boolean value) {}
+    public void setOp(boolean value) {
+    }
 }

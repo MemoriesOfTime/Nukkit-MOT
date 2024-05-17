@@ -33,7 +33,7 @@ public class TrimFactory {
         trimPatterns.add(new TrimPattern("minecraft:wayfinder_armor_trim_smithing_template", "wayfinder"));
         trimPatterns.add(new TrimPattern("minecraft:raiser_armor_trim_smithing_template", "raiser"));
         trimPatterns.add(new TrimPattern("minecraft:host_armor_trim_smithing_template", "host"));
-        
+
         trimMaterials.add(new TrimMaterial("quartz", "§h", "minecraft:quartz"));
         trimMaterials.add(new TrimMaterial("iron", "§i", "minecraft:iron_ingot"));
         trimMaterials.add(new TrimMaterial("netherite", "§j", "minecraft:netherite_ingot"));

@@ -29,7 +29,7 @@ public class EntityRavager extends EntityWalkingMob {
 
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 7, 12, 18 });
+        this.setDamage(new int[]{0, 7, 12, 18});
     }
 
     @Override

@@ -31,16 +31,27 @@ public class Vector3f implements Cloneable {
         this.z = z;
     }
 
+    public static int getOppositeSide(int side) {
+        switch (side) {
+            case Vector3f.SIDE_DOWN:
+                return Vector3f.SIDE_UP;
+            case Vector3f.SIDE_UP:
+                return Vector3f.SIDE_DOWN;
+            case Vector3f.SIDE_NORTH:
+                return Vector3f.SIDE_SOUTH;
+            case Vector3f.SIDE_SOUTH:
+                return Vector3f.SIDE_NORTH;
+            case Vector3f.SIDE_WEST:
+                return Vector3f.SIDE_EAST;
+            case Vector3f.SIDE_EAST:
+                return Vector3f.SIDE_WEST;
+            default:
+                return -1;
+        }
+    }
+
     public float getX() {
         return this.x;
-    }
-
-    public float getY() {
-        return this.y;
-    }
-
-    public float getZ() {
-        return this.z;
     }
 
     public Vector3f setX(float x) {
@@ -48,9 +59,17 @@ public class Vector3f implements Cloneable {
         return this;
     }
 
+    public float getY() {
+        return this.y;
+    }
+
     public Vector3f setY(float y) {
         this.y = y;
         return this;
+    }
+
+    public float getZ() {
+        return this.z;
     }
 
     public Vector3f setZ(float z) {
@@ -170,25 +189,6 @@ public class Vector3f implements Cloneable {
                 return new Vector3f(this.x + step, this.y, this.z);
             default:
                 return this;
-        }
-    }
-
-    public static int getOppositeSide(int side) {
-        switch (side) {
-            case Vector3f.SIDE_DOWN:
-                return Vector3f.SIDE_UP;
-            case Vector3f.SIDE_UP:
-                return Vector3f.SIDE_DOWN;
-            case Vector3f.SIDE_NORTH:
-                return Vector3f.SIDE_SOUTH;
-            case Vector3f.SIDE_SOUTH:
-                return Vector3f.SIDE_NORTH;
-            case Vector3f.SIDE_WEST:
-                return Vector3f.SIDE_EAST;
-            case Vector3f.SIDE_EAST:
-                return Vector3f.SIDE_WEST;
-            default:
-                return -1;
         }
     }
 
@@ -358,11 +358,9 @@ public class Vector3f implements Cloneable {
 
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof Vector3f)) {
+        if (!(obj instanceof Vector3f other)) {
             return false;
         }
-
-        Vector3f other = (Vector3f) obj;
 
         return this.x == other.x && this.y == other.y && this.z == other.z;
     }

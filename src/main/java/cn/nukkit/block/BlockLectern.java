@@ -131,7 +131,7 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable, Bloc
         if (t instanceof BlockEntityLectern) {
             lectern = (BlockEntityLectern) t;
         } else {
-            lectern = (BlockEntityLectern) BlockEntity.createBlockEntity(BlockEntity.LECTERN, this.getChunk(), BlockEntity.getDefaultCompound(this, BlockEntity.LECTERN));;
+            lectern = (BlockEntityLectern) BlockEntity.createBlockEntity(BlockEntity.LECTERN, this.getChunk(), BlockEntity.getDefaultCompound(this, BlockEntity.LECTERN));
         }
         Item currentBook = lectern.getBook();
         if (!currentBook.isNull()) {

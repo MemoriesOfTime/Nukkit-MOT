@@ -21,17 +21,17 @@ public class EntityBlueWitherSkull extends EntityWitherSkull implements EntityEx
         super(chunk, nbt);
     }
 
-    @Override
-    public int getNetworkId() {
-        return NETWORK_ID;
-    }
-
     public EntityBlueWitherSkull(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
         this(chunk, nbt, shootingEntity, false);
     }
 
     public EntityBlueWitherSkull(FullChunk chunk, CompoundTag nbt, Entity shootingEntity, boolean critical) {
         super(chunk, nbt, shootingEntity);
+    }
+
+    @Override
+    public int getNetworkId() {
+        return NETWORK_ID;
     }
 
     public void setExplode(boolean bool) {
@@ -47,7 +47,7 @@ public class EntityBlueWitherSkull extends EntityWitherSkull implements EntityEx
         if (this.age > 1200 || this.isCollided || this.hadCollision) {
             if (this.level.getGameRules().getBoolean(GameRule.PROJECTILES_CAN_BREAK_BLOCKS) && this.canExplode) {
                 this.explode();
-            }else {
+            } else {
                 this.close();
             }
         } else if (this.age % 4 == 0) {

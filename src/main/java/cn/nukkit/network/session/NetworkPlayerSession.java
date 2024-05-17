@@ -10,6 +10,7 @@ import javax.crypto.SecretKey;
 public interface NetworkPlayerSession {
 
     void sendPacket(DataPacket packet);
+
     void sendImmediatePacket(DataPacket packet, Runnable callback);
 
     @Deprecated
@@ -21,8 +22,9 @@ public interface NetworkPlayerSession {
 
     Player getPlayer();
 
-    void setCompression(CompressionProvider compression);
     CompressionProvider getCompression();
+
+    void setCompression(CompressionProvider compression);
 
     default void setEncryption(SecretKey encryptionKey, Cipher encryptionCipher, Cipher decryptionCipher) {
 

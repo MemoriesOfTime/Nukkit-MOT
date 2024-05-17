@@ -21,7 +21,7 @@ import cn.nukkit.utils.Utils;
 
 /**
  * @author Adam Matthew [larryTheCoder]
- * 
+ * <p>
  * Nukkit Project.
  */
 public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityExplosive {
@@ -140,7 +140,7 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
 
         super.namedTag.putInt("TNTFuse", this.fuse);
     }
-    
+
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
         if (item.getId() == Item.FLINT_AND_STEEL || item.getId() == Item.FIRE_CHARGE) {

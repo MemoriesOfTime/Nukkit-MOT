@@ -129,15 +129,14 @@ public class EntitySheep extends EntityWalkingAnimal {
         return drops.toArray(Item.EMPTY_ARRAY);
     }
 
+    public int getColor() {
+        return this.color;
+    }
 
     public void setColor(int woolColor) {
         this.color = woolColor;
         this.namedTag.putByte("Color", woolColor);
         this.setDataProperty(new ByteEntityData(DATA_COLOUR, woolColor));
-    }
-
-    public int getColor() {
-        return this.color;
     }
 
     private int randomColor() {

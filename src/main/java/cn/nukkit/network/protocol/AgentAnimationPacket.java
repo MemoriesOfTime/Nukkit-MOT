@@ -8,13 +8,10 @@ import lombok.ToString;
 @ToString
 public class AgentAnimationPacket extends DataPacket {
     public static final int NETWORK_ID = ProtocolInfo.AGENT_ANIMATION_PACKET;
-
+    public final byte TYPE_ARM_SWING = 0;
+    public final byte TYPE_SHRUG = 1;
     public byte animation;
     public long runtimeEntityId;
-
-    public final byte TYPE_ARM_SWING = 0;
-
-    public final byte TYPE_SHRUG = 1;
 
     @Override
     public byte pid() {

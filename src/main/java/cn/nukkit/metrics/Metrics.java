@@ -20,18 +20,15 @@ import java.util.zip.GZIPOutputStream;
 
 /**
  * bStats collects some data for plugin authors.
- *
+ * <p>
  * Check out https://bStats.org/ to learn more about bStats!
  */
 public class Metrics {
 
     public static final int B_STATS_VERSION = 1;
-
-    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
     // The url to which the data is sent
     private static final String URL = "https://bStats.org/submitData/server-implementation";
-
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     // A list with all custom charts
     private final List<CustomChart> charts = new ArrayList<>();
 
@@ -49,6 +46,59 @@ public class Metrics {
         this.serverUUID = serverUUID;
         this.logger = logger;
         this.startSubmitting();
+    }
+
+    /**
+     * Sends the data to the bStats server.
+     *
+     * @param data The data to send.
+     * @throws Exception If the request failed.
+     */
+    private static void sendData(JSONObject data) throws Exception {
+        if (data == null) {
+            throw new IllegalArgumentException("Data cannot be null!");
+        }
+
+        HttpsURLConnection connection = (HttpsURLConnection) new java.net.URL(URL).openConnection();
+
+        // Compress the data to save bandwidth
+        byte[] compressedData = compress(data.toString());
+
+        // Add headers
+        connection.setRequestMethod("POST");
+        connection.addRequestProperty("Accept", "application/json");
+        connection.addRequestProperty("Connection", "close");
+        connection.addRequestProperty("Content-Encoding", "gzip"); // We gzip our request
+        connection.addRequestProperty("Content-Length", String.valueOf(compressedData.length));
+        connection.setRequestProperty("Content-Type", "application/json"); // We send our data in JSON format
+        connection.setRequestProperty("User-Agent", "MC-Server/" + B_STATS_VERSION);
+
+        // Send data
+        connection.setDoOutput(true);
+        DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream());
+        outputStream.write(compressedData);
+        outputStream.flush();
+        outputStream.close();
+
+        connection.getInputStream().close(); // We don't care about the response - Just send our data :)
+    }
+
+    /**
+     * Gzips the given String.
+     *
+     * @param str The string to gzip.
+     * @return The gzipped String.
+     * @throws IOException If the compression failed.
+     */
+    private static byte[] compress(final String str) throws IOException {
+        if (str == null) {
+            return null;
+        }
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        GZIPOutputStream gzip = new GZIPOutputStream(outputStream);
+        gzip.write(str.getBytes(StandardCharsets.UTF_8));
+        gzip.close();
+        return outputStream.toByteArray();
     }
 
     /**
@@ -141,59 +191,6 @@ public class Metrics {
     }
 
     /**
-     * Sends the data to the bStats server.
-     *
-     * @param data The data to send.
-     * @throws Exception If the request failed.
-     */
-    private static void sendData(JSONObject data) throws Exception {
-        if (data == null) {
-            throw new IllegalArgumentException("Data cannot be null!");
-        }
-
-        HttpsURLConnection connection = (HttpsURLConnection) new java.net.URL(URL).openConnection();
-
-        // Compress the data to save bandwidth
-        byte[] compressedData = compress(data.toString());
-
-        // Add headers
-        connection.setRequestMethod("POST");
-        connection.addRequestProperty("Accept", "application/json");
-        connection.addRequestProperty("Connection", "close");
-        connection.addRequestProperty("Content-Encoding", "gzip"); // We gzip our request
-        connection.addRequestProperty("Content-Length", String.valueOf(compressedData.length));
-        connection.setRequestProperty("Content-Type", "application/json"); // We send our data in JSON format
-        connection.setRequestProperty("User-Agent", "MC-Server/" + B_STATS_VERSION);
-
-        // Send data
-        connection.setDoOutput(true);
-        DataOutputStream outputStream = new DataOutputStream(connection.getOutputStream());
-        outputStream.write(compressedData);
-        outputStream.flush();
-        outputStream.close();
-
-        connection.getInputStream().close(); // We don't care about the response - Just send our data :)
-    }
-
-    /**
-     * Gzips the given String.
-     *
-     * @param str The string to gzip.
-     * @return The gzipped String.
-     * @throws IOException If the compression failed.
-     */
-    private static byte[] compress(final String str) throws IOException {
-        if (str == null) {
-            return null;
-        }
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        GZIPOutputStream gzip = new GZIPOutputStream(outputStream);
-        gzip.write(str.getBytes(StandardCharsets.UTF_8));
-        gzip.close();
-        return outputStream.toByteArray();
-    }
-
-    /**
      * Represents a custom chart.
      */
     public static abstract class CustomChart {
@@ -243,7 +240,7 @@ public class Metrics {
         /**
          * Class constructor.
          *
-         * @param chartId The id of the chart.
+         * @param chartId  The id of the chart.
          * @param callable The callable which is used to request the chart data.
          */
         public SimplePie(String chartId, Callable<String> callable) {
@@ -274,7 +271,7 @@ public class Metrics {
         /**
          * Class constructor.
          *
-         * @param chartId The id of the chart.
+         * @param chartId  The id of the chart.
          * @param callable The callable which is used to request the chart data.
          */
         public AdvancedPie(String chartId, Callable<Map<String, Integer>> callable) {
@@ -318,7 +315,7 @@ public class Metrics {
         /**
          * Class constructor.
          *
-         * @param chartId The id of the chart.
+         * @param chartId  The id of the chart.
          * @param callable The callable which is used to request the chart data.
          */
         public DrilldownPie(String chartId, Callable<Map<String, Map<String, Integer>>> callable) {
@@ -367,7 +364,7 @@ public class Metrics {
         /**
          * Class constructor.
          *
-         * @param chartId The id of the chart.
+         * @param chartId  The id of the chart.
          * @param callable The callable which is used to request the chart data.
          */
         public SingleLineChart(String chartId, Callable<Integer> callable) {
@@ -399,7 +396,7 @@ public class Metrics {
         /**
          * Class constructor.
          *
-         * @param chartId The id of the chart.
+         * @param chartId  The id of the chart.
          * @param callable The callable which is used to request the chart data.
          */
         public MultiLineChart(String chartId, Callable<Map<String, Integer>> callable) {
@@ -444,7 +441,7 @@ public class Metrics {
         /**
          * Class constructor.
          *
-         * @param chartId The id of the chart.
+         * @param chartId  The id of the chart.
          * @param callable The callable which is used to request the chart data.
          */
         public SimpleBarChart(String chartId, Callable<Map<String, Integer>> callable) {
@@ -482,7 +479,7 @@ public class Metrics {
         /**
          * Class constructor.
          *
-         * @param chartId The id of the chart.
+         * @param chartId  The id of the chart.
          * @param callable The callable which is used to request the chart data.
          */
         public AdvancedBarChart(String chartId, Callable<Map<String, int[]>> callable) {

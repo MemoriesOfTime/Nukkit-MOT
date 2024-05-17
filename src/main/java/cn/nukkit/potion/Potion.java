@@ -66,6 +66,23 @@ public class Potion implements Cloneable {
     public static final int SLOWNESS_IV = 43;
 
     protected static Potion[] potions;
+    protected final int id;
+    protected final int level;
+    protected boolean splash;
+
+    public Potion(int id) {
+        this(id, 1);
+    }
+
+    public Potion(int id, int level) {
+        this(id, level, false);
+    }
+
+    public Potion(int id, int level, boolean splash) {
+        this.id = id;
+        this.level = level;
+        this.splash = splash;
+    }
 
     public static void init() {
         potions = new Potion[256];
@@ -130,120 +147,6 @@ public class Potion implements Cloneable {
             return getPotion(id);
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    protected final int id;
-
-    protected final int level;
-
-    protected boolean splash;
-
-    public Potion(int id) {
-        this(id, 1);
-    }
-
-    public Potion(int id, int level) {
-        this(id, level, false);
-    }
-
-    public Potion(int id, int level, boolean splash) {
-        this.id = id;
-        this.level = level;
-        this.splash = splash;
-    }
-
-    public Effect getEffect() {
-        return getEffect(this.id, this.splash);
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public int getLevel() {
-        return level;
-    }
-
-    public boolean isSplash() {
-        return splash;
-    }
-
-    public Potion setSplash(boolean splash) {
-        this.splash = splash;
-        return this;
-    }
-
-    public void applyPotion(Entity entity) {
-        applyPotion(entity, 0.5);
-    }
-
-    public void applyPotion(Entity entity, double health) {
-        if (!(entity instanceof EntityLiving)) {
-            return;
-        }
-
-        if (this.id == WATER && (entity instanceof EntityEnderman || entity instanceof EntityStrider || entity instanceof EntitySnowGolem || entity instanceof EntityBlaze)) {
-            entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, 1f));
-            return;
-        }
-
-        Effect applyEffect = getEffect(this.id, this.splash);
-
-        if (applyEffect == null) {
-            return;
-        }
-
-        /*if (entity instanceof Player) {
-            if (!((Player) entity).isSurvival() && !((Player) entity).isAdventure() && applyEffect.isBad()) {
-                return;
-            }
-        }*/
-
-        PotionApplyEvent event = new PotionApplyEvent(this, applyEffect, entity);
-
-        entity.getServer().getPluginManager().callEvent(event);
-        if (event.isCancelled()) {
-            return;
-        }
-
-        applyEffect = event.getApplyEffect();
-
-        switch (this.id) {
-            case INSTANT_HEALTH:
-            case INSTANT_HEALTH_II:
-                if (entity instanceof EntitySmite) {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * (6 << (applyEffect.getAmplifier() + 1)))));
-                } else {
-                    entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
-                }
-                break;
-            case HARMING:
-                if (entity instanceof EntitySmite) {
-                    entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
-                } else {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * 6)));
-                }
-                break;
-            case HARMING_II:
-                if (entity instanceof EntitySmite) {
-                    entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
-                } else {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * 12)));
-                }
-                break;
-            default:
-                applyEffect.setDuration((int) ((splash ? health : 1) * (double) applyEffect.getDuration() + 0.5));
-                entity.addEffect(applyEffect);
-        }
-    }
-
-    @Override
-    public Potion clone() {
-        try {
-            return (Potion) super.clone();
-        } catch (CloneNotSupportedException e) {
-            return null;
         }
     }
 
@@ -450,5 +353,99 @@ public class Potion implements Cloneable {
             case SLOWNESS_IV -> 20;
             default -> 0;
         };
+    }
+
+    public Effect getEffect() {
+        return getEffect(this.id, this.splash);
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public int getLevel() {
+        return level;
+    }
+
+    public boolean isSplash() {
+        return splash;
+    }
+
+    public Potion setSplash(boolean splash) {
+        this.splash = splash;
+        return this;
+    }
+
+    public void applyPotion(Entity entity) {
+        applyPotion(entity, 0.5);
+    }
+
+    public void applyPotion(Entity entity, double health) {
+        if (!(entity instanceof EntityLiving)) {
+            return;
+        }
+
+        if (this.id == WATER && (entity instanceof EntityEnderman || entity instanceof EntityStrider || entity instanceof EntitySnowGolem || entity instanceof EntityBlaze)) {
+            entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, 1f));
+            return;
+        }
+
+        Effect applyEffect = getEffect(this.id, this.splash);
+
+        if (applyEffect == null) {
+            return;
+        }
+
+        /*if (entity instanceof Player) {
+            if (!((Player) entity).isSurvival() && !((Player) entity).isAdventure() && applyEffect.isBad()) {
+                return;
+            }
+        }*/
+
+        PotionApplyEvent event = new PotionApplyEvent(this, applyEffect, entity);
+
+        entity.getServer().getPluginManager().callEvent(event);
+        if (event.isCancelled()) {
+            return;
+        }
+
+        applyEffect = event.getApplyEffect();
+
+        switch (this.id) {
+            case INSTANT_HEALTH:
+            case INSTANT_HEALTH_II:
+                if (entity instanceof EntitySmite) {
+                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * (6 << (applyEffect.getAmplifier() + 1)))));
+                } else {
+                    entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
+                }
+                break;
+            case HARMING:
+                if (entity instanceof EntitySmite) {
+                    entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
+                } else {
+                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * 6)));
+                }
+                break;
+            case HARMING_II:
+                if (entity instanceof EntitySmite) {
+                    entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
+                } else {
+                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * 12)));
+                }
+                break;
+            default:
+                applyEffect.setDuration((int) ((splash ? health : 1) * (double) applyEffect.getDuration() + 0.5));
+                entity.addEffect(applyEffect);
+        }
+    }
+
+    @Override
+    public Potion clone() {
+        try {
+            return (Potion) super.clone();
+        } catch (CloneNotSupportedException e) {
+            return null;
+        }
     }
 }

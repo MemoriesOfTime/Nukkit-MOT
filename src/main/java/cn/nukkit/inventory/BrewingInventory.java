@@ -5,7 +5,7 @@ import cn.nukkit.blockentity.BlockEntityBrewingStand;
 import cn.nukkit.item.Item;
 
 public class BrewingInventory extends ContainerInventory {
-  
+
     public BrewingInventory(BlockEntityBrewingStand brewingStand) {
         super(brewingStand, InventoryType.BREWING_STAND);
     }
@@ -23,12 +23,12 @@ public class BrewingInventory extends ContainerInventory {
         setItem(0, item);
     }
 
-    public void setFuel(Item fuel) {
-        setItem(4, fuel);
-    }
-
     public Item getFuel() {
         return getItem(4);
+    }
+
+    public void setFuel(Item fuel) {
+        setItem(4, fuel);
     }
 
     @Override

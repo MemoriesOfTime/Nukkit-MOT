@@ -35,7 +35,7 @@ public class PlayerFogPacket extends DataPacket {
     }
 
     /**
-     * @param identifier 这个迷雾的命名空间id
+     * @param identifier     这个迷雾的命名空间id
      * @param userProvidedId 用户指定的特征id
      */
     public record Fog(Identifier identifier, String userProvidedId) {

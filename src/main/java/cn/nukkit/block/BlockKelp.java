@@ -17,16 +17,16 @@ public class BlockKelp extends BlockFlowable {
     public BlockKelp() {
         this(0);
     }
-    
+
     public BlockKelp(int meta) {
         super(meta);
     }
-    
+
     @Override
     public int getId() {
         return BLOCK_KELP;
     }
-    
+
     @Override
     public String getName() {
         return "Kelp";
@@ -41,7 +41,7 @@ public class BlockKelp extends BlockFlowable {
     public boolean canBeActivated() {
         return true;
     }
-    
+
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = this.down();
@@ -53,12 +53,12 @@ public class BlockKelp extends BlockFlowable {
             if (waterDamage == 8) {
                 this.getLevel().setBlock(this, 1, new BlockWater(), true, false);
             }
-            
+
             if (down.getId() == BLOCK_KELP && down.getDamage() != 24) {
                 down.setDamage(24);
                 this.getLevel().setBlock(down, down, true, true);
             }
-            
+
             //Placing it by hand gives it a random age value between 0 and 24.
             this.setDamage(ThreadLocalRandom.current().nextInt(25));
             this.getLevel().setBlock(this, this, true, true);
@@ -67,7 +67,7 @@ public class BlockKelp extends BlockFlowable {
             return false;
         }
     }
-    
+
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
@@ -78,13 +78,13 @@ public class BlockKelp extends BlockFlowable {
                 this.getLevel().useBreakOn(this);
                 return type;
             }
-        
+
             Block down = this.down();
             if ((!down.isSolid() && down.getId() != BLOCK_KELP) || down.getId() == MAGMA || down.getId() == ICE || down.getId() == SOUL_SAND) {
                 this.getLevel().useBreakOn(this);
                 return type;
             }
-        
+
             if (waterDamage == 8) {
                 this.getLevel().setBlock(this, 1, new BlockWater(), true, false);
             }
@@ -97,7 +97,7 @@ public class BlockKelp extends BlockFlowable {
         }
         return super.onUpdate(type);
     }
-    
+
     public boolean grow() {
         int age = MathHelper.clamp(this.getDamage(), 0, 25);
         if (age < 25) {
@@ -118,7 +118,7 @@ public class BlockKelp extends BlockFlowable {
         }
         return false;
     }
-    
+
     @Override
     public boolean onBreak(Item item) {
         Block down = this.down();
@@ -128,10 +128,10 @@ public class BlockKelp extends BlockFlowable {
         this.getLevel().setBlock(this, new BlockAir(), true, true);
         return true;
     }
-    
+
     @Override
     public boolean onActivate(Item item, Player player) {
-        if (item.getId() != Item.DYE || item.getDamage() != 0x0f){ //Bone meal
+        if (item.getId() != Item.DYE || item.getDamage() != 0x0f) { //Bone meal
             return false;
         }
         int x = (int) this.x;
@@ -159,7 +159,7 @@ public class BlockKelp extends BlockFlowable {
         }
         return false;
     }
-    
+
     @Override
     public Item toItem() {
         return new ItemKelp();

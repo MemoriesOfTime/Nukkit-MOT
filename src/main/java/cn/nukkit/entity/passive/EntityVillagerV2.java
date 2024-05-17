@@ -6,7 +6,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 public class EntityVillagerV2 extends EntityVillager {
 
     public static final int NETWORK_ID = 115;
-    
+
     public static final int PROFESSION_UNEMPLOYED = 0;
     public static final int PROFESSION_FARMER = 1;
     public static final int PROFESSION_FISHERMAN = 2;
@@ -41,5 +41,5 @@ public class EntityVillagerV2 extends EntityVillager {
     public boolean getCanTrade() {
         return canTrade;
     }
-    
+
 }

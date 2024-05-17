@@ -45,7 +45,7 @@ public class AdventureSettings implements Cloneable {
     /**
      * Set an adventure setting value
      *
-     * @param type adventure setting
+     * @param type  adventure setting
      * @param value new value
      * @return AdventureSettings
      */
@@ -74,6 +74,7 @@ public class AdventureSettings implements Cloneable {
 
     /**
      * Send adventure settings values to the player
+     *
      * @param reset reset in air ticks
      */
     void update(boolean reset) {
@@ -136,7 +137,7 @@ public class AdventureSettings implements Cloneable {
 
             player.dataPacket(packet);
             player.dataPacket(adventurePacket);
-        }else {
+        } else {
             AdventureSettingsPacket pk = new AdventureSettingsPacket();
             for (Type t : Type.values()) {
                 if (t.getId() <= 0) {
@@ -188,7 +189,7 @@ public class AdventureSettings implements Cloneable {
         private final int id;
         private final PlayerAbility ability;
         private final boolean defaultValue;
-        private int protocol;
+        private final int protocol;
 
         Type(int id, PlayerAbility ability, boolean defaultValue) {
             this(id, ability, defaultValue, -1);

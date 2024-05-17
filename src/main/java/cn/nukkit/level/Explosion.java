@@ -35,14 +35,12 @@ import java.util.List;
 public class Explosion {
 
     private static final int rays = 16;
+    private static final double stepLen = 0.3d;
     private final Level level;
     private final Position source;
     private final double size;
-
-    private List<Block> affectedBlocks = new ArrayList<>();
-    private static final double stepLen = 0.3d;
-
     private final Object what;
+    private List<Block> affectedBlocks = new ArrayList<>();
     private boolean doesDamage = true;
 
     public Explosion(Position center, double size, Entity what) {

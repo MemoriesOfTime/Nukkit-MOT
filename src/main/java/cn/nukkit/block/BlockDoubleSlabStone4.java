@@ -71,7 +71,7 @@ public class BlockDoubleSlabStone4 extends BlockDoubleSlabStone {
         if (item.isPickaxe() && item.getTier() >= ItemTool.TIER_WOODEN) {
             Item drop = Block.get(Block.STONE_SLAB4, this.getDamage() & 0x07).toItem();
             drop.setCount(2);
-            return new Item[]{ drop };
+            return new Item[]{drop};
         } else {
             return Item.EMPTY_ARRAY;
         }

@@ -35,10 +35,14 @@ public class BoundingBox {
 
     public static BoundingBox orientBox(final int x, final int y, final int z, final int xOffset, final int yOffset, final int zOffset, final int xLength, final int yLength, final int zLength, final BlockFace orientation) {
         return switch (orientation) {
-            case NORTH -> new BoundingBox(x + xOffset, y + yOffset, z - zLength + 1 + zOffset, x + xLength - 1 + xOffset, y + yLength - 1 + yOffset, z + zOffset);
-            case WEST -> new BoundingBox(x - zLength + 1 + zOffset, y + yOffset, z + xOffset, x + zOffset, y + yLength - 1 + yOffset, z + xLength - 1 + xOffset);
-            case EAST -> new BoundingBox(x + zOffset, y + yOffset, z + xOffset, x + zLength - 1 + zOffset, y + yLength - 1 + yOffset, z + xLength - 1 + xOffset);
-            default -> new BoundingBox(x + xOffset, y + yOffset, z + zOffset, x + xLength - 1 + xOffset, y + yLength - 1 + yOffset, z + zLength - 1 + zOffset);
+            case NORTH ->
+                    new BoundingBox(x + xOffset, y + yOffset, z - zLength + 1 + zOffset, x + xLength - 1 + xOffset, y + yLength - 1 + yOffset, z + zOffset);
+            case WEST ->
+                    new BoundingBox(x - zLength + 1 + zOffset, y + yOffset, z + xOffset, x + zOffset, y + yLength - 1 + yOffset, z + xLength - 1 + xOffset);
+            case EAST ->
+                    new BoundingBox(x + zOffset, y + yOffset, z + xOffset, x + zLength - 1 + zOffset, y + yLength - 1 + yOffset, z + xLength - 1 + xOffset);
+            default ->
+                    new BoundingBox(x + xOffset, y + yOffset, z + zOffset, x + xLength - 1 + xOffset, y + yLength - 1 + yOffset, z + zLength - 1 + zOffset);
         };
     }
 

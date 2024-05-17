@@ -13,20 +13,6 @@ public class ParseException extends RuntimeException implements SNBTConstants {
     private boolean alreadyAdjusted;
     private SNBTParserImplement parser;
 
-    private void setInfo(SNBTParserImplement parser, Token token, EnumSet<TokenType> expectedTypes, List<SNBTParserImplement.NonTerminalCall> callStack) {
-        this.parser = parser;
-        if (token != null && token.getType() != TokenType.EOF && token.getNext() != null) {
-            token = token.getNext();
-        }
-        this.token = token;
-        this.expectedTypes = expectedTypes;
-        this.callStack = new ArrayList<>(callStack);
-    }
-
-    public boolean hitEOF() {
-        return token != null && token.getType() == TokenType.EOF;
-    }
-
     public ParseException(SNBTParserImplement parser, Token token, EnumSet<TokenType> expectedTypes, List<SNBTParserImplement.NonTerminalCall> callStack) {
         setInfo(parser, token, expectedTypes, callStack);
     }
@@ -52,6 +38,20 @@ public class ParseException extends RuntimeException implements SNBTConstants {
     // Needed because of inheritance
     public ParseException(String message) {
         super(message);
+    }
+
+    private void setInfo(SNBTParserImplement parser, Token token, EnumSet<TokenType> expectedTypes, List<SNBTParserImplement.NonTerminalCall> callStack) {
+        this.parser = parser;
+        if (token != null && token.getType() != TokenType.EOF && token.getNext() != null) {
+            token = token.getNext();
+        }
+        this.token = token;
+        this.expectedTypes = expectedTypes;
+        this.callStack = new ArrayList<>(callStack);
+    }
+
+    public boolean hitEOF() {
+        return token != null && token.getType() == TokenType.EOF;
     }
 
     @Override

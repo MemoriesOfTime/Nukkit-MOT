@@ -8,6 +8,18 @@ public class EntityLlamaSpit extends EntityProjectile {
 
     public static final int NETWORK_ID = 102;
 
+    public EntityLlamaSpit(FullChunk chunk, CompoundTag nbt) {
+        this(chunk, nbt, null);
+    }
+
+    public EntityLlamaSpit(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
+        this(chunk, nbt, shootingEntity, false);
+    }
+
+    public EntityLlamaSpit(FullChunk chunk, CompoundTag nbt, Entity shootingEntity, boolean critical) {
+        super(chunk, nbt, shootingEntity);
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
@@ -36,18 +48,6 @@ public class EntityLlamaSpit extends EntityProjectile {
     @Override
     protected double getBaseDamage() {
         return 1;
-    }
-
-    public EntityLlamaSpit(FullChunk chunk, CompoundTag nbt) {
-        this(chunk, nbt, null);
-    }
-
-    public EntityLlamaSpit(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
-        this(chunk, nbt, shootingEntity, false);
-    }
-
-    public EntityLlamaSpit(FullChunk chunk, CompoundTag nbt, Entity shootingEntity, boolean critical) {
-        super(chunk, nbt, shootingEntity);
     }
 
     @Override

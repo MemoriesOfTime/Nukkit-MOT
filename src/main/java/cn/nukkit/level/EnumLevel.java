@@ -17,15 +17,6 @@ public enum EnumLevel {
     Level level;
 
     /**
-     * Get Level
-     *
-     * @return Level or null if the dimension is not enabled
-     */
-    public Level getLevel() {
-        return level;
-    }
-
-    /**
      * Internal: Initialize default overworld, nether and the end Levels
      */
     public static void initLevels() {
@@ -58,5 +49,14 @@ public enum EnumLevel {
             }
             THE_END.level = server.getLevelByName("the_end");
         }
+    }
+
+    /**
+     * Get Level
+     *
+     * @return Level or null if the dimension is not enabled
+     */
+    public Level getLevel() {
+        return level;
     }
 }

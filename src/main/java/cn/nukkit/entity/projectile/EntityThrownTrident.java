@@ -57,6 +57,14 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
     private int riptideLevel;
     private int impalingLevel;
 
+    public EntityThrownTrident(FullChunk chunk, CompoundTag nbt) {
+        this(chunk, nbt, null);
+    }
+
+    public EntityThrownTrident(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
+        super(chunk, nbt, shootingEntity);
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
@@ -85,14 +93,6 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
     @Override
     public float getDrag() {
         return 0.01f;
-    }
-
-    public EntityThrownTrident(FullChunk chunk, CompoundTag nbt) {
-        this(chunk, nbt, null);
-    }
-
-    public EntityThrownTrident(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
-        super(chunk, nbt, shootingEntity);
     }
 
     @Override
@@ -411,10 +411,6 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
         return this.getDataFlag(DATA_FLAGS, DATA_FLAG_SHOW_TRIDENT_ROPE);
     }
 
-    public void setRope(boolean tridentRope) { //兼容PM1E
-        this.setTridentRope(tridentRope);
-    }
-
     public void setTridentRope(boolean tridentRope) {
         if (tridentRope) {
             this.setDataProperty(new LongEntityData(DATA_OWNER_EID, this.shootingEntity.getId()));
@@ -422,6 +418,10 @@ public class EntityThrownTrident extends EntitySlenderProjectile {
             this.setDataProperty(new LongEntityData(DATA_OWNER_EID, -1));
         }
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_SHOW_TRIDENT_ROPE, tridentRope);
+    }
+
+    public void setRope(boolean tridentRope) { //兼容PM1E
+        this.setTridentRope(tridentRope);
     }
 
     public boolean canReturnToShooter() {

@@ -33,14 +33,13 @@ public class EncryptionUtils {
     public static final ECPublicKey MOJANG_PUBLIC_KEY;
     @Deprecated
     public static final ECPublicKey OLD_MOJANG_PUBLIC_KEY;
+    public static final String ALGORITHM_TYPE = AlgorithmIdentifiers.ECDSA_USING_P384_CURVE_AND_SHA384;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String MOJANG_PUBLIC_KEY_BASE64 =
             "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAECRXueJeTDqNRRgJi/vlRufByu/2G0i2Ebt6YMar5QX/R0DIIyrJMcUpruK4QveTfJSTp3Shlq4Gk34cD/4GUWwkv0DVuzeuB+tXija7HBxii03NHDbPAD0AKnLr2wdAp";
     private static final String OLD_MOJANG_PUBLIC_KEY_BASE64 =
             "MHYwEAYHKoZIzj0CAQYFK4EEACIDYgAE8ELkixyLcwlZryUQcu1TvPOmI2B7vX83ndnWRUaXm74wFfa5f/lwQNTfrLVHa2PmenpGI6JhIMUJaWZrjmMj90NoKNFSNBuKdm8rYiXsfaz3K36x/1U26HpG0ZxK/V1V";
     private static final KeyPairGenerator KEY_PAIR_GEN;
-
-    public static final String ALGORITHM_TYPE = AlgorithmIdentifiers.ECDSA_USING_P384_CURVE_AND_SHA384;
     private static final org.jose4j.jwa.AlgorithmConstraints ALGORITHM_CONSTRAINTS =
             new AlgorithmConstraints(AlgorithmConstraints.ConstraintType.PERMIT, ALGORITHM_TYPE);
 
@@ -243,7 +242,8 @@ public class EncryptionUtils {
             Cipher cipher = Cipher.getInstance(transformation);
             cipher.init(encrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
             return cipher;
-        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException | InvalidAlgorithmParameterException e) {
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException | InvalidKeyException |
+                 InvalidAlgorithmParameterException e) {
             throw new AssertionError("Unable to initialize required encryption", e);
         }
     }

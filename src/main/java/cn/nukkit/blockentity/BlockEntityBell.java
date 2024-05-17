@@ -13,10 +13,10 @@ import java.util.List;
 
 public class BlockEntityBell extends BlockEntitySpawnable {
 
+    public final List<Player> spawnExceptions = new ArrayList<>(2);
     private boolean ringing;
     private int direction;
     private int ticks;
-    public final List<Player> spawnExceptions = new ArrayList<>(2);
 
     public BlockEntityBell(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);

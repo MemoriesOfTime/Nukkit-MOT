@@ -72,46 +72,46 @@ public class BiomeSelector {
                 }
             } else if (noiseOcean < -0.12f) {
                 biome = EnumBiome.BEACH;
-            } else if (temperature < 0f)    {
+            } else if (temperature < 0f) {
                 // cold
-                if (hills < 0.2f)    {
-                    if (rainfall < -0.5f)   {
+                if (hills < 0.2f) {
+                    if (rainfall < -0.5f) {
                         biome = EnumBiome.EXTREME_HILLS_M;
                     } else if (rainfall > 0.5f) {
                         biome = EnumBiome.EXTREME_HILLS_PLUS_M;
-                    } else if (rainfall < 0f)   {
+                    } else if (rainfall < 0f) {
                         biome = EnumBiome.EXTREME_HILLS;
                     } else {
                         biome = EnumBiome.EXTREME_HILLS_PLUS;
                     }
                 } else {
-                    if (rainfall < -0.6)    {
+                    if (rainfall < -0.6) {
                         biome = EnumBiome.MEGA_TAIGA;
-                    } else if (rainfall > 0.6)   {
+                    } else if (rainfall > 0.6) {
                         biome = EnumBiome.MEGA_SPRUCE_TAIGA;
-                    } else if (rainfall < 0.2f)  {
+                    } else if (rainfall < 0.2f) {
                         biome = EnumBiome.TAIGA;
                     } else {
                         biome = EnumBiome.TAIGA_M;
                     }
                 }
-            } else if (temperature < 0.5f)  {
+            } else if (temperature < 0.5f) {
                 // normal
                 if (temperature < 0.25f) {
-                    if (rainfall < 0f)  {
+                    if (rainfall < 0f) {
                         if (noiseOcean < 0f) {
                             biome = EnumBiome.SUNFLOWER_PLAINS;
                         } else {
                             biome = EnumBiome.PLAINS;
                         }
-                    } else if (rainfall < 0.25f)    {
-                        if (noiseOcean < 0f)    {
+                    } else if (rainfall < 0.25f) {
+                        if (noiseOcean < 0f) {
                             biome = EnumBiome.FLOWER_FOREST;
                         } else {
                             biome = EnumBiome.FOREST;
                         }
                     } else {
-                        if (noiseOcean < 0f)    {
+                        if (noiseOcean < 0f) {
                             biome = EnumBiome.BIRCH_FOREST_M;
                         } else {
                             biome = EnumBiome.BIRCH_FOREST;
@@ -119,25 +119,26 @@ public class BiomeSelector {
                     }
                 } else {
                     if (rainfall < -0.2f) {
-                        if (noiseOcean < 0f)    {
+                        if (noiseOcean < 0f) {
                             biome = EnumBiome.SWAMPLAND_M;
                         } else {
                             biome = EnumBiome.SWAMP;
                         }
                     } else if (rainfall > 0.1f) {
-                        if (noiseOcean < 0.155f)  {
+                        if (noiseOcean < 0.155f) {
                             biome = EnumBiome.JUNGLE_M;
-                        } if (rainfall > 0.2f) {
+                        }
+                        if (rainfall > 0.2f) {
                             if (hills < 0f) {
                                 biome = EnumBiome.BAMBOO_JUNGLE_HILLS;
                             } else {
                                 biome = EnumBiome.BAMBOO_JUNGLE;
                             }
-                        }else {
+                        } else {
                             biome = EnumBiome.JUNGLE;
                         }
                     } else {
-                        if (noiseOcean < 0f)    {
+                        if (noiseOcean < 0f) {
                             biome = EnumBiome.ROOFED_FOREST_M;
                         } else {
                             biome = EnumBiome.ROOFED_FOREST;
@@ -146,16 +147,16 @@ public class BiomeSelector {
                 }
             } else {
                 // hot
-                if (rainfall < 0f)  {
-                    if (noiseOcean < 0f)    {
+                if (rainfall < 0f) {
+                    if (noiseOcean < 0f) {
                         biome = EnumBiome.DESERT_M;
-                    } else if (hills < 0f)    {
+                    } else if (hills < 0f) {
                         biome = EnumBiome.DESERT_HILLS;
                     } else {
                         biome = EnumBiome.DESERT;
                     }
-                } else if (rainfall > 0.4f)   {
-                    if (noiseOcean < 0.155f)    {
+                } else if (rainfall > 0.4f) {
+                    if (noiseOcean < 0.155f) {
                         if (hills < 0f) {
                             biome = EnumBiome.SAVANNA_PLATEAU_M;
                         } else {
@@ -169,20 +170,20 @@ public class BiomeSelector {
                         }
                     }
                 } else {
-                    if (noiseOcean < 0f)    {
+                    if (noiseOcean < 0f) {
                         if (hills < 0f) {
                             biome = EnumBiome.MESA_PLATEAU_F;
                         } else {
                             biome = EnumBiome.MESA_PLATEAU_F_M;
                         }
-                    } else if (hills < 0f)  {
-                        if (noiseOcean < 0.2f)    {
+                    } else if (hills < 0f) {
+                        if (noiseOcean < 0.2f) {
                             biome = EnumBiome.MESA_PLATEAU_M;
                         } else {
                             biome = EnumBiome.MESA_PLATEAU;
                         }
                     } else {
-                        if (noiseOcean < 0.1f)  {
+                        if (noiseOcean < 0.1f) {
                             biome = EnumBiome.MESA_BRYCE;
                         } else {
                             biome = EnumBiome.MESA;

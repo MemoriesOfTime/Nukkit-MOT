@@ -49,7 +49,8 @@ public abstract class BlockThin extends BlockTransparent {
                 f2 = 0;
                 f3 = 1;
             }
-        } catch (LevelException ignore) {}
+        } catch (LevelException ignore) {
+        }
         return new SimpleAxisAlignedBB(
                 this.x + f,
                 this.y,

@@ -2,13 +2,17 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
-import lombok.Getter;
 
-@Getter
 public class BlockFenceGateCrimson extends BlockFenceGate {
-    private final int id = CRIMSON_FENCE_GATE;
+    @Override
+    public int getId() {
+        return CRIMSON_FENCE_GATE;
+    }
 
-    private final String name = "Crimson Fence Gate";
+    @Override
+    public String getName() {
+        return "Crimson Fence Gate";
+    }
 
     public BlockFenceGateCrimson() {
         this(0);

@@ -11,6 +11,14 @@ public class EntityShulkerBullet extends EntityProjectile {
 
     public static final int NETWORK_ID = 76;
 
+    public EntityShulkerBullet(FullChunk chunk, CompoundTag nbt) {
+        this(chunk, nbt, null);
+    }
+
+    public EntityShulkerBullet(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
+        super(chunk, nbt, shootingEntity);
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
@@ -44,14 +52,6 @@ public class EntityShulkerBullet extends EntityProjectile {
     @Override
     protected double getBaseDamage() {
         return 4;
-    }
-
-    public EntityShulkerBullet(FullChunk chunk, CompoundTag nbt) {
-        this(chunk, nbt, null);
-    }
-
-    public EntityShulkerBullet(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
-        super(chunk, nbt, shootingEntity);
     }
 
     @Override

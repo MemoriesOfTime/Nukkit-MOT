@@ -28,6 +28,36 @@ public final class BVector3 {
     private double length;
 
     /**
+     * 通过传入的yaw、pitch和向量的模初始化BVector3
+     * <p>
+     * Initialize B Vector 3 by the modulus of the incoming yaw, pitch and vector
+     *
+     * @param yaw    the yaw
+     * @param pitch  the pitch
+     * @param length 向量模
+     */
+    private BVector3(double yaw, double pitch, double length) {
+        this.vector3 = getDirectionVector(yaw, pitch);
+        this.yaw = getYawFromVector(this.vector3);
+        this.pitch = getPitchFromVector(this.vector3);
+        this.length = length;
+    }
+
+    /**
+     * 通过传入的向量坐标初始化BVector3
+     * <p>
+     * Initialize B Vector 3 with the vector coordinates passed in
+     *
+     * @param vector3 向量坐标
+     */
+    private BVector3(Vector3 vector3) {
+        this.yaw = getYawFromVector(vector3);
+        this.pitch = getPitchFromVector(vector3);
+        this.vector3 = getDirectionVector(yaw, pitch);
+        this.length = vector3.length();
+    }
+
+    /**
      * 通过传入的Location的yaw与pitch初始化BVector3<br>
      * 此方法返回的BVector3的模长为1
      * <p>
@@ -97,59 +127,55 @@ public final class BVector3 {
     }
 
     /**
-     * 通过传入的yaw、pitch和向量的模初始化BVector3
+     * 通过yaw与pitch计算出等价的Vector3方向向量
+     *
+     * @param yaw   yaw
+     * @param pitch pitch
+     * @return Vector3方向向量
+     */
+    public static Vector3 getDirectionVector(double yaw, double pitch) {
+        var pitch0 = toRadians(pitch + 90);
+        var yaw0 = toRadians(yaw + 90);
+        var x = sin(pitch0) * cos(yaw0);
+        var z = sin(pitch0) * sin(yaw0);
+        var y = cos(pitch0);
+        return new Vector3(x, y, z).normalize();
+    }
+
+    /**
+     * 通过方向向量计算出yaw
      * <p>
-     * Initialize B Vector 3 by the modulus of the incoming yaw, pitch and vector
+     * Calculate yaw from the direction vector
      *
-     * @param yaw    the yaw
-     * @param pitch  the pitch
-     * @param length 向量模
+     * @param vector 方向向量
+     * @return yaw
      */
-    private BVector3(double yaw, double pitch, double length) {
-        this.vector3 = getDirectionVector(yaw, pitch);
-        this.yaw = getYawFromVector(this.vector3);
-        this.pitch = getPitchFromVector(this.vector3);
-        this.length = length;
+    public static double getYawFromVector(Vector3 vector) {
+        double length = vector.x * vector.x + vector.z * vector.z;
+        // 避免NAN
+        if (length == 0) {
+            return 0;
+        }
+        double yaw = toDegrees(asin(-vector.x / sqrt(length)));
+        return -vector.z > 0.0D ? 180.0D - yaw : StrictMath.abs(yaw) < 1E-10 ? 0 : yaw;
     }
 
     /**
-     * 通过传入的向量坐标初始化BVector3
+     * 通过方向向量计算出pitch
      * <p>
-     * Initialize B Vector 3 with the vector coordinates passed in
+     * Calculate the pitch by the direction vector
      *
-     * @param vector3 向量坐标
+     * @param vector 方向向量
+     * @return pitch
      */
-    private BVector3(Vector3 vector3) {
-        this.yaw = getYawFromVector(vector3);
-        this.pitch = getPitchFromVector(vector3);
-        this.vector3 = getDirectionVector(yaw, pitch);
-        this.length = vector3.length();
-    }
-
-    /**
-     * 设置Yaw
-     *
-     * @param yaw the yaw
-     * @return the yaw
-     */
-    public BVector3 setYaw(double yaw) {
-        this.vector3 = getDirectionVector(yaw, this.pitch);
-        //重新计算在范围内的等价yaw值
-        this.yaw = getYawFromVector(this.vector3);
-        return this;
-    }
-
-    /**
-     * 设置 pitch.
-     *
-     * @param pitch the pitch
-     * @return the pitch
-     */
-    public BVector3 setPitch(double pitch) {
-        this.vector3 = getDirectionVector(this.yaw, pitch);
-        //重新计算在范围内的等价pitch值
-        this.pitch = getPitchFromVector(this.vector3);
-        return this;
+    public static double getPitchFromVector(Vector3 vector) {
+        double length = vector.x * vector.x + vector.z * vector.z + vector.y * vector.y;
+        // 避免NAN
+        if (length == 0) {
+            return 0;
+        }
+        var pitch = toDegrees(asin(-vector.y / sqrt(length)));
+        return StrictMath.abs(pitch) < 1E-10 ? 0 : pitch;
     }
 
     /**
@@ -278,8 +304,34 @@ public final class BVector3 {
         return yaw;
     }
 
+    /**
+     * 设置Yaw
+     *
+     * @param yaw the yaw
+     * @return the yaw
+     */
+    public BVector3 setYaw(double yaw) {
+        this.vector3 = getDirectionVector(yaw, this.pitch);
+        //重新计算在范围内的等价yaw值
+        this.yaw = getYawFromVector(this.vector3);
+        return this;
+    }
+
     public double getPitch() {
         return pitch;
+    }
+
+    /**
+     * 设置 pitch.
+     *
+     * @param pitch the pitch
+     * @return the pitch
+     */
+    public BVector3 setPitch(double pitch) {
+        this.vector3 = getDirectionVector(this.yaw, pitch);
+        //重新计算在范围内的等价pitch值
+        this.pitch = getPitchFromVector(this.vector3);
+        return this;
     }
 
     /**
@@ -298,57 +350,5 @@ public final class BVector3 {
      */
     public Vector3 getUnclonedDirectionVector() {
         return vector3;
-    }
-
-    /**
-     * 通过yaw与pitch计算出等价的Vector3方向向量
-     *
-     * @param yaw   yaw
-     * @param pitch pitch
-     * @return Vector3方向向量
-     */
-    public static Vector3 getDirectionVector(double yaw, double pitch) {
-        var pitch0 = toRadians(pitch + 90);
-        var yaw0 = toRadians(yaw + 90);
-        var x = sin(pitch0) * cos(yaw0);
-        var z = sin(pitch0) * sin(yaw0);
-        var y = cos(pitch0);
-        return new Vector3(x, y, z).normalize();
-    }
-
-    /**
-     * 通过方向向量计算出yaw
-     * <p>
-     * Calculate yaw from the direction vector
-     *
-     * @param vector 方向向量
-     * @return yaw
-     */
-    public static double getYawFromVector(Vector3 vector) {
-        double length = vector.x * vector.x + vector.z * vector.z;
-        // 避免NAN
-        if (length == 0) {
-            return 0;
-        }
-        double yaw = toDegrees(asin(-vector.x / sqrt(length)));
-        return -vector.z > 0.0D ? 180.0D - yaw : StrictMath.abs(yaw) < 1E-10 ? 0 : yaw;
-    }
-
-    /**
-     * 通过方向向量计算出pitch
-     * <p>
-     * Calculate the pitch by the direction vector
-     *
-     * @param vector 方向向量
-     * @return pitch
-     */
-    public static double getPitchFromVector(Vector3 vector) {
-        double length = vector.x * vector.x + vector.z * vector.z + vector.y * vector.y;
-        // 避免NAN
-        if (length == 0) {
-            return 0;
-        }
-        var pitch = toDegrees(asin(-vector.y / sqrt(length)));
-        return StrictMath.abs(pitch) < 1E-10 ? 0 : pitch;
     }
 }

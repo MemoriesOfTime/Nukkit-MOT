@@ -27,8 +27,6 @@ import java.util.zip.GZIPInputStream;
 public class GlobalBlockPalette {
 
     private static final Gson GSON = new Gson();
-    private static boolean initialized;
-
     private static final AtomicInteger runtimeIdAllocator282 = new AtomicInteger(0);
     private static final AtomicInteger runtimeIdAllocator291 = new AtomicInteger(0);
     private static final AtomicInteger runtimeIdAllocator313 = new AtomicInteger(0);
@@ -39,7 +37,6 @@ public class GlobalBlockPalette {
     private static final AtomicInteger runtimeIdAllocator388 = new AtomicInteger(0);
     private static final AtomicInteger runtimeIdAllocator389 = new AtomicInteger(0);
     private static final AtomicInteger runtimeIdAllocator407 = new AtomicInteger(0);
-
     private static final Int2IntMap legacyToRuntimeId223 = new Int2IntOpenHashMap();
     private static final Int2IntMap legacyToRuntimeId261 = new Int2IntOpenHashMap();
     private static final Int2IntMap legacyToRuntimeId274 = new Int2IntOpenHashMap();
@@ -53,7 +50,6 @@ public class GlobalBlockPalette {
     private static final Int2IntMap legacyToRuntimeId388 = new Int2IntOpenHashMap();
     private static final Int2IntMap legacyToRuntimeId389 = new Int2IntOpenHashMap();
     private static final Int2IntMap legacyToRuntimeId407 = new Int2IntOpenHashMap();
-
     private static final BlockPalette blockPalette419;
     private static final BlockPalette blockPalette428;
     private static final BlockPalette blockPalette440;
@@ -76,7 +72,7 @@ public class GlobalBlockPalette {
     private static final BlockPalette blockPalette649;
     private static final BlockPalette blockPalette662;
     private static final BlockPalette blockPalette671;
-
+    private static boolean initialized;
     private static byte[] compiledTable282;
     private static byte[] compiledTable291;
     private static byte[] compiledTable313;
@@ -137,7 +133,8 @@ public class GlobalBlockPalette {
         // 223
         InputStream stream223 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_223.json");
         if (stream223 == null) throw new AssertionError("Unable to locate RuntimeID table 223");
-        Collection<TableEntryOld> entries223 = GSON.fromJson(new InputStreamReader(stream223, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
+        Collection<TableEntryOld> entries223 = GSON.fromJson(new InputStreamReader(stream223, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>() {
+        }.getType());
         for (TableEntryOld entry : entries223) {
             legacyToRuntimeId223.put((entry.id << 4) | entry.data, entry.runtimeID);
         }
@@ -145,7 +142,8 @@ public class GlobalBlockPalette {
         // 261
         InputStream stream261 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_261.json");
         if (stream261 == null) throw new AssertionError("Unable to locate RuntimeID table 261");
-        Collection<TableEntryOld> entries261 = GSON.fromJson(new InputStreamReader(stream261, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
+        Collection<TableEntryOld> entries261 = GSON.fromJson(new InputStreamReader(stream261, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>() {
+        }.getType());
         for (TableEntryOld entry : entries261) {
             legacyToRuntimeId261.put((entry.id << 4) | entry.data, entry.runtimeID);
         }
@@ -153,7 +151,8 @@ public class GlobalBlockPalette {
         // 274
         InputStream stream274 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_274.json");
         if (stream274 == null) throw new AssertionError("Unable to locate RuntimeID table 274");
-        Collection<TableEntryOld> entries274 = GSON.fromJson(new InputStreamReader(stream274, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>(){}.getType());
+        Collection<TableEntryOld> entries274 = GSON.fromJson(new InputStreamReader(stream274, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntryOld>>() {
+        }.getType());
         for (TableEntryOld entry : entries274) {
             legacyToRuntimeId274.put((entry.id << 4) | entry.data, entry.runtimeID);
         }
@@ -161,7 +160,8 @@ public class GlobalBlockPalette {
         // 282
         InputStream stream282 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_282.json");
         if (stream282 == null) throw new AssertionError("Unable to locate RuntimeID table 282");
-        Collection<TableEntry> entries282 = GSON.fromJson(new InputStreamReader(stream282, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        Collection<TableEntry> entries282 = GSON.fromJson(new InputStreamReader(stream282, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>() {
+        }.getType());
         BinaryStream table282 = new BinaryStream();
         table282.putUnsignedVarInt(entries282.size());
         for (TableEntry entry : entries282) {
@@ -173,7 +173,8 @@ public class GlobalBlockPalette {
         // 291
         InputStream stream291 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_291.json");
         if (stream291 == null) throw new AssertionError("Unable to locate RuntimeID table 291");
-        Collection<TableEntry> entries291 = GSON.fromJson(new InputStreamReader(stream291, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        Collection<TableEntry> entries291 = GSON.fromJson(new InputStreamReader(stream291, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>() {
+        }.getType());
         BinaryStream table291 = new BinaryStream();
         table291.putUnsignedVarInt(entries291.size());
         for (TableEntry entry : entries291) {
@@ -185,7 +186,8 @@ public class GlobalBlockPalette {
         // 313
         InputStream stream313 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_313.json");
         if (stream313 == null) throw new AssertionError("Unable to locate RuntimeID table 313");
-        Collection<TableEntry> entries313 = GSON.fromJson(new InputStreamReader(stream313, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        Collection<TableEntry> entries313 = GSON.fromJson(new InputStreamReader(stream313, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>() {
+        }.getType());
         BinaryStream table313 = new BinaryStream();
         table313.putUnsignedVarInt(entries313.size());
         for (TableEntry entry : entries313) {
@@ -197,7 +199,8 @@ public class GlobalBlockPalette {
         // 332
         InputStream stream332 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_332.json");
         if (stream332 == null) throw new AssertionError("Unable to locate RuntimeID table 332");
-        Collection<TableEntry> entries332 = GSON.fromJson(new InputStreamReader(stream332, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        Collection<TableEntry> entries332 = GSON.fromJson(new InputStreamReader(stream332, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>() {
+        }.getType());
         BinaryStream table332 = new BinaryStream();
         table332.putUnsignedVarInt(entries332.size());
         for (TableEntry entry : entries332) {
@@ -209,7 +212,8 @@ public class GlobalBlockPalette {
         // 340
         InputStream stream340 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_340.json");
         if (stream340 == null) throw new AssertionError("Unable to locate RuntimeID table 340");
-        Collection<TableEntry> entries340 = GSON.fromJson(new InputStreamReader(stream340, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        Collection<TableEntry> entries340 = GSON.fromJson(new InputStreamReader(stream340, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>() {
+        }.getType());
         BinaryStream table340 = new BinaryStream();
         table340.putUnsignedVarInt(entries340.size());
         for (TableEntry entry : entries340) {
@@ -221,7 +225,8 @@ public class GlobalBlockPalette {
         // 354
         InputStream stream354 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_354.json");
         if (stream354 == null) throw new AssertionError("Unable to locate RuntimeID table 354");
-        Collection<TableEntry> entries354 = GSON.fromJson(new InputStreamReader(stream354, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        Collection<TableEntry> entries354 = GSON.fromJson(new InputStreamReader(stream354, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>() {
+        }.getType());
         BinaryStream table354 = new BinaryStream();
         table354.putUnsignedVarInt(entries354.size());
         for (TableEntry entry : entries354) {
@@ -233,7 +238,8 @@ public class GlobalBlockPalette {
         // 361
         InputStream stream361 = Server.class.getClassLoader().getResourceAsStream("runtimeid_table_361.json");
         if (stream361 == null) throw new AssertionError("Unable to locate RuntimeID table 361");
-        Collection<TableEntry> entries361 = GSON.fromJson(new InputStreamReader(stream361, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>(){}.getType());
+        Collection<TableEntry> entries361 = GSON.fromJson(new InputStreamReader(stream361, StandardCharsets.UTF_8), new TypeToken<Collection<TableEntry>>() {
+        }.getType());
         BinaryStream table361 = new BinaryStream();
         table361.putUnsignedVarInt(entries361.size());
         for (TableEntry entry : entries361) {
@@ -320,7 +326,8 @@ public class GlobalBlockPalette {
             return blockPalette649;
         } else if (protocol >= ProtocolInfo.v1_20_50) {
             return blockPalette630;
-        } if (protocol >= ProtocolInfo.v1_20_40) {
+        }
+        if (protocol >= ProtocolInfo.v1_20_40) {
             return blockPalette622;
         } else if (protocol >= ProtocolInfo.v1_20_30_24) {
             return blockPalette618;
@@ -366,7 +373,8 @@ public class GlobalBlockPalette {
             return getPaletteByProtocol(protocol).getRuntimeId(id, meta);
         }
 
-        if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
+        if (protocol < 223)
+            throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
         int legacyId = protocol >= 388 ? ((id << 6) | meta) : ((id << 4) | meta);
         int runtimeId;
         switch (protocol) {
@@ -479,7 +487,8 @@ public class GlobalBlockPalette {
     }
 
     public static int getOrCreateRuntimeId(int protocol, int legacyId) throws NoSuchElementException {
-        if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
+        if (protocol < 223)
+            throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
         int runtimeId;
         switch (protocol) {
             case 223:

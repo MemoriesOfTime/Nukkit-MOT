@@ -156,8 +156,7 @@ public abstract class BlockRedstoneComparator extends BlockRedstoneDiode impleme
         BlockEntity blockEntity = this.level.getBlockEntity(this);
         int currentOutput = 0;
 
-        if (blockEntity instanceof BlockEntityComparator) {
-            BlockEntityComparator blockEntityComparator = (BlockEntityComparator) blockEntity;
+        if (blockEntity instanceof BlockEntityComparator blockEntityComparator) {
             currentOutput = blockEntityComparator.getOutputSignal();
             blockEntityComparator.setOutputSignal(output);
         }
@@ -207,13 +206,13 @@ public abstract class BlockRedstoneComparator extends BlockRedstoneDiode impleme
         return new ItemRedstoneComparator();
     }
 
-    public enum Mode {
-        COMPARE,
-        SUBTRACT
-    }
-
     @Override
     public BlockColor getColor() {
         return BlockColor.AIR_BLOCK_COLOR;
+    }
+
+    public enum Mode {
+        COMPARE,
+        SUBTRACT
     }
 }

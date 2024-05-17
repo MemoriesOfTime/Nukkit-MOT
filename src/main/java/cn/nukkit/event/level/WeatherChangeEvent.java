@@ -15,10 +15,6 @@ public class WeatherChangeEvent extends WeatherEvent implements Cancellable {
     private final boolean to;
     private int intensity;
 
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
     @Deprecated
     public WeatherChangeEvent(Level level, boolean to) {
         this(level, to, 10000);
@@ -28,6 +24,10 @@ public class WeatherChangeEvent extends WeatherEvent implements Cancellable {
         super(level);
         this.to = to;
         this.intensity = intensity;
+    }
+
+    public static HandlerList getHandlers() {
+        return handlers;
     }
 
     /**

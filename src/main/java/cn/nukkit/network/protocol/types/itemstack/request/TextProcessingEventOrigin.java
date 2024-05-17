@@ -18,7 +18,6 @@ public enum TextProcessingEventOrigin {
     SCOREBOARD_TEXT(12),
     TICKING_AREA_TEXT(13);
 
-    private final int id;
     private static final Int2ObjectArrayMap<TextProcessingEventOrigin> VALUES = new Int2ObjectArrayMap<>();
 
     static {
@@ -27,16 +26,17 @@ public enum TextProcessingEventOrigin {
         }
     }
 
+    private final int id;
+
     TextProcessingEventOrigin(int id) {
         this.id = id;
     }
 
-    public int getId() {
-        return id;
-    }
-
-
     public static TextProcessingEventOrigin fromId(int id) {
         return VALUES.get(id);
+    }
+
+    public int getId() {
+        return id;
     }
 }

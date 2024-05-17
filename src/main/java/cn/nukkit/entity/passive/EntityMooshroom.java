@@ -76,7 +76,7 @@ public class EntityMooshroom extends EntityWalkingAnimal {
     public int getKillExperience() {
         return this.isBaby() ? 0 : Utils.rand(1, 3);
     }
-    
+
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
         if (item.getId() == Item.BOWL) {

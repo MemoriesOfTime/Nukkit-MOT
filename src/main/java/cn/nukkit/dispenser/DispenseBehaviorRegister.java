@@ -12,7 +12,7 @@ import java.util.Map;
 public final class DispenseBehaviorRegister {
 
     private static final Map<Integer, DispenseBehavior> behaviors = new HashMap<>();
-    private static DispenseBehavior defaultBehavior = new DefaultDispenseBehavior();
+    private static final DispenseBehavior defaultBehavior = new DefaultDispenseBehavior();
 
     public static void registerBehavior(int itemId, DispenseBehavior behavior) {
         behaviors.put(itemId, behavior);

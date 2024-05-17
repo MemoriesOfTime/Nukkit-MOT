@@ -158,7 +158,10 @@ public class InventoryTransactionPacket extends DataPacket {
                 itemData.itemInHand = this.getSlot(this.protocol);
                 itemData.playerPos = this.getVector3f().asVector3();
                 itemData.clickPos = this.getVector3f();
-                try { itemData.blockRuntimeId = (int) this.getUnsignedVarInt(); } catch (Exception ignore) {}
+                try {
+                    itemData.blockRuntimeId = (int) this.getUnsignedVarInt();
+                } catch (Exception ignore) {
+                }
 
                 this.transactionData = itemData;
                 break;

@@ -26,7 +26,7 @@ public class DefaultPlayerDataSerializer implements PlayerDataSerializer {
 
     @Override
     public Optional<InputStream> read(String name, UUID uuid) throws IOException {
-        File file = new File(dataPath  + "players/" + name + ".dat");
+        File file = new File(dataPath + "players/" + name + ".dat");
         if (!file.exists()) {
             return Optional.empty();
         }
@@ -37,7 +37,7 @@ public class DefaultPlayerDataSerializer implements PlayerDataSerializer {
     @Override
     public OutputStream write(String name, UUID uuid) throws IOException {
         Preconditions.checkNotNull(name, "name");
-        File file = new File(dataPath  + "players/" + name + ".dat");
+        File file = new File(dataPath + "players/" + name + ".dat");
         return new FileOutputStream(file);
     }
 }

@@ -67,7 +67,7 @@ public class EntitySmallFireBall extends EntityProjectile {
         super.onUpdate(currentTick);
         return !this.closed;
     }
-    
+
     @Override
     public void onCollideWithEntity(Entity entity) {
         super.onCollideWithEntity(entity);

@@ -13,9 +13,8 @@ import java.util.stream.Collectors;
 
 public class ListTag<T extends Tag> extends Tag {
 
-    private List<T> list = new ArrayList<>();
-
     public byte type;
+    private List<T> list = new ArrayList<>();
 
     public ListTag() {
         super("");
@@ -69,7 +68,7 @@ public class ListTag<T extends Tag> extends Tag {
     public String toString() {
         StringJoiner joiner = new StringJoiner(",\n\t");
         list.forEach(tag -> joiner.add(tag.toString().replace("\n", "\n\t")));
-        return "ListTag '" + this.getName() + "' (" + list.size() + " entries of type " + Tag.getTagName(type) + ") {\n\t" + joiner.toString() + "\n}";
+        return "ListTag '" + this.getName() + "' (" + list.size() + " entries of type " + Tag.getTagName(type) + ") {\n\t" + joiner + "\n}";
     }
 
     @Override
@@ -145,12 +144,12 @@ public class ListTag<T extends Tag> extends Tag {
         return new ArrayList<>(list);
     }
 
-    public List<T> getAllUnsafe() {
-        return list;
-    }
-
     public void setAll(List<T> tags) {
         this.list = new ArrayList<>(tags);
+    }
+
+    public List<T> getAllUnsafe() {
+        return list;
     }
 
     public void remove(T tag) {

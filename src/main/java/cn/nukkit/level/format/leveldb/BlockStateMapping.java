@@ -30,31 +30,11 @@ public class BlockStateMapping {
     private static final BlockStateMapping INSTANCE = new BlockStateMapping(PALETTE_VERSION);
     private static final CompoundTagUpdaterContext CONTEXT;
     private static final int LATEST_UPDATER_VERSION;
-
-    private final int version;
-
-    private LegacyStateMapper legacyMapper;
-
-    private int defaultRuntimeId = -1;
-    private BlockStateSnapshot defaultState;
-
     private static final ExpiringMap<NbtMap, NbtMap> BLOCK_UPDATE_CACHE = ExpiringMap.builder()
             .maxSize(1024)
             .expiration(60L, TimeUnit.SECONDS)
             .expirationPolicy(ExpirationPolicy.ACCESSED)
             .build();
-    private final Int2ObjectMap<BlockStateSnapshot> runtime2State = new Int2ObjectOpenHashMap<>();
-    private final Object2ObjectMap<NbtMap, BlockStateSnapshot> paletteMap = new Object2ObjectOpenCustomHashMap<>(new Hash.Strategy<>() {
-        @Override
-        public int hashCode(NbtMap nbtMap) {
-            return nbtMap.hashCode();
-        }
-
-        @Override
-        public boolean equals(NbtMap nbtMap, NbtMap nbtMap2) {
-            return Objects.equals(nbtMap, nbtMap2);
-        }
-    });
 
     static {
         INSTANCE.setLegacyMapper(new NukkitLegacyMapper());
@@ -93,9 +73,22 @@ public class BlockStateMapping {
         LATEST_UPDATER_VERSION = context.getLatestVersion();
     }
 
-    public static BlockStateMapping get() {
-        return INSTANCE;
-    }
+    private final int version;
+    private final Int2ObjectMap<BlockStateSnapshot> runtime2State = new Int2ObjectOpenHashMap<>();
+    private final Object2ObjectMap<NbtMap, BlockStateSnapshot> paletteMap = new Object2ObjectOpenCustomHashMap<>(new Hash.Strategy<>() {
+        @Override
+        public int hashCode(NbtMap nbtMap) {
+            return nbtMap.hashCode();
+        }
+
+        @Override
+        public boolean equals(NbtMap nbtMap, NbtMap nbtMap2) {
+            return Objects.equals(nbtMap, nbtMap2);
+        }
+    });
+    private LegacyStateMapper legacyMapper;
+    private int defaultRuntimeId = -1;
+    private BlockStateSnapshot defaultState;
 
     public BlockStateMapping(int version) {
         this(version, null);
@@ -104,6 +97,10 @@ public class BlockStateMapping {
     public BlockStateMapping(int version, LegacyStateMapper legacyStateMapper) {
         this.version = version;
         this.legacyMapper = legacyStateMapper;
+    }
+
+    public static BlockStateMapping get() {
+        return INSTANCE;
     }
 
     public void registerState(int runtimeId, NbtMap state) {
@@ -126,12 +123,12 @@ public class BlockStateMapping {
         this.paletteMap.clear();
     }
 
-    public void setLegacyMapper(LegacyStateMapper legacyStateMapper) {
-        this.legacyMapper = legacyStateMapper;
-    }
-
     public LegacyStateMapper getLegacyMapper() {
         return this.legacyMapper;
+    }
+
+    public void setLegacyMapper(LegacyStateMapper legacyStateMapper) {
+        this.legacyMapper = legacyStateMapper;
     }
 
     public int getVersion() {
@@ -216,7 +213,8 @@ public class BlockStateMapping {
         if (data == -1) {
             log.warn("Can not find legacyId! No runtime2legacy mapping for " + runtimeId);
             data = this.legacyMapper.runtimeToLegacyData(this.getDefaultRuntimeId());
-            Preconditions.checkArgument(data != -1, "Can not find legacyData for default runtimeId: " + this.getDefaultRuntimeId());        }
+            Preconditions.checkArgument(data != -1, "Can not find legacyData for default runtimeId: " + this.getDefaultRuntimeId());
+        }
         return data;
     }
 

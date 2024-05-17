@@ -18,6 +18,10 @@ import java.util.Map;
  */
 public class BlockEntityBeacon extends BlockEntitySpawnable {
 
+    private static final int POWER_LEVEL_MAX = 4;
+    private static final List<Integer> allowedEffects = Arrays.asList(Effect.SPEED, Effect.HASTE, Effect.DAMAGE_RESISTANCE, Effect.JUMP, Effect.STRENGTH, Effect.REGENERATION);
+    private long currentTick = 0;
+
     public BlockEntityBeacon(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
     }
@@ -63,8 +67,6 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
                 .putInt("Primary", this.namedTag.getInt("Primary"))
                 .putInt("Secondary", this.namedTag.getInt("Secondary"));
     }
-
-    private long currentTick = 0;
 
     @Override
     public boolean onUpdate() {
@@ -142,8 +144,6 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
         return true;
     }
 
-    private static final int POWER_LEVEL_MAX = 4;
-
     private boolean hasSkyAccess() {
         //Check every block from our y coord to the top of the world
         for (int y = getFloorY() + 1; y <= this.level.getMaxBlockY(); y++) {
@@ -171,7 +171,7 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
                                     testBlockId != Block.GOLD_BLOCK &&
                                     testBlockId != Block.EMERALD_BLOCK &&
                                     testBlockId != Block.DIAMOND_BLOCK
-                            ) {
+                    ) {
                         return powerLevel - 1;
                     }
                 }
@@ -219,8 +219,6 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
             this.spawnToAll();
         }
     }
-
-    private static final List<Integer> allowedEffects = Arrays.asList(Effect.SPEED, Effect.HASTE, Effect.DAMAGE_RESISTANCE, Effect.JUMP, Effect.STRENGTH, Effect.REGENERATION);
 
     @Override
     public boolean updateCompoundTag(CompoundTag nbt, Player player) {

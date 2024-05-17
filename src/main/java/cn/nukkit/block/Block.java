@@ -44,7 +44,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static final int ID_MASK = 0xfff; //max 4095
     public static final int DATA_SIZE = dynamic(1 << DATA_BITS);
     public static final int DATA_MASK = dynamic(DATA_SIZE - 1);
-
+    /**
+     * A commonly used block face pattern
+     */
+    protected static final int[] FACES2534 = {2, 5, 3, 4};
+    private static final boolean[] usesFakeWater = new boolean[MAX_BLOCK_ID];
     @SuppressWarnings("rawtypes")
     public static Class[] list = null;
     public static Block[] fullList = null;
@@ -55,18 +59,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static boolean[] transparent = null;
     public static boolean[] diffusesSkyLight = null;
     public static boolean[] hasMeta = null;
-
-    private static final boolean[] usesFakeWater = new boolean[MAX_BLOCK_ID];
-
     public AxisAlignedBB boundingBox = null;
     public int layer = 0;
 
-    /**
-     * A commonly used block face pattern
-     */
-    protected static final int[] FACES2534 = {2, 5, 3, 4};
-
-    protected Block() {}
+    protected Block() {
+    }
 
     public static void init() {
         Block.usesFakeWater[SEAGRASS] = true;
@@ -473,7 +470,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[WARPED_WALL_SIGN] = BlockWarpedWallSign.class; //508
             list[CRIMSON_STAIRS] = BlockStairsCrimson.class; //509
             list[WARPED_STAIRS] = BlockStairsWarped.class; //510
-
             list[CRIMSON_FENCE] = BlockFenceCrimson.class; //511
             list[WARPED_FENCE] = BlockFenceWarped.class; //512
             list[CRIMSON_FENCE_GATE] = BlockFenceGateCrimson.class; //513
@@ -773,6 +769,119 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return get(fullId >> DATA_BITS, fullId & DATA_MASK);
     }
 
+    private static double toolBreakTimeBonus0(int toolType, int toolTier, boolean isWoolBlock, boolean isCobweb) {
+        if (toolType == ItemTool.TYPE_SWORD) return isCobweb ? 15.0 : 1.0;
+        if (toolType == ItemTool.TYPE_SHEARS) return isWoolBlock ? 5.0 : 15.0;
+        if (toolType == ItemTool.TYPE_NONE) return 1.0;
+        switch (toolTier) {
+            case ItemTool.TIER_WOODEN:
+                return 2.0;
+            case ItemTool.TIER_STONE:
+                return 4.0;
+            case ItemTool.TIER_IRON:
+                return 6.0;
+            case ItemTool.TIER_DIAMOND:
+                return 8.0;
+            case ItemTool.TIER_NETHERITE:
+                return 9.0;
+            case ItemTool.TIER_GOLD:
+                return 12.0;
+            default:
+                return 1.0;
+        }
+    }
+
+    private static double speedBonusByEfficiencyLore0(int efficiencyLoreLevel) {
+        if (efficiencyLoreLevel == 0) return 0;
+        return efficiencyLoreLevel * efficiencyLoreLevel + 1;
+    }
+
+    private static double speedRateByHasteLore0(int hasteLoreLevel) {
+        return 1.0 + (0.2 * hasteLoreLevel);
+    }
+
+    private static int toolType0(Item item, int blockId) {
+        if ((blockId == LEAVES && item.isHoe()) || (blockId == LEAVES2 && item.isHoe())) return ItemTool.TYPE_SHEARS;
+        if (item.isSword()) return ItemTool.TYPE_SWORD;
+        if (item.isShovel()) return ItemTool.TYPE_SHOVEL;
+        if (item.isPickaxe()) return ItemTool.TYPE_PICKAXE;
+        if (item.isAxe()) return ItemTool.TYPE_AXE;
+        if (item.isHoe()) return ItemTool.TYPE_HOE;
+        if (item.isShears()) return ItemTool.TYPE_SHEARS;
+        return ItemTool.TYPE_NONE;
+    }
+
+    private static boolean correctTool0(int blockToolType, Item item, int blockId) {
+        if (item.isShears() && (blockId == COBWEB || blockId == LEAVES || blockId == LEAVES2)) {
+            return true;
+        }
+
+        if ((blockId == LEAVES && item.isHoe()) ||
+                (blockId == LEAVES2 && item.isHoe())) {
+            return (blockToolType == ItemTool.TYPE_SHEARS && item.isHoe());
+        }
+
+        return (blockToolType == ItemTool.TYPE_SWORD && item.isSword()) ||
+                (blockToolType == ItemTool.TYPE_SHOVEL && item.isShovel()) ||
+                (blockToolType == ItemTool.TYPE_PICKAXE && item.isPickaxe()) ||
+                (blockToolType == ItemTool.TYPE_AXE && item.isAxe()) ||
+                (blockToolType == ItemTool.TYPE_HOE && item.isHoe()) ||
+                (blockToolType == ItemTool.TYPE_SHEARS && item.isShears()) ||
+                blockToolType == ItemTool.TYPE_NONE;
+    }
+
+    private static double breakTime0(double blockHardness, boolean correctTool, boolean canHarvestWithHand,
+                                     int blockId, int toolType, int toolTier, int efficiencyLoreLevel, int hasteEffectLevel,
+                                     boolean insideOfWaterWithoutAquaAffinity, boolean outOfWaterButNotOnGround) {
+        double baseTime = ((correctTool || canHarvestWithHand) ? 1.5 : 5.0) * blockHardness;
+        double speed = 1.0 / baseTime;
+        boolean isWoolBlock = blockId == Block.WOOL, isCobweb = blockId == Block.COBWEB;
+        if (correctTool) speed *= toolBreakTimeBonus0(toolType, toolTier, isWoolBlock, isCobweb);
+        speed += correctTool ? speedBonusByEfficiencyLore0(efficiencyLoreLevel) : 0;
+        speed *= speedRateByHasteLore0(hasteEffectLevel);
+        if (insideOfWaterWithoutAquaAffinity || outOfWaterButNotOnGround) speed *= 0.25;
+        return 1.0 / speed;
+    }
+
+    public static boolean equals(Block b1, Block b2) {
+        return equals(b1, b2, true);
+    }
+
+    public static boolean equals(Block b1, Block b2, boolean checkDamage) {
+        return b1 != null && b2 != null && b1.getId() == b2.getId() && (!checkDamage || b1.getDamage() == b2.getDamage());
+    }
+
+    protected static boolean canStayOnFullSolid(Block down) {
+        if (down.isTransparent()) {
+            switch (down.getId()) {
+                case BEACON:
+                case ICE:
+                case GLASS:
+                case STAINED_GLASS:
+                case HARD_GLASS:
+                case HARD_STAINED_GLASS:
+                case SCAFFOLDING:
+                case BARRIER:
+                case GLOWSTONE:
+                case SEA_LANTERN:
+                case HOPPER_BLOCK:
+                    return true;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    @Deprecated
+    public static boolean hasWater(int id) {
+        return id == WATER || id == STILL_WATER || usesFakeWater[id];
+    }
+
+    @Deprecated
+    public static boolean usesFakeWater(int id) {
+        return usesFakeWater[id];
+    }
+
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         return this.getLevel().setBlock(this, this, true, true);
     }
@@ -804,7 +913,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public void onNeighborChange(@NotNull BlockFace side) {
 
     }
-
 
     /**
      * 当玩家使用与左键或者右键方块时会触发，常被用于处理例如物品展示框左键掉落物品这种逻辑<br>
@@ -961,10 +1069,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         return id;
-	}
+    }
 
     /**
      * The full id is a combination of the id and data.
+     *
      * @return full id
      */
     public int getFullId() {
@@ -1000,7 +1109,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
      *
      * @param player 玩家
      * @return true - 直接掉落方块物品, false - 通过getDrops方法获取掉落物品
-     *         true - Drop block items directly, false - Get dropped items through the getDrops method
+     * true - Drop block items directly, false - Get dropped items through the getDrops method
      */
     public boolean isDropOriginal(Player player) {
         return false;
@@ -1011,7 +1120,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             return Item.EMPTY_ARRAY;
         }
 
-        if(this.canHarvestWithHand() || this.canHarvest(item)) {
+        if (this.canHarvestWithHand() || this.canHarvest(item)) {
             return new Item[]{this.toItem()};
         }
         return Item.EMPTY_ARRAY;
@@ -1051,80 +1160,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (item.isHoe()) return ItemTool.TYPE_HOE;
         if (item.isShears()) return ItemTool.TYPE_SHEARS;
         return ItemTool.TYPE_NONE;
-    }
-
-    private static double toolBreakTimeBonus0(int toolType, int toolTier, boolean isWoolBlock, boolean isCobweb) {
-        if (toolType == ItemTool.TYPE_SWORD) return isCobweb ? 15.0 : 1.0;
-        if (toolType == ItemTool.TYPE_SHEARS) return isWoolBlock ? 5.0 : 15.0;
-        if (toolType == ItemTool.TYPE_NONE) return 1.0;
-        switch (toolTier) {
-            case ItemTool.TIER_WOODEN:
-                return 2.0;
-            case ItemTool.TIER_STONE:
-                return 4.0;
-            case ItemTool.TIER_IRON:
-                return 6.0;
-            case ItemTool.TIER_DIAMOND:
-                return 8.0;
-            case ItemTool.TIER_NETHERITE:
-                return 9.0;
-            case ItemTool.TIER_GOLD:
-                return 12.0;
-            default:
-                return 1.0;
-        }
-    }
-
-    private static double speedBonusByEfficiencyLore0(int efficiencyLoreLevel) {
-        if (efficiencyLoreLevel == 0) return 0;
-        return efficiencyLoreLevel * efficiencyLoreLevel + 1;
-    }
-
-    private static double speedRateByHasteLore0(int hasteLoreLevel) {
-        return 1.0 + (0.2 * hasteLoreLevel);
-    }
-
-    private static int toolType0(Item item, int blockId) {
-        if((blockId == LEAVES && item.isHoe()) || (blockId == LEAVES2 && item.isHoe())) return ItemTool.TYPE_SHEARS;
-        if (item.isSword()) return ItemTool.TYPE_SWORD;
-        if (item.isShovel()) return ItemTool.TYPE_SHOVEL;
-        if (item.isPickaxe()) return ItemTool.TYPE_PICKAXE;
-        if (item.isAxe()) return ItemTool.TYPE_AXE;
-        if (item.isHoe()) return ItemTool.TYPE_HOE;
-        if (item.isShears()) return ItemTool.TYPE_SHEARS;
-        return ItemTool.TYPE_NONE;
-    }
-
-    private static boolean correctTool0(int blockToolType, Item item, int blockId) {
-        if (item.isShears() && (blockId == COBWEB || blockId == LEAVES || blockId == LEAVES2)){
-            return true;
-        }
-
-        if((blockId == LEAVES && item.isHoe()) ||
-                (blockId == LEAVES2 && item.isHoe())){
-            return (blockToolType == ItemTool.TYPE_SHEARS && item.isHoe());
-        }
-
-        return (blockToolType == ItemTool.TYPE_SWORD && item.isSword()) ||
-                (blockToolType == ItemTool.TYPE_SHOVEL && item.isShovel()) ||
-                (blockToolType == ItemTool.TYPE_PICKAXE && item.isPickaxe()) ||
-                (blockToolType == ItemTool.TYPE_AXE && item.isAxe()) ||
-                (blockToolType == ItemTool.TYPE_HOE && item.isHoe()) ||
-                (blockToolType == ItemTool.TYPE_SHEARS && item.isShears()) ||
-                blockToolType == ItemTool.TYPE_NONE;
-    }
-
-    private static double breakTime0(double blockHardness, boolean correctTool, boolean canHarvestWithHand,
-                                     int blockId, int toolType, int toolTier, int efficiencyLoreLevel, int hasteEffectLevel,
-                                     boolean insideOfWaterWithoutAquaAffinity, boolean outOfWaterButNotOnGround) {
-        double baseTime = ((correctTool || canHarvestWithHand) ? 1.5 : 5.0) * blockHardness;
-        double speed = 1.0 / baseTime;
-        boolean isWoolBlock = blockId == Block.WOOL, isCobweb = blockId == Block.COBWEB;
-        if (correctTool) speed *= toolBreakTimeBonus0(toolType, toolTier, isWoolBlock, isCobweb);
-        speed += correctTool ? speedBonusByEfficiencyLore0(efficiencyLoreLevel) : 0;
-        speed *= speedRateByHasteLore0(hasteEffectLevel);
-        if (insideOfWaterWithoutAquaAffinity || outOfWaterButNotOnGround) speed *= 0.25;
-        return 1.0 / speed;
     }
 
     public double calculateBreakTime(@Nonnull Item item) {
@@ -1549,17 +1584,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return !isTransparent() && isSolid() && !isPowerSource();
     }
 
-    public static boolean equals(Block b1, Block b2) {
-        return equals(b1, b2, true);
-    }
-
-    public static boolean equals(Block b1, Block b2, boolean checkDamage) {
-        return b1 != null && b2 != null && b1.getId() == b2.getId() && (!checkDamage || b1.getDamage() == b2.getDamage());
-    }
-
     @Override
     public int hashCode() {
-        return  ((int) x ^ ((int) z << 12)) ^ ((int) (y + 64)/*这里不删除+64，为以后支持384世界高度准备*/ << 23);
+        return ((int) x ^ ((int) z << 12)) ^ ((int) (y + 64)/*这里不删除+64，为以后支持384世界高度准备*/ << 23);
     }
 
     public Item toItem() {
@@ -1606,27 +1633,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return false;
     }
 
-    protected static boolean canStayOnFullSolid(Block down) {
-        if (down.isTransparent()) {
-            switch (down.getId()) {
-                case BEACON:
-                case ICE:
-                case GLASS:
-                case STAINED_GLASS:
-                case HARD_GLASS:
-                case HARD_STAINED_GLASS:
-                case SCAFFOLDING:
-                case BARRIER:
-                case GLOWSTONE:
-                case SEA_LANTERN:
-                case HOPPER_BLOCK:
-                    return true;
-            }
-            return false;
-        }
-        return true;
-    }
-
     /**
      * 被爆炸破坏时必定掉落<br>
      * Drop when destroyed by explosion
@@ -1635,16 +1641,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
      */
     public boolean alwaysDropsOnExplosion() {
         return false;
-    }
-
-    @Deprecated
-    public static boolean hasWater(int id) {
-        return id == WATER || id == STILL_WATER || usesFakeWater[id];
-    }
-
-    @Deprecated
-    public static boolean usesFakeWater(int id) {
-        return usesFakeWater[id];
     }
 
     public boolean isSuspiciousBlock() {

@@ -63,22 +63,9 @@ abstract public class PluginBase implements Plugin {
     }
 
     /**
-     * 加载这个插件。<br>
-     * Enables this plugin.
-     * 
-     * 如果你需要卸载这个插件，建议使用{@link #setEnabled(boolean)}<br>
-     * If you need to disable this plugin, it's recommended to use {@link #setEnabled(boolean)}
-     *
-     * @since Nukkit 1.0 | Nukkit API 1.0.0
-     */
-    public final void setEnabled() {
-        this.setEnabled(true);
-    }
-
-    /**
      * 加载或卸载这个插件。<br>
      * Enables or disables this plugin.
-     * 
+     * <p>
      * 插件管理器插件常常使用这个方法。<br>
      * It's normally used by a plugin manager plugin to manage plugins.
      *
@@ -96,6 +83,19 @@ abstract public class PluginBase implements Plugin {
                 onDisable();
             }
         }
+    }
+
+    /**
+     * 加载这个插件。<br>
+     * Enables this plugin.
+     * <p>
+     * 如果你需要卸载这个插件，建议使用{@link #setEnabled(boolean)}<br>
+     * If you need to disable this plugin, it's recommended to use {@link #setEnabled(boolean)}
+     *
+     * @since Nukkit 1.0 | Nukkit API 1.0.0
+     */
+    public final void setEnabled() {
+        this.setEnabled(true);
     }
 
     @Override
@@ -116,7 +116,7 @@ abstract public class PluginBase implements Plugin {
     /**
      * 初始化这个插件。<br>
      * Initialize the plugin.
-     * 
+     * <p>
      * 这个方法会在加载(load)之前被插件加载器调用，初始化关于插件的一些事项，不能被重写。<br>
      * Called by plugin loader before load, and initialize the plugin. Can't be overridden.
      *
@@ -271,7 +271,7 @@ abstract public class PluginBase implements Plugin {
     /**
      * 返回这个插件完整的名字。<br>
      * Returns the full name of this plugin.
-     * 
+     * <p>
      * 一个插件完整的名字由{@code 名字+" v"+版本号}组成。比如：<br>
      * A full name of a plugin is composed by {@code name+" v"+version}.for example:
      * {@code HelloWorld v1.0.0}

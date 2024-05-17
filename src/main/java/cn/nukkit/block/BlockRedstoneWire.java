@@ -29,6 +29,25 @@ public class BlockRedstoneWire extends BlockFlowable {
         super(meta);
     }
 
+    protected static boolean canConnectUpwardsTo(Level level, Vector3 pos) {
+        return canConnectUpwardsTo(level.getBlock(pos));
+    }
+
+    protected static boolean canConnectUpwardsTo(Block block) {
+        return canConnectTo(block, null);
+    }
+
+    protected static boolean canConnectTo(Block block, BlockFace side) {
+        if (block.getId() == Block.REDSTONE_WIRE) {
+            return true;
+        } else if (BlockRedstoneDiode.isDiode(block)) {
+            BlockFace face = ((BlockRedstoneDiode) block).getFacing();
+            return face == side || face.getOpposite() == side;
+        } else {
+            return block.isPowerSource() && side != null;
+        }
+    }
+
     @Override
     public String getName() {
         return "Redstone Wire";
@@ -264,25 +283,6 @@ public class BlockRedstoneWire extends BlockFlowable {
         boolean flag = block.isNormalBlock();
         boolean flag1 = this.level.getBlock(pos.up()).isNormalBlock();
         return !flag1 && flag && canConnectUpwardsTo(this.level, v.up()) || (canConnectTo(block, side) || !flag && canConnectUpwardsTo(this.level, block.down()));
-    }
-
-    protected static boolean canConnectUpwardsTo(Level level, Vector3 pos) {
-        return canConnectUpwardsTo(level.getBlock(pos));
-    }
-
-    protected static boolean canConnectUpwardsTo(Block block) {
-        return canConnectTo(block, null);
-    }
-
-    protected static boolean canConnectTo(Block block, BlockFace side) {
-        if (block.getId() == Block.REDSTONE_WIRE) {
-            return true;
-        } else if (BlockRedstoneDiode.isDiode(block)) {
-            BlockFace face = ((BlockRedstoneDiode) block).getFacing();
-            return face == side || face.getOpposite() == side;
-        } else {
-            return block.isPowerSource() && side != null;
-        }
     }
 
     @Override

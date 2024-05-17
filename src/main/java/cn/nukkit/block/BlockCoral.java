@@ -17,15 +17,15 @@ public class BlockCoral extends BlockFlowable {
     public static final int TYPE_BUBBLE = 2;
     public static final int TYPE_FIRE = 3;
     public static final int TYPE_HORN = 4;
-    
+
     public BlockCoral() {
         this(0);
     }
-    
+
     public BlockCoral(int meta) {
         super(meta);
     }
-    
+
     @Override
     public int getId() {
         return CORAL;
@@ -35,7 +35,7 @@ public class BlockCoral extends BlockFlowable {
     public int getWaterloggingLevel() {
         return 2;
     }
-    
+
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
@@ -47,7 +47,7 @@ public class BlockCoral extends BlockFlowable {
             }
             return type;
         } else if (type == Level.BLOCK_UPDATE_SCHEDULED) {
-            if (!this.isDead() && !(this.getLevelBlockAtLayer(1) instanceof BlockWater)  && !(this.getLevelBlockAtLayer(1) instanceof BlockIceFrosted)) {
+            if (!this.isDead() && !(this.getLevelBlockAtLayer(1) instanceof BlockWater) && !(this.getLevelBlockAtLayer(1) instanceof BlockIceFrosted)) {
                 BlockFadeEvent event = new BlockFadeEvent(this, new BlockCoral(this.getDamage() | 0x8));
                 if (!event.isCancelled()) {
                     this.setDead(true);
@@ -83,7 +83,7 @@ public class BlockCoral extends BlockFlowable {
 
     @Override
     public String getName() {
-        String[] names = new String[] {
+        String[] names = new String[]{
                 "Tube Coral",
                 "Brain Coral",
                 "Bubble Coral",
@@ -108,7 +108,7 @@ public class BlockCoral extends BlockFlowable {
             return BlockColor.GRAY_BLOCK_COLOR;
         }
 
-        BlockColor[] colors = new BlockColor[] {
+        BlockColor[] colors = new BlockColor[]{
                 BlockColor.BLUE_BLOCK_COLOR,
                 BlockColor.PINK_BLOCK_COLOR,
                 BlockColor.PURPLE_BLOCK_COLOR,

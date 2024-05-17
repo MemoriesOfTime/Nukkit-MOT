@@ -39,6 +39,10 @@ public class EntityHuman extends EntityHumanType {
 
     protected Skin skin;
 
+    public EntityHuman(FullChunk chunk, CompoundTag nbt) {
+        super(chunk, nbt);
+    }
+
     @Override
     public float getWidth() {
         return 0.58f;
@@ -51,7 +55,7 @@ public class EntityHuman extends EntityHumanType {
 
     @Override
     public float getHeight() {
-        if(isSwimming() || isGliding()) {
+        if (isSwimming() || isGliding()) {
             return 0.6f;
         } else if (isShortSneaking()) {
             if (this instanceof Player player && player.protocol < ProtocolInfo.v1_20_0) {
@@ -72,7 +76,7 @@ public class EntityHuman extends EntityHumanType {
 
     @Override
     public float getEyeHeight() {
-        if(isSwimming() || isGliding() || isCrawling()) {
+        if (isSwimming() || isGliding() || isCrawling()) {
             return 0.42f;
         } else if (isShortSneaking()) {
             return 1.26f;
@@ -90,12 +94,12 @@ public class EntityHuman extends EntityHumanType {
         return -1;
     }
 
-    public EntityHuman(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
-    }
-
     public Skin getSkin() {
         return skin;
+    }
+
+    public void setSkin(Skin skin) {
+        this.skin = skin;
     }
 
     @Override
@@ -105,10 +109,6 @@ public class EntityHuman extends EntityHumanType {
 
     public byte[] getRawUniqueId() {
         return rawUUID;
-    }
-
-    public void setSkin(Skin skin) {
-        this.skin = skin;
     }
 
     @Override

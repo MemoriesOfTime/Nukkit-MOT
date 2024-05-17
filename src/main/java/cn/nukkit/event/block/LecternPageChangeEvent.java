@@ -31,12 +31,12 @@ public class LecternPageChangeEvent extends BlockEvent implements Cancellable {
         return (newRawPage * 2) + 1;
     }
 
-    public int getRightPage() {
-        return getLeftPage() + 1;
-    }
-
     public void setLeftPage(int newLeftPage) {
         this.newRawPage = (newLeftPage - 1) / 2;
+    }
+
+    public int getRightPage() {
+        return getLeftPage() + 1;
     }
 
     public void setRightPage(int newRightPage) {

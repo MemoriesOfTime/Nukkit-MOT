@@ -26,6 +26,10 @@ public abstract class BlockRedstoneDiode extends BlockFlowable implements Faceab
         super(meta);
     }
 
+    public static boolean isDiode(Block block) {
+        return block instanceof BlockRedstoneDiode;
+    }
+
     @Override
     public int getWaterloggingLevel() {
         return 2;
@@ -179,10 +183,6 @@ public abstract class BlockRedstoneDiode extends BlockFlowable implements Faceab
 
     protected boolean isAlternateInput(Block block) {
         return block.isPowerSource();
-    }
-
-    public static boolean isDiode(Block block) {
-        return block instanceof BlockRedstoneDiode;
     }
 
     protected int getRedstoneSignal() {

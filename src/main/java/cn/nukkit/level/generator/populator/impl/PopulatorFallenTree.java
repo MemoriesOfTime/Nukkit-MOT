@@ -12,7 +12,7 @@ import cn.nukkit.math.NukkitRandom;
  * Created by PetteriM1
  */
 public class PopulatorFallenTree extends Populator {
-    
+
     private ChunkManager level;
     private int type;
 

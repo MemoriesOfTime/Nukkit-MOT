@@ -38,6 +38,10 @@ public class ItemPainting extends Item {
         super(PAINTING, 0, count, "Painting");
     }
 
+    private static double offset(int value) {
+        return value > 1 ? 0.5 : 0;
+    }
+
     @Override
     public boolean canBeActivated() {
         return true;
@@ -121,9 +125,5 @@ public class ItemPainting extends Item {
         entity.spawnToAll();
 
         return true;
-    }
-
-    private static double offset(int value) {
-        return value > 1 ? 0.5 : 0;
     }
 }

@@ -12,7 +12,10 @@ import java.util.List;
 public class ResourcePackStackPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.RESOURCE_PACK_STACK_PACKET;
-
+    /**
+     * v1.16.100 and above
+     */
+    public final List<ExperimentData> experiments = new ObjectArrayList<>();
     public boolean mustAccept = false;
     public ResourcePack[] behaviourPackStack = ResourcePack.EMPTY_ARRAY;
     public ResourcePack[] resourcePackStack = ResourcePack.EMPTY_ARRAY;
@@ -20,10 +23,6 @@ public class ResourcePackStackPacket extends DataPacket {
      * Below v1.16.100
      */
     public boolean isExperimental = false;
-    /**
-     * v1.16.100 and above
-     */
-    public final List<ExperimentData> experiments = new ObjectArrayList<>();
     /**
      * @since v671
      */

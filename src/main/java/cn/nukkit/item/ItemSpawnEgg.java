@@ -131,10 +131,10 @@ public class ItemSpawnEgg extends Item {
 
             if (Utils.rand(1, 20) == 1 &&
                     (entity instanceof EntityCow ||
-                    entity instanceof EntityChicken ||
-                    entity instanceof EntityPig ||
-                    entity instanceof EntitySheep ||
-                    entity instanceof EntityZombie)) {
+                            entity instanceof EntityChicken ||
+                            entity instanceof EntityPig ||
+                            entity instanceof EntitySheep ||
+                            entity instanceof EntityZombie)) {
 
                 ((BaseEntity) entity).setBaby(true);
             }

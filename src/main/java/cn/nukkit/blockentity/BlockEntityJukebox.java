@@ -37,13 +37,13 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
         return this.getLevel().getBlockIdAt(chunk, getFloorX(), getFloorY(), getFloorZ()) == Block.JUKEBOX;
     }
 
+    public Item getRecordItem() {
+        return recordItem;
+    }
+
     public void setRecordItem(Item recordItem) {
         Objects.requireNonNull(recordItem, "Record item cannot be null");
         this.recordItem = recordItem;
-    }
-
-    public Item getRecordItem() {
-        return recordItem;
     }
 
     public void play() {
@@ -66,7 +66,7 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
                 case Item.RECORD_5 -> LevelSoundEventPacket.SOUND_RECORD_5;
                 case Item.RECORD_RELIC -> LevelSoundEventPacket.SOUND_RECORD_RELIC;
                 default ->
-                    throw new IllegalStateException("Sound is not implemented for item: " + this.recordItem.getId());
+                        throw new IllegalStateException("Sound is not implemented for item: " + this.recordItem.getId());
             });
         }
     }

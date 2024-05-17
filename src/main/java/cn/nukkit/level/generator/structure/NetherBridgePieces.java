@@ -31,21 +31,21 @@ public final class NetherBridgePieces {
     private static final BlockState SPAWNER = new BlockState(Block.MONSTER_SPAWNER);
 
     private static final PieceWeight[] BRIDGE_PIECE_WEIGHTS = new PieceWeight[]{
-        new PieceWeight(BridgeStraight.class, 30, 0, true),
-        new PieceWeight(BridgeCrossing.class, 10, 4),
-        new PieceWeight(RoomCrossing.class, 10, 4),
-        new PieceWeight(StairsRoom.class, 10, 3),
-        new PieceWeight(MonsterThrone.class, 5, 2),
-        new PieceWeight(CastleEntrance.class, 5, 1)
+            new PieceWeight(BridgeStraight.class, 30, 0, true),
+            new PieceWeight(BridgeCrossing.class, 10, 4),
+            new PieceWeight(RoomCrossing.class, 10, 4),
+            new PieceWeight(StairsRoom.class, 10, 3),
+            new PieceWeight(MonsterThrone.class, 5, 2),
+            new PieceWeight(CastleEntrance.class, 5, 1)
     };
     private static final PieceWeight[] CASTLE_PIECE_WEIGHTS = new PieceWeight[]{
-        new PieceWeight(CastleSmallCorridorPiece.class, 25, 0, true),
-        new PieceWeight(CastleSmallCorridorCrossingPiece.class, 15, 5),
-        new PieceWeight(CastleSmallCorridorRightTurnPiece.class, 5, 10),
-        new PieceWeight(CastleSmallCorridorLeftTurnPiece.class, 5, 10),
-        new PieceWeight(CastleCorridorStairsPiece.class, 10, 3, true),
-        new PieceWeight(CastleCorridorTBalconyPiece.class, 7, 2),
-        new PieceWeight(CastleStalkRoom.class, 5, 2)
+            new PieceWeight(CastleSmallCorridorPiece.class, 25, 0, true),
+            new PieceWeight(CastleSmallCorridorCrossingPiece.class, 15, 5),
+            new PieceWeight(CastleSmallCorridorRightTurnPiece.class, 5, 10),
+            new PieceWeight(CastleSmallCorridorLeftTurnPiece.class, 5, 10),
+            new PieceWeight(CastleCorridorStairsPiece.class, 10, 3, true),
+            new PieceWeight(CastleCorridorTBalconyPiece.class, 7, 2),
+            new PieceWeight(CastleStalkRoom.class, 5, 2)
     };
 
     private static NetherBridgePiece findAndCreateBridgePieceFactory(final PieceWeight weight, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
@@ -199,10 +199,14 @@ public final class NetherBridgePieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case SOUTH -> generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, orientation, getGenDepth(), isCastle);
-                    case WEST -> generateAndAddPiece(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, orientation, getGenDepth(), isCastle);
-                    case EAST -> generateAndAddPiece(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, orientation, getGenDepth(), isCastle);
-                    default -> generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, orientation, getGenDepth(), isCastle);
+                    case SOUTH ->
+                            generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, orientation, getGenDepth(), isCastle);
+                    case WEST ->
+                            generateAndAddPiece(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, orientation, getGenDepth(), isCastle);
+                    case EAST ->
+                            generateAndAddPiece(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, orientation, getGenDepth(), isCastle);
+                    default ->
+                            generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, orientation, getGenDepth(), isCastle);
                 }
             }
         }
@@ -211,8 +215,10 @@ public final class NetherBridgePieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case WEST, EAST -> generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth(), isCastle);
-                    default -> generateAndAddPiece(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.WEST, getGenDepth(), isCastle);
+                    case WEST, EAST ->
+                            generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth(), isCastle);
+                    default ->
+                            generateAndAddPiece(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.WEST, getGenDepth(), isCastle);
                 }
             }
         }
@@ -221,8 +227,10 @@ public final class NetherBridgePieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case WEST, EAST -> generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth(), isCastle);
-                    default -> generateAndAddPiece(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.EAST, getGenDepth(), isCastle);
+                    case WEST, EAST ->
+                            generateAndAddPiece(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth(), isCastle);
+                    default ->
+                            generateAndAddPiece(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.EAST, getGenDepth(), isCastle);
                 }
             }
         }
@@ -230,9 +238,9 @@ public final class NetherBridgePieces {
 
     public static class StartPiece extends BridgeCrossing {
         public final List<StructurePiece> pendingChildren;
-        public PieceWeight previousPiece;
         public final List<PieceWeight> availableBridgePieces;
         public final List<PieceWeight> availableCastlePieces;
+        public PieceWeight previousPiece;
 
         public StartPiece(final NukkitRandom random, final int x, final int z) {
             super(random, x, z);
@@ -267,7 +275,7 @@ public final class NetherBridgePieces {
         public static BridgeStraight createPiece(final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -1, -3, 0, 5, 10, 19, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new BridgeStraight(genDepth, random, boundingBox, orientation) : null;
+                    new BridgeStraight(genDepth, random, boundingBox, orientation) : null;
         }
 
         @Override
@@ -324,7 +332,7 @@ public final class NetherBridgePieces {
         public static BridgeEndFiller createPiece(final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -1, -3, 0, 5, 10, 8, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new BridgeEndFiller(genDepth, random, boundingBox, orientation) : null;
+                    new BridgeEndFiller(genDepth, random, boundingBox, orientation) : null;
         }
 
         @Override
@@ -375,7 +383,7 @@ public final class NetherBridgePieces {
         public static BridgeCrossing createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -8, -3, 0, 19, 10, 19, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new BridgeCrossing(genDepth, boundingBox, orientation) : null;
+                    new BridgeCrossing(genDepth, boundingBox, orientation) : null;
         }
 
         @Override
@@ -442,7 +450,7 @@ public final class NetherBridgePieces {
         public static RoomCrossing createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -2, 0, 0, 7, 9, 7, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new RoomCrossing(genDepth, boundingBox, orientation) : null;
+                    new RoomCrossing(genDepth, boundingBox, orientation) : null;
         }
 
         @Override
@@ -498,7 +506,7 @@ public final class NetherBridgePieces {
         public static StairsRoom createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final int genDepth, final BlockFace orientation) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -2, 0, 0, 7, 11, 7, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new StairsRoom(genDepth, boundingBox, orientation) : null;
+                    new StairsRoom(genDepth, boundingBox, orientation) : null;
         }
 
         @Override
@@ -555,7 +563,7 @@ public final class NetherBridgePieces {
         public static MonsterThrone createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final int genDepth, final BlockFace orientation) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -2, 0, 0, 7, 8, 9, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new MonsterThrone(genDepth, boundingBox, orientation) : null;
+                    new MonsterThrone(genDepth, boundingBox, orientation) : null;
         }
 
         @Override
@@ -597,8 +605,8 @@ public final class NetherBridgePieces {
                     final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
                     if (chunk != null) {
                         Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(),
-                            BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.MOB_SPAWNER)
-                                .putInt("EntityId", EntityBlaze.NETWORK_ID)));
+                                BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.MOB_SPAWNER)
+                                        .putInt("EntityId", EntityBlaze.NETWORK_ID)));
                     }
                 }
             }
@@ -628,7 +636,7 @@ public final class NetherBridgePieces {
         public static CastleEntrance createPiece(final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -5, -3, 0, 13, 14, 13, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new CastleEntrance(genDepth, random, boundingBox, orientation) : null;
+                    new CastleEntrance(genDepth, random, boundingBox, orientation) : null;
         }
 
         @Override
@@ -729,7 +737,7 @@ public final class NetherBridgePieces {
         public static CastleStalkRoom createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -5, -3, 0, 13, 14, 13, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new CastleStalkRoom(genDepth, boundingBox, orientation) : null;
+                    new CastleStalkRoom(genDepth, boundingBox, orientation) : null;
         }
 
         @Override
@@ -866,7 +874,7 @@ public final class NetherBridgePieces {
         public static CastleSmallCorridorPiece createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -1, 0, 0, 5, 7, 5, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new CastleSmallCorridorPiece(genDepth, boundingBox, orientation) : null;
+                    new CastleSmallCorridorPiece(genDepth, boundingBox, orientation) : null;
         }
 
         @Override
@@ -912,7 +920,7 @@ public final class NetherBridgePieces {
         public static CastleSmallCorridorCrossingPiece createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -1, 0, 0, 5, 7, 5, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new CastleSmallCorridorCrossingPiece(genDepth, boundingBox, orientation) : null;
+                    new CastleSmallCorridorCrossingPiece(genDepth, boundingBox, orientation) : null;
         }
 
         @Override
@@ -960,7 +968,7 @@ public final class NetherBridgePieces {
         public static CastleSmallCorridorRightTurnPiece createPiece(final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
             final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -1, 0, 0, 5, 7, 5, orientation);
             return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-                new CastleSmallCorridorRightTurnPiece(genDepth, random, boundingBox, orientation) : null;
+                    new CastleSmallCorridorRightTurnPiece(genDepth, random, boundingBox, orientation) : null;
         }
 
         @Override
@@ -1046,164 +1054,164 @@ public final class NetherBridgePieces {
             generateBox(level, boundingBox, 4, 2, 0, 4, 5, 4, NETHER_BRICKS, NETHER_BRICKS, false);
             generateBox(level, boundingBox, 4, 3, 1, 4, 4, 1, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
             generateBox(level, boundingBox, 4, 3, 3, 4, 4, 3, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
-			generateBox(level, boundingBox, 0, 2, 0, 0, 5, 0, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 0, 2, 4, 3, 5, 4, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 1, 3, 4, 1, 4, 4, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
-			generateBox(level, boundingBox, 3, 3, 4, 3, 4, 4, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+            generateBox(level, boundingBox, 0, 2, 0, 0, 5, 0, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 0, 2, 4, 3, 5, 4, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 1, 3, 4, 1, 4, 4, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+            generateBox(level, boundingBox, 3, 3, 4, 3, 4, 4, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
 
-			if (isNeedingChest && boundingBox.isInside(new BlockVector3(getWorldX(3, 3), getWorldY(2), getWorldZ(3, 3)))) {
-				isNeedingChest = false;
+            if (isNeedingChest && boundingBox.isInside(new BlockVector3(getWorldX(3, 3), getWorldY(2), getWorldZ(3, 3)))) {
+                isNeedingChest = false;
 
-				final BlockFace orientation = getOrientation();
-				placeBlock(level, new BlockState(Block.CHEST, (orientation == null ? BlockFace.NORTH : orientation).getOpposite().getIndex()), 3, 2, 3, boundingBox);
+                final BlockFace orientation = getOrientation();
+                placeBlock(level, new BlockState(Block.CHEST, (orientation == null ? BlockFace.NORTH : orientation).getOpposite().getIndex()), 3, 2, 3, boundingBox);
 
-				final BlockVector3 vec = new BlockVector3(getWorldX(3, 3), getWorldY(2), getWorldZ(3, 3));
-				if (boundingBox.isInside(vec)) {
-					final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
-					if (chunk != null) {
-						final CompoundTag nbt = BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.CHEST);
-						final ListTag<CompoundTag> itemList = new ListTag<>("Items");
-						NetherBridgeChest.get().create(itemList, random);
-						nbt.putList(itemList);
-						Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
-					}
-				}
-			}
+                final BlockVector3 vec = new BlockVector3(getWorldX(3, 3), getWorldY(2), getWorldZ(3, 3));
+                if (boundingBox.isInside(vec)) {
+                    final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
+                    if (chunk != null) {
+                        final CompoundTag nbt = BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.CHEST);
+                        final ListTag<CompoundTag> itemList = new ListTag<>("Items");
+                        NetherBridgeChest.get().create(itemList, random);
+                        nbt.putList(itemList);
+                        Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+                    }
+                }
+            }
 
-			generateBox(level, boundingBox, 0, 6, 0, 4, 6, 4, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 0, 6, 0, 4, 6, 4, NETHER_BRICKS, NETHER_BRICKS, false);
 
-			for (int x = 0; x <= 4; ++x) {
-				for (int z = 0; z <= 4; ++z) {
-					fillColumnDown(level, NETHER_BRICKS, x, -1, z, boundingBox);
-				}
-			}
+            for (int x = 0; x <= 4; ++x) {
+                for (int z = 0; z <= 4; ++z) {
+                    fillColumnDown(level, NETHER_BRICKS, x, -1, z, boundingBox);
+                }
+            }
 
-			return true;
-		}
+            return true;
+        }
 
-		@Override
-		public String getType() {
-			return "NeSCLT";
-		}
-	}
+        @Override
+        public String getType() {
+            return "NeSCLT";
+        }
+    }
 
-	public static class CastleCorridorStairsPiece extends NetherBridgePiece {
-		public CastleCorridorStairsPiece(final int genDepth, final BoundingBox boundingBox, final BlockFace orientation) {
-			super(genDepth);
-			setOrientation(orientation);
-			this.boundingBox = boundingBox;
-		}
+    public static class CastleCorridorStairsPiece extends NetherBridgePiece {
+        public CastleCorridorStairsPiece(final int genDepth, final BoundingBox boundingBox, final BlockFace orientation) {
+            super(genDepth);
+            setOrientation(orientation);
+            this.boundingBox = boundingBox;
+        }
 
-		public static CastleCorridorStairsPiece createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
-			final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -1, -7, 0, 5, 14, 10, orientation);
-			return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-				new CastleCorridorStairsPiece(genDepth, boundingBox, orientation) : null;
-		}
+        public static CastleCorridorStairsPiece createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
+            final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -1, -7, 0, 5, 14, 10, orientation);
+            return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
+                    new CastleCorridorStairsPiece(genDepth, boundingBox, orientation) : null;
+        }
 
-		@Override
-		public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
-			generateChildForward((StartPiece) piece, pieces, random, 1, 0, true);
-		}
+        @Override
+        public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
+            generateChildForward((StartPiece) piece, pieces, random, 1, 0, true);
+        }
 
-		@Override
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			final BlockState stairsS = new BlockState(Block.NETHER_BRICKS_STAIRS, WeirdoDirection.SOUTH);
-			for (int i = 0; i <= 9; ++i) {
-				final int maxY = Math.max(1, 7 - i);
-				final int miny = Math.min(Math.max(maxY + 5, 14 - i), 13);
+        @Override
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            final BlockState stairsS = new BlockState(Block.NETHER_BRICKS_STAIRS, WeirdoDirection.SOUTH);
+            for (int i = 0; i <= 9; ++i) {
+                final int maxY = Math.max(1, 7 - i);
+                final int miny = Math.min(Math.max(maxY + 5, 14 - i), 13);
 
-				generateBox(level, boundingBox, 0, 0, i, 4, maxY, i, NETHER_BRICKS, NETHER_BRICKS, false);
-				generateBox(level, boundingBox, 1, maxY + 1, i, 3, miny - 1, i, BlockState.AIR, BlockState.AIR, false);
+                generateBox(level, boundingBox, 0, 0, i, 4, maxY, i, NETHER_BRICKS, NETHER_BRICKS, false);
+                generateBox(level, boundingBox, 1, maxY + 1, i, 3, miny - 1, i, BlockState.AIR, BlockState.AIR, false);
 
-				if (i <= 6) {
-					placeBlock(level, stairsS, 1, maxY + 1, i, boundingBox);
-					placeBlock(level, stairsS, 2, maxY + 1, i, boundingBox);
-					placeBlock(level, stairsS, 3, maxY + 1, i, boundingBox);
-				}
+                if (i <= 6) {
+                    placeBlock(level, stairsS, 1, maxY + 1, i, boundingBox);
+                    placeBlock(level, stairsS, 2, maxY + 1, i, boundingBox);
+                    placeBlock(level, stairsS, 3, maxY + 1, i, boundingBox);
+                }
 
-				generateBox(level, boundingBox, 0, miny, i, 4, miny, i, NETHER_BRICKS, NETHER_BRICKS, false);
-				generateBox(level, boundingBox, 0, maxY + 1, i, 0, miny - 1, i, NETHER_BRICKS, NETHER_BRICKS, false);
-				generateBox(level, boundingBox, 4, maxY + 1, i, 4, miny - 1, i, NETHER_BRICKS, NETHER_BRICKS, false);
+                generateBox(level, boundingBox, 0, miny, i, 4, miny, i, NETHER_BRICKS, NETHER_BRICKS, false);
+                generateBox(level, boundingBox, 0, maxY + 1, i, 0, miny - 1, i, NETHER_BRICKS, NETHER_BRICKS, false);
+                generateBox(level, boundingBox, 4, maxY + 1, i, 4, miny - 1, i, NETHER_BRICKS, NETHER_BRICKS, false);
 
-				if ((i & 0x1) == 0x0) {
-					generateBox(level, boundingBox, 0, maxY + 2, i, 0, maxY + 3, i, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
-					generateBox(level, boundingBox, 4, maxY + 2, i, 4, maxY + 3, i, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
-				}
+                if ((i & 0x1) == 0x0) {
+                    generateBox(level, boundingBox, 0, maxY + 2, i, 0, maxY + 3, i, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+                    generateBox(level, boundingBox, 4, maxY + 2, i, 4, maxY + 3, i, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+                }
 
-				for (int x = 0; x <= 4; ++x) {
-					fillColumnDown(level, NETHER_BRICKS, x, -1, i, boundingBox);
-				}
-			}
-			return true;
-		}
+                for (int x = 0; x <= 4; ++x) {
+                    fillColumnDown(level, NETHER_BRICKS, x, -1, i, boundingBox);
+                }
+            }
+            return true;
+        }
 
-		@Override
-		public String getType() {
-			return "NeCCS";
-		}
-	}
+        @Override
+        public String getType() {
+            return "NeCCS";
+        }
+    }
 
-	public static class CastleCorridorTBalconyPiece extends NetherBridgePiece {
-		public CastleCorridorTBalconyPiece(final int genDepth, final BoundingBox boundingBox, final BlockFace orientation) {
-			super(genDepth);
-			setOrientation(orientation);
-			this.boundingBox = boundingBox;
-		}
+    public static class CastleCorridorTBalconyPiece extends NetherBridgePiece {
+        public CastleCorridorTBalconyPiece(final int genDepth, final BoundingBox boundingBox, final BlockFace orientation) {
+            super(genDepth);
+            setOrientation(orientation);
+            this.boundingBox = boundingBox;
+        }
 
-		public static CastleCorridorTBalconyPiece createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
-			final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -3, 0, 0, 9, 7, 9, orientation);
-			return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
-				new CastleCorridorTBalconyPiece(genDepth, boundingBox, orientation) : null;
-		}
+        public static CastleCorridorTBalconyPiece createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
+            final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -3, 0, 0, 9, 7, 9, orientation);
+            return NetherBridgePiece.isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ?
+                    new CastleCorridorTBalconyPiece(genDepth, boundingBox, orientation) : null;
+        }
 
-		@Override
-		public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
-			int horizontalOffset = 1;
-			final BlockFace orientation = getOrientation();
-			if (orientation == BlockFace.WEST || orientation == BlockFace.NORTH) {
-				horizontalOffset = 5;
-			}
+        @Override
+        public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
+            int horizontalOffset = 1;
+            final BlockFace orientation = getOrientation();
+            if (orientation == BlockFace.WEST || orientation == BlockFace.NORTH) {
+                horizontalOffset = 5;
+            }
 
-			generateChildLeft((StartPiece) piece, pieces, random, 0, horizontalOffset, random.nextBoundedInt(8) > 0);
-			generateChildRight((StartPiece) piece, pieces, random, 0, horizontalOffset, random.nextBoundedInt(8) > 0);
-		}
+            generateChildLeft((StartPiece) piece, pieces, random, 0, horizontalOffset, random.nextBoundedInt(8) > 0);
+            generateChildRight((StartPiece) piece, pieces, random, 0, horizontalOffset, random.nextBoundedInt(8) > 0);
+        }
 
-		@Override
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			generateBox(level, boundingBox, 0, 0, 0, 8, 1, 8, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 0, 2, 0, 8, 5, 8, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 0, 6, 0, 8, 6, 5, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 0, 2, 0, 2, 5, 0, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 6, 2, 0, 8, 5, 0, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 1, 3, 0, 1, 4, 0, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
-			generateBox(level, boundingBox, 7, 3, 0, 7, 4, 0, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
-			generateBox(level, boundingBox, 0, 2, 4, 8, 2, 8, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 1, 1, 4, 2, 2, 4, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 6, 1, 4, 7, 2, 4, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 1, 3, 8, 7, 3, 8, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
-			placeBlock(level, NETHER_BRICK_FENCE, 0, 3, 8, boundingBox);
-			placeBlock(level, NETHER_BRICK_FENCE, 8, 3, 8, boundingBox);
-			generateBox(level, boundingBox, 0, 3, 6, 0, 3, 7, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
-			generateBox(level, boundingBox, 8, 3, 6, 8, 3, 7, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
-			generateBox(level, boundingBox, 0, 3, 4, 0, 5, 5, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 8, 3, 4, 8, 5, 5, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 1, 3, 5, 2, 5, 5, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 6, 3, 5, 7, 5, 5, NETHER_BRICKS, NETHER_BRICKS, false);
-			generateBox(level, boundingBox, 1, 4, 5, 1, 5, 5, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
-			generateBox(level, boundingBox, 7, 4, 5, 7, 5, 5, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+        @Override
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            generateBox(level, boundingBox, 0, 0, 0, 8, 1, 8, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 0, 2, 0, 8, 5, 8, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 0, 6, 0, 8, 6, 5, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 0, 2, 0, 2, 5, 0, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 6, 2, 0, 8, 5, 0, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 1, 3, 0, 1, 4, 0, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+            generateBox(level, boundingBox, 7, 3, 0, 7, 4, 0, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+            generateBox(level, boundingBox, 0, 2, 4, 8, 2, 8, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 1, 1, 4, 2, 2, 4, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 6, 1, 4, 7, 2, 4, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 1, 3, 8, 7, 3, 8, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+            placeBlock(level, NETHER_BRICK_FENCE, 0, 3, 8, boundingBox);
+            placeBlock(level, NETHER_BRICK_FENCE, 8, 3, 8, boundingBox);
+            generateBox(level, boundingBox, 0, 3, 6, 0, 3, 7, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+            generateBox(level, boundingBox, 8, 3, 6, 8, 3, 7, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+            generateBox(level, boundingBox, 0, 3, 4, 0, 5, 5, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 8, 3, 4, 8, 5, 5, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 1, 3, 5, 2, 5, 5, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 6, 3, 5, 7, 5, 5, NETHER_BRICKS, NETHER_BRICKS, false);
+            generateBox(level, boundingBox, 1, 4, 5, 1, 5, 5, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
+            generateBox(level, boundingBox, 7, 4, 5, 7, 5, 5, NETHER_BRICK_FENCE, NETHER_BRICK_FENCE, false);
 
-			for (int x = 0; x <= 8; ++x) {
-				for (int z = 0; z <= 5; ++z) {
-					fillColumnDown(level, NETHER_BRICKS, x, -1, z, boundingBox);
-				}
-			}
+            for (int x = 0; x <= 8; ++x) {
+                for (int z = 0; z <= 5; ++z) {
+                    fillColumnDown(level, NETHER_BRICKS, x, -1, z, boundingBox);
+                }
+            }
 
-			return true;
-		}
+            return true;
+        }
 
-		@Override
-		public String getType() {
-			return "NeCTB";
-		}
-	}
+        @Override
+        public String getType() {
+            return "NeCTB";
+        }
+    }
 }

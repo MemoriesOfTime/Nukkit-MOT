@@ -26,7 +26,7 @@ public class ModalFormResponsePacket extends DataPacket {
             if (this.getBoolean()) {
                 this.cancelReason = this.getByte();
             }
-        }else {
+        } else {
             this.data = this.getString(); // Data will be null if player close form without submit (by cross button or ESC)
         }
     }

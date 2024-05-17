@@ -14,6 +14,10 @@ public class EnchantmentDurability extends Enchantment {
         super(ID_DURABILITY, "durability", Rarity.UNCOMMON, EnchantmentType.BREAKABLE);
     }
 
+    public static boolean negateDamage(Item item, int level, Random random) {
+        return !(item.isArmor() && random.nextFloat() < 0.6f) && random.nextInt(level + 1) > 0;
+    }
+
     @Override
     public int getMinEnchantAbility(int level) {
         return 5 + ((level - 1) << 3);
@@ -32,9 +36,5 @@ public class EnchantmentDurability extends Enchantment {
     @Override
     public boolean canEnchant(Item item) {
         return item.getMaxDurability() >= 0 || super.canEnchant(item);
-    }
-
-    public static boolean negateDamage(Item item, int level, Random random) {
-        return !(item.isArmor() && random.nextFloat() < 0.6f) && random.nextInt(level + 1) > 0;
     }
 }

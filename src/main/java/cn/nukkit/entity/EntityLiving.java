@@ -42,6 +42,12 @@ import java.util.Map;
  */
 public abstract class EntityLiving extends Entity implements EntityDamageable {
 
+    protected final boolean isDrowned = this instanceof EntityDrowned;
+    protected int attackTime = 0;
+    protected float movementSpeed = 0.1f;
+    protected int turtleTicks = 0;
+    private boolean blocking = false;
+
     public EntityLiving(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
     }
@@ -55,16 +61,6 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     protected float getDrag() {
         return 0.02f;
     }
-
-    protected int attackTime = 0;
-
-    protected float movementSpeed = 0.1f;
-
-    protected int turtleTicks = 0;
-
-    private boolean blocking = false;
-
-    protected final boolean isDrowned = this instanceof EntityDrowned;
 
     @Override
     protected void initEntity() {
@@ -249,8 +245,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         this.checkTameableEntityDeath();
 
         if (this.level.getGameRules().getBoolean(GameRule.DO_MOB_LOOT) && this.lastDamageCause != null && DamageCause.VOID != this.lastDamageCause.getCause()) {
-            if (ev.getEntity() instanceof BaseEntity) {
-                BaseEntity baseEntity = (BaseEntity) ev.getEntity();
+            if (ev.getEntity() instanceof BaseEntity baseEntity) {
                 if (baseEntity.getLastDamageCause() instanceof EntityDamageByEntityEvent) {
                     if (((EntityDamageByEntityEvent) baseEntity.getLastDamageCause()).getDamager() instanceof Player) {
                         this.getLevel().dropExpOrb(this, baseEntity.getKillExperience());
@@ -281,8 +276,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public boolean entityBaseTick(int tickDiff) {
         boolean inWater = this.isSubmerged();
 
-        if (this instanceof Player && !this.closed) {
-            Player p = (Player) this;
+        if (this instanceof Player p && !this.closed) {
             boolean isBreathing = !inWater;
 
             PlayerInventory inv = p.getInventory();
@@ -469,19 +463,20 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                     return block;
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         return null;
+    }
+
+    public float getMovementSpeed() {
+        return this.movementSpeed;
     }
 
     public void setMovementSpeed(float speed) {
         this.movementSpeed = speed;
     }
 
-    public float getMovementSpeed() {
-        return this.movementSpeed;
-    }
-    
     public int getAirTicks() {
         return this.airTicks;
     }

@@ -31,6 +31,13 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class EntityFallingBlock extends Entity {
 
     public static final int NETWORK_ID = 66;
+    protected int blockId;
+    protected int damage;
+    protected boolean breakOnLava;
+
+    public EntityFallingBlock(FullChunk chunk, CompoundTag nbt) {
+        super(chunk, nbt);
+    }
 
     @Override
     public float getWidth() {
@@ -65,14 +72,6 @@ public class EntityFallingBlock extends Entity {
     @Override
     public boolean canCollide() {
         return blockId == BlockID.ANVIL;
-    }
-
-    protected int blockId;
-    protected int damage;
-    protected boolean breakOnLava;
-
-    public EntityFallingBlock(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
     }
 
     @Override

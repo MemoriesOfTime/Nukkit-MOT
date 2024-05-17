@@ -55,8 +55,7 @@ public class PlayerInventory extends BaseInventory {
             return false;
         }
 
-        if (this.getHolder() instanceof Player) {
-            Player player = (Player) this.getHolder();
+        if (this.getHolder() instanceof Player player) {
             Item item = this.getItem(slot);
             PlayerItemHeldEvent ev = new PlayerItemHeldEvent(player, item, slot);
             this.getHolder().getLevel().getServer().getPluginManager().callEvent(ev);
@@ -354,6 +353,26 @@ public class PlayerInventory extends BaseInventory {
         return armor;
     }
 
+    public void setArmorContents(Item[] items) {
+        if (items.length < 4) {
+            Item[] newItems = new Item[4];
+            System.arraycopy(items, 0, newItems, 0, items.length);
+            items = newItems;
+        }
+
+        for (int i = 0; i < 4; ++i) {
+            if (items[i] == null) {
+                items[i] = new ItemBlock(Block.get(BlockID.AIR), null, 0);
+            }
+
+            if (items[i].getId() == Item.AIR) {
+                this.clear(this.getSize() + i);
+            } else {
+                this.setItem(this.getSize() + i, items[i]);
+            }
+        }
+    }
+
     @Override
     public void clearAll() {
         int limit = this.getSize() + 4;
@@ -393,26 +412,6 @@ public class PlayerInventory extends BaseInventory {
             pk.eid = this.getHolder().getId();
             pk.slots = armor;
             player.dataPacket(pk);
-        }
-    }
-
-    public void setArmorContents(Item[] items) {
-        if (items.length < 4) {
-            Item[] newItems = new Item[4];
-            System.arraycopy(items, 0, newItems, 0, items.length);
-            items = newItems;
-        }
-
-        for (int i = 0; i < 4; ++i) {
-            if (items[i] == null) {
-                items[i] = new ItemBlock(Block.get(BlockID.AIR), null, 0);
-            }
-
-            if (items[i].getId() == Item.AIR) {
-                this.clear(this.getSize() + i);
-            } else {
-                this.setItem(this.getSize() + i, items[i]);
-            }
         }
     }
 
@@ -497,8 +496,7 @@ public class PlayerInventory extends BaseInventory {
 
     @Override
     public void sendSlot(int index, Player... players) {
-        if (players.length == 0 && this.getHolder() instanceof Player) {
-            Player p = (Player) this.getHolder();
+        if (players.length == 0 && this.getHolder() instanceof Player p) {
             if (p.protocol >= 407) {
                 players = new Player[]{p};
             }
@@ -539,10 +537,9 @@ public class PlayerInventory extends BaseInventory {
     }
 
     public void sendCreativeContents() {
-        if (!(this.getHolder() instanceof Player)) {
+        if (!(this.getHolder() instanceof Player p)) {
             return;
         }
-        Player p = (Player) this.getHolder();
 
         if (p.protocol < 407) {
             if (p.protocol < ProtocolInfo.v1_2_0) {

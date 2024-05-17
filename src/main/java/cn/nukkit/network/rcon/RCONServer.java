@@ -27,17 +27,13 @@ public class RCONServer extends Thread {
     private static final int SERVERDATA_AUTH_RESPONSE = 2;
     private static final int SERVERDATA_EXECCOMMAND = 2;
     private static final int SERVERDATA_RESPONSE_VALUE = 0;
-
-    private volatile boolean running;
-
-    private ServerSocketChannel serverChannel;
-    private Selector selector;
-
-    private String password;
     private final Set<SocketChannel> rconSessions = new HashSet<>();
-
     private final List<RCONCommand> receiveQueue = new ArrayList<>();
     private final Map<SocketChannel, List<RCONPacket>> sendQueues = new HashMap<>();
+    private volatile boolean running;
+    private final ServerSocketChannel serverChannel;
+    private final Selector selector;
+    private final String password;
 
     public RCONServer(String address, int port, String password) throws IOException {
         this.setName("RCON");
@@ -159,11 +155,17 @@ public class RCONServer extends Thread {
                 if (new String(packet.getPayload(), StandardCharsets.UTF_8).equals(this.password)) {
                     this.rconSessions.add(channel);
                     this.send(channel, new RCONPacket(packet.getId(), SERVERDATA_AUTH_RESPONSE, payload));
-                    try { Server.getInstance().getLogger().info("[RCON] " + channel.getRemoteAddress().toString() + " connected"); } catch (Exception ignored) {}
+                    try {
+                        Server.getInstance().getLogger().info("[RCON] " + channel.getRemoteAddress().toString() + " connected");
+                    } catch (Exception ignored) {
+                    }
                     return;
                 }
 
-                try { Server.getInstance().getLogger().info("[RCON] Authentication failed for " + channel.getRemoteAddress().toString()); } catch (Exception ignored) {}
+                try {
+                    Server.getInstance().getLogger().info("[RCON] Authentication failed for " + channel.getRemoteAddress().toString());
+                } catch (Exception ignored) {
+                }
                 this.send(channel, new RCONPacket(-1, SERVERDATA_AUTH_RESPONSE, payload));
                 break;
             case SERVERDATA_EXECCOMMAND:

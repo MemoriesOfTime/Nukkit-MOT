@@ -66,7 +66,6 @@ public enum ContainerSlotType {
     CREATED_OUTPUT(60),
     SMITHING_TABLE_TEMPLATE(61),
     CRAFTER_BLOCK_CONTAINER(62);
-    private final int id;
     private static final Int2ObjectArrayMap<ContainerSlotType> VALUES = new Int2ObjectArrayMap<>();
 
     static {
@@ -75,16 +74,17 @@ public enum ContainerSlotType {
         }
     }
 
+    private final int id;
+
     ContainerSlotType(int id) {
         this.id = id;
     }
 
-    public int getId() {
-        return id;
-    }
-
-
     public static ContainerSlotType fromId(int id) {
         return VALUES.get(id);
+    }
+
+    public int getId() {
+        return id;
     }
 }

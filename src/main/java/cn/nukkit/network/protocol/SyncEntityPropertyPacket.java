@@ -32,7 +32,7 @@ public class SyncEntityPropertyPacket extends DataPacket {
     }
 
     @Override
-    public void encode(){
+    public void encode() {
         this.reset();
         try {
             this.put(NBTIO.write(data, ByteOrder.BIG_ENDIAN, true));

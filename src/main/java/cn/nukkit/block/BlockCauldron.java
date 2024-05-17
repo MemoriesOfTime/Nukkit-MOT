@@ -109,11 +109,9 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
     public boolean onActivate(Item item, Player player) {
         BlockEntity be = this.level.getBlockEntity(this);
 
-        if (!(be instanceof BlockEntityCauldron)) {
+        if (!(be instanceof BlockEntityCauldron cauldron)) {
             return false;
         }
-
-        BlockEntityCauldron cauldron = (BlockEntityCauldron) be;
 
         switch (item.getId()) {
             case Item.BUCKET:

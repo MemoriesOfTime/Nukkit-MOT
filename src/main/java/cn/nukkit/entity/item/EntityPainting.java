@@ -177,10 +177,6 @@ public class EntityPainting extends EntityHanging {
         PIG_SCENE("Pigscene", 4, 4),
         BURNING_SKULL("BurningSkull", 4, 4);
 
-        public final String title;
-        public final int width;
-        public final int height;
-
         private static final Map<String, Motive> BY_NAME = new HashMap<>();
 
         static {
@@ -188,6 +184,10 @@ public class EntityPainting extends EntityHanging {
                 BY_NAME.put(motive.title, motive);
             }
         }
+
+        public final String title;
+        public final int width;
+        public final int height;
 
         Motive(String title, int width, int height) {
             this.title = title;

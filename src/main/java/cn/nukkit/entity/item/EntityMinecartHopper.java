@@ -26,10 +26,8 @@ import cn.nukkit.utils.MinecartType;
 public class EntityMinecartHopper extends EntityMinecartAbstract implements InventoryHolder, BlockHopper.IHopper {
 
     public static final int NETWORK_ID = 96;
-
-    protected MinecartHopperInventory inventory;
-
     public int transferCooldown = 8;
+    protected MinecartHopperInventory inventory;
 
     public EntityMinecartHopper(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);

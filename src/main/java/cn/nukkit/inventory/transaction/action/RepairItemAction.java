@@ -5,7 +5,7 @@ import cn.nukkit.item.Item;
 
 public class RepairItemAction extends InventoryAction {
 
-    private int type;
+    private final int type;
 
     public RepairItemAction(Item sourceItem, Item targetItem, int type) {
         super(sourceItem, targetItem);

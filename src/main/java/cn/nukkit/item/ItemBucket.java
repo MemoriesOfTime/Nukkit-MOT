@@ -262,7 +262,7 @@ public class ItemBucket extends Item {
                 player.getLevel().addSound(new FizzSound(target, 2.6F + (ThreadLocalRandom.current().nextFloat() - ThreadLocalRandom.current().nextFloat()) * 0.8F));
                 player.getLevel().addParticle(new ExplodeParticle(target.add(0.5, 1, 0.5)));
             } else {
-                player.getLevel().sendBlocks(new Player[] {player}, new Block[] {block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
+                player.getLevel().sendBlocks(new Player[]{player}, new Block[]{block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
                 player.getInventory().sendContents(player);
             }
         }

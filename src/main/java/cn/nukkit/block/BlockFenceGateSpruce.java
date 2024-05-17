@@ -26,10 +26,10 @@ public class BlockFenceGateSpruce extends BlockFenceGate {
     public String getName() {
         return "Spruce Fence Gate";
     }
-    
+
     @Override
     public Item toItem() {
-        return Item.get(Item.FENCE_GATE_SPRUCE,0, 1);
+        return Item.get(Item.FENCE_GATE_SPRUCE, 0, 1);
     }
 
     @Override

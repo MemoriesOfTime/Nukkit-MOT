@@ -427,12 +427,12 @@ public final class PlayerHandle {
         player.lastBeAttackEntity = lastBeAttackEntity;
     }*/
 
-    public void setLoginChainData(LoginChainData loginChainData) {
-        player.loginChainData = loginChainData;
-    }
-
     public LoginChainData getLoginChainData() {
         return player.loginChainData;
+    }
+
+    public void setLoginChainData(LoginChainData loginChainData) {
+        player.loginChainData = loginChainData;
     }
 
     public boolean isVerified() {

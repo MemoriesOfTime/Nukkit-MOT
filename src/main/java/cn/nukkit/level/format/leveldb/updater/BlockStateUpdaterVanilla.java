@@ -21,7 +21,7 @@ public class BlockStateUpdaterVanilla implements BlockStateUpdater {
         ctx.addUpdater(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION, true)
                 .match("name", "minecraft:water")
                 .visit("states")
-                .tryAdd("liquid_depth", (int) 0);
+                .tryAdd("liquid_depth", 0);
 
         ctx.addUpdater(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION, true)
                 .match("name", "minecraft:polished_blackstone_double_slab")

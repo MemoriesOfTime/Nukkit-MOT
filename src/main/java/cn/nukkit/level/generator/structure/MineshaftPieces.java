@@ -344,7 +344,7 @@ public final class MineshaftPieces {
                 final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
                 if (chunk != null) {
                     final CompoundTag nbt = Entity.getDefaultNBT(vec.asVector3().add(.5, 0.5, .5))
-                        .putString("id", "MinecartChest");
+                            .putString("id", "MinecartChest");
 
                     final ListTag<CompoundTag> itemList = new ListTag<>("Items");
                     MineshaftChest.get().create(itemList, random);
@@ -403,8 +403,8 @@ public final class MineshaftPieces {
                         final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
                         if (chunk != null) {
                             Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(),
-                                BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.MOB_SPAWNER)
-                                    .putInt("EntityId", EntityCaveSpider.NETWORK_ID)));
+                                    BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.MOB_SPAWNER)
+                                            .putInt("EntityId", EntityCaveSpider.NETWORK_ID)));
                         }
                     }
                 }
@@ -636,10 +636,14 @@ public final class MineshaftPieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case SOUTH -> generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, genDepth);
-                    case WEST -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0, BlockFace.WEST, genDepth);
-                    case EAST -> generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0, BlockFace.EAST, genDepth);
-                    default -> generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, genDepth);
+                    case SOUTH ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, genDepth);
+                    case WEST ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0, BlockFace.WEST, genDepth);
+                    case EAST ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0, BlockFace.EAST, genDepth);
+                    default ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, genDepth);
                 }
             }
         }

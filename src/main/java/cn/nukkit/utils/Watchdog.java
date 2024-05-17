@@ -14,11 +14,11 @@ public class Watchdog extends Thread {
 
     private final Server server;
     private final long time;
-    private boolean responding = true;
     /**
      * Watchdog running
      */
     public volatile boolean running;
+    private boolean responding = true;
 
     public Watchdog(Server server, long time) {
         this.server = server;
@@ -26,6 +26,46 @@ public class Watchdog extends Thread {
         this.running = true;
         this.setName("Watchdog");
         this.setDaemon(true);
+    }
+
+    /**
+     * Dump thread stack trace
+     *
+     * @param thread thread to dump
+     * @param logger logger
+     * @param log    bug report generator input
+     */
+    private static void dumpThread(ThreadInfo thread, Logger logger, StringBuilder log) {
+        if (thread == null) {
+            print("Attempted to dump a null thread!", logger, log);
+            return;
+        }
+
+        print("Current Thread: " + thread.getThreadName(), logger, log);
+        print("\tPID: " + thread.getThreadId() + " | Suspended: " + thread.isSuspended() + " | Native: " + thread.isInNative() + " | State: " + thread.getThreadState(), logger, log);
+
+        if (thread.getLockedMonitors().length != 0) {
+            print("\tThread is waiting on monitor(s):", logger, log);
+            for (MonitorInfo monitor : thread.getLockedMonitors()) {
+                print("\t\tLocked on:" + monitor.getLockedStackFrame(), logger, log);
+            }
+        }
+
+        print("\tStack:", logger, log);
+        for (StackTraceElement stack : thread.getStackTrace()) {
+            print("\t\t" + stack, logger, log);
+        }
+    }
+
+    /**
+     * Print a line to log
+     *
+     * @param logger logger
+     * @param log    bug report generator input
+     */
+    private static void print(String text, Logger logger, StringBuilder log) {
+        logger.emergency(text);
+        log.append(text).append('\n');
     }
 
     /**
@@ -68,7 +108,8 @@ public class Watchdog extends Thread {
                     try {
                         new BugReportGenerator(log.toString()).start();
                         Thread.sleep(1000); // Wait for the report to be sent
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                     responding = false;
                     this.server.forceShutdown("\u00A7cServer stopped responding");
                 }
@@ -82,45 +123,5 @@ public class Watchdog extends Thread {
             }
         }
         server.getLogger().warning("Watchdog has been stopped");
-    }
-
-    /**
-     * Dump thread stack trace
-     *
-     * @param thread thread to dump
-     * @param logger logger
-     * @param log bug report generator input
-     */
-    private static void dumpThread(ThreadInfo thread, Logger logger, StringBuilder log) {
-        if (thread == null) {
-            print("Attempted to dump a null thread!", logger, log);
-            return;
-        }
-
-        print("Current Thread: " + thread.getThreadName(), logger, log);
-        print("\tPID: " + thread.getThreadId() + " | Suspended: " + thread.isSuspended() + " | Native: " + thread.isInNative() + " | State: " + thread.getThreadState(), logger, log);
-
-        if (thread.getLockedMonitors().length != 0) {
-            print("\tThread is waiting on monitor(s):", logger, log);
-            for (MonitorInfo monitor : thread.getLockedMonitors()) {
-                print("\t\tLocked on:" + monitor.getLockedStackFrame(), logger, log);
-            }
-        }
-
-        print("\tStack:", logger, log);
-        for (StackTraceElement stack : thread.getStackTrace()) {
-            print("\t\t" + stack, logger, log);
-        }
-    }
-
-    /**
-     * Print a line to log
-     *
-     * @param logger logger
-     * @param log bug report generator input
-     */
-    private static void print(String text, Logger logger, StringBuilder log) {
-        logger.emergency(text);
-        log.append(text).append('\n');
     }
 }

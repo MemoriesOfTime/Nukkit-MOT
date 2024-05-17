@@ -28,24 +28,7 @@ public abstract class Generator implements BlockID {
     public static final int TYPE_NETHER = 3;
     public static final int TYPE_THE_END = 4;
     public static final int TYPE_VOID = 5;
-
-    public abstract int getId();
-
-    public DimensionData getDimensionData() {
-        DimensionData dimensionData = DimensionEnum.getDataFromId(this.getDimension());
-        if (dimensionData == null) {
-            dimensionData = DimensionEnum.OVERWORLD.getDimensionData();
-        }
-        return dimensionData;
-    }
-
-    @Deprecated
-    public int getDimension() {
-        return Level.DIMENSION_OVERWORLD;
-    }
-
     private static final Map<String, Class<? extends Generator>> nameList = new HashMap<>();
-
     private static final Map<Integer, Class<? extends Generator>> typeList = new HashMap<>();
 
     public static boolean addGenerator(Class<? extends Generator> clazz, String name, int type) {
@@ -105,6 +88,21 @@ public abstract class Generator implements BlockID {
             MainLogger.getLogger().error("Error while loading: " + path);
             throw new RuntimeException(e);
         }
+    }
+
+    public abstract int getId();
+
+    public DimensionData getDimensionData() {
+        DimensionData dimensionData = DimensionEnum.getDataFromId(this.getDimension());
+        if (dimensionData == null) {
+            dimensionData = DimensionEnum.OVERWORLD.getDimensionData();
+        }
+        return dimensionData;
+    }
+
+    @Deprecated
+    public int getDimension() {
+        return Level.DIMENSION_OVERWORLD;
     }
 
     public abstract void init(ChunkManager level, NukkitRandom random);

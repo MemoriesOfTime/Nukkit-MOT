@@ -18,21 +18,21 @@ public class EntityMinecartEmpty extends EntityMinecartAbstract {
 
     public static final int NETWORK_ID = 84;
 
-    @Override
-    public int getNetworkId() {
-        return NETWORK_ID;
-    }
-
     public EntityMinecartEmpty(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
         setName("Minecart");
     }
 
     @Override
+    public int getNetworkId() {
+        return NETWORK_ID;
+    }
+
+    @Override
     public MinecartType getType() {
         return MinecartType.valueOf(0);
     }
-    
+
     @Override
     public boolean isRideable() {
         return true;

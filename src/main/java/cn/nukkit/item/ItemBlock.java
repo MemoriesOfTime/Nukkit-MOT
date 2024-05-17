@@ -44,13 +44,13 @@ public class ItemBlock extends Item {
     public Block getBlock() {
         return this.block.clone();
     }
-    
+
     @Override
     public int getMaxStackSize() {
         if (this.block.getId() == Block.SHULKER_BOX || this.block.getId() == Block.UNDYED_SHULKER_BOX) {
             return 1;
         }
-        
+
         return super.getMaxStackSize();
     }
 }

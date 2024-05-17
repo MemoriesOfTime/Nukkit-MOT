@@ -16,12 +16,11 @@ import static java.lang.Math.abs;
  */
 public class ObjectEndSpike extends BasicGenerator {
 
-    private Vector3 position;
     private final int radius;
     private final int height;
     private final boolean hasIronBars;
-
     private final Vector3 tempPosition = new Vector3();
+    private Vector3 position;
 
     public ObjectEndSpike(Vector3 position, int radius, int height, boolean hasIronBars) {
         this.position = position;

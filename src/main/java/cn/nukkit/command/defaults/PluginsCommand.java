@@ -20,16 +20,6 @@ public class PluginsCommand extends VanillaCommand {
         this.commandParameters.clear();
     }
 
-    @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
-        }
-
-        sendPluginList(sender);
-        return true;
-    }
-
     private static void sendPluginList(CommandSender sender) {
         StringBuilder list = new StringBuilder();
         Map<String, Plugin> plugins = sender.getServer().getPluginManager().getPlugins();
@@ -42,5 +32,15 @@ public class PluginsCommand extends VanillaCommand {
         }
 
         sender.sendMessage(new TranslationContainer("nukkit.command.plugins.success", String.valueOf(plugins.size()), list.toString()));
+    }
+
+    @Override
+    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+        if (!this.testPermission(sender)) {
+            return true;
+        }
+
+        sendPluginList(sender);
+        return true;
     }
 }

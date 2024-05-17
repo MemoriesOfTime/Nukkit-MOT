@@ -9,16 +9,10 @@ import cn.nukkit.nbt.tag.CompoundTag;
 public class CreatureSpawnEvent extends Event implements Cancellable {
 
     private static final HandlerList handlers = new HandlerList();
-
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
     private final SpawnReason reason;
     private final int entityNetworkId;
     private final Position position;
     private final CompoundTag compoundTag;
-
     public CreatureSpawnEvent(int networkId, SpawnReason reason) {
         this(networkId, new Position(), new CompoundTag(), reason);
     }
@@ -32,6 +26,10 @@ public class CreatureSpawnEvent extends Event implements Cancellable {
         this.entityNetworkId = networkId;
         this.position = position;
         this.compoundTag = nbt;
+    }
+
+    public static HandlerList getHandlers() {
+        return handlers;
     }
 
     public SpawnReason getReason() {

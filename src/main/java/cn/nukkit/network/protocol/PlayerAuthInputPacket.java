@@ -23,7 +23,7 @@ public class PlayerAuthInputPacket extends DataPacket {
     private float headYaw;
     private Vector3f position;
     private Vector2 motion;
-    private Set<AuthInputAction> inputData = EnumSet.noneOf(AuthInputAction.class);
+    private final Set<AuthInputAction> inputData = EnumSet.noneOf(AuthInputAction.class);
     private InputMode inputMode;
     private ClientPlayMode playMode;
     private AuthInteractionModel interactionModel;
@@ -31,7 +31,7 @@ public class PlayerAuthInputPacket extends DataPacket {
     private long tick;
     private Vector3f delta;
     // private ItemStackRequest itemStackRequest;
-    private Map<PlayerActionType, PlayerBlockActionData> blockActionData = new EnumMap<>(PlayerActionType.class);
+    private final Map<PlayerActionType, PlayerBlockActionData> blockActionData = new EnumMap<>(PlayerActionType.class);
     /**
      * @since 575
      */

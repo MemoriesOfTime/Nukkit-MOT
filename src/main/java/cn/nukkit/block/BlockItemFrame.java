@@ -227,13 +227,6 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable, Bl
         };
     }
 
-    @Override
-    public void setBlockFace(@NotNull BlockFace face) {
-        if (face.getIndex() > 1) {
-            this.setDamage(FACING[face.getIndex()]);
-        }
-    }
-
     public boolean isStoringMap() {
         return (this.getDamage() & HAS_MAP_BIT) != 0;
     }
@@ -250,6 +243,13 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable, Bl
     @Override
     public BlockFace getBlockFace() {
         return this.getFacing().getOpposite();
+    }
+
+    @Override
+    public void setBlockFace(@NotNull BlockFace face) {
+        if (face.getIndex() > 1) {
+            this.setDamage(FACING[face.getIndex()]);
+        }
     }
 
     @Override

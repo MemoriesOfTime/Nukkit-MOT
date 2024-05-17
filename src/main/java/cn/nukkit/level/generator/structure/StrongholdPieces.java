@@ -232,7 +232,8 @@ public final class StrongholdPieces {
         //\\ StrongholdPiece::generateSmallDoor(BlockSource *,Random &,BoundingBox const &,StrongholdPiece::SmallDoorType,int,int,int)
         protected void generateSmallDoor(final ChunkManager level, final BoundingBox boundingBox, final SmallDoorType type, final int x, final int y, final int z) {
             switch (type) {
-                case OPENING -> generateBox(level, boundingBox, x, y, z, x + 3 - 1, y + 3 - 1, z, BlockState.AIR, BlockState.AIR, false);
+                case OPENING ->
+                        generateBox(level, boundingBox, x, y, z, x + 3 - 1, y + 3 - 1, z, BlockState.AIR, BlockState.AIR, false);
                 case WOOD_DOOR -> {
                     placeBlock(level, STONE_BRICKS, x, y, z, boundingBox);
                     placeBlock(level, STONE_BRICKS, x, y + 1, z, boundingBox);
@@ -286,10 +287,14 @@ public final class StrongholdPieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case NORTH -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 + x, boundingBox.y0 + y, boundingBox.z0 - 1, orientation, getGenDepth());
-                    case SOUTH -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 + x, boundingBox.y0 + y, boundingBox.z1 + 1, orientation, getGenDepth());
-                    case WEST -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + y, boundingBox.z0 + x, orientation, getGenDepth());
-                    case EAST -> generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + y, boundingBox.z0 + x, orientation, getGenDepth());
+                    case NORTH ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x0 + x, boundingBox.y0 + y, boundingBox.z0 - 1, orientation, getGenDepth());
+                    case SOUTH ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x0 + x, boundingBox.y0 + y, boundingBox.z1 + 1, orientation, getGenDepth());
+                    case WEST ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + y, boundingBox.z0 + x, orientation, getGenDepth());
+                    case EAST ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + y, boundingBox.z0 + x, orientation, getGenDepth());
                 }
             }
         }
@@ -299,8 +304,10 @@ public final class StrongholdPieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case NORTH, SOUTH -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + y, boundingBox.z0 + z, BlockFace.WEST, getGenDepth());
-                    case WEST, EAST -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 + z, boundingBox.y0 + y, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
+                    case NORTH, SOUTH ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + y, boundingBox.z0 + z, BlockFace.WEST, getGenDepth());
+                    case WEST, EAST ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x0 + z, boundingBox.y0 + y, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
                 }
             }
         }
@@ -310,8 +317,10 @@ public final class StrongholdPieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 switch (orientation) {
-                    case NORTH, SOUTH -> generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + y, boundingBox.z0 + z, BlockFace.EAST, getGenDepth());
-                    case WEST, EAST -> generateAndAddPiece(piece, pieces, random, boundingBox.x0 + z, boundingBox.y0 + y, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
+                    case NORTH, SOUTH ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + y, boundingBox.z0 + z, BlockFace.EAST, getGenDepth());
+                    case WEST, EAST ->
+                            generateAndAddPiece(piece, pieces, random, boundingBox.x0 + z, boundingBox.y0 + y, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
                 }
             }
         }
@@ -988,330 +997,330 @@ public final class StrongholdPieces {
             for (int z = 3; z < 12; z += 2) {
                 generateBox(level, boundingBox, 3, 1, z, 4, 3, z, BOOKSHELF, BOOKSHELF, false);
                 generateBox(level, boundingBox, 6, 1, z, 7, 3, z, BOOKSHELF, BOOKSHELF, false);
-				generateBox(level, boundingBox, 9, 1, z, 10, 3, z, BOOKSHELF, BOOKSHELF, false);
-			}
+                generateBox(level, boundingBox, 9, 1, z, 10, 3, z, BOOKSHELF, BOOKSHELF, false);
+            }
 
-			if (isTall) {
-				generateBox(level, boundingBox, 1, 5, 1, 3, 5, 13, OAK_PLANKS, OAK_PLANKS, false);
-				generateBox(level, boundingBox, 10, 5, 1, 12, 5, 13, OAK_PLANKS, OAK_PLANKS, false);
-				generateBox(level, boundingBox, 4, 5, 1, 9, 5, 2, OAK_PLANKS, OAK_PLANKS, false);
-				generateBox(level, boundingBox, 4, 5, 12, 9, 5, 13, OAK_PLANKS, OAK_PLANKS, false);
-				placeBlock(level, OAK_PLANKS, 9, 5, 11, boundingBox);
-				placeBlock(level, OAK_PLANKS, 8, 5, 11, boundingBox);
-				placeBlock(level, OAK_PLANKS, 9, 5, 10, boundingBox);
-				generateBox(level, boundingBox, 3, 6, 3, 3, 6, 11, OAK_FENCE, OAK_FENCE, false);
-				generateBox(level, boundingBox, 10, 6, 3, 10, 6, 9, OAK_FENCE, OAK_FENCE, false);
-				generateBox(level, boundingBox, 4, 6, 2, 9, 6, 2, OAK_FENCE, OAK_FENCE, false);
-				generateBox(level, boundingBox, 4, 6, 12, 7, 6, 12, OAK_FENCE, OAK_FENCE, false);
-				placeBlock(level, OAK_FENCE, 3, 6, 2, boundingBox);
-				placeBlock(level, OAK_FENCE, 3, 6, 12, boundingBox);
-				placeBlock(level, OAK_FENCE, 10, 6, 2, boundingBox);
+            if (isTall) {
+                generateBox(level, boundingBox, 1, 5, 1, 3, 5, 13, OAK_PLANKS, OAK_PLANKS, false);
+                generateBox(level, boundingBox, 10, 5, 1, 12, 5, 13, OAK_PLANKS, OAK_PLANKS, false);
+                generateBox(level, boundingBox, 4, 5, 1, 9, 5, 2, OAK_PLANKS, OAK_PLANKS, false);
+                generateBox(level, boundingBox, 4, 5, 12, 9, 5, 13, OAK_PLANKS, OAK_PLANKS, false);
+                placeBlock(level, OAK_PLANKS, 9, 5, 11, boundingBox);
+                placeBlock(level, OAK_PLANKS, 8, 5, 11, boundingBox);
+                placeBlock(level, OAK_PLANKS, 9, 5, 10, boundingBox);
+                generateBox(level, boundingBox, 3, 6, 3, 3, 6, 11, OAK_FENCE, OAK_FENCE, false);
+                generateBox(level, boundingBox, 10, 6, 3, 10, 6, 9, OAK_FENCE, OAK_FENCE, false);
+                generateBox(level, boundingBox, 4, 6, 2, 9, 6, 2, OAK_FENCE, OAK_FENCE, false);
+                generateBox(level, boundingBox, 4, 6, 12, 7, 6, 12, OAK_FENCE, OAK_FENCE, false);
+                placeBlock(level, OAK_FENCE, 3, 6, 2, boundingBox);
+                placeBlock(level, OAK_FENCE, 3, 6, 12, boundingBox);
+                placeBlock(level, OAK_FENCE, 10, 6, 2, boundingBox);
 
-				for (int i = 0; i <= 2; ++i) {
-					placeBlock(level, OAK_FENCE, 8 + i, 6, 12 - i, boundingBox);
-					if (i != 2) {
-						placeBlock(level, OAK_FENCE, 8 + i, 6, 11 - i, boundingBox);
-					}
-				}
+                for (int i = 0; i <= 2; ++i) {
+                    placeBlock(level, OAK_FENCE, 8 + i, 6, 12 - i, boundingBox);
+                    if (i != 2) {
+                        placeBlock(level, OAK_FENCE, 8 + i, 6, 11 - i, boundingBox);
+                    }
+                }
 
-				final BlockState ladderS = new BlockState(Block.LADDER, FacingDirection.SOUTH);
-				placeBlock(level, ladderS, 10, 1, 13, boundingBox);
-				placeBlock(level, ladderS, 10, 2, 13, boundingBox);
-				placeBlock(level, ladderS, 10, 3, 13, boundingBox);
-				placeBlock(level, ladderS, 10, 4, 13, boundingBox);
-				placeBlock(level, ladderS, 10, 5, 13, boundingBox);
-				placeBlock(level, ladderS, 10, 6, 13, boundingBox);
-				placeBlock(level, ladderS, 10, 7, 13, boundingBox);
+                final BlockState ladderS = new BlockState(Block.LADDER, FacingDirection.SOUTH);
+                placeBlock(level, ladderS, 10, 1, 13, boundingBox);
+                placeBlock(level, ladderS, 10, 2, 13, boundingBox);
+                placeBlock(level, ladderS, 10, 3, 13, boundingBox);
+                placeBlock(level, ladderS, 10, 4, 13, boundingBox);
+                placeBlock(level, ladderS, 10, 5, 13, boundingBox);
+                placeBlock(level, ladderS, 10, 6, 13, boundingBox);
+                placeBlock(level, ladderS, 10, 7, 13, boundingBox);
 
-				placeBlock(level, OAK_FENCE, 6, 9, 7, boundingBox);
-				placeBlock(level, OAK_FENCE, 7, 9, 7, boundingBox);
-				placeBlock(level, OAK_FENCE, 6, 8, 7, boundingBox);
-				placeBlock(level, OAK_FENCE, 7, 8, 7, boundingBox);
-				placeBlock(level, OAK_FENCE, 6, 7, 7, boundingBox);
-				placeBlock(level, OAK_FENCE, 7, 7, 7, boundingBox);
-				placeBlock(level, OAK_FENCE, 5, 7, 7, boundingBox);
-				placeBlock(level, OAK_FENCE, 8, 7, 7, boundingBox);
-				placeBlock(level, OAK_FENCE, 6, 7, 6, boundingBox);
-				placeBlock(level, OAK_FENCE, 6, 7, 8, boundingBox);
-				placeBlock(level, OAK_FENCE, 7, 7, 6, boundingBox);
-				placeBlock(level, OAK_FENCE, 7, 7, 8, boundingBox);
+                placeBlock(level, OAK_FENCE, 6, 9, 7, boundingBox);
+                placeBlock(level, OAK_FENCE, 7, 9, 7, boundingBox);
+                placeBlock(level, OAK_FENCE, 6, 8, 7, boundingBox);
+                placeBlock(level, OAK_FENCE, 7, 8, 7, boundingBox);
+                placeBlock(level, OAK_FENCE, 6, 7, 7, boundingBox);
+                placeBlock(level, OAK_FENCE, 7, 7, 7, boundingBox);
+                placeBlock(level, OAK_FENCE, 5, 7, 7, boundingBox);
+                placeBlock(level, OAK_FENCE, 8, 7, 7, boundingBox);
+                placeBlock(level, OAK_FENCE, 6, 7, 6, boundingBox);
+                placeBlock(level, OAK_FENCE, 6, 7, 8, boundingBox);
+                placeBlock(level, OAK_FENCE, 7, 7, 6, boundingBox);
+                placeBlock(level, OAK_FENCE, 7, 7, 8, boundingBox);
 
-				placeBlock(level, TORCH, 5, 8, 7, boundingBox);
-				placeBlock(level, TORCH, 8, 8, 7, boundingBox);
-				placeBlock(level, TORCH, 6, 8, 6, boundingBox);
-				placeBlock(level, TORCH, 6, 8, 8, boundingBox);
-				placeBlock(level, TORCH, 7, 8, 6, boundingBox);
-				placeBlock(level, TORCH, 7, 8, 8, boundingBox);
-			}
+                placeBlock(level, TORCH, 5, 8, 7, boundingBox);
+                placeBlock(level, TORCH, 8, 8, 7, boundingBox);
+                placeBlock(level, TORCH, 6, 8, 6, boundingBox);
+                placeBlock(level, TORCH, 6, 8, 8, boundingBox);
+                placeBlock(level, TORCH, 7, 8, 6, boundingBox);
+                placeBlock(level, TORCH, 7, 8, 8, boundingBox);
+            }
 
-			final BlockFace orientation = getOrientation();
-			final BlockState chest = new BlockState(Block.CHEST, (orientation == null ? BlockFace.NORTH : orientation).getOpposite().getIndex());
-			placeBlock(level, chest, 3, 3, 5, boundingBox);
+            final BlockFace orientation = getOrientation();
+            final BlockState chest = new BlockState(Block.CHEST, (orientation == null ? BlockFace.NORTH : orientation).getOpposite().getIndex());
+            placeBlock(level, chest, 3, 3, 5, boundingBox);
 
-			final BlockVector3 vec = new BlockVector3(getWorldX(3, 5), getWorldY(3), getWorldZ(3, 5));
-			if (boundingBox.isInside(vec)) {
-				final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
-				if (chunk != null) {
-					final CompoundTag nbt = BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.CHEST);
-					final ListTag<CompoundTag> itemList = new ListTag<>("Items");
-					StrongholdLibraryChest.get().create(itemList, random);
-					nbt.putList(itemList);
-					Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
-				}
-			}
+            final BlockVector3 vec = new BlockVector3(getWorldX(3, 5), getWorldY(3), getWorldZ(3, 5));
+            if (boundingBox.isInside(vec)) {
+                final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
+                if (chunk != null) {
+                    final CompoundTag nbt = BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.CHEST);
+                    final ListTag<CompoundTag> itemList = new ListTag<>("Items");
+                    StrongholdLibraryChest.get().create(itemList, random);
+                    nbt.putList(itemList);
+                    Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+                }
+            }
 
-			if (isTall) {
-				placeBlock(level, BlockState.AIR, 12, 9, 1, boundingBox);
-				placeBlock(level, chest, 12, 8, 1, boundingBox);
+            if (isTall) {
+                placeBlock(level, BlockState.AIR, 12, 9, 1, boundingBox);
+                placeBlock(level, chest, 12, 8, 1, boundingBox);
 
-				vec.setComponents(getWorldX(12, 1), getWorldY(8), getWorldZ(12, 1));
-				if (boundingBox.isInside(vec)) {
-					final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
-					if (chunk != null) {
-						final CompoundTag nbt = BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.CHEST);
-						final ListTag<CompoundTag> itemList = new ListTag<>("Items");
-						StrongholdLibraryChest.get().create(itemList, random);
-						nbt.putList(itemList);
-						Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
-					}
-				}
-			}
+                vec.setComponents(getWorldX(12, 1), getWorldY(8), getWorldZ(12, 1));
+                if (boundingBox.isInside(vec)) {
+                    final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
+                    if (chunk != null) {
+                        final CompoundTag nbt = BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.CHEST);
+                        final ListTag<CompoundTag> itemList = new ListTag<>("Items");
+                        StrongholdLibraryChest.get().create(itemList, random);
+                        nbt.putList(itemList);
+                        Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+                    }
+                }
+            }
 
-			return true;
-		}
-	}
+            return true;
+        }
+    }
 
-	public static class FiveCrossing extends StrongholdPiece {
+    public static class FiveCrossing extends StrongholdPiece {
 
-		private final boolean leftLow;
-		private final boolean leftHigh;
-		private final boolean rightLow;
-		private final boolean rightHigh;
+        private final boolean leftLow;
+        private final boolean leftHigh;
+        private final boolean rightLow;
+        private final boolean rightHigh;
 
-		public FiveCrossing(final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
-			super(genDepth);
-			setOrientation(orientation);
-			entryDoor = randomSmallDoor(random);
-			this.boundingBox = boundingBox;
-			leftLow = random.nextBoolean();
-			leftHigh = random.nextBoolean();
-			rightLow = random.nextBoolean();
-			rightHigh = random.nextBoundedInt(3) > 0;
-		}
+        public FiveCrossing(final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
+            super(genDepth);
+            setOrientation(orientation);
+            entryDoor = randomSmallDoor(random);
+            this.boundingBox = boundingBox;
+            leftLow = random.nextBoolean();
+            leftHigh = random.nextBoolean();
+            rightLow = random.nextBoolean();
+            rightHigh = random.nextBoundedInt(3) > 0;
+        }
 
-		public static FiveCrossing createPiece(final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
-			final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -4, -3, 0, 10, 9, 11, orientation);
-			return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new FiveCrossing(genDepth, random, boundingBox, orientation) : null;
-		}
+        public static FiveCrossing createPiece(final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
+            final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -4, -3, 0, 10, 9, 11, orientation);
+            return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new FiveCrossing(genDepth, random, boundingBox, orientation) : null;
+        }
 
-		@Override //\\ SHFiveCrossing::getType(void) // 1397241155i64
-		public String getType() {
-			return "SH5C";
-		}
+        @Override //\\ SHFiveCrossing::getType(void) // 1397241155i64
+        public String getType() {
+            return "SH5C";
+        }
 
-		@Override
-		public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
-			int lowX = 3;
-			int highX = 5;
+        @Override
+        public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
+            int lowX = 3;
+            int highX = 5;
 
-			final BlockFace orientation = getOrientation();
-			if (orientation == BlockFace.WEST || orientation == BlockFace.NORTH) {
-				lowX = 8 - lowX;
-				highX = 8 - highX;
-			}
+            final BlockFace orientation = getOrientation();
+            if (orientation == BlockFace.WEST || orientation == BlockFace.NORTH) {
+                lowX = 8 - lowX;
+                highX = 8 - highX;
+            }
 
-			generateSmallDoorChildForward((StartPiece) piece, pieces, random, 5, 1);
+            generateSmallDoorChildForward((StartPiece) piece, pieces, random, 5, 1);
 
-			if (leftLow) {
-				generateSmallDoorChildLeft((StartPiece) piece, pieces, random, lowX, 1);
-			}
-			if (leftHigh) {
-				generateSmallDoorChildLeft((StartPiece) piece, pieces, random, highX, 7);
-			}
-			if (rightLow) {
-				generateSmallDoorChildRight((StartPiece) piece, pieces, random, lowX, 1);
-			}
-			if (rightHigh) {
-				generateSmallDoorChildRight((StartPiece) piece, pieces, random, highX, 7);
-			}
-		}
+            if (leftLow) {
+                generateSmallDoorChildLeft((StartPiece) piece, pieces, random, lowX, 1);
+            }
+            if (leftHigh) {
+                generateSmallDoorChildLeft((StartPiece) piece, pieces, random, highX, 7);
+            }
+            if (rightLow) {
+                generateSmallDoorChildRight((StartPiece) piece, pieces, random, lowX, 1);
+            }
+            if (rightHigh) {
+                generateSmallDoorChildRight((StartPiece) piece, pieces, random, highX, 7);
+            }
+        }
 
-		@Override
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			generateBox(level, boundingBox, 0, 0, 0, 9, 8, 10, true, random, SMOOTH_STONE_SELECTOR);
-			generateSmallDoor(level, boundingBox, entryDoor, 4, 3, 0);
+        @Override
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            generateBox(level, boundingBox, 0, 0, 0, 9, 8, 10, true, random, SMOOTH_STONE_SELECTOR);
+            generateSmallDoor(level, boundingBox, entryDoor, 4, 3, 0);
 
-			if (leftLow) {
-				generateBox(level, boundingBox, 0, 3, 1, 0, 5, 3, BlockState.AIR, BlockState.AIR, false);
-			}
-			if (rightLow) {
-				generateBox(level, boundingBox, 9, 3, 1, 9, 5, 3, BlockState.AIR, BlockState.AIR, false);
-			}
-			if (leftHigh) {
-				generateBox(level, boundingBox, 0, 5, 7, 0, 7, 9, BlockState.AIR, BlockState.AIR, false);
-			}
-			if (rightHigh) {
-				generateBox(level, boundingBox, 9, 5, 7, 9, 7, 9, BlockState.AIR, BlockState.AIR, false);
-			}
+            if (leftLow) {
+                generateBox(level, boundingBox, 0, 3, 1, 0, 5, 3, BlockState.AIR, BlockState.AIR, false);
+            }
+            if (rightLow) {
+                generateBox(level, boundingBox, 9, 3, 1, 9, 5, 3, BlockState.AIR, BlockState.AIR, false);
+            }
+            if (leftHigh) {
+                generateBox(level, boundingBox, 0, 5, 7, 0, 7, 9, BlockState.AIR, BlockState.AIR, false);
+            }
+            if (rightHigh) {
+                generateBox(level, boundingBox, 9, 5, 7, 9, 7, 9, BlockState.AIR, BlockState.AIR, false);
+            }
 
-			generateBox(level, boundingBox, 5, 1, 10, 7, 3, 10, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 5, 1, 10, 7, 3, 10, BlockState.AIR, BlockState.AIR, false);
 
-			generateBox(level, boundingBox, 1, 2, 1, 8, 2, 6, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 4, 1, 5, 4, 4, 9, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 8, 1, 5, 8, 4, 9, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 1, 4, 7, 3, 4, 9, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 1, 3, 5, 3, 3, 6, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 1, 3, 4, 3, 3, 4, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
-			generateBox(level, boundingBox, 1, 4, 6, 3, 4, 6, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
-			generateBox(level, boundingBox, 5, 1, 7, 7, 1, 8, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 5, 1, 9, 7, 1, 9, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
-			generateBox(level, boundingBox, 5, 2, 7, 7, 2, 7, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
-			generateBox(level, boundingBox, 4, 5, 7, 4, 5, 9, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
-			generateBox(level, boundingBox, 8, 5, 7, 8, 5, 9, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
-			generateBox(level, boundingBox, 5, 5, 7, 7, 5, 9, SMOOTH_STONE_SLAB_DOUBLE, SMOOTH_STONE_SLAB_DOUBLE, false);
+            generateBox(level, boundingBox, 1, 2, 1, 8, 2, 6, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 4, 1, 5, 4, 4, 9, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 8, 1, 5, 8, 4, 9, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 1, 4, 7, 3, 4, 9, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 1, 3, 5, 3, 3, 6, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 1, 3, 4, 3, 3, 4, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
+            generateBox(level, boundingBox, 1, 4, 6, 3, 4, 6, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
+            generateBox(level, boundingBox, 5, 1, 7, 7, 1, 8, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 5, 1, 9, 7, 1, 9, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
+            generateBox(level, boundingBox, 5, 2, 7, 7, 2, 7, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
+            generateBox(level, boundingBox, 4, 5, 7, 4, 5, 9, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
+            generateBox(level, boundingBox, 8, 5, 7, 8, 5, 9, STONE_BRICK_SLAB, STONE_BRICK_SLAB, false);
+            generateBox(level, boundingBox, 5, 5, 7, 7, 5, 9, SMOOTH_STONE_SLAB_DOUBLE, SMOOTH_STONE_SLAB_DOUBLE, false);
 
-			placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.SOUTH), 6, 5, 6, boundingBox);
+            placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.SOUTH), 6, 5, 6, boundingBox);
 
-			return true;
-		}
-	}
+            return true;
+        }
+    }
 
-	public static class PortalRoom extends StrongholdPiece {
+    public static class PortalRoom extends StrongholdPiece {
 
-		private boolean hasPlacedSpawner;
+        private boolean hasPlacedSpawner;
 
-		public PortalRoom(final int genDepth, final BoundingBox boundingBox, final BlockFace orientation) {
-			super(genDepth);
-			setOrientation(orientation);
-			this.boundingBox = boundingBox;
-		}
+        public PortalRoom(final int genDepth, final BoundingBox boundingBox, final BlockFace orientation) {
+            super(genDepth);
+            setOrientation(orientation);
+            this.boundingBox = boundingBox;
+        }
 
-		public static PortalRoom createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
-			final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -4, -1, 0, 11, 8, 16, orientation);
-			return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new PortalRoom(genDepth, boundingBox, orientation) : null;
-		}
+        public static PortalRoom createPiece(final List<StructurePiece> pieces, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
+            final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, -4, -1, 0, 11, 8, 16, orientation);
+            return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new PortalRoom(genDepth, boundingBox, orientation) : null;
+        }
 
-		@Override
-		public String getType() {
-			return "SHPR";
-		}
+        @Override
+        public String getType() {
+            return "SHPR";
+        }
 
-		@Override
-		public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
-			if (piece != null) {
-				((StartPiece) piece).portalRoomPiece = this;
-			}
-		}
+        @Override
+        public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
+            if (piece != null) {
+                ((StartPiece) piece).portalRoomPiece = this;
+            }
+        }
 
-		@Override
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			generateBox(level, boundingBox, 0, 0, 0, 10, 7, 15, false, random, SMOOTH_STONE_SELECTOR);
-			generateSmallDoor(level, boundingBox, SmallDoorType.GRATES, 4, 1, 0);
+        @Override
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            generateBox(level, boundingBox, 0, 0, 0, 10, 7, 15, false, random, SMOOTH_STONE_SELECTOR);
+            generateSmallDoor(level, boundingBox, SmallDoorType.GRATES, 4, 1, 0);
 
-			final int y = 6;
-			generateBox(level, boundingBox, 1, y, 1, 1, y, 14, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 9, y, 1, 9, y, 14, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 2, y, 1, 8, y, 2, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 2, y, 14, 8, y, 14, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 1, 1, 1, 2, 1, 4, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 8, 1, 1, 9, 1, 4, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 1, 1, 1, 1, 1, 3, LAVA, LAVA, false);
-			generateBox(level, boundingBox, 9, 1, 1, 9, 1, 3, LAVA, LAVA, false);
-			generateBox(level, boundingBox, 3, 1, 8, 7, 1, 12, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 4, 1, 9, 6, 1, 11, LAVA, LAVA, false);
+            final int y = 6;
+            generateBox(level, boundingBox, 1, y, 1, 1, y, 14, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 9, y, 1, 9, y, 14, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 2, y, 1, 8, y, 2, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 2, y, 14, 8, y, 14, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 1, 1, 1, 2, 1, 4, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 8, 1, 1, 9, 1, 4, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 1, 1, 1, 1, 1, 3, LAVA, LAVA, false);
+            generateBox(level, boundingBox, 9, 1, 1, 9, 1, 3, LAVA, LAVA, false);
+            generateBox(level, boundingBox, 3, 1, 8, 7, 1, 12, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 4, 1, 9, 6, 1, 11, LAVA, LAVA, false);
 
-			for (int z = 3; z < 14; z += 2) {
-				generateBox(level, boundingBox, 0, 3, z, 0, 4, z, IRON_BARS, IRON_BARS, false);
-				generateBox(level, boundingBox, 10, 3, z, 10, 4, z, IRON_BARS, IRON_BARS, false);
-			}
-			for (int x = 2; x < 9; x += 2) {
-				generateBox(level, boundingBox, x, 3, 15, x, 4, 15, IRON_BARS, IRON_BARS, false);
-			}
+            for (int z = 3; z < 14; z += 2) {
+                generateBox(level, boundingBox, 0, 3, z, 0, 4, z, IRON_BARS, IRON_BARS, false);
+                generateBox(level, boundingBox, 10, 3, z, 10, 4, z, IRON_BARS, IRON_BARS, false);
+            }
+            for (int x = 2; x < 9; x += 2) {
+                generateBox(level, boundingBox, x, 3, 15, x, 4, 15, IRON_BARS, IRON_BARS, false);
+            }
 
-			generateBox(level, boundingBox, 4, 1, 5, 6, 1, 7, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 4, 2, 6, 6, 2, 7, false, random, SMOOTH_STONE_SELECTOR);
-			generateBox(level, boundingBox, 4, 3, 7, 6, 3, 7, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 4, 1, 5, 6, 1, 7, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 4, 2, 6, 6, 2, 7, false, random, SMOOTH_STONE_SELECTOR);
+            generateBox(level, boundingBox, 4, 3, 7, 6, 3, 7, false, random, SMOOTH_STONE_SELECTOR);
 
-			final BlockState stairsN = new BlockState(Block.STONE_BRICK_STAIRS, WeirdoDirection.NORTH);
-			for (int x = 4; x <= 6; ++x) {
-				placeBlock(level, stairsN, x, 1, 4, boundingBox);
-				placeBlock(level, stairsN, x, 2, 5, boundingBox);
-				placeBlock(level, stairsN, x, 3, 6, boundingBox);
-			}
+            final BlockState stairsN = new BlockState(Block.STONE_BRICK_STAIRS, WeirdoDirection.NORTH);
+            for (int x = 4; x <= 6; ++x) {
+                placeBlock(level, stairsN, x, 1, 4, boundingBox);
+                placeBlock(level, stairsN, x, 2, 5, boundingBox);
+                placeBlock(level, stairsN, x, 3, 6, boundingBox);
+            }
 
-			final BlockState frameN = new BlockState(Block.END_PORTAL_FRAME, Direction.NORTH);
-			final BlockState frameS = new BlockState(Block.END_PORTAL_FRAME, Direction.SOUTH);
-			final BlockState frameE = new BlockState(Block.END_PORTAL_FRAME, Direction.EAST);
-			final BlockState frameW = new BlockState(Block.END_PORTAL_FRAME, Direction.WEST);
+            final BlockState frameN = new BlockState(Block.END_PORTAL_FRAME, Direction.NORTH);
+            final BlockState frameS = new BlockState(Block.END_PORTAL_FRAME, Direction.SOUTH);
+            final BlockState frameE = new BlockState(Block.END_PORTAL_FRAME, Direction.EAST);
+            final BlockState frameW = new BlockState(Block.END_PORTAL_FRAME, Direction.WEST);
 
-			boolean actived = true;
-			final boolean[] hasEye = new boolean[12];
+            boolean actived = true;
+            final boolean[] hasEye = new boolean[12];
 
-			for (int i = 0; i < hasEye.length; ++i) {
-				hasEye[i] = random.nextBoundedInt(100) > 90;
-				actived &= hasEye[i];
-			}
+            for (int i = 0; i < hasEye.length; ++i) {
+                hasEye[i] = random.nextBoundedInt(100) > 90;
+                actived &= hasEye[i];
+            }
 
-			placeBlock(level, hasEye[0] ? new BlockState(Block.END_PORTAL_FRAME, frameN.getMeta() | EndPortalEyeBit.HAS_EYE) : frameN, 4, 3, 8, boundingBox);
-			placeBlock(level, hasEye[1] ? new BlockState(Block.END_PORTAL_FRAME, frameN.getMeta() | EndPortalEyeBit.HAS_EYE) : frameN, 5, 3, 8, boundingBox);
-			placeBlock(level, hasEye[2] ? new BlockState(Block.END_PORTAL_FRAME, frameN.getMeta() | EndPortalEyeBit.HAS_EYE) : frameN, 6, 3, 8, boundingBox);
-			placeBlock(level, hasEye[3] ? new BlockState(Block.END_PORTAL_FRAME, frameS.getMeta() | EndPortalEyeBit.HAS_EYE) : frameS, 4, 3, 12, boundingBox);
-			placeBlock(level, hasEye[4] ? new BlockState(Block.END_PORTAL_FRAME, frameS.getMeta() | EndPortalEyeBit.HAS_EYE) : frameS, 5, 3, 12, boundingBox);
-			placeBlock(level, hasEye[5] ? new BlockState(Block.END_PORTAL_FRAME, frameS.getMeta() | EndPortalEyeBit.HAS_EYE) : frameS, 6, 3, 12, boundingBox);
-			placeBlock(level, hasEye[6] ? new BlockState(Block.END_PORTAL_FRAME, frameE.getMeta() | EndPortalEyeBit.HAS_EYE) : frameE, 3, 3, 9, boundingBox);
-			placeBlock(level, hasEye[7] ? new BlockState(Block.END_PORTAL_FRAME, frameE.getMeta() | EndPortalEyeBit.HAS_EYE) : frameE, 3, 3, 10, boundingBox);
-			placeBlock(level, hasEye[8] ? new BlockState(Block.END_PORTAL_FRAME, frameE.getMeta() | EndPortalEyeBit.HAS_EYE) : frameE, 3, 3, 11, boundingBox);
-			placeBlock(level, hasEye[9] ? new BlockState(Block.END_PORTAL_FRAME, frameW.getMeta() | EndPortalEyeBit.HAS_EYE) : frameW, 7, 3, 9, boundingBox);
-			placeBlock(level, hasEye[10] ? new BlockState(Block.END_PORTAL_FRAME, frameW.getMeta() | EndPortalEyeBit.HAS_EYE) : frameW, 7, 3, 10, boundingBox);
-			placeBlock(level, hasEye[11] ? new BlockState(Block.END_PORTAL_FRAME, frameW.getMeta() | EndPortalEyeBit.HAS_EYE) : frameW, 7, 3, 11, boundingBox);
+            placeBlock(level, hasEye[0] ? new BlockState(Block.END_PORTAL_FRAME, frameN.getMeta() | EndPortalEyeBit.HAS_EYE) : frameN, 4, 3, 8, boundingBox);
+            placeBlock(level, hasEye[1] ? new BlockState(Block.END_PORTAL_FRAME, frameN.getMeta() | EndPortalEyeBit.HAS_EYE) : frameN, 5, 3, 8, boundingBox);
+            placeBlock(level, hasEye[2] ? new BlockState(Block.END_PORTAL_FRAME, frameN.getMeta() | EndPortalEyeBit.HAS_EYE) : frameN, 6, 3, 8, boundingBox);
+            placeBlock(level, hasEye[3] ? new BlockState(Block.END_PORTAL_FRAME, frameS.getMeta() | EndPortalEyeBit.HAS_EYE) : frameS, 4, 3, 12, boundingBox);
+            placeBlock(level, hasEye[4] ? new BlockState(Block.END_PORTAL_FRAME, frameS.getMeta() | EndPortalEyeBit.HAS_EYE) : frameS, 5, 3, 12, boundingBox);
+            placeBlock(level, hasEye[5] ? new BlockState(Block.END_PORTAL_FRAME, frameS.getMeta() | EndPortalEyeBit.HAS_EYE) : frameS, 6, 3, 12, boundingBox);
+            placeBlock(level, hasEye[6] ? new BlockState(Block.END_PORTAL_FRAME, frameE.getMeta() | EndPortalEyeBit.HAS_EYE) : frameE, 3, 3, 9, boundingBox);
+            placeBlock(level, hasEye[7] ? new BlockState(Block.END_PORTAL_FRAME, frameE.getMeta() | EndPortalEyeBit.HAS_EYE) : frameE, 3, 3, 10, boundingBox);
+            placeBlock(level, hasEye[8] ? new BlockState(Block.END_PORTAL_FRAME, frameE.getMeta() | EndPortalEyeBit.HAS_EYE) : frameE, 3, 3, 11, boundingBox);
+            placeBlock(level, hasEye[9] ? new BlockState(Block.END_PORTAL_FRAME, frameW.getMeta() | EndPortalEyeBit.HAS_EYE) : frameW, 7, 3, 9, boundingBox);
+            placeBlock(level, hasEye[10] ? new BlockState(Block.END_PORTAL_FRAME, frameW.getMeta() | EndPortalEyeBit.HAS_EYE) : frameW, 7, 3, 10, boundingBox);
+            placeBlock(level, hasEye[11] ? new BlockState(Block.END_PORTAL_FRAME, frameW.getMeta() | EndPortalEyeBit.HAS_EYE) : frameW, 7, 3, 11, boundingBox);
 
-			if (actived) {
-				placeBlock(level, END_PORTAL, 4, 3, 9, boundingBox);
-				placeBlock(level, END_PORTAL, 5, 3, 9, boundingBox);
-				placeBlock(level, END_PORTAL, 6, 3, 9, boundingBox);
-				placeBlock(level, END_PORTAL, 4, 3, 10, boundingBox);
-				placeBlock(level, END_PORTAL, 5, 3, 10, boundingBox);
-				placeBlock(level, END_PORTAL, 6, 3, 10, boundingBox);
-				placeBlock(level, END_PORTAL, 4, 3, 11, boundingBox);
-				placeBlock(level, END_PORTAL, 5, 3, 11, boundingBox);
-				placeBlock(level, END_PORTAL, 6, 3, 11, boundingBox);
-			}
+            if (actived) {
+                placeBlock(level, END_PORTAL, 4, 3, 9, boundingBox);
+                placeBlock(level, END_PORTAL, 5, 3, 9, boundingBox);
+                placeBlock(level, END_PORTAL, 6, 3, 9, boundingBox);
+                placeBlock(level, END_PORTAL, 4, 3, 10, boundingBox);
+                placeBlock(level, END_PORTAL, 5, 3, 10, boundingBox);
+                placeBlock(level, END_PORTAL, 6, 3, 10, boundingBox);
+                placeBlock(level, END_PORTAL, 4, 3, 11, boundingBox);
+                placeBlock(level, END_PORTAL, 5, 3, 11, boundingBox);
+                placeBlock(level, END_PORTAL, 6, 3, 11, boundingBox);
+            }
 
-			if (!hasPlacedSpawner) {
-				final BlockVector3 vec = new BlockVector3(getWorldX(5, 6), getWorldY(3), getWorldZ(5, 6));
-				if (boundingBox.isInside(vec)) {
-					hasPlacedSpawner = true;
-					level.setBlockAt(vec.x, vec.y, vec.z, SPAWNER.getId(), SPAWNER.getMeta());
+            if (!hasPlacedSpawner) {
+                final BlockVector3 vec = new BlockVector3(getWorldX(5, 6), getWorldY(3), getWorldZ(5, 6));
+                if (boundingBox.isInside(vec)) {
+                    hasPlacedSpawner = true;
+                    level.setBlockAt(vec.x, vec.y, vec.z, SPAWNER.getId(), SPAWNER.getMeta());
 
-					final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
-					if (chunk != null) {
-						Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.MOB_SPAWNER).putInt("EntityId", EntitySilverfish.NETWORK_ID)));
-					}
-				}
-			}
+                    final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
+                    if (chunk != null) {
+                        Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.MOB_SPAWNER).putInt("EntityId", EntitySilverfish.NETWORK_ID)));
+                    }
+                }
+            }
 
-			return true;
-		}
-	}
+            return true;
+        }
+    }
 
-	static class SmoothStoneSelector extends StructurePiece.BlockSelector {
+    static class SmoothStoneSelector extends StructurePiece.BlockSelector {
 
-		@Override
+        @Override
         public void next(final NukkitRandom random, final int x, final int y, final int z, final boolean hasNext) {
-			if (hasNext) {
-				final int chance = random.nextBoundedInt(100);
-				if (chance < 20) {
-					next = CRACKED_STONE_BRICKS;
-				} else if (chance < 50) {
-					next = MOSSY_STONE_BRICKS;
-				} else if (chance < 55) {
-					next = INFESTED_STONE_BRICKS;
-				} else {
-					next = STONE_BRICKS;
-				}
-			} else {
-				next = BlockState.AIR;
-			}
-		}
-	}
+            if (hasNext) {
+                final int chance = random.nextBoundedInt(100);
+                if (chance < 20) {
+                    next = CRACKED_STONE_BRICKS;
+                } else if (chance < 50) {
+                    next = MOSSY_STONE_BRICKS;
+                } else if (chance < 55) {
+                    next = INFESTED_STONE_BRICKS;
+                } else {
+                    next = STONE_BRICKS;
+                }
+            } else {
+                next = BlockState.AIR;
+            }
+        }
+    }
 }

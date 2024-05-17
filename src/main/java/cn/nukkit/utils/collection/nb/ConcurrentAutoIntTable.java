@@ -21,6 +21,18 @@ public class ConcurrentAutoIntTable implements Serializable {
 
     // --- public interface ---
 
+    private static final AtomicReferenceFieldUpdater<ConcurrentAutoIntTable, CAT> _catUpdater =
+            AtomicReferenceFieldUpdater.newUpdater(ConcurrentAutoIntTable.class, CAT.class, "_cat");
+    // The underlying array of concurrently updated long counters
+    private volatile CAT _cat = new CAT(null, 16/*Start Small, Think Big!*/, 0);
+
+    // Hash spreader
+    private static int hash() {
+        //int h = (int)Thread.currentThread().getId();
+        int h = System.identityHashCode(Thread.currentThread());
+        return h << 3;                // Pad out cache lines.  The goal is to avoid cache-line contention
+    }
+
     /**
      * Add the given value to current counter value.  Concurrent updates will
      * not be lost, but addAndGet or getAndAdd are not implemented because the
@@ -109,44 +121,30 @@ public class ConcurrentAutoIntTable implements Serializable {
         return _cat.add_if(x, hash(), this);
     }
 
-    // The underlying array of concurrently updated long counters
-    private volatile CAT _cat = new CAT(null, 16/*Start Small, Think Big!*/, 0);
-    private static AtomicReferenceFieldUpdater<ConcurrentAutoIntTable, CAT> _catUpdater =
-            AtomicReferenceFieldUpdater.newUpdater(ConcurrentAutoIntTable.class, CAT.class, "_cat");
-
     private boolean CAS_cat(CAT oldcat, CAT newcat) {
         return _catUpdater.compareAndSet(this, oldcat, newcat);
-    }
-
-    // Hash spreader
-    private static int hash() {
-        //int h = (int)Thread.currentThread().getId();
-        int h = System.identityHashCode(Thread.currentThread());
-        return h << 3;                // Pad out cache lines.  The goal is to avoid cache-line contention
     }
 
     // --- CAT -----------------------------------------------------------------
     private static class CAT implements Serializable {
         private static final VarHandle _IHandle = MethodHandles.arrayElementVarHandle(int[].class);
-
-        private static boolean CAS(int[] A, int idx, int old, int nnn) {
-            return _IHandle.compareAndSet(A, idx, old, nnn);
-        }
+        private static final int MAX_SPIN = 1;
 
         //volatile long _resizers;    // count of threads attempting a resize
         //static private final AtomicLongFieldUpdater<CAT> _resizerUpdater =
         //  AtomicLongFieldUpdater.newUpdater(CAT.class, "_resizers");
-
         private final CAT _next;
+        private final int[] _t;     // Power-of-2 array of ints
         private volatile long _fuzzy_sum_cache;
         private volatile long _fuzzy_time;
-        private static final int MAX_SPIN = 1;
-        private final int[] _t;     // Power-of-2 array of ints
-
         CAT(CAT next, int sz, int init) {
             _next = next;
             _t = new int[sz];
             _t[0] = init;
+        }
+
+        private static boolean CAS(int[] A, int idx, int old, int nnn) {
+            return _IHandle.compareAndSet(A, idx, old, nnn);
         }
 
         // Only add 'x' to some slot in table, hinted at by 'hash'.  The sum can

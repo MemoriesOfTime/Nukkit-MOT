@@ -49,11 +49,6 @@ public class BlockEntityBarrel extends BlockEntitySpawnableContainer implements 
     }
 
     @Override
-    public boolean hasName() {
-        return this.namedTag.contains("CustomName");
-    }
-
-    @Override
     public void setName(String name) {
         if (name == null || name.equals("")) {
             this.namedTag.remove("CustomName");
@@ -61,5 +56,10 @@ public class BlockEntityBarrel extends BlockEntitySpawnableContainer implements 
         }
 
         this.namedTag.putString("CustomName", name);
+    }
+
+    @Override
+    public boolean hasName() {
+        return this.namedTag.contains("CustomName");
     }
 }

@@ -58,7 +58,7 @@ public class EmptyChunkSection implements ChunkSection {
 
     @Override
     public int[] getBlockState(int x, int y, int z, int layer) {
-        return new int[]{0,0};
+        return new int[]{0, 0};
     }
 
     @Override

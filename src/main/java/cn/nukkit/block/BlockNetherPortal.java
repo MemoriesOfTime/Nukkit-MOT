@@ -27,6 +27,123 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         super(0);
     }
 
+    public static boolean trySpawnPortal(Level level, Vector3 pos) {
+        return trySpawnPortal(level, pos, false);
+    }
+
+    public static boolean trySpawnPortal(Level level, Vector3 pos, boolean force) {
+        PortalBuilder builder = new PortalBuilder(level, pos, Axis.X, force);
+
+        if (builder.isValid() && builder.portalBlockCount == 0) {
+            builder.placePortalBlocks();
+            return true;
+        } else {
+            builder = new PortalBuilder(level, pos, Axis.Z, force);
+
+            if (builder.isValid() && builder.portalBlockCount == 0) {
+                builder.placePortalBlocks();
+                return true;
+            } else {
+                return false;
+            }
+        }
+    }
+
+    public static Position getSafePortal(Position portal) {
+        Level level = portal.getLevel();
+        Vector3 down = portal.down();
+        while (level.getBlockIdAt(down.getFloorX(), down.getFloorY(), down.getFloorZ()) == NETHER_PORTAL) {
+            down = down.down();
+        }
+
+        return Position.fromObject(down.up(), portal.getLevel());
+    }
+
+    public static Position findNearestPortal(Position pos) {
+        Level level = pos.getLevel();
+        Position found = null;
+
+        for (int xx = -128; xx <= 128; xx++) {
+            for (int zz = -128; zz <= 128; zz++) {
+                for (int y = 0; y < level.getMaxBlockY(); y++) {
+                    int x = pos.getFloorX() + xx, z = pos.getFloorZ() + zz;
+                    if (level.getBlockIdAt(x, y, z) == NETHER_PORTAL) {
+                        found = new Position(x, y, z, level);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (found == null) {
+            return null;
+        }
+        Vector3 up = found.up();
+        int x = up.getFloorX(), y = up.getFloorY(), z = up.getFloorZ();
+        int id = level.getBlockIdAt(x, y, z);
+        if (id != AIR && id != OBSIDIAN && id != NETHER_PORTAL) {
+            for (int xx = -1; xx < 4; xx++) {
+                for (int yy = 1; yy < 4; yy++) {
+                    for (int zz = -1; zz < 3; zz++) {
+                        level.setBlockAt(x + xx, y + yy, z + zz, AIR);
+                    }
+                }
+            }
+        }
+        return found;
+    }
+
+    public static void spawnPortal(Position pos) {
+        Level lvl = pos.level;
+        int x = pos.getFloorX(), y = pos.getFloorY(), z = pos.getFloorZ();
+
+        for (int xx = -1; xx < 4; xx++) {
+            for (int yy = 1; yy < 4; yy++) {
+                for (int zz = -1; zz < 3; zz++) {
+                    lvl.setBlockAt(x + xx, y + yy, z + zz, AIR);
+                }
+            }
+        }
+
+        lvl.setBlockAt(x + 1, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
+
+        z += 1;
+        lvl.setBlockAt(x, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 1, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
+
+        z += 1;
+        lvl.setBlockAt(x + 1, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
+
+        z -= 1;
+        y += 1;
+        lvl.setBlockAt(x, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 1, y, z, NETHER_PORTAL);
+        lvl.setBlockAt(x + 2, y, z, NETHER_PORTAL);
+        lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
+
+        y += 1;
+        lvl.setBlockAt(x, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 1, y, z, NETHER_PORTAL);
+        lvl.setBlockAt(x + 2, y, z, NETHER_PORTAL);
+        lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
+
+        y += 1;
+        lvl.setBlockAt(x, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 1, y, z, NETHER_PORTAL);
+        lvl.setBlockAt(x + 2, y, z, NETHER_PORTAL);
+        lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
+
+        y += 1;
+        lvl.setBlockAt(x, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 1, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
+        lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
+    }
+
     @Override
     public String getName() {
         return "Nether Portal Block";
@@ -101,26 +218,9 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         return new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x + 1.0D, this.y + 1.0D, this.z + 1.0D);
     }
 
-    public static boolean trySpawnPortal(Level level, Vector3 pos) {
-        return trySpawnPortal(level, pos, false);
-    }
-
-    public static boolean trySpawnPortal(Level level, Vector3 pos, boolean force) {
-        PortalBuilder builder = new PortalBuilder(level, pos, Axis.X, force);
-
-        if (builder.isValid() && builder.portalBlockCount == 0) {
-            builder.placePortalBlocks();
-            return true;
-        } else {
-            builder = new PortalBuilder(level, pos, Axis.Z, force);
-
-            if (builder.isValid() && builder.portalBlockCount == 0) {
-                builder.placePortalBlocks();
-                return true;
-            } else {
-                return false;
-            }
-        }
+    @Override
+    public BlockFace getBlockFace() {
+        return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
     }
 
     public static class PortalBuilder {
@@ -134,7 +234,7 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
         private int height;
         private int width;
 
-        private boolean force;
+        private final boolean force;
 
         public PortalBuilder(Level level, Vector3 pos, Axis axis, boolean force) {
             this.level = level;
@@ -262,105 +362,5 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
                 }
             }
         }
-    }
-
-    public static Position getSafePortal(Position portal) {
-        Level level = portal.getLevel();
-        Vector3 down = portal.down();
-        while (level.getBlockIdAt(down.getFloorX(), down.getFloorY(), down.getFloorZ()) == NETHER_PORTAL) {
-            down = down.down();
-        }
-
-        return Position.fromObject(down.up(), portal.getLevel());
-    }
-
-    public static Position findNearestPortal(Position pos) {
-        Level level = pos.getLevel();
-        Position found = null;
-
-        for (int xx = -128; xx <= 128; xx++) {
-            for (int zz = -128; zz <= 128; zz++) {
-                for (int y = 0; y  < level.getMaxBlockY(); y++) {
-                    int x = pos.getFloorX() + xx, z = pos.getFloorZ() + zz;
-                    if (level.getBlockIdAt(x, y, z) == NETHER_PORTAL) {
-                        found = new Position(x, y, z, level);
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (found == null) {
-            return null;
-        }
-        Vector3 up = found.up();
-        int x = up.getFloorX(), y = up.getFloorY(), z = up.getFloorZ();
-        int id = level.getBlockIdAt(x, y, z);
-        if (id != AIR && id != OBSIDIAN && id != NETHER_PORTAL) {
-            for (int xx = -1; xx < 4; xx++) {
-                for (int yy = 1; yy < 4; yy++)  {
-                    for (int zz = -1; zz < 3; zz++) {
-                        level.setBlockAt(x + xx, y + yy, z + zz, AIR);
-                    }
-                }
-            }
-        }
-        return found;
-    }
-
-    public static void spawnPortal(Position pos) {
-        Level lvl = pos.level;
-        int x = pos.getFloorX(), y = pos.getFloorY(), z = pos.getFloorZ();
-
-        for (int xx = -1; xx < 4; xx++) {
-            for (int yy = 1; yy < 4; yy++)  {
-                for (int zz = -1; zz < 3; zz++) {
-                    lvl.setBlockAt(x + xx, y + yy, z + zz, AIR);
-                }
-            }
-        }
-
-        lvl.setBlockAt(x + 1, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
-
-        z += 1;
-        lvl.setBlockAt(x, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 1, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
-
-        z += 1;
-        lvl.setBlockAt(x + 1, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
-
-        z -= 1;
-        y += 1;
-        lvl.setBlockAt(x, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 1, y, z, NETHER_PORTAL);
-        lvl.setBlockAt(x + 2, y, z, NETHER_PORTAL);
-        lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
-
-        y += 1;
-        lvl.setBlockAt(x, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 1, y, z, NETHER_PORTAL);
-        lvl.setBlockAt(x + 2, y, z, NETHER_PORTAL);
-        lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
-
-        y += 1;
-        lvl.setBlockAt(x, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 1, y, z, NETHER_PORTAL);
-        lvl.setBlockAt(x + 2, y, z, NETHER_PORTAL);
-        lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
-
-        y += 1;
-        lvl.setBlockAt(x, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 1, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 2, y, z, OBSIDIAN);
-        lvl.setBlockAt(x + 3, y, z, OBSIDIAN);
-    }
-
-    @Override
-    public BlockFace getBlockFace() {
-        return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
     }
 }

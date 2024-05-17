@@ -87,7 +87,7 @@ public class EntityRabbit extends EntityJumpingAnimal {
         if (item.getId() == Item.DANDELION || item.getId() == Item.CARROT || item.getId() == Item.GOLDEN_CARROT) {
             player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EAT);
-            this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(),0), item));
+            this.level.addParticle(new ItemBreakParticle(this.add(0, this.getMountedYOffset(), 0), item));
             this.setInLove();
             return true;
         }

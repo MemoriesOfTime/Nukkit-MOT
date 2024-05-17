@@ -45,7 +45,7 @@ public class EntityEndermite extends EntityWalkingMob implements EntityArthropod
 
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 2, 2, 3 });
+        this.setDamage(new int[]{0, 2, 2, 3});
     }
 
     @Override

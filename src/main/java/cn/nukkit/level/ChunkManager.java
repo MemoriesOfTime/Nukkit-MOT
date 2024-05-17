@@ -11,13 +11,15 @@ import org.jetbrains.annotations.NotNull;
 public interface ChunkManager {
 
     int getBlockIdAt(int x, int y, int z, int layer);
+
     int getBlockIdAt(int x, int y, int z);
-    
+
     void setBlockFullIdAt(int x, int y, int z, int layer, int fullId);
 
     void setBlockFullIdAt(int x, int y, int z, int fullId);
 
     void setBlockIdAt(int x, int y, int z, int layer, int id);
+
     void setBlockIdAt(int x, int y, int z, int id);
 
     boolean setBlockAtLayer(int x, int y, int z, int layer, int id, int data);
@@ -33,9 +35,11 @@ public interface ChunkManager {
     void setBlockAt(int x, int y, int z, int id, int data);
 
     int getBlockDataAt(int x, int y, int z, int layer);
+
     int getBlockDataAt(int x, int y, int z);
 
     void setBlockDataAt(int x, int y, int z, int layer, int data);
+
     void setBlockDataAt(int x, int y, int z, int data);
 
     BaseFullChunk getChunk(int chunkX, int chunkZ);

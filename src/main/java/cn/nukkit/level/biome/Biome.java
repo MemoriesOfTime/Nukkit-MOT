@@ -32,12 +32,7 @@ public abstract class Biome implements BlockID {
     public static final Biome[] biomes = new Biome[MAX_BIOMES];
     public static final List<Biome> unorderedBiomes = new ObjectArrayList<>();
     private static final Int2ObjectMap<String> runtimeId2Identifier = new Int2ObjectOpenHashMap<>();
-    private static CompoundTag biomeDefinitions;
-
-    private final ArrayList<Populator> populators = new ArrayList<>();
-    private int id;
-    private float baseHeight = 0.1f;
-    private float heightVariation = 0.3f;
+    private static final CompoundTag biomeDefinitions;
 
     static {
         try (InputStream stream = Biome.class.getClassLoader().getResourceAsStream("biome_id_map.json")) {
@@ -60,6 +55,11 @@ public abstract class Biome implements BlockID {
             throw new AssertionError("Unable to locate block biome_definitions_554", e);
         }
     }
+
+    private final ArrayList<Populator> populators = new ArrayList<>();
+    private int id;
+    private float baseHeight = 0.1f;
+    private float heightVariation = 0.3f;
 
     public static String getBiomeNameFromId(int protocol, int biomeId) {
         return runtimeId2Identifier.get(biomeId);
@@ -139,20 +139,20 @@ public abstract class Biome implements BlockID {
 
     public abstract String getName();
 
-    public void setBaseHeight(float baseHeight) {
-        this.baseHeight = baseHeight;
-    }
-
-    public void setHeightVariation(float heightVariation)   {
-        this.heightVariation = heightVariation;
-    }
-
     public float getBaseHeight() {
         return baseHeight;
     }
 
+    public void setBaseHeight(float baseHeight) {
+        this.baseHeight = baseHeight;
+    }
+
     public float getHeightVariation() {
         return heightVariation;
+    }
+
+    public void setHeightVariation(float heightVariation) {
+        this.heightVariation = heightVariation;
     }
 
     @Override
@@ -176,12 +176,12 @@ public abstract class Biome implements BlockID {
 
     /**
      * Whether or not overhangs should generate in this biome (places where solid blocks generate over air)
-     *
+     * <p>
      * This should probably be used with a custom max elevation or things can look stupid
      *
      * @return overhang
      */
-    public boolean doesOverhang()   {
+    public boolean doesOverhang() {
         return false;
     }
 
@@ -192,7 +192,7 @@ public abstract class Biome implements BlockID {
      * @param z z
      * @return height offset
      */
-    public int getHeightOffset(int x, int z)    {
+    public int getHeightOffset(int x, int z) {
         return 0;
     }
 

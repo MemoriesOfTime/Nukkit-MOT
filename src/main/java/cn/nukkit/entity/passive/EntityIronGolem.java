@@ -52,8 +52,8 @@ public class EntityIronGolem extends EntityWalkingMob {
         super.initEntity();
 
         this.noFallDamage = true;
-        this.setDamage(new int[] { 0, 11, 21, 31 });
-        this.setMinDamage(new int[] { 0, 4, 7, 11 });
+        this.setDamage(new int[]{0, 11, 21, 31});
+        this.setMinDamage(new int[]{0, 4, 7, 11});
     }
 
     @Override

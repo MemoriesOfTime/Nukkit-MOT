@@ -26,12 +26,7 @@ public class StartGamePacket extends DataPacket {
     public static final int GAME_PUBLISH_SETTING_FRIENDS_ONLY = 2;
     public static final int GAME_PUBLISH_SETTING_FRIENDS_OF_FRIENDS = 3;
     public static final int GAME_PUBLISH_SETTING_PUBLIC = 4;
-
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
-    }
-
+    public final List<ExperimentData> experiments = new ObjectArrayList<>();
     public String version;
 
     public long entityUniqueId;
@@ -66,7 +61,6 @@ public class StartGamePacket extends DataPacket {
     public int platformBroadcastIntent = GAME_PUBLISH_SETTING_PUBLIC;
     public boolean commandsEnabled;
     public boolean isTexturePacksRequired = false;
-    public final List<ExperimentData> experiments = new ObjectArrayList<>();
     public GameRules gameRules;
     public boolean bonusChest = false;
     public boolean hasStartWithMapEnabled = false;
@@ -132,6 +126,11 @@ public class StartGamePacket extends DataPacket {
     public boolean hardcore;
 
     @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
+
+    @Override
     public void decode() {
     }
 
@@ -148,7 +147,7 @@ public class StartGamePacket extends DataPacket {
         /* Level settings start */
         if (protocol >= ProtocolInfo.v1_18_30) {
             this.putLLong(this.seed);
-        }else {
+        } else {
             this.putVarInt(this.seed);
         }
         if (protocol >= 407) {

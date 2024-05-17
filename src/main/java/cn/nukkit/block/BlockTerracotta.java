@@ -67,7 +67,7 @@ public class BlockTerracotta extends BlockSolidMeta {
     }
 
     @Override
-    public boolean canHarvestWithHand(){
+    public boolean canHarvestWithHand() {
         return false;
     }
 }

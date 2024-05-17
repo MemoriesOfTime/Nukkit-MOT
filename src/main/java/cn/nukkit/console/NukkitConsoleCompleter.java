@@ -15,6 +15,14 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class NukkitConsoleCompleter implements Completer {
 
+    private static void addCandidates(Consumer<String> commandConsumer) {
+        for (String command : Server.getInstance().getCommandMap().getCommands().keySet()) {
+            if (!command.contains(":")) {
+                commandConsumer.accept(command);
+            }
+        }
+    }
+
     @Override
     public void complete(LineReader lineReader, ParsedLine parsedLine, List<Candidate> candidates) {
         if (parsedLine.wordIndex() == 0) {
@@ -41,14 +49,6 @@ public class NukkitConsoleCompleter implements Completer {
                 }
 
                 candidates.add(new Candidate(match));
-            }
-        }
-    }
-
-    private static void addCandidates(Consumer<String> commandConsumer) {
-        for (String command : Server.getInstance().getCommandMap().getCommands().keySet()) {
-            if (!command.contains(":")) {
-                commandConsumer.accept(command);
             }
         }
     }

@@ -25,6 +25,18 @@ public class BlockEndPortalFrame extends BlockTransparentMeta implements Faceabl
         super(meta);
     }
 
+    private static boolean isCompletedPortal(Block center) {
+        for (int i = 0; i < 4; i++) {
+            for (int j = -1; j <= 1; j++) {
+                Block block = center.getSide(BlockFace.fromHorizontalIndex(i), 2).getSide(BlockFace.fromHorizontalIndex((i + 1) % 4), j);
+                if (block.getId() != Block.END_PORTAL_FRAME || (block.getDamage() & 0x4) == 0) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     @Override
     public int getId() {
         return END_PORTAL_FRAME;
@@ -141,18 +153,6 @@ public class BlockEndPortalFrame extends BlockTransparentMeta implements Faceabl
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(faces[player != null ? player.getDirection().getHorizontalIndex() : 0]);
         this.getLevel().setBlock(block, this, true, true);
-        return true;
-    }
-
-    private static boolean isCompletedPortal(Block center) {
-        for (int i = 0; i < 4; i++) {
-            for (int j = -1; j <= 1; j++) {
-                Block block = center.getSide(BlockFace.fromHorizontalIndex(i), 2).getSide(BlockFace.fromHorizontalIndex((i + 1) % 4), j);
-                if (block.getId() != Block.END_PORTAL_FRAME || (block.getDamage() & 0x4) == 0) {
-                    return false;
-                }
-            }
-        }
         return true;
     }
 

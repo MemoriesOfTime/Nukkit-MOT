@@ -13,18 +13,13 @@ import java.util.UUID;
  */
 public class ShapelessRecipe implements CraftingRecipe {
 
-    private String recipeId;
-
     private final Item output;
-
-    private long least, most;
-
     private final List<Item> ingredients;
     private final List<Item> ingredientsAggregate;
-
     private final int priority;
-
     private final int networkId;
+    private String recipeId;
+    private long least, most;
 
     public ShapelessRecipe(Item result, Collection<Item> ingredients) {
         this(null, 10, result, ingredients);
@@ -195,7 +190,7 @@ public class ShapelessRecipe implements CraftingRecipe {
      * Returns whether the specified list of crafting grid inputs and outputs matches this recipe. Outputs DO NOT
      * include the primary result item.
      *
-     * @param inputList  list of items taken from the crafting grid
+     * @param inputList       list of items taken from the crafting grid
      * @param extraOutputList list of items put back into the crafting grid (secondary results)
      * @return bool
      */

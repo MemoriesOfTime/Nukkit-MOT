@@ -179,10 +179,9 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable, Blo
     public boolean onActivate(Item item, Player player) {
         if (item.getId() == Item.DYE) {
             BlockEntity blockEntity = this.level.getBlockEntity(this);
-            if (!(blockEntity instanceof BlockEntitySign)) {
+            if (!(blockEntity instanceof BlockEntitySign sign)) {
                 return false;
             }
-            BlockEntitySign sign = (BlockEntitySign) blockEntity;
 
             int meta = item.getDamage();
             if (meta == ItemDye.INK_SAC || meta == ItemDye.GLOW_INK_SAC) {

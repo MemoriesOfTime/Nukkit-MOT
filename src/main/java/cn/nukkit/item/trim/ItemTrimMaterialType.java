@@ -19,6 +19,12 @@ public enum ItemTrimMaterialType {
     MATERIAL_LAPIS("lapis"),
     MATERIAL_AMETHYST("amethyst");
 
+    private final String materialName;
+
+    ItemTrimMaterialType(@NotNull String input) {
+        this.materialName = input;
+    }
+
     @Nullable
     public static ItemTrimMaterialType fromMaterialName(@NotNull String materialName) {
         for (ItemTrimMaterialType value : ItemTrimMaterialType.values()) {
@@ -27,12 +33,6 @@ public enum ItemTrimMaterialType {
             }
         }
         return null;
-    }
-
-    private final String materialName;
-
-    ItemTrimMaterialType(@NotNull String input) {
-        this.materialName = input;
     }
 
     @NotNull

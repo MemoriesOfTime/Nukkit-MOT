@@ -28,10 +28,8 @@ public class CraftingTransaction extends InventoryTransaction {
     protected Item primaryOutput;
 
     protected CraftingRecipe recipe;
-
-    private Recipe transactionRecipe;
-
     protected int craftingType;
+    private Recipe transactionRecipe;
 
     public CraftingTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions, false);
@@ -157,7 +155,7 @@ public class CraftingTransaction extends InventoryTransaction {
                     case Item.BREAD -> source.awardAchievement("makeBread");
                     case Item.CAKE -> source.awardAchievement("bakeCake");
                     case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
-                        Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
+                            Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
                     case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
                     case Item.DIAMOND -> source.awardAchievement("diamond");
                 }
@@ -171,8 +169,7 @@ public class CraftingTransaction extends InventoryTransaction {
 
     public boolean checkForCraftingPart(List<InventoryAction> actions) {
         for (InventoryAction action : actions) {
-            if (action instanceof SlotChangeAction) {
-                SlotChangeAction slotChangeAction = (SlotChangeAction) action;
+            if (action instanceof SlotChangeAction slotChangeAction) {
                 if (slotChangeAction.getInventory().getType() == InventoryType.UI) {
                     if (slotChangeAction.getSlot() == 50) {
                         if (!slotChangeAction.getSourceItem().equals(slotChangeAction.getTargetItem())) {

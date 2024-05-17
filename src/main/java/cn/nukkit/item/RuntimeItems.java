@@ -151,12 +151,6 @@ public class RuntimeItems {
         return legacyString2LegacyInt.getOrDefault(identifier, -1);
     }
 
-    @Data
-    public static class MappingEntry {
-        private final String legacyName;
-        private final int damage;
-    }
-
     public static int getId(int fullId) {
         return (short) (fullId >> 16);
     }
@@ -175,6 +169,12 @@ public class RuntimeItems {
 
     public static boolean hasData(int id) {
         return (id & 0x1) != 0;
+    }
+
+    @Data
+    public static class MappingEntry {
+        private final String legacyName;
+        private final int damage;
     }
 
     @ToString

@@ -91,13 +91,13 @@ public class BlockBeehive extends BlockSolidMeta implements Faceable, BlockEntit
         if (beehive == null) {
             return false;
         }
-        
+
         if (beehive.namedTag.getByte("ShouldSpawnBees") > 0) {
             List<BlockFace> validSpawnFaces = beehive.scanValidSpawnFaces(true);
             for (BlockEntityBeehive.Occupant occupant : beehive.getOccupants()) {
                 beehive.spawnOccupant(occupant, validSpawnFaces);
             }
-    
+
             beehive.namedTag.putByte("ShouldSpawnBees", 0);
         }
         return true;
@@ -116,7 +116,7 @@ public class BlockBeehive extends BlockSolidMeta implements Faceable, BlockEntit
         }
         return false;
     }
-    
+
     @Override
     public boolean canBeActivated() {
         return true;
@@ -139,7 +139,7 @@ public class BlockBeehive extends BlockSolidMeta implements Faceable, BlockEntit
             beehive.angerBees(player);
         }
     }
-    
+
     @Override
     public Item toItem() {
         Item item = Item.get(getItemId(), 0, 1);
@@ -156,7 +156,7 @@ public class BlockBeehive extends BlockSolidMeta implements Faceable, BlockEntit
         }
         return item;
     }
-    
+
     @Override
     public boolean canSilkTouch() {
         return true;
@@ -182,12 +182,12 @@ public class BlockBeehive extends BlockSolidMeta implements Faceable, BlockEntit
     public boolean canHarvestWithHand() {
         return true;
     }
-    
+
     @Override
     public Item[] getDrops(Item item) {
-        return new Item[]{ Item.get(BEEHIVE) };
+        return new Item[]{Item.get(BEEHIVE)};
     }
-    
+
     @Override
     public BlockFace getBlockFace() {
         return BlockFace.fromHorizontalIndex(this.getDamage(DIRECTION_BIT));
@@ -198,12 +198,12 @@ public class BlockBeehive extends BlockSolidMeta implements Faceable, BlockEntit
         this.setDamage(DIRECTION_BIT, face.getHorizontalIndex());
     }
 
-    public void setHoneyLevel(int honeyLevel) {
-        this.setDamage(HONEY_LEVEL_BIT, honeyLevel);
-    }
-
     public int getHoneyLevel() {
         return getDamage(HONEY_LEVEL_BIT);
+    }
+
+    public void setHoneyLevel(int honeyLevel) {
+        this.setDamage(HONEY_LEVEL_BIT, honeyLevel);
     }
 
     public boolean isEmpty() {
@@ -213,12 +213,12 @@ public class BlockBeehive extends BlockSolidMeta implements Faceable, BlockEntit
     public boolean isFull() {
         return getHoneyLevel() == HONEY_LEVEL_MAX;
     }
-    
+
     @Override
     public boolean hasComparatorInputOverride() {
         return true;
     }
-    
+
     @Override
     public int getComparatorInputOverride() {
         return getHoneyLevel();

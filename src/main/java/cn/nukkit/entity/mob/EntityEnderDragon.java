@@ -22,13 +22,13 @@ public class EntityEnderDragon extends EntityFlyingMob implements EntityBoss {
 
     public static final int NETWORK_ID = 53;
 
+    public EntityEnderDragon(FullChunk chunk, CompoundTag nbt) {
+        super(chunk, nbt);
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
-    }
-
-    public EntityEnderDragon(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
     }
 
     @Override
@@ -58,7 +58,7 @@ public class EntityEnderDragon extends EntityFlyingMob implements EntityBoss {
 
     @Override
     public int getKillExperience() {
-        for (int i = 0; i < 167;) {
+        for (int i = 0; i < 167; ) {
             this.level.dropExpOrb(this, 3);
             i++;
         }
@@ -67,8 +67,7 @@ public class EntityEnderDragon extends EntityFlyingMob implements EntityBoss {
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
+        if (creature instanceof Player player) {
             return player.spawned && player.isAlive() && !player.closed && (player.isSurvival() || player.isAdventure()) && distance <= 800 && distance > 50;
         }
         return creature.isAlive() && !creature.closed && distance <= 800 && distance > 50;
@@ -76,7 +75,7 @@ public class EntityEnderDragon extends EntityFlyingMob implements EntityBoss {
 
     @Override
     public void attackEntity(Entity player) {
-    if (this.attackDelay > 60 && Utils.rand(1, 5) < 3 && this.distanceSquared(player) <= 90000) {
+        if (this.attackDelay > 60 && Utils.rand(1, 5) < 3 && this.distanceSquared(player) <= 90000) {
             this.attackDelay = 0;
             double f = 1.1;
             double yaw = this.yaw + Utils.rand(-4.0, 4.0);

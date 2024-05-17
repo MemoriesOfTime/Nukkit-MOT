@@ -83,23 +83,13 @@ public class Location extends Position {
         return this.yaw;
     }
 
-    public double getPitch() {
-        return this.pitch;
-    }
-
-    public double getHeadYaw() {
-        return this.headYaw;
-    }
-
     public Location setYaw(double yaw) {
         this.yaw = yaw;
         return this;
     }
 
-    public Location setBothYaw(double yaw) {
-        this.yaw = yaw;
-        this.headYaw = yaw;
-        return this;
+    public double getPitch() {
+        return this.pitch;
     }
 
     public Location setPitch(double pitch) {
@@ -107,8 +97,18 @@ public class Location extends Position {
         return this;
     }
 
+    public double getHeadYaw() {
+        return this.headYaw;
+    }
+
     public Location setHeadYaw(double headYaw) {
         this.headYaw = headYaw;
+        return this;
+    }
+
+    public Location setBothYaw(double yaw) {
+        this.yaw = yaw;
+        this.headYaw = yaw;
         return this;
     }
 

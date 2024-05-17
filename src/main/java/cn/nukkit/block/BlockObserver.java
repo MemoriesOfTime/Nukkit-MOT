@@ -67,7 +67,7 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
     public boolean canHarvestWithHand() {
         return false;
     }
-    
+
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         if (player != null) {

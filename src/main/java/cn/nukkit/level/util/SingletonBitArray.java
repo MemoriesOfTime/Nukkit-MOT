@@ -5,9 +5,8 @@ import com.google.common.base.Preconditions;
 public class SingletonBitArray implements BitArray {
 
     private static final int[] EMPTY_WORDS = new int[0];
-
-    private int value;
     private final int size;
+    private int value;
 
     SingletonBitArray(int size) {
         this.size = size;

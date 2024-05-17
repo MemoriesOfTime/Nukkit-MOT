@@ -14,14 +14,11 @@ import java.util.concurrent.atomic.AtomicLong;
 public class BlockUpdateEntry implements Comparable<BlockUpdateEntry> {
 
     private static final AtomicLong entryID = new AtomicLong(0);
-
-    public int priority;
-    public long delay;
-
     public final Vector3 pos;
     public final Block block;
-
     public final long id;
+    public int priority;
+    public long delay;
 
     public BlockUpdateEntry(Vector3 pos, Block block) {
         this.pos = pos;

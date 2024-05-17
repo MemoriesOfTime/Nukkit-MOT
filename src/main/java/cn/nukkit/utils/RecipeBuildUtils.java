@@ -4,10 +4,9 @@ import cn.nukkit.item.Item;
 import cn.nukkit.nbt.tag.CompoundTag;
 
 public class RecipeBuildUtils {
+    private static int netId = 3000;
     private final CompoundTag recipe;
     private final int size;
-
-    private static int netId = 3000;
 
     public RecipeBuildUtils(CompoundTag tag, int size) {
         this.recipe = tag;

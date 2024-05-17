@@ -38,6 +38,21 @@ public class QueryHandler {
         this.regenerateInfo();
     }
 
+    public static byte[] getTokenString(String token, InetAddress address) {
+        return getTokenString(token.getBytes(StandardCharsets.UTF_8), address);
+    }
+
+    public static byte[] getTokenString(byte[] token, InetAddress address) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            digest.update(address.toString().getBytes(StandardCharsets.UTF_8));
+            digest.update(token);
+            return Arrays.copyOf(digest.digest(), 4);
+        } catch (NoSuchAlgorithmException e) {
+            return ByteBuffer.allocate(4).putInt(Utils.random.nextInt()).array();
+        }
+    }
+
     public void regenerateInfo() {
         QueryRegenerateEvent ev = this.server.getQueryInformation();
         this.longData = ev.getLongQuery();
@@ -52,22 +67,6 @@ public class QueryHandler {
             token[i] = (byte) Utils.random.nextInt(255);
         }
         this.token = token;
-    }
-
-    public static byte[] getTokenString(String token, InetAddress address) {
-        return getTokenString(token.getBytes(StandardCharsets.UTF_8), address);
-    }
-
-
-    public static byte[] getTokenString(byte[] token, InetAddress address) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("MD5");
-            digest.update(address.toString().getBytes(StandardCharsets.UTF_8));
-            digest.update(token);
-            return Arrays.copyOf(digest.digest(), 4);
-        } catch (NoSuchAlgorithmException e) {
-            return ByteBuffer.allocate(4).putInt(Utils.random.nextInt()).array();
-        }
     }
 
     public void handle(InetSocketAddress address, ByteBuf packet) {
@@ -89,7 +88,7 @@ public class QueryHandler {
                 packet.readBytes(token);
 
                 if (!Arrays.equals(token, getTokenString(this.token, address.getAddress())) &&
-                    !Arrays.equals(token, getTokenString(this.lastToken, address.getAddress()))) {
+                        !Arrays.equals(token, getTokenString(this.lastToken, address.getAddress()))) {
                     break;
                 }
 

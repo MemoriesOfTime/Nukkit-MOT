@@ -29,6 +29,8 @@ public class End extends Generator {
     private static final double detailNoiseScaleX = 80;
     private static final double detailNoiseScaleZ = 80;
     private final double[][][] density = new double[3][3][33];
+    private final List<Populator> populators = new ArrayList<>();
+    private final List<Populator> generationPopulators = new ArrayList<>();
     double[] detailNoise;
     double[] roughnessNoise;
     double[] roughnessNoise2;
@@ -39,9 +41,6 @@ public class End extends Generator {
     private NoiseGeneratorOctavesD roughnessNoiseOctaves2;
     private NoiseGeneratorOctavesD detailNoiseOctaves;
     private NoiseGeneratorSimplexD islandNoise;
-    private final List<Populator> populators = new ArrayList<>();
-    private final List<Populator> generationPopulators = new ArrayList<>();
-
     private long localSeed1;
     private long localSeed2;
 

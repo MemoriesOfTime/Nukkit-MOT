@@ -9,6 +9,15 @@ public class ShortTag extends NumberTag<Integer> {
 
     public int data;
 
+    public ShortTag(String name) {
+        super(name);
+    }
+
+    public ShortTag(String name, int data) {
+        super(name);
+        this.data = data;
+    }
+
     @Override
     public Integer getData() {
         return data;
@@ -17,15 +26,6 @@ public class ShortTag extends NumberTag<Integer> {
     @Override
     public void setData(Integer data) {
         this.data = data == null ? 0 : data;
-    }
-
-    public ShortTag(String name) {
-        super(name);
-    }
-
-    public ShortTag(String name, int data) {
-        super(name);
-        this.data = data;
     }
 
     @Override

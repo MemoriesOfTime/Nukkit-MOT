@@ -20,6 +20,39 @@ public interface BlockEntityHolder<E extends BlockEntity> {
     Logger log = LogManager.getLogger(BlockEntityHolder.class);
 
     @Nullable
+    static <E extends BlockEntity, H extends BlockEntityHolder<E>> E setBlockAndCreateEntity(@NotNull H holder) {
+        return setBlockAndCreateEntity(holder, true, true);
+    }
+
+    @Nullable
+    static <E extends BlockEntity, H extends BlockEntityHolder<E>> E setBlockAndCreateEntity(
+            @NotNull H holder, boolean direct, boolean update) {
+        return setBlockAndCreateEntity(holder, direct, update, null);
+    }
+
+    @Nullable
+    static <E extends BlockEntity, H extends BlockEntityHolder<E>> E setBlockAndCreateEntity(
+            @NotNull H holder, boolean direct, boolean update, @Nullable CompoundTag initialData,
+            @Nullable Object... args) {
+        Block block = holder.getBlock();
+        Level level = block.getLevel();
+        Block layer0 = level.getBlock(block, 0);
+        Block layer1 = level.getBlock(block, 1);
+        if (level.setBlock(block, block, direct, update)) {
+            try {
+                return holder.createBlockEntity(initialData, args);
+            } catch (Exception e) {
+                log.warn("Failed to create block entity {} at {} at ", holder.getBlockEntityType(), holder.getLocation(), e);
+                level.setBlock(layer0, 0, layer0, direct, update);
+                level.setBlock(layer1, 1, layer1, direct, update);
+                throw e;
+            }
+        }
+
+        return null;
+    }
+
+    @Nullable
     default E getBlockEntity() {
         Level level = getLevel();
         if (level == null) {
@@ -58,12 +91,12 @@ public interface BlockEntityHolder<E extends BlockEntity> {
         } else {
             initialData = initialData.copy();
         }
-        BlockEntity created = BlockEntity.createBlockEntity(typeName, chunk, 
+        BlockEntity created = BlockEntity.createBlockEntity(typeName, chunk,
                 initialData
-                    .putString("id", typeName)
-                    .putInt("x", getFloorX())
-                    .putInt("y", getFloorY())
-                    .putInt("z", getFloorZ()), 
+                        .putString("id", typeName)
+                        .putInt("x", getFloorX())
+                        .putInt("y", getFloorY())
+                        .putInt("z", getFloorZ()),
                 args);
 
         Class<? extends E> entityClass = getBlockEntityClass();
@@ -107,39 +140,6 @@ public interface BlockEntityHolder<E extends BlockEntity> {
     Location getLocation();
 
     Level getLevel();
-
-    @Nullable
-    static <E extends BlockEntity, H extends BlockEntityHolder<E>> E setBlockAndCreateEntity(@NotNull H holder) {
-        return setBlockAndCreateEntity(holder, true, true);
-    }
-
-    @Nullable
-    static <E extends BlockEntity, H extends BlockEntityHolder<E>> E setBlockAndCreateEntity(
-            @NotNull H holder, boolean direct, boolean update) {
-        return setBlockAndCreateEntity(holder, direct, update, null);
-    }
-
-    @Nullable
-    static <E extends BlockEntity, H extends BlockEntityHolder<E>> E setBlockAndCreateEntity(
-            @NotNull H holder, boolean direct, boolean update, @Nullable CompoundTag initialData,
-            @Nullable Object... args) {
-        Block block = holder.getBlock(); 
-        Level level = block.getLevel();
-        Block layer0 = level.getBlock(block, 0);
-        Block layer1 = level.getBlock(block, 1);
-        if (level.setBlock(block, block, direct, update)) {
-            try {
-                return holder.createBlockEntity(initialData, args);
-            } catch (Exception e) {
-                log.warn("Failed to create block entity {} at {} at ", holder.getBlockEntityType(), holder.getLocation(), e);
-                level.setBlock(layer0, 0, layer0, direct, update);
-                level.setBlock(layer1, 1, layer1, direct, update);
-                throw e;
-            }
-        }
-        
-        return null;
-    }
 
     default Block getBlock() {
         if (this instanceof Position) {

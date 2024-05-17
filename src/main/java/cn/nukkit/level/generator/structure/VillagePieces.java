@@ -248,8 +248,10 @@ public final class VillagePieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 return switch (orientation) {
-                    case WEST, EAST -> generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
-                    default -> generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.WEST, getGenDepth());
+                    case WEST, EAST ->
+                            generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
+                    default ->
+                            generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 - 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.WEST, getGenDepth());
                 };
             }
             return null;
@@ -259,8 +261,10 @@ public final class VillagePieces {
             final BlockFace orientation = getOrientation();
             if (orientation != null) {
                 return switch (orientation) {
-                    case WEST, EAST -> generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
-                    default -> generatePieceFromSmallDoor(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.EAST, getGenDepth());
+                    case WEST, EAST ->
+                            generatePieceFromSmallDoor(start, pieces, random, boundingBox.x0 + horizontalOffset, boundingBox.y0 + yOffset, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
+                    default ->
+                            generatePieceFromSmallDoor(start, pieces, random, boundingBox.x1 + 1, boundingBox.y0 + yOffset, boundingBox.z0 + horizontalOffset, BlockFace.EAST, getGenDepth());
                 };
             }
             return null;
@@ -417,10 +421,14 @@ public final class VillagePieces {
         protected void placeTorch(final ChunkManager level, final BlockFace orientation, final int x, final int y, final int z, final BoundingBox boundingBox) {
             if (!isZombieVillage) {
                 switch (orientation) {
-                    case SOUTH -> placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.SOUTH), x, y, z, boundingBox);
-                    case EAST -> placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.EAST), x, y, z, boundingBox);
-                    case WEST -> placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.WEST), x, y, z, boundingBox);
-                    default -> placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.NORTH), x, y, z, boundingBox);
+                    case SOUTH ->
+                            placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.SOUTH), x, y, z, boundingBox);
+                    case EAST ->
+                            placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.EAST), x, y, z, boundingBox);
+                    case WEST ->
+                            placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.WEST), x, y, z, boundingBox);
+                    default ->
+                            placeBlock(level, new BlockState(Block.TORCH, TorchFacingDirection.NORTH), x, y, z, boundingBox);
                 }
             }
         }
@@ -1014,752 +1022,760 @@ public final class VillagePieces {
 
         @Override
         public String getType() {
-        	return "ViPH";
-		}
-
-		@Override
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			if (horizPos < 0) {
-				horizPos = getAverageGroundHeight(level, boundingBox);
-
-				if (horizPos < 0) {
-					return true;
-				}
-
-				this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 7 - 1, 0);
-			}
-
-			final BlockState cobble = getSpecificBlock(COBBLESTONE);
-			final BlockState stairsN = getSpecificBlock(OAK_STAIRS__N);
-			final BlockState stairsS = getSpecificBlock(OAK_STAIRS__S);
-			final BlockState stairsW = getSpecificBlock(OAK_STAIRS__W);
-			final BlockState planks = getSpecificBlock(PLANKS);
-			final BlockState log = getSpecificBlock(LOG);
-			final BlockState fence = getSpecificBlock(OAK_FENCE);
-
-			generateBox(level, boundingBox, 1, 1, 1, 7, 4, 4, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 2, 1, 6, 8, 4, 10, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 2, 0, 6, 8, 0, 10, DIRT, DIRT, false);
-			placeBlock(level, cobble, 6, 0, 6, boundingBox);
-			generateBox(level, boundingBox, 2, 1, 6, 2, 1, 10, fence, fence, false);
-			generateBox(level, boundingBox, 8, 1, 6, 8, 1, 10, fence, fence, false);
-			generateBox(level, boundingBox, 3, 1, 10, 7, 1, 10, fence, fence, false);
-			generateBox(level, boundingBox, 1, 0, 1, 7, 0, 4, planks, planks, false);
-			generateBox(level, boundingBox, 0, 0, 0, 0, 3, 5, cobble, cobble, false);
-			generateBox(level, boundingBox, 8, 0, 0, 8, 3, 5, cobble, cobble, false);
-			generateBox(level, boundingBox, 1, 0, 0, 7, 1, 0, cobble, cobble, false);
-			generateBox(level, boundingBox, 1, 0, 5, 7, 1, 5, cobble, cobble, false);
-			generateBox(level, boundingBox, 1, 2, 0, 7, 3, 0, planks, planks, false);
-			generateBox(level, boundingBox, 1, 2, 5, 7, 3, 5, planks, planks, false);
-			generateBox(level, boundingBox, 0, 4, 1, 8, 4, 1, planks, planks, false);
-			generateBox(level, boundingBox, 0, 4, 4, 8, 4, 4, planks, planks, false);
-			generateBox(level, boundingBox, 0, 5, 2, 8, 5, 3, planks, planks, false);
-			placeBlock(level, planks, 0, 4, 2, boundingBox);
-			placeBlock(level, planks, 0, 4, 3, boundingBox);
-			placeBlock(level, planks, 8, 4, 2, boundingBox);
-			placeBlock(level, planks, 8, 4, 3, boundingBox);
-
-			for (int i = -1; i <= 2; ++i) {
-				for (int x = 0; x <= 8; ++x) {
-					placeBlock(level, stairsN, x, 4 + i, i, boundingBox);
-					placeBlock(level, stairsS, x, 4 + i, 5 - i, boundingBox);
-				}
-			}
-
-			placeBlock(level, log, 0, 2, 1, boundingBox);
-			placeBlock(level, log, 0, 2, 4, boundingBox);
-			placeBlock(level, log, 8, 2, 1, boundingBox);
-			placeBlock(level, log, 8, 2, 4, boundingBox);
-			placeBlock(level, GLASS_PANE, 0, 2, 2, boundingBox);
-			placeBlock(level, GLASS_PANE, 0, 2, 3, boundingBox);
-			placeBlock(level, GLASS_PANE, 8, 2, 2, boundingBox);
-			placeBlock(level, GLASS_PANE, 8, 2, 3, boundingBox);
-			placeBlock(level, GLASS_PANE, 2, 2, 5, boundingBox);
-			placeBlock(level, GLASS_PANE, 3, 2, 5, boundingBox);
-			placeBlock(level, GLASS_PANE, 5, 2, 0, boundingBox);
-			placeBlock(level, GLASS_PANE, 6, 2, 5, boundingBox);
-			placeBlock(level, fence, 2, 1, 3, boundingBox);
-			placeBlock(level, BROWN_CARPET, 2, 2, 3, boundingBox);
-			placeBlock(level, planks, 1, 1, 4, boundingBox);
-			placeBlock(level, stairsN, 2, 1, 4, boundingBox);
-			placeBlock(level, stairsW, 1, 1, 3, boundingBox);
-			generateBox(level, boundingBox, 5, 0, 1, 7, 0, 3, DOUBLE_STONE_SLAB, DOUBLE_STONE_SLAB, false);
-			placeBlock(level, DOUBLE_STONE_SLAB, 6, 1, 1, boundingBox);
-			placeBlock(level, DOUBLE_STONE_SLAB, 6, 1, 2, boundingBox);
-			placeBlock(level, BlockState.AIR, 2, 1, 0, boundingBox);
-			placeBlock(level, BlockState.AIR, 2, 2, 0, boundingBox);
-			placeTorch(level, BlockFace.NORTH, 2, 3, 1, boundingBox);
-			placeDoor(level, boundingBox, random, 2, 1, 0, BlockFace.NORTH);
-
-			if (getBlock(level, 2, 0, -1, boundingBox).equals(BlockState.AIR) && !getBlock(level, 2, -1, -1, boundingBox).equals(BlockState.AIR)) {
-				placeBlock(level, stairsN, 2, 0, -1, boundingBox);
-
-				if (getBlock(level, 2, -1, -1, boundingBox).getId() == BlockID.GRASS_PATH) {
-					placeBlock(level, GRASS, 2, -1, -1, boundingBox);
-				}
-			}
-
-			placeBlock(level, BlockState.AIR, 6, 1, 5, boundingBox);
-			placeBlock(level, BlockState.AIR, 6, 2, 5, boundingBox);
-			placeTorch(level, BlockFace.SOUTH, 6, 3, 4, boundingBox);
-			placeDoor(level, boundingBox, random, 6, 1, 5, BlockFace.SOUTH);
-
-			for (int x = 0; x < 9; ++x) {
-				for (int z = 0; z < 5; ++z) {
-					fillAirColumnUp(level, x, 7, z, boundingBox);
-					fillColumnDown(level, cobble, x, -1, z, boundingBox);
-				}
-			}
-
-			spawnVillagers(level, boundingBox, 4, 1, 2, 2);
-			return true;
-		}
-
-		@Override //\\ PigHouse::getVillagerProfession(int)
-		protected int getVillagerProfession(final int villagerCount, final int profession) {
-			return villagerCount == 0 ? EntityVillager.PROFESSION_BUTCHER : super.getVillagerProfession(villagerCount, profession);
-		}
-	}
-
-	public static class DoubleFarmland extends VillagePiece {
-		private final BlockState cropA;
-		private final BlockState cropB;
-		private final BlockState cropC;
-		private final BlockState cropD;
-
-		public DoubleFarmland(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
-			super(start, genDepth);
-			setOrientation(orientation);
-			this.boundingBox = boundingBox;
-			cropA = Farmland.selectCrops(random);
-			cropB = Farmland.selectCrops(random);
-			cropC = Farmland.selectCrops(random);
-			cropD = Farmland.selectCrops(random);
-		}
-
-		public static DoubleFarmland createPiece(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
-			final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 13, 4, 9, orientation);
-			return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new DoubleFarmland(start, genDepth, random, boundingBox, orientation) : null;
-		}
-
-		@Override
-		public String getType() {
-			return "ViDF";
-		}
-
-		@Override
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			if (horizPos < 0) {
-				horizPos = getAverageGroundHeight(level, boundingBox);
-
-				if (horizPos < 0) {
-					return true;
-				}
-
-				this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 4 - 1, 0);
-			}
-
-			final BlockState log = getSpecificBlock(LOG);
-
-			generateBox(level, boundingBox, 0, 1, 0, 12, 4, 8, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 1, 0, 1, 2, 0, 7, FARMLAND, FARMLAND, false);
-			generateBox(level, boundingBox, 4, 0, 1, 5, 0, 7, FARMLAND, FARMLAND, false);
-			generateBox(level, boundingBox, 7, 0, 1, 8, 0, 7, FARMLAND, FARMLAND, false);
-			generateBox(level, boundingBox, 10, 0, 1, 11, 0, 7, FARMLAND, FARMLAND, false);
-			generateBox(level, boundingBox, 0, 0, 0, 0, 0, 8, log, log, false);
-			generateBox(level, boundingBox, 6, 0, 0, 6, 0, 8, log, log, false);
-			generateBox(level, boundingBox, 12, 0, 0, 12, 0, 8, log, log, false);
-			generateBox(level, boundingBox, 1, 0, 0, 11, 0, 0, log, log, false);
-			generateBox(level, boundingBox, 1, 0, 8, 11, 0, 8, log, log, false);
-			generateBox(level, boundingBox, 3, 0, 1, 3, 0, 7, WATER, WATER, false);
-			generateBox(level, boundingBox, 9, 0, 1, 9, 0, 7, WATER, WATER, false);
-
-			if (type != PopulatorVillage.Type.COLD) { //BE
-				for (int z = 1; z <= 7; ++z) {
-					final int maxAgeA = 7;
-					final int minAgeA = maxAgeA / 3;
-					placeBlock(level, new BlockState(cropA.getId(), Mth.nextInt(random, minAgeA, maxAgeA)), 1, 1, z, boundingBox);
-					placeBlock(level, new BlockState(cropA.getId(), Mth.nextInt(random, minAgeA, maxAgeA)), 2, 1, z, boundingBox);
-					final int maxAgeB = 7;
-					final int minAgeB = maxAgeB / 3;
-					placeBlock(level, new BlockState(cropB.getId(), Mth.nextInt(random, minAgeB, maxAgeB)), 4, 1, z, boundingBox);
-					placeBlock(level, new BlockState(cropB.getId(), Mth.nextInt(random, minAgeB, maxAgeB)), 5, 1, z, boundingBox);
-					final int maxAgeC = 7;
-					final int minAgeC = maxAgeC / 3;
-					placeBlock(level, new BlockState(cropC.getId(), Mth.nextInt(random, minAgeC, maxAgeC)), 7, 1, z, boundingBox);
-					placeBlock(level, new BlockState(cropC.getId(), Mth.nextInt(random, minAgeC, maxAgeC)), 8, 1, z, boundingBox);
-					final int maxAgeD = 7;
-					final int minAgeD = maxAgeD / 3;
-					placeBlock(level, new BlockState(cropD.getId(), Mth.nextInt(random, minAgeD, maxAgeD)), 10, 1, z, boundingBox);
-					placeBlock(level, new BlockState(cropD.getId(), Mth.nextInt(random, minAgeD, maxAgeD)), 11, 1, z, boundingBox);
-				}
-			}
-
-			for (int x = 0; x < 13; ++x) {
-				for (int z = 0; z < 9; ++z) {
-					fillAirColumnUp(level, x, 4, z, boundingBox);
-					fillColumnDown(level, DIRT, x, -1, z, boundingBox);
-				}
-			}
-
-			return true;
-		}
-	}
-
-	public static class Farmland extends VillagePiece {
-		private final BlockState cropA;
-		private final BlockState cropB;
-
-		public Farmland(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
-			super(start, genDepth);
-			setOrientation(orientation);
-			this.boundingBox = boundingBox;
-			cropA = selectCrops(random);
-			cropB = selectCrops(random);
-		}
-
-		//\\ Farmland::selectCrops(Random &,StartPiece &)
-		protected static BlockState selectCrops(final NukkitRandom random) {
-			return switch (random.nextBoundedInt(10)) {
-				case 0, 1 -> CARROTS;
-				case 2, 3 -> POTATOES;
-				case 4 -> BEETROOTS;
-				default -> WHEAT;
-			};
-		}
-
-		public static Farmland createPiece(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
-			final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 7, 4, 9, orientation);
-			return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new Farmland(start, genDepth, random, boundingBox, orientation) : null;
-		}
-
-		@Override
-		public String getType() {
-			return "ViF";
-		}
-
-		@Override
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			if (horizPos < 0) {
-				horizPos = getAverageGroundHeight(level, boundingBox);
-
-				if (horizPos < 0) {
-					return true;
-				}
-
-				this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 4 - 1, 0);
-			}
-
-			final BlockState log = getSpecificBlock(LOG);
-
-			generateBox(level, boundingBox, 0, 1, 0, 6, 4, 8, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 1, 0, 1, 2, 0, 7, FARMLAND, FARMLAND, false);
-			generateBox(level, boundingBox, 4, 0, 1, 5, 0, 7, FARMLAND, FARMLAND, false);
-			generateBox(level, boundingBox, 0, 0, 0, 0, 0, 8, log, log, false);
-			generateBox(level, boundingBox, 6, 0, 0, 6, 0, 8, log, log, false);
-			generateBox(level, boundingBox, 1, 0, 0, 5, 0, 0, log, log, false);
-			generateBox(level, boundingBox, 1, 0, 8, 5, 0, 8, log, log, false);
-			generateBox(level, boundingBox, 3, 0, 1, 3, 0, 7, WATER, WATER, false);
-
-			if (type != PopulatorVillage.Type.COLD) { //BE
-				for (int z = 1; z <= 7; ++z) {
-					final int maxAgeA = 7;
-					final int minAgeA = maxAgeA / 3;
-					placeBlock(level, new BlockState(cropA.getId(), Mth.nextInt(random, minAgeA, maxAgeA)), 1, 1, z, boundingBox);
-					placeBlock(level, new BlockState(cropA.getId(), Mth.nextInt(random, minAgeA, maxAgeA)), 2, 1, z, boundingBox);
-					final int maxAgeB = 7;
-					final int minAgeB = maxAgeB / 3;
-					placeBlock(level, new BlockState(cropB.getId(), Mth.nextInt(random, minAgeB, maxAgeB)), 4, 1, z, boundingBox);
-					placeBlock(level, new BlockState(cropB.getId(), Mth.nextInt(random, minAgeB, maxAgeB)), 5, 1, z, boundingBox);
-				}
-			}
-
-			for (int x = 0; x < 7; ++x) {
-				for (int z = 0; z < 9; ++z) {
-					fillAirColumnUp(level, x, 4, z, boundingBox);
-					fillColumnDown(level, DIRT, x, -1, z, boundingBox);
-				}
-			}
-
-			return true;
-		}
-	}
-
-	public static class Smithy extends VillagePiece {
-		private boolean hasPlacedChest;
-
-		public Smithy(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
-			super(start, genDepth);
-			setOrientation(orientation);
-			this.boundingBox = boundingBox;
-		}
-
-		public static Smithy createPiece(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
-			final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 10, 6, 7, orientation);
-			return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new Smithy(start, genDepth, random, boundingBox, orientation) : null;
-		}
-
-		@Override
-		public String getType() {
-			return "ViS";
-		}
-
-		@Override
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			if (horizPos < 0) {
-				horizPos = getAverageGroundHeight(level, boundingBox);
-
-				if (horizPos < 0) {
-					return true;
-				}
-
-				this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 6 - 1, 0);
-			}
-
-			final BlockState cobble = COBBLESTONE;
-			final BlockState stairsN = getSpecificBlock(OAK_STAIRS__N);
-			final BlockState stairsW = getSpecificBlock(OAK_STAIRS__W);
-			final BlockState planks = getSpecificBlock(PLANKS);
-			final BlockState cobbleStairsN = getSpecificBlock(COBBLESTONE_STAIRS__N);
-			final BlockState log = getSpecificBlock(LOG);
-			final BlockState fence = getSpecificBlock(OAK_FENCE);
-
-			generateBox(level, boundingBox, 0, 1, 0, 9, 4, 6, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 0, 0, 0, 9, 0, 6, cobble, cobble, false);
-			generateBox(level, boundingBox, 0, 4, 0, 9, 4, 6, cobble, cobble, false);
-			generateBox(level, boundingBox, 0, 5, 0, 9, 5, 6, STONE_SLAB, STONE_SLAB, false);
-			generateBox(level, boundingBox, 1, 5, 1, 8, 5, 5, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 1, 1, 0, 2, 3, 0, planks, planks, false);
-			generateBox(level, boundingBox, 0, 1, 0, 0, 4, 0, log, log, false);
-			generateBox(level, boundingBox, 3, 1, 0, 3, 4, 0, log, log, false);
-			generateBox(level, boundingBox, 0, 1, 6, 0, 4, 6, log, log, false);
-			placeBlock(level, planks, 3, 3, 1, boundingBox);
-			generateBox(level, boundingBox, 3, 1, 2, 3, 3, 2, planks, planks, false);
-			generateBox(level, boundingBox, 4, 1, 3, 5, 3, 3, planks, planks, false);
-			generateBox(level, boundingBox, 0, 1, 1, 0, 3, 5, planks, planks, false);
-			generateBox(level, boundingBox, 1, 1, 6, 5, 3, 6, planks, planks, false);
-			generateBox(level, boundingBox, 5, 1, 0, 5, 3, 0, fence, fence, false);
-			generateBox(level, boundingBox, 9, 1, 0, 9, 3, 0, fence, fence, false);
-			generateBox(level, boundingBox, 6, 1, 4, 9, 4, 6, cobble, cobble, false);
-			placeBlock(level, FLOWING_LAVA, 7, 1, 5, boundingBox);
-			placeBlock(level, FLOWING_LAVA, 8, 1, 5, boundingBox);
-			placeBlock(level, IRON_BARS, 9, 2, 5, boundingBox);
-			placeBlock(level, IRON_BARS, 9, 2, 4, boundingBox);
-			generateBox(level, boundingBox, 7, 2, 4, 8, 2, 5, BlockState.AIR, BlockState.AIR, false);
-			placeBlock(level, cobble, 6, 1, 3, boundingBox);
-
-			placeBlock(level, FURNACE, 6, 2, 3, boundingBox);
-			placeBlock(level, FURNACE, 6, 3, 3, boundingBox);
-
-			BlockVector3 vec = new BlockVector3(getWorldX(6, 3), getWorldY(2), getWorldZ(6, 3));
-			if (boundingBox.isInside(vec)) {
-				final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
-				if (chunk != null) {
-					Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(),
-						BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.FURNACE)));
-				}
-			}
-			vec = vec.up();
-			if (boundingBox.isInside(vec)) {
-				final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
-				if (chunk != null) {
-					Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(),
-						BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.FURNACE)));
-				}
-			}
-
-			placeBlock(level, DOUBLE_STONE_SLAB, 8, 1, 1, boundingBox);
-			placeBlock(level, GLASS_PANE, 0, 2, 2, boundingBox);
-			placeBlock(level, GLASS_PANE, 0, 2, 4, boundingBox);
-			placeBlock(level, GLASS_PANE, 2, 2, 6, boundingBox);
-			placeBlock(level, GLASS_PANE, 4, 2, 6, boundingBox);
-			placeBlock(level, fence, 2, 1, 4, boundingBox);
-			placeBlock(level, BROWN_CARPET, 2, 2, 4, boundingBox);
-			placeBlock(level, planks, 1, 1, 5, boundingBox);
-			placeBlock(level, stairsN, 2, 1, 5, boundingBox);
-			placeBlock(level, stairsW, 1, 1, 4, boundingBox);
-
-			if (!hasPlacedChest && boundingBox.isInside(new BlockVector3(getWorldX(5, 5), getWorldY(1), getWorldZ(5, 5)))) {
-				hasPlacedChest = true;
-
-				//\\ StructureHelpers::createChest(v7, v6, (int *)v4, v5, 5, 1, 5, v197, (__int64)&v204);
-				final BlockFace orientation = getOrientation();
-				placeBlock(level, new BlockState(Block.CHEST, (orientation == null ? BlockFace.NORTH : orientation).getOpposite().getIndex()), 5, 1, 5, boundingBox);
-
-				vec = new BlockVector3(getWorldX(5, 5), getWorldY(1), getWorldZ(5, 5));
-				if (boundingBox.isInside(vec)) {
-					final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
-					if (chunk != null) {
-						final CompoundTag nbt = BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.CHEST);
-						final ListTag<CompoundTag> itemList = new ListTag<>("Items");
-						VillageBlacksmithChest.get().create(itemList, random);
-						nbt.putList(itemList);
-						Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
-					}
-				}
-			}
-
-			for (int x = 6; x <= 8; ++x) {
-				if (getBlock(level, x, 0, -1, boundingBox).equals(BlockState.AIR) && !getBlock(level, x, -1, -1, boundingBox).equals(BlockState.AIR)) {
-					placeBlock(level, cobbleStairsN, x, 0, -1, boundingBox);
-
-					if (getBlock(level, x, -1, -1, boundingBox).getId() == BlockID.GRASS_PATH) {
-						placeBlock(level, GRASS, x, -1, -1, boundingBox);
-					}
-				}
-			}
-
-			for (int x = 0; x < 10; ++x) {
-				for (int z = 0; z < 7; ++z) {
-					fillAirColumnUp(level, x, 6, z, boundingBox);
-					fillColumnDown(level, cobble, x, -1, z, boundingBox);
-				}
-			}
-
-			spawnVillagers(level, boundingBox, 7, 1, 1, 1);
-			return true;
-		}
-
-		@Override
-		protected int getVillagerProfession(final int villagerCount, final int profession) {
-			return EntityVillager.PROFESSION_BLACKSMITH;
-		}
-	}
-
-	public static class TwoRoomHouse extends VillagePiece {
-		public TwoRoomHouse(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
-			super(start, genDepth);
-			setOrientation(orientation);
-			this.boundingBox = boundingBox;
-		}
-
-		public static TwoRoomHouse createPiece(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
-			final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 9, 7, 12, orientation);
-			return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new TwoRoomHouse(start, genDepth, random, boundingBox, orientation) : null;
-		}
-
-		@Override
-		public String getType() {
-			return "ViTRH";
-		}
-
-		@Override
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			if (horizPos < 0) {
-				horizPos = getAverageGroundHeight(level, boundingBox);
-
-				if (horizPos < 0) {
-					return true;
-				}
-
-				this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 7 - 1, 0);
-			}
-
-			final BlockState cobble = getSpecificBlock(COBBLESTONE);
-			final BlockState stairsN = getSpecificBlock(OAK_STAIRS__N);
-			final BlockState stairsS = getSpecificBlock(OAK_STAIRS__S);
-			final BlockState stairsE = getSpecificBlock(OAK_STAIRS__E);
-			final BlockState stairsW = getSpecificBlock(OAK_STAIRS__W);
-			final BlockState planks = getSpecificBlock(PLANKS);
-			final BlockState log = getSpecificBlock(LOG);
-
-			generateBox(level, boundingBox, 1, 1, 1, 7, 4, 4, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 2, 1, 6, 8, 4, 10, BlockState.AIR, BlockState.AIR, false);
-			generateBox(level, boundingBox, 2, 0, 5, 8, 0, 10, planks, planks, false);
-			generateBox(level, boundingBox, 1, 0, 1, 7, 0, 4, planks, planks, false);
-			generateBox(level, boundingBox, 0, 0, 0, 0, 3, 5, cobble, cobble, false);
-			generateBox(level, boundingBox, 8, 0, 0, 8, 3, 10, cobble, cobble, false);
-			generateBox(level, boundingBox, 1, 0, 0, 7, 2, 0, cobble, cobble, false);
-			generateBox(level, boundingBox, 1, 0, 5, 2, 1, 5, cobble, cobble, false);
-			generateBox(level, boundingBox, 2, 0, 6, 2, 3, 10, cobble, cobble, false);
-			generateBox(level, boundingBox, 3, 0, 10, 7, 3, 10, cobble, cobble, false);
-			generateBox(level, boundingBox, 1, 2, 0, 7, 3, 0, planks, planks, false);
-			generateBox(level, boundingBox, 1, 2, 5, 2, 3, 5, planks, planks, false);
-			generateBox(level, boundingBox, 0, 4, 1, 8, 4, 1, planks, planks, false);
-			generateBox(level, boundingBox, 0, 4, 4, 3, 4, 4, planks, planks, false);
-			generateBox(level, boundingBox, 0, 5, 2, 8, 5, 3, planks, planks, false);
-			placeBlock(level, planks, 0, 4, 2, boundingBox);
-			placeBlock(level, planks, 0, 4, 3, boundingBox);
-			placeBlock(level, planks, 8, 4, 2, boundingBox);
-			placeBlock(level, planks, 8, 4, 3, boundingBox);
-			placeBlock(level, planks, 8, 4, 4, boundingBox);
-
-			for (int i = -1; i <= 2; ++i) {
-				for (int x = 0; x <= 8; ++x) {
-					placeBlock(level, stairsN, x, 4 + i, i, boundingBox);
-
-					if ((i > -1 || x <= 1) && (i > 0 || x <= 3) && (i > 1 || x != 5)) {
-						placeBlock(level, stairsS, x, 4 + i, 5 - i, boundingBox);
-					}
-				}
-			}
-
-			generateBox(level, boundingBox, 3, 4, 5, 3, 4, 10, planks, planks, false);
-			generateBox(level, boundingBox, 7, 4, 2, 7, 4, 10, planks, planks, false);
-			generateBox(level, boundingBox, 4, 5, 4, 4, 5, 10, planks, planks, false);
-			generateBox(level, boundingBox, 6, 5, 4, 6, 5, 10, planks, planks, false);
-			generateBox(level, boundingBox, 5, 6, 3, 5, 6, 10, planks, planks, false);
-
-			for (int i = 4; i >= 1; --i) {
-				placeBlock(level, planks, i, 2 + i, 7 - i, boundingBox);
-
-				for (int z = 8 - i; z <= 10; ++z) {
-					placeBlock(level, stairsE, i, 2 + i, z, boundingBox);
-				}
-			}
-
-			placeBlock(level, planks, 6, 6, 3, boundingBox);
-			placeBlock(level, planks, 7, 5, 4, boundingBox);
-			placeBlock(level, stairsW, 6, 6, 4, boundingBox);
-
-			for (int i = 6; i <= 8; ++i) {
-				for (int z = 5; z <= 10; ++z) {
-					placeBlock(level, stairsW, i, 12 - i, z, boundingBox);
-				}
-			}
-
-			placeBlock(level, log, 0, 2, 1, boundingBox);
-			placeBlock(level, log, 0, 2, 4, boundingBox);
-			placeBlock(level, GLASS_PANE, 0, 2, 2, boundingBox);
-			placeBlock(level, GLASS_PANE, 0, 2, 3, boundingBox);
-			placeBlock(level, log, 4, 2, 0, boundingBox);
-			placeBlock(level, GLASS_PANE, 5, 2, 0, boundingBox);
-			placeBlock(level, log, 6, 2, 0, boundingBox);
-			placeBlock(level, log, 8, 2, 1, boundingBox);
-			placeBlock(level, GLASS_PANE, 8, 2, 2, boundingBox);
-			placeBlock(level, GLASS_PANE, 8, 2, 3, boundingBox);
-			placeBlock(level, log, 8, 2, 4, boundingBox);
-			placeBlock(level, planks, 8, 2, 5, boundingBox);
-			placeBlock(level, log, 8, 2, 6, boundingBox);
-			placeBlock(level, GLASS_PANE, 8, 2, 7, boundingBox);
-			placeBlock(level, GLASS_PANE, 8, 2, 8, boundingBox);
-			placeBlock(level, log, 8, 2, 9, boundingBox);
-			placeBlock(level, log, 2, 2, 6, boundingBox);
-			placeBlock(level, GLASS_PANE, 2, 2, 7, boundingBox);
-			placeBlock(level, GLASS_PANE, 2, 2, 8, boundingBox);
-			placeBlock(level, log, 2, 2, 9, boundingBox);
-			placeBlock(level, log, 4, 4, 10, boundingBox);
-			placeBlock(level, GLASS_PANE, 5, 4, 10, boundingBox);
-			placeBlock(level, log, 6, 4, 10, boundingBox);
-			placeBlock(level, planks, 5, 5, 10, boundingBox);
-			placeBlock(level, BlockState.AIR, 2, 1, 0, boundingBox);
-			placeBlock(level, BlockState.AIR, 2, 2, 0, boundingBox);
-			placeTorch(level, BlockFace.NORTH, 2, 3, 1, boundingBox);
-			placeDoor(level, boundingBox, random, 2, 1, 0, BlockFace.NORTH);
-			generateBox(level, boundingBox, 1, 0, -1, 3, 2, -1, BlockState.AIR, BlockState.AIR, false);
-
-			if (getBlock(level, 2, 0, -1, boundingBox).equals(BlockState.AIR) && !getBlock(level, 2, -1, -1, boundingBox).equals(BlockState.AIR)) {
-				placeBlock(level, stairsN, 2, 0, -1, boundingBox);
-
-				if (getBlock(level, 2, -1, -1, boundingBox).getId() == BlockID.GRASS_PATH) {
-					placeBlock(level, GRASS, 2, -1, -1, boundingBox);
-				}
-			}
-
-			for (int x = 0; x < 9; ++x) {
-				for (int z = 0; z < 5; ++z) {
-					fillAirColumnUp(level, x, 7, z, boundingBox);
-					fillColumnDown(level, cobble, x, -1, z, boundingBox);
-				}
-			}
-
-			for (int x = 2; x < 9; ++x) {
-				for (int z = 5; z < 11; ++z) {
-					fillAirColumnUp(level, x, 7, z, boundingBox);
-					fillColumnDown(level, cobble, x, -1, z, boundingBox);
-				}
-			}
-
-			if (type == PopulatorVillage.Type.COLD) { //BE
-				//\\ StructureHelpers::createChest(v7, v6, 5, 1, 9, v279, (unsigned __int64)&Dst, v284, v285, v288, v289);
-				final BlockFace orientation = getOrientation();
-				placeBlock(level, new BlockState(Block.CHEST, (orientation == null ? BlockFace.NORTH : orientation).getOpposite().getIndex()), 5, 1, 9, boundingBox);
-
-				final BlockVector3 vec = new BlockVector3(getWorldX(5, 9), getWorldY(1), getWorldZ(5, 9));
-				if (boundingBox.isInside(vec)) {
-					final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
-					if (chunk != null) {
-						final CompoundTag nbt = BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.CHEST);
-						final ListTag<CompoundTag> itemList = new ListTag<>("Items");
-						VillageTwoRoomHouseChest.get().create(itemList, random);
-						nbt.putList(itemList);
-						Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
-					}
-				}
-			}
-
-			spawnVillagers(level, boundingBox, 4, 1, 2, 2);
-			return true;
-		}
-	}
-
-	public static class LightPost extends VillagePiece {
-		public LightPost(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
-			super(start, genDepth);
-			setOrientation(orientation);
-			this.boundingBox = boundingBox;
-		}
-
-		public static BoundingBox findPieceBox(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation) {
-			final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 3, 4, 2, orientation);
-			return StructurePiece.findCollisionPiece(pieces, boundingBox) != null ? null : boundingBox;
-		}
-
-		@Override
-		public String getType() {
-			return "ViL";
-		}
-
-		@Override
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			if (horizPos < 0) {
-				horizPos = getAverageGroundHeight(level, boundingBox);
-
-				if (horizPos < 0) {
-					return true;
-				}
-
-				this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 4 - 1, 0);
-			}
-
-			final BlockState fence = getSpecificBlock(OAK_FENCE);
-			generateBox(level, boundingBox, 0, 0, 0, 2, 3, 1, BlockState.AIR, BlockState.AIR, false);
-			placeBlock(level, fence, 1, 0, 0, boundingBox);
-			placeBlock(level, fence, 1, 1, 0, boundingBox);
-			placeBlock(level, fence, 1, 2, 0, boundingBox);
-			placeBlock(level, BLACK_WOOL, 1, 3, 0, boundingBox);
-			placeTorch(level, BlockFace.EAST, 2, 3, 0, boundingBox);
-			placeTorch(level, BlockFace.NORTH, 1, 3, 1, boundingBox);
-			placeTorch(level, BlockFace.WEST, 0, 3, 0, boundingBox);
-			placeTorch(level, BlockFace.SOUTH, 1, 3, -1, boundingBox);
-			return true;
-		}
-	}
-
-	public static class StraightRoad extends Road {
-		private final int length;
-
-		public StraightRoad(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
-			super(start, genDepth);
-			setOrientation(orientation);
-			this.boundingBox = boundingBox;
-			length = Math.max(boundingBox.getXSpan(), boundingBox.getZSpan());
-		}
-
-		//\\ StraightRoad::findPieceBox(StartPiece *,std::vector<std::unique_ptr<StructurePiece,std::default_delete<StructurePiece>>,std::allocator<std::unique_ptr<StructurePiece,std::default_delete<StructurePiece>>>> &,Random &,int,int,int,int)
-		public static BoundingBox findPieceBox(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation) {
-			for (int i = 7 * Mth.nextInt(random, 3, 5); i >= 7; i -= 7) {
-				final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 3, 3, i, orientation);
-
-				if (StructurePiece.findCollisionPiece(pieces, boundingBox) == null) {
-					return boundingBox;
-				}
-			}
-
-			return null;
-		}
-
-		@Override
-		public String getType() {
-			return "ViSR";
-		}
-
-		@Override
-		//\\ StraightRoad::addChildren(StructurePiece *,std::vector<std::unique_ptr<StructurePiece,std::default_delete<StructurePiece>>,std::allocator<std::unique_ptr<StructurePiece,std::default_delete<StructurePiece>>>> &,Random &)
-		public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
-			boolean success = false;
-
-			for (int offset = random.nextBoundedInt(5); offset < length - 8; offset += 2 + random.nextBoundedInt(5)) {
-				final StructurePiece result = generateChildLeft((StartPiece) piece, pieces, random, 0, offset);
-				if (result != null) {
-					offset += Math.max(result.getBoundingBox().getXSpan(), result.getBoundingBox().getZSpan());
-					success = true;
-				}
-			}
-
-			for (int offset = random.nextBoundedInt(5); offset < length - 8; offset += 2 + random.nextBoundedInt(5)) {
-				final StructurePiece result = generateChildRight((StartPiece) piece, pieces, random, 0, offset);
-				if (result != null) {
-					offset += Math.max(result.getBoundingBox().getXSpan(), result.getBoundingBox().getZSpan());
-					success = true;
-				}
-			}
-
-			final BlockFace orientation = getOrientation();
-
-			if (success && random.nextBoundedInt(3) > 0 && orientation != null) {
-				switch (orientation) {
-					case SOUTH -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z1 - 2, BlockFace.WEST, getGenDepth());
-					case WEST -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
-					case EAST -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 - 2, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
-					default -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0, BlockFace.WEST, getGenDepth());
-				}
-			}
-
-			if (success && random.nextBoundedInt(3) > 0 && orientation != null) {
-				switch (orientation) {
-					case SOUTH -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z1 - 2, BlockFace.EAST, getGenDepth());
-					case WEST -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
-					case EAST -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 - 2, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
-					default -> generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0, BlockFace.EAST, getGenDepth());
-				}
-			}
-		}
-
-		@Override //\\ StraightRoad::postProcess(BlockSource *,Random &,BoundingBox const &)
-		public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
-			final BlockState path = getSpecificBlock(GRASS_PATH);
-			final BlockState planks = getSpecificBlock(PLANKS);
-			final BlockState gravel = getSpecificBlock(GRAVEL);
-			final BlockState cobble = getSpecificBlock(COBBLESTONE);
-
-			for (int x = this.boundingBox.x0; x <= this.boundingBox.x1; ++x) {
-				for (int z = this.boundingBox.z0; z <= this.boundingBox.z1; ++z) {
-					final BlockVector3 vec = new BlockVector3(x, 64 + yOffset, z);
-
-					if (boundingBox.isInside(vec)) {
-						final BaseFullChunk chunk = level.getChunk(chunkX, chunkZ);
-						if (chunk == null) {
-							vec.y = 63 - 1 + yOffset;
-						} else {
-							final int cx = x & 0xf;
-							final int cz = z & 0xf;
-							int y = chunk.getHighestBlockAt(cx, cz);
-							int id = chunk.getBlockId(cx, y, cz);
-							while (Block.transparent[id] && y > 63 - 1 + yOffset) {
-								id = chunk.getBlockId(cx, --y, cz);
-							}
-							vec.y = y;
-						}
-
-						if (vec.y < 63 + yOffset) {
-							vec.y = 63 - 1 + yOffset;
-						}
-
-						while (vec.y >= 63 - 1 + yOffset) {
-							final int block = level.getBlockIdAt(vec.x, vec.y, vec.z);
-
-							if (block == BlockID.GRASS && level.getBlockIdAt(vec.x, vec.y + 1, vec.z) == BlockID.AIR) {
-								level.setBlockAt(vec.x, vec.y, vec.z, path.getId(), path.getMeta());
-								break;
-							}
-							if (block == BlockID.WATER || block == BlockID.STILL_WATER || block == BlockID.LAVA || block == BlockID.STILL_LAVA) {
-								level.setBlockAt(vec.x, vec.y, vec.z, planks.getId(), planks.getMeta());
-								break;
-							}
-							if (block == BlockID.SAND || block == BlockID.SANDSTONE || block == BlockID.RED_SANDSTONE) {
-								level.setBlockAt(vec.x, vec.y, vec.z, gravel.getId(), gravel.getMeta());
-								level.setBlockAt(vec.x, vec.y - 1, vec.z, cobble.getId(), cobble.getMeta());
-								break;
-							}
-
-							--vec.y;
-						}
-					}
-				}
-			}
-
-			return true;
-		}
-	}
+            return "ViPH";
+        }
+
+        @Override
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            if (horizPos < 0) {
+                horizPos = getAverageGroundHeight(level, boundingBox);
+
+                if (horizPos < 0) {
+                    return true;
+                }
+
+                this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 7 - 1, 0);
+            }
+
+            final BlockState cobble = getSpecificBlock(COBBLESTONE);
+            final BlockState stairsN = getSpecificBlock(OAK_STAIRS__N);
+            final BlockState stairsS = getSpecificBlock(OAK_STAIRS__S);
+            final BlockState stairsW = getSpecificBlock(OAK_STAIRS__W);
+            final BlockState planks = getSpecificBlock(PLANKS);
+            final BlockState log = getSpecificBlock(LOG);
+            final BlockState fence = getSpecificBlock(OAK_FENCE);
+
+            generateBox(level, boundingBox, 1, 1, 1, 7, 4, 4, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 2, 1, 6, 8, 4, 10, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 2, 0, 6, 8, 0, 10, DIRT, DIRT, false);
+            placeBlock(level, cobble, 6, 0, 6, boundingBox);
+            generateBox(level, boundingBox, 2, 1, 6, 2, 1, 10, fence, fence, false);
+            generateBox(level, boundingBox, 8, 1, 6, 8, 1, 10, fence, fence, false);
+            generateBox(level, boundingBox, 3, 1, 10, 7, 1, 10, fence, fence, false);
+            generateBox(level, boundingBox, 1, 0, 1, 7, 0, 4, planks, planks, false);
+            generateBox(level, boundingBox, 0, 0, 0, 0, 3, 5, cobble, cobble, false);
+            generateBox(level, boundingBox, 8, 0, 0, 8, 3, 5, cobble, cobble, false);
+            generateBox(level, boundingBox, 1, 0, 0, 7, 1, 0, cobble, cobble, false);
+            generateBox(level, boundingBox, 1, 0, 5, 7, 1, 5, cobble, cobble, false);
+            generateBox(level, boundingBox, 1, 2, 0, 7, 3, 0, planks, planks, false);
+            generateBox(level, boundingBox, 1, 2, 5, 7, 3, 5, planks, planks, false);
+            generateBox(level, boundingBox, 0, 4, 1, 8, 4, 1, planks, planks, false);
+            generateBox(level, boundingBox, 0, 4, 4, 8, 4, 4, planks, planks, false);
+            generateBox(level, boundingBox, 0, 5, 2, 8, 5, 3, planks, planks, false);
+            placeBlock(level, planks, 0, 4, 2, boundingBox);
+            placeBlock(level, planks, 0, 4, 3, boundingBox);
+            placeBlock(level, planks, 8, 4, 2, boundingBox);
+            placeBlock(level, planks, 8, 4, 3, boundingBox);
+
+            for (int i = -1; i <= 2; ++i) {
+                for (int x = 0; x <= 8; ++x) {
+                    placeBlock(level, stairsN, x, 4 + i, i, boundingBox);
+                    placeBlock(level, stairsS, x, 4 + i, 5 - i, boundingBox);
+                }
+            }
+
+            placeBlock(level, log, 0, 2, 1, boundingBox);
+            placeBlock(level, log, 0, 2, 4, boundingBox);
+            placeBlock(level, log, 8, 2, 1, boundingBox);
+            placeBlock(level, log, 8, 2, 4, boundingBox);
+            placeBlock(level, GLASS_PANE, 0, 2, 2, boundingBox);
+            placeBlock(level, GLASS_PANE, 0, 2, 3, boundingBox);
+            placeBlock(level, GLASS_PANE, 8, 2, 2, boundingBox);
+            placeBlock(level, GLASS_PANE, 8, 2, 3, boundingBox);
+            placeBlock(level, GLASS_PANE, 2, 2, 5, boundingBox);
+            placeBlock(level, GLASS_PANE, 3, 2, 5, boundingBox);
+            placeBlock(level, GLASS_PANE, 5, 2, 0, boundingBox);
+            placeBlock(level, GLASS_PANE, 6, 2, 5, boundingBox);
+            placeBlock(level, fence, 2, 1, 3, boundingBox);
+            placeBlock(level, BROWN_CARPET, 2, 2, 3, boundingBox);
+            placeBlock(level, planks, 1, 1, 4, boundingBox);
+            placeBlock(level, stairsN, 2, 1, 4, boundingBox);
+            placeBlock(level, stairsW, 1, 1, 3, boundingBox);
+            generateBox(level, boundingBox, 5, 0, 1, 7, 0, 3, DOUBLE_STONE_SLAB, DOUBLE_STONE_SLAB, false);
+            placeBlock(level, DOUBLE_STONE_SLAB, 6, 1, 1, boundingBox);
+            placeBlock(level, DOUBLE_STONE_SLAB, 6, 1, 2, boundingBox);
+            placeBlock(level, BlockState.AIR, 2, 1, 0, boundingBox);
+            placeBlock(level, BlockState.AIR, 2, 2, 0, boundingBox);
+            placeTorch(level, BlockFace.NORTH, 2, 3, 1, boundingBox);
+            placeDoor(level, boundingBox, random, 2, 1, 0, BlockFace.NORTH);
+
+            if (getBlock(level, 2, 0, -1, boundingBox).equals(BlockState.AIR) && !getBlock(level, 2, -1, -1, boundingBox).equals(BlockState.AIR)) {
+                placeBlock(level, stairsN, 2, 0, -1, boundingBox);
+
+                if (getBlock(level, 2, -1, -1, boundingBox).getId() == BlockID.GRASS_PATH) {
+                    placeBlock(level, GRASS, 2, -1, -1, boundingBox);
+                }
+            }
+
+            placeBlock(level, BlockState.AIR, 6, 1, 5, boundingBox);
+            placeBlock(level, BlockState.AIR, 6, 2, 5, boundingBox);
+            placeTorch(level, BlockFace.SOUTH, 6, 3, 4, boundingBox);
+            placeDoor(level, boundingBox, random, 6, 1, 5, BlockFace.SOUTH);
+
+            for (int x = 0; x < 9; ++x) {
+                for (int z = 0; z < 5; ++z) {
+                    fillAirColumnUp(level, x, 7, z, boundingBox);
+                    fillColumnDown(level, cobble, x, -1, z, boundingBox);
+                }
+            }
+
+            spawnVillagers(level, boundingBox, 4, 1, 2, 2);
+            return true;
+        }
+
+        @Override //\\ PigHouse::getVillagerProfession(int)
+        protected int getVillagerProfession(final int villagerCount, final int profession) {
+            return villagerCount == 0 ? EntityVillager.PROFESSION_BUTCHER : super.getVillagerProfession(villagerCount, profession);
+        }
+    }
+
+    public static class DoubleFarmland extends VillagePiece {
+        private final BlockState cropA;
+        private final BlockState cropB;
+        private final BlockState cropC;
+        private final BlockState cropD;
+
+        public DoubleFarmland(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
+            super(start, genDepth);
+            setOrientation(orientation);
+            this.boundingBox = boundingBox;
+            cropA = Farmland.selectCrops(random);
+            cropB = Farmland.selectCrops(random);
+            cropC = Farmland.selectCrops(random);
+            cropD = Farmland.selectCrops(random);
+        }
+
+        public static DoubleFarmland createPiece(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
+            final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 13, 4, 9, orientation);
+            return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new DoubleFarmland(start, genDepth, random, boundingBox, orientation) : null;
+        }
+
+        @Override
+        public String getType() {
+            return "ViDF";
+        }
+
+        @Override
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            if (horizPos < 0) {
+                horizPos = getAverageGroundHeight(level, boundingBox);
+
+                if (horizPos < 0) {
+                    return true;
+                }
+
+                this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 4 - 1, 0);
+            }
+
+            final BlockState log = getSpecificBlock(LOG);
+
+            generateBox(level, boundingBox, 0, 1, 0, 12, 4, 8, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 1, 0, 1, 2, 0, 7, FARMLAND, FARMLAND, false);
+            generateBox(level, boundingBox, 4, 0, 1, 5, 0, 7, FARMLAND, FARMLAND, false);
+            generateBox(level, boundingBox, 7, 0, 1, 8, 0, 7, FARMLAND, FARMLAND, false);
+            generateBox(level, boundingBox, 10, 0, 1, 11, 0, 7, FARMLAND, FARMLAND, false);
+            generateBox(level, boundingBox, 0, 0, 0, 0, 0, 8, log, log, false);
+            generateBox(level, boundingBox, 6, 0, 0, 6, 0, 8, log, log, false);
+            generateBox(level, boundingBox, 12, 0, 0, 12, 0, 8, log, log, false);
+            generateBox(level, boundingBox, 1, 0, 0, 11, 0, 0, log, log, false);
+            generateBox(level, boundingBox, 1, 0, 8, 11, 0, 8, log, log, false);
+            generateBox(level, boundingBox, 3, 0, 1, 3, 0, 7, WATER, WATER, false);
+            generateBox(level, boundingBox, 9, 0, 1, 9, 0, 7, WATER, WATER, false);
+
+            if (type != PopulatorVillage.Type.COLD) { //BE
+                for (int z = 1; z <= 7; ++z) {
+                    final int maxAgeA = 7;
+                    final int minAgeA = maxAgeA / 3;
+                    placeBlock(level, new BlockState(cropA.getId(), Mth.nextInt(random, minAgeA, maxAgeA)), 1, 1, z, boundingBox);
+                    placeBlock(level, new BlockState(cropA.getId(), Mth.nextInt(random, minAgeA, maxAgeA)), 2, 1, z, boundingBox);
+                    final int maxAgeB = 7;
+                    final int minAgeB = maxAgeB / 3;
+                    placeBlock(level, new BlockState(cropB.getId(), Mth.nextInt(random, minAgeB, maxAgeB)), 4, 1, z, boundingBox);
+                    placeBlock(level, new BlockState(cropB.getId(), Mth.nextInt(random, minAgeB, maxAgeB)), 5, 1, z, boundingBox);
+                    final int maxAgeC = 7;
+                    final int minAgeC = maxAgeC / 3;
+                    placeBlock(level, new BlockState(cropC.getId(), Mth.nextInt(random, minAgeC, maxAgeC)), 7, 1, z, boundingBox);
+                    placeBlock(level, new BlockState(cropC.getId(), Mth.nextInt(random, minAgeC, maxAgeC)), 8, 1, z, boundingBox);
+                    final int maxAgeD = 7;
+                    final int minAgeD = maxAgeD / 3;
+                    placeBlock(level, new BlockState(cropD.getId(), Mth.nextInt(random, minAgeD, maxAgeD)), 10, 1, z, boundingBox);
+                    placeBlock(level, new BlockState(cropD.getId(), Mth.nextInt(random, minAgeD, maxAgeD)), 11, 1, z, boundingBox);
+                }
+            }
+
+            for (int x = 0; x < 13; ++x) {
+                for (int z = 0; z < 9; ++z) {
+                    fillAirColumnUp(level, x, 4, z, boundingBox);
+                    fillColumnDown(level, DIRT, x, -1, z, boundingBox);
+                }
+            }
+
+            return true;
+        }
+    }
+
+    public static class Farmland extends VillagePiece {
+        private final BlockState cropA;
+        private final BlockState cropB;
+
+        public Farmland(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
+            super(start, genDepth);
+            setOrientation(orientation);
+            this.boundingBox = boundingBox;
+            cropA = selectCrops(random);
+            cropB = selectCrops(random);
+        }
+
+        //\\ Farmland::selectCrops(Random &,StartPiece &)
+        protected static BlockState selectCrops(final NukkitRandom random) {
+            return switch (random.nextBoundedInt(10)) {
+                case 0, 1 -> CARROTS;
+                case 2, 3 -> POTATOES;
+                case 4 -> BEETROOTS;
+                default -> WHEAT;
+            };
+        }
+
+        public static Farmland createPiece(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
+            final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 7, 4, 9, orientation);
+            return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new Farmland(start, genDepth, random, boundingBox, orientation) : null;
+        }
+
+        @Override
+        public String getType() {
+            return "ViF";
+        }
+
+        @Override
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            if (horizPos < 0) {
+                horizPos = getAverageGroundHeight(level, boundingBox);
+
+                if (horizPos < 0) {
+                    return true;
+                }
+
+                this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 4 - 1, 0);
+            }
+
+            final BlockState log = getSpecificBlock(LOG);
+
+            generateBox(level, boundingBox, 0, 1, 0, 6, 4, 8, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 1, 0, 1, 2, 0, 7, FARMLAND, FARMLAND, false);
+            generateBox(level, boundingBox, 4, 0, 1, 5, 0, 7, FARMLAND, FARMLAND, false);
+            generateBox(level, boundingBox, 0, 0, 0, 0, 0, 8, log, log, false);
+            generateBox(level, boundingBox, 6, 0, 0, 6, 0, 8, log, log, false);
+            generateBox(level, boundingBox, 1, 0, 0, 5, 0, 0, log, log, false);
+            generateBox(level, boundingBox, 1, 0, 8, 5, 0, 8, log, log, false);
+            generateBox(level, boundingBox, 3, 0, 1, 3, 0, 7, WATER, WATER, false);
+
+            if (type != PopulatorVillage.Type.COLD) { //BE
+                for (int z = 1; z <= 7; ++z) {
+                    final int maxAgeA = 7;
+                    final int minAgeA = maxAgeA / 3;
+                    placeBlock(level, new BlockState(cropA.getId(), Mth.nextInt(random, minAgeA, maxAgeA)), 1, 1, z, boundingBox);
+                    placeBlock(level, new BlockState(cropA.getId(), Mth.nextInt(random, minAgeA, maxAgeA)), 2, 1, z, boundingBox);
+                    final int maxAgeB = 7;
+                    final int minAgeB = maxAgeB / 3;
+                    placeBlock(level, new BlockState(cropB.getId(), Mth.nextInt(random, minAgeB, maxAgeB)), 4, 1, z, boundingBox);
+                    placeBlock(level, new BlockState(cropB.getId(), Mth.nextInt(random, minAgeB, maxAgeB)), 5, 1, z, boundingBox);
+                }
+            }
+
+            for (int x = 0; x < 7; ++x) {
+                for (int z = 0; z < 9; ++z) {
+                    fillAirColumnUp(level, x, 4, z, boundingBox);
+                    fillColumnDown(level, DIRT, x, -1, z, boundingBox);
+                }
+            }
+
+            return true;
+        }
+    }
+
+    public static class Smithy extends VillagePiece {
+        private boolean hasPlacedChest;
+
+        public Smithy(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
+            super(start, genDepth);
+            setOrientation(orientation);
+            this.boundingBox = boundingBox;
+        }
+
+        public static Smithy createPiece(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
+            final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 10, 6, 7, orientation);
+            return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new Smithy(start, genDepth, random, boundingBox, orientation) : null;
+        }
+
+        @Override
+        public String getType() {
+            return "ViS";
+        }
+
+        @Override
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            if (horizPos < 0) {
+                horizPos = getAverageGroundHeight(level, boundingBox);
+
+                if (horizPos < 0) {
+                    return true;
+                }
+
+                this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 6 - 1, 0);
+            }
+
+            final BlockState cobble = COBBLESTONE;
+            final BlockState stairsN = getSpecificBlock(OAK_STAIRS__N);
+            final BlockState stairsW = getSpecificBlock(OAK_STAIRS__W);
+            final BlockState planks = getSpecificBlock(PLANKS);
+            final BlockState cobbleStairsN = getSpecificBlock(COBBLESTONE_STAIRS__N);
+            final BlockState log = getSpecificBlock(LOG);
+            final BlockState fence = getSpecificBlock(OAK_FENCE);
+
+            generateBox(level, boundingBox, 0, 1, 0, 9, 4, 6, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 0, 0, 0, 9, 0, 6, cobble, cobble, false);
+            generateBox(level, boundingBox, 0, 4, 0, 9, 4, 6, cobble, cobble, false);
+            generateBox(level, boundingBox, 0, 5, 0, 9, 5, 6, STONE_SLAB, STONE_SLAB, false);
+            generateBox(level, boundingBox, 1, 5, 1, 8, 5, 5, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 1, 1, 0, 2, 3, 0, planks, planks, false);
+            generateBox(level, boundingBox, 0, 1, 0, 0, 4, 0, log, log, false);
+            generateBox(level, boundingBox, 3, 1, 0, 3, 4, 0, log, log, false);
+            generateBox(level, boundingBox, 0, 1, 6, 0, 4, 6, log, log, false);
+            placeBlock(level, planks, 3, 3, 1, boundingBox);
+            generateBox(level, boundingBox, 3, 1, 2, 3, 3, 2, planks, planks, false);
+            generateBox(level, boundingBox, 4, 1, 3, 5, 3, 3, planks, planks, false);
+            generateBox(level, boundingBox, 0, 1, 1, 0, 3, 5, planks, planks, false);
+            generateBox(level, boundingBox, 1, 1, 6, 5, 3, 6, planks, planks, false);
+            generateBox(level, boundingBox, 5, 1, 0, 5, 3, 0, fence, fence, false);
+            generateBox(level, boundingBox, 9, 1, 0, 9, 3, 0, fence, fence, false);
+            generateBox(level, boundingBox, 6, 1, 4, 9, 4, 6, cobble, cobble, false);
+            placeBlock(level, FLOWING_LAVA, 7, 1, 5, boundingBox);
+            placeBlock(level, FLOWING_LAVA, 8, 1, 5, boundingBox);
+            placeBlock(level, IRON_BARS, 9, 2, 5, boundingBox);
+            placeBlock(level, IRON_BARS, 9, 2, 4, boundingBox);
+            generateBox(level, boundingBox, 7, 2, 4, 8, 2, 5, BlockState.AIR, BlockState.AIR, false);
+            placeBlock(level, cobble, 6, 1, 3, boundingBox);
+
+            placeBlock(level, FURNACE, 6, 2, 3, boundingBox);
+            placeBlock(level, FURNACE, 6, 3, 3, boundingBox);
+
+            BlockVector3 vec = new BlockVector3(getWorldX(6, 3), getWorldY(2), getWorldZ(6, 3));
+            if (boundingBox.isInside(vec)) {
+                final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
+                if (chunk != null) {
+                    Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(),
+                            BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.FURNACE)));
+                }
+            }
+            vec = vec.up();
+            if (boundingBox.isInside(vec)) {
+                final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
+                if (chunk != null) {
+                    Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(),
+                            BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.FURNACE)));
+                }
+            }
+
+            placeBlock(level, DOUBLE_STONE_SLAB, 8, 1, 1, boundingBox);
+            placeBlock(level, GLASS_PANE, 0, 2, 2, boundingBox);
+            placeBlock(level, GLASS_PANE, 0, 2, 4, boundingBox);
+            placeBlock(level, GLASS_PANE, 2, 2, 6, boundingBox);
+            placeBlock(level, GLASS_PANE, 4, 2, 6, boundingBox);
+            placeBlock(level, fence, 2, 1, 4, boundingBox);
+            placeBlock(level, BROWN_CARPET, 2, 2, 4, boundingBox);
+            placeBlock(level, planks, 1, 1, 5, boundingBox);
+            placeBlock(level, stairsN, 2, 1, 5, boundingBox);
+            placeBlock(level, stairsW, 1, 1, 4, boundingBox);
+
+            if (!hasPlacedChest && boundingBox.isInside(new BlockVector3(getWorldX(5, 5), getWorldY(1), getWorldZ(5, 5)))) {
+                hasPlacedChest = true;
+
+                //\\ StructureHelpers::createChest(v7, v6, (int *)v4, v5, 5, 1, 5, v197, (__int64)&v204);
+                final BlockFace orientation = getOrientation();
+                placeBlock(level, new BlockState(Block.CHEST, (orientation == null ? BlockFace.NORTH : orientation).getOpposite().getIndex()), 5, 1, 5, boundingBox);
+
+                vec = new BlockVector3(getWorldX(5, 5), getWorldY(1), getWorldZ(5, 5));
+                if (boundingBox.isInside(vec)) {
+                    final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
+                    if (chunk != null) {
+                        final CompoundTag nbt = BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.CHEST);
+                        final ListTag<CompoundTag> itemList = new ListTag<>("Items");
+                        VillageBlacksmithChest.get().create(itemList, random);
+                        nbt.putList(itemList);
+                        Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+                    }
+                }
+            }
+
+            for (int x = 6; x <= 8; ++x) {
+                if (getBlock(level, x, 0, -1, boundingBox).equals(BlockState.AIR) && !getBlock(level, x, -1, -1, boundingBox).equals(BlockState.AIR)) {
+                    placeBlock(level, cobbleStairsN, x, 0, -1, boundingBox);
+
+                    if (getBlock(level, x, -1, -1, boundingBox).getId() == BlockID.GRASS_PATH) {
+                        placeBlock(level, GRASS, x, -1, -1, boundingBox);
+                    }
+                }
+            }
+
+            for (int x = 0; x < 10; ++x) {
+                for (int z = 0; z < 7; ++z) {
+                    fillAirColumnUp(level, x, 6, z, boundingBox);
+                    fillColumnDown(level, cobble, x, -1, z, boundingBox);
+                }
+            }
+
+            spawnVillagers(level, boundingBox, 7, 1, 1, 1);
+            return true;
+        }
+
+        @Override
+        protected int getVillagerProfession(final int villagerCount, final int profession) {
+            return EntityVillager.PROFESSION_BLACKSMITH;
+        }
+    }
+
+    public static class TwoRoomHouse extends VillagePiece {
+        public TwoRoomHouse(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
+            super(start, genDepth);
+            setOrientation(orientation);
+            this.boundingBox = boundingBox;
+        }
+
+        public static TwoRoomHouse createPiece(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation, final int genDepth) {
+            final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 9, 7, 12, orientation);
+            return isOkBox(boundingBox) && StructurePiece.findCollisionPiece(pieces, boundingBox) == null ? new TwoRoomHouse(start, genDepth, random, boundingBox, orientation) : null;
+        }
+
+        @Override
+        public String getType() {
+            return "ViTRH";
+        }
+
+        @Override
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            if (horizPos < 0) {
+                horizPos = getAverageGroundHeight(level, boundingBox);
+
+                if (horizPos < 0) {
+                    return true;
+                }
+
+                this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 7 - 1, 0);
+            }
+
+            final BlockState cobble = getSpecificBlock(COBBLESTONE);
+            final BlockState stairsN = getSpecificBlock(OAK_STAIRS__N);
+            final BlockState stairsS = getSpecificBlock(OAK_STAIRS__S);
+            final BlockState stairsE = getSpecificBlock(OAK_STAIRS__E);
+            final BlockState stairsW = getSpecificBlock(OAK_STAIRS__W);
+            final BlockState planks = getSpecificBlock(PLANKS);
+            final BlockState log = getSpecificBlock(LOG);
+
+            generateBox(level, boundingBox, 1, 1, 1, 7, 4, 4, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 2, 1, 6, 8, 4, 10, BlockState.AIR, BlockState.AIR, false);
+            generateBox(level, boundingBox, 2, 0, 5, 8, 0, 10, planks, planks, false);
+            generateBox(level, boundingBox, 1, 0, 1, 7, 0, 4, planks, planks, false);
+            generateBox(level, boundingBox, 0, 0, 0, 0, 3, 5, cobble, cobble, false);
+            generateBox(level, boundingBox, 8, 0, 0, 8, 3, 10, cobble, cobble, false);
+            generateBox(level, boundingBox, 1, 0, 0, 7, 2, 0, cobble, cobble, false);
+            generateBox(level, boundingBox, 1, 0, 5, 2, 1, 5, cobble, cobble, false);
+            generateBox(level, boundingBox, 2, 0, 6, 2, 3, 10, cobble, cobble, false);
+            generateBox(level, boundingBox, 3, 0, 10, 7, 3, 10, cobble, cobble, false);
+            generateBox(level, boundingBox, 1, 2, 0, 7, 3, 0, planks, planks, false);
+            generateBox(level, boundingBox, 1, 2, 5, 2, 3, 5, planks, planks, false);
+            generateBox(level, boundingBox, 0, 4, 1, 8, 4, 1, planks, planks, false);
+            generateBox(level, boundingBox, 0, 4, 4, 3, 4, 4, planks, planks, false);
+            generateBox(level, boundingBox, 0, 5, 2, 8, 5, 3, planks, planks, false);
+            placeBlock(level, planks, 0, 4, 2, boundingBox);
+            placeBlock(level, planks, 0, 4, 3, boundingBox);
+            placeBlock(level, planks, 8, 4, 2, boundingBox);
+            placeBlock(level, planks, 8, 4, 3, boundingBox);
+            placeBlock(level, planks, 8, 4, 4, boundingBox);
+
+            for (int i = -1; i <= 2; ++i) {
+                for (int x = 0; x <= 8; ++x) {
+                    placeBlock(level, stairsN, x, 4 + i, i, boundingBox);
+
+                    if ((i > -1 || x <= 1) && (i > 0 || x <= 3) && (i > 1 || x != 5)) {
+                        placeBlock(level, stairsS, x, 4 + i, 5 - i, boundingBox);
+                    }
+                }
+            }
+
+            generateBox(level, boundingBox, 3, 4, 5, 3, 4, 10, planks, planks, false);
+            generateBox(level, boundingBox, 7, 4, 2, 7, 4, 10, planks, planks, false);
+            generateBox(level, boundingBox, 4, 5, 4, 4, 5, 10, planks, planks, false);
+            generateBox(level, boundingBox, 6, 5, 4, 6, 5, 10, planks, planks, false);
+            generateBox(level, boundingBox, 5, 6, 3, 5, 6, 10, planks, planks, false);
+
+            for (int i = 4; i >= 1; --i) {
+                placeBlock(level, planks, i, 2 + i, 7 - i, boundingBox);
+
+                for (int z = 8 - i; z <= 10; ++z) {
+                    placeBlock(level, stairsE, i, 2 + i, z, boundingBox);
+                }
+            }
+
+            placeBlock(level, planks, 6, 6, 3, boundingBox);
+            placeBlock(level, planks, 7, 5, 4, boundingBox);
+            placeBlock(level, stairsW, 6, 6, 4, boundingBox);
+
+            for (int i = 6; i <= 8; ++i) {
+                for (int z = 5; z <= 10; ++z) {
+                    placeBlock(level, stairsW, i, 12 - i, z, boundingBox);
+                }
+            }
+
+            placeBlock(level, log, 0, 2, 1, boundingBox);
+            placeBlock(level, log, 0, 2, 4, boundingBox);
+            placeBlock(level, GLASS_PANE, 0, 2, 2, boundingBox);
+            placeBlock(level, GLASS_PANE, 0, 2, 3, boundingBox);
+            placeBlock(level, log, 4, 2, 0, boundingBox);
+            placeBlock(level, GLASS_PANE, 5, 2, 0, boundingBox);
+            placeBlock(level, log, 6, 2, 0, boundingBox);
+            placeBlock(level, log, 8, 2, 1, boundingBox);
+            placeBlock(level, GLASS_PANE, 8, 2, 2, boundingBox);
+            placeBlock(level, GLASS_PANE, 8, 2, 3, boundingBox);
+            placeBlock(level, log, 8, 2, 4, boundingBox);
+            placeBlock(level, planks, 8, 2, 5, boundingBox);
+            placeBlock(level, log, 8, 2, 6, boundingBox);
+            placeBlock(level, GLASS_PANE, 8, 2, 7, boundingBox);
+            placeBlock(level, GLASS_PANE, 8, 2, 8, boundingBox);
+            placeBlock(level, log, 8, 2, 9, boundingBox);
+            placeBlock(level, log, 2, 2, 6, boundingBox);
+            placeBlock(level, GLASS_PANE, 2, 2, 7, boundingBox);
+            placeBlock(level, GLASS_PANE, 2, 2, 8, boundingBox);
+            placeBlock(level, log, 2, 2, 9, boundingBox);
+            placeBlock(level, log, 4, 4, 10, boundingBox);
+            placeBlock(level, GLASS_PANE, 5, 4, 10, boundingBox);
+            placeBlock(level, log, 6, 4, 10, boundingBox);
+            placeBlock(level, planks, 5, 5, 10, boundingBox);
+            placeBlock(level, BlockState.AIR, 2, 1, 0, boundingBox);
+            placeBlock(level, BlockState.AIR, 2, 2, 0, boundingBox);
+            placeTorch(level, BlockFace.NORTH, 2, 3, 1, boundingBox);
+            placeDoor(level, boundingBox, random, 2, 1, 0, BlockFace.NORTH);
+            generateBox(level, boundingBox, 1, 0, -1, 3, 2, -1, BlockState.AIR, BlockState.AIR, false);
+
+            if (getBlock(level, 2, 0, -1, boundingBox).equals(BlockState.AIR) && !getBlock(level, 2, -1, -1, boundingBox).equals(BlockState.AIR)) {
+                placeBlock(level, stairsN, 2, 0, -1, boundingBox);
+
+                if (getBlock(level, 2, -1, -1, boundingBox).getId() == BlockID.GRASS_PATH) {
+                    placeBlock(level, GRASS, 2, -1, -1, boundingBox);
+                }
+            }
+
+            for (int x = 0; x < 9; ++x) {
+                for (int z = 0; z < 5; ++z) {
+                    fillAirColumnUp(level, x, 7, z, boundingBox);
+                    fillColumnDown(level, cobble, x, -1, z, boundingBox);
+                }
+            }
+
+            for (int x = 2; x < 9; ++x) {
+                for (int z = 5; z < 11; ++z) {
+                    fillAirColumnUp(level, x, 7, z, boundingBox);
+                    fillColumnDown(level, cobble, x, -1, z, boundingBox);
+                }
+            }
+
+            if (type == PopulatorVillage.Type.COLD) { //BE
+                //\\ StructureHelpers::createChest(v7, v6, 5, 1, 9, v279, (unsigned __int64)&Dst, v284, v285, v288, v289);
+                final BlockFace orientation = getOrientation();
+                placeBlock(level, new BlockState(Block.CHEST, (orientation == null ? BlockFace.NORTH : orientation).getOpposite().getIndex()), 5, 1, 9, boundingBox);
+
+                final BlockVector3 vec = new BlockVector3(getWorldX(5, 9), getWorldY(1), getWorldZ(5, 9));
+                if (boundingBox.isInside(vec)) {
+                    final BaseFullChunk chunk = level.getChunk(vec.x >> 4, vec.z >> 4);
+                    if (chunk != null) {
+                        final CompoundTag nbt = BlockEntity.getDefaultCompound(vec.asVector3(), BlockEntity.CHEST);
+                        final ListTag<CompoundTag> itemList = new ListTag<>("Items");
+                        VillageTwoRoomHouseChest.get().create(itemList, random);
+                        nbt.putList(itemList);
+                        Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(), nbt));
+                    }
+                }
+            }
+
+            spawnVillagers(level, boundingBox, 4, 1, 2, 2);
+            return true;
+        }
+    }
+
+    public static class LightPost extends VillagePiece {
+        public LightPost(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
+            super(start, genDepth);
+            setOrientation(orientation);
+            this.boundingBox = boundingBox;
+        }
+
+        public static BoundingBox findPieceBox(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation) {
+            final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 3, 4, 2, orientation);
+            return StructurePiece.findCollisionPiece(pieces, boundingBox) != null ? null : boundingBox;
+        }
+
+        @Override
+        public String getType() {
+            return "ViL";
+        }
+
+        @Override
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            if (horizPos < 0) {
+                horizPos = getAverageGroundHeight(level, boundingBox);
+
+                if (horizPos < 0) {
+                    return true;
+                }
+
+                this.boundingBox.move(0, horizPos - this.boundingBox.y1 + 4 - 1, 0);
+            }
+
+            final BlockState fence = getSpecificBlock(OAK_FENCE);
+            generateBox(level, boundingBox, 0, 0, 0, 2, 3, 1, BlockState.AIR, BlockState.AIR, false);
+            placeBlock(level, fence, 1, 0, 0, boundingBox);
+            placeBlock(level, fence, 1, 1, 0, boundingBox);
+            placeBlock(level, fence, 1, 2, 0, boundingBox);
+            placeBlock(level, BLACK_WOOL, 1, 3, 0, boundingBox);
+            placeTorch(level, BlockFace.EAST, 2, 3, 0, boundingBox);
+            placeTorch(level, BlockFace.NORTH, 1, 3, 1, boundingBox);
+            placeTorch(level, BlockFace.WEST, 0, 3, 0, boundingBox);
+            placeTorch(level, BlockFace.SOUTH, 1, 3, -1, boundingBox);
+            return true;
+        }
+    }
+
+    public static class StraightRoad extends Road {
+        private final int length;
+
+        public StraightRoad(final StartPiece start, final int genDepth, final NukkitRandom random, final BoundingBox boundingBox, final BlockFace orientation) {
+            super(start, genDepth);
+            setOrientation(orientation);
+            this.boundingBox = boundingBox;
+            length = Math.max(boundingBox.getXSpan(), boundingBox.getZSpan());
+        }
+
+        //\\ StraightRoad::findPieceBox(StartPiece *,std::vector<std::unique_ptr<StructurePiece,std::default_delete<StructurePiece>>,std::allocator<std::unique_ptr<StructurePiece,std::default_delete<StructurePiece>>>> &,Random &,int,int,int,int)
+        public static BoundingBox findPieceBox(final StartPiece start, final List<StructurePiece> pieces, final NukkitRandom random, final int x, final int y, final int z, final BlockFace orientation) {
+            for (int i = 7 * Mth.nextInt(random, 3, 5); i >= 7; i -= 7) {
+                final BoundingBox boundingBox = BoundingBox.orientBox(x, y, z, 0, 0, 0, 3, 3, i, orientation);
+
+                if (StructurePiece.findCollisionPiece(pieces, boundingBox) == null) {
+                    return boundingBox;
+                }
+            }
+
+            return null;
+        }
+
+        @Override
+        public String getType() {
+            return "ViSR";
+        }
+
+        @Override
+        //\\ StraightRoad::addChildren(StructurePiece *,std::vector<std::unique_ptr<StructurePiece,std::default_delete<StructurePiece>>,std::allocator<std::unique_ptr<StructurePiece,std::default_delete<StructurePiece>>>> &,Random &)
+        public void addChildren(final StructurePiece piece, final List<StructurePiece> pieces, final NukkitRandom random) {
+            boolean success = false;
+
+            for (int offset = random.nextBoundedInt(5); offset < length - 8; offset += 2 + random.nextBoundedInt(5)) {
+                final StructurePiece result = generateChildLeft((StartPiece) piece, pieces, random, 0, offset);
+                if (result != null) {
+                    offset += Math.max(result.getBoundingBox().getXSpan(), result.getBoundingBox().getZSpan());
+                    success = true;
+                }
+            }
+
+            for (int offset = random.nextBoundedInt(5); offset < length - 8; offset += 2 + random.nextBoundedInt(5)) {
+                final StructurePiece result = generateChildRight((StartPiece) piece, pieces, random, 0, offset);
+                if (result != null) {
+                    offset += Math.max(result.getBoundingBox().getXSpan(), result.getBoundingBox().getZSpan());
+                    success = true;
+                }
+            }
+
+            final BlockFace orientation = getOrientation();
+
+            if (success && random.nextBoundedInt(3) > 0 && orientation != null) {
+                switch (orientation) {
+                    case SOUTH ->
+                            generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z1 - 2, BlockFace.WEST, getGenDepth());
+                    case WEST ->
+                            generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
+                    case EAST ->
+                            generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 - 2, boundingBox.y0, boundingBox.z0 - 1, BlockFace.NORTH, getGenDepth());
+                    default ->
+                            generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0 - 1, boundingBox.y0, boundingBox.z0, BlockFace.WEST, getGenDepth());
+                }
+            }
+
+            if (success && random.nextBoundedInt(3) > 0 && orientation != null) {
+                switch (orientation) {
+                    case SOUTH ->
+                            generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z1 - 2, BlockFace.EAST, getGenDepth());
+                    case WEST ->
+                            generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x0, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
+                    case EAST ->
+                            generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 - 2, boundingBox.y0, boundingBox.z1 + 1, BlockFace.SOUTH, getGenDepth());
+                    default ->
+                            generateAndAddRoadPiece((StartPiece) piece, pieces, random, boundingBox.x1 + 1, boundingBox.y0, boundingBox.z0, BlockFace.EAST, getGenDepth());
+                }
+            }
+        }
+
+        @Override //\\ StraightRoad::postProcess(BlockSource *,Random &,BoundingBox const &)
+        public boolean postProcess(final ChunkManager level, final NukkitRandom random, final BoundingBox boundingBox, final int chunkX, final int chunkZ) {
+            final BlockState path = getSpecificBlock(GRASS_PATH);
+            final BlockState planks = getSpecificBlock(PLANKS);
+            final BlockState gravel = getSpecificBlock(GRAVEL);
+            final BlockState cobble = getSpecificBlock(COBBLESTONE);
+
+            for (int x = this.boundingBox.x0; x <= this.boundingBox.x1; ++x) {
+                for (int z = this.boundingBox.z0; z <= this.boundingBox.z1; ++z) {
+                    final BlockVector3 vec = new BlockVector3(x, 64 + yOffset, z);
+
+                    if (boundingBox.isInside(vec)) {
+                        final BaseFullChunk chunk = level.getChunk(chunkX, chunkZ);
+                        if (chunk == null) {
+                            vec.y = 63 - 1 + yOffset;
+                        } else {
+                            final int cx = x & 0xf;
+                            final int cz = z & 0xf;
+                            int y = chunk.getHighestBlockAt(cx, cz);
+                            int id = chunk.getBlockId(cx, y, cz);
+                            while (Block.transparent[id] && y > 63 - 1 + yOffset) {
+                                id = chunk.getBlockId(cx, --y, cz);
+                            }
+                            vec.y = y;
+                        }
+
+                        if (vec.y < 63 + yOffset) {
+                            vec.y = 63 - 1 + yOffset;
+                        }
+
+                        while (vec.y >= 63 - 1 + yOffset) {
+                            final int block = level.getBlockIdAt(vec.x, vec.y, vec.z);
+
+                            if (block == BlockID.GRASS && level.getBlockIdAt(vec.x, vec.y + 1, vec.z) == BlockID.AIR) {
+                                level.setBlockAt(vec.x, vec.y, vec.z, path.getId(), path.getMeta());
+                                break;
+                            }
+                            if (block == BlockID.WATER || block == BlockID.STILL_WATER || block == BlockID.LAVA || block == BlockID.STILL_LAVA) {
+                                level.setBlockAt(vec.x, vec.y, vec.z, planks.getId(), planks.getMeta());
+                                break;
+                            }
+                            if (block == BlockID.SAND || block == BlockID.SANDSTONE || block == BlockID.RED_SANDSTONE) {
+                                level.setBlockAt(vec.x, vec.y, vec.z, gravel.getId(), gravel.getMeta());
+                                level.setBlockAt(vec.x, vec.y - 1, vec.z, cobble.getId(), cobble.getMeta());
+                                break;
+                            }
+
+                            --vec.y;
+                        }
+                    }
+                }
+            }
+
+            return true;
+        }
+    }
 }

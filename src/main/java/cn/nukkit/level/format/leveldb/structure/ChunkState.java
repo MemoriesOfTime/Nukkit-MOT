@@ -4,5 +4,5 @@ public enum ChunkState {
     NEW,
     GENERATED,
     POPULATED,
-    FINISHED;
+    FINISHED
 }

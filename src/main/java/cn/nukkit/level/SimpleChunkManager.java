@@ -74,7 +74,7 @@ public class SimpleChunkManager implements ChunkManager {
 
     @Override
     public int getBlockDataAt(int x, int y, int z) {
-       return this.getBlockDataAt(x, y, z, 0);
+        return this.getBlockDataAt(x, y, z, 0);
     }
 
     @Override

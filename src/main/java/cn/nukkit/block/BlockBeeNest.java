@@ -41,7 +41,7 @@ public class BlockBeeNest extends BlockBeehive {
     public double getResistance() {
         return 1.5;
     }
-    
+
     @Override
     public Item[] getDrops(Item item) {
         return Item.EMPTY_ARRAY;

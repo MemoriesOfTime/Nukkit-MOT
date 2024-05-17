@@ -14,6 +14,22 @@ public class PopulatorNetherWart extends Populator {
     private int randomAmount;
     private int baseAmount;
 
+    private static boolean canNetherWartStay(FullChunk chunk, int x, int y, int z) {
+        return (chunk.getBlockId(x, y, z) == Block.AIR) && chunk.getBlockId(x, y - 1, z) == Block.SOUL_SAND;
+    }
+
+    private static int getHighestWorkableBlock(FullChunk chunk, int x, int z) {
+        int y;
+
+        for (y = 0; y <= 127; ++y) {
+            int b = chunk.getBlockId(x, y, z);
+            if (b == Block.AIR) {
+                break;
+            }
+        }
+        return y == 0 ? -1 : y;
+    }
+
     public void setRandomAmount(int randomAmount) {
         this.randomAmount = randomAmount;
     }
@@ -33,21 +49,5 @@ public class PopulatorNetherWart extends Populator {
                 chunk.setBlock(x, y, z, Block.NETHER_WART_BLOCK);
             }
         }
-    }
-
-    private static boolean canNetherWartStay(FullChunk chunk, int x, int y, int z) {
-        return (chunk.getBlockId(x, y, z) == Block.AIR) && chunk.getBlockId(x, y - 1, z) == Block.SOUL_SAND;
-    }
-
-    private static int getHighestWorkableBlock(FullChunk chunk, int x, int z) {
-        int y;
-
-        for (y = 0; y <= 127; ++y) {
-            int b = chunk.getBlockId(x, y, z);
-            if (b == Block.AIR) {
-                break;
-            }
-        }
-        return y == 0 ? -1 : y;
     }
 }

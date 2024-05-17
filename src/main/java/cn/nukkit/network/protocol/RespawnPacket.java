@@ -29,7 +29,7 @@ public class RespawnPacket extends DataPacket {
         this.z = v.z;
         if (protocol >= 388) {
             this.respawnState = this.getByte();
-            this.runtimeEntityId  = this.getEntityRuntimeId();
+            this.runtimeEntityId = this.getEntityRuntimeId();
         }
     }
 

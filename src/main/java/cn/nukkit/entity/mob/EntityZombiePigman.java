@@ -58,7 +58,7 @@ public class EntityZombiePigman extends EntityWalkingMob implements EntitySmite 
         }
 
         this.fireProof = true;
-        this.setDamage(new int[] { 0, 5, 9, 13 });
+        this.setDamage(new int[]{0, 5, 9, 13});
     }
 
     @Override

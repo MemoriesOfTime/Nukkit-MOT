@@ -14,9 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BlockUpdateScheduler {
 
     private final Level level;
-    private long lastTick;
     private final Long2ObjectNonBlockingMap<Set<BlockUpdateEntry>> queuedUpdates;
-
+    private long lastTick;
     private Set<BlockUpdateEntry> pendingUpdates;
 
     public BlockUpdateScheduler(Level level, long currentTick) {

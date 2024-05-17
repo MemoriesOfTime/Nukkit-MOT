@@ -19,13 +19,13 @@ public class EntityZoglin extends EntityWalkingMob implements EntitySmite {
 
     public final static int NETWORK_ID = 126;
 
+    public EntityZoglin(FullChunk chunk, CompoundTag nbt) {
+        super(chunk, nbt);
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
-    }
-
-    public EntityZoglin(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
     }
 
     @Override

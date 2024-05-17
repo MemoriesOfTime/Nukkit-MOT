@@ -273,6 +273,11 @@ public class BlockNoteblock extends BlockSolid implements BlockEntityHolder<Bloc
         return super.onUpdate(type);
     }
 
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.WOOD_BLOCK_COLOR;
+    }
+
     public enum Instrument {
         PIANO(Sound.NOTE_HARP),
         BASS_DRUM(Sound.NOTE_BD),
@@ -300,10 +305,5 @@ public class BlockNoteblock extends BlockSolid implements BlockEntityHolder<Bloc
         public Sound getSound() {
             return sound;
         }
-    }
-
-    @Override
-    public BlockColor getColor() {
-        return BlockColor.WOOD_BLOCK_COLOR;
     }
 }

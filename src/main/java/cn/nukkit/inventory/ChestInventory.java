@@ -89,12 +89,12 @@ public class ChestInventory extends ContainerInventory {
         }
     }
 
-    public void setDoubleInventory(DoubleChestInventory doubleInventory) {
-        this.doubleInventory = doubleInventory;
-    }
-
     public DoubleChestInventory getDoubleInventory() {
         return doubleInventory;
+    }
+
+    public void setDoubleInventory(DoubleChestInventory doubleInventory) {
+        this.doubleInventory = doubleInventory;
     }
 
     @Override

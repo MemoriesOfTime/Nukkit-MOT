@@ -19,19 +19,17 @@ import cn.nukkit.utils.Utils;
 public class EntityLightning extends Entity implements EntityLightningStrike {
 
     public static final int NETWORK_ID = 93;
-
-    private boolean isEffect = true;
-
     public int state;
     public int liveTime;
+    private boolean isEffect = true;
+
+    public EntityLightning(FullChunk chunk, CompoundTag nbt) {
+        super(chunk, nbt);
+    }
 
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
-    }
-
-    public EntityLightning(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
     }
 
     @Override

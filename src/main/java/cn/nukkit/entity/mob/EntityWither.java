@@ -30,7 +30,7 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     public static final int NETWORK_ID = 52;
 
     /**
-     *  Whether the wither is exploded and dying
+     * Whether the wither is exploded and dying
      */
     private boolean exploded;
     private boolean wasExplosion;

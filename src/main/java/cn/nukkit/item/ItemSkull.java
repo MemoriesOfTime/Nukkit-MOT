@@ -31,7 +31,7 @@ public class ItemSkull extends Item {
 
     public static String getItemSkullName(int meta) {
         switch (meta) {
-            case WITHER_SKELETON_SKULL :
+            case WITHER_SKELETON_SKULL:
                 return "Wither Skeleton Skull";
             case ZOMBIE_HEAD:
                 return "Zombie Head";

@@ -9,6 +9,15 @@ public class ByteTag extends NumberTag<Integer> {
 
     public int data;
 
+    public ByteTag(String name) {
+        super(name);
+    }
+
+    public ByteTag(String name, int data) {
+        super(name);
+        this.data = data;
+    }
+
     @Override
     public Integer getData() {
         return data;
@@ -17,15 +26,6 @@ public class ByteTag extends NumberTag<Integer> {
     @Override
     public void setData(Integer data) {
         this.data = data == null ? 0 : data;
-    }
-
-    public ByteTag(String name) {
-        super(name);
-    }
-
-    public ByteTag(String name, int data) {
-        super(name);
-        this.data = data;
     }
 
     @Override

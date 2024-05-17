@@ -17,7 +17,7 @@ public class Data3dSerializer {
     public static void serialize(WriteBatch db, LevelDBChunk chunk) {
         DimensionData dimensionData = chunk.getProvider().getLevel().getDimensionData();
 
-        ByteBuf buffer  = ByteBufAllocator.DEFAULT.ioBuffer();
+        ByteBuf buffer = ByteBufAllocator.DEFAULT.ioBuffer();
         try {
             byte[] heightMap = chunk.getHeightMapArray();
             for (int height : heightMap) {

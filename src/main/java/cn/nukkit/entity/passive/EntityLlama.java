@@ -23,16 +23,17 @@ import java.util.Objects;
 public class EntityLlama extends EntityHorseBase {
 
     public static final int NETWORK_ID = 29;
-
-    private int variant;
-
     private static final int[] VARIANTS = {0, 1, 2, 3};
-
+    private int variant;
     private int attackTicks;
     private Entity damagedBy;
 
     public EntityLlama(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+    }
+
+    private static int getRandomVariant() {
+        return VARIANTS[Utils.rand(0, VARIANTS.length - 1)];
     }
 
     @Override
@@ -151,7 +152,7 @@ public class EntityLlama extends EntityHorseBase {
         if (canTarget) {
             if (this.isInLove()) {
                 return creature instanceof BaseEntity && ((BaseEntity) creature).isInLove() && creature.isAlive() && !creature.closed && creature.getNetworkId() == this.getNetworkId() && distance <= 100;
-            }else if (creature instanceof Player player) {
+            } else if (creature instanceof Player player) {
                 return player.spawned && player.isAlive() && !player.closed &&
                         this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 40;
             }
@@ -168,9 +169,5 @@ public class EntityLlama extends EntityHorseBase {
     @Override
     public void onPlayerInput(Player player, double strafe, double forward) {
         // can't be controlled
-    }
-
-    private static int getRandomVariant() {
-        return VARIANTS[Utils.rand(0, VARIANTS.length - 1)];
     }
 }

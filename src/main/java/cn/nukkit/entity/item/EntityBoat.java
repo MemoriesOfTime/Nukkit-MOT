@@ -49,9 +49,8 @@ public class EntityBoat extends EntityVehicle {
     public static final double SINKING_DEPTH = 0.07;
     public static final double SINKING_SPEED = 0.0005;
     public static final double SINKING_MAX_SPEED = 0.005;
-
-    protected boolean sinking = true;
     public int woodID;
+    protected boolean sinking = true;
     private boolean inWater;
 
     public EntityBoat(FullChunk chunk, CompoundTag nbt) {

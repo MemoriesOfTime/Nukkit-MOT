@@ -18,6 +18,10 @@ public class EntityEndCrystal extends Entity implements EntityExplosive {
 
     protected boolean detonated = false;
 
+    public EntityEndCrystal(FullChunk chunk, CompoundTag nbt) {
+        super(chunk, nbt);
+    }
+
     @Override
     public float getLength() {
         return 1.0f;
@@ -36,10 +40,6 @@ public class EntityEndCrystal extends Entity implements EntityExplosive {
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
-    }
-
-    public EntityEndCrystal(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
     }
 
     @Override

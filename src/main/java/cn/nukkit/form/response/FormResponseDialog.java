@@ -8,19 +8,19 @@ import lombok.Getter;
 @Getter
 public class FormResponseDialog extends FormResponse {
 
-    private long entityRuntimeId;
-    private String data;
+    private final long entityRuntimeId;
+    private final String data;
     private ElementDialogButton clickedButton;//can be null
-    private String sceneName;
-    private NPCRequestPacket.RequestType requestType;
-    private int skinType;
+    private final String sceneName;
+    private final NPCRequestPacket.RequestType requestType;
+    private final int skinType;
 
     public FormResponseDialog(NPCRequestPacket packet, FormWindowDialog dialog) {
         this.entityRuntimeId = packet.entityRuntimeId;
         this.data = packet.commandString;
         try {
             this.clickedButton = dialog.getButtons().get(packet.actionType);
-        }catch (IndexOutOfBoundsException e) {
+        } catch (IndexOutOfBoundsException e) {
             this.clickedButton = null;
         }
         this.sceneName = packet.sceneName;

@@ -29,7 +29,7 @@ public class OpCommand extends VanillaCommand {
         if (!this.testPermission(sender)) {
             return true;
         }
-        
+
         if (sender instanceof Player && !(Server.getInstance().opInGame)) {
             sender.sendMessage("\u00A7cCan't use this command in game");
             return true;

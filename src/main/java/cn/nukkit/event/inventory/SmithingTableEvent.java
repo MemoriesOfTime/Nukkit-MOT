@@ -30,17 +30,11 @@ import cn.nukkit.item.Item;
  */
 public class SmithingTableEvent extends InventoryEvent implements Cancellable {
     private static final HandlerList handlers = new HandlerList();
-
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
     private final Item equipmentItem;
     private final Item resultItem;
     private final Item ingredientItem;
     private final Item templateItem;
     private final Player player;
-
     public SmithingTableEvent(SmithingInventory inventory, Item equipmentItem, Item resultItem, Item ingredientItem, Item templateItem, Player player) {
         super(inventory);
         this.equipmentItem = equipmentItem;
@@ -48,6 +42,10 @@ public class SmithingTableEvent extends InventoryEvent implements Cancellable {
         this.ingredientItem = ingredientItem;
         this.templateItem = templateItem;
         this.player = player;
+    }
+
+    public static HandlerList getHandlers() {
+        return handlers;
     }
 
     public Item getEquipmentItem() {

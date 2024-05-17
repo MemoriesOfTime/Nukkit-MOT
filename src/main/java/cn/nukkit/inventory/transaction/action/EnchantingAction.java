@@ -7,7 +7,7 @@ import lombok.Getter;
 public class EnchantingAction extends InventoryAction {
 
     @Getter
-    private int type;
+    private final int type;
 
     public EnchantingAction(Item source, Item target, int type) {
         super(source, target);

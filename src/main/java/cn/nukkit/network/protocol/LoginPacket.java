@@ -18,14 +18,60 @@ import java.util.*;
 public class LoginPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.LOGIN_PACKET;
-
+    private static final Gson GSON = new Gson();
     public String username;
-    private int protocol_;
     public UUID clientUUID;
     public long clientId;
     public Skin skin;
+    private int protocol_;
 
-    private static final Gson GSON = new Gson();
+    private static JsonObject decodeToken(String token) {
+        String[] base = token.split("\\.");
+        if (base.length < 2) return null;
+        return GSON.fromJson(new String(Base64.getDecoder().decode(base[1]), StandardCharsets.UTF_8), JsonObject.class);
+    }
+
+    private static SkinAnimation getAnimation(int protocol, JsonObject element) {
+        float frames = element.get("Frames").getAsFloat();
+        int type = element.get("Type").getAsInt();
+        byte[] data = Base64.getDecoder().decode(element.get("Image").getAsString());
+        int width = element.get("ImageWidth").getAsInt();
+        int height = element.get("ImageHeight").getAsInt();
+        int expression = protocol >= ProtocolInfo.v1_16_100 ? element.get("AnimationExpression").getAsInt() : 0;
+        return new SkinAnimation(new SerializedImage(width, height, data), type, frames, expression);
+    }
+
+    private static SerializedImage getImage(JsonObject token, String name) {
+        if (token.has(name + "Data")) {
+            byte[] skinImage = Base64.getDecoder().decode(token.get(name + "Data").getAsString());
+            if (token.has(name + "ImageHeight") && token.has(name + "ImageWidth")) {
+                int width = token.get(name + "ImageWidth").getAsInt();
+                int height = token.get(name + "ImageHeight").getAsInt();
+                return new SerializedImage(width, height, skinImage);
+            } else {
+                return SerializedImage.fromLegacy(skinImage);
+            }
+        }
+        return SerializedImage.EMPTY;
+    }
+
+    private static PersonaPiece getPersonaPiece(JsonObject object) {
+        String pieceId = object.get("PieceId").getAsString();
+        String pieceType = object.get("PieceType").getAsString();
+        String packId = object.get("PackId").getAsString();
+        boolean isDefault = object.get("IsDefault").getAsBoolean();
+        String productId = object.get("ProductId").getAsString();
+        return new PersonaPiece(pieceId, pieceType, packId, isDefault, productId);
+    }
+
+    public static PersonaPieceTint getTint(JsonObject object) {
+        String pieceType = object.get("PieceType").getAsString();
+        List<String> colors = new ArrayList<>();
+        for (JsonElement element : object.get("Colors").getAsJsonArray()) {
+            colors.add(element.getAsString()); // remove #
+        }
+        return new PersonaPieceTint(pieceType, colors);
+    }
 
     @Override
     public byte pid() {
@@ -151,7 +197,7 @@ public class LoginPacket extends DataPacket {
                     skin.setFullSkinId(fullSkinId);
                     if (skin.getCapeId() != null) {
                         skin.setSkinId(fullSkinId.substring(0, fullSkinId.length() - skin.getCapeId().length()));
-                    }else {
+                    } else {
                         skin.setSkinId(fullSkinId);
                     }
                 }
@@ -210,54 +256,6 @@ public class LoginPacket extends DataPacket {
                 }
             }
         }
-    }
-
-    private static JsonObject decodeToken(String token) {
-        String[] base = token.split("\\.");
-        if (base.length < 2) return null;
-        return GSON.fromJson(new String(Base64.getDecoder().decode(base[1]), StandardCharsets.UTF_8), JsonObject.class);
-    }
-
-    private static SkinAnimation getAnimation(int protocol, JsonObject element) {
-        float frames = element.get("Frames").getAsFloat();
-        int type = element.get("Type").getAsInt();
-        byte[] data = Base64.getDecoder().decode(element.get("Image").getAsString());
-        int width = element.get("ImageWidth").getAsInt();
-        int height = element.get("ImageHeight").getAsInt();
-        int expression = protocol >= ProtocolInfo.v1_16_100 ? element.get("AnimationExpression").getAsInt() : 0;
-        return new SkinAnimation(new SerializedImage(width, height, data), type, frames, expression);
-    }
-
-    private static SerializedImage getImage(JsonObject token, String name) {
-        if (token.has(name + "Data")) {
-            byte[] skinImage = Base64.getDecoder().decode(token.get(name + "Data").getAsString());
-            if (token.has(name + "ImageHeight") && token.has(name + "ImageWidth")) {
-                int width = token.get(name + "ImageWidth").getAsInt();
-                int height = token.get(name + "ImageHeight").getAsInt();
-                return new SerializedImage(width, height, skinImage);
-            } else {
-                return SerializedImage.fromLegacy(skinImage);
-            }
-        }
-        return SerializedImage.EMPTY;
-    }
-
-    private static PersonaPiece getPersonaPiece(JsonObject object) {
-        String pieceId = object.get("PieceId").getAsString();
-        String pieceType = object.get("PieceType").getAsString();
-        String packId = object.get("PackId").getAsString();
-        boolean isDefault = object.get("IsDefault").getAsBoolean();
-        String productId = object.get("ProductId").getAsString();
-        return new PersonaPiece(pieceId, pieceType, packId, isDefault, productId);
-    }
-
-    public static PersonaPieceTint getTint(JsonObject object) {
-        String pieceType = object.get("PieceType").getAsString();
-        List<String> colors = new ArrayList<>();
-        for (JsonElement element : object.get("Colors").getAsJsonArray()) {
-            colors.add(element.getAsString()); // remove #
-        }
-        return new PersonaPieceTint(pieceType, colors);
     }
 
     private static class MapTypeToken extends TypeToken<Map<String, List<String>>> {

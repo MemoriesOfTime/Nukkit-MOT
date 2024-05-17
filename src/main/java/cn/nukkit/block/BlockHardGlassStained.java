@@ -14,6 +14,7 @@ public class BlockHardGlassStained extends BlockTransparentMeta {
     public BlockHardGlassStained(int meta) {
         super(meta);
     }
+
     @Override
     public int getId() {
         return HARD_STAINED_GLASS;

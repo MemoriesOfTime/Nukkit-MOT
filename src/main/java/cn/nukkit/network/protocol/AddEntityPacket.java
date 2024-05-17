@@ -24,6 +24,24 @@ import java.util.Map;
 public class AddEntityPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.ADD_ENTITY_PACKET;
+    public Map<Integer, String> mapping;
+    public long entityUniqueId;
+    public long entityRuntimeId;
+    public int type;
+    public String id;
+    public float x;
+    public float y;
+    public float z;
+    public float speedX = 0f;
+    public float speedY = 0f;
+    public float speedZ = 0f;
+    public float yaw;
+    public float pitch;
+    public float headYaw;
+    public float bodyYaw = -1;
+    public EntityMetadata metadata = new EntityMetadata();
+    public Attribute[] attributes = new Attribute[0];
+    public EntityLink[] links = new EntityLink[0];
 
     public static void setupLegacyIdentifiers(Map<Integer, String> mapping, int protocolId) {
         mapping.put(51, "minecraft:npc");
@@ -159,7 +177,7 @@ public class AddEntityPacket extends DataPacket {
             mapping.put(EntityNPCEntity.NETWORK_ID, "minecraft:npc");
         }
 
-        if (protocolId < ProtocolInfo.v1_17_0 ) {
+        if (protocolId < ProtocolInfo.v1_17_0) {
             mapping.put(EntityGoat.NETWORK_ID, mapping.get(EntitySheep.NETWORK_ID));
             mapping.put(EntityGlowSquid.NETWORK_ID, mapping.get(EntitySquid.NETWORK_ID));
             mapping.put(EntityAxolotl.NETWORK_ID, mapping.get(EntityTropicalFish.NETWORK_ID));
@@ -195,25 +213,6 @@ public class AddEntityPacket extends DataPacket {
         return NETWORK_ID;
     }
 
-    public Map<Integer, String> mapping;
-    public long entityUniqueId;
-    public long entityRuntimeId;
-    public int type;
-    public String id;
-    public float x;
-    public float y;
-    public float z;
-    public float speedX = 0f;
-    public float speedY = 0f;
-    public float speedZ = 0f;
-    public float yaw;
-    public float pitch;
-    public float headYaw;
-    public float bodyYaw = -1;
-    public EntityMetadata metadata = new EntityMetadata();
-    public Attribute[] attributes = new Attribute[0];
-    public EntityLink[] links = new EntityLink[0];
-
     @Override
     public void decode() {
 
@@ -226,7 +225,7 @@ public class AddEntityPacket extends DataPacket {
         this.putEntityRuntimeId(this.entityRuntimeId);
         if (this.protocol < ProtocolInfo.v1_8_0) {
             this.putUnsignedVarInt(this.type);
-        }else {
+        } else {
             this.putString(this.getIdentifier());
         }
         this.putVector3f(this.x, this.y, this.z);

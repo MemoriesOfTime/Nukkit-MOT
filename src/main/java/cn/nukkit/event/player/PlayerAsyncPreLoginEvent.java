@@ -18,22 +18,15 @@ import java.util.function.Consumer;
 public class PlayerAsyncPreLoginEvent extends PlayerEvent {
 
     private static final HandlerList handlers = new HandlerList();
-
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
     private final String name;
     private final UUID uuid;
     private final LoginChainData chainData;
-    private Skin skin;
     private final String address;
     private final int port;
-
+    private final List<Consumer<Server>> scheduledActions = new ArrayList<>();
+    private Skin skin;
     private LoginResult loginResult = LoginResult.SUCCESS;
     private String kickMessage = "Plugin Reason";
-
-    private final List<Consumer<Server>> scheduledActions = new ArrayList<>();
 
     public PlayerAsyncPreLoginEvent(String name, UUID uuid, LoginChainData chainData, Skin skin, String address, int port) {
         this.name = name;
@@ -42,6 +35,10 @@ public class PlayerAsyncPreLoginEvent extends PlayerEvent {
         this.skin = skin;
         this.address = address;
         this.port = port;
+    }
+
+    public static HandlerList getHandlers() {
+        return handlers;
     }
 
     public String getName() {

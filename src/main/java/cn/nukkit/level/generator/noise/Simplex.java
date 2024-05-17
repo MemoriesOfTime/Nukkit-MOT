@@ -7,18 +7,6 @@ import cn.nukkit.math.NukkitRandom;
  * Nukkit Project
  */
 public class Simplex extends Perlin {
-    protected static double SQRT_3;
-    protected static double SQRT_5;
-    protected static double F2;
-    protected static double G2;
-    protected static double G22;
-    protected static double F3;
-    protected static double G3;
-    protected static double F4;
-    protected static double G4;
-    protected static double G42;
-    protected static double G43;
-    protected static double G44;
     protected static final int[][] grad4 = {{0, 1, 1, 1}, {0, 1, 1, -1}, {0, 1, -1, 1}, {0, 1, -1, -1},
             {0, -1, 1, 1}, {0, -1, 1, -1}, {0, -1, -1, 1}, {0, -1, -1, -1},
             {1, 0, 1, 1}, {1, 0, 1, -1}, {1, 0, -1, 1}, {1, 0, -1, -1},
@@ -36,6 +24,18 @@ public class Simplex extends Perlin {
             {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0},
             {2, 0, 1, 3}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {3, 0, 1, 2}, {3, 0, 2, 1}, {0, 0, 0, 0}, {3, 1, 2, 0},
             {2, 1, 0, 3}, {0, 0, 0, 0}, {0, 0, 0, 0}, {0, 0, 0, 0}, {3, 1, 0, 2}, {0, 0, 0, 0}, {3, 2, 0, 1}, {3, 2, 1, 0}};
+    protected static double SQRT_3;
+    protected static double SQRT_5;
+    protected static double F2;
+    protected static double G2;
+    protected static double G22;
+    protected static double F3;
+    protected static double G3;
+    protected static double F4;
+    protected static double G4;
+    protected static double G42;
+    protected static double G43;
+    protected static double G44;
     protected final double offsetW;
 
     public Simplex(NukkitRandom random, double octaves, double persistence) {

@@ -16,12 +16,6 @@ import java.util.UUID;
 public class AddPlayerPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.ADD_PLAYER_PACKET;
-
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
-    }
-
     public UUID uuid;
     public String username;
     public long entityUniqueId;
@@ -43,6 +37,11 @@ public class AddPlayerPacket extends DataPacket {
     public EntityMetadata metadata = new EntityMetadata();
     public String deviceId = "";
     public int buildPlatform = -1;
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
 
     @Override
     public void decode() {
@@ -81,7 +80,7 @@ public class AddPlayerPacket extends DataPacket {
                 this.putUnsignedVarInt(0);
                 this.putUnsignedVarInt(0);
                 this.putUnsignedVarInt(0);
-            }else if (protocol >= ProtocolInfo.v1_19_40) {
+            } else if (protocol >= ProtocolInfo.v1_19_40) {
                 this.putUnsignedVarInt(0); // Entity properties int
                 this.putUnsignedVarInt(0); // Entity properties float
             }

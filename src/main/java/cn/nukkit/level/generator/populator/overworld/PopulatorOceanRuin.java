@@ -28,81 +28,81 @@ import java.util.function.Consumer;
 
 public class PopulatorOceanRuin extends Populator {
     protected static final List<ChunkPosition> ADJACENT_CHUNKS = Lists.newArrayList(
-        new ChunkPosition(-1, -1),
-        new ChunkPosition(-1, 0),
-        new ChunkPosition(-1, 1),
-        new ChunkPosition(0, -1),
-        new ChunkPosition(0, 1),
-        new ChunkPosition(1, -1),
-        new ChunkPosition(1, 0),
-        new ChunkPosition(1, 1)
+            new ChunkPosition(-1, -1),
+            new ChunkPosition(-1, 0),
+            new ChunkPosition(-1, 1),
+            new ChunkPosition(0, -1),
+            new ChunkPosition(0, 1),
+            new ChunkPosition(1, -1),
+            new ChunkPosition(1, 0),
+            new ChunkPosition(1, 1)
     );
 
     protected static final int SPACING = 20;
     protected static final int SEPARATION = 8;
     protected static final ReadableStructureTemplate[] WARM_RUINS = {
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm1.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm2.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm3.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm4.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm5.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm6.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm7.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm8.nbt"))
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm1.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm2.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm3.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm4.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm5.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm6.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm7.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin_warm8.nbt"))
     };
     protected static final ReadableStructureTemplate[] RUINS_BRICK = {
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin1_brick.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin2_brick.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin3_brick.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin4_brick.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin5_brick.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin6_brick.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin7_brick.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin8_brick.nbt"))
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin1_brick.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin2_brick.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin3_brick.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin4_brick.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin5_brick.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin6_brick.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin7_brick.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin8_brick.nbt"))
     };
     protected static final ReadableStructureTemplate[] RUINS_CRACKED = { //70
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin1_cracked.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin2_cracked.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin3_cracked.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin4_cracked.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin5_cracked.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin6_cracked.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin7_cracked.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin8_cracked.nbt"))
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin1_cracked.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin2_cracked.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin3_cracked.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin4_cracked.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin5_cracked.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin6_cracked.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin7_cracked.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin8_cracked.nbt"))
     };
     protected static final ReadableStructureTemplate[] RUINS_MOSSY = { //50
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin1_mossy.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin2_mossy.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin3_mossy.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin4_mossy.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin5_mossy.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin6_mossy.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin7_mossy.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin8_mossy.nbt"))
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin1_mossy.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin2_mossy.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin3_mossy.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin4_mossy.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin5_mossy.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin6_mossy.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin7_mossy.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/ruin8_mossy.nbt"))
     };
     protected static final ReadableStructureTemplate[] BIG_WARM_RUINS = {
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin_warm4.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin_warm5.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin_warm6.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin_warm7.nbt"))
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin_warm4.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin_warm5.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin_warm6.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin_warm7.nbt"))
     };
     protected static final ReadableStructureTemplate[] BIG_RUINS_BRICK = {
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin1_brick.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin2_brick.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin3_brick.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin8_brick.nbt"))
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin1_brick.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin2_brick.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin3_brick.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin8_brick.nbt"))
     };
     protected static final ReadableStructureTemplate[] BIG_RUINS_MOSSY = {
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin1_cracked.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin2_cracked.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin3_cracked.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin8_cracked.nbt"))
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin1_cracked.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin2_cracked.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin3_cracked.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin8_cracked.nbt"))
     };
     protected static final ReadableStructureTemplate[] BIG_RUINS_CRACKED = {
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin1_mossy.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin2_mossy.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin3_mossy.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin8_mossy.nbt"))
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin1_mossy.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin2_mossy.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin3_mossy.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/ruin/big_ruin8_mossy.nbt"))
     };
 
     protected static Consumer<CompoundTag> getSmallRuinProcessor(final FullChunk chunk, final NukkitRandom random) {
@@ -141,8 +141,8 @@ public class PopulatorOceanRuin extends Populator {
     public void populate(final ChunkManager level, final int chunkX, final int chunkZ, final NukkitRandom random, final FullChunk chunk) {
         final int biome = chunk.getBiomeId(7, 7);
         if (biome >= 44 && biome <= 50
-            && chunkX == (chunkX < 0 ? chunkX - SPACING + 1 : chunkX) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)
-            && chunkZ == (chunkZ < 0 ? chunkZ - SPACING + 1 : chunkZ) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)) {
+                && chunkX == (chunkX < 0 ? chunkX - SPACING + 1 : chunkX) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)
+                && chunkZ == (chunkZ < 0 ? chunkZ - SPACING + 1 : chunkZ) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)) {
             final boolean isWarm = random.nextBoundedInt(10) < 4;
             final boolean isLarge = random.nextBoundedInt(100) <= 30;
 
@@ -192,8 +192,8 @@ public class PopulatorOceanRuin extends Populator {
 
         if (!chunk.isGenerated()) {
             Server.getInstance().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new CallbackableChunkGenerationTask<>(
-                chunk.getProvider().getLevel(), chunk, this,
-                populator -> populator.placeRuin(template, chunk, seed, false, index)));
+                    chunk.getProvider().getLevel(), chunk, this,
+                    populator -> populator.placeRuin(template, chunk, seed, false, index)));
         } else {
             placeRuin(template, chunk, seed, false, index);
         }
@@ -222,9 +222,9 @@ public class PopulatorOceanRuin extends Populator {
 
         final BlockVector3 vec = new BlockVector3((chunk.getX() << 4) + x, y, (chunk.getZ() << 4) + z);
         template.placeInChunk(chunk, random, vec, new StructurePlaceSettings()
-            .setIgnoreAir(true)
-            .setIntegrity(isLarge ? 90 : 80)
-            .setBlockActorProcessor(isLarge ? getBigRuinProcessor(chunk, random) : getSmallRuinProcessor(chunk, random)));
+                .setIgnoreAir(true)
+                .setIntegrity(isLarge ? 90 : 80)
+                .setBlockActorProcessor(isLarge ? getBigRuinProcessor(chunk, random) : getSmallRuinProcessor(chunk, random)));
 
         if (index != -1) {
             final ReadableStructureTemplate mossy;
@@ -239,13 +239,13 @@ public class PopulatorOceanRuin extends Populator {
             }
 
             mossy.placeInChunk(chunk, random, vec, new StructurePlaceSettings()
-                .setIgnoreAir(true)
-                .setIntegrity(70)
-                .setBlockActorProcessor(isLarge ? getBigRuinProcessor(chunk, random) : getSmallRuinProcessor(chunk, random)));
+                    .setIgnoreAir(true)
+                    .setIntegrity(70)
+                    .setBlockActorProcessor(isLarge ? getBigRuinProcessor(chunk, random) : getSmallRuinProcessor(chunk, random)));
             cracked.placeInChunk(chunk, random, vec, new StructurePlaceSettings()
-                .setIgnoreAir(true)
-                .setIntegrity(50)
-                .setBlockActorProcessor(isLarge ? getBigRuinProcessor(chunk, random) : getSmallRuinProcessor(chunk, random)));
+                    .setIgnoreAir(true)
+                    .setIntegrity(50)
+                    .setBlockActorProcessor(isLarge ? getBigRuinProcessor(chunk, random) : getSmallRuinProcessor(chunk, random)));
         }
     }
 

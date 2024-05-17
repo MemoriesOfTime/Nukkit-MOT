@@ -1,4 +1,3 @@
-
 package cn.nukkit.lang;
 
 import cn.nukkit.Server;
@@ -21,13 +20,13 @@ import java.util.regex.Pattern;
  */
 @Log4j2
 public class PluginI18n {
+    private final Pattern split = Pattern.compile("%[A-Za-z0-9_.-]+");
+    private final String pluginName;
+    private final Map<LangCode, Map<String, String>> MULTI_LANGUAGE;
     /**
      * 插件多语言的默认备选语言
      */
     private LangCode fallback;
-    private final Pattern split = Pattern.compile("%[A-Za-z0-9_.-]+");
-    private final String pluginName;
-    private final Map<LangCode, Map<String, String>> MULTI_LANGUAGE;
 
     public PluginI18n(PluginBase plugin) {
         this.pluginName = plugin.getFile().getName();
@@ -35,6 +34,28 @@ public class PluginI18n {
         this.fallback = LangCode.en_US;
     }
 
+    static void readAndWriteLang(BufferedReader reader, Map<String, String> d) throws IOException {
+        String line;
+        while ((line = reader.readLine()) != null) {
+            line = line.trim();
+            if (line.isEmpty() || line.charAt(0) == '#') {
+                continue;
+            }
+            String[] t = line.split("=", 2);
+            if (t.length < 2) {
+                continue;
+            }
+            String key = t[0];
+            String value = t[1];
+            if (value.length() > 1 && value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"') {
+                value = value.substring(1, value.length() - 1).replace("\\\"", "\"").replace("\\\\", "\\");
+            }
+            if (value.isEmpty()) {
+                continue;
+            }
+            d.put(key, value);
+        }
+    }
 
     /**
      * 翻译一个文本key，key从语言文件中查询
@@ -48,7 +69,6 @@ public class PluginI18n {
     public String tr(LangCode lang, String key) {
         return tr(lang, key, EmptyArrays.EMPTY_STRINGS);
     }
-
 
     /**
      * 翻译一个文本key，key从语言文件中查询，并且按照给定参数填充其中参数
@@ -67,7 +87,6 @@ public class PluginI18n {
         }
         return baseText;
     }
-
 
     /**
      * 翻译一个文本key，key从语言文件中查询，并且按照给定参数填充其中参数
@@ -106,7 +125,6 @@ public class PluginI18n {
         return baseText;
     }
 
-
     /**
      * 获取指定id对应的多语言文本，若不存在则返回null
      * <p>
@@ -126,7 +144,6 @@ public class PluginI18n {
             return Server.getInstance().getLanguage().internalGet(id);
         }
     }
-
 
     /**
      * 获取指定id对应的多语言文本，若不存在则返回id本身
@@ -300,29 +317,6 @@ public class PluginI18n {
         Map<String, String> d = new Object2ObjectOpenHashMap<>();
         readAndWriteLang(reader, d);
         return d;
-    }
-
-    static void readAndWriteLang(BufferedReader reader, Map<String, String> d) throws IOException {
-        String line;
-        while ((line = reader.readLine()) != null) {
-            line = line.trim();
-            if (line.isEmpty() || line.charAt(0) == '#') {
-                continue;
-            }
-            String[] t = line.split("=", 2);
-            if (t.length < 2) {
-                continue;
-            }
-            String key = t[0];
-            String value = t[1];
-            if (value.length() > 1 && value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"') {
-                value = value.substring(1, value.length() - 1).replace("\\\"", "\"").replace("\\\\", "\\");
-            }
-            if (value.isEmpty()) {
-                continue;
-            }
-            d.put(key, value);
-        }
     }
 }
 

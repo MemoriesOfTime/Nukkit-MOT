@@ -16,14 +16,13 @@ public enum BlockFace {
     EAST(5, 4, 3, "east", AxisDirection.POSITIVE, new Vector3(1, 0, 0));
 
     /**
-     * All faces in D-U-N-S-W-E order
-     */
-    private static final BlockFace[] VALUES = new BlockFace[6];
-
-    /**
      * All faces with horizontal axis in order S-W-N-E
      */
     public static final BlockFace[] HORIZONTALS = new BlockFace[4];
+    /**
+     * All faces in D-U-N-S-W-E order
+     */
+    private static final BlockFace[] VALUES = new BlockFace[6];
 
     static {
         DOWN.axis = Axis.Y;
@@ -61,15 +60,12 @@ public enum BlockFace {
      * The name of this BlockFace (up, down, north, etc.)
      */
     private final String name;
-
-
-    private Axis axis;
     private final AxisDirection axisDirection;
-
     /**
      * Normalized vector that points in the direction of this BlockFace
      */
     private final Vector3 unitVector;
+    private Axis axis;
 
     BlockFace(int index, int opposite, int horizontalIndex, String name, AxisDirection axisDirection, Vector3 unitVector) {
         this.index = index;
@@ -229,18 +225,18 @@ public enum BlockFace {
     }
 
     /**
-    * Get the opposite BlockFace (e.g. DOWN ==&gt; UP)
-    *
-    * @return block face
+     * Get the opposite BlockFace (e.g. DOWN ==&gt; UP)
+     *
+     * @return block face
      */
     public BlockFace getOpposite() {
         return fromIndex(opposite);
     }
 
     /**
-    * Rotate this BlockFace around the Y axis clockwise (NORTH =&gt; EAST =&gt; SOUTH =&gt; WEST =&gt; NORTH)
-    *
-    * @return block face
+     * Rotate this BlockFace around the Y axis clockwise (NORTH =&gt; EAST =&gt; SOUTH =&gt; WEST =&gt; NORTH)
+     *
+     * @return block face
      */
     public BlockFace rotateY() {
         switch (this) {
@@ -258,9 +254,9 @@ public enum BlockFace {
     }
 
     /**
-    * Rotate this BlockFace around the Y axis counter-clockwise (NORTH =&gt; WEST =&gt; SOUTH =&gt; EAST =&gt; NORTH)
-    *
-    * @return block face
+     * Rotate this BlockFace around the Y axis counter-clockwise (NORTH =&gt; WEST =&gt; SOUTH =&gt; EAST =&gt; NORTH)
+     *
+     * @return block face
      */
     public BlockFace rotateYCCW() {
         switch (this) {
@@ -286,14 +282,14 @@ public enum BlockFace {
         Y("y"),
         Z("z");
 
-        private final String name;
-        private Plane plane;
-
         static {
             X.plane = Plane.HORIZONTAL;
             Y.plane = Plane.VERTICAL;
             Z.plane = Plane.HORIZONTAL;
         }
+
+        private final String name;
+        private Plane plane;
 
         Axis(String name) {
             this.name = name;

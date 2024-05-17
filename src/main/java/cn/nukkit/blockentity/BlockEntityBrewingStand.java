@@ -24,15 +24,12 @@ import java.util.List;
 
 public class BlockEntityBrewingStand extends BlockEntitySpawnable implements InventoryHolder, BlockEntityContainer, BlockEntityNameable {
 
-    protected BrewingInventory inventory;
-
     public static final int MAX_BREW_TIME = 400;
-
+    public static final List<Integer> ingredients = new ArrayList<>(Arrays.asList(Item.NETHER_WART, Item.GHAST_TEAR, Item.GLOWSTONE_DUST, Item.REDSTONE_DUST, Item.GUNPOWDER, Item.MAGMA_CREAM, Item.BLAZE_POWDER, Item.GOLDEN_CARROT, Item.SPIDER_EYE, Item.FERMENTED_SPIDER_EYE, Item.GLISTERING_MELON, Item.SUGAR, Item.RABBIT_FOOT, Item.PUFFERFISH, Item.TURTLE_SHELL, Item.PHANTOM_MEMBRANE, Item.DRAGON_BREATH));
     public int brewTime;
     public int fuelTotal;
     public int fuelAmount;
-
-    public static final List<Integer> ingredients = new ArrayList<>(Arrays.asList(Item.NETHER_WART, Item.GHAST_TEAR, Item.GLOWSTONE_DUST, Item.REDSTONE_DUST, Item.GUNPOWDER, Item.MAGMA_CREAM, Item.BLAZE_POWDER, Item.GOLDEN_CARROT, Item.SPIDER_EYE, Item.FERMENTED_SPIDER_EYE, Item.GLISTERING_MELON, Item.SUGAR, Item.RABBIT_FOOT, Item.PUFFERFISH, Item.TURTLE_SHELL, Item.PHANTOM_MEMBRANE, Item.DRAGON_BREATH));
+    protected BrewingInventory inventory;
 
     public BlockEntityBrewingStand(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -72,11 +69,6 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
     }
 
     @Override
-    public boolean hasName() {
-        return namedTag.contains("CustomName");
-    }
-
-    @Override
     public void setName(String name) {
         if (name == null || name.isEmpty()) {
             namedTag.remove("CustomName");
@@ -84,6 +76,11 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
         }
 
         namedTag.putString("CustomName", name);
+    }
+
+    @Override
+    public boolean hasName() {
+        return namedTag.contains("CustomName");
     }
 
     @Override
@@ -272,7 +269,7 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
     }
 
     private MixRecipe[] matchRecipes(boolean quickTest) {
-        MixRecipe[] recipes = new MixRecipe[quickTest? 1 : 3];
+        MixRecipe[] recipes = new MixRecipe[quickTest ? 1 : 3];
         Item ingredient = inventory.getIngredient();
         CraftingManager craftingManager = getLevel().getServer().getCraftingManager();
         for (int i = 0; i < 3; i++) {

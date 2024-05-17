@@ -11,20 +11,20 @@ import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 
 public class BlockSeagrass extends BlockFlowable {
-    
+
     public BlockSeagrass() {
         this(0);
     }
-    
+
     public BlockSeagrass(int meta) {
         super(meta % 3);
     }
-    
+
     @Override
     public int getId() {
         return SEAGRASS;
     }
-    
+
     @Override
     public String getName() {
         return "Seagrass";
@@ -46,7 +46,7 @@ public class BlockSeagrass extends BlockFlowable {
         }
         return false;
     }
-    
+
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
@@ -57,7 +57,7 @@ public class BlockSeagrass extends BlockFlowable {
                 this.getLevel().useBreakOn(this);
                 return Level.BLOCK_UPDATE_NORMAL;
             }
-            
+
             Block down = this.down();
             damage = this.getDamage();
             if (damage == 0 || damage == 2) {
@@ -65,7 +65,7 @@ public class BlockSeagrass extends BlockFlowable {
                     this.getLevel().useBreakOn(this);
                     return Level.BLOCK_UPDATE_NORMAL;
                 }
-                
+
                 if (damage == 2) {
                     Block up = up();
                     if (up.getId() != getId() || up.getDamage() != 1) {
@@ -75,18 +75,18 @@ public class BlockSeagrass extends BlockFlowable {
             } else if (down.getId() != getId() || down.getDamage() != 2) {
                 this.getLevel().useBreakOn(this);
             }
-            
+
             return Level.BLOCK_UPDATE_NORMAL;
         }
-        
+
         return 0;
     }
-    
+
     @Override
     public boolean canBeActivated() {
         return true;
     }
-    
+
     @Override
     public boolean onActivate(Item item, Player player) {
         if (getDamage() == 0 && item.getId() == Item.DYE && item.getDamage() == DyeColor.WHITE.getDyeData()) {
@@ -104,14 +104,14 @@ public class BlockSeagrass extends BlockFlowable {
                 return true;
             }
         }
-        
+
         return false;
     }
-    
+
     @Override
     public Item[] getDrops(Item item) {
         if (item.isShears()) {
-            return new Item[] { toItem() };
+            return new Item[]{toItem()};
         } else {
             return Item.EMPTY_ARRAY;
         }
@@ -121,7 +121,7 @@ public class BlockSeagrass extends BlockFlowable {
     public void setDamage(int meta) {
         super.setDamage(meta % 3);
     }
-    
+
     @Override
     public boolean canBeReplaced() {
         return true;

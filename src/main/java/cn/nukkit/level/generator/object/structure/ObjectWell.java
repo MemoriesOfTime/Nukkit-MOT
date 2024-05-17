@@ -42,7 +42,7 @@ public class ObjectWell {
                 }
             }
         }
-        
+
         //slabs for all sides
         level.setBlockAt(x + 2, y, z, Block.SLAB, 1);
         level.setBlockAt(x - 2, y, z, Block.SLAB, 1);
@@ -55,21 +55,21 @@ public class ObjectWell {
         level.setBlockAt(x - 1, y, z, Block.WATER);
         level.setBlockAt(x, y, z + 1, Block.WATER);
         level.setBlockAt(x, y, z - 1, Block.WATER);
-        
+
         //air
         level.setBlockAt(x, y + 1, z, Block.AIR);
         level.setBlockAt(x + 1, y + 1, z, Block.AIR);
         level.setBlockAt(x - 1, y + 1, z, Block.AIR);
         level.setBlockAt(x, y + 1, z + 1, Block.AIR);
         level.setBlockAt(x, y + 1, z - 1, Block.AIR);
-        
+
         //more air
         level.setBlockAt(x, y + 2, z, Block.AIR);
         level.setBlockAt(x + 1, y + 2, z, Block.AIR);
         level.setBlockAt(x - 1, y + 2, z, Block.AIR);
         level.setBlockAt(x, y + 2, z + 1, Block.AIR);
         level.setBlockAt(x, y + 2, z - 1, Block.AIR);
-        
+
         //roof
         level.setBlockAt(x, y + 3, z, Block.SANDSTONE);
         level.setBlockAt(x + 1, y + 3, z, Block.SLAB, 1);

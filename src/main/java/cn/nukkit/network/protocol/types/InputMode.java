@@ -9,19 +9,18 @@ public enum InputMode {
     MOTION_CONTROLLER(4),
     COUNT(5);
 
-    private final int ordinal;
-
     private static final InputMode[] VALUES = values();
+    private final int ordinal;
 
     InputMode(int ordinal) {
         this.ordinal = ordinal;
     }
 
-    public int getOrdinal() {
-        return ordinal;
-    }
-
     public static InputMode fromOrdinal(int ordinal) {
         return VALUES[ordinal];
+    }
+
+    public int getOrdinal() {
+        return ordinal;
     }
 }

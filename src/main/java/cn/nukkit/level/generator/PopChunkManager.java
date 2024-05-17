@@ -6,8 +6,8 @@ import java.util.Arrays;
 
 public class PopChunkManager extends SimpleChunkManager {
 
-    private boolean clean = true;
     private final BaseFullChunk[] chunks = new BaseFullChunk[9];
+    private boolean clean = true;
     private int CX = Integer.MAX_VALUE;
     private int CZ = Integer.MAX_VALUE;
 

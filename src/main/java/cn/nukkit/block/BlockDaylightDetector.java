@@ -64,12 +64,12 @@ public class BlockDaylightDetector extends BlockTransparent {
     public double getMaxY() {
         return this.y + 0.625;
     }
-    
+
     @Override
     public boolean isPowerSource() {
         return this.level.isAnimalSpawningAllowedByTime();
     }
-    
+
     @Override
     public int getWeakPower(BlockFace face) {
         return this.level.isAnimalSpawningAllowedByTime() ? 15 : 0;

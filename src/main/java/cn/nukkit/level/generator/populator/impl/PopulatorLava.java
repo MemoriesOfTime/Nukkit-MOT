@@ -13,6 +13,17 @@ public class PopulatorLava extends Populator {
     private int baseAmount;
     private NukkitRandom random;
 
+    private static int getHighestWorkableBlock(FullChunk chunk, int x, int z) {
+        int y;
+        for (y = 127; y >= 0; y--) {
+            int b = chunk.getBlockId(x, y, z);
+            if (b == Block.AIR) {
+                break;
+            }
+        }
+        return y == 0 ? -1 : y;
+    }
+
     public void setRandomAmount(int amount) {
         this.randomAmount = amount;
     }
@@ -138,7 +149,7 @@ public class PopulatorLava extends Populator {
                             (j == 1 && previousDirection == 0) ||
                             (j == 2 && previousDirection == 3) ||
                             (j == 3 && previousDirection == 2)
-                    ) {
+            ) {
                 int x = xx;
                 int z = zz;
                 if (j == 0) {
@@ -211,17 +222,5 @@ public class PopulatorLava extends Populator {
             blockDecay = 0;
         }
         return (decay >= 0 && blockDecay >= decay) ? decay : blockDecay;
-    }
-
-
-    private static int getHighestWorkableBlock(FullChunk chunk, int x, int z) {
-        int y;
-        for (y = 127; y >= 0; y--) {
-            int b = chunk.getBlockId(x, y, z);
-            if (b == Block.AIR) {
-                break;
-            }
-        }
-        return y == 0 ? -1 : y;
     }
 }

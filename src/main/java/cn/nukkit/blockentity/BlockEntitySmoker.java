@@ -12,6 +12,10 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 
 public class BlockEntitySmoker extends BlockEntityFurnace {
 
+    private static final IntSet CAN_SMELT = new IntOpenHashSet(new int[]{
+            Item.RAW_PORKCHOP, Item.RAW_BEEF, Item.RAW_RABBIT, Item.RAW_FISH, Item.RAW_CHICKEN, Item.RAW_MUTTON, Item.RAW_SALMON, Item.POTATO
+    });
+
     public BlockEntitySmoker(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
     }
@@ -36,10 +40,6 @@ public class BlockEntitySmoker extends BlockEntityFurnace {
         int blockID = level.getBlockIdAt(chunk, (int) x, (int) y, (int) z, 0);
         return blockID == Block.SMOKER || blockID == Block.LIT_SMOKER;
     }
-
-    private static final IntSet CAN_SMELT = new IntOpenHashSet(new int[]{
-            Item.RAW_PORKCHOP, Item.RAW_BEEF, Item.RAW_RABBIT, Item.RAW_FISH, Item.RAW_CHICKEN, Item.RAW_MUTTON, Item.RAW_SALMON, Item.POTATO
-    });
 
     @Override
     public boolean onUpdate() {

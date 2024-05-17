@@ -37,7 +37,7 @@ public class EntityShulker extends EntityWalkingMob {
     public float getHeight() {
         return 1f;
     }
-    
+
     @Override
     public double getSpeed() {
         return 0;
@@ -65,7 +65,7 @@ public class EntityShulker extends EntityWalkingMob {
             double yawR = FastMath.toRadians(yaw);
             double pitchR = FastMath.toRadians(pitch);
             Location pos = new Location(this.x - Math.sin(yawR) * Math.cos(pitchR) * 0.5, this.y + this.getHeight() - 0.18,
-                        this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
+                    this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
 
             if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) != Block.AIR) {
                 return;

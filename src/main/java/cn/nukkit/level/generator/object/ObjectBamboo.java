@@ -18,17 +18,17 @@ public class ObjectBamboo {
         bamboo.setLeafSize(BlockBamboo.LEAF_SIZE_NONE);
         int height = random.nextRange(MIN_HEIGHT, MAX_HEIGHT);
 
-        if (height > 4){
+        if (height > 4) {
             bamboo.setThick(true);
         }
 
-        for (int i = 0; i < height; i++){
-            if (level.getBlockIdAt((int) pos.getX(), (int) pos.getY() + i, (int) pos.getZ()) != Block.AIR){
+        for (int i = 0; i < height; i++) {
+            if (level.getBlockIdAt((int) pos.getX(), (int) pos.getY() + i, (int) pos.getZ()) != Block.AIR) {
                 break;
             }
 
-            if (i >= height*0.7 || (height == 3 && i == 2)){
-                bamboo.setLeafSize(bamboo.isThick()? BlockBamboo.LEAF_SIZE_LARGE : BlockBamboo.LEAF_SIZE_SMALL);
+            if (i >= height * 0.7 || (height == 3 && i == 2)) {
+                bamboo.setLeafSize(bamboo.isThick() ? BlockBamboo.LEAF_SIZE_LARGE : BlockBamboo.LEAF_SIZE_SMALL);
             }
             level.setBlockAt((int) pos.getX(), (int) pos.getY() + i, (int) pos.getZ(), bamboo.getId(), bamboo.getDamage());
         }

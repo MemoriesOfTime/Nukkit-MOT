@@ -10,7 +10,7 @@ public class ElementStepSlider extends Element {
     @SuppressWarnings("unused")
     private final String type = "step_slider";
     private String text = "";
-    private List<String> steps;
+    private final List<String> steps;
     @SerializedName("default")
     private int defaultStepIndex = 0;
 

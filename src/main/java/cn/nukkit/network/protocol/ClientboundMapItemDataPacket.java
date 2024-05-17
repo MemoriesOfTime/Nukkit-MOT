@@ -15,9 +15,10 @@ public class ClientboundMapItemDataPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.CLIENTBOUND_MAP_ITEM_DATA_PACKET;
     public static final long[] EMPTY_LONGS = new long[0];
-
+    public static final int TEXTURE_UPDATE = 0x02;
+    public static final int DECORATIONS_UPDATE = 0x04;
+    public static final int ENTITIES_UPDATE = 0x08;
     public long[] eids = EMPTY_LONGS;
-
     public long mapId;
     @Deprecated
     public int update;
@@ -27,18 +28,12 @@ public class ClientboundMapItemDataPacket extends DataPacket {
     public int height;
     public int offsetX;
     public int offsetZ;
-
     public byte dimensionId;
     public BlockVector3 origin = new BlockVector3();
-
     public MapDecorator[] decorators = new MapDecorator[0];
     public MapTrackedObject[] trackedEntities = new MapTrackedObject[0];
     public int[] colors = new int[0];
     public BufferedImage image = null;
-
-    public static final int TEXTURE_UPDATE = 0x02;
-    public static final int DECORATIONS_UPDATE = 0x04;
-    public static final int ENTITIES_UPDATE = 0x08;
 
     @Override
     public byte pid() {

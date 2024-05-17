@@ -54,10 +54,10 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
     @Override
     protected void initEntity() {
         this.setMaxHealth(20);
-        
+
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 2, 3, 4 });
+        this.setDamage(new int[]{0, 2, 3, 4});
 
         if (this.namedTag.contains("Armor") && this.namedTag.get("Armor") instanceof ListTag) {
             ListTag<CompoundTag> listTag = this.namedTag.getList("Armor", CompoundTag.class);
@@ -261,6 +261,7 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
     /**
      * Get held tool
+     *
      * @return the tool this zombie has in hand or null
      */
     public Item getTool() {

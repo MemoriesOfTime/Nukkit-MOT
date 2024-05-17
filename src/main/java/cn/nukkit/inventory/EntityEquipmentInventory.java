@@ -10,11 +10,10 @@ import java.util.Set;
 
 public class EntityEquipmentInventory extends BaseInventory {
 
-    private EntityArmorStand entityLiving;
-    private final Set<Player> viewers = new HashSet<>();
-
     private static final int MAINHAND = 0;
     private static final int OFFHAND = 1;
+    private final Set<Player> viewers = new HashSet<>();
+    private final EntityArmorStand entityLiving;
 
     public EntityEquipmentInventory(EntityArmorStand entity) {
         super(entity, InventoryType.ENTITY_EQUIPMENT);

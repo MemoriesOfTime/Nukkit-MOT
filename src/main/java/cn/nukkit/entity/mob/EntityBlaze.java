@@ -51,8 +51,7 @@ public class EntityBlaze extends EntityFlyingMob {
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
+        if (creature instanceof Player player) {
             return !player.closed && player.spawned && player.isAlive() && (player.isSurvival() || player.isAdventure()) && distance <= 2304; // 48 blocks
         }
         return false;

@@ -9,17 +9,16 @@ import cn.nukkit.network.protocol.DataPacket;
  */
 public class ContainerSetSlotPacketV113 extends DataPacket {
     public static final byte NETWORK_ID = 0x32;
-
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
-    }
-
     public int windowid;
     public int slot;
     public int hotbarSlot;
     public Item item;
     public int selectedSlot;
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
 
     @Override
     public void decode() {

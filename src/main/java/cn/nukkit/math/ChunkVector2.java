@@ -45,12 +45,12 @@ public class ChunkVector2 {
         return this.x;
     }
 
-    public int getZ() {
-        return this.z;
-    }
-
     public void setX(int x) {
         this.x = x;
+    }
+
+    public int getZ() {
+        return this.z;
     }
 
     public void setZ(int z) {

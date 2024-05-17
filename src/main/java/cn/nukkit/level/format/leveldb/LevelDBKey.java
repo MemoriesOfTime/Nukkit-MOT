@@ -24,8 +24,7 @@ public enum LevelDBKey {
     FLAGS('f'),
 
     VERSION_OLD('v'),
-    VERSION(',')
-    ;
+    VERSION(',');
 
     private final byte encoded;
 

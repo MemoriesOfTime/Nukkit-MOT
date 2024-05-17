@@ -65,7 +65,7 @@ public class Identifier {
         String[] strings = new String[]{DEFAULT_NAMESPACE, id};
         int i = id.indexOf(delimiter);
         if (i >= 0) {
-            strings[1] = id.substring(i + 1, id.length());
+            strings[1] = id.substring(i + 1);
             if (i >= 1) {
                 strings[0] = id.substring(0, i);
             }

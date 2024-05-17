@@ -12,8 +12,8 @@ import java.lang.reflect.Method;
  * @author Tee7even
  */
 public class SimpleCommand extends Command {
-    private Object object;
-    private Method method;
+    private final Object object;
+    private final Method method;
     private boolean forbidConsole;
     private int maxArgs;
     private int minArgs;

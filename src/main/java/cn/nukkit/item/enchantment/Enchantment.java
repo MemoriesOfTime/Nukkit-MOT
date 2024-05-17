@@ -51,124 +51,111 @@ public abstract class Enchantment implements Cloneable {
     public static final Enchantment[] EMPTY_ARRAY = new Enchantment[0];
 
     public static final int CUSTOM_ENCHANTMENT_ID = dynamic(256);
-
-    protected static Enchantment[] enchantments;
-
-    protected static Map<Identifier, Enchantment> customEnchantments = new Object2ObjectLinkedOpenHashMap<>();
-
     public static final int ID_PROTECTION_ALL = 0;
     public static final String NAME_PROTECTION_ALL = "protection";
-
     public static final int ID_PROTECTION_FIRE = 1;
     public static final String NAME_PROTECTION_FIRE = "fire_protection";
-
     public static final int ID_PROTECTION_FALL = 2;
     public static final String NAME_PROTECTION_FALL = "feather_falling";
-
     public static final int ID_PROTECTION_EXPLOSION = 3;
     public static final String NAME_PROTECTION_EXPLOSION = "blast_protection";
-
     public static final int ID_PROTECTION_PROJECTILE = 4;
     public static final String NAME_PROTECTION_PROJECTILE = "projectile_protection";
-
     public static final int ID_THORNS = 5;
     public static final String NAME_THORNS = "thorns";
-
     public static final int ID_WATER_BREATHING = 6;
     public static final String NAME_WATER_BREATHING = "respiration";
-
     public static final int ID_WATER_WALKER = 7;
     public static final String NAME_WATER_WALKER = "depth_strider";
-
     public static final int ID_WATER_WORKER = 8;
     public static final String NAME_WATER_WORKER = "aqua_affinity";
-
     public static final int ID_DAMAGE_ALL = 9;
     public static final String NAME_DAMAGE_ALL = "sharpness";
-
     public static final int ID_DAMAGE_SMITE = 10;
     public static final String NAME_DAMAGE_SMITE = "smite";
-
     public static final int ID_DAMAGE_ARTHROPODS = 11;
     public static final String NAME_DAMAGE_ARTHROPODS = "bane_of_arthropods";
-
     public static final int ID_KNOCKBACK = 12;
     public static final String NAME_KNOCKBACK = "knockback";
-
     public static final int ID_FIRE_ASPECT = 13;
     public static final String NAME_FIRE_ASPECT = "fire_aspect";
-
     public static final int ID_LOOTING = 14;
     public static final String NAME_LOOTING = "looting";
-
     public static final int ID_EFFICIENCY = 15;
     public static final String NAME_EFFICIENCY = "efficiency";
-
     public static final int ID_SILK_TOUCH = 16;
     public static final String NAME_SILK_TOUCH = "silk_touch";
-
     public static final int ID_DURABILITY = 17;
     public static final String NAME_DURABILITY = "unbreaking";
-
     public static final int ID_FORTUNE_DIGGING = 18;
     public static final String NAME_FORTUNE_DIGGING = "fortune";
-
     public static final int ID_BOW_POWER = 19;
     public static final String NAME_BOW_POWER = "power";
-
     public static final int ID_BOW_KNOCKBACK = 20;
     public static final String NAME_BOW_KNOCKBACK = "punch";
-
     public static final int ID_BOW_FLAME = 21;
     public static final String NAME_BOW_FLAME = "flame";
-
     public static final int ID_BOW_INFINITY = 22;
     public static final String NAME_BOW_INFINITY = "infinity";
-
     public static final int ID_FORTUNE_FISHING = 23;
     public static final String NAME_FORTUNE_FISHING = "luck_of_the_sea";
-
     public static final int ID_LURE = 24;
     public static final String NAME_LURE = "lure";
-
     public static final int ID_FROST_WALKER = 25;
     public static final String NAME_FROST_WALKER = "frost_walker";
-
     public static final int ID_MENDING = 26;
     public static final String NAME_MENDING = "mending";
-
     public static final int ID_BINDING_CURSE = 27;
     public static final String NAME_BINDING_CURSE = "binding";
-
     public static final int ID_VANISHING_CURSE = 28;
     public static final String NAME_VANISHING_CURSE = "vanishing";
-
     public static final int ID_TRIDENT_IMPALING = 29;
     public static final String NAME_TRIDENT_IMPALING = "impaling";
-
     public static final int ID_TRIDENT_RIPTIDE = 30;
     public static final String NAME_TRIDENT_RIPTIDE = "riptide";
-
     public static final int ID_TRIDENT_LOYALTY = 31;
     public static final String NAME_TRIDENT_LOYALTY = "loyalty";
-
     public static final int ID_TRIDENT_CHANNELING = 32;
     public static final String NAME_TRIDENT_CHANNELING = "channeling";
-
     public static final int ID_CROSSBOW_MULTISHOT = 33;
     public static final String NAME_CROSSBOW_MULTISHOT = "multishot";
-
     public static final int ID_CROSSBOW_PIERCING = 34;
     public static final String NAME_CROSSBOW_PIERCING = "piercing";
-
     public static final int ID_CROSSBOW_QUICK_CHARGE = 35;
     public static final String NAME_CROSSBOW_QUICK_CHARGE = "quick_charge";
-
     public static final int ID_SOUL_SPEED = 36;
     public static final String NAME_SOUL_SPEED = "soul_speed";
-
     public static final int ID_SWIFT_SNEAK = 37;
     public static final String NAME_SWIFT_SNEAK = "swift_sneak";
+    public static final String[] words = {"the", "elder", "scrolls", "klaatu", "berata", "niktu", "xyzzy", "bless", "curse", "light", "darkness", "fire", "air", "earth", "water", "hot", "dry", "cold", "wet", "ignite", "snuff", "embiggen", "twist", "shorten", "stretch", "fiddle", "destroy", "imbue", "galvanize", "enchant", "free", "limited", "range", "of", "towards", "inside", "sphere", "cube", "self", "other", "ball", "mental", "physical", "grow", "shrink", "demon", "elemental", "spirit", "animal", "creature", "beast", "humanoid", "undead", "fresh", "stale"};
+    protected static Enchantment[] enchantments;
+    protected static Map<Identifier, Enchantment> customEnchantments = new Object2ObjectLinkedOpenHashMap<>();
+    private static int BOOK_NUMBER = 1;
+    private static WeakReference<Method> defineClassMethodRef = new WeakReference<>(null);
+    public final int id;
+    protected final String name;
+    @Nullable
+    protected final Identifier identifier;
+    private final Rarity rarity;
+    public EnchantmentType type;
+    protected int level = 1;
+
+    protected Enchantment(int id, String name, Rarity rarity, EnchantmentType type) {
+        this.identifier = null;
+        this.id = id;
+        this.rarity = rarity;
+        this.type = type;
+
+        this.name = name;
+    }
+
+    protected Enchantment(@NotNull Identifier identifier, String name, Rarity rarity, @NotNull EnchantmentType type) {
+        this.identifier = identifier;
+        this.id = CUSTOM_ENCHANTMENT_ID;
+        this.rarity = rarity;
+        this.type = type;
+        this.name = name;
+    }
 
     public static void init() {
         enchantments = new Enchantment[256];
@@ -269,8 +256,6 @@ public abstract class Enchantment implements Cloneable {
         return OK.TRUE;
     }
 
-    private static int BOOK_NUMBER = 1;
-
     private static OK<?> registerCustomEnchantBook(Enchantment enchantment) {
         var identifier = enchantment.getIdentifier();
         assert identifier != null;
@@ -313,8 +298,6 @@ public abstract class Enchantment implements Cloneable {
         }
         return OK.TRUE;
     }
-
-    private static WeakReference<Method> defineClassMethodRef = new WeakReference<>(null);
 
     @SuppressWarnings("DuplicatedCode")
     private static Class<?> loadClass(ClassLoader loader, String className, byte[] b) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException, InaccessibleObjectException {
@@ -392,32 +375,14 @@ public abstract class Enchantment implements Cloneable {
         return customEnchantments.entrySet().stream().collect(Collectors.toMap(e -> e.getKey().toString(), e -> e.getValue().getId()));
     }
 
-    public final int id;
-    private final Rarity rarity;
-    public EnchantmentType type;
+    public static String getRandomName() {
+        HashSet<String> set = new HashSet<>();
+        while (set.size() < Utils.random.nextInt(3, 6)) {
+            set.add(Enchantment.words[Utils.random.nextInt(0, Enchantment.words.length)]);
+        }
 
-    protected int level = 1;
-
-    protected final String name;
-
-    @Nullable
-    protected final Identifier identifier;
-
-    protected Enchantment(int id, String name, Rarity rarity, EnchantmentType type) {
-        this.identifier = null;
-        this.id = id;
-        this.rarity = rarity;
-        this.type = type;
-
-        this.name = name;
-    }
-
-    protected Enchantment(@NotNull Identifier identifier, String name, Rarity rarity, @NotNull EnchantmentType type) {
-        this.identifier = identifier;
-        this.id = CUSTOM_ENCHANTMENT_ID;
-        this.rarity = rarity;
-        this.type = type;
-        this.name = name;
+        String[] words = set.toArray(new String[0]);
+        return String.join(" ", words);
     }
 
     @Nullable
@@ -531,29 +496,6 @@ public abstract class Enchantment implements Cloneable {
         }
     }
 
-    public static final String[] words = {"the", "elder", "scrolls", "klaatu", "berata", "niktu", "xyzzy", "bless", "curse", "light", "darkness", "fire", "air", "earth", "water", "hot", "dry", "cold", "wet", "ignite", "snuff", "embiggen", "twist", "shorten", "stretch", "fiddle", "destroy", "imbue", "galvanize", "enchant", "free", "limited", "range", "of", "towards", "inside", "sphere", "cube", "self", "other", "ball", "mental", "physical", "grow", "shrink", "demon", "elemental", "spirit", "animal", "creature", "beast", "humanoid", "undead", "fresh", "stale"};
-
-    public static String getRandomName() {
-        HashSet<String> set = new HashSet<>();
-        while (set.size() < Utils.random.nextInt(3, 6)) {
-            set.add(Enchantment.words[Utils.random.nextInt(0, Enchantment.words.length)]);
-        }
-
-        String[] words = set.toArray(new String[0]);
-        return String.join(" ", words);
-    }
-
-    private static class UnknownEnchantment extends Enchantment {
-
-        protected UnknownEnchantment(int id) {
-            super(id, "unknown", Rarity.VERY_RARE, EnchantmentType.ALL);
-        }
-
-        protected UnknownEnchantment(Identifier identifier) {
-            super(identifier, "unknown", Rarity.VERY_RARE, EnchantmentType.ALL);
-        }
-    }
-
     public enum Rarity {
         COMMON(10),
         UNCOMMON(5),
@@ -566,10 +508,6 @@ public abstract class Enchantment implements Cloneable {
             this.weight = weight;
         }
 
-        public int getWeight() {
-            return this.weight;
-        }
-
         public static Rarity fromWeight(int weight) {
             if (weight < 2) {
                 return VERY_RARE;
@@ -579,6 +517,21 @@ public abstract class Enchantment implements Cloneable {
                 return UNCOMMON;
             }
             return COMMON;
+        }
+
+        public int getWeight() {
+            return this.weight;
+        }
+    }
+
+    private static class UnknownEnchantment extends Enchantment {
+
+        protected UnknownEnchantment(int id) {
+            super(id, "unknown", Rarity.VERY_RARE, EnchantmentType.ALL);
+        }
+
+        protected UnknownEnchantment(Identifier identifier) {
+            super(identifier, "unknown", Rarity.VERY_RARE, EnchantmentType.ALL);
         }
     }
 }

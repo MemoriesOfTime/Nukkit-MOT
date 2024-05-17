@@ -100,7 +100,7 @@ public class TitleCommand extends VanillaCommand {
                     return false;
             }
         } else if (args.length == 5) {
-            if (args[1].toLowerCase().equals("times")) {
+            if (args[1].equalsIgnoreCase("times")) {
                 try {
                     /*player.setTitleAnimationTimes(Integer.valueOf(args[2]), //fadeIn
                             Integer.valueOf(args[3]), //stay

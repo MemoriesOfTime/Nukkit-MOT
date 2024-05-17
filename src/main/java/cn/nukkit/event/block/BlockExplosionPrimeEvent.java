@@ -10,23 +10,16 @@ import javax.annotation.Nullable;
 /**
  * @author joserobjr
  * @since 2020-10-06
- *
  * @deprecated use {@link BlockExplodeEvent}
  */
 @Deprecated
 public class BlockExplosionPrimeEvent extends BlockEvent implements Cancellable {
 
     private static final HandlerList handlers = new HandlerList();
-
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
+    private final Player player;
     private double force;
     private boolean blockBreaking;
     private double fireChance;
-    private final Player player;
-
     @Deprecated
     public BlockExplosionPrimeEvent(Block block, double force) {
         this(block, force, 0);
@@ -46,6 +39,10 @@ public class BlockExplosionPrimeEvent extends BlockEvent implements Cancellable 
         this.blockBreaking = true;
         this.fireChance = fireChance;
         this.player = player;
+    }
+
+    public static HandlerList getHandlers() {
+        return handlers;
     }
 
     public double getForce() {

@@ -28,6 +28,8 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
         TAG = loadEntityIdentifiers(582);
     }
 
+    public byte[] identifiers;
+
     private static byte[] loadEntityIdentifiers(int protocol) {
         try (InputStream stream = Nukkit.class.getClassLoader().getResourceAsStream("entity_identifiers_" + protocol + ".dat")) {
             return ByteStreams.toByteArray(stream);
@@ -35,8 +37,6 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
             throw new AssertionError("Error whilst loading entity identifiers " + protocol, e);
         }
     }
-
-    public byte[] identifiers;
 
     @Override
     public byte pid() {
@@ -56,7 +56,7 @@ public class AvailableEntityIdentifiersPacket extends DataPacket {
             } else {
                 this.put(EntityManager.get().getNetworkTagCached());
             }
-        }else {
+        } else {
             if (this.identifiers == null) {
                 this.identifiers = Entity.getEntityIdentifiersCache(this.protocol);
             }

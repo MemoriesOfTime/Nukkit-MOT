@@ -10,7 +10,7 @@ import java.io.IOException;
 /**
  * Implementation of Source RCON protocol.
  * https://developer.valvesoftware.com/wiki/Source_RCON_Protocol
- * 
+ * <p>
  * Wrapper for RCONServer. Handles data.
  *
  * @author Tee7even
@@ -64,6 +64,7 @@ public class RCON {
                 serverThread.close();
                 serverThread.wait(5000);
             }
-        } catch (InterruptedException ignored) {}
+        } catch (InterruptedException ignored) {
+        }
     }
 }

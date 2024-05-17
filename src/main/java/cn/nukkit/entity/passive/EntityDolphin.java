@@ -69,8 +69,7 @@ public class EntityDolphin extends EntityWaterAnimal {
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
+        if (creature instanceof Player player) {
             int id = player.getInventory().getItemInHandFast().getId();
             return player.spawned && player.isAlive() && !player.closed && (id == Item.RAW_FISH || id == Item.RAW_SALMON) && distance <= 49;
         }

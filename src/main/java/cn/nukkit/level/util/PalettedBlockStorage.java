@@ -18,6 +18,17 @@ public class PalettedBlockStorage {
     protected IntList palette;
     protected BitArray bitArray;
 
+    protected PalettedBlockStorage(BitArrayVersion version, int defaultState) {
+        this.bitArray = version.createPalette(SIZE);
+        this.palette = new IntArrayList(16);
+        this.palette.add(defaultState);
+    }
+
+    protected PalettedBlockStorage(BitArray bitArray, IntList palette) {
+        this.palette = palette;
+        this.bitArray = bitArray;
+    }
+
     public static PalettedBlockStorage createFromBlockPalette() {
         return createFromBlockPalette(BitArrayVersion.V2, 0);
     }
@@ -42,17 +53,6 @@ public class PalettedBlockStorage {
 
     public static PalettedBlockStorage createWithDefaultState(BitArrayVersion version, int defaultState) {
         return new PalettedBlockStorage(version, defaultState);
-    }
-
-    protected PalettedBlockStorage(BitArrayVersion version, int defaultState) {
-        this.bitArray = version.createPalette(SIZE);
-        this.palette = new IntArrayList(16);
-        this.palette.add(defaultState);
-    }
-
-    protected PalettedBlockStorage(BitArray bitArray, IntList palette) {
-        this.palette = palette;
-        this.bitArray = bitArray;
     }
 
     protected int getPaletteHeader(BitArrayVersion version) {
@@ -99,7 +99,7 @@ public class PalettedBlockStorage {
     public void readFromStorage(ByteBuf byteBuf) {
         short header = byteBuf.readUnsignedByte();
 
-        BitArrayVersion version  = BitArrayVersion.get(header >> 1, true);
+        BitArrayVersion version = BitArrayVersion.get(header >> 1, true);
 
         this.palette.clear();
 

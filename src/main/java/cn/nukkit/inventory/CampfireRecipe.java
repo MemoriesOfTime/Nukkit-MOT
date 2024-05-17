@@ -13,13 +13,13 @@ public class CampfireRecipe implements SmeltingRecipe {
         this.ingredient = ingredient.clone();
     }
 
-    public void setInput(Item item) {
-        this.ingredient = item.clone();
-    }
-
     @Override
     public Item getInput() {
         return this.ingredient.clone();
+    }
+
+    public void setInput(Item item) {
+        this.ingredient = item.clone();
     }
 
     @Override

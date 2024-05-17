@@ -22,7 +22,7 @@ import org.jetbrains.annotations.NotNull;
  */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<ContainerSetSlotPacketV113> {
-    
+
     public static final ContainerSetSlotProcessor_v113 INSTANCE = new ContainerSetSlotProcessor_v113();
 
     @Override
@@ -31,7 +31,7 @@ public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<Containe
         if (!player.spawned || !player.isAlive()) {
             return;
         }
-        
+
         if (pk.slot < 0) {
             return;
         }
@@ -85,7 +85,6 @@ public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<Containe
 
         if (transaction.getSourceItem().deepEquals(transaction.getTargetItem()) && transaction.getTargetItem().getCount() == transaction.getSourceItem().getCount()) { //No changes!
             //No changes, just a local inventory update sent by the server
-            return;
         }
 
 

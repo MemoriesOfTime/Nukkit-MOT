@@ -50,6 +50,15 @@ public class RepairItemTransaction extends InventoryTransaction {
         }
     }
 
+    public static boolean checkForRepairItemPart(List<InventoryAction> actions) {
+        for (InventoryAction action : actions) {
+            if (action instanceof RepairItemAction) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public boolean canExecute() {
         Inventory inventory = getSource().getWindowById(Player.ANVIL_WINDOW_ID);
@@ -417,14 +426,5 @@ public class RepairItemTransaction extends InventoryTransaction {
 
     public int getCost() {
         return this.cost;
-    }
-
-    public static boolean checkForRepairItemPart(List<InventoryAction> actions) {
-        for (InventoryAction action : actions) {
-            if (action instanceof RepairItemAction) {
-                return true;
-            }
-        }
-        return false;
     }
 }

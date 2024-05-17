@@ -25,7 +25,7 @@ public class DolphinSpawner extends AbstractEntitySpawner {
         final int blockId = level.getBlockIdAt((int) pos.x, (int) pos.y, (int) pos.z);
         if ((blockId == Block.WATER || blockId == Block.STILL_WATER) && (biomeId == 0 || biomeId == 24)) {
             if (level.isAnimalSpawningAllowedByTime()) {
-                final int b = level.getBlockIdAt((int) pos.x, (int) (pos.y -1), (int) pos.z);
+                final int b = level.getBlockIdAt((int) pos.x, (int) (pos.y - 1), (int) pos.z);
                 if (b == Block.WATER || b == Block.STILL_WATER) {
                     for (int i = 0; i < Utils.rand(1, 3); i++) {
                         BaseEntity entity = this.spawnTask.createEntity("Dolphin", pos.add(0, -1, 0));

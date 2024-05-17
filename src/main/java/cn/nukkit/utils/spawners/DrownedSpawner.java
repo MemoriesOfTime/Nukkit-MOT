@@ -22,7 +22,7 @@ public class DrownedSpawner extends AbstractEntitySpawner {
             if (biomeId == 0 || biomeId == 7 || biomeId == 24) {
                 if (level.getBlockLightAt((int) pos.x, (int) pos.y, (int) pos.z) <= 7) {
                     if (level.isMobSpawningAllowedByTime()) {
-                        final int b = level.getBlockIdAt((int) pos.x, (int) (pos.y -1), (int) pos.z);
+                        final int b = level.getBlockIdAt((int) pos.x, (int) (pos.y - 1), (int) pos.z);
                         if (b == Block.WATER || b == Block.STILL_WATER) {
                             this.spawnTask.createEntity("Drowned", pos.add(0.5, -1, 0.5));
                         }

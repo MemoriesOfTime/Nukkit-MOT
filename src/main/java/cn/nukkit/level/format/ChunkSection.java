@@ -35,7 +35,7 @@ public interface ChunkSection {
     }
 
     default int[] getBlockState(int x, int y, int z, int layer) {
-        return new int[] {getBlockId(x, y, z, layer), getBlockData(x, y, z, layer)};
+        return new int[]{getBlockId(x, y, z, layer), getBlockData(x, y, z, layer)};
     }
 
     Block getAndSetBlock(int x, int y, int z, int layer, Block block);
@@ -73,11 +73,11 @@ public interface ChunkSection {
     byte[] getDataArray();
 
     byte[] getDataArray(int layer);
-    
+
     default byte[] getDataExtraArray() {
         return getDataExtraArray(0);
     }
-    
+
     byte[] getDataExtraArray(int layer);
 
     default byte[][] getHyperDataArray() {
@@ -98,7 +98,7 @@ public interface ChunkSection {
 
     // for < 1.13 chunk format
     byte[] getBytes(int protocolId);
-    
+
     int getMaximumLayer();
 
     CompoundTag toNBT();

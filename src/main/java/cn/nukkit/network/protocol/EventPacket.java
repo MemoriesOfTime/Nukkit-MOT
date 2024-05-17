@@ -6,11 +6,6 @@ import lombok.ToString;
 public class EventPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.EVENT_PACKET;
-
-    public long eid;
-    public int unknown1; // event data
-    public byte unknown2; // event type
-
     public static final int TYPE_ACHIEVEMENT_AWARDED = 0;
     public static final int TYPE_ENTITY_INTERACT = 1;
     public static final int TYPE_PORTAL_BUILT = 2;
@@ -29,11 +24,13 @@ public class EventPacket extends DataPacket {
     public static final int TYPE_CAULDRON_BLOCK_USED = 15;
     public static final int TYPE_COMPOSTER_BLOCK_USED = 16;
     public static final int TYPE_BELL_BLOCK_USED = 17;
-
     /**
      * @since v588
      */
     public static final int TYPE_CAREFUL_RESTORATION = 30;
+    public long eid;
+    public int unknown1; // event data
+    public byte unknown2; // event type
 
     @Override
     public byte pid() {

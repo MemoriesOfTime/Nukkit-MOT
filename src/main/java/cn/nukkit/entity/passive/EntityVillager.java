@@ -26,18 +26,16 @@ public class EntityVillager extends EntityWalkingAnimal implements InventoryHold
     public static final int PROFESSION_GENERIC = 5;
 
     public static final int NETWORK_ID = 15;
-
-    /**
-     * 代表交易配方
-     */
-    @Getter
-    protected ListTag<Tag> recipes = new ListTag<>("Recipes");
     /**
      * 用于控制村民的等级成长所需要的经验
      * 例如[0,10,20,30,40] 村民达到1级所需经验0,2级为10,这里的经验是{@link EntityVillager#tradeExp}.
      */
     public int[] tierExpRequirement;
-
+    /**
+     * 代表交易配方
+     */
+    @Getter
+    protected ListTag<Tag> recipes = new ListTag<>("Recipes");
     protected TradeInventory inventory;
     /**
      * 用于控制该村民是否可以交易
@@ -334,10 +332,10 @@ public class EntityVillager extends EntityWalkingAnimal implements InventoryHold
     public void addExperience(int xp) {
         this.tradeExp += xp;
         this.setDataProperty(new IntEntityData(DATA_TRADE_EXPERIENCE, this.tradeExp));
-        int next = getTradeTier()+1;
+        int next = getTradeTier() + 1;
         if (next < this.tierExpRequirement.length) {
             if (tradeExp >= this.tierExpRequirement[next]) {
-                setTradeTier(next+1);
+                setTradeTier(next + 1);
             }
         }
     }

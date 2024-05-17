@@ -10,8 +10,10 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
-import cn.nukkit.math.*;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Axis;
+import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.Vector3;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -20,7 +22,7 @@ import java.util.List;
 
 public class BlockTarget extends BlockTransparent implements BlockEntityHolder<BlockEntityTarget> {
 
-    
+
     public BlockTarget() {
 
     }
@@ -57,15 +59,15 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
     @Override
     public int getWeakPower(BlockFace face) {
         BlockEntityTarget target = getBlockEntity();
-        return target == null? 0 : target.getActivePower();
+        return target == null ? 0 : target.getActivePower();
     }
 
-    
+
     public boolean activatePower(int power) {
         return activatePower(power, 4 * 2);
     }
 
-    
+
     public boolean activatePower(int power, int ticks) {
         Level level = getLevel();
         if (power <= 0 || ticks <= 0) {
@@ -83,7 +85,7 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
         return true;
     }
 
-    
+
     public boolean deactivatePower() {
         BlockEntityTarget target = getBlockEntity();
         if (target != null) {
@@ -125,13 +127,13 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
             return;
         }
 
-        Vector3 hitVector = intercept.hitVector.subtract(x*2, y*2, z*2);
+        Vector3 hitVector = intercept.hitVector.subtract(x * 2, y * 2, z * 2);
         List<Axis> axes = new ArrayList<>(Arrays.asList(Axis.values()));
         axes.remove(faceHit.getAxis());
 
-        double[] coords = new double[] { hitVector.getAxis(axes.get(0)), hitVector.getAxis(axes.get(1)) };
+        double[] coords = new double[]{hitVector.getAxis(axes.get(0)), hitVector.getAxis(axes.get(1))};
 
-        for (int i = 0; i < 2 ; i++) {
+        for (int i = 0; i < 2; i++) {
             if (coords[i] == 0.5) {
                 coords[i] = 1;
             } else if (coords[i] <= 0 || coords[i] >= 1) {

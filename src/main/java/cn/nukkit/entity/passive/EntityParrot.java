@@ -11,13 +11,15 @@ import cn.nukkit.utils.Utils;
 public class EntityParrot extends EntityFlyingAnimal {
 
     public static final int NETWORK_ID = 30;
-
-    private int variant;
-
     private static final int[] VARIANTS = {0, 1, 2, 3, 4};
+    private int variant;
 
     public EntityParrot(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+    }
+
+    private static int getRandomVariant() {
+        return VARIANTS[Utils.rand(0, VARIANTS.length - 1)];
     }
 
     @Override
@@ -78,9 +80,5 @@ public class EntityParrot extends EntityFlyingAnimal {
                     && distance <= 49;
         }
         return false;
-    }
-
-    private static int getRandomVariant() {
-        return VARIANTS[Utils.rand(0, VARIANTS.length - 1)];
     }
 }

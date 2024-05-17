@@ -122,73 +122,6 @@ public class Server {
 
     public static final String BROADCAST_CHANNEL_ADMINISTRATIVE = "nukkit.broadcast.admin";
     public static final String BROADCAST_CHANNEL_USERS = "nukkit.broadcast.user";
-
-    private static Server instance;
-
-    private final BanList banByName;
-    private final BanList banByIP;
-    private final Config operators;
-    private final Config whitelist;
-
-    private final AtomicBoolean isRunning = new AtomicBoolean(true);
-    private boolean hasStopped;
-
-    private final PluginManager pluginManager;
-    private final ServerScheduler scheduler;
-
-    private int tickCounter;
-    private long nextTick;
-    private final float[] tickAverage = {20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20};
-    private final float[] useAverage = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    private float maxTick = 20;
-    private float maxUse = 0;
-
-    private final NukkitConsole console;
-    private final ConsoleThread consoleThread;
-
-    private final SimpleCommandMap commandMap;
-    private final CraftingManager craftingManager;
-    private final ResourcePackManager resourcePackManager;
-    private final ConsoleCommandSender consoleSender;
-    private final IScoreboardManager scoreboardManager;
-
-    private int maxPlayers;
-    private boolean autoSave = true;
-    private RCON rcon;
-
-    private final EntityMetadataStore entityMetadata;
-    private final PlayerMetadataStore playerMetadata;
-    private final LevelMetadataStore levelMetadata;
-    private final Network network;
-
-    private boolean autoTickRate;
-    private int autoTickRateLimit;
-    private boolean alwaysTickPlayers;
-    private int baseTickRate;
-    private int difficulty;
-    private int defaultGameMode = Integer.MAX_VALUE;
-    int c_s_spawnThreshold;
-
-    private int autoSaveTicker;
-    private int autoSaveTicks;
-
-    private final BaseLang baseLang;
-    private boolean forceLanguage;
-
-    private final String filePath;
-    private final String dataPath;
-    private final String pluginPath;
-
-    private String ip;
-    private int port;
-    private QueryHandler queryHandler;
-    private QueryRegenerateEvent queryRegenerateEvent;
-    private final UUID serverID;
-    private final Config properties;
-
-    private final Map<InetSocketAddress, Player> players = new HashMap<>();
-    final Map<UUID, Player> playerList = new HashMap<>();
-
     /**
      * Worlds where automatic mob spawning is disabled.
      */
@@ -206,42 +139,44 @@ public class Server {
      * Worlds where random block ticking is disabled.
      */
     public static final List<String> noTickingWorlds = new ArrayList<>();
-
     private static final Pattern uuidPattern = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}.dat$");
-
-    private final Map<Integer, Level> levels = new ConcurrentHashMap<>() {
-        @Override
-        public Level put(@NotNull Integer key, @NotNull Level value) {
-            Level result = super.put(key, value);
-            levelArray = levels.values().toArray(new Level[0]);
-            return result;
-        }
-
-        @Override
-        public boolean remove(Object key, Object value) {
-            boolean result = super.remove(key, value);
-            levelArray = levels.values().toArray(new Level[0]);
-            return result;
-        }
-
-        @Override
-        public Level remove(@NotNull Object key) {
-            Level result = super.remove(key);
-            levelArray = levels.values().toArray(new Level[0]);
-            return result;
-        }
-    };
-
-    private Level[] levelArray = new Level[0];
+    private static Server instance;
+    /**
+     * This is needed for structure generation
+     */
+    public final ForkJoinPool computeThreadPool;
+    final Map<UUID, Player> playerList = new HashMap<>();
+    private final BanList banByName;
+    private final BanList banByIP;
+    private final Config operators;
+    private final Config whitelist;
+    private final AtomicBoolean isRunning = new AtomicBoolean(true);
+    private final PluginManager pluginManager;
+    private final ServerScheduler scheduler;
+    private final float[] tickAverage = {20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20};
+    private final float[] useAverage = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    private final NukkitConsole console;
+    private final ConsoleThread consoleThread;
+    private final SimpleCommandMap commandMap;
+    private final CraftingManager craftingManager;
+    private final ResourcePackManager resourcePackManager;
+    private final ConsoleCommandSender consoleSender;
+    private final IScoreboardManager scoreboardManager;
+    private final EntityMetadataStore entityMetadata;
+    private final PlayerMetadataStore playerMetadata;
+    private final LevelMetadataStore levelMetadata;
+    private final Network network;
+    private final BaseLang baseLang;
+    private final String filePath;
+    private final String dataPath;
+    private final String pluginPath;
+    private final UUID serverID;
+    private final Config properties;
+    private final Map<InetSocketAddress, Player> players = new HashMap<>();
     private final ServiceManager serviceManager = new NKServiceManager();
-    private Level defaultLevel;
     private final Thread currentThread;
-    private Watchdog watchdog;
     private final DB nameLookup;
-    private PlayerDataSerializer playerDataSerializer;
-    private SpawnerTask spawnerTask;
     private final BatchingHelper batchingHelper;
-
     /**
      * The server's MOTD. Remember to call network.setName() when updated.
      */
@@ -313,7 +248,28 @@ public class Server {
     /**
      * Bed spawnpoints enabled.
      */
-    public boolean bedSpawnpoints;
+    public boolean bedSpawnpoints;    private final Map<Integer, Level> levels = new ConcurrentHashMap<>() {
+        @Override
+        public Level put(@NotNull Integer key, @NotNull Level value) {
+            Level result = super.put(key, value);
+            levelArray = levels.values().toArray(new Level[0]);
+            return result;
+        }
+
+        @Override
+        public boolean remove(Object key, Object value) {
+            boolean result = super.remove(key, value);
+            levelArray = levels.values().toArray(new Level[0]);
+            return result;
+        }
+
+        @Override
+        public Level remove(@NotNull Object key) {
+            Level result = super.remove(key);
+            levelArray = levels.values().toArray(new Level[0]);
+            return result;
+        }
+    };
     /**
      * Server side achievements enabled.
      */
@@ -517,10 +473,6 @@ public class Server {
      */
     public boolean enableSpark;
     /**
-     * This is needed for structure generation
-     */
-    public final ForkJoinPool computeThreadPool;
-    /**
      * Set LevelDB cache size.
      */
     public int levelDbCache;
@@ -536,6 +488,34 @@ public class Server {
      * A number of datagram packets each address can send within one RakNet tick (10ms)
      */
     public int rakPacketLimit;
+    int c_s_spawnThreshold;
+    private boolean hasStopped;
+    private int tickCounter;
+    private long nextTick;
+    private float maxTick = 20;
+    private float maxUse = 0;
+    private int maxPlayers;
+    private boolean autoSave = true;
+    private RCON rcon;
+    private boolean autoTickRate;
+    private int autoTickRateLimit;
+    private boolean alwaysTickPlayers;
+    private int baseTickRate;
+    private int difficulty;
+    private int defaultGameMode = Integer.MAX_VALUE;
+    private int autoSaveTicker;
+    private int autoSaveTicks;
+    private boolean forceLanguage;
+    private String ip;
+    private int port;
+    private QueryHandler queryHandler;
+    private QueryRegenerateEvent queryRegenerateEvent;
+    private Level[] levelArray = new Level[0];
+    private Level defaultLevel;
+    private Watchdog watchdog;
+    private PlayerDataSerializer playerDataSerializer;
+    private SpawnerTask spawnerTask;
+    private int lastLevelGC;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -643,7 +623,7 @@ public class Server {
 
         org.apache.logging.log4j.Level currentLevel = Nukkit.getLogLevel();
         for (org.apache.logging.log4j.Level level : org.apache.logging.log4j.Level.values()) {
-            if (level.intLevel() == (Nukkit.DEBUG + 3) * 100  && level.intLevel() > currentLevel.intLevel()) {
+            if (level.intLevel() == (Nukkit.DEBUG + 3) * 100 && level.intLevel() > currentLevel.intLevel()) {
                 Nukkit.setLogLevel(level);
                 break;
             }
@@ -673,8 +653,8 @@ public class Server {
         // Convert legacy data before plugins get the chance to mess with it
         try {
             nameLookup = Iq80DBFactory.factory.open(new File(dataPath, "players"), new Options()
-                            .createIfMissing(true)
-                            .compressionType(CompressionType.ZLIB_RAW));
+                    .createIfMissing(true)
+                    .compressionType(CompressionType.ZLIB_RAW));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -835,6 +815,281 @@ public class Server {
         this.start();
     }
 
+    public static void broadcastPacket(Collection<Player> players, DataPacket packet) {
+        for (Player player : players) {
+            player.dataPacket(packet);
+        }
+    }
+
+    public static void broadcastPacket(Player[] players, DataPacket packet) {
+        for (Player player : players) {
+            player.dataPacket(packet);
+        }
+    }
+
+    public static void broadcastPackets(Player[] players, DataPacket[] packets) {
+        for (Player player : players) {
+            for (DataPacket packet : packets) {
+                player.dataPacket(packet);
+            }
+        }
+    }
+
+    public static String getGamemodeString(int mode) {
+        return getGamemodeString(mode, false);
+    }
+
+    public static String getGamemodeString(int mode, boolean direct) {
+        switch (mode) {
+            case Player.SURVIVAL:
+                return direct ? "Survival" : "%gameMode.survival";
+            case Player.CREATIVE:
+                return direct ? "Creative" : "%gameMode.creative";
+            case Player.ADVENTURE:
+                return direct ? "Adventure" : "%gameMode.adventure";
+            case Player.SPECTATOR:
+                return direct ? "Spectator" : "%gameMode.spectator";
+        }
+        return "UNKNOWN";
+    }
+
+    public static int getGamemodeFromString(String str) {
+        return switch (str.trim().toLowerCase()) {
+            case "0", "survival", "s" -> Player.SURVIVAL;
+            case "1", "creative", "c" -> Player.CREATIVE;
+            case "2", "adventure", "a" -> Player.ADVENTURE;
+            case "3", "spectator", "spc", "view", "v" -> Player.SPECTATOR;
+            default -> -1;
+        };
+    }
+
+    public static int getDifficultyFromString(String str) {
+        return switch (str.trim().toLowerCase()) {
+            case "0", "peaceful", "p" -> 0;
+            case "1", "easy", "e" -> 1;
+            case "2", "normal", "n" -> 2;
+            case "3", "hard", "h" -> 3;
+            default -> -1;
+        };
+    }
+
+    /**
+     * Sort players by protocol version
+     *
+     * @param players players
+     * @return players sorted by protocol
+     */
+    public static Int2ObjectMap<ObjectList<Player>> sortPlayers(Player[] players) {
+        Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
+        for (Player player : players) {
+            targets.computeIfAbsent(player.protocol, i -> new ObjectArrayList<>()).add(player);
+        }
+        return targets;
+    }
+
+    /**
+     * Sort players by protocol version
+     *
+     * @param players players
+     * @return players sorted by protocol
+     */
+    public static Int2ObjectMap<ObjectList<Player>> sortPlayers(Collection<Player> players) {
+        Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
+        for (Player player : players) {
+            targets.computeIfAbsent(player.protocol, i -> new ObjectArrayList<>()).add(player);
+        }
+        return targets;
+    }
+
+    /**
+     * Internal method to register all default entities
+     */
+    private static void registerEntities() {
+        //Items
+        Entity.registerEntity("Item", EntityItem.class);
+        Entity.registerEntity("Painting", EntityPainting.class);
+        Entity.registerEntity("XpOrb", EntityXPOrb.class);
+        Entity.registerEntity("ArmorStand", EntityArmorStand.class);
+        Entity.registerEntity("EndCrystal", EntityEndCrystal.class);
+        Entity.registerEntity("FallingSand", EntityFallingBlock.class);
+        Entity.registerEntity("PrimedTnt", EntityPrimedTNT.class);
+        Entity.registerEntity("Firework", EntityFirework.class);
+        //Projectiles
+        Entity.registerEntity("Arrow", EntityArrow.class);
+        Entity.registerEntity("Snowball", EntitySnowball.class);
+        Entity.registerEntity("EnderPearl", EntityEnderPearl.class);
+        Entity.registerEntity("EnderEye", EntityEnderEye.class);
+        Entity.registerEntity("ThrownExpBottle", EntityExpBottle.class);
+        Entity.registerEntity("ThrownPotion", EntityPotion.class);
+        Entity.registerEntity("Egg", EntityEgg.class);
+        Entity.registerEntity("SmallFireBall", EntitySmallFireBall.class);
+        // 和原版名称不一样，已弃用
+        // The name is different from the vanilla version and has been deprecated
+        Entity.registerEntity("BlazeFireBall", EntityBlazeFireBall.class);
+        Entity.registerEntity("GhastFireBall", EntityGhastFireBall.class);
+        Entity.registerEntity("ShulkerBullet", EntityShulkerBullet.class);
+        Entity.registerEntity("ThrownLingeringPotion", EntityPotionLingering.class);
+        Entity.registerEntity("ThrownTrident", EntityThrownTrident.class);
+        Entity.registerEntity("WitherSkull", EntityWitherSkull.class);
+        Entity.registerEntity("BlueWitherSkull", EntityBlueWitherSkull.class);
+        Entity.registerEntity("LlamaSpit", EntityLlamaSpit.class);
+        Entity.registerEntity("EvocationFangs", EntityEvocationFangs.class);
+        Entity.registerEntity("EnderCharge", EntityEnderCharge.class);
+        Entity.registerEntity("FishingHook", EntityFishingHook.class);
+        //Monsters
+        Entity.registerEntity("Blaze", EntityBlaze.class);
+        Entity.registerEntity("Creeper", EntityCreeper.class);
+        Entity.registerEntity("CaveSpider", EntityCaveSpider.class);
+        Entity.registerEntity("Drowned", EntityDrowned.class);
+        Entity.registerEntity("ElderGuardian", EntityElderGuardian.class);
+        Entity.registerEntity("EnderDragon", EntityEnderDragon.class);
+        Entity.registerEntity("Enderman", EntityEnderman.class);
+        Entity.registerEntity("Endermite", EntityEndermite.class);
+        Entity.registerEntity("Evoker", EntityEvoker.class);
+        Entity.registerEntity("Ghast", EntityGhast.class);
+        Entity.registerEntity("Guardian", EntityGuardian.class);
+        Entity.registerEntity("Husk", EntityHusk.class);
+        Entity.registerEntity("MagmaCube", EntityMagmaCube.class);
+        Entity.registerEntity("Phantom", EntityPhantom.class);
+        Entity.registerEntity("Ravager", EntityRavager.class);
+        Entity.registerEntity("Shulker", EntityShulker.class);
+        Entity.registerEntity("Silverfish", EntitySilverfish.class);
+        Entity.registerEntity("Skeleton", EntitySkeleton.class);
+        Entity.registerEntity("SkeletonHorse", EntitySkeletonHorse.class);
+        Entity.registerEntity("Slime", EntitySlime.class);
+        Entity.registerEntity("Spider", EntitySpider.class);
+        Entity.registerEntity("Stray", EntityStray.class);
+        Entity.registerEntity("Vindicator", EntityVindicator.class);
+        Entity.registerEntity("Warden", EntityWarden.class);
+        Entity.registerEntity("Vex", EntityVex.class);
+        Entity.registerEntity("WitherSkeleton", EntityWitherSkeleton.class);
+        Entity.registerEntity("Wither", EntityWither.class);
+        Entity.registerEntity("Witch", EntityWitch.class);
+        Entity.registerEntity("ZombiePigman", EntityZombiePigman.class);
+        Entity.registerEntity("ZombieVillager", EntityZombieVillager.class);
+        Entity.registerEntity("Zombie", EntityZombie.class);
+        Entity.registerEntity("Pillager", EntityPillager.class);
+        Entity.registerEntity("ZombieVillagerV2", EntityZombieVillagerV2.class);
+        Entity.registerEntity("Hoglin", EntityHoglin.class);
+        Entity.registerEntity("Piglin", EntityPiglin.class);
+        Entity.registerEntity("Zoglin", EntityZoglin.class);
+        Entity.registerEntity("PiglinBrute", EntityPiglinBrute.class);
+        //Passive
+        Entity.registerEntity("Bat", EntityBat.class);
+        Entity.registerEntity("Cat", EntityCat.class);
+        Entity.registerEntity("Chicken", EntityChicken.class);
+        Entity.registerEntity("Cod", EntityCod.class);
+        Entity.registerEntity("Cow", EntityCow.class);
+        Entity.registerEntity("Dolphin", EntityDolphin.class);
+        Entity.registerEntity("Donkey", EntityDonkey.class);
+        Entity.registerEntity("Horse", EntityHorse.class);
+        Entity.registerEntity("IronGolem", EntityIronGolem.class);
+        Entity.registerEntity("Llama", EntityLlama.class);
+        Entity.registerEntity("Mooshroom", EntityMooshroom.class);
+        Entity.registerEntity("Mule", EntityMule.class);
+        Entity.registerEntity("Panda", EntityPanda.class);
+        Entity.registerEntity("Parrot", EntityParrot.class);
+        Entity.registerEntity("PolarBear", EntityPolarBear.class);
+        Entity.registerEntity("Pig", EntityPig.class);
+        Entity.registerEntity("Pufferfish", EntityPufferfish.class);
+        Entity.registerEntity("Rabbit", EntityRabbit.class);
+        Entity.registerEntity("Salmon", EntitySalmon.class);
+        Entity.registerEntity("Sheep", EntitySheep.class);
+        Entity.registerEntity("Squid", EntitySquid.class);
+        Entity.registerEntity("SnowGolem", EntitySnowGolem.class);
+        Entity.registerEntity("TropicalFish", EntityTropicalFish.class);
+        Entity.registerEntity("Turtle", EntityTurtle.class);
+        Entity.registerEntity("Wolf", EntityWolf.class);
+        Entity.registerEntity("Ocelot", EntityOcelot.class);
+        Entity.registerEntity("Villager", EntityVillager.class);
+        Entity.registerEntity("ZombieHorse", EntityZombieHorse.class);
+        Entity.registerEntity("WanderingTrader", EntityWanderingTrader.class);
+        Entity.registerEntity("VillagerV2", EntityVillagerV2.class);
+        Entity.registerEntity("Fox", EntityFox.class);
+        Entity.registerEntity("Frog", EntityFrog.class);
+        Entity.registerEntity("Goat", EntityGoat.class);
+        Entity.registerEntity("Bee", EntityBee.class);
+        Entity.registerEntity("Strider", EntityStrider.class);
+        Entity.registerEntity("Tadpole", EntityTadpole.class);
+        Entity.registerEntity("Axolotl", EntityAxolotl.class);
+        Entity.registerEntity("GlowSquid", EntityGlowSquid.class);
+        Entity.registerEntity("Allay", EntityAllay.class);
+        Entity.registerEntity("Npc", EntityNPCEntity.class);
+        Entity.registerEntity("Camel", EntityCamel.class);
+        //Vehicles
+        Entity.registerEntity("MinecartRideable", EntityMinecartEmpty.class);
+        Entity.registerEntity("MinecartChest", EntityMinecartChest.class);
+        Entity.registerEntity("MinecartHopper", EntityMinecartHopper.class);
+        Entity.registerEntity("MinecartTnt", EntityMinecartTNT.class);
+        Entity.registerEntity("Boat", EntityBoat.class);
+        Entity.registerEntity("ChestBoat", EntityChestBoat.class);
+        //Others
+        Entity.registerEntity("Human", EntityHuman.class, true);
+        Entity.registerEntity("Lightning", EntityLightning.class);
+    }
+
+    /**
+     * Internal method to register all default block entities
+     */
+    private static void registerBlockEntities() {
+        BlockEntity.registerBlockEntity(BlockEntity.FURNACE, BlockEntityFurnace.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BLAST_FURNACE, BlockEntityBlastFurnace.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SMOKER, BlockEntitySmoker.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CHEST, BlockEntityChest.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SIGN, BlockEntitySign.class);
+        BlockEntity.registerBlockEntity(BlockEntity.ENCHANT_TABLE, BlockEntityEnchantTable.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SKULL, BlockEntitySkull.class);
+        BlockEntity.registerBlockEntity(BlockEntity.FLOWER_POT, BlockEntityFlowerPot.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BREWING_STAND, BlockEntityBrewingStand.class);
+        BlockEntity.registerBlockEntity(BlockEntity.ITEM_FRAME, BlockEntityItemFrame.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CAULDRON, BlockEntityCauldron.class);
+        BlockEntity.registerBlockEntity(BlockEntity.ENDER_CHEST, BlockEntityEnderChest.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BEACON, BlockEntityBeacon.class);
+        BlockEntity.registerBlockEntity(BlockEntity.PISTON_ARM, BlockEntityPistonArm.class);
+        BlockEntity.registerBlockEntity(BlockEntity.COMPARATOR, BlockEntityComparator.class);
+        BlockEntity.registerBlockEntity(BlockEntity.HOPPER, BlockEntityHopper.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BED, BlockEntityBed.class);
+        BlockEntity.registerBlockEntity(BlockEntity.JUKEBOX, BlockEntityJukebox.class);
+        BlockEntity.registerBlockEntity(BlockEntity.SHULKER_BOX, BlockEntityShulkerBox.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BANNER, BlockEntityBanner.class);
+        BlockEntity.registerBlockEntity(BlockEntity.DROPPER, BlockEntityDropper.class);
+        BlockEntity.registerBlockEntity(BlockEntity.DISPENSER, BlockEntityDispenser.class);
+        BlockEntity.registerBlockEntity(BlockEntity.MOB_SPAWNER, BlockEntitySpawner.class);
+        BlockEntity.registerBlockEntity(BlockEntity.MUSIC, BlockEntityMusic.class);
+        BlockEntity.registerBlockEntity(BlockEntity.LECTERN, BlockEntityLectern.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BEEHIVE, BlockEntityBeehive.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CAMPFIRE, BlockEntityCampfire.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BELL, BlockEntityBell.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BARREL, BlockEntityBarrel.class);
+        BlockEntity.registerBlockEntity(BlockEntity.MOVING_BLOCK, BlockEntityMovingBlock.class);
+        BlockEntity.registerBlockEntity(BlockEntity.END_GATEWAY, BlockEntityEndGateway.class);
+        BlockEntity.registerBlockEntity(BlockEntity.DECORATED_POT, BlockEntityDecoratedPot.class);
+        BlockEntity.registerBlockEntity(BlockEntity.TARGET, BlockEntityTarget.class);
+        BlockEntity.registerBlockEntity(BlockEntity.BRUSHABLE_BLOCK, BlockEntityBrushableBlock.class);
+    }
+
+    /**
+     * Get the Server instance
+     *
+     * @return Server
+     */
+    public static Server getInstance() {
+        return instance;
+    }
+
+    /**
+     * Internal: Warn user about non multiversion compatible plugins.
+     */
+    public static void mvw(String action) {
+        if (getInstance().minimumProtocol != ProtocolInfo.CURRENT_PROTOCOL) {
+            if (Nukkit.DEBUG > 1) {
+                getInstance().getLogger().logException(new PluginException("Default " + action + " used by a plugin. This can cause instability with the multiversion."));
+            } else {
+                getInstance().getLogger().warning("Default " + action + " used by a plugin. This can cause instability with the multiversion.");
+            }
+        }
+    }
+
     public int broadcastMessage(String message) {
         return this.broadcast(message, BROADCAST_CHANNEL_USERS);
     }
@@ -901,27 +1156,6 @@ public class Server {
         }
 
         return recipients.size();
-    }
-
-
-    public static void broadcastPacket(Collection<Player> players, DataPacket packet) {
-        for (Player player : players) {
-            player.dataPacket(packet);
-        }
-    }
-
-    public static void broadcastPacket(Player[] players, DataPacket packet) {
-        for (Player player : players) {
-            player.dataPacket(packet);
-        }
-    }
-
-    public static void broadcastPackets(Player[] players, DataPacket[] packets) {
-        for (Player player : players) {
-            for (DataPacket packet : packets) {
-                player.dataPacket(packet);
-            }
-        }
     }
 
     public void batchPackets(Player[] players, DataPacket[] packets) {
@@ -1020,7 +1254,8 @@ public class Server {
         for (BanEntry entry : this.banByIP.getEntires().values()) {
             try {
                 this.network.blockAddress(InetAddress.getByName(entry.getName()), -1);
-            } catch (UnknownHostException ignore) {}
+            } catch (UnknownHostException ignore) {
+            }
         }
 
         this.pluginManager.registerInterface(JavaPluginLoader.class);
@@ -1111,7 +1346,8 @@ public class Server {
         for (BanEntry entry : this.banByIP.getEntires().values()) {
             try {
                 this.network.blockAddress(InetAddress.getByName(entry.getName()), -1);
-            } catch (UnknownHostException ignore) {}
+            } catch (UnknownHostException ignore) {
+            }
         }
 
         this.tickCounter = 0;
@@ -1142,8 +1378,6 @@ public class Server {
             this.network.blockAddress(address.getAddress(), -1);
         }
     }
-
-    private int lastLevelGC;
 
     public void tickProcessor() {
         this.nextTick = System.currentTimeMillis();
@@ -1334,7 +1568,7 @@ public class Server {
         } else if (player.protocol == ProtocolInfo.v1_12_0) {
             player.dataPacket(CraftingManager.packet361);
         } else if (player.protocol == ProtocolInfo.v1_11_0) {
-             player.dataPacket(CraftingManager.packet354);
+            player.dataPacket(CraftingManager.packet354);
         } else if (player.protocol == ProtocolInfo.v1_10_0) {
             player.dataPacket(CraftingManager.packet340);
         } else if (player.protocol == ProtocolInfo.v1_9_0 || player.protocol == ProtocolInfo.v1_8_0 || player.protocol == ProtocolInfo.v1_7_0) { // these should work just fine
@@ -1610,44 +1844,6 @@ public class Server {
 
     public boolean getForceGamemode() {
         return this.forceGamemode;
-    }
-
-    public static String getGamemodeString(int mode) {
-        return getGamemodeString(mode, false);
-    }
-
-    public static String getGamemodeString(int mode, boolean direct) {
-        switch (mode) {
-            case Player.SURVIVAL:
-                return direct ? "Survival" : "%gameMode.survival";
-            case Player.CREATIVE:
-                return direct ? "Creative" : "%gameMode.creative";
-            case Player.ADVENTURE:
-                return direct ? "Adventure" : "%gameMode.adventure";
-            case Player.SPECTATOR:
-                return direct ? "Spectator" : "%gameMode.spectator";
-        }
-        return "UNKNOWN";
-    }
-
-    public static int getGamemodeFromString(String str) {
-        return switch (str.trim().toLowerCase()) {
-            case "0", "survival", "s" -> Player.SURVIVAL;
-            case "1", "creative", "c" -> Player.CREATIVE;
-            case "2", "adventure", "a" -> Player.ADVENTURE;
-            case "3", "spectator", "spc", "view", "v" -> Player.SPECTATOR;
-            default -> -1;
-        };
-    }
-
-    public static int getDifficultyFromString(String str) {
-        return switch (str.trim().toLowerCase()) {
-            case "0", "peaceful", "p" -> 0;
-            case "1", "easy", "e" -> 1;
-            case "2", "normal", "n" -> 2;
-            case "3", "hard", "h" -> 3;
-            default -> -1;
-        };
     }
 
     public int getDifficulty() {
@@ -1985,9 +2181,9 @@ public class Server {
      * Internal: Save offline player data
      *
      * @param serializer serializer
-     * @param tag compound tag
-     * @param name player name
-     * @param uuid player uuid
+     * @param tag        compound tag
+     * @param name       player name
+     * @param uuid       player uuid
      */
     private void saveOfflinePlayerDataInternal(PlayerDataSerializer serializer, CompoundTag tag, String name, UUID uuid) {
         try (OutputStream dataStream = serializer.write(name, uuid)) {
@@ -2031,7 +2227,7 @@ public class Server {
                 tag.putString("NameTag", name);
             }
 
-            if (new File(getDataPath() + "players/" + uuid.toString() + ".dat").exists()) {
+            if (new File(getDataPath() + "players/" + uuid + ".dat").exists()) {
                 // We don't want to overwrite existing data.
                 continue;
             }
@@ -2198,7 +2394,7 @@ public class Server {
 
     /**
      * Unload a level
-     *
+     * <p>
      * Notice: the default level cannot be unloaded without forceUnload=true
      *
      * @param level Level
@@ -2210,10 +2406,10 @@ public class Server {
 
     /**
      * Unload a level
-     *
+     * <p>
      * Notice: the default level cannot be unloaded without forceUnload=true
      *
-     * @param level Level
+     * @param level       Level
      * @param forceUnload force unload (ignore cancelled events and default level)
      * @return unloaded
      */
@@ -2300,8 +2496,8 @@ public class Server {
     /**
      * Generate a new level
      *
-     * @param name level name
-     * @param seed level seed
+     * @param name      level name
+     * @param seed      level seed
      * @param generator level generator
      * @return generated
      */
@@ -2312,10 +2508,10 @@ public class Server {
     /**
      * Generate a new level
      *
-     * @param name level name
-     * @param seed level seed
+     * @param name      level name
+     * @param seed      level seed
      * @param generator level generator
-     * @param options level generator options
+     * @param options   level generator options
      * @return generated
      */
     public boolean generateLevel(String name, long seed, Class<? extends Generator> generator, Map<String, Object> options) {
@@ -2325,11 +2521,11 @@ public class Server {
     /**
      * Generate a new level
      *
-     * @param name level name
-     * @param seed level seed
+     * @param name      level name
+     * @param seed      level seed
      * @param generator level generator
-     * @param options level generator options
-     * @param provider level provider
+     * @param options   level generator options
+     * @param provider  level provider
      * @return generated
      */
     public boolean generateLevel(String name, long seed, Class<? extends Generator> generator, Map<String, Object> options, Class<? extends LevelProvider> provider) {
@@ -2452,7 +2648,7 @@ public class Server {
     /**
      * Get a value from server.properties
      *
-     * @param variable key
+     * @param variable     key
      * @param defaultValue default value
      * @return value
      */
@@ -2464,7 +2660,7 @@ public class Server {
      * Set a string value in server.properties
      *
      * @param variable key
-     * @param value value
+     * @param value    value
      */
     public void setPropertyString(String variable, String value) {
         this.properties.set(variable, value);
@@ -2484,7 +2680,7 @@ public class Server {
     /**
      * Get a string value from server.properties
      *
-     * @param key key
+     * @param key          key
      * @param defaultValue default value
      * @return value
      */
@@ -2505,7 +2701,7 @@ public class Server {
     /**
      * Get an int value from server.properties
      *
-     * @param variable key
+     * @param variable     key
      * @param defaultValue default value
      * @return value
      */
@@ -2517,7 +2713,7 @@ public class Server {
      * Set an int value in server.properties
      *
      * @param variable key
-     * @param value value
+     * @param value    value
      */
     public void setPropertyInt(String variable, int value) {
         this.properties.set(variable, value);
@@ -2537,7 +2733,7 @@ public class Server {
     /**
      * Get a boolean value from server.properties
      *
-     * @param variable key
+     * @param variable     key
      * @param defaultValue default value
      * @return value
      */
@@ -2560,7 +2756,7 @@ public class Server {
      * Set a boolean value in server.properties
      *
      * @param variable key
-     * @param value value
+     * @param value    value
      */
     public void setPropertyBoolean(String variable, boolean value) {
         this.properties.set(variable, value ? "1" : "0");
@@ -2735,34 +2931,6 @@ public class Server {
     }
 
     /**
-     * Sort players by protocol version
-     *
-     * @param players players
-     * @return players sorted by protocol
-     */
-    public static Int2ObjectMap<ObjectList<Player>> sortPlayers(Player[] players) {
-        Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
-        for (Player player : players) {
-            targets.computeIfAbsent(player.protocol, i -> new ObjectArrayList<>()).add(player);
-        }
-        return targets;
-    }
-
-    /**
-     * Sort players by protocol version
-     *
-     * @param players players
-     * @return players sorted by protocol
-     */
-    public static Int2ObjectMap<ObjectList<Player>> sortPlayers(Collection<Player> players) {
-        Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
-        for (Player player : players) {
-            targets.computeIfAbsent(player.protocol, i -> new ObjectArrayList<>()).add(player);
-        }
-        return targets;
-    }
-
-    /**
      * Checks the current thread against the expected primary thread for the server.
      *
      * <b>Note:</b> this method should not be used to indicate the current synchronized state of the runtime. A current thread matching the main thread indicates that it is synchronized, but a mismatch does not preclude the same assumption.
@@ -2784,173 +2952,6 @@ public class Server {
 
     private void registerProfessions() {
         Profession.init();
-    }
-
-    /**
-     * Internal method to register all default entities
-     */
-    private static void registerEntities() {
-        //Items
-        Entity.registerEntity("Item", EntityItem.class);
-        Entity.registerEntity("Painting", EntityPainting.class);
-        Entity.registerEntity("XpOrb", EntityXPOrb.class);
-        Entity.registerEntity("ArmorStand", EntityArmorStand.class);
-        Entity.registerEntity("EndCrystal", EntityEndCrystal.class);
-        Entity.registerEntity("FallingSand", EntityFallingBlock.class);
-        Entity.registerEntity("PrimedTnt", EntityPrimedTNT.class);
-        Entity.registerEntity("Firework", EntityFirework.class);
-        //Projectiles
-        Entity.registerEntity("Arrow", EntityArrow.class);
-        Entity.registerEntity("Snowball", EntitySnowball.class);
-        Entity.registerEntity("EnderPearl", EntityEnderPearl.class);
-        Entity.registerEntity("EnderEye", EntityEnderEye.class);
-        Entity.registerEntity("ThrownExpBottle", EntityExpBottle.class);
-        Entity.registerEntity("ThrownPotion", EntityPotion.class);
-        Entity.registerEntity("Egg", EntityEgg.class);
-        Entity.registerEntity("SmallFireBall", EntitySmallFireBall.class);
-        // 和原版名称不一样，已弃用
-        // The name is different from the vanilla version and has been deprecated
-        Entity.registerEntity("BlazeFireBall", EntityBlazeFireBall.class);
-        Entity.registerEntity("GhastFireBall", EntityGhastFireBall.class);
-        Entity.registerEntity("ShulkerBullet", EntityShulkerBullet.class);
-        Entity.registerEntity("ThrownLingeringPotion", EntityPotionLingering.class);
-        Entity.registerEntity("ThrownTrident", EntityThrownTrident.class);
-        Entity.registerEntity("WitherSkull", EntityWitherSkull.class);
-        Entity.registerEntity("BlueWitherSkull", EntityBlueWitherSkull.class);
-        Entity.registerEntity("LlamaSpit", EntityLlamaSpit.class);
-        Entity.registerEntity("EvocationFangs", EntityEvocationFangs.class);
-        Entity.registerEntity("EnderCharge", EntityEnderCharge.class);
-        Entity.registerEntity("FishingHook", EntityFishingHook.class);
-        //Monsters
-        Entity.registerEntity("Blaze", EntityBlaze.class);
-        Entity.registerEntity("Creeper", EntityCreeper.class);
-        Entity.registerEntity("CaveSpider", EntityCaveSpider.class);
-        Entity.registerEntity("Drowned", EntityDrowned.class);
-        Entity.registerEntity("ElderGuardian", EntityElderGuardian.class);
-        Entity.registerEntity("EnderDragon", EntityEnderDragon.class);
-        Entity.registerEntity("Enderman", EntityEnderman.class);
-        Entity.registerEntity("Endermite", EntityEndermite.class);
-        Entity.registerEntity("Evoker", EntityEvoker.class);
-        Entity.registerEntity("Ghast", EntityGhast.class);
-        Entity.registerEntity("Guardian", EntityGuardian.class);
-        Entity.registerEntity("Husk", EntityHusk.class);
-        Entity.registerEntity("MagmaCube", EntityMagmaCube.class);
-        Entity.registerEntity("Phantom", EntityPhantom.class);
-        Entity.registerEntity("Ravager", EntityRavager.class);
-        Entity.registerEntity("Shulker", EntityShulker.class);
-        Entity.registerEntity("Silverfish", EntitySilverfish.class);
-        Entity.registerEntity("Skeleton", EntitySkeleton.class);
-        Entity.registerEntity("SkeletonHorse", EntitySkeletonHorse.class);
-        Entity.registerEntity("Slime", EntitySlime.class);
-        Entity.registerEntity("Spider", EntitySpider.class);
-        Entity.registerEntity("Stray", EntityStray.class);
-        Entity.registerEntity("Vindicator", EntityVindicator.class);
-        Entity.registerEntity("Warden", EntityWarden.class);
-        Entity.registerEntity("Vex", EntityVex.class);
-        Entity.registerEntity("WitherSkeleton", EntityWitherSkeleton.class);
-        Entity.registerEntity("Wither", EntityWither.class);
-        Entity.registerEntity("Witch", EntityWitch.class);
-        Entity.registerEntity("ZombiePigman", EntityZombiePigman.class);
-        Entity.registerEntity("ZombieVillager", EntityZombieVillager.class);
-        Entity.registerEntity("Zombie", EntityZombie.class);
-        Entity.registerEntity("Pillager", EntityPillager.class);
-        Entity.registerEntity("ZombieVillagerV2", EntityZombieVillagerV2.class);
-        Entity.registerEntity("Hoglin", EntityHoglin.class);
-        Entity.registerEntity("Piglin", EntityPiglin.class);
-        Entity.registerEntity("Zoglin", EntityZoglin.class);
-        Entity.registerEntity("PiglinBrute", EntityPiglinBrute.class);
-        //Passive
-        Entity.registerEntity("Bat", EntityBat.class);
-        Entity.registerEntity("Cat", EntityCat.class);
-        Entity.registerEntity("Chicken", EntityChicken.class);
-        Entity.registerEntity("Cod", EntityCod.class);
-        Entity.registerEntity("Cow", EntityCow.class);
-        Entity.registerEntity("Dolphin", EntityDolphin.class);
-        Entity.registerEntity("Donkey", EntityDonkey.class);
-        Entity.registerEntity("Horse", EntityHorse.class);
-        Entity.registerEntity("IronGolem", EntityIronGolem.class);
-        Entity.registerEntity("Llama", EntityLlama.class);
-        Entity.registerEntity("Mooshroom", EntityMooshroom.class);
-        Entity.registerEntity("Mule", EntityMule.class);
-        Entity.registerEntity("Panda", EntityPanda.class);
-        Entity.registerEntity("Parrot", EntityParrot.class);
-        Entity.registerEntity("PolarBear", EntityPolarBear.class);
-        Entity.registerEntity("Pig", EntityPig.class);
-        Entity.registerEntity("Pufferfish", EntityPufferfish.class);
-        Entity.registerEntity("Rabbit", EntityRabbit.class);
-        Entity.registerEntity("Salmon", EntitySalmon.class);
-        Entity.registerEntity("Sheep", EntitySheep.class);
-        Entity.registerEntity("Squid", EntitySquid.class);
-        Entity.registerEntity("SnowGolem", EntitySnowGolem.class);
-        Entity.registerEntity("TropicalFish", EntityTropicalFish.class);
-        Entity.registerEntity("Turtle", EntityTurtle.class);
-        Entity.registerEntity("Wolf", EntityWolf.class);
-        Entity.registerEntity("Ocelot", EntityOcelot.class);
-        Entity.registerEntity("Villager", EntityVillager.class);
-        Entity.registerEntity("ZombieHorse", EntityZombieHorse.class);
-        Entity.registerEntity("WanderingTrader", EntityWanderingTrader.class);
-        Entity.registerEntity("VillagerV2", EntityVillagerV2.class);
-        Entity.registerEntity("Fox", EntityFox.class);
-        Entity.registerEntity("Frog", EntityFrog.class);
-        Entity.registerEntity("Goat", EntityGoat.class);
-        Entity.registerEntity("Bee", EntityBee.class);
-        Entity.registerEntity("Strider", EntityStrider.class);
-        Entity.registerEntity("Tadpole", EntityTadpole.class);
-        Entity.registerEntity("Axolotl", EntityAxolotl.class);
-        Entity.registerEntity("GlowSquid", EntityGlowSquid.class);
-        Entity.registerEntity("Allay", EntityAllay.class);
-        Entity.registerEntity("Npc", EntityNPCEntity.class);
-        Entity.registerEntity("Camel", EntityCamel.class);
-        //Vehicles
-        Entity.registerEntity("MinecartRideable", EntityMinecartEmpty.class);
-        Entity.registerEntity("MinecartChest", EntityMinecartChest.class);
-        Entity.registerEntity("MinecartHopper", EntityMinecartHopper.class);
-        Entity.registerEntity("MinecartTnt", EntityMinecartTNT.class);
-        Entity.registerEntity("Boat", EntityBoat.class);
-        Entity.registerEntity("ChestBoat", EntityChestBoat.class);
-        //Others
-        Entity.registerEntity("Human", EntityHuman.class, true);
-        Entity.registerEntity("Lightning", EntityLightning.class);
-    }
-
-    /**
-     * Internal method to register all default block entities
-     */
-    private static void registerBlockEntities() {
-        BlockEntity.registerBlockEntity(BlockEntity.FURNACE, BlockEntityFurnace.class);
-        BlockEntity.registerBlockEntity(BlockEntity.BLAST_FURNACE, BlockEntityBlastFurnace.class);
-        BlockEntity.registerBlockEntity(BlockEntity.SMOKER, BlockEntitySmoker.class);
-        BlockEntity.registerBlockEntity(BlockEntity.CHEST, BlockEntityChest.class);
-        BlockEntity.registerBlockEntity(BlockEntity.SIGN, BlockEntitySign.class);
-        BlockEntity.registerBlockEntity(BlockEntity.ENCHANT_TABLE, BlockEntityEnchantTable.class);
-        BlockEntity.registerBlockEntity(BlockEntity.SKULL, BlockEntitySkull.class);
-        BlockEntity.registerBlockEntity(BlockEntity.FLOWER_POT, BlockEntityFlowerPot.class);
-        BlockEntity.registerBlockEntity(BlockEntity.BREWING_STAND, BlockEntityBrewingStand.class);
-        BlockEntity.registerBlockEntity(BlockEntity.ITEM_FRAME, BlockEntityItemFrame.class);
-        BlockEntity.registerBlockEntity(BlockEntity.CAULDRON, BlockEntityCauldron.class);
-        BlockEntity.registerBlockEntity(BlockEntity.ENDER_CHEST, BlockEntityEnderChest.class);
-        BlockEntity.registerBlockEntity(BlockEntity.BEACON, BlockEntityBeacon.class);
-        BlockEntity.registerBlockEntity(BlockEntity.PISTON_ARM, BlockEntityPistonArm.class);
-        BlockEntity.registerBlockEntity(BlockEntity.COMPARATOR, BlockEntityComparator.class);
-        BlockEntity.registerBlockEntity(BlockEntity.HOPPER, BlockEntityHopper.class);
-        BlockEntity.registerBlockEntity(BlockEntity.BED, BlockEntityBed.class);
-        BlockEntity.registerBlockEntity(BlockEntity.JUKEBOX, BlockEntityJukebox.class);
-        BlockEntity.registerBlockEntity(BlockEntity.SHULKER_BOX, BlockEntityShulkerBox.class);
-        BlockEntity.registerBlockEntity(BlockEntity.BANNER, BlockEntityBanner.class);
-        BlockEntity.registerBlockEntity(BlockEntity.DROPPER, BlockEntityDropper.class);
-        BlockEntity.registerBlockEntity(BlockEntity.DISPENSER, BlockEntityDispenser.class);
-        BlockEntity.registerBlockEntity(BlockEntity.MOB_SPAWNER, BlockEntitySpawner.class);
-        BlockEntity.registerBlockEntity(BlockEntity.MUSIC, BlockEntityMusic.class);
-        BlockEntity.registerBlockEntity(BlockEntity.LECTERN, BlockEntityLectern.class);
-        BlockEntity.registerBlockEntity(BlockEntity.BEEHIVE, BlockEntityBeehive.class);
-        BlockEntity.registerBlockEntity(BlockEntity.CAMPFIRE, BlockEntityCampfire.class);
-        BlockEntity.registerBlockEntity(BlockEntity.BELL, BlockEntityBell.class);
-        BlockEntity.registerBlockEntity(BlockEntity.BARREL, BlockEntityBarrel.class);
-        BlockEntity.registerBlockEntity(BlockEntity.MOVING_BLOCK, BlockEntityMovingBlock.class);
-        BlockEntity.registerBlockEntity(BlockEntity.END_GATEWAY, BlockEntityEndGateway.class);
-        BlockEntity.registerBlockEntity(BlockEntity.DECORATED_POT, BlockEntityDecoratedPot.class);
-        BlockEntity.registerBlockEntity(BlockEntity.TARGET, BlockEntityTarget.class);
-        BlockEntity.registerBlockEntity(BlockEntity.BRUSHABLE_BLOCK, BlockEntityBrushableBlock.class);
     }
 
     /**
@@ -2982,15 +2983,6 @@ public class Server {
      */
     public void setPlayerDataSerializer(PlayerDataSerializer playerDataSerializer) {
         this.playerDataSerializer = Preconditions.checkNotNull(playerDataSerializer, "playerDataSerializer");
-    }
-
-    /**
-     * Get the Server instance
-     *
-     * @return Server
-     */
-    public static Server getInstance() {
-        return instance;
     }
 
     /**
@@ -3116,19 +3108,6 @@ public class Server {
         this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
         this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
         this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
-    }
-
-    /**
-     * Internal: Warn user about non multiversion compatible plugins.
-     */
-    public static void mvw(String action) {
-        if (getInstance().minimumProtocol != ProtocolInfo.CURRENT_PROTOCOL) {
-            if (Nukkit.DEBUG > 1) {
-                getInstance().getLogger().logException(new PluginException("Default " + action + " used by a plugin. This can cause instability with the multiversion."));
-            } else {
-                getInstance().getLogger().warning("Default " + action + " used by a plugin. This can cause instability with the multiversion.");
-            }
-        }
     }
 
     /**
@@ -3263,13 +3242,6 @@ public class Server {
         }
     }
 
-    private class ConsoleThread extends Thread implements InterruptibleThread {
-        @Override
-        public void run() {
-            console.start();
-        }
-    }
-
     private static class ComputeThread extends ForkJoinWorkerThread {
         ComputeThread(final ForkJoinPool pool, final AtomicInteger threadCount) {
             super(pool);
@@ -3282,8 +3254,8 @@ public class Server {
 
         @SuppressWarnings("removal")
         private static final AccessControlContext ACC = contextWithPermissions(
-            new RuntimePermission("getClassLoader"),
-            new RuntimePermission("setContextClassLoader")
+                new RuntimePermission("getClassLoader"),
+                new RuntimePermission("setContextClassLoader")
         );
 
         @SuppressWarnings("removal")
@@ -3301,4 +3273,13 @@ public class Server {
             return AccessController.doPrivileged((PrivilegedAction<ForkJoinWorkerThread>) () -> new ComputeThread(pool, threadCount), ACC);
         }
     }
+
+    private class ConsoleThread extends Thread implements InterruptibleThread {
+        @Override
+        public void run() {
+            console.start();
+        }
+    }
+
+
 }

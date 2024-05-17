@@ -21,14 +21,11 @@ import java.util.*;
  */
 public class InventoryTransaction {
 
-    private boolean invalid;
     protected boolean hasExecuted;
-
     protected Player source;
-
     protected Set<Inventory> inventories = new HashSet<>();
-
     protected List<InventoryAction> actions = new ArrayList<>();
+    private boolean invalid;
 
     public InventoryTransaction(Player source, List<InventoryAction> actions) {
         this(source, actions, true);
@@ -166,8 +163,7 @@ public class InventoryTransaction {
     protected void sendInventories() {
         if (this.getSource().protocol >= ProtocolInfo.v1_16_0) {
             for (InventoryAction action : this.actions) {
-                if (action instanceof SlotChangeAction) {
-                    SlotChangeAction sca = (SlotChangeAction) action;
+                if (action instanceof SlotChangeAction sca) {
                     sca.getInventory().sendSlot(sca.getSlot(), this.source);
                 }
             }
@@ -196,10 +192,9 @@ public class InventoryTransaction {
         Player who = null;
 
         for (InventoryAction action : this.actions) {
-            if (!(action instanceof SlotChangeAction)) {
+            if (!(action instanceof SlotChangeAction slotChange)) {
                 continue;
             }
-            SlotChangeAction slotChange = (SlotChangeAction) action;
 
             if (slotChange.getInventory().getHolder() instanceof Player) {
                 who = (Player) slotChange.getInventory().getHolder();

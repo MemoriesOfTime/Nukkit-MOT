@@ -54,8 +54,7 @@ public class PlaySoundCommand extends VanillaCommand {
             return true;
         }
 
-        if (args[1].equalsIgnoreCase("@s") && sender instanceof Player) {
-            Player p = (Player) sender;
+        if (args[1].equalsIgnoreCase("@s") && sender instanceof Player p) {
 
             p.getLevel().addSound(p, args[0], p);
             sender.sendMessage(new TranslationContainer("commands.playsound.success", args[0], p.getName()));

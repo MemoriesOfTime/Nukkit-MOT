@@ -27,6 +27,10 @@ public class ItemArmorStand extends Item {
         super(ARMOR_STAND, meta, count, "Armor Stand");
     }
 
+    public static float getDirection(float yaw) {
+        return (Math.round(yaw / 22.5f / 2) * 45) - 180;
+    }
+
     @Override
     public boolean canBeActivated() {
         return true;
@@ -76,9 +80,5 @@ public class ItemArmorStand extends Item {
             return true;
         }
         return false;
-    }
-
-    public static float getDirection(float yaw) {
-        return (Math.round(yaw / 22.5f / 2) * 45) - 180;
     }
 }

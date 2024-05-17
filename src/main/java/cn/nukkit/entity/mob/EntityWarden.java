@@ -44,7 +44,7 @@ public class EntityWarden extends EntityWalkingMob {
 
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 16, 30, 45 });
+        this.setDamage(new int[]{0, 16, 30, 45});
     }
 
     @Override

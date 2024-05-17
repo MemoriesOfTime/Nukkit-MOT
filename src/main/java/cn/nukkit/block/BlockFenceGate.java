@@ -70,7 +70,7 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
         if (i == 2 || i == 0) {
             return new SimpleAxisAlignedBB(x, y, z + 0.375, x + 1, y + 1.5, z + 0.625);
         } else {
-            return new SimpleAxisAlignedBB( x + 0.375, y, z, x + 0.625, y + 1.5, z + 1);
+            return new SimpleAxisAlignedBB(x + 0.375, y, z, x + 0.625, y + 1.5, z + 1);
         }
     }
 
@@ -169,7 +169,7 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
 
         return 0;
     }
-    
+
     @Override
     public Item toItem() {
         return Item.get(Item.FENCE_GATE, 0, 1);

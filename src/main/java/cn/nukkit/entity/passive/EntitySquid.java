@@ -57,7 +57,7 @@ public class EntitySquid extends EntityWaterAnimal {
 
     @Override
     public boolean attack(EntityDamageEvent source) {
-        boolean att =  super.attack(source);
+        boolean att = super.attack(source);
         if (source.isCancelled()) {
             return att;
         }

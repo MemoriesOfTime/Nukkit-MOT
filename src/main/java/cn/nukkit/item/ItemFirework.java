@@ -138,8 +138,8 @@ public class ItemFirework extends Item {
     public int getFlight() {
         int flight = 0;
         Tag tag = this.getNamedTag();
-        if (tag != null && (tag = ((CompoundTag)tag).get("Fireworks")) instanceof CompoundTag) {
-            flight = ((CompoundTag)tag).getByte("Flight");
+        if (tag != null && (tag = ((CompoundTag) tag).get("Fireworks")) instanceof CompoundTag) {
+            flight = ((CompoundTag) tag).getByte("Flight");
         }
         return flight;
     }

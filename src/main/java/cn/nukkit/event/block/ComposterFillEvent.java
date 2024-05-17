@@ -23,6 +23,10 @@ public class ComposterFillEvent extends BlockEvent implements Cancellable {
         this.success = success;
     }
 
+    public static HandlerList getHandlers() {
+        return handlers;
+    }
+
     public Player getPlayer() {
         return player;
     }
@@ -41,9 +45,5 @@ public class ComposterFillEvent extends BlockEvent implements Cancellable {
 
     public void setSuccess(boolean success) {
         this.success = success;
-    }
-
-    public static HandlerList getHandlers() {
-        return handlers;
     }
 }

@@ -5,10 +5,7 @@ import java.io.Reader;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CoderResult;
+import java.nio.charset.*;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.EnumSet;
@@ -18,80 +15,65 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class SNBTLexer implements SNBTConstants {
-    static final private SNBTNfaData.NfaFunction[] nfaFunctions = SNBTNfaData.getFunctionTableMap(null);
     static final int DEFAULT_TAB_SIZE = 1;
-    private int tabSize = DEFAULT_TAB_SIZE;
-
-    /**
-     * set the tab size used for location reporting
-     */
-    public void setTabSize(int tabSize) {
-        this.tabSize = tabSize;
-    }
-
-    final Token DUMMY_START_TOKEN = new Token();
+    // Token types that are "regular" tokens that participate in parsing,
+    // i.e. declared as TOKEN
+    static final EnumSet<TokenType> regularTokens = EnumSet.of(EOF, COLON, COMMA, OPEN_BRACKET, CLOSE_BRACKET, OPEN_BRACE, CLOSE_BRACE, BOOLEAN, FLOAT, DOUBLE, INTEGER, LONG, BYTE, SHORT, STRING, B, _TOKEN_17, I);
+    // Tokens that are skipped, i.e. SKIP
+    static final EnumSet<TokenType> skippedTokens = EnumSet.of(WHITESPACE);
+    static final int BUF_SIZE = 0x10000;
+    static final private SNBTNfaData.NfaFunction[] nfaFunctions = SNBTNfaData.getFunctionTableMap(null);
     // Just a dummy Token value that we put in the tokenLocationTable
     // to indicate that this location in the file is ignored.
     static final private Token IGNORED = new Token(), SKIPPED = new Token();
+    // Token types that do not participate in parsing, a.k.a. "special" tokens in legacy JavaCC,
+    // i.e. declared as UNPARSED (or SPECIAL_TOKEN)
+    static private final EnumSet<TokenType> unparsedTokens = EnumSet.noneOf(TokenType.class);
+    // Tokens that correspond to a MORE, i.e. that are pending
+    // additional input
+    static private final EnumSet<TokenType> moreTokens = EnumSet.noneOf(TokenType.class);
 
     static {
         IGNORED.setUnparsed(true);
         SKIPPED.setUnparsed(true);
     }
 
+    final Token DUMMY_START_TOKEN = new Token();
+    EnumSet<TokenType> activeTokenTypes = EnumSet.allOf(TokenType.class);
+    LexicalState lexicalState = LexicalState.values()[0];
+    private int tabSize = DEFAULT_TAB_SIZE;
     // Munged content, possibly replace unicode escapes, tabs, or CRLF with LF.
-    private CharSequence content;
+    private final CharSequence content;
     // Typically a filename, I suppose.
     private String inputSource = "input";
     // A list of offsets of the beginning of lines
     private int[] lineOffsets;
     // The starting line and column, usually 1,1
-    // that is used to report a file position 
+    // that is used to report a file position
     // in 1-based line/column terms
-    private int startingLine, startingColumn;
+    private final int startingLine;
+    private final int startingColumn;
     // The offset in the internal buffer to the very
     // next character that the readChar method returns
     private int bufferPosition;
     // A BitSet that stores where the tokens are located.
     // This is not strictly necessary, I suppose...
-    private BitSet tokenOffsets;
+    private final BitSet tokenOffsets;
     //  A Bitset that stores the line numbers that
     // contain either hard tabs or extended (beyond 0xFFFF) unicode
     // characters.
-    private BitSet needToCalculateColumns = new BitSet();
+    private final BitSet needToCalculateColumns = new BitSet();
     // Just a very simple, bloody minded approach, just store the
-    // Token objects in a table where the offsets are the code unit 
+    // Token objects in a table where the offsets are the code unit
     // positions in the content buffer. If the Token at a given offset is
     // the dummy or marker type IGNORED, then the location is skipped via
-    // whatever preprocessor logic.    
-    private Token[] tokenLocationTable;
-    // The following two BitSets are used to store 
+    // whatever preprocessor logic.
+    private final Token[] tokenLocationTable;
+    // The following two BitSets are used to store
     // the current active NFA states in the core tokenization loop
     private BitSet nextStates = new BitSet(76), currentStates = new BitSet(76);
-    EnumSet<TokenType> activeTokenTypes = EnumSet.allOf(TokenType.class);
 
     {
-    }
-
-    // Token types that are "regular" tokens that participate in parsing,
-    // i.e. declared as TOKEN
-    static final EnumSet<TokenType> regularTokens = EnumSet.of(EOF, COLON, COMMA, OPEN_BRACKET, CLOSE_BRACKET, OPEN_BRACE, CLOSE_BRACE, BOOLEAN, FLOAT, DOUBLE, INTEGER, LONG, BYTE, SHORT, STRING, B, _TOKEN_17, I);
-    // Token types that do not participate in parsing, a.k.a. "special" tokens in legacy JavaCC,
-    // i.e. declared as UNPARSED (or SPECIAL_TOKEN)
-    static private final EnumSet<TokenType> unparsedTokens = EnumSet.noneOf(TokenType.class);
-    // Tokens that are skipped, i.e. SKIP 
-    static final EnumSet<TokenType> skippedTokens = EnumSet.of(WHITESPACE);
-    // Tokens that correspond to a MORE, i.e. that are pending 
-    // additional input
-    static private final EnumSet<TokenType> moreTokens = EnumSet.noneOf(TokenType.class);
-
-    // The source of the raw characters that we are scanning  
-    public String getInputSource() {
-        return inputSource;
-    }
-
-    public void setInputSource(String inputSource) {
-        this.inputSource = inputSource;
     }
 
     public SNBTLexer(CharSequence input) {
@@ -108,16 +90,14 @@ public class SNBTLexer implements SNBTConstants {
     }
 
     /**
-     * @param inputSource just the name of the input source (typically the filename) that
-     *                    will be used in error messages and so on.
-     * @param input       the input
-     * @param lexState    the lexical state to use
-     * @param startingLine
-     * The line number at which we are starting for the purposes of location/error messages.
-     * In most normal usage, this is 1.
-     * @param startingColumn
-     * The column number at which we are starting for the purposes of location/error messages.
-     * In most normal usages this is 1.
+     * @param inputSource    just the name of the input source (typically the filename) that
+     *                       will be used in error messages and so on.
+     * @param input          the input
+     * @param lexState       the lexical state to use
+     * @param startingLine   The line number at which we are starting for the purposes of location/error messages.
+     *                       In most normal usage, this is 1.
+     * @param startingColumn The column number at which we are starting for the purposes of location/error messages.
+     *                       In most normal usages this is 1.
      */
     public SNBTLexer(String inputSource, CharSequence input, LexicalState lexState, int startingLine, int startingColumn) {
         this.inputSource = inputSource;
@@ -157,6 +137,250 @@ public class SNBTLexer implements SNBTConstants {
     public SNBTLexer(String inputSource, Reader reader, LexicalState lexState, int line, int column) {
         this(inputSource, readToEnd(reader), lexState, line, column);
         switchTo(lexState);
+    }
+
+    // Icky method to handle annoying stuff. Might make this public later if it is
+    // needed elsewhere
+    private static String mungeContent(CharSequence content, boolean preserveTabs, boolean preserveLines, boolean javaUnicodeEscape, boolean ensureFinalEndline) {
+        if (preserveTabs && preserveLines && !javaUnicodeEscape) {
+            if (ensureFinalEndline) {
+                if (content.length() == 0) {
+                    content = "\n";
+                } else {
+                    int lastChar = content.charAt(content.length() - 1);
+                    if (lastChar != '\n' && lastChar != '\r') {
+                        if (content instanceof StringBuilder) {
+                            ((StringBuilder) content).append('\n');
+                        } else {
+                            content = String.valueOf(content) + '\n';
+                        }
+                    }
+                }
+            }
+            return content.toString();
+        }
+        StringBuilder buf = new StringBuilder();
+        // This is just to handle tabs to spaces. If you don't have that setting set, it
+        // is really unused.
+        int col = 0;
+        int index = 0, contentLength = content.length();
+        while (index < contentLength) {
+            char ch = content.charAt(index++);
+            if (ch == '\n') {
+                buf.append(ch);
+                col = 0;
+            } else if (javaUnicodeEscape && ch == '\\' && index < contentLength && content.charAt(index) == 'u') {
+                int numPrecedingSlashes = 0;
+                for (int i = index - 1; i >= 0; i--) {
+                    if (content.charAt(i) == '\\')
+                        numPrecedingSlashes++;
+                    else break;
+                }
+                if (numPrecedingSlashes % 2 == 0) {
+                    buf.append('\\');
+                    ++col;
+                    continue;
+                }
+                int numConsecutiveUs = 0;
+                for (int i = index; i < contentLength; i++) {
+                    if (content.charAt(i) == 'u')
+                        numConsecutiveUs++;
+                    else break;
+                }
+                String fourHexDigits = content.subSequence(index + numConsecutiveUs, index + numConsecutiveUs + 4).toString();
+                buf.append((char) Integer.parseInt(fourHexDigits, 16));
+                index += (numConsecutiveUs + 4);
+                ++col;
+            } else if (!preserveLines && ch == '\r') {
+                buf.append('\n');
+                col = 0;
+                if (index < contentLength && content.charAt(index) == '\n') {
+                    ++index;
+                }
+            } else if (ch == '\t' && !preserveTabs) {
+                int spacesToAdd = DEFAULT_TAB_SIZE - col % DEFAULT_TAB_SIZE;
+                for (int i = 0; i < spacesToAdd; i++) {
+                    buf.append(' ');
+                    col++;
+                }
+            } else {
+                buf.append(ch);
+                if (!Character.isLowSurrogate(ch))
+                    col++;
+            }
+        }
+        if (ensureFinalEndline) {
+            if (buf.length() == 0) {
+                return "\n";
+            }
+            char lastChar = buf.charAt(buf.length() - 1);
+            if (lastChar != '\n' && lastChar != '\r')
+                buf.append('\n');
+        }
+        return buf.toString();
+    }
+
+    static String displayChar(int ch) {
+        if (ch == '\'') return "'\\''";
+        if (ch == '\\') return "'\\\\'";
+        if (ch == '\t') return "'\\t'";
+        if (ch == '\r') return "'\\r'";
+        if (ch == '\n') return "'\\n'";
+        if (ch == '\f') return "'\\f'";
+        if (ch == ' ') return "' '";
+        if (ch < 128 && !Character.isWhitespace(ch) && !Character.isISOControl(ch)) return "'" + (char) ch + "'";
+        if (ch < 10) return "" + ch;
+        return "0x" + Integer.toHexString(ch);
+    }
+
+    static String addEscapes(String str) {
+        StringBuilder retval = new StringBuilder();
+        for (int ch : str.codePoints().toArray()) {
+            switch (ch) {
+                case '\b':
+                    retval.append("\\b");
+                    continue;
+                case '\t':
+                    retval.append("\\t");
+                    continue;
+                case '\n':
+                    retval.append("\\n");
+                    continue;
+                case '\f':
+                    retval.append("\\f");
+                    continue;
+                case '\r':
+                    retval.append("\\r");
+                    continue;
+                case '\"':
+                    retval.append("\\\"");
+                    continue;
+                case '\'':
+                    retval.append("\\'");
+                    continue;
+                case '\\':
+                    retval.append("\\\\");
+                    continue;
+                default:
+                    if (Character.isISOControl(ch)) {
+                        String s = "0000" + Integer.toString(ch, 16);
+                        retval.append("\\u" + s.substring(s.length() - 4));
+                    } else {
+                        retval.appendCodePoint(ch);
+                    }
+                    continue;
+            }
+        }
+        return retval.toString();
+    }
+
+    // Annoying kludge really...
+    static String readToEnd(Reader reader) {
+        try {
+            return readFully(reader);
+        } catch (IOException ioe) {
+            throw new RuntimeException(ioe);
+        }
+    }
+
+    static String readFully(Reader reader) throws IOException {
+        char[] block = new char[BUF_SIZE];
+        int charsRead = reader.read(block);
+        if (charsRead < 0) {
+            throw new IOException("No input");
+        } else if (charsRead < BUF_SIZE) {
+            char[] result = new char[charsRead];
+            System.arraycopy(block, 0, result, 0, charsRead);
+            reader.close();
+            return new String(block, 0, charsRead);
+        }
+        StringBuilder buf = new StringBuilder();
+        buf.append(block);
+        do {
+            charsRead = reader.read(block);
+            if (charsRead > 0) {
+                buf.append(block, 0, charsRead);
+            }
+        }
+        while (charsRead == BUF_SIZE);
+        reader.close();
+        return buf.toString();
+    }
+
+    /**
+     * @param bytes   the raw byte array
+     * @param charset The encoding to use to decode the bytes. If this is null, we check for the
+     *                initial byte order mark (used by Microsoft a lot seemingly)
+     *                See: <a href="https://docs.microsoft.com/es-es/globalization/encoding/byte-order-markc">Microsoft docs</a>
+     * @return A String taking into account the encoding passed in or in the byte order mark (if it was present).
+     * And if no encoding was passed in and no byte-order mark was present, we assume the raw input
+     * is in UTF-8.
+     */
+    static public String stringFromBytes(byte[] bytes, Charset charset) throws CharacterCodingException {
+        int arrayLength = bytes.length;
+        if (charset == null) {
+            int firstByte = arrayLength > 0 ? Byte.toUnsignedInt(bytes[0]) : 1;
+            int secondByte = arrayLength > 1 ? Byte.toUnsignedInt(bytes[1]) : 1;
+            int thirdByte = arrayLength > 2 ? Byte.toUnsignedInt(bytes[2]) : 1;
+            int fourthByte = arrayLength > 3 ? Byte.toUnsignedInt(bytes[3]) : 1;
+            if (firstByte == 0xEF && secondByte == 0xBB && thirdByte == 0xBF) {
+                return new String(bytes, 3, bytes.length - 3, UTF_8);
+            }
+            if (firstByte == 0 && secondByte == 0 && thirdByte == 0xFE && fourthByte == 0xFF) {
+                return new String(bytes, 4, bytes.length - 4, Charset.forName("UTF-32BE"));
+            }
+            if (firstByte == 0xFF && secondByte == 0xFE && thirdByte == 0 && fourthByte == 0) {
+                return new String(bytes, 4, bytes.length - 4, Charset.forName("UTF-32LE"));
+            }
+            if (firstByte == 0xFE && secondByte == 0xFF) {
+                return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16BE);
+            }
+            if (firstByte == 0xFF && secondByte == 0xFE) {
+                return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16LE);
+            }
+            charset = UTF_8;
+        }
+        CharsetDecoder decoder = charset.newDecoder();
+        ByteBuffer b = ByteBuffer.wrap(bytes);
+        CharBuffer c = CharBuffer.allocate(bytes.length);
+        while (true) {
+            CoderResult r = decoder.decode(b, c, false);
+            if (!r.isError()) {
+                break;
+            }
+            if (!r.isMalformed()) {
+                r.throwException();
+            }
+            int n = r.length();
+            b.position(b.position() + n);
+            for (int i = 0; i < n; i++) {
+                c.put((char) 0xFFFD);
+            }
+        }
+        ((Buffer) c).limit(c.position());
+        ((Buffer) c).rewind();
+        return c.toString();
+        // return new String(bytes, charset);
+    }
+
+    static public String stringFromBytes(byte[] bytes) throws CharacterCodingException {
+        return stringFromBytes(bytes, null);
+    }
+
+    /**
+     * set the tab size used for location reporting
+     */
+    public void setTabSize(int tabSize) {
+        this.tabSize = tabSize;
+    }
+
+    // The source of the raw characters that we are scanning
+    public String getInputSource() {
+        return inputSource;
+    }
+
+    public void setInputSource(String inputSource) {
+        this.inputSource = inputSource;
     }
 
     private Token getNextToken() {
@@ -241,7 +465,7 @@ public class SNBTLexer implements SNBTConstants {
                 // Holder for the new type (if any) matched on this iteration
                 TokenType newType = null;
                 if (codeUnitsRead > 0) {
-                    // What was nextStates on the last iteration 
+                    // What was nextStates on the last iteration
                     // is now the currentStates!
                     BitSet temp = currentStates;
                     currentStates = nextStates;
@@ -293,8 +517,6 @@ public class SNBTLexer implements SNBTConstants {
         }
         return matchedToken;
     }
-
-    LexicalState lexicalState = LexicalState.values()[0];
 
     /**
      * Switch to specified lexical state.
@@ -513,236 +735,6 @@ public class SNBTLexer implements SNBTConstants {
             }
         }
         this.lineOffsets = lineOffsets;
-    }
-
-    // Icky method to handle annoying stuff. Might make this public later if it is
-    // needed elsewhere
-    private static String mungeContent(CharSequence content, boolean preserveTabs, boolean preserveLines, boolean javaUnicodeEscape, boolean ensureFinalEndline) {
-        if (preserveTabs && preserveLines && !javaUnicodeEscape) {
-            if (ensureFinalEndline) {
-                if (content.length() == 0) {
-                    content = "\n";
-                } else {
-                    int lastChar = content.charAt(content.length() - 1);
-                    if (lastChar != '\n' && lastChar != '\r') {
-                        if (content instanceof StringBuilder) {
-                            ((StringBuilder) content).append((char) '\n');
-                        } else {
-                            content = String.valueOf(content) + '\n';
-                        }
-                    }
-                }
-            }
-            return content.toString();
-        }
-        StringBuilder buf = new StringBuilder();
-        // This is just to handle tabs to spaces. If you don't have that setting set, it
-        // is really unused.
-        int col = 0;
-        int index = 0, contentLength = content.length();
-        while (index < contentLength) {
-            char ch = content.charAt(index++);
-            if (ch == '\n') {
-                buf.append(ch);
-                col = 0;
-            } else if (javaUnicodeEscape && ch == '\\' && index < contentLength && content.charAt(index) == 'u') {
-                int numPrecedingSlashes = 0;
-                for (int i = index - 1; i >= 0; i--) {
-                    if (content.charAt(i) == '\\')
-                        numPrecedingSlashes++;
-                    else break;
-                }
-                if (numPrecedingSlashes % 2 == 0) {
-                    buf.append('\\');
-                    ++col;
-                    continue;
-                }
-                int numConsecutiveUs = 0;
-                for (int i = index; i < contentLength; i++) {
-                    if (content.charAt(i) == 'u')
-                        numConsecutiveUs++;
-                    else break;
-                }
-                String fourHexDigits = content.subSequence(index + numConsecutiveUs, index + numConsecutiveUs + 4).toString();
-                buf.append((char) Integer.parseInt(fourHexDigits, 16));
-                index += (numConsecutiveUs + 4);
-                ++col;
-            } else if (!preserveLines && ch == '\r') {
-                buf.append('\n');
-                col = 0;
-                if (index < contentLength && content.charAt(index) == '\n') {
-                    ++index;
-                }
-            } else if (ch == '\t' && !preserveTabs) {
-                int spacesToAdd = DEFAULT_TAB_SIZE - col % DEFAULT_TAB_SIZE;
-                for (int i = 0; i < spacesToAdd; i++) {
-                    buf.append(' ');
-                    col++;
-                }
-            } else {
-                buf.append(ch);
-                if (!Character.isLowSurrogate(ch))
-                    col++;
-            }
-        }
-        if (ensureFinalEndline) {
-            if (buf.length() == 0) {
-                return "\n";
-            }
-            char lastChar = buf.charAt(buf.length() - 1);
-            if (lastChar != '\n' && lastChar != '\r')
-                buf.append('\n');
-        }
-        return buf.toString();
-    }
-
-    static String displayChar(int ch) {
-        if (ch == '\'') return "\'\\'\'";
-        if (ch == '\\') return "\'\\\\\'";
-        if (ch == '\t') return "\'\\t\'";
-        if (ch == '\r') return "\'\\r\'";
-        if (ch == '\n') return "\'\\n\'";
-        if (ch == '\f') return "\'\\f\'";
-        if (ch == ' ') return "\' \'";
-        if (ch < 128 && !Character.isWhitespace(ch) && !Character.isISOControl(ch)) return "\'" + (char) ch + "\'";
-        if (ch < 10) return "" + ch;
-        return "0x" + Integer.toHexString(ch);
-    }
-
-    static String addEscapes(String str) {
-        StringBuilder retval = new StringBuilder();
-        for (int ch : str.codePoints().toArray()) {
-            switch (ch) {
-                case '\b':
-                    retval.append("\\b");
-                    continue;
-                case '\t':
-                    retval.append("\\t");
-                    continue;
-                case '\n':
-                    retval.append("\\n");
-                    continue;
-                case '\f':
-                    retval.append("\\f");
-                    continue;
-                case '\r':
-                    retval.append("\\r");
-                    continue;
-                case '\"':
-                    retval.append("\\\"");
-                    continue;
-                case '\'':
-                    retval.append("\\\'");
-                    continue;
-                case '\\':
-                    retval.append("\\\\");
-                    continue;
-                default:
-                    if (Character.isISOControl(ch)) {
-                        String s = "0000" + Integer.toString(ch, 16);
-                        retval.append("\\u" + s.substring(s.length() - 4, s.length()));
-                    } else {
-                        retval.appendCodePoint(ch);
-                    }
-                    continue;
-            }
-        }
-        return retval.toString();
-    }
-
-    // Annoying kludge really...
-    static String readToEnd(Reader reader) {
-        try {
-            return readFully(reader);
-        } catch (IOException ioe) {
-            throw new RuntimeException(ioe);
-        }
-    }
-
-    static final int BUF_SIZE = 0x10000;
-
-    static String readFully(Reader reader) throws IOException {
-        char[] block = new char[BUF_SIZE];
-        int charsRead = reader.read(block);
-        if (charsRead < 0) {
-            throw new IOException("No input");
-        } else if (charsRead < BUF_SIZE) {
-            char[] result = new char[charsRead];
-            System.arraycopy(block, 0, result, 0, charsRead);
-            reader.close();
-            return new String(block, 0, charsRead);
-        }
-        StringBuilder buf = new StringBuilder();
-        buf.append(block);
-        do {
-            charsRead = reader.read(block);
-            if (charsRead > 0) {
-                buf.append(block, 0, charsRead);
-            }
-        }
-        while (charsRead == BUF_SIZE);
-        reader.close();
-        return buf.toString();
-    }
-
-    /**
-     * @param bytes   the raw byte array
-     * @param charset The encoding to use to decode the bytes. If this is null, we check for the
-     *                initial byte order mark (used by Microsoft a lot seemingly)
-     *        See: <a href="https://docs.microsoft.com/es-es/globalization/encoding/byte-order-markc">Microsoft docs</a>
-     * @return A String taking into account the encoding passed in or in the byte order mark (if it was present).
-     * And if no encoding was passed in and no byte-order mark was present, we assume the raw input
-     * is in UTF-8.
-     */
-    static public String stringFromBytes(byte[] bytes, Charset charset) throws CharacterCodingException {
-        int arrayLength = bytes.length;
-        if (charset == null) {
-            int firstByte = arrayLength > 0 ? Byte.toUnsignedInt(bytes[0]) : 1;
-            int secondByte = arrayLength > 1 ? Byte.toUnsignedInt(bytes[1]) : 1;
-            int thirdByte = arrayLength > 2 ? Byte.toUnsignedInt(bytes[2]) : 1;
-            int fourthByte = arrayLength > 3 ? Byte.toUnsignedInt(bytes[3]) : 1;
-            if (firstByte == 0xEF && secondByte == 0xBB && thirdByte == 0xBF) {
-                return new String(bytes, 3, bytes.length - 3, Charset.forName("UTF-8"));
-            }
-            if (firstByte == 0 && secondByte == 0 && thirdByte == 0xFE && fourthByte == 0xFF) {
-                return new String(bytes, 4, bytes.length - 4, Charset.forName("UTF-32BE"));
-            }
-            if (firstByte == 0xFF && secondByte == 0xFE && thirdByte == 0 && fourthByte == 0) {
-                return new String(bytes, 4, bytes.length - 4, Charset.forName("UTF-32LE"));
-            }
-            if (firstByte == 0xFE && secondByte == 0xFF) {
-                return new String(bytes, 2, bytes.length - 2, Charset.forName("UTF-16BE"));
-            }
-            if (firstByte == 0xFF && secondByte == 0xFE) {
-                return new String(bytes, 2, bytes.length - 2, Charset.forName("UTF-16LE"));
-            }
-            charset = UTF_8;
-        }
-        CharsetDecoder decoder = charset.newDecoder();
-        ByteBuffer b = ByteBuffer.wrap(bytes);
-        CharBuffer c = CharBuffer.allocate(bytes.length);
-        while (true) {
-            CoderResult r = decoder.decode(b, c, false);
-            if (!r.isError()) {
-                break;
-            }
-            if (!r.isMalformed()) {
-                r.throwException();
-            }
-            int n = r.length();
-            b.position(b.position() + n);
-            for (int i = 0; i < n; i++) {
-                c.put((char) 0xFFFD);
-            }
-        }
-        ((Buffer) c).limit(c.position());
-        ((Buffer) c).rewind();
-        return c.toString();
-        // return new String(bytes, charset);
-    }
-
-    static public String stringFromBytes(byte[] bytes) throws CharacterCodingException {
-        return stringFromBytes(bytes, null);
     }
 
 }

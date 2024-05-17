@@ -23,7 +23,7 @@ public class PopulatorNetherFortress extends Populator {
         random.setSeed(gx ^ gz << 4 ^ seed);
         random.nextInt();
         if (random.nextBoundedInt(3) == (0x51d8e999 & 3) // salted
-            && chunkX == (gx << 4) + 4 + random.nextBoundedInt(8) && chunkZ == (gz << 4) + 4 + random.nextBoundedInt(8)) {
+                && chunkX == (gx << 4) + 4 + random.nextBoundedInt(8) && chunkZ == (gz << 4) + 4 + random.nextBoundedInt(8)) {
             random.setSeed(seed);
             final int r1 = random.nextInt();
             final int r2 = random.nextInt();
@@ -49,8 +49,8 @@ public class PopulatorNetherFortress extends Populator {
                             final int f_cx = cx;
                             final int f_cz = cz;
                             Server.getInstance().computeThreadPool.submit(new CallbackableChunkGenerationTask<>(
-                                chunk.getProvider().getLevel(), ck, start,
-                                structure -> structure.postProcess(level, rand, new BoundingBox(x, z, x + 15, z + 15), f_cx, f_cz))
+                                    chunk.getProvider().getLevel(), ck, start,
+                                    structure -> structure.postProcess(level, rand, new BoundingBox(x, z, x + 15, z + 15), f_cx, f_cz))
                             );
                         }
                     }

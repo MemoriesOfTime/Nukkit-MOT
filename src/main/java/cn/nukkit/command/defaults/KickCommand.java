@@ -1,7 +1,6 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
@@ -48,7 +47,7 @@ public class KickCommand extends VanillaCommand {
 
         Player player = sender.getServer().getPlayer(name);
         if (player != null) {
-            player.kick(PlayerKickEvent.Reason.KICKED_BY_ADMIN, reason.toString(), true, "source=" + sender.getName() + ", reason=" + reason.toString());
+            player.kick(PlayerKickEvent.Reason.KICKED_BY_ADMIN, reason.toString(), true, "source=" + sender.getName() + ", reason=" + reason);
             if (reason.length() >= 1) {
                 broadcastCommandMessage(sender, new TranslationContainer("commands.kick.success.reason", player.getName(), reason.toString())
                 );

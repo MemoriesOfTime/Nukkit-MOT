@@ -35,8 +35,8 @@ public class FloatingTextParticle extends Particle {
         EMPTY_SKIN.setCapeId("");
     }
 
-    protected UUID uuid = UUID.randomUUID();
     protected final Level level;
+    protected UUID uuid = UUID.randomUUID();
     protected long entityId = -1;
     protected boolean invisible = false;
     protected EntityMetadata metadata = new EntityMetadata();
@@ -65,7 +65,7 @@ public class FloatingTextParticle extends Particle {
                 65536L
         );
         metadata.putLong(Entity.DATA_FLAGS, flags)
-                .putLong(Entity.DATA_LEAD_HOLDER_EID,-1)
+                .putLong(Entity.DATA_LEAD_HOLDER_EID, -1)
                 .putFloat(Entity.DATA_SCALE, 0.01f)
                 .putFloat(Entity.DATA_BOUNDING_BOX_HEIGHT, 0.01f)
                 .putFloat(Entity.DATA_BOUNDING_BOX_WIDTH, 0.01f)

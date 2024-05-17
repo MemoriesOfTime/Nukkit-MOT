@@ -8,7 +8,7 @@ import java.util.concurrent.CompletableFuture;
 
 public class CompletableFutureCombiner {
 
-    private List<CompletableFuture<?>> futures = Collections.synchronizedList(new ObjectArrayList<>());
+    private final List<CompletableFuture<?>> futures = Collections.synchronizedList(new ObjectArrayList<>());
     private CompletableFuture<Void> promise;
 
     private void checkFutures() {

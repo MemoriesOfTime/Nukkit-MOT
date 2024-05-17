@@ -12,9 +12,9 @@ public interface EntityTameable {
 
     Player getOwner();
 
-    boolean hasOwner();
-
     void setOwner(Player player);
+
+    boolean hasOwner();
 
     String getOwnerUUID();
 

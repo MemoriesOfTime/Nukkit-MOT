@@ -45,14 +45,16 @@ public class PopulatorIgloo extends Populator {
                         final ListTag<CompoundTag> itemList = new ListTag<>("Items");
                         IglooChest.get().create(itemList, random);
                         Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new LootSpawnTask(chunk.getProvider().getLevel(),
-                            new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
+                                new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
                     }
-                    case "Villager" -> Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new ActorSpawnTask(chunk.getProvider().getLevel(),
-                        Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
-                            .putString("id", String.valueOf(EntityVillager.NETWORK_ID))), 2);
-                    case "Zombie Villager" -> Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new ActorSpawnTask(chunk.getProvider().getLevel(),
-                        Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
-                            .putString("id", String.valueOf(EntityZombieVillager.NETWORK_ID))), 2);
+                    case "Villager" ->
+                            Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new ActorSpawnTask(chunk.getProvider().getLevel(),
+                                    Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
+                                            .putString("id", String.valueOf(EntityVillager.NETWORK_ID))), 2);
+                    case "Zombie Villager" ->
+                            Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new ActorSpawnTask(chunk.getProvider().getLevel(),
+                                    Entity.getDefaultNBT(new Vector3(nbt.getInt("x") + 0.5, nbt.getInt("y"), nbt.getInt("z") + 0.5))
+                                            .putString("id", String.valueOf(EntityZombieVillager.NETWORK_ID))), 2);
                 }
             }
         };
@@ -62,8 +64,8 @@ public class PopulatorIgloo extends Populator {
     public void populate(final ChunkManager level, final int chunkX, final int chunkZ, final NukkitRandom random, final FullChunk chunk) {
         final int biome = chunk.getBiomeId(7, 7);
         if ((biome == EnumBiome.ICE_PLAINS.id || biome == EnumBiome.COLD_TAIGA.id || biome == EnumBiome.ICE_PLAINS_SPIKES.id)
-            && chunkX == (chunkX < 0 ? chunkX - SPACING + 1 : chunkX) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)
-            && chunkZ == (chunkZ < 0 ? chunkZ - SPACING + 1 : chunkZ) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)) {
+                && chunkX == (chunkX < 0 ? chunkX - SPACING + 1 : chunkX) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)
+                && chunkZ == (chunkZ < 0 ? chunkZ - SPACING + 1 : chunkZ) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)) {
             ReadableStructureTemplate template;
             final boolean hasLaboratory = random.nextBoolean();
 
@@ -112,7 +114,7 @@ public class PopulatorIgloo extends Populator {
                 vec.y -= template.getSize().getY();
 
                 template.placeInChunk(chunk, random, vec, new StructurePlaceSettings()
-                    .setBlockActorProcessor(getBlockActorProcessor(chunk, random)));
+                        .setBlockActorProcessor(getBlockActorProcessor(chunk, random)));
             }
         }
     }

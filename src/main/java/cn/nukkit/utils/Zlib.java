@@ -7,7 +7,7 @@ import java.util.zip.Deflater;
 
 public abstract class Zlib {
 
-    private static ZlibProvider[] providers;
+    private static final ZlibProvider[] providers;
     private static ZlibProvider provider;
 
     static {
@@ -18,7 +18,7 @@ public abstract class Zlib {
 
     /**
      * Set Zlib provider that is used to compress data
-     *
+     * <p>
      * 0 = ZlibOriginal
      * 1 = ZlibSingleThreadLowMem
      * 2 = ZlibThreadLocal (default)

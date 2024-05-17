@@ -26,7 +26,7 @@ public class BlockFenceGateBirch extends BlockFenceGate {
     public String getName() {
         return "Birch Fence Gate";
     }
-    
+
     @Override
     public Item toItem() {
         return Item.get(Item.FENCE_GATE_BIRCH, 0, 1);

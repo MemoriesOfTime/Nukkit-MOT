@@ -7,7 +7,33 @@ import java.util.*;
  * The base concrete class for non-terminal Nodes
  */
 public class BaseNode implements Node {
+    static private Class<? extends List> listClass;
     private SNBTLexer tokenSource;
+    /**
+     * the parent node
+     */
+    private Node parent;
+    /**
+     * the child nodes
+     */
+    private final List<Node> children = newList();
+    private int beginOffset, endOffset;
+    private boolean unparsed;
+    private Map<String, Node> namedChildMap;
+    private Map<String, List<Node>> namedChildListMap;
+
+    /**
+     * Sets the List class that is used to store child nodes. By default,
+     * this is java.util.ArrayList. There is probably very little reason
+     * to ever use anything else, though you could use this method
+     * to replace this with LinkedList or your own java.util.List implementation even.
+     *
+     * @param listClass the #java.util.List implementation to use internally
+     *                  for the child nodes. By default #java.util.ArrayList is used.
+     */
+    static public void setListClass(Class<? extends List> listClass) {
+        BaseNode.listClass = listClass;
+    }
 
     @Override
     public SNBTLexer getTokenSource() {
@@ -25,21 +51,6 @@ public class BaseNode implements Node {
         this.tokenSource = tokenSource;
     }
 
-    static private Class<? extends List> listClass;
-
-    /**
-     * Sets the List class that is used to store child nodes. By default,
-     * this is java.util.ArrayList. There is probably very little reason
-     * to ever use anything else, though you could use this method
-     * to replace this with LinkedList or your own java.util.List implementation even.
-     *
-     * @param listClass the #java.util.List implementation to use internally
-     *                  for the child nodes. By default #java.util.ArrayList is used.
-     */
-    static public void setListClass(Class<? extends List> listClass) {
-        BaseNode.listClass = listClass;
-    }
-
     @SuppressWarnings("unchecked")
     private List<Node> newList() {
         if (listClass == null) {
@@ -52,17 +63,6 @@ public class BaseNode implements Node {
         }
     }
 
-    /**
-     * the parent node
-     */
-    private Node parent;
-    /**
-     * the child nodes
-     */
-    private List<Node> children = newList();
-    private int beginOffset, endOffset;
-    private boolean unparsed;
-
     @Override
     public boolean isUnparsed() {
         return this.unparsed;
@@ -74,13 +74,13 @@ public class BaseNode implements Node {
     }
 
     @Override
-    public void setParent(Node n) {
-        parent = n;
+    public Node getParent() {
+        return parent;
     }
 
     @Override
-    public Node getParent() {
-        return parent;
+    public void setParent(Node n) {
+        parent = n;
     }
 
     @Override
@@ -153,9 +153,6 @@ public class BaseNode implements Node {
         }
         return buf.toString();
     }
-
-    private Map<String, Node> namedChildMap;
-    private Map<String, List<Node>> namedChildListMap;
 
     public Node getNamedChild(String name) {
         if (namedChildMap == null) {

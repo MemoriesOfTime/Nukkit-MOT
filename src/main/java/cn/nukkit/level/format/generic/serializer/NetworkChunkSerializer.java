@@ -109,7 +109,7 @@ public class NetworkChunkSerializer {
             }
             if (protocolId >= ProtocolInfo.v1_18_0) {
                 stream.put(biomePalettes);
-            }else {
+            } else {
                 stream.put(chunk.getBiomeIdArray());
             }
             // Border blocks

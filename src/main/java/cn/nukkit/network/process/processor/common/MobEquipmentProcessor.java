@@ -19,11 +19,11 @@ import org.jetbrains.annotations.NotNull;
 public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacket> {
 
     public static final MobEquipmentProcessor INSTANCE = new MobEquipmentProcessor();
-    
+
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull MobEquipmentPacket pk) {
         Player player = playerHandle.player;
-        
+
         if (!player.spawned || !player.isAlive()) {
             return;
         }

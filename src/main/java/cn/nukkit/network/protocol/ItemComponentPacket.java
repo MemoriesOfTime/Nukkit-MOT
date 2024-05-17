@@ -15,12 +15,12 @@ public class ItemComponentPacket extends DataPacket {
 
     public Entry[] entries = Entry.EMPTY_ARRAY;
 
-    public void setEntries(Entry[] entries) {
-        this.entries = entries == null? null : entries.length == 0? Entry.EMPTY_ARRAY : entries.clone();
+    public Entry[] getEntries() {
+        return entries == null ? null : entries.length == 0 ? Entry.EMPTY_ARRAY : entries.clone();
     }
 
-    public Entry[] getEntries() {
-        return entries == null? null : entries.length == 0? Entry.EMPTY_ARRAY : entries.clone();
+    public void setEntries(Entry[] entries) {
+        this.entries = entries == null ? null : entries.length == 0 ? Entry.EMPTY_ARRAY : entries.clone();
     }
 
     @Override

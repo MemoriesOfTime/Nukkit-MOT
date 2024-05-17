@@ -12,14 +12,12 @@ import java.util.Set;
 
 public class EntityArmorInventory extends BaseInventory {
 
-    private EntityArmorStand entityLiving;
-
-    private final Set<Player> viewers = new HashSet<>();
-
     public static final int SLOT_HEAD = 0;
     public static final int SLOT_CHEST = 1;
     public static final int SLOT_LEGS = 2;
     public static final int SLOT_FEET = 3;
+    private final Set<Player> viewers = new HashSet<>();
+    private final EntityArmorStand entityLiving;
 
     public EntityArmorInventory(EntityArmorStand entity) {
         super(entity, InventoryType.ENTITY_ARMOR);
@@ -45,28 +43,28 @@ public class EntityArmorInventory extends BaseInventory {
         return this.getItem(SLOT_HEAD);
     }
 
-    public Item getChestplate() {
-        return this.getItem(SLOT_CHEST);
-    }
-
-    public Item getLeggings() {
-        return this.getItem(SLOT_LEGS);
-    }
-
-    public Item getBoots() {
-        return this.getItem(SLOT_FEET);
-    }
-
     public void setHelmet(Item item) {
         this.setItem(SLOT_CHEST, item);
+    }
+
+    public Item getChestplate() {
+        return this.getItem(SLOT_CHEST);
     }
 
     public void setChestplate(Item item) {
         this.setItem(SLOT_CHEST, item);
     }
 
+    public Item getLeggings() {
+        return this.getItem(SLOT_LEGS);
+    }
+
     public void setLeggings(Item item) {
         this.setItem(SLOT_LEGS, item);
+    }
+
+    public Item getBoots() {
+        return this.getItem(SLOT_FEET);
     }
 
     public void setBoots(Item item) {

@@ -18,6 +18,14 @@ public class EntityEgg extends EntityProjectile {
 
     public static final int NETWORK_ID = 82;
 
+    public EntityEgg(FullChunk chunk, CompoundTag nbt) {
+        this(chunk, nbt, null);
+    }
+
+    public EntityEgg(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
+        super(chunk, nbt, shootingEntity);
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
@@ -46,14 +54,6 @@ public class EntityEgg extends EntityProjectile {
     @Override
     protected float getDrag() {
         return 0.01f;
-    }
-
-    public EntityEgg(FullChunk chunk, CompoundTag nbt) {
-        this(chunk, nbt, null);
-    }
-
-    public EntityEgg(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
-        super(chunk, nbt, shootingEntity);
     }
 
     @Override

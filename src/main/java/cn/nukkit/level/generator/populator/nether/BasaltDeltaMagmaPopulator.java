@@ -38,15 +38,15 @@ public class BasaltDeltaMagmaPopulator extends Populator {
             final int b3 = level.getBlockIdAt(x, y, z + 1);
             final int b4 = level.getBlockIdAt(x, y, z - 1);
             if ((b == Block.BASALT || b == Block.BLACKSTONE) && level.getBlockIdAt(x, y + 1, z) == 0 &&
-                (b1 == BlockID.STILL_LAVA ||
-                    b2 == BlockID.STILL_LAVA ||
-                    b3 == BlockID.STILL_LAVA ||
-                    b4 == BlockID.STILL_LAVA ||
-                    b1 == BlockID.LAVA ||
-                    b2 == BlockID.LAVA ||
-                    b3 == BlockID.LAVA ||
-                    b4 == BlockID.LAVA
-                )
+                    (b1 == BlockID.STILL_LAVA ||
+                            b2 == BlockID.STILL_LAVA ||
+                            b3 == BlockID.STILL_LAVA ||
+                            b4 == BlockID.STILL_LAVA ||
+                            b1 == BlockID.LAVA ||
+                            b2 == BlockID.LAVA ||
+                            b3 == BlockID.LAVA ||
+                            b4 == BlockID.LAVA
+                    )
             ) {
                 blockYs.add(y);
             }

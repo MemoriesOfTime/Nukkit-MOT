@@ -102,6 +102,11 @@ public abstract class Food {
             .addEffect(Effect.getEffect(Effect.WITHER).setAmplifier(1).setDuration(120)).addRelative(Item.SUSPICIOUS_STEW, 9));
     public static final Food honey_bottle = registerDefaultFood(new FoodNormal(6, 1.2F).addRelative(Item.HONEY_BOTTLE));
     public static final Food glow_berries = registerDefaultFood(new FoodNormal(2, 0.4F).addRelative(Item.GLOW_BERRIES));
+    protected final List<NodeIDMeta> relativeIDs = new ArrayList<>();
+    protected int restoreFood = 0;
+    protected float restoreSaturation = 0;
+    protected int eatingTick = 31;
+    protected IntSupplier eatingTickSupplier;
 
     public static Food registerFood(Food food, Plugin plugin) {
         Objects.requireNonNull(food);
@@ -151,14 +156,6 @@ public abstract class Food {
         }
         return result[0];
     }
-
-    protected int restoreFood = 0;
-    protected float restoreSaturation = 0;
-    protected final List<NodeIDMeta> relativeIDs = new ArrayList<>();
-
-    protected int eatingTick = 31;
-
-    protected IntSupplier eatingTickSupplier;
 
     public final boolean eatenBy(Player player) {
         PlayerEatFoodEvent event = new PlayerEatFoodEvent(player, this);

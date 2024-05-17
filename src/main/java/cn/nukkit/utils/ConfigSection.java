@@ -4,7 +4,7 @@ import java.util.*;
 
 /**
  * Config section
- *
+ * <p>
  * Created by fromgate on 26.04.2016.
  */
 @SuppressWarnings("serial")
@@ -617,8 +617,7 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         for (Object object : list) {
             if (object instanceof Character) {
                 result.add((Character) object);
-            } else if (object instanceof String) {
-                String str = (String) object;
+            } else if (object instanceof String str) {
 
                 if (str.length() == 1) {
                     result.add(str.charAt(0));
@@ -691,7 +690,7 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
     /**
      * Check existence of config section element
      *
-     * @param key key
+     * @param key        key
      * @param ignoreCase ignore case
      * @return existence of config section element
      */
@@ -724,8 +723,7 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
         if (super.containsKey(key)) super.remove(key);
         else if (this.containsKey(".")) {
             String[] keys = key.split("\\.", 2);
-            if (super.get(keys[0]) instanceof ConfigSection) {
-                ConfigSection section = (ConfigSection) super.get(keys[0]);
+            if (super.get(keys[0]) instanceof ConfigSection section) {
                 section.remove(keys[1]);
             }
         }

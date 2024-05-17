@@ -37,7 +37,7 @@ public class EntityWitherSkeleton extends EntityWalkingMob implements EntitySmit
         super.initEntity();
 
         this.fireProof = true;
-        this.setDamage(new int[] { 0, 5, 8, 12 });
+        this.setDamage(new int[]{0, 5, 8, 12});
     }
 
     @Override

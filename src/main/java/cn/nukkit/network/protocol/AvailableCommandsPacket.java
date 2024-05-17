@@ -20,20 +20,16 @@ import static org.cloudburstmc.protocol.common.util.Preconditions.checkArgument;
 public class AvailableCommandsPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.AVAILABLE_COMMANDS_PACKET;
-
-    private static final ObjIntConsumer<BinaryStream> WRITE_BYTE = (s, v) -> s.putByte((byte) v);
-    private static final ObjIntConsumer<BinaryStream> WRITE_SHORT = BinaryStream::putLShort;
-    private static final ObjIntConsumer<BinaryStream> WRITE_INT = BinaryStream::putLInt;
-    //private static final ToIntFunction<BinaryStream> READ_BYTE = BinaryStream::getByte;
-    //private static final ToIntFunction<BinaryStream> READ_SHORT = BinaryStream::getLShort;
-    //private static final ToIntFunction<BinaryStream> READ_INT = BinaryStream::getLInt;
-
     public static final int ARG_FLAG_VALID = 0x100000;
     public static final int ARG_FLAG_ENUM = 0x200000;
     public static final int ARG_FLAG_POSTFIX = 0x1000000;
+    //private static final ToIntFunction<BinaryStream> READ_BYTE = BinaryStream::getByte;
+    //private static final ToIntFunction<BinaryStream> READ_SHORT = BinaryStream::getLShort;
+    //private static final ToIntFunction<BinaryStream> READ_INT = BinaryStream::getLInt;
     public static final int ARG_FLAG_SOFT_ENUM = 0x4000000;
-
-
+    private static final ObjIntConsumer<BinaryStream> WRITE_BYTE = (s, v) -> s.putByte((byte) v);
+    private static final ObjIntConsumer<BinaryStream> WRITE_SHORT = BinaryStream::putLShort;
+    private static final ObjIntConsumer<BinaryStream> WRITE_INT = BinaryStream::putLInt;
     //各个版本的参数
     private static final TypeMap<CommandParam> COMMAND_PARAMS_291 = TypeMap.builder(CommandParam.class)
             .insert(1, CommandParam.INT)
@@ -210,9 +206,8 @@ public class AvailableCommandsPacket extends DataPacket {
     public static final int ARG_TYPE_JSON = COMMAND_PARAMS.getId(CommandParam.JSON);
     public static final int ARG_TYPE_BLOCK_STATES = COMMAND_PARAMS.getId(CommandParam.BLOCK_STATES);
     public static final int ARG_TYPE_COMMAND = COMMAND_PARAMS.getId(CommandParam.COMMAND);
-
-    public Map<String, CommandDataVersions> commands;
     public final Map<String, List<String>> softEnums = new HashMap<>();
+    public Map<String, CommandDataVersions> commands;
 
     public static TypeMap<CommandParam> getCommandParams(int protocol) {
         //TODO Multiversion

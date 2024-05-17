@@ -81,11 +81,11 @@ public class ItemDye extends Item {
         return DyeColor.getByDyeData(meta).getColor();
     }
 
-    public DyeColor getDyeColor() {
-        return DyeColor.getByDyeData(meta);
-    }
-
     public static String getColorName(int meta) {
         return DyeColor.getByDyeData(meta).getName();
+    }
+
+    public DyeColor getDyeColor() {
+        return DyeColor.getByDyeData(meta);
     }
 }

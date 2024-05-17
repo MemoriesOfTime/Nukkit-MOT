@@ -124,12 +124,12 @@ public class BlockTNT extends BlockSolid {
     public BlockColor getColor() {
         return BlockColor.TNT_BLOCK_COLOR;
     }
-    
+
     @Override
     public boolean hasEntityCollision() {
         return true;
     }
-    
+
     @Override
     public void onEntityCollide(Entity entity) {
         if ((entity instanceof EntityArrow && entity.isOnFire()) || entity instanceof EntitySmallFireBall) {

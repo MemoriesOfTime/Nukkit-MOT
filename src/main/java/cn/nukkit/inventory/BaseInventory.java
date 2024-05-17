@@ -25,25 +25,16 @@ import java.util.*;
  */
 public abstract class BaseInventory implements Inventory {
 
-    protected final InventoryType type;
-
-    protected int maxStackSize = Inventory.MAX_STACK;
-
-    protected int size;
-
-    protected final String name;
-
-    protected final String title;
-
     public final Map<Integer, Item> slots = new HashMap<>();
-
+    protected final InventoryType type;
+    protected final String name;
+    protected final String title;
     protected final Set<Player> viewers = new HashSet<>();
-
-    protected InventoryHolder holder;
-
-    public boolean destroyed = false;
-
     final Item air;
+    public boolean destroyed = false;
+    protected int maxStackSize = Inventory.MAX_STACK;
+    protected int size;
+    protected InventoryHolder holder;
 
     public BaseInventory(InventoryHolder holder, InventoryType type) {
         this(holder, type, new HashMap<>());
@@ -91,6 +82,11 @@ public abstract class BaseInventory implements Inventory {
     @Override
     public int getMaxStackSize() {
         return maxStackSize;
+    }
+
+    @Override
+    public void setMaxStackSize(int maxStackSize) {
+        this.maxStackSize = maxStackSize;
     }
 
     @Override
@@ -254,7 +250,7 @@ public abstract class BaseInventory implements Inventory {
             this.setItem(slot, item);
         }
     }
-    
+
     @Override
     public boolean canAddItem(Item item) {
         int count = item.getCount();
@@ -303,7 +299,7 @@ public abstract class BaseInventory implements Inventory {
                 emptySlots.add(i);
             }
 
-            for (Iterator<Item> iterator = itemSlots.iterator(); iterator.hasNext();) {
+            for (Iterator<Item> iterator = itemSlots.iterator(); iterator.hasNext(); ) {
                 Item slot = iterator.next();
                 if (slot.equals(item)) {
                     int maxStackSize = Math.min(item.getMaxStackSize(), this.getMaxStackSize());
@@ -426,11 +422,6 @@ public abstract class BaseInventory implements Inventory {
     @Override
     public InventoryHolder getHolder() {
         return holder;
-    }
-
-    @Override
-    public void setMaxStackSize(int maxStackSize) {
-        this.maxStackSize = maxStackSize;
     }
 
     @Override

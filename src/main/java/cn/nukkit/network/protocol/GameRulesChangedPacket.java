@@ -14,14 +14,13 @@ import java.util.Map;
 public class GameRulesChangedPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.GAME_RULES_CHANGED_PACKET;
+    public GameRules gameRules;
+    public Map<GameRule, GameRules.Value> gameRulesMap;
 
     @Override
     public byte pid() {
         return NETWORK_ID;
     }
-
-    public GameRules gameRules;
-    public Map<GameRule, GameRules.Value> gameRulesMap;
 
     @Override
     public void decode() {

@@ -10,6 +10,7 @@ import java.util.List;
 public interface ResourcePackLoader {
     /**
      * 加载资源包并返回结果
+     *
      * @return 加载的资源包
      */
     List<ResourcePack> loadPacks();

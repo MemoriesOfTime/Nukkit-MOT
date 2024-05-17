@@ -76,8 +76,8 @@ public class BlockSponge extends BlockSolidMeta {
             return true;
         } else if (this.getDamage() == DRY
                 && (block instanceof BlockWater
-                        || block.getLevelBlockAround().stream().anyMatch(b -> b instanceof BlockWater)
-                        || block.getLevelBlockAround(1).stream().anyMatch(b -> b instanceof BlockWater))
+                || block.getLevelBlockAround().stream().anyMatch(b -> b instanceof BlockWater)
+                || block.getLevelBlockAround(1).stream().anyMatch(b -> b instanceof BlockWater))
                 && performWaterAbsorb(block)) {
             level.setBlock(block, Block.get(BlockID.SPONGE, WET), true, true);
 

@@ -7,7 +7,7 @@ import java.util.Arrays;
  */
 public class BytePalette {
 
-    private static byte[] BYTE0 = new byte[0];
+    private static final byte[] BYTE0 = new byte[0];
     private byte[] keys = BYTE0;
     private byte lastIndex = Byte.MIN_VALUE;
 
@@ -24,9 +24,8 @@ public class BytePalette {
     private byte[] insert(byte val) {
         lastIndex = Byte.MIN_VALUE;
         if (keys.length == 0) {
-            return new byte[] { val };
-        }
-        else if (val < keys[0]) {
+            return new byte[]{val};
+        } else if (val < keys[0]) {
             byte[] s = new byte[keys.length + 1];
             System.arraycopy(keys, 0, s, 1, keys.length);
             s[0] = val;

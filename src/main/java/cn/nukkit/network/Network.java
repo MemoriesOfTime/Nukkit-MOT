@@ -42,24 +42,18 @@ public class Network {
     public static final byte CHANNEL_ENTITY_SPAWNING = 6; //Entity spawn/despawn channel
     public static final byte CHANNEL_TEXT = 7; //Chat and other text stuff
     public static final byte CHANNEL_END = 31;
-
-    private PacketPool packetPool113;
-    private PacketPool packetPoolCurrent;
-
     private final Server server;
-
     private final Set<SourceInterface> interfaces = new HashSet<>();
-
     private final Set<AdvancedSourceInterface> advancedInterfaces = new HashSet<>();
+    private final List<NetworkIF> hardWareNetworkInterfaces;
+    private final LinkedList<NetWorkStatisticData> netWorkStatisticDataList = new LinkedList<>();
 
     /*private double upload = 0;
     private double download = 0;*/
-
+    private PacketPool packetPool113;
+    private PacketPool packetPoolCurrent;
     private String name;
     private String subName;
-
-    private final List<NetworkIF> hardWareNetworkInterfaces;
-    private final LinkedList<NetWorkStatisticData> netWorkStatisticDataList = new LinkedList<>();
 
     public Network(Server server) {
         this.registerPackets();
@@ -151,13 +145,13 @@ public class Network {
         }
     }
 
+    public String getName() {
+        return name;
+    }
+
     public void setName(String name) {
         this.name = name;
         this.updateName();
-    }
-
-    public String getName() {
-        return name;
     }
 
     public String getSubName() {
@@ -262,7 +256,7 @@ public class Network {
                     try {
                         if (raknetProtocol > 8) {
                             pk.decode();
-                        }else { // version < 1.6
+                        } else { // version < 1.6
                             pk.setBuffer(buf, pk.protocol < ProtocolInfo.v1_2_0 ? 1 : 3);
                             pk.decode();
                         }

@@ -26,22 +26,22 @@ public class BlockVector3 implements Cloneable {
         return this.x;
     }
 
-    public int getY() {
-        return this.y;
-    }
-
-    public int getZ() {
-        return this.z;
-    }
-
     public BlockVector3 setX(int x) {
         this.x = x;
         return this;
     }
 
+    public int getY() {
+        return this.y;
+    }
+
     public BlockVector3 setY(int y) {
         this.y = y;
         return this;
+    }
+
+    public int getZ() {
+        return this.z;
     }
 
     public BlockVector3 setZ(int z) {
@@ -234,8 +234,7 @@ public class BlockVector3 implements Cloneable {
         if (o == null) return false;
         if (o == this) return true;
 
-        if (!(o instanceof BlockVector3)) return false;
-        BlockVector3 that = (BlockVector3) o;
+        if (!(o instanceof BlockVector3 that)) return false;
 
         return this.x == that.x &&
                 this.y == that.y &&

@@ -11,22 +11,20 @@ import lombok.ToString;
 public class InventoryContentPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.INVENTORY_CONTENT_PACKET;
-
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
-    }
-
     public static final int SPECIAL_INVENTORY = 0;
     public static final int SPECIAL_OFFHAND = 0x77;
     public static final int SPECIAL_ARMOR = 0x78;
     public static final int SPECIAL_CREATIVE = 0x79;
     public static final int SPECIAL_HOTBAR = 0x7a;
     public static final int SPECIAL_FIXED_INVENTORY = 0x7b;
-
     public int inventoryId;
     public int networkId;
     public Item[] slots = Item.EMPTY_ARRAY;
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
 
     @Override
     public DataPacket clean() {

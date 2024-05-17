@@ -52,8 +52,8 @@ public class BatchingHelper {
             for (DataPacket packet : packets) {
                 packet.protocol = players[0].protocol;
                 players[0].getNetworkSession().sendPacket(packet);
-           }
-           return;
+            }
+            return;
         }
 
         Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
@@ -119,7 +119,7 @@ public class BatchingHelper {
                         BatchPacket batchPacket = new BatchPacket();
                         batchPacket.payload = bytes;
                         player.dataPacket(batchPacket);
-                    }else {
+                    } else {
                         player.dataPacket(pk);
                     }
                 }

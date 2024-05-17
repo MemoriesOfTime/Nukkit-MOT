@@ -10,16 +10,9 @@ import lombok.ToString;
 public class MobEffectPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.MOB_EFFECT_PACKET;
-
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
-    }
-
     public static final byte EVENT_ADD = 1;
     public static final byte EVENT_MODIFY = 2;
     public static final byte EVENT_REMOVE = 3;
-
     public long eid;
     public int eventId;
     public int effectId;
@@ -30,6 +23,11 @@ public class MobEffectPacket extends DataPacket {
      * @since v662 1.20.70
      */
     public long tick;
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
 
     @Override
     public void decode() {

@@ -85,14 +85,6 @@ public interface CompressionProvider {
         }
     };
 
-
-    byte[] compress(BinaryStream packet, int level) throws Exception;
-    byte[] decompress(byte[] compressed) throws Exception;
-
-    default byte[] decompress(byte[] compressed, int maxSize) throws Exception {
-        return this.decompress(compressed);
-    }
-
     static CompressionProvider from(PacketCompressionAlgorithm algorithm, int raknetProtocol) {
         if (algorithm == null) {
             return NONE;
@@ -101,10 +93,6 @@ public interface CompressionProvider {
         } else if (algorithm == PacketCompressionAlgorithm.SNAPPY) {
             return SNAPPY;
         }
-        throw new UnsupportedOperationException();
-    }
-
-    default byte getPrefix() {
         throw new UnsupportedOperationException();
     }
 
@@ -125,5 +113,17 @@ public interface CompressionProvider {
             }
             default -> throw new IllegalArgumentException("Unsupported compression type: " + prefix);
         }
+    }
+
+    byte[] compress(BinaryStream packet, int level) throws Exception;
+
+    byte[] decompress(byte[] compressed) throws Exception;
+
+    default byte[] decompress(byte[] compressed, int maxSize) throws Exception {
+        return this.decompress(compressed);
+    }
+
+    default byte getPrefix() {
+        throw new UnsupportedOperationException();
     }
 }

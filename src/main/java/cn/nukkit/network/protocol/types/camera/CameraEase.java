@@ -38,6 +38,7 @@ public enum CameraEase {
     EASE_IN_OUT_BOUNCE("in_out_bounce");
 
     private static final Map<String, CameraEase> serializeNames = new HashMap<>();
+
     static {
         for (CameraEase value : values()) {
             serializeNames.put(value.getSerializeName(), value);
@@ -50,11 +51,11 @@ public enum CameraEase {
         this.serializeName = serializeName;
     }
 
-    public String getSerializeName() {
-        return this.serializeName;
-    }
-
     public static CameraEase fromName(String serializeName) {
         return serializeNames.get(serializeName);
+    }
+
+    public String getSerializeName() {
+        return this.serializeName;
     }
 }

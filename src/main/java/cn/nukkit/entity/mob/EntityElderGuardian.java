@@ -43,7 +43,7 @@ public class EntityElderGuardian extends EntitySwimmingMob {
         super.initEntity();
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_ELDER, true);
-        this.setDamage(new int[] { 0, 5, 8, 12 });
+        this.setDamage(new int[]{0, 5, 8, 12});
     }
 
     @Override

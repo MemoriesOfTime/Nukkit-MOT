@@ -52,6 +52,13 @@ public abstract class EntityTameableMob extends EntityWalkingMob implements Enti
     }
 
     @Override
+    public void setOwner(Player player) {
+        this.owner = player;
+        this.setDataProperty(new LongEntityData(DATA_OWNER_EID, player.getId()));
+        this.setTamed(true);
+    }
+
+    @Override
     public boolean hasOwner() {
         return hasOwner(true);
     }
@@ -68,13 +75,6 @@ public abstract class EntityTameableMob extends EntityWalkingMob implements Enti
         }
 
         return false;
-    }
-
-    @Override
-    public void setOwner(Player player) {
-        this.owner = player;
-        this.setDataProperty(new LongEntityData(DATA_OWNER_EID, player.getId()));
-        this.setTamed(true);
     }
 
     @Override

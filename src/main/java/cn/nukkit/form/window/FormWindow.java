@@ -10,17 +10,16 @@ import java.util.List;
 public abstract class FormWindow {
 
     protected static final Gson GSON = new Gson();
-
-    protected transient boolean closed = false;
     protected final transient List<FormResponseHandler> handlers = new ObjectArrayList<>();
+    protected transient boolean closed = false;
 
     public String getJSONData() {
         return FormWindow.GSON.toJson(this);
     }
 
-    public abstract void setResponse(String data);
-
     public abstract FormResponse getResponse();
+
+    public abstract void setResponse(String data);
 
     public boolean wasClosed() {
         return closed;

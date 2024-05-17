@@ -9,7 +9,6 @@ import org.iq80.leveldb.util.FileUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
@@ -33,36 +32,6 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         } else if (!path.isDirectory()) {
             throw new IllegalArgumentException(Server.getInstance().getLanguage().translateString("nukkit.resources.invalid-path", path.getName()));
         }
-    }
-
-    @Override
-    public List<ResourcePack> loadPacks() {
-        var baseLang = Server.getInstance().getLanguage();
-        List<ResourcePack> loadedResourcePacks = new ArrayList<>();
-        for (File pack : path.listFiles()) {
-            try {
-                ResourcePack resourcePack = null;
-                String fileExt = Files.getFileExtension(pack.getName());
-                if (pack.isDirectory()) {
-                    File file = loadDirectoryPack(pack);
-                    if (file != null) {
-                        resourcePack = new ZippedResourcePack(file);
-                    }
-                } else if (!fileExt.equals("key")) { //directory resource packs temporarily unsupported
-                    switch (fileExt) {
-                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack);
-                        default -> log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
-                    }
-                }
-                if (resourcePack != null) {
-                    loadedResourcePacks.add(resourcePack);
-                    log.info(baseLang.translateString("nukkit.resources.zip.loaded", pack.getName()));
-                }
-            } catch (IllegalArgumentException e) {
-                log.warn(baseLang.translateString("nukkit.resources.fail", pack.getName(), e.getMessage()), e);
-            }
-        }
-        return loadedResourcePacks;
     }
 
     private static File loadDirectoryPack(File directory) {
@@ -122,5 +91,36 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
             }
         }
         return files;
+    }
+
+    @Override
+    public List<ResourcePack> loadPacks() {
+        var baseLang = Server.getInstance().getLanguage();
+        List<ResourcePack> loadedResourcePacks = new ArrayList<>();
+        for (File pack : path.listFiles()) {
+            try {
+                ResourcePack resourcePack = null;
+                String fileExt = Files.getFileExtension(pack.getName());
+                if (pack.isDirectory()) {
+                    File file = loadDirectoryPack(pack);
+                    if (file != null) {
+                        resourcePack = new ZippedResourcePack(file);
+                    }
+                } else if (!fileExt.equals("key")) { //directory resource packs temporarily unsupported
+                    switch (fileExt) {
+                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack);
+                        default ->
+                                log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
+                    }
+                }
+                if (resourcePack != null) {
+                    loadedResourcePacks.add(resourcePack);
+                    log.info(baseLang.translateString("nukkit.resources.zip.loaded", pack.getName()));
+                }
+            } catch (IllegalArgumentException e) {
+                log.warn(baseLang.translateString("nukkit.resources.fail", pack.getName(), e.getMessage()), e);
+            }
+        }
+        return loadedResourcePacks;
     }
 }

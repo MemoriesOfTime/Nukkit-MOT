@@ -18,6 +18,10 @@ public class BlockHarvestEvent extends BlockEvent implements Cancellable {
         this.drops = drops;
     }
 
+    public static HandlerList getHandlers() {
+        return handlers;
+    }
+
     public Block getNewState() {
         return newState;
     }
@@ -32,10 +36,6 @@ public class BlockHarvestEvent extends BlockEvent implements Cancellable {
 
     public void setDrops(Item[] drops) {
         this.drops = drops;
-    }
-
-    public static HandlerList getHandlers() {
-        return handlers;
     }
 
 }

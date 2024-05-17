@@ -42,7 +42,7 @@ public class EntityGuardian extends EntitySwimmingMob {
     @Override
     public void initEntity() {
         this.setMaxHealth(30);
-        
+
         super.initEntity();
 
         this.setDamage(new int[]{0, 4, 6, 9});
@@ -50,8 +50,7 @@ public class EntityGuardian extends EntitySwimmingMob {
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (creature instanceof Player) {
-            Player player = (Player) creature;
+        if (creature instanceof Player player) {
             return (!player.closed) && player.spawned && player.isAlive() && (player.isSurvival() || player.isAdventure()) && distance <= 100;
         } else if (creature instanceof EntitySquid) {
             return creature.isAlive() && this.distanceSquared(creature) <= 80;

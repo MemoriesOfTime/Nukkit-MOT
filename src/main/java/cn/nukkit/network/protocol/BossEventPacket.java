@@ -10,23 +10,41 @@ public class BossEventPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.BOSS_EVENT_PACKET;
 
-    /** Shows the bossbar to the player. */
+    /**
+     * Shows the bossbar to the player.
+     */
     public static final int TYPE_SHOW = 0;
-    /** Registers a player to a boss fight. */
+    /**
+     * Registers a player to a boss fight.
+     */
     public static final int TYPE_REGISTER_PLAYER = 1;
-    /** Not sure on this. */
+    /**
+     * Not sure on this.
+     */
     public static final int TYPE_UPDATE = 1;
-    /** Removes the bossbar from the client. */
+    /**
+     * Removes the bossbar from the client.
+     */
     public static final int TYPE_HIDE = 2;
-    /** Unregisters a player from a boss fight. */
+    /**
+     * Unregisters a player from a boss fight.
+     */
     public static final int TYPE_UNREGISTER_PLAYER = 3;
-    /** Sets the bar percentage. */
+    /**
+     * Sets the bar percentage.
+     */
     public static final int TYPE_HEALTH_PERCENT = 4;
-    /** Sets title of the bar. */
+    /**
+     * Sets title of the bar.
+     */
     public static final int TYPE_TITLE = 5;
-    /** Not sure on this. Includes color and overlay fields, plus an unknown short. */
-    public static final int TYPE_UPDATE_PROPERTIES  = 6;
-    /** Sets color and overlay of the bar. */
+    /**
+     * Not sure on this. Includes color and overlay fields, plus an unknown short.
+     */
+    public static final int TYPE_UPDATE_PROPERTIES = 6;
+    /**
+     * Sets color and overlay of the bar.
+     */
     public static final int TYPE_TEXTURE = 7;
     public static final int TYPE_QUERY = 8;
 
@@ -38,7 +56,7 @@ public class BossEventPacket extends DataPacket {
     public short unknown;
     public int color;
     public int overlay;
-    
+
     @Override
     public byte pid() {
         return NETWORK_ID;

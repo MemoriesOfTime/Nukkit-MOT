@@ -89,9 +89,6 @@ import java.util.function.Predicate;
  */
 public class Level implements ChunkManager, Metadatable {
 
-    private static int levelIdCounter = 1;
-    private static int chunkLoaderCounter = 1;
-
     public static final int BLOCK_UPDATE_NORMAL = 1;
     public static final int BLOCK_UPDATE_RANDOM = 2;
     public static final int BLOCK_UPDATE_SCHEDULED = 3;
@@ -99,26 +96,28 @@ public class Level implements ChunkManager, Metadatable {
     public static final int BLOCK_UPDATE_TOUCH = 5;
     public static final int BLOCK_UPDATE_REDSTONE = 6;
     public static final int BLOCK_UPDATE_TICK = 7;
-
     public static final int TIME_DAY = 1000;
     public static final int TIME_NOON = 6000;
     public static final int TIME_SUNSET = 12000;
     public static final int TIME_NIGHT = 13000;
     public static final int TIME_MIDNIGHT = 18000;
     public static final int TIME_SUNRISE = 23000;
-
     public static final int TIME_FULL = 24000;
-
     public static final int DIMENSION_OVERWORLD = 0;
     public static final int DIMENSION_NETHER = 1;
     public static final int DIMENSION_THE_END = 2;
-
     // Lower values use less memory
     public static final int MAX_BLOCK_CACHE = 512;
-
+    public static final boolean[] xrayableBlocks = new boolean[Block.MAX_BLOCK_ID];
     // The blocks that can randomly tick
     private static final boolean[] randomTickBlocks = new boolean[Block.MAX_BLOCK_ID];
-    public static final boolean[] xrayableBlocks = new boolean[Block.MAX_BLOCK_ID];
+    private static final int LCG_CONSTANT = 1013904223;
+    // 用于实现世界监听的回调
+    private static final AtomicInteger callbackIdCounter = new AtomicInteger();
+    private static final Entity[] EMPTY_ENTITY_ARR = new Entity[0];
+    private static final Entity[] ENTITY_BUFFER = new Entity[512];
+    private static int levelIdCounter = 1;
+    private static int chunkLoaderCounter = 1;
 
     static {
         randomTickBlocks[Block.GRASS] = true;
@@ -168,100 +167,70 @@ public class Level implements ChunkManager, Metadatable {
 
     @NonComputationAtomic
     public final Long2ObjectNonBlockingMap<Entity> updateEntities = new Long2ObjectNonBlockingMap<>();
-
-    @NonComputationAtomic
-    private final Long2ObjectNonBlockingMap<BlockEntity> blockEntities = new Long2ObjectNonBlockingMap<>();
-
-    @NonComputationAtomic
-    private final Long2ObjectNonBlockingMap<Player> players = new Long2ObjectNonBlockingMap<>();
-
     @NonComputationAtomic
     public final Long2ObjectNonBlockingMap<Entity> entities = new Long2ObjectNonBlockingMap<>();
-
-    private final ConcurrentLinkedQueue<BlockEntity> updateBlockEntities = new ConcurrentLinkedQueue<>();
-
-    private final Server server;
-
-    private final int levelId;
-
-    private LevelProvider provider;
     /**
      * 防止读取provider时卸载世界导致空指针
      */
     public final ReentrantReadWriteLock providerLock = new ReentrantReadWriteLock();
-
+    // Notice: These shouldn't be used in the internal methods
+    // Check the dimension id instead
+    public final boolean isNether;
+    public final boolean isEnd;
+    @NonComputationAtomic
+    private final Long2ObjectNonBlockingMap<BlockEntity> blockEntities = new Long2ObjectNonBlockingMap<>();
+    @NonComputationAtomic
+    private final Long2ObjectNonBlockingMap<Player> players = new Long2ObjectNonBlockingMap<>();
+    private final ConcurrentLinkedQueue<BlockEntity> updateBlockEntities = new ConcurrentLinkedQueue<>();
+    private final Server server;
+    private final int levelId;
     private final Int2ObjectOpenHashMap<ChunkLoader> loaders = new Int2ObjectOpenHashMap<>();
-
     private final Int2IntMap loaderCounter = new Int2IntOpenHashMap();
-
     private final Map<Long, Map<Integer, ChunkLoader>> chunkLoaders = new ConcurrentHashMap<>();
-
     private final Map<Long, Map<Integer, Player>> playerLoaders = new ConcurrentHashMap<>();
-
     private final Map<Long, Deque<DataPacket>> chunkPackets = new ConcurrentHashMap<>();
-
     @NonComputationAtomic
     private final Long2ObjectNonBlockingMap<Long> unloadQueue = new Long2ObjectNonBlockingMap<>();
-
-    private int time;
-
-    public boolean stopTime;
-
-    public float skyLightSubtracted;
-
     private final String folderName;
-
     // Avoid OOM, gc'd references result in whole chunk being sent (possibly higher cpu)
     private final Long2ObjectOpenHashMap<SoftReference<Map<Character, Object>>> changedBlocks = new Long2ObjectOpenHashMap<>();
     // Storing the vector is redundant
     private final Object changeBlocksPresent = new Object();
     // Storing extra blocks past 512 is redundant
     private final Map<Character, Object> changeBlocksFullMap = new CharacterHashMap();
-
-    private final BlockUpdateScheduler updateQueue;
-    private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
     //private final TreeSet<BlockUpdateEntry> updateQueue = new TreeSet<>();
     //private final List<BlockUpdateEntry> nextTickUpdates = Lists.newArrayList();
     //private final Map<BlockVector3, Integer> updateQueueIndex = new HashMap<>();
-
+    private final BlockUpdateScheduler updateQueue;
+    private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
     private final Int2ObjectMap<ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<LongSet> chunkSendTasks = new Int2ObjectOpenHashMap<>();
-
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkGenerationQueue = new Long2ObjectOpenHashMap<>();
     private final int chunkGenerationQueueSize;
     private final int chunkPopulationQueueSize;
-
-    private boolean autoSave;
-
-    private BlockMetadataStore blockMetadata;
-
     private final boolean useSections;
 
     private final Vector3 temporalVector;
-
-    public int sleepTicks = 0;
-
     private final int chunkTickRadius;
     private final Long2IntMap chunkTickList = new Long2IntOpenHashMap();
     private final int chunksPerTicks;
     private final boolean clearChunksOnTick;
-
-    private int updateLCG = ThreadLocalRandom.current().nextInt();
-
-    private static final int LCG_CONSTANT = 1013904223;
-
-    private int tickRate;
+    private final Class<? extends Generator> generatorClass;
+    private final boolean randomTickingEnabled;
+    private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
+    private final boolean antiXray;
+    private final Int2ObjectMap<Consumer<Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<BiConsumer<Long, DataPacket>> callbackChunkPacketSend = new Int2ObjectOpenHashMap<>();
+    private final Map<Long, Map<Character, Object>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
+    public boolean stopTime;
+    public float skyLightSubtracted;
+    public int sleepTicks = 0;
     public int tickRateTime = 0;
     public int tickRateCounter = 0;
-
-    // Notice: These shouldn't be used in the internal methods
-    // Check the dimension id instead
-    public final boolean isNether;
-    public final boolean isEnd;
-
-    private final Class<? extends Generator> generatorClass;
+    public GameRules gameRules;
+    private LevelProvider provider;
     private final ThreadLocal<Generator> generators = new ThreadLocal<>() {
         @Override
         public Generator initialValue() {
@@ -279,33 +248,21 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
     };
-
+    private int time;
+    private boolean autoSave;
+    private BlockMetadataStore blockMetadata;
+    private int updateLCG = ThreadLocalRandom.current().nextInt();
+    private int tickRate;
     private boolean raining;
     private int rainingIntensity;
     private int rainTime;
     private boolean thundering;
     private int thunderTime;
-
     private long levelCurrentTick;
-
     private DimensionData dimensionData;
-
-    public GameRules gameRules;
-
-    private final boolean randomTickingEnabled;
-
     @Getter
     private ExecutorService asyncChuckExecutor;
-    private final Queue<NetworkChunkSerializer.NetworkChunkSerializerCallbackData> asyncChunkRequestCallbackQueue = new ConcurrentLinkedQueue<>();
-
     private Iterator<LongObjectEntry<Long>> lastUsingUnloadingIter;
-
-    private final boolean antiXray;
-
-    // 用于实现世界监听的回调
-    private static final AtomicInteger callbackIdCounter = new AtomicInteger();
-    private final Int2ObjectMap<Consumer<Block>> callbackBlockSet = new Int2ObjectOpenHashMap<>();
-    private final Int2ObjectMap<BiConsumer<Long, DataPacket>> callbackChunkPacketSend = new Int2ObjectOpenHashMap<>();
 
     public Level(Server server, String name, String path, Class<? extends LevelProvider> provider) {
         this.levelId = levelIdCounter++;
@@ -433,16 +390,64 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
+    private static boolean matchMVChunkProtocol(int chunk, int player) {
+        if (chunk == 0) if (player < ProtocolInfo.v1_2_0) return true;
+        if (chunk == ProtocolInfo.v1_2_0)
+            if (player >= ProtocolInfo.v1_2_0) if (player < ProtocolInfo.v1_12_0) return true;
+        if (chunk == ProtocolInfo.v1_12_0) if (player == ProtocolInfo.v1_12_0) return true;
+        if (chunk == ProtocolInfo.v1_13_0) if (player == ProtocolInfo.v1_13_0) return true;
+        if (chunk == ProtocolInfo.v1_14_0)
+            if (player == ProtocolInfo.v1_14_0 || player == ProtocolInfo.v1_14_60) return true;
+        if (chunk == ProtocolInfo.v1_16_0)
+            if (player >= ProtocolInfo.v1_16_0) if (player <= ProtocolInfo.v1_16_100_52) return true;
+        if (chunk == ProtocolInfo.v1_16_100)
+            if (player >= ProtocolInfo.v1_16_100) if (player < ProtocolInfo.v1_16_210) return true;
+        if (chunk == ProtocolInfo.v1_16_210)
+            if (player >= ProtocolInfo.v1_16_210) if (player < ProtocolInfo.v1_17_0) return true;
+        if (chunk == ProtocolInfo.v1_17_0) if (player == ProtocolInfo.v1_17_0) return true;
+        if (chunk == ProtocolInfo.v1_17_10)
+            if (player >= ProtocolInfo.v1_17_10) if (player < ProtocolInfo.v1_17_30) return true;
+        if (chunk == ProtocolInfo.v1_17_30) if (player == ProtocolInfo.v1_17_30) return true;
+        if (chunk == ProtocolInfo.v1_17_40) if (player == ProtocolInfo.v1_17_40) return true;
+        if (chunk == ProtocolInfo.v1_18_0) if (player == ProtocolInfo.v1_18_0) return true;
+        if (chunk == ProtocolInfo.v1_18_10)
+            if (player >= ProtocolInfo.v1_18_10_26) if (player < ProtocolInfo.v1_18_30) return true;
+        if (chunk == ProtocolInfo.v1_18_30) if (player == ProtocolInfo.v1_18_30) return true;
+        if (chunk == ProtocolInfo.v1_19_0)
+            if (player >= ProtocolInfo.v1_19_0_29) if (player < ProtocolInfo.v1_19_20) return true;
+        if (chunk == ProtocolInfo.v1_19_20)
+            if (player >= ProtocolInfo.v1_19_20) if (player < ProtocolInfo.v1_19_50) return true;
+        if (chunk == ProtocolInfo.v1_19_50)
+            if (player >= ProtocolInfo.v1_19_50_20) if (player < ProtocolInfo.v1_19_60) return true;
+        if (chunk == ProtocolInfo.v1_19_60)
+            if (player >= ProtocolInfo.v1_19_60) if (player < ProtocolInfo.v1_19_70) return true;
+        if (chunk == ProtocolInfo.v1_19_70)
+            if (player >= ProtocolInfo.v1_19_70_24) if (player < ProtocolInfo.v1_19_80) return true;
+        if (chunk == ProtocolInfo.v1_19_80) if (player == ProtocolInfo.v1_19_80) return true;
+        if (chunk == ProtocolInfo.v1_20_0)
+            if (player >= ProtocolInfo.v1_20_0_23) if (player < ProtocolInfo.v1_20_10_21) return true;
+        if (chunk == ProtocolInfo.v1_20_10)
+            if (player >= ProtocolInfo.v1_20_10_21) if (player < ProtocolInfo.v1_20_30_24) return true;
+        if (chunk == ProtocolInfo.v1_20_30)
+            if (player >= ProtocolInfo.v1_20_30_24) if (player < ProtocolInfo.v1_20_40) return true;
+        if (chunk == ProtocolInfo.v1_20_40) if (player == ProtocolInfo.v1_20_40) return true;
+        if (chunk == ProtocolInfo.v1_20_50) if (player == ProtocolInfo.v1_20_50) return true;
+        if (chunk == ProtocolInfo.v1_20_60) if (player == ProtocolInfo.v1_20_60) return true;
+        if (chunk == ProtocolInfo.v1_20_70) if (player == ProtocolInfo.v1_20_70) return true;
+        if (chunk == ProtocolInfo.v1_20_80) return player >= ProtocolInfo.v1_20_80;
+        return false; //TODO Multiversion  Remember to update when block palette changes
+    }
+
     public int getTickRate() {
         return tickRate;
     }
 
-    public int getTickRateTime() {
-        return tickRateTime;
-    }
-
     public void setTickRate(int tickRate) {
         this.tickRate = tickRate;
+    }
+
+    public int getTickRateTime() {
+        return tickRateTime;
     }
 
     public void initLevel() {
@@ -2033,8 +2038,6 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
-    private final Map<Long, Map<Character, Object>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
-
     public void addLightUpdate(int x, int y, int z) {
         long index = chunkHash(x >> 4, z >> 4);
         Map<Character, Object> currentMap = lightQueue.get(index);
@@ -2170,7 +2173,7 @@ public class Level implements ChunkManager, Metadatable {
         switch (type) {
             case 0 -> { //explode
                 vector3 = vector3.floor();
-                vector3Array = new Vector3[] {
+                vector3Array = new Vector3[]{
                         vector3.add(1, 0, 0),
                         vector3.add(-1, 0, 0),
                         vector3.add(0, 1, 0),
@@ -2893,9 +2896,6 @@ public class Level implements ChunkManager, Metadatable {
     public Entity[] getNearbyEntities(AxisAlignedBB bb) {
         return this.getNearbyEntities(bb, null);
     }
-
-    private static final Entity[] EMPTY_ENTITY_ARR = new Entity[0];
-    private static final Entity[] ENTITY_BUFFER = new Entity[512];
 
     public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity) {
         return getNearbyEntities(bb, entity, false);
@@ -3951,6 +3951,11 @@ public class Level implements ChunkManager, Metadatable {
         return time;
     }
 
+    public void setTime(int time) {
+        this.time = time;
+        this.sendTime();
+    }
+
     public boolean isDaytime() {
         return this.skyLightSubtracted < 4;
     }
@@ -3965,11 +3970,6 @@ public class Level implements ChunkManager, Metadatable {
 
     public String getFolderName() {
         return this.folderName;
-    }
-
-    public void setTime(int time) {
-        this.time = time;
-        this.sendTime();
     }
 
     public void stopTime() {
@@ -4089,7 +4089,6 @@ public class Level implements ChunkManager, Metadatable {
 
         levelProvider.doGarbageCollection();
     }
-
 
     public void doGarbageCollection(long allocatedTime) {
         long start = System.currentTimeMillis();
@@ -4991,54 +4990,6 @@ public class Level implements ChunkManager, Metadatable {
             return 0;
         }
         throw new IllegalArgumentException("Invalid chunk protocol: " + protocol);
-    }
-
-    private static boolean matchMVChunkProtocol(int chunk, int player) {
-        if (chunk == 0) if (player < ProtocolInfo.v1_2_0) return true;
-        if (chunk == ProtocolInfo.v1_2_0)
-            if (player >= ProtocolInfo.v1_2_0) if (player < ProtocolInfo.v1_12_0) return true;
-        if (chunk == ProtocolInfo.v1_12_0) if (player == ProtocolInfo.v1_12_0) return true;
-        if (chunk == ProtocolInfo.v1_13_0) if (player == ProtocolInfo.v1_13_0) return true;
-        if (chunk == ProtocolInfo.v1_14_0)
-            if (player == ProtocolInfo.v1_14_0 || player == ProtocolInfo.v1_14_60) return true;
-        if (chunk == ProtocolInfo.v1_16_0)
-            if (player >= ProtocolInfo.v1_16_0) if (player <= ProtocolInfo.v1_16_100_52) return true;
-        if (chunk == ProtocolInfo.v1_16_100)
-            if (player >= ProtocolInfo.v1_16_100) if (player < ProtocolInfo.v1_16_210) return true;
-        if (chunk == ProtocolInfo.v1_16_210)
-            if (player >= ProtocolInfo.v1_16_210) if (player < ProtocolInfo.v1_17_0) return true;
-        if (chunk == ProtocolInfo.v1_17_0) if (player == ProtocolInfo.v1_17_0) return true;
-        if (chunk == ProtocolInfo.v1_17_10)
-            if (player >= ProtocolInfo.v1_17_10) if (player < ProtocolInfo.v1_17_30) return true;
-        if (chunk == ProtocolInfo.v1_17_30) if (player == ProtocolInfo.v1_17_30) return true;
-        if (chunk == ProtocolInfo.v1_17_40) if (player == ProtocolInfo.v1_17_40) return true;
-        if (chunk == ProtocolInfo.v1_18_0) if (player == ProtocolInfo.v1_18_0) return true;
-        if (chunk == ProtocolInfo.v1_18_10)
-            if (player >= ProtocolInfo.v1_18_10_26) if (player < ProtocolInfo.v1_18_30) return true;
-        if (chunk == ProtocolInfo.v1_18_30) if (player == ProtocolInfo.v1_18_30) return true;
-        if (chunk == ProtocolInfo.v1_19_0)
-            if (player >= ProtocolInfo.v1_19_0_29) if (player < ProtocolInfo.v1_19_20) return true;
-        if (chunk == ProtocolInfo.v1_19_20)
-            if (player >= ProtocolInfo.v1_19_20) if (player < ProtocolInfo.v1_19_50) return true;
-        if (chunk == ProtocolInfo.v1_19_50)
-            if (player >= ProtocolInfo.v1_19_50_20) if (player < ProtocolInfo.v1_19_60) return true;
-        if (chunk == ProtocolInfo.v1_19_60)
-            if (player >= ProtocolInfo.v1_19_60) if (player < ProtocolInfo.v1_19_70) return true;
-        if (chunk == ProtocolInfo.v1_19_70)
-            if (player >= ProtocolInfo.v1_19_70_24) if (player < ProtocolInfo.v1_19_80) return true;
-        if (chunk == ProtocolInfo.v1_19_80) if (player == ProtocolInfo.v1_19_80) return true;
-        if (chunk == ProtocolInfo.v1_20_0)
-            if (player >= ProtocolInfo.v1_20_0_23) if (player < ProtocolInfo.v1_20_10_21) return true;
-        if (chunk == ProtocolInfo.v1_20_10)
-            if (player >= ProtocolInfo.v1_20_10_21) if (player < ProtocolInfo.v1_20_30_24) return true;
-        if (chunk == ProtocolInfo.v1_20_30)
-            if (player >= ProtocolInfo.v1_20_30_24) if (player < ProtocolInfo.v1_20_40) return true;
-        if (chunk == ProtocolInfo.v1_20_40) if (player == ProtocolInfo.v1_20_40) return true;
-        if (chunk == ProtocolInfo.v1_20_50) if (player == ProtocolInfo.v1_20_50) return true;
-        if (chunk == ProtocolInfo.v1_20_60) if (player == ProtocolInfo.v1_20_60) return true;
-        if (chunk == ProtocolInfo.v1_20_70) if (player == ProtocolInfo.v1_20_70) return true;
-        if (chunk == ProtocolInfo.v1_20_80) if (player >= ProtocolInfo.v1_20_80) return true;
-        return false; //TODO Multiversion  Remember to update when block palette changes
     }
 
     private static class CharacterHashMap extends HashMap<Character, Object> {

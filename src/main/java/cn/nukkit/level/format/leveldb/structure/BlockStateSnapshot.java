@@ -27,6 +27,10 @@ public class BlockStateSnapshot {
         this.legacyData = legacy;
     }
 
+    public static BlockStateSnapshotBuilder builder() {
+        return new BlockStateSnapshotBuilder();
+    }
+
     public NbtMap getVanillaState() {
         return this.vanillaState;
     }
@@ -72,10 +76,6 @@ public class BlockStateSnapshot {
             this.block = Block.get(this.getLegacyId(), this.getLegacyData());
         }
         return this.block;
-    }
-
-    public static BlockStateSnapshotBuilder builder() {
-        return new BlockStateSnapshotBuilder();
     }
 
     public static class BlockStateSnapshotBuilder {

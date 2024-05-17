@@ -46,10 +46,18 @@ public class UpdateAbilitiesPacket extends DataPacket {
         }
     }
 
+    private final List<AbilityLayer> abilityLayers = new ObjectArrayList<>();
     private long entityId;
     private PlayerPermission playerPermission;
     private CommandPermission commandPermission;
-    private final List<AbilityLayer> abilityLayers = new ObjectArrayList<>();
+
+    private static int getAbilitiesNumber(Set<PlayerAbility> abilities) {
+        int number = 0;
+        for (PlayerAbility ability : abilities) {
+            number |= FLAGS_TO_BITS.getOrDefault(ability, 0);
+        }
+        return number;
+    }
 
     @Override
     public void decode() {
@@ -71,14 +79,6 @@ public class UpdateAbilitiesPacket extends DataPacket {
         buffer.putLInt(getAbilitiesNumber(abilityLayer.getAbilityValues()));
         buffer.putLFloat(abilityLayer.getFlySpeed());
         buffer.putLFloat(abilityLayer.getWalkSpeed());
-    }
-
-    private static int getAbilitiesNumber(Set<PlayerAbility> abilities) {
-        int number = 0;
-        for (PlayerAbility ability : abilities) {
-            number |= FLAGS_TO_BITS.getOrDefault(ability, 0);
-        }
-        return number;
     }
 
     @Override

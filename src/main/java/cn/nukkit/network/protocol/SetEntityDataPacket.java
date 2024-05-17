@@ -13,12 +13,6 @@ import lombok.ToString;
 public class SetEntityDataPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.SET_ENTITY_DATA_PACKET;
-
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
-    }
-
     public long eid;
     public EntityMetadata metadata;
     public long frame;
@@ -26,6 +20,11 @@ public class SetEntityDataPacket extends DataPacket {
      * @since v557
      */
     public PropertySyncData syncedProperties = new PropertySyncData(new int[]{}, new float[]{});
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
 
     @Override
     public void decode() {

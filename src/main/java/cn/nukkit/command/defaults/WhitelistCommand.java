@@ -32,6 +32,14 @@ public class WhitelistCommand extends VanillaCommand {
         });
     }
 
+    private static boolean badPerm(CommandSender sender, String perm) {
+        if (!sender.hasPermission("nukkit.command.allowlist." + perm)) {
+            sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.permission"));
+            return true;
+        }
+
+        return false;
+    }
 
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
@@ -78,8 +86,10 @@ public class WhitelistCommand extends VanillaCommand {
                         sender.sendMessage(result.substring(0, result.length() - 2));
                     }
                 }
-                case "add" -> sender.sendMessage(new TranslationContainer("commands.generic.usage", "%commands.allowlist.add.usage"));
-                case "remove" -> sender.sendMessage(new TranslationContainer("commands.generic.usage", "%commands.allowlist.remove.usage"));
+                case "add" ->
+                        sender.sendMessage(new TranslationContainer("commands.generic.usage", "%commands.allowlist.add.usage"));
+                case "remove" ->
+                        sender.sendMessage(new TranslationContainer("commands.generic.usage", "%commands.allowlist.remove.usage"));
             }
             return true;
         }
@@ -100,14 +110,5 @@ public class WhitelistCommand extends VanillaCommand {
         }
 
         return true;
-    }
-
-    private static boolean badPerm(CommandSender sender, String perm) {
-        if (!sender.hasPermission("nukkit.command.allowlist." + perm)) {
-            sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.permission"));
-            return true;
-        }
-
-        return false;
     }
 }

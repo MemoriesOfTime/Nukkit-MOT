@@ -219,7 +219,7 @@ public enum TextFormat {
     /**
      * Cleans the given message of all format codes.
      *
-     * @param input String to clean.
+     * @param input     String to clean.
      * @param recursive Do recursively.
      * @return A copy of the input string, without any formatting.
      */
@@ -287,7 +287,7 @@ public enum TextFormat {
                 TextFormat color = getByChar(input.charAt(index + 1));
 
                 if (color != null) {
-                    result.insert(0, color.toString());
+                    result.insert(0, color);
 
                     // Once we find a color or reset we can stop searching
                     if (color.isColor() || color.equals(RESET)) {

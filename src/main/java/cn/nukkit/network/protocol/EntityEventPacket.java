@@ -75,17 +75,15 @@ public class EntityEventPacket extends DataPacket {
     public static final int GROW_UP = 76;
     public static final int VIBRATION_DETECTED = 77;
     public static final int DRINK_MILK = 78;
+    public long eid;
+    public int event;
+    public int data = 0;
+    public int originProtocol = -1;
 
     @Override
     public byte pid() {
         return NETWORK_ID;
     }
-
-    public long eid;
-    public int event;
-    public int data = 0;
-
-    public int originProtocol = -1;
 
     @Override
     public void decode() {

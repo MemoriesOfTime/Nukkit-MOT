@@ -5,17 +5,17 @@ import cn.nukkit.Server;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.scheduler.Task;
 
-public class ScrollingTextDialog implements Dialog{
+public class ScrollingTextDialog implements Dialog {
 
     private Player player;
     private FormWindowDialog dialog;
     private int scrollingSpeed;//unit: gt
     private boolean scrolling = false;
     private int cursor = 0;
-    private Task scrollingTask;
+    private final Task scrollingTask;
 
     public ScrollingTextDialog(Player player, FormWindowDialog dialog) {
-        this(player, dialog,2);
+        this(player, dialog, 2);
     }
 
     public ScrollingTextDialog(Player player, FormWindowDialog dialog, int scrollingSpeed) {
@@ -53,12 +53,12 @@ public class ScrollingTextDialog implements Dialog{
         return scrolling;
     }
 
-    public void stopScrolling(){
-        scrolling = false;
-    }
-
     public void setScrolling(boolean scrolling) {
         this.scrolling = scrolling;
+    }
+
+    public void stopScrolling() {
+        scrolling = false;
     }
 
     public int getCursor() {
@@ -83,7 +83,8 @@ public class ScrollingTextDialog implements Dialog{
 
     private class ScrollingRunner extends Task {
 
-        private FormWindowDialog clone = new FormWindowDialog(dialog.getTitle(), dialog.getContent(), dialog.getBindEntity());
+        private final FormWindowDialog clone = new FormWindowDialog(dialog.getTitle(), dialog.getContent(), dialog.getBindEntity());
+
         {
             clone.setSkinData(dialog.getSkinData());
         }
@@ -97,9 +98,9 @@ public class ScrollingTextDialog implements Dialog{
                 this.cancel();
                 return;
             }
-            clone.setContent(dialog.getContent().substring(0,cursor));
+            clone.setContent(dialog.getContent().substring(0, cursor));
             player.showDialogWindow(clone);
-            if (dialog.getContent().length() - (cursor+1) >= 2 && dialog.getContent().charAt(cursor) == '§') {
+            if (dialog.getContent().length() - (cursor + 1) >= 2 && dialog.getContent().charAt(cursor) == '§') {
                 cursor += 2;
             } else {
                 cursor++;

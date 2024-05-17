@@ -26,6 +26,12 @@ public enum ItemTrimPatternType {
     SILENCE_ARMOR_TRIM("silence"),
     WAYFINDER_ARMOR_TRIM("wayfinder");
 
+    private final String trimPattern;
+
+    ItemTrimPatternType(@NotNull String name) {
+        this.trimPattern = name;
+    }
+
     @Nullable
     public static ItemTrimMaterialType fromTrimPattern(@NotNull String trimPattern) {
         for (ItemTrimMaterialType value : ItemTrimMaterialType.values()) {
@@ -34,12 +40,6 @@ public enum ItemTrimPatternType {
             }
         }
         return null;
-    }
-
-    private final String trimPattern;
-
-    ItemTrimPatternType(@NotNull String name) {
-        this.trimPattern = name;
     }
 
     @NotNull

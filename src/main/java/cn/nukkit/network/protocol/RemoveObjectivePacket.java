@@ -26,11 +26,11 @@ public class RemoveObjectivePacket extends DataPacket {
         this.putString(this.objectiveName);
     }
 
-    public void setObjectiveName(@NotNull String objectiveName) {
-        this.objectiveName = objectiveName;
-    }
-
     public String getObjectiveName() {
         return this.objectiveName;
+    }
+
+    public void setObjectiveName(@NotNull String objectiveName) {
+        this.objectiveName = objectiveName;
     }
 }

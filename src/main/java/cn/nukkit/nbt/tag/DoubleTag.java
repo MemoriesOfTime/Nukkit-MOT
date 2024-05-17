@@ -9,6 +9,15 @@ public class DoubleTag extends NumberTag<Double> {
 
     public double data;
 
+    public DoubleTag(String name) {
+        super(name);
+    }
+
+    public DoubleTag(String name, double data) {
+        super(name);
+        this.data = data;
+    }
+
     @Override
     public Double getData() {
         return data;
@@ -17,15 +26,6 @@ public class DoubleTag extends NumberTag<Double> {
     @Override
     public void setData(Double data) {
         this.data = data == null ? 0 : data;
-    }
-
-    public DoubleTag(String name) {
-        super(name);
-    }
-
-    public DoubleTag(String name, double data) {
-        super(name);
-        this.data = data;
     }
 
     @Override

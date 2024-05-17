@@ -16,14 +16,16 @@ import java.util.Objects;
 public class EntityHorse extends EntityHorseBase {
 
     public static final int NETWORK_ID = 23;
-
-    private int variant;
-
     private static final int[] VARIANTS = {0, 1, 2, 3, 4, 5, 6, 256, 257, 258, 259, 260, 261, 262, 512, 513, 514, 515, 516, 517, 518,
             768, 769, 770, 771, 772, 773, 774, 1024, 1025, 1026, 1027, 1028, 1029, 1030};
+    private int variant;
 
     public EntityHorse(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+    }
+
+    private static int getRandomVariant() {
+        return VARIANTS[Utils.rand(0, VARIANTS.length - 1)];
     }
 
     @Override
@@ -76,7 +78,7 @@ public class EntityHorse extends EntityHorseBase {
         if (canTarget) {
             if (this.isInLove()) {
                 return creature instanceof BaseEntity && ((BaseEntity) creature).isInLove() && creature.isAlive() && !creature.closed && creature.getNetworkId() == this.getNetworkId() && distance <= 100;
-            }else if (creature instanceof Player player) {
+            } else if (creature instanceof Player player) {
                 return player.spawned && player.isAlive() && !player.closed &&
                         this.isFeedItem(Objects.requireNonNullElse(player.getInventory(), EMPTY_INVENTORY).getItemInHandFast()) && distance <= 40;
             }
@@ -99,9 +101,5 @@ public class EntityHorse extends EntityHorseBase {
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);
-    }
-
-    private static int getRandomVariant() {
-        return VARIANTS[Utils.rand(0, VARIANTS.length - 1)];
     }
 }

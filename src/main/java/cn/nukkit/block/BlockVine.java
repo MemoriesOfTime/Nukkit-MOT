@@ -29,6 +29,20 @@ public class BlockVine extends BlockTransparentMeta {
         this(0);
     }
 
+    private static int getMetaFromFace(BlockFace face) {
+        switch (face) {
+            case SOUTH:
+            default:
+                return 0x01;
+            case WEST:
+                return 0x02;
+            case NORTH:
+                return 0x04;
+            case EAST:
+                return 0x08;
+        }
+    }
+
     @Override
     public String getName() {
         return "Vines";
@@ -308,20 +322,6 @@ public class BlockVine extends BlockTransparentMeta {
         }
         if (isOnHorizontalFace) {
             putVine(block, meta, source);
-        }
-    }
-
-    private static int getMetaFromFace(BlockFace face) {
-        switch (face) {
-            case SOUTH:
-            default:
-                return 0x01;
-            case WEST:
-                return 0x02;
-            case NORTH:
-                return 0x04;
-            case EAST:
-                return 0x08;
         }
     }
 

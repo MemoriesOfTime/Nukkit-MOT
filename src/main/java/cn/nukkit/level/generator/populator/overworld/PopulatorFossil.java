@@ -13,25 +13,25 @@ import cn.nukkit.math.NukkitRandom;
 
 public class PopulatorFossil extends Populator {
     protected static final ReadableStructureTemplate[] FOSSILS = {
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_01.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_02.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_03.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_04.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_01.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_02.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_03.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_04.nbt"))
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_01.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_02.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_03.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_04.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_01.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_02.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_03.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_04.nbt"))
     };
 
     protected static final ReadableStructureTemplate[] FOSSILS_COAL = {
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_01_coal.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_02_coal.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_03_coal.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_04_coal.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_01_coal.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_02_coal.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_03_coal.nbt")),
-        new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_04_coal.nbt"))
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_01_coal.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_02_coal.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_03_coal.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_spine_04_coal.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_01_coal.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_02_coal.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_03_coal.nbt")),
+            new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/fossils/fossil_skull_04_coal.nbt"))
     };
 
     @Override

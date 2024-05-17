@@ -125,8 +125,8 @@ public class PopulatorDungeon extends Populator {
 
                 level.setBlockAt(x, y, z, BlockID.MONSTER_SPAWNER);
                 Server.getInstance().getScheduler().scheduleTask(InternalPlugin.INSTANCE, new BlockActorSpawnTask(chunk.getProvider().getLevel(),
-                    BlockEntity.getDefaultCompound(new Vector3(x, y, z), BlockEntity.MOB_SPAWNER)
-                        .putInt("EntityId", MOBS[random.nextBoundedInt(MOBS.length)])));
+                        BlockEntity.getDefaultCompound(new Vector3(x, y, z), BlockEntity.MOB_SPAWNER)
+                                .putInt("EntityId", MOBS[random.nextBoundedInt(MOBS.length)])));
             }
         }
     }

@@ -32,6 +32,14 @@ public class EntityDefinition {
         this.runtimeId = ID_ALLOCATOR.getAndIncrement();
     }
 
+    public static EntityDefinitionBuilder builder() {
+        return new EntityDefinitionBuilder();
+    }
+
+    private static IllegalArgumentException a(IllegalArgumentException illegalArgumentException) {
+        return illegalArgumentException;
+    }
+
     private CompoundTag createNetworkTag() {
         CompoundTag compoundTag = new CompoundTag("");
         compoundTag.putBoolean("hasspawnegg", this.spawnEgg);
@@ -57,10 +65,6 @@ public class EntityDefinition {
         return this.networkTagOld;
     }
 
-    public static EntityDefinitionBuilder builder() {
-        return new EntityDefinitionBuilder();
-    }
-
     public String getIdentifier() {
         return this.identifier;
     }
@@ -83,10 +87,6 @@ public class EntityDefinition {
 
     public int getRuntimeId() {
         return this.runtimeId;
-    }
-
-    private static IllegalArgumentException a(IllegalArgumentException illegalArgumentException) {
-        return illegalArgumentException;
     }
 
     @ToString

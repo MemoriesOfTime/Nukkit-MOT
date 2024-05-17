@@ -10,22 +10,20 @@ import lombok.ToString;
 public class BlockEventPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.BLOCK_EVENT_PACKET;
-
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
-    }
-
     public int x;
     public int y;
     public int z;
     public int eventType;
     public int eventData;
-
     @Deprecated
     public int case1 = -1;
     @Deprecated
     public int case2 = -1;
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
 
     @Override
     public void decode() {

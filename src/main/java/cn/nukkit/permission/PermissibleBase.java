@@ -16,13 +16,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class PermissibleBase implements Permissible {
 
-    ServerOperator opable;
-
-    private Permissible parent = null;
-
     private final Set<PermissionAttachment> attachments = new ConcurrentSet<>();
-
     private final Map<String, PermissionAttachmentInfo> permissions = new ConcurrentHashMap<>();
+    ServerOperator opable;
+    private Permissible parent = null;
 
     public PermissibleBase(ServerOperator opable) {
         this.opable = opable;

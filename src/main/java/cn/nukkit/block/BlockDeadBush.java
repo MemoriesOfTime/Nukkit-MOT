@@ -35,7 +35,7 @@ public class BlockDeadBush extends BlockFlowable {
     public int getWaterloggingLevel() {
         return 1;
     }
-    
+
     @Override
     public boolean canBeReplaced() {
         return true;

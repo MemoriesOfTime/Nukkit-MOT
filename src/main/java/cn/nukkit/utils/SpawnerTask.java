@@ -80,6 +80,160 @@ public class SpawnerTask implements Runnable {
     }
 
     /**
+     * Check if mob spawning is allowed
+     *
+     * @param level     world
+     * @param networkId mob network id
+     * @param player    player
+     * @return whether mob spawning is possible near the player
+     */
+    static boolean entitySpawnAllowed(Level level, int networkId, Player player) {
+        if (networkId == EntityPhantom.NETWORK_ID && (player.getTimeSinceRest() < 72000 || player.isSleeping() || player.isSpectator() || !level.getGameRules().getBoolean(GameRule.DO_INSOMNIA))) {
+            return false;
+        }
+        int max = getMaxSpawns(networkId, level.getDimension() == Level.DIMENSION_NETHER, level.getDimension() == Level.DIMENSION_THE_END);
+        if (max == 0) return false;
+        int count = 0;
+        for (Entity entity : level.entities.values()) {
+            if (entity.isAlive() && entity.getNetworkId() == networkId && new Vector3(player.x, entity.y, player.z).distanceSquared(entity) < 16384) { // 128 blocks
+                count++;
+                if (count > max) {
+                    return false;
+                }
+            }
+        }
+        return count < max;
+    }
+
+    /**
+     * Get safe x / z coordinate for mob spawning
+     *
+     * @param degree
+     * @param safeDegree
+     * @param correctionDegree
+     * @return safe spawn x / z coordinate
+     */
+    static int getRandomSafeXZCoord(int degree, int safeDegree, int correctionDegree) {
+        int addX = Utils.rand((degree >> 1) * -1, degree >> 1);
+        if (addX >= 0) {
+            if (degree < safeDegree) {
+                addX = safeDegree;
+                addX += Utils.rand((correctionDegree >> 1) * -1, correctionDegree >> 1);
+            }
+        } else {
+            if (degree > safeDegree) {
+                addX = -safeDegree;
+                addX += Utils.rand((correctionDegree >> 1) * -1, correctionDegree >> 1);
+            }
+        }
+        return addX;
+    }
+
+    /**
+     * Get safe y coordinate for mob spawning
+     *
+     * @param level world
+     * @param pos   initial position
+     * @return safe spawn y coordinate
+     */
+    static int getSafeYCoord(Level level, Position pos) {
+        int x = (int) pos.x;
+        int y = (int) pos.y;
+        int z = (int) pos.z;
+
+        BaseFullChunk chunk = level.getChunk(x >> 4, z >> 4, true);
+        if (level.getBlockIdAt(chunk, x, y, z) == Block.AIR) {
+            while (true) {
+                y--;
+                if (y > level.getMaxBlockY()) {
+                    y = level.getMaxBlockY() + 1;
+                    break;
+                }
+                if (y < 1) {
+                    y = 0;
+                    break;
+                }
+                if (level.getBlockIdAt(chunk, x, y, z) != Block.AIR) {
+                    int checkNeedDegree = 3;
+                    int checkY = y;
+                    while (true) {
+                        checkY++;
+                        checkNeedDegree--;
+                        if (checkY > level.getMaxBlockY() || level.getBlockIdAt(chunk, x, checkY, z) != Block.AIR) {
+                            break;
+                        }
+                        if (checkNeedDegree <= 0) {
+                            return y;
+                        }
+                    }
+                }
+            }
+        } else {
+            while (true) {
+                y++;
+                if (y > level.getMaxBlockY()) {
+                    y = level.getMaxBlockY() + 1;
+                    break;
+                }
+                if (y < 1) {
+                    y = 0;
+                    break;
+                }
+                if (level.getBlockIdAt(chunk, x, y, z) != Block.AIR) {
+                    int checkNeedDegree = 3;
+                    int checkY = y;
+                    while (true) {
+                        checkY--;
+                        checkNeedDegree--;
+                        if (checkY < 1 || level.getBlockIdAt(chunk, x, checkY, z) != Block.AIR) {
+                            break;
+                        }
+                        if (checkNeedDegree <= 0) {
+                            return y;
+                        }
+                    }
+                }
+            }
+        }
+        return y;
+    }
+
+    /**
+     * Get maximum amount of mobs in distance
+     *
+     * @param id     mob network id
+     * @param nether is nether world
+     * @param end    is end world
+     * @return maximum amount of mobs
+     */
+    private static int getMaxSpawns(int id, boolean nether, boolean end) {
+        switch (id) {
+            case EntityZombiePigman.NETWORK_ID:
+            case EntityPiglin.NETWORK_ID:
+            case EntityHoglin.NETWORK_ID:
+                return nether ? 4 : 0;
+            case EntityGhast.NETWORK_ID:
+            case EntityMagmaCube.NETWORK_ID:
+            case EntityBlaze.NETWORK_ID:
+            case EntityWitherSkeleton.NETWORK_ID:
+            case EntityStrider.NETWORK_ID:
+                return nether ? 2 : 0;
+            case EntityEnderman.NETWORK_ID:
+                return end ? 10 : 2;
+            case EntitySalmon.NETWORK_ID:
+            case EntityCod.NETWORK_ID:
+                return end || nether ? 0 : 4;
+            case EntityWitch.NETWORK_ID:
+                return end || nether ? 0 : 1;
+            case EntityPhantom.NETWORK_ID:
+                int difficulty = Server.getInstance().getDifficulty();
+                return end || nether ? 0 : difficulty == 1 ? 2 : difficulty == 2 ? 3 : 4;
+            default:
+                return end || nether ? 0 : 2;
+        }
+    }
+
+    /**
      * Register animal spawner
      *
      * @param clazz spawner class
@@ -181,36 +335,10 @@ public class SpawnerTask implements Runnable {
     }
 
     /**
-     * Check if mob spawning is allowed
-     *
-     * @param level world
-     * @param networkId mob network id
-     * @param player player
-     * @return whether mob spawning is possible near the player
-     */
-    static boolean entitySpawnAllowed(Level level, int networkId, Player player) {
-        if (networkId == EntityPhantom.NETWORK_ID && (player.getTimeSinceRest() < 72000 || player.isSleeping() || player.isSpectator() || !level.getGameRules().getBoolean(GameRule.DO_INSOMNIA))) {
-            return false;
-        }
-        int max = getMaxSpawns(networkId, level.getDimension() == Level.DIMENSION_NETHER, level.getDimension() == Level.DIMENSION_THE_END);
-        if (max == 0) return false;
-        int count = 0;
-        for (Entity entity : level.entities.values()) {
-            if (entity.isAlive() && entity.getNetworkId() == networkId && new Vector3(player.x, entity.y, player.z).distanceSquared(entity) < 16384) { // 128 blocks
-                count++;
-                if (count > max) {
-                    return false;
-                }
-            }
-        }
-        return count < max;
-    }
-
-    /**
      * Attempt to spawn a mob
      *
      * @param type mob id
-     * @param pos position
+     * @param pos  position
      * @return spawned entity or null
      */
     public BaseEntity createEntity(Object type, Position pos) {
@@ -231,133 +359,5 @@ public class SpawnerTask implements Runnable {
             }
         }
         return entity;
-    }
-
-    /**
-     * Get safe x / z coordinate for mob spawning
-     *
-     * @param degree
-     * @param safeDegree
-     * @param correctionDegree
-     * @return safe spawn x / z coordinate
-     */
-    static int getRandomSafeXZCoord(int degree, int safeDegree, int correctionDegree) {
-        int addX = Utils.rand((degree >> 1) * -1, degree >> 1);
-        if (addX >= 0) {
-            if (degree < safeDegree) {
-                addX = safeDegree;
-                addX += Utils.rand((correctionDegree >> 1) * -1, correctionDegree >> 1);
-            }
-        } else {
-            if (degree > safeDegree) {
-                addX = -safeDegree;
-                addX += Utils.rand((correctionDegree >> 1) * -1, correctionDegree >> 1);
-            }
-        }
-        return addX;
-    }
-
-    /**
-     * Get safe y coordinate for mob spawning
-     *
-     * @param level world
-     * @param pos initial position
-     * @return safe spawn y coordinate
-     */
-    static int getSafeYCoord(Level level, Position pos) {
-        int x = (int) pos.x;
-        int y = (int) pos.y;
-        int z = (int) pos.z;
-
-        BaseFullChunk chunk = level.getChunk(x >> 4, z >> 4, true);
-        if (level.getBlockIdAt(chunk, x, y, z) == Block.AIR) {
-            while (true) {
-                y--;
-                if (y > level.getMaxBlockY()) {
-                    y = level.getMaxBlockY() + 1;
-                    break;
-                }
-                if (y < 1) {
-                    y = 0;
-                    break;
-                }
-                if (level.getBlockIdAt(chunk, x, y, z) != Block.AIR) {
-                    int checkNeedDegree = 3;
-                    int checkY = y;
-                    while (true) {
-                        checkY++;
-                        checkNeedDegree--;
-                        if (checkY > level.getMaxBlockY() || level.getBlockIdAt(chunk, x, checkY, z) != Block.AIR) {
-                            break;
-                        }
-                        if (checkNeedDegree <= 0) {
-                            return y;
-                        }
-                    }
-                }
-            }
-        } else {
-            while (true) {
-                y++;
-                if (y > level.getMaxBlockY()) {
-                    y = level.getMaxBlockY() + 1;
-                    break;
-                }
-                if (y < 1) {
-                    y = 0;
-                    break;
-                }
-                if (level.getBlockIdAt(chunk, x, y, z) != Block.AIR) {
-                    int checkNeedDegree = 3;
-                    int checkY = y;
-                    while (true) {
-                        checkY--;
-                        checkNeedDegree--;
-                        if (checkY < 1 || level.getBlockIdAt(chunk, x, checkY, z) != Block.AIR) {
-                            break;
-                        }
-                        if (checkNeedDegree <= 0) {
-                            return y;
-                        }
-                    }
-                }
-            }
-        }
-        return y;
-    }
-
-    /**
-     * Get maximum amount of mobs in distance
-     *
-     * @param id mob network id
-     * @param nether is nether world
-     * @param end is end world
-     * @return maximum amount of mobs
-     */
-    private static int getMaxSpawns(int id, boolean nether, boolean end) {
-        switch (id) {
-            case EntityZombiePigman.NETWORK_ID:
-            case EntityPiglin.NETWORK_ID:
-            case EntityHoglin.NETWORK_ID:
-                return nether ? 4 : 0;
-            case EntityGhast.NETWORK_ID:
-            case EntityMagmaCube.NETWORK_ID:
-            case EntityBlaze.NETWORK_ID:
-            case EntityWitherSkeleton.NETWORK_ID:
-            case EntityStrider.NETWORK_ID:
-                return nether ? 2 : 0;
-            case EntityEnderman.NETWORK_ID:
-                return end ? 10 : 2;
-            case EntitySalmon.NETWORK_ID:
-            case EntityCod.NETWORK_ID:
-                return end || nether ? 0 : 4;
-            case EntityWitch.NETWORK_ID:
-                return end || nether ? 0 : 1;
-            case EntityPhantom.NETWORK_ID:
-                int difficulty = Server.getInstance().getDifficulty();
-                return end || nether ? 0 : difficulty == 1 ? 2 : difficulty == 2 ? 3 : 4;
-            default:
-                return end || nether ? 0 : 2;
-        }
     }
 }

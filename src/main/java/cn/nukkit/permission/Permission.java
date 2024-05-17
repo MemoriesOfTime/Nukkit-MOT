@@ -16,22 +16,9 @@ public class Permission {
     public final static String DEFAULT_FALSE = "false";
 
     public static final String DEFAULT_PERMISSION = DEFAULT_OP;
-
-    public static String getByName(String value) {
-        return switch (value.toLowerCase()) {
-            case "op", "isop", "operator", "isoperator", "admin", "isadmin" -> DEFAULT_OP;
-            case "!op", "notop", "!operator", "notoperator", "!admin", "notadmin" -> DEFAULT_NOT_OP;
-            case "true" -> DEFAULT_TRUE;
-            default -> DEFAULT_FALSE;
-        };
-    }
-
     private final String name;
-
-    private String description;
-
     private final Map<String, Boolean> children;
-
+    private String description;
     private String defaultValue;
 
     public Permission(String name) {
@@ -55,62 +42,13 @@ public class Permission {
         this.recalculatePermissibles();
     }
 
-    public String getName() {
-        return name;
-    }
-
-    public Map<String, Boolean> getChildren() {
-        return children;
-    }
-
-    public String getDefault() {
-        return defaultValue;
-    }
-
-    public void setDefault(String value) {
-        if (!value.equals(this.defaultValue)) {
-            this.defaultValue = value;
-            this.recalculatePermissibles();
-        }
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public Set<Permissible> getPermissibles() {
-        return Server.getInstance().getPluginManager().getPermissionSubscriptions(this.name);
-    }
-
-    public void recalculatePermissibles() {
-        Set<Permissible> perms = this.getPermissibles();
-
-        Server.getInstance().getPluginManager().recalculatePermissionDefaults(this);
-
-        for (Permissible p : perms) {
-            p.recalculatePermissions();
-        }
-    }
-
-    public void addParent(Permission permission, boolean value) {
-        this.children.put(this.name, value);
-        permission.recalculatePermissibles();
-    }
-
-    public Permission addParent(String name, boolean value) {
-        Permission perm = Server.getInstance().getPluginManager().getPermission(name);
-        if (perm == null) {
-            perm = new Permission(name);
-            Server.getInstance().getPluginManager().addPermission(perm);
-        }
-
-        this.addParent(perm, value);
-
-        return perm;
+    public static String getByName(String value) {
+        return switch (value.toLowerCase()) {
+            case "op", "isop", "operator", "isoperator", "admin", "isadmin" -> DEFAULT_OP;
+            case "!op", "notop", "!operator", "notoperator", "!admin", "notadmin" -> DEFAULT_NOT_OP;
+            case "true" -> DEFAULT_TRUE;
+            default -> DEFAULT_FALSE;
+        };
     }
 
     public static List<Permission> loadPermissions(Map<String, Object> data) {
@@ -170,5 +108,63 @@ public class Permission {
         }
 
         return new Permission(name, desc, defaultValue, children);
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public Map<String, Boolean> getChildren() {
+        return children;
+    }
+
+    public String getDefault() {
+        return defaultValue;
+    }
+
+    public void setDefault(String value) {
+        if (!value.equals(this.defaultValue)) {
+            this.defaultValue = value;
+            this.recalculatePermissibles();
+        }
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public Set<Permissible> getPermissibles() {
+        return Server.getInstance().getPluginManager().getPermissionSubscriptions(this.name);
+    }
+
+    public void recalculatePermissibles() {
+        Set<Permissible> perms = this.getPermissibles();
+
+        Server.getInstance().getPluginManager().recalculatePermissionDefaults(this);
+
+        for (Permissible p : perms) {
+            p.recalculatePermissions();
+        }
+    }
+
+    public void addParent(Permission permission, boolean value) {
+        this.children.put(this.name, value);
+        permission.recalculatePermissibles();
+    }
+
+    public Permission addParent(String name, boolean value) {
+        Permission perm = Server.getInstance().getPluginManager().getPermission(name);
+        if (perm == null) {
+            perm = new Permission(name);
+            Server.getInstance().getPluginManager().addPermission(perm);
+        }
+
+        this.addParent(perm, value);
+
+        return perm;
     }
 }

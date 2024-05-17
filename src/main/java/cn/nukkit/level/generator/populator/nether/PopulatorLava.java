@@ -133,9 +133,9 @@ public class PopulatorLava extends Populator {
         int cost = 1000;
         for (int j = 0; j < 4; ++j) {
             if (j == 0 && previousDirection == 1 ||
-                j == 1 && previousDirection == 0 ||
-                j == 2 && previousDirection == 3 ||
-                j == 3 && previousDirection == 2
+                    j == 1 && previousDirection == 0 ||
+                    j == 2 && previousDirection == 3 ||
+                    j == 3 && previousDirection == 2
             ) {
                 int x = xx;
                 int z = zz;

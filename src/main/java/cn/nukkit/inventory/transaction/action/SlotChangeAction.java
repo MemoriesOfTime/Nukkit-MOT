@@ -14,8 +14,8 @@ import java.util.Set;
  */
 public class SlotChangeAction extends InventoryAction {
 
-    protected Inventory inventory;
     private final int inventorySlot;
+    protected Inventory inventory;
 
     public SlotChangeAction(Inventory inventory, int inventorySlot, Item sourceItem, Item targetItem) {
         super(sourceItem, targetItem);
@@ -62,7 +62,7 @@ public class SlotChangeAction extends InventoryAction {
      */
     @Override
     public boolean execute(Player source) {
-        if(this.getInventory() instanceof FurnaceInventory){
+        if (this.getInventory() instanceof FurnaceInventory) {
             return ((FurnaceInventory) this.getInventory()).setItemByPlayer(source, this.inventorySlot, this.targetItem, false);
         } else {
             return this.inventory.setItem(this.inventorySlot, this.targetItem, false);

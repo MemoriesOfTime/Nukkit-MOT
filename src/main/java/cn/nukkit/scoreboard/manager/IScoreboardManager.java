@@ -6,8 +6,8 @@ import cn.nukkit.network.protocol.types.DisplaySlot;
 import cn.nukkit.scoreboard.displayer.IScoreboardViewer;
 import cn.nukkit.scoreboard.scoreboard.IScoreboard;
 import cn.nukkit.scoreboard.storage.IScoreboardStorage;
-import javax.annotation.Nullable;
 
+import javax.annotation.Nullable;
 import java.util.Map;
 import java.util.Set;
 

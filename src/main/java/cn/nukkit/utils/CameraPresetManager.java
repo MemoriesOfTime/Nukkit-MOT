@@ -17,9 +17,33 @@ import java.util.TreeMap;
 
 public class CameraPresetManager {
 
+    public static final CameraPreset FIRST_PERSON;
+    public static final CameraPreset FREE;
+    public static final CameraPreset THIRD_PERSON;
+    public static final CameraPreset THIRD_PERSON_FRONT;
+    private static final Map<String, CameraPreset> PRESETS = new TreeMap<>();
     @Getter
     private static DefinitionRegistry<NamedDefinition> cameraPresetDefinitions;
-    private static final Map<String, CameraPreset> PRESETS = new TreeMap<>();
+
+    static {
+        FIRST_PERSON = CameraPreset.builder()
+                .identifier("minecraft:first_person")
+                .build();
+        FREE = CameraPreset.builder()
+                .identifier("minecraft:free")
+                .pos(new Vector3f(0, 0, 0))
+                .yaw(0F)
+                .pitch(0F)
+                .build();
+        THIRD_PERSON = CameraPreset.builder()
+                .identifier("minecraft:third_person")
+                .build();
+        THIRD_PERSON_FRONT = CameraPreset.builder()
+                .identifier("minecraft:third_person_front")
+                .build();
+
+        registerCameraPresets(FIRST_PERSON, FREE, THIRD_PERSON, THIRD_PERSON_FRONT);
+    }
 
     public static Map<String, CameraPreset> getPresets() {
         return PRESETS;
@@ -48,31 +72,6 @@ public class CameraPresetManager {
         cameraPresetDefinitions = builder.build();
 
         Server.getInstance().getOnlinePlayers().values().forEach(Player::sendCameraPresets);
-    }
-
-    public static final CameraPreset FIRST_PERSON;
-    public static final CameraPreset FREE;
-    public static final CameraPreset THIRD_PERSON;
-    public static final CameraPreset THIRD_PERSON_FRONT;
-
-    static {
-        FIRST_PERSON = CameraPreset.builder()
-                .identifier("minecraft:first_person")
-                .build();
-        FREE = CameraPreset.builder()
-                .identifier("minecraft:free")
-                .pos(new Vector3f(0, 0, 0))
-                .yaw(0F)
-                .pitch(0F)
-                .build();
-        THIRD_PERSON = CameraPreset.builder()
-                .identifier("minecraft:third_person")
-                .build();
-        THIRD_PERSON_FRONT = CameraPreset.builder()
-                .identifier("minecraft:third_person_front")
-                .build();
-
-        registerCameraPresets(FIRST_PERSON, FREE, THIRD_PERSON, THIRD_PERSON_FRONT);
     }
 
 }

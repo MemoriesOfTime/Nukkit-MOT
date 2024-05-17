@@ -10,14 +10,13 @@ import lombok.ToString;
 public class ContainerClosePacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.CONTAINER_CLOSE_PACKET;
+    public int windowId;
+    public boolean wasServerInitiated;
 
     @Override
     public byte pid() {
         return NETWORK_ID;
     }
-
-    public int windowId;
-    public boolean wasServerInitiated;
 
     @Override
     public void decode() {

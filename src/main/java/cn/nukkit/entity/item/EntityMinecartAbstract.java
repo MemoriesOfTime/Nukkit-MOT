@@ -41,7 +41,6 @@ import java.util.Objects;
  */
 public abstract class EntityMinecartAbstract extends EntityVehicle implements EntityControllable {
 
-    private String entityName;
     private static final int[][][] matrix = new int[][][]{
             {{0, 0, -1}, {0, 0, 1}},
             {{-1, 0, 0}, {1, 0, 0}},
@@ -54,6 +53,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             {{0, 0, -1}, {-1, 0, 0}},
             {{0, 0, -1}, {1, 0, 0}}
     };
+    private String entityName;
     private double currentSpeed = 0;
     private Block blockInside;
     // Plugins modifiers
@@ -65,10 +65,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
     private double flyingY = 0.95;
     private double flyingZ = 0.95;
     private double maxSpeed = 0.4D;
-
-    public abstract MinecartType getType();
-
-    public abstract boolean isRideable();
+    private boolean hasUpdated = false;
 
     public EntityMinecartAbstract(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -76,6 +73,10 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
         setMaxHealth(40);
         setHealth(40);
     }
+
+    public abstract MinecartType getType();
+
+    public abstract boolean isRideable();
 
     @Override
     public float getHeight() {
@@ -92,13 +93,13 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
         return 0.1F;
     }
 
-    public void setName(String name) {
-        entityName = name;
-    }
-
     @Override
     public String getName() {
         return entityName;
+    }
+
+    public void setName(String name) {
+        entityName = name;
     }
 
     @Override
@@ -191,7 +192,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
             // Reverse yaw if yaw is below 0
             if (yawToChange < 0) {
                 // -90-(-90)-(-90) = 90
-                yawToChange -= yawToChange - yawToChange;
+                yawToChange -= 0.0;
             }
 
             setRotation(yawToChange, pitch);
@@ -334,8 +335,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
                 motiveZ *= 1 + entityCollisionReduction;
                 motiveX *= 0.5D;
                 motiveZ *= 0.5D;
-                if (entity instanceof EntityMinecartAbstract) {
-                    EntityMinecartAbstract mine = (EntityMinecartAbstract) entity;
+                if (entity instanceof EntityMinecartAbstract mine) {
                     double desinityX = mine.x - x;
                     double desinityZ = mine.z - z;
                     Vector3 vector = new Vector3(desinityX, 0, desinityZ).normalize();
@@ -396,8 +396,6 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
 
     protected void activate(int x, int y, int z, boolean flag) {
     }
-
-    private boolean hasUpdated = false;
 
     /**
      * 检查邻近的漏斗并通知它输出物品
@@ -794,7 +792,7 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
     /**
      * Set the minecart display block
      *
-     * @param block The block that will changed. Set {@code null} for BlockAir
+     * @param block  The block that will changed. Set {@code null} for BlockAir
      * @param update Do update for the block. (This state changes if you want to show the block)
      * @return {@code true} if the block is normal block
      */
@@ -836,21 +834,21 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
     }
 
     /**
-     * Set the block offset.
-     *
-     * @param offset The offset
-     */
-    public void setDisplayBlockOffset(int offset) {
-        setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, offset));
-    }
-
-    /**
      * Get the block display offset
      *
      * @return integer
      */
     public int getDisplayBlockOffset() {
         return super.getDataPropertyInt(DATA_DISPLAY_OFFSET);
+    }
+
+    /**
+     * Set the block offset.
+     *
+     * @param offset The offset
+     */
+    public void setDisplayBlockOffset(int offset) {
+        setDataProperty(new IntEntityData(DATA_DISPLAY_OFFSET, offset));
     }
 
     /**

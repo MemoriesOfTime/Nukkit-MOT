@@ -20,18 +20,18 @@ public class Offset {
         return new Offset();
     }
 
-    public Offset position(float x, float y, float z){
-        this.position = new Vector3f(x,y,z);
+    public Offset position(float x, float y, float z) {
+        this.position = new Vector3f(x, y, z);
         return this;
     }
 
-    public Offset rotation(float x, float y, float z){
-        this.rotation = new Vector3f(x,y,z);
+    public Offset rotation(float x, float y, float z) {
+        this.rotation = new Vector3f(x, y, z);
         return this;
     }
 
-    public Offset scale(float x, float y, float z){
-        this.scale = new Vector3f(x,y,z);
+    public Offset scale(float x, float y, float z) {
+        this.scale = new Vector3f(x, y, z);
         return this;
     }
 

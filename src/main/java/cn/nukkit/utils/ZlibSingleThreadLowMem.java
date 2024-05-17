@@ -44,10 +44,10 @@ public class ZlibSingleThreadLowMem implements ZlibProvider {
         FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
         bos.reset();
         //try {
-            while (!DEFLATER.finished()) {
-                int i = DEFLATER.deflate(BUFFER);
-                bos.write(BUFFER, 0, i);
-            }
+        while (!DEFLATER.finished()) {
+            int i = DEFLATER.deflate(BUFFER);
+            bos.write(BUFFER, 0, i);
+        }
         /*} finally {
             deflater.end();
         }*/

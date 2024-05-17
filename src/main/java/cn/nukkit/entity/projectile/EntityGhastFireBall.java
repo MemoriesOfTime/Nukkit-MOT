@@ -19,6 +19,18 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
 
     private boolean directionChanged;
 
+    public EntityGhastFireBall(FullChunk chunk, CompoundTag nbt) {
+        this(chunk, nbt, null);
+    }
+
+    public EntityGhastFireBall(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
+        this(chunk, nbt, shootingEntity, false);
+    }
+
+    public EntityGhastFireBall(FullChunk chunk, CompoundTag nbt, Entity shootingEntity, boolean critical) {
+        super(chunk, nbt, shootingEntity);
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
@@ -49,18 +61,6 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
         return 6;
     }
 
-    public EntityGhastFireBall(FullChunk chunk, CompoundTag nbt) {
-        this(chunk, nbt, null);
-    }
-
-    public EntityGhastFireBall(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
-        this(chunk, nbt, shootingEntity, false);
-    }
-
-    public EntityGhastFireBall(FullChunk chunk, CompoundTag nbt, Entity shootingEntity, boolean critical) {
-        super(chunk, nbt, shootingEntity);
-    }
-
     public void setExplode(boolean bool) {
         this.canExplode = bool;
     }
@@ -83,7 +83,7 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
         super.onUpdate(currentTick);
         return !this.closed;
     }
-    
+
     @Override
     public void onCollideWithEntity(Entity entity) {
         this.isCollided = true;

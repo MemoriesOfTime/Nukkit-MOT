@@ -2,15 +2,26 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
-import lombok.Getter;
 
-@Getter
 public class BlockFenceCrimson extends BlockFence {
-    private final int id = CRIMSON_FENCE;
-    private final int burnChance = 0;
-    private final int burnAbility= 0;
+    @Override
+    public int getId() {
+        return CRIMSON_FENCE;
+    }
 
-    private final String name = "Crimson Fence";
+    @Override
+    public int getBurnChance() {
+        return 0;
+    }
+
+    @Override
+    public int getBurnAbility() {
+        return 0;
+    }
+
+    public String getName() {
+        return "Crimson Fence";
+    }
 
     public BlockFenceCrimson() {
         this(0);

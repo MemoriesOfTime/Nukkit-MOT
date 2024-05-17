@@ -10,6 +10,28 @@ import java.util.function.Predicate;
 
 public interface Node extends Comparable<Node> {
 
+    static List<Token> getTokens(Node node) {
+        List<Token> result = new ArrayList<Token>();
+        for (Node child : node.children()) {
+            if (child instanceof Token) {
+                result.add((Token) child);
+            } else {
+                result.addAll(getTokens(child));
+            }
+        }
+        return result;
+    }
+
+    static List<Token> getRealTokens(Node n) {
+        List<Token> result = new ArrayList<Token>();
+        for (Token token : getTokens(n)) {
+            if (!token.isUnparsed()) {
+                result.add(token);
+            }
+        }
+        return result;
+    }
+
     /**
      * Life-cycle hook method called after the node has been made the current
      * node
@@ -42,21 +64,21 @@ public interface Node extends Comparable<Node> {
         return getChildCount() > 0;
     }
 
-    /**
-     * @param n The Node to set as the parent. Mostly used internally.
-     *          The various addChild or appendChild sorts of methods should use this
-     *          to set the node's parent.
-     */
-    void setParent(Node n);
+    // The following 9 methods will typically just 
+    // delegate straightforwardly to a List object that
+    // holds the child nodes
 
     /**
      * @return this node's parent Node
      */
     Node getParent();
 
-    // The following 9 methods will typically just 
-    // delegate straightforwardly to a List object that
-    // holds the child nodes
+    /**
+     * @param n The Node to set as the parent. Mostly used internally.
+     *          The various addChild or appendChild sorts of methods should use this
+     *          to set the node's parent.
+     */
+    void setParent(Node n);
 
     /**
      * appends a child node to this Node
@@ -225,8 +247,7 @@ public interface Node extends Comparable<Node> {
         List<Node> result = new ArrayList<>();
         for (int i = 0; i < getChildCount(); i++) {
             Node child = getChild(i);
-            if (includeUnparsedTokens && child instanceof Token) {
-                Token tok = (Token) child;
+            if (includeUnparsedTokens && child instanceof Token tok) {
                 if (!tok.isUnparsed()) {
                     result.addAll(tok.precedingUnparsedTokens());
                 }
@@ -248,8 +269,7 @@ public interface Node extends Comparable<Node> {
         List<Token> result = new ArrayList<>();
         for (Iterator<Node> it = iterator(); it.hasNext(); ) {
             Node child = it.next();
-            if (child instanceof Token) {
-                Token token = (Token) child;
+            if (child instanceof Token token) {
                 if (token.isUnparsed()) {
                     continue;
                 }
@@ -298,9 +318,11 @@ public interface Node extends Comparable<Node> {
         return tokenSource == null ? null : tokenSource.getText(getBeginOffset(), getEndOffset());
     }
 
+
     default int getLength() {
         return 1 + getEndOffset() - getBeginOffset();
     }
+
 
     /**
      * @return the (1-based) line location where this Node starts
@@ -311,9 +333,6 @@ public interface Node extends Comparable<Node> {
     }
 
 
-    ;
-
-
     /**
      * @return the (1-based) line location where this Node ends
      */
@@ -322,10 +341,6 @@ public interface Node extends Comparable<Node> {
         return tokenSource == null ? 0 : tokenSource.getLineFromOffset(getEndOffset() - 1);
     }
 
-
-    ;
-
-
     /**
      * @return the (1-based) column where this Node starts
      */
@@ -333,10 +348,6 @@ public interface Node extends Comparable<Node> {
         SNBTLexer tokenSource = getTokenSource();
         return tokenSource == null ? 0 : tokenSource.getCodePointColumnFromOffset(getBeginOffset());
     }
-
-
-    ;
-
 
     /**
      * @return the (1-based) column offset where this Node ends
@@ -353,16 +364,16 @@ public interface Node extends Comparable<Node> {
     int getBeginOffset();
 
     /**
+     * Set the offset where the token begins, expressed in code units.
+     */
+    void setBeginOffset(int beginOffset);
+
+    /**
      * @return the offset in the input source where the token ends,
      * expressed in code units. This is actually the offset where the
      * very next token would begin.
      */
     int getEndOffset();
-
-    /**
-     * Set the offset where the token begins, expressed in code units.
-     */
-    void setBeginOffset(int beginOffset);
 
     /**
      * Set the offset where the token ends, actually the location where
@@ -416,8 +427,7 @@ public interface Node extends Comparable<Node> {
     default Token firstDescendantOfType(SNBTConstants.TokenType type) {
         for (int i = 0; i < getChildCount(); i++) {
             Node child = getChild(i);
-            if (child instanceof Token) {
-                Token tok = (Token) child;
+            if (child instanceof Token tok) {
                 if (tok.getType() == type) {
                     return tok;
                 }
@@ -432,8 +442,7 @@ public interface Node extends Comparable<Node> {
     default Token firstChildOfType(SNBTConstants.TokenType tokenType) {
         for (int i = 0; i < getChildCount(); i++) {
             Node child = getChild(i);
-            if (child instanceof Token) {
-                Token tok = (Token) child;
+            if (child instanceof Token tok) {
                 if (tok.getType() == tokenType) return tok;
             }
         }
@@ -497,8 +506,7 @@ public interface Node extends Comparable<Node> {
     default Token getFirstToken() {
         Node first = getFirstChild();
         if (first == null) return null;
-        if (first instanceof Token) {
-            Token tok = (Token) first;
+        if (first instanceof Token tok) {
             while (tok.previousCachedToken() != null && tok.previousCachedToken().isUnparsed()) {
                 tok = tok.previousCachedToken();
             }
@@ -582,28 +590,6 @@ public interface Node extends Comparable<Node> {
         return parent;
     }
 
-    static public List<Token> getTokens(Node node) {
-        List<Token> result = new ArrayList<Token>();
-        for (Node child : node.children()) {
-            if (child instanceof Token) {
-                result.add((Token) child);
-            } else {
-                result.addAll(getTokens(child));
-            }
-        }
-        return result;
-    }
-
-    static public List<Token> getRealTokens(Node n) {
-        List<Token> result = new ArrayList<Token>();
-        for (Token token : getTokens(n)) {
-            if (!token.isUnparsed()) {
-                result.add(token);
-            }
-        }
-        return result;
-    }
-
     default List<Node> descendants() {
         return descendants(Node.class, null);
     }
@@ -654,7 +640,7 @@ public interface Node extends Comparable<Node> {
     // NB: This is not thread-safe
     // If the node's children could change out from under you,
     // you could have a problem.
-    default public ListIterator<Node> iterator() {
+    default ListIterator<Node> iterator() {
         return new ListIterator<Node>() {
             private int current = -1;
             private boolean justModified;
@@ -716,9 +702,9 @@ public interface Node extends Comparable<Node> {
     }
 
 
-    static abstract public class Visitor {
-        static private Map<Class<? extends Visitor>, Map<Class<? extends Node>, Method>> mapLookup;
+    abstract class Visitor {
         static private final Method DUMMY_METHOD;
+        static private final Map<Class<? extends Visitor>, Map<Class<? extends Node>, Method>> mapLookup;
 
         static {
             try {
@@ -731,6 +717,7 @@ public interface Node extends Comparable<Node> {
             mapLookup = Collections.synchronizedMap(new HashMap<Class<? extends Visitor>, Map<Class<? extends Node>, Method>>());
         }
 
+        protected boolean visitUnparsedTokens;
         private Map<Class<? extends Node>, Method> methodCache;
 
         {
@@ -740,8 +727,6 @@ public interface Node extends Comparable<Node> {
                 mapLookup.put(this.getClass(), methodCache);
             }
         }
-
-        protected boolean visitUnparsedTokens;
 
         private Method getVisitMethod(Node node) {
             Class<? extends Node> nodeClass = node.getClass();

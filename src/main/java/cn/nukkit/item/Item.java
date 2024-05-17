@@ -51,7 +51,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     public static final Item AIR_ITEM = new ItemBlock(Block.get(BlockID.AIR), null, 0);
 
     public static final Item[] EMPTY_ARRAY = new Item[0];
-
+    public static final String UNKNOWN_STR = "Unknown";
+    public static final Map<String, Supplier<Item>> NAMESPACED_ID_ITEM = new HashMap<>();
     /**
      * Groups:
      * <ol>
@@ -65,35 +66,57 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     private static final Pattern ITEM_STRING_PATTERN = Pattern.compile(
             //       1:namespace    2:name           3:damage   4:num-id    5:damage
             "^(?:(?:([a-z_]\\w*):)?([a-z._]\\w*)(?::(-?\\d+))?|(-?\\d+)(?::(-?\\d+))?)$");
-
-    public static final String UNKNOWN_STR = "Unknown";
-    public static Class<?>[] list = null;
-    public static final Map<String, Supplier<Item>> NAMESPACED_ID_ITEM = new HashMap<>();
-
-    private static final HashMap<String,  Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
+    private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
-
-    protected Block block = null;
+    private static final List<Item> creative137 = new ObjectArrayList<>();
+    private static final List<Item> creative274 = new ObjectArrayList<>();
+    private static final List<Item> creative291 = new ObjectArrayList<>();
+    private static final List<Item> creative313 = new ObjectArrayList<>();
+    private static final List<Item> creative332 = new ObjectArrayList<>();
+    private static final List<Item> creative340 = new ObjectArrayList<>();
+    private static final List<Item> creative354 = new ObjectArrayList<>();
+    private static final List<Item> creative389 = new ObjectArrayList<>();
+    private static final List<Item> creative407 = new ObjectArrayList<>();
+    private static final List<Item> creative440 = new ObjectArrayList<>();
+    private static final List<Item> creative448 = new ObjectArrayList<>();
+    private static final List<Item> creative465 = new ObjectArrayList<>();
+    private static final List<Item> creative471 = new ObjectArrayList<>();
+    private static final List<Item> creative475 = new ObjectArrayList<>();
+    private static final List<Item> creative486 = new ObjectArrayList<>();
+    private static final List<Item> creative503 = new ObjectArrayList<>();
+    private static final List<Item> creative527 = new ObjectArrayList<>();
+    private static final List<Item> creative534 = new ObjectArrayList<>();
+    private static final List<Item> creative544 = new ObjectArrayList<>();
+    private static final List<Item> creative560 = new ObjectArrayList<>();
+    private static final List<Item> creative567 = new ObjectArrayList<>();
+    private static final List<Item> creative575 = new ObjectArrayList<>();
+    private static final List<Item> creative582 = new ObjectArrayList<>();
+    private static final List<Item> creative589 = new ObjectArrayList<>();
+    private static final List<Item> creative594 = new ObjectArrayList<>();
+    private static final List<Item> creative618 = new ObjectArrayList<>();
+    private static final List<Item> creative622 = new ObjectArrayList<>();
+    private static final List<Item> creative630 = new ObjectArrayList<>();
+    private static final List<Item> creative649 = new ObjectArrayList<>();
+    private static final List<Item> creative662 = new ObjectArrayList<>();
+    private static final List<Item> creative671 = new ObjectArrayList<>();
+    public static Class<?>[] list = null;
     protected final int id;
+    public int count;
+    protected Block block = null;
     protected int meta;
     protected boolean hasMeta = true;
+    protected String name;
     private byte[] tags = new byte[0];
     private CompoundTag cachedNBT = null;
-    public int count;
-    protected String name;
-
     public Item(int id) {
         this(id, 0, 1, UNKNOWN_STR);
     }
-
     public Item(int id, Integer meta) {
         this(id, meta, 1, UNKNOWN_STR);
     }
-
     public Item(int id, Integer meta, int count) {
         this(id, meta, count, UNKNOWN_STR);
     }
-
     public Item(int id, Integer meta, int count, String name) {
         //this.id = id & 0xffff;
         this.id = id;
@@ -104,14 +127,6 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         }
         this.count = count;
         this.name = name;
-    }
-
-    public boolean hasMeta() {
-        return hasMeta;
-    }
-
-    public boolean canBeActivated() {
-        return false;
     }
 
     public static void init() {
@@ -459,38 +474,6 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         initCreativeItems();
     }
 
-    private static final List<Item> creative137 = new ObjectArrayList<>();
-    private static final List<Item> creative274 = new ObjectArrayList<>();
-    private static final List<Item> creative291 = new ObjectArrayList<>();
-    private static final List<Item> creative313 = new ObjectArrayList<>();
-    private static final List<Item> creative332 = new ObjectArrayList<>();
-    private static final List<Item> creative340 = new ObjectArrayList<>();
-    private static final List<Item> creative354 = new ObjectArrayList<>();
-    private static final List<Item> creative389 = new ObjectArrayList<>();
-    private static final List<Item> creative407 = new ObjectArrayList<>();
-    private static final List<Item> creative440 = new ObjectArrayList<>();
-    private static final List<Item> creative448 = new ObjectArrayList<>();
-    private static final List<Item> creative465 = new ObjectArrayList<>();
-    private static final List<Item> creative471 = new ObjectArrayList<>();
-    private static final List<Item> creative475 = new ObjectArrayList<>();
-    private static final List<Item> creative486 = new ObjectArrayList<>();
-    private static final List<Item> creative503 = new ObjectArrayList<>();
-    private static final List<Item> creative527 = new ObjectArrayList<>();
-    private static final List<Item> creative534 = new ObjectArrayList<>();
-    private static final List<Item> creative544 = new ObjectArrayList<>();
-    private static final List<Item> creative560 = new ObjectArrayList<>();
-    private static final List<Item> creative567 = new ObjectArrayList<>();
-    private static final List<Item> creative575 = new ObjectArrayList<>();
-    private static final List<Item> creative582 = new ObjectArrayList<>();
-    private static final List<Item> creative589 = new ObjectArrayList<>();
-    private static final List<Item> creative594 = new ObjectArrayList<>();
-    private static final List<Item> creative618 = new ObjectArrayList<>();
-    private static final List<Item> creative622 = new ObjectArrayList<>();
-    private static final List<Item> creative630 = new ObjectArrayList<>();
-    private static final List<Item> creative649 = new ObjectArrayList<>();
-    private static final List<Item> creative662 = new ObjectArrayList<>();
-    private static final List<Item> creative671 = new ObjectArrayList<>();
-
     private static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
         clearCreativeItems();
@@ -751,7 +734,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_20_70 -> Item.creative662.add(item.clone());
             case v1_20_80 -> Item.creative671.add(item.clone());
             // TODO Multiversion
-            default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
+            default ->
+                    throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
     }
 
@@ -925,7 +909,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return new OK<Void>(true);
     }
 
-    private static void registerCustomItem(CustomItem item, int protocol,  boolean addCreativeItem, int... creativeProtocols) {
+    private static void registerCustomItem(CustomItem item, int protocol, boolean addCreativeItem, int... creativeProtocols) {
         if (RuntimeItems.getMapping(protocol).registerCustomItem(item) && addCreativeItem) {
             for (int creativeProtocol : creativeProtocols) {
                 addCreativeItem(creativeProtocol, (Item) item);
@@ -1142,6 +1126,26 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return items;
     }
 
+    public static CompoundTag parseCompoundTag(byte[] tag) {
+        try {
+            return NBTIO.read(tag, ByteOrder.LITTLE_ENDIAN);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public boolean hasMeta() {
+        return hasMeta;
+    }
+
+    public boolean canBeActivated() {
+        return false;
+    }
+
+    public byte[] getCompoundTag() {
+        return tags;
+    }
+
     public Item setCompoundTag(CompoundTag tag) {
         this.setNamedTag(tag);
         return this;
@@ -1151,10 +1155,6 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         this.tags = tags == null ? new byte[0] : tags;
         this.cachedNBT = null;
         return this;
-    }
-
-    public byte[] getCompoundTag() {
-        return tags;
     }
 
     public boolean hasCompoundTag() {
@@ -1185,23 +1185,6 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return this;
     }
 
-    public Item setCustomBlockData(CompoundTag compoundTag) {
-        CompoundTag tags = compoundTag.copy();
-        tags.setName("BlockEntityTag");
-
-        CompoundTag tag;
-        if (!this.hasCompoundTag()) {
-            tag = new CompoundTag();
-        } else {
-            tag = this.getNamedTag();
-        }
-
-        tag.putCompound("BlockEntityTag", tags);
-        this.setNamedTag(tag);
-
-        return this;
-    }
-
     public CompoundTag getCustomBlockData() {
         if (!this.hasCompoundTag()) {
             return null;
@@ -1217,6 +1200,23 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         }
 
         return null;
+    }
+
+    public Item setCustomBlockData(CompoundTag compoundTag) {
+        CompoundTag tags = compoundTag.copy();
+        tags.setName("BlockEntityTag");
+
+        CompoundTag tag;
+        if (!this.hasCompoundTag()) {
+            tag = new CompoundTag();
+        } else {
+            tag = this.getNamedTag();
+        }
+
+        tag.putCompound("BlockEntityTag", tags);
+        this.setNamedTag(tag);
+
+        return this;
     }
 
     public boolean hasEnchantments() {
@@ -1419,8 +1419,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         Tag tag = this.getNamedTagEntry("display");
         ArrayList<String> lines = new ArrayList<>();
 
-        if (tag instanceof CompoundTag) {
-            CompoundTag nbt = (CompoundTag) tag;
+        if (tag instanceof CompoundTag nbt) {
             ListTag<StringTag> lore = nbt.getList("Lore", StringTag.class);
 
             if (lore.size() > 0) {
@@ -1479,13 +1478,6 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return this.cachedNBT;
     }
 
-    public CompoundTag getOrCreateNamedTag() {
-        if (!this.hasCompoundTag()) {
-            return new CompoundTag();
-        }
-        return this.getNamedTag();
-    }
-
     public Item setNamedTag(CompoundTag tag) {
         if (tag.isEmpty()) {
             return this.clearNamedTag();
@@ -1498,16 +1490,15 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         return this;
     }
 
-    public Item clearNamedTag() {
-        return this.setCompoundTag(new byte[0]);
+    public CompoundTag getOrCreateNamedTag() {
+        if (!this.hasCompoundTag()) {
+            return new CompoundTag();
+        }
+        return this.getNamedTag();
     }
 
-    public static CompoundTag parseCompoundTag(byte[] tag) {
-        try {
-            return NBTIO.read(tag, ByteOrder.LITTLE_ENDIAN);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public Item clearNamedTag() {
+        return this.setCompoundTag(new byte[0]);
     }
 
     public byte[] writeCompoundTag(CompoundTag tag) {
@@ -1704,7 +1695,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
      * Called when a player uses the item on air, for example throwing a projectile.
      * Returns whether the item was changed, for example count decrease or durability change.
      *
-     * @param player player
+     * @param player          player
      * @param directionVector direction
      * @return item changed
      */
@@ -1879,20 +1870,6 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     /**
-     * 设置物品锁定在玩家的物品栏的模式
-     * @param mode lock mode
-     */
-    public void setItemLockMode(ItemLockMode mode) {
-        CompoundTag tag = getOrCreateNamedTag();
-        if (mode == ItemLockMode.NONE) {
-            tag.remove("minecraft:item_lock");
-        } else {
-            tag.putByte("minecraft:item_lock", mode.ordinal());
-        }
-        this.setCompoundTag(tag);
-    }
-
-    /**
      * 获取物品锁定在玩家的物品栏的模式
      * <p>
      * Get items locked mode in the player's item inventory
@@ -1905,6 +1882,21 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             return ItemLockMode.values()[tag.getByte("minecraft:item_lock")];
         }
         return ItemLockMode.NONE;
+    }
+
+    /**
+     * 设置物品锁定在玩家的物品栏的模式
+     *
+     * @param mode lock mode
+     */
+    public void setItemLockMode(ItemLockMode mode) {
+        CompoundTag tag = getOrCreateNamedTag();
+        if (mode == ItemLockMode.NONE) {
+            tag.remove("minecraft:item_lock");
+        } else {
+            tag.putByte("minecraft:item_lock", mode.ordinal());
+        }
+        this.setCompoundTag(tag);
     }
 
     public enum ItemLockMode {

@@ -62,19 +62,23 @@ public class SmithingTransaction extends InventoryTransaction {
         }
     }
 
+    public static boolean checkForItemPart(List<InventoryAction> actions) {
+        return actions.stream().anyMatch(it -> it instanceof SmithingItemAction);
+    }
+
     @Override
     public void addAction(InventoryAction action) {
         super.addAction(action);
         if (action instanceof SmithingItemAction) {
             switch (((SmithingItemAction) action).getType()) {
                 case 0 -> // input
-                    this.equipmentItem = action.getTargetItem();
+                        this.equipmentItem = action.getTargetItem();
                 case 1 -> // ingredient
-                    this.ingredientItem = action.getTargetItem();
+                        this.ingredientItem = action.getTargetItem();
                 case 2 -> // result
-                    this.outputItem = action.getSourceItem();
+                        this.outputItem = action.getSourceItem();
                 case 3 -> // template
-                    this.templateItem = action.getTargetItem();
+                        this.templateItem = action.getTargetItem();
             }
         } else if (action instanceof CreativeInventoryAction creativeAction && this.source.isCreative()) {
             if (creativeAction.getActionType() == 0) {
@@ -105,9 +109,9 @@ public class SmithingTransaction extends InventoryTransaction {
         }
 
         Item air = Item.get(0);
-        Item equipment = equipmentItem != null? equipmentItem : air;
-        Item ingredient = ingredientItem != null? ingredientItem : air;
-        Item template = templateItem != null? templateItem : air;
+        Item equipment = equipmentItem != null ? equipmentItem : air;
+        Item ingredient = ingredientItem != null ? ingredientItem : air;
+        Item template = templateItem != null ? templateItem : air;
 
         return equipment.equals(smithingInventory.getEquipment(), true, true)
                 && ingredient.equals(smithingInventory.getIngredient(), true, true)
@@ -124,9 +128,9 @@ public class SmithingTransaction extends InventoryTransaction {
         }
         SmithingInventory inventory = (SmithingInventory) getSource().getWindowById(Player.SMITHING_WINDOW_ID);
         Item air = Item.get(0);
-        Item equipment = equipmentItem != null? equipmentItem : air;
-        Item ingredient = ingredientItem != null? ingredientItem : air;
-        Item template = templateItem != null? templateItem : air;
+        Item equipment = equipmentItem != null ? equipmentItem : air;
+        Item ingredient = ingredientItem != null ? ingredientItem : air;
+        Item template = templateItem != null ? templateItem : air;
         SmithingTableEvent event = new SmithingTableEvent(inventory, equipment, outputItem, ingredient, template, source);
         this.source.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
@@ -150,18 +154,14 @@ public class SmithingTransaction extends InventoryTransaction {
     }
 
     public Item getEquipmentItem() {
-        return equipmentItem == null? null : equipmentItem.clone();
+        return equipmentItem == null ? null : equipmentItem.clone();
     }
 
     public Item getIngredientItem() {
-        return ingredientItem == null? null : ingredientItem.clone();
+        return ingredientItem == null ? null : ingredientItem.clone();
     }
 
     public Item getOutputItem() {
-        return outputItem == null? null : outputItem.clone();
-    }
-
-    public static boolean checkForItemPart(List<InventoryAction> actions) {
-        return actions.stream().anyMatch(it-> it instanceof SmithingItemAction);
+        return outputItem == null ? null : outputItem.clone();
     }
 }

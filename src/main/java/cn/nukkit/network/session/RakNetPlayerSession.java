@@ -50,19 +50,16 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private final Queue<DataPacket> inbound = PlatformDependent.newSpscQueue();
     private final Queue<DataPacket> outbound = PlatformDependent.newMpscQueue();
     private final ScheduledFuture<?> tickFuture;
-
+    private final AtomicLong encryptCounter = new AtomicLong();
+    private final AtomicLong decryptCounter = new AtomicLong();
     private Player player;
     private String disconnectReason = null;
-
     private CompressionProvider compressionIn;
     private CompressionProvider compressionOut;
     private boolean compressionInitialized;
-
     private SecretKey encryptionKey;
     private Cipher encryptionCipher;
     private Cipher decryptionCipher;
-    private final AtomicLong encryptCounter = new AtomicLong();
-    private final AtomicLong decryptCounter = new AtomicLong();
 
     public RakNetPlayerSession(RakNetInterface server, RakChildChannel channel) {
         this.server = server;
@@ -91,10 +88,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
             byte[] packetBuffer;
 
-            boolean ci = false;
-            if (this.compressionInitialized && this.player.protocol >= ProtocolInfo.v1_20_60) {
-                ci = true;
-            }
+            boolean ci = this.compressionInitialized && this.player.protocol >= ProtocolInfo.v1_20_60;
 
             if (this.decryptionCipher != null) {
                 try {
@@ -289,10 +283,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     private void sendPacket(byte[] compressedPayload) {
-        boolean ci = false;
-        if (this.compressionInitialized && this.player.protocol >= ProtocolInfo.v1_20_60) {
-            ci = true;
-        }
+        boolean ci = this.compressionInitialized && this.player.protocol >= ProtocolInfo.v1_20_60;
 
         ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
         finalPayload.writeByte(0xfe);
@@ -314,7 +305,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             } catch (Exception e) {
                 log.error("Packet encryption failed for {}", player.getName(), e);
             }
-        }else {
+        } else {
             if (ci) {
                 finalPayload.writeByte(this.compressionOut.getPrefix());
             }
@@ -326,6 +317,11 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     @Override
+    public CompressionProvider getCompression() {
+        return this.compressionOut;
+    }
+
+    @Override
     public void setCompression(CompressionProvider compression) {
         Preconditions.checkNotNull(compression, "compression");
         this.compressionIn = compression;
@@ -334,18 +330,13 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     @Override
-    public CompressionProvider getCompression() {
-        return this.compressionOut;
+    public Player getPlayer() {
+        return this.player;
     }
 
     public void setPlayer(Player player) {
         Preconditions.checkArgument(this.player == null && player != null);
         this.player = player;
-    }
-
-    @Override
-    public Player getPlayer() {
-        return this.player;
     }
 
     public RakChildChannel getChannel() {

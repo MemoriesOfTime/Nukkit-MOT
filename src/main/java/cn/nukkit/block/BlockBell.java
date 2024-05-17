@@ -123,7 +123,7 @@ public class BlockBell extends BlockTransparentMeta implements Faceable, BlockEn
                 Vector3 entityVector = entityPos.subtract(blockPos);
                 entityVector = entityVector.normalize().multiply(0.4);
                 entityVector.y = Math.max(0.15, entityVector.y);
-                if(this.ring(entity, BellRingEvent.RingCause.DROPPED_ITEM)) {
+                if (this.ring(entity, BellRingEvent.RingCause.DROPPED_ITEM)) {
                     entity.setMotion(entityVector);
                 }
             }
@@ -147,7 +147,7 @@ public class BlockBell extends BlockTransparentMeta implements Faceable, BlockEn
 
     @Override
     public boolean onActivate(Item item, Player player) {
-        return this.ring(player, player != null? BellRingEvent.RingCause.HUMAN_INTERACTION : BellRingEvent.RingCause.UNKNOWN);
+        return this.ring(player, player != null ? BellRingEvent.RingCause.HUMAN_INTERACTION : BellRingEvent.RingCause.UNKNOWN);
     }
 
     public boolean ring(Entity causeEntity, BellRingEvent.RingCause cause) {
@@ -166,8 +166,8 @@ public class BlockBell extends BlockTransparentMeta implements Faceable, BlockEn
                 if (causeEntity instanceof EntityItem) {
                     Position blockMid = this.add(0.5, 0.5, 0.5);
                     Vector3 vector = causeEntity.subtract(blockMid).normalize();
-                    int x = vector.x < 0? -1 : vector.x > 0? 1 : 0;
-                    int z = vector.z < 0? -1 : vector.z > 0? 1 : 0;
+                    int x = vector.x < 0 ? -1 : vector.x > 0 ? 1 : 0;
+                    int z = vector.z < 0 ? -1 : vector.z > 0 ? 1 : 0;
                     if (x != 0 && z != 0) {
                         if (Math.abs(vector.x) < Math.abs(vector.z)) {
                             x = 0;
@@ -369,7 +369,7 @@ public class BlockBell extends BlockTransparentMeta implements Faceable, BlockEn
     }
 
     public void setToggled(boolean toggled) {
-        this.setDamage(this.getDamage() & (DATA_MASK ^ 0b010000) | (toggled? 0b010000 : 0b000000));
+        this.setDamage(this.getDamage() & (DATA_MASK ^ 0b010000) | (toggled ? 0b010000 : 0b000000));
     }
 
     @Override

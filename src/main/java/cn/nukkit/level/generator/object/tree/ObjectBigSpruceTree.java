@@ -77,7 +77,7 @@ public class ObjectBigSpruceTree extends ObjectSpruceTree {
     }*/
 
     @Override
-    public void placeLeaves(ChunkManager level, int topSize, int lRadius, int x, int y, int z, NukkitRandom random)   {
+    public void placeLeaves(ChunkManager level, int topSize, int lRadius, int x, int y, int z, NukkitRandom random) {
         int radius = 1 + random.nextBoundedInt(1);
         int maxR = 1;
         int minR = 0;

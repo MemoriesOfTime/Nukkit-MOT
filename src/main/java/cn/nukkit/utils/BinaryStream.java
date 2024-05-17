@@ -53,11 +53,15 @@ import static org.cloudburstmc.protocol.common.util.Preconditions.checkArgument;
  */
 public class BinaryStream {
 
-    public int offset;
-    private byte[] buffer;
-    protected int count;
-
     private static final int MAX_ARRAY_SIZE = 2147483639;
+    private static final String MV_ORIGIN_NBT = "mv_origin_nbt";
+    private static final String MV_ORIGIN_ID = "mv_origin_id";
+    private static final String MV_ORIGIN_NAMESPACE = "mv_origin_namespace";
+    private static final String MV_ORIGIN_META = "mv_origin_meta";
+    private static byte[] steveSkinDecoded;
+    public int offset;
+    protected int count;
+    private byte[] buffer;
 
     public BinaryStream() {
         this.buffer = new byte[32];
@@ -81,6 +85,38 @@ public class BinaryStream {
         this.count = buffer.length;
     }
 
+    private static List<String> extractStringList(Item item, String tagName) {
+        CompoundTag namedTag = item.getNamedTag();
+        if (namedTag == null) {
+            return Collections.emptyList();
+        }
+
+        ListTag<StringTag> listTag = namedTag.getList(tagName, StringTag.class);
+        if (listTag == null) {
+            return Collections.emptyList();
+        }
+
+        int size = listTag.size();
+        List<String> values = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            StringTag stringTag = listTag.get(i);
+            if (stringTag != null) {
+                values.add(stringTag.data);
+            }
+        }
+
+        return values;
+    }
+
+    private static int hugeCapacity(int minCapacity) {
+        if (minCapacity < 0) { // overflow
+            throw new OutOfMemoryError();
+        }
+        return (minCapacity > MAX_ARRAY_SIZE) ?
+                Integer.MAX_VALUE :
+                MAX_ARRAY_SIZE;
+    }
+
     public void reuse() {
         this.offset = 0;
         this.count = 0;
@@ -90,11 +126,6 @@ public class BinaryStream {
         this.offset = 0;
         this.count = 0;
         return this;
-    }
-
-    public void setBuffer(byte[] buffer) {
-        this.buffer = buffer;
-        this.count = buffer == null ? -1 : buffer.length;
     }
 
     public void setBuffer(byte[] buffer, int offset) {
@@ -112,6 +143,11 @@ public class BinaryStream {
 
     public byte[] getBuffer() {
         return Arrays.copyOf(buffer, count);
+    }
+
+    public void setBuffer(byte[] buffer) {
+        this.buffer = buffer;
+        this.count = buffer == null ? -1 : buffer.length;
     }
 
     public byte[] getBufferUnsafe() {
@@ -317,8 +353,6 @@ public class BinaryStream {
         this.putSkin(ProtocolInfo.CURRENT_PROTOCOL, skin);
     }
 
-    private static byte[] steveSkinDecoded;
-
     public void putSkin(int protocol, Skin skin) {
         this.putString(skin.getSkinId());
 
@@ -500,11 +534,6 @@ public class BinaryStream {
         }
         return skin;
     }
-
-    private static final String MV_ORIGIN_NBT = "mv_origin_nbt";
-    private static final String MV_ORIGIN_ID = "mv_origin_id";
-    private static final String MV_ORIGIN_NAMESPACE = "mv_origin_namespace";
-    private static final String MV_ORIGIN_META = "mv_origin_meta";
 
     public Item getSlot() {
         Server.mvw("BinaryStream#getSlot()");
@@ -1220,7 +1249,7 @@ public class BinaryStream {
         if (protocolId >= ProtocolInfo.v1_19_30_23) {
             this.putLShort(runtimeId);
             this.putLShort(damage);
-        }else {
+        } else {
             this.putVarInt(runtimeId);
             this.putVarInt(damage);
         }
@@ -1235,29 +1264,6 @@ public class BinaryStream {
         this.putByte((byte) 3);
         this.putString(itemTag);
         this.putVarInt(count);
-    }
-
-    private static List<String> extractStringList(Item item, String tagName) {
-        CompoundTag namedTag = item.getNamedTag();
-        if (namedTag == null) {
-            return Collections.emptyList();
-        }
-
-        ListTag<StringTag> listTag = namedTag.getList(tagName, StringTag.class);
-        if (listTag == null) {
-            return Collections.emptyList();
-        }
-
-        int size = listTag.size();
-        List<String> values = new ArrayList<>(size);
-        for (int i = 0; i < size; i++) {
-            StringTag stringTag = listTag.get(i);
-            if (stringTag != null) {
-                values.add(stringTag.data);
-            }
-        }
-
-        return values;
     }
 
     public byte[] getByteArray() {
@@ -1595,15 +1601,6 @@ public class BinaryStream {
             newCapacity = hugeCapacity(minCapacity);
         }
         this.buffer = Arrays.copyOf(buffer, newCapacity);
-    }
-
-    private static int hugeCapacity(int minCapacity) {
-        if (minCapacity < 0) { // overflow
-            throw new OutOfMemoryError();
-        }
-        return (minCapacity > MAX_ARRAY_SIZE) ?
-                Integer.MAX_VALUE :
-                MAX_ARRAY_SIZE;
     }
 
     public ItemStackRequest readItemStackRequest() {

@@ -112,7 +112,7 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
                 }
 
                 ThreadLocalRandom random = ThreadLocalRandom.current();
-                for(int i = 0; i < 2; ++i) {
+                for (int i = 0; i < 2; ++i) {
                     level.addParticle(new SplashParticle(add(random.nextFloat(), random.nextFloat() + 1, random.nextFloat())));
                     level.addParticle(new BubbleParticle(add(random.nextFloat(), random.nextFloat() + 1, random.nextFloat())));
                 }

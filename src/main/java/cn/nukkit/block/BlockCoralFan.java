@@ -16,19 +16,19 @@ public class BlockCoralFan extends BlockFlowable implements Faceable {
     public BlockCoralFan() {
         this(0);
     }
-    
+
     public BlockCoralFan(int meta) {
         super(meta);
     }
-    
+
     @Override
     public int getId() {
         return CORAL_FAN;
     }
-    
+
     @Override
     public String getName() {
-        String[] names = new String[] {
+        String[] names = new String[]{
                 "Tube Coral Fan",
                 "Brain Coral Fan",
                 "Bubble Coral Fan",
@@ -37,10 +37,10 @@ public class BlockCoralFan extends BlockFlowable implements Faceable {
         };
         return names[this.getType()];
     }
-    
+
     @Override
     public BlockColor getColor() {
-        BlockColor[] colors = new BlockColor[] {
+        BlockColor[] colors = new BlockColor[]{
                 BlockColor.BLUE_BLOCK_COLOR,
                 BlockColor.PINK_BLOCK_COLOR,
                 BlockColor.PURPLE_BLOCK_COLOR,
@@ -54,7 +54,7 @@ public class BlockCoralFan extends BlockFlowable implements Faceable {
     public int getWaterloggingLevel() {
         return 2;
     }
-    
+
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
@@ -90,7 +90,7 @@ public class BlockCoralFan extends BlockFlowable implements Faceable {
         }
         return 0;
     }
-    
+
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         if (face == BlockFace.DOWN) {
@@ -116,13 +116,13 @@ public class BlockCoralFan extends BlockFlowable implements Faceable {
             if (rotation < 0) {
                 rotation += 360.0;
             }
-            int axisBit = rotation >= 0 && rotation < 12 || (342 <= rotation && rotation < 360)? 0x0 : 0x8;
+            int axisBit = rotation >= 0 && rotation < 12 || (342 <= rotation && rotation < 360) ? 0x0 : 0x8;
             this.setDamage(this.getDamage() & 0x7 | axisBit);
-            this.getLevel().setBlock(this, 0, hasWater? new BlockCoralFan(this.getDamage()) : new BlockCoralFanDead(this.getDamage()), true, true);
+            this.getLevel().setBlock(this, 0, hasWater ? new BlockCoralFan(this.getDamage()) : new BlockCoralFanDead(this.getDamage()), true, true);
         } else {
             int type = this.getType();
             int typeBit = type % 2;
-            int deadBit = this.isDead()? 0x1 : 0;
+            int deadBit = this.isDead() ? 0x1 : 0;
             int faceBit;
             switch (face) {
                 case WEST:
@@ -160,17 +160,17 @@ public class BlockCoralFan extends BlockFlowable implements Faceable {
 
         return true;
     }
-    
+
     @Override
     public boolean canSilkTouch() {
         return true;
     }
-    
+
     @Override
     public Item toItem() {
         return Item.get(this.getItemId(), this.getDamage() ^ 0x8);
     }
-    
+
     @Override
     public Item[] getDrops(Item item) {
         if (item.getEnchantment(Enchantment.ID_SILK_TOUCH) != null) {

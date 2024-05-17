@@ -26,7 +26,7 @@ public class SwampHut extends ScatteredStructurePiece {
 
         builder.setBlock(new BlockVector3(1, 3, 5), BlockID.FLOWER_POT_BLOCK);
         builder.setTile(new BlockVector3(1, 3, 5), BlockEntity.FLOWER_POT, new CompoundTag()
-            .putShort("item", BlockID.RED_MUSHROOM));
+                .putShort("item", BlockID.RED_MUSHROOM));
 
         builder.setBlock(new BlockVector3(2, 3, 2), BlockID.FENCE);
         builder.setBlock(new BlockVector3(3, 3, 7), BlockID.FENCE);

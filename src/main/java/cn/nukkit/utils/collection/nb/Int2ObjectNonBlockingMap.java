@@ -94,53 +94,11 @@ public class Int2ObjectNonBlockingMap<TypeV>
     // --- Bits to allow Unsafe CAS'ing of the CHM field
     private static final VarHandle _chm_handler; // fieldOffset(Long2ObjectNonBlockingMap.class, "_chm");
     private static final VarHandle _val_1_handler;// fieldOffset(Long2ObjectNonBlockingMap.class, "_val_1");
-
-    static {
-        try {
-            _chm_handler = MethodHandles.lookup().in(Int2ObjectNonBlockingMap.class)
-                    .findVarHandle(Int2ObjectNonBlockingMap.class, "_chm", CHM.class);
-            _val_1_handler = MethodHandles.lookup().in(Int2ObjectNonBlockingMap.class)
-                    .findVarHandle(Int2ObjectNonBlockingMap.class, "_val_1", Object.class);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            throw new RuntimeException(e); // Should never happen
-        }
-    }
-
-    private boolean CAS(final VarHandle handle, final Object old, final Object nnn) {
-        return handle.compareAndSet(this, old, nnn);
-    }
-
-    // --- Adding a 'prime' bit onto Values via wrapping with a junk wrapper class
-    private static final class Prime {
-        final Object _V;
-
-        Prime(Object V) {
-            _V = V;
-        }
-
-        static Object unbox(Object V) {
-            return V instanceof Prime ? ((Prime) V)._V : V;
-        }
-    }
-
-    // --- The Hash Table --------------------
-    private transient CHM _chm;
-    // This next field holds the value for Key 0 - the special key value which
-    // is the initial array value, and also means: no-key-inserted-yet.
-    private transient Object _val_1; // Value for Key: NO_KEY
-
-    // Time since last resize
-    private transient long _last_resize_milli;
-
-    // Optimize for space: use a 1/2-sized table and allow more re-probes
-    private final boolean _opt_for_space;
-
     // --- Minimum table size ----------------
     // Pick size 16 K/V pairs, which turns into (16*2)*4+12 = 140 bytes on a
     // standard 32-bit HotSpot, and (16*2)*8+12 = 268 bytes on 64-bit Azul.
     private static final int MIN_SIZE_LOG = 4;             //
     private static final int MIN_SIZE = (1 << MIN_SIZE_LOG); // Must be power of 2
-
     // --- Sentinels -------------------------
     // No-Match-Old - putIfMatch does updates only if it matches the old value,
     // and NO_MATCH_OLD basically counts as a wildcard match.
@@ -156,41 +114,33 @@ public class Int2ObjectNonBlockingMap<TypeV>
     // updates can happen to the old table (and since the K/V pair was deleted
     // nothing was copied to the new table).
     private static final Prime TOMBPRIME = new Prime(TOMBSTONE);
-
     // I exclude 1 int from the 2^64 possibilities, and test for it before
     // entering the main array.  The NO_KEY value must be zero, the initial
     // value set by Java before it hands me the array.
     private static final int NO_KEY = 0;
 
+    static {
+        try {
+            _chm_handler = MethodHandles.lookup().in(Int2ObjectNonBlockingMap.class)
+                    .findVarHandle(Int2ObjectNonBlockingMap.class, "_chm", CHM.class);
+            _val_1_handler = MethodHandles.lookup().in(Int2ObjectNonBlockingMap.class)
+                    .findVarHandle(Int2ObjectNonBlockingMap.class, "_val_1", Object.class);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e); // Should never happen
+        }
+    }
+
+    // Optimize for space: use a 1/2-sized table and allow more re-probes
+    private final boolean _opt_for_space;
+    // --- The Hash Table --------------------
+    private transient CHM _chm;
+    // This next field holds the value for Key 0 - the special key value which
+    // is the initial array value, and also means: no-key-inserted-yet.
+    private transient Object _val_1; // Value for Key: NO_KEY
+    // Time since last resize
+    private transient long _last_resize_milli;
     // Count of reprobes
     private transient ConcurrentAutoIntTable _reprobes = new ConcurrentAutoIntTable();
-
-    /**
-     * Get and clear the current count of reprobes.  Reprobes happen on key
-     * collisions, and a high reprobe rate may indicate a poor hash function or
-     * weaknesses in the table resizing function.
-     *
-     * @return the count of reprobes since the last call to {@link #reprobes}
-     * or since the table was created.
-     */
-    public long reprobes() {
-        long r = _reprobes.get();
-        _reprobes = new ConcurrentAutoIntTable();
-        return r;
-    }
-
-
-    // --- reprobe_limit -----------------------------------------------------
-    // Heuristic to decide if we have reprobed toooo many times.  Running over
-    // the reprobe limit on a 'get' call acts as a 'miss'; on a 'put' call it
-    // can trigger a table resize.  Several places must have exact agreement on
-    // what the reprobe_limit is, so we share it here.
-    private static int reprobe_limit(int len) {
-        return REPROBE_LIMIT + (len >> 4);
-    }
-
-    // --- Long2ObjectNonBlockingMap ----------------------------------------------
-    // Constructors
 
     /**
      * Create a new Int2ObjectNonBlockingMap with default minimum size (currently set
@@ -221,6 +171,7 @@ public class Int2ObjectNonBlockingMap<TypeV>
         this(1, opt_for_space);
     }
 
+
     /**
      * Create a new Int2ObjectNonBlockingMap, setting both the initial size and
      * the space-for-speed tradeoff.  {@code true} optimizes for space and is
@@ -230,6 +181,47 @@ public class Int2ObjectNonBlockingMap<TypeV>
     public Int2ObjectNonBlockingMap(final int initial_sz, final boolean opt_for_space) {
         _opt_for_space = opt_for_space;
         initialize(initial_sz);
+    }
+
+    // --- Long2ObjectNonBlockingMap ----------------------------------------------
+    // Constructors
+
+    // --- reprobe_limit -----------------------------------------------------
+    // Heuristic to decide if we have reprobed toooo many times.  Running over
+    // the reprobe limit on a 'get' call acts as a 'miss'; on a 'put' call it
+    // can trigger a table resize.  Several places must have exact agreement on
+    // what the reprobe_limit is, so we share it here.
+    private static int reprobe_limit(int len) {
+        return REPROBE_LIMIT + (len >> 4);
+    }
+
+    // --- hash ----------------------------------------------------------------
+    // Helper function to spread lousy hashCodes Throws NPE for null Key, on
+    // purpose - as the first place to conveniently toss the required NPE for a
+    // null Key.
+    private static int hash(int h) {
+        h ^= (h >>> 20) ^ (h >>> 12);
+        h ^= (h >>> 7) ^ (h >>> 4);
+        h += h << 7; // smear low bits up high, for hashcodes that only differ by 1
+        return h;
+    }
+
+    private boolean CAS(final VarHandle handle, final Object old, final Object nnn) {
+        return handle.compareAndSet(this, old, nnn);
+    }
+
+    /**
+     * Get and clear the current count of reprobes.  Reprobes happen on key
+     * collisions, and a high reprobe rate may indicate a poor hash function or
+     * weaknesses in the table resizing function.
+     *
+     * @return the count of reprobes since the last call to {@link #reprobes}
+     * or since the table was created.
+     */
+    public long reprobes() {
+        long r = _reprobes.get();
+        _reprobes = new ConcurrentAutoIntTable();
+        return r;
     }
 
     private void initialize(final int initial_sz) {
@@ -504,30 +496,335 @@ public class Int2ObjectNonBlockingMap<TypeV>
         topchm.help_copy_impl(false);
     }
 
-    // --- hash ----------------------------------------------------------------
-    // Helper function to spread lousy hashCodes Throws NPE for null Key, on
-    // purpose - as the first place to conveniently toss the required NPE for a
-    // null Key.
-    private static int hash(int h) {
-        h ^= (h >>> 20) ^ (h >>> 12);
-        h ^= (h >>> 7) ^ (h >>> 4);
-        h += h << 7; // smear low bits up high, for hashcodes that only differ by 1
-        return h;
+    /**
+     * Returns an enumeration of the values in this table.
+     *
+     * @return an enumeration of the values in this table
+     * @see #values()
+     */
+    public Enumeration<TypeV> elements() {
+        return new SnapshotV();
     }
 
+    /**
+     * Returns a {@link Collection} view of the values contained in this map.
+     * The collection is backed by the map, so changes to the map are reflected
+     * in the collection, and vice-versa.  The collection supports element
+     * removal, which removes the corresponding mapping from this map, via the
+     * <tt>Iterator.remove</tt>, <tt>Collection.remove</tt>,
+     * <tt>removeAll</tt>, <tt>retainAll</tt>, and <tt>clear</tt> operations.
+     * It does not support the <tt>add</tt> or <tt>addAll</tt> operations.
+     *
+     * <p>The view's <tt>iterator</tt> is a "weakly consistent" iterator that
+     * will never throw {@link ConcurrentModificationException}, and guarantees
+     * to traverse elements as they existed upon construction of the iterator,
+     * and may (but is not guaranteed to) reflect any modifications subsequent
+     * to construction.
+     */
+    @Override
+    public Collection<TypeV> values() {
+        return new AbstractCollection<>() {
+            @Override
+            public void clear() {
+                Int2ObjectNonBlockingMap.this.clear();
+            }
+
+            @Override
+            public int size() {
+                return Int2ObjectNonBlockingMap.this.size();
+            }
+
+            @Override
+            public boolean contains(Object v) {
+                return Int2ObjectNonBlockingMap.this.containsValue(v);
+            }
+
+            @Override
+            public Iterator<TypeV> iterator() {
+                return new SnapshotV();
+            }
+        };
+    }
+
+    /**
+     * Returns an enumeration of the <strong>auto-boxed</strong> keys in this table.
+     * <strong>Warning:</strong> this version will auto-box all returned keys.
+     *
+     * @return an enumeration of the auto-boxed keys in this table
+     * @see #keySet()
+     */
+    public Enumeration<Integer> keys() {
+        return new IteratorInteger();
+    }
+
+    public IteratorInteger fastKeyIterator() {
+        return new IteratorInteger();
+    }
+
+    // --- values --------------------------------------------------------------
+
+    /**
+     * Returns a {@link Set} view of the keys contained in this map; with care
+     * the keys may be iterated over <strong>without auto-boxing</strong>.  The
+     * set is backed by the map, so changes to the map are reflected in the
+     * set, and vice-versa.  The set supports element removal, which removes
+     * the corresponding mapping from this map, via the
+     * <tt>Iterator.remove</tt>, <tt>Set.remove</tt>, <tt>removeAll</tt>,
+     * <tt>retainAll</tt>, and <tt>clear</tt> operations.  It does not support
+     * the <tt>add</tt> or <tt>addAll</tt> operations.
+     *
+     * <p>The view's <tt>iterator</tt> is a "weakly consistent" iterator that
+     * will never throw {@link ConcurrentModificationException}, and guarantees
+     * to traverse elements as they existed upon construction of the iterator,
+     * and may (but is not guaranteed to) reflect any modifications subsequent
+     * to construction.
+     */
+    @Override
+    public Set<Integer> keySet() {
+        return new AbstractIntSet() {
+            @Override
+            public void clear() {
+                Int2ObjectNonBlockingMap.this.clear();
+            }
+
+            @Override
+            public int size() {
+                return Int2ObjectNonBlockingMap.this.size();
+            }
+
+            @Override
+            public boolean contains(int k) {
+                return Int2ObjectNonBlockingMap.this.containsKey(k);
+            }
+
+            @Override
+            public boolean remove(int k) {
+                return Int2ObjectNonBlockingMap.this.remove(k) != null;
+            }
+
+            @Override
+            public IteratorInteger iterator() {
+                return new IteratorInteger();
+            }
+        };
+    }
+
+    // --- keySet --------------------------------------------------------------
+
+    /**
+     * Keys as a long array.  Array may be zero-padded if keys are concurrently deleted.
+     */
+    public int[] keySetInt() {
+        int[] dom = new int[size()];
+        IteratorInteger i = (IteratorInteger) keySet().iterator();
+        int j = 0;
+        while (j < dom.length && i.hasNext())
+            dom[j++] = i.nextInt();
+        return dom;
+    }
+
+    /**
+     * Returns a {@link Set} view of the mappings contained in this map.  The
+     * set is backed by the map, so changes to the map are reflected in the
+     * set, and vice-versa.  The set supports element removal, which removes
+     * the corresponding mapping from the map, via the
+     * <tt>Iterator.remove</tt>, <tt>Set.remove</tt>, <tt>removeAll</tt>,
+     * <tt>retainAll</tt>, and <tt>clear</tt> operations.  It does not support
+     * the <tt>add</tt> or <tt>addAll</tt> operations.
+     *
+     * <p>The view's <tt>iterator</tt> is a "weakly consistent" iterator
+     * that will never throw {@link ConcurrentModificationException},
+     * and guarantees to traverse elements as they existed upon
+     * construction of the iterator, and may (but is not guaranteed to)
+     * reflect any modifications subsequent to construction.
+     *
+     * <p><strong>Warning:</strong> the iterator associated with this Set
+     * requires the creation of {@link Entry} objects with each
+     * iteration.  The {@link Int2ObjectNonBlockingMap}
+     * does not normally create or using {@link Entry} objects so
+     * they will be created soley to support this iteration.  Iterating using
+     * {@link Map#keySet} or {@link Map#values} will be more efficient.  In addition,
+     * this version requires <strong>auto-boxing</strong> the keys.
+     */
+    @Override
+    @Deprecated
+    public Set<Entry<Integer, TypeV>> entrySet() {
+        return new AbstractSet<>() {
+            @Override
+            public void clear() {
+                Int2ObjectNonBlockingMap.this.clear();
+            }
+
+            @Override
+            public int size() {
+                return Int2ObjectNonBlockingMap.this.size();
+            }
+
+            @Override
+            public boolean remove(final Object o) {
+                if (!(o instanceof final Map.Entry<?, ?> e)) return false;
+                return Int2ObjectNonBlockingMap.this.remove(e.getKey(), e.getValue());
+            }
+
+            @Override
+            public boolean contains(final Object o) {
+                if (!(o instanceof final Map.Entry<?, ?> e)) return false;
+                TypeV v = get(e.getKey());
+                return v != null && v.equals(e.getValue());
+            }
+
+            @Override
+            public Iterator<Entry<Integer, TypeV>> iterator() {
+                return new SnapshotESlow();
+            }
+        };
+    }
+
+    public Set<IntObjectEntry<TypeV>> fastEntrySet() {
+        return new AbstractSet<>() {
+            @Override
+            public void clear() {
+                Int2ObjectNonBlockingMap.this.clear();
+            }
+
+            @Override
+            public int size() {
+                return Int2ObjectNonBlockingMap.this.size();
+            }
+
+            @Override
+            public boolean remove(final Object o) {
+                if (!(o instanceof final Map.Entry<?, ?> e)) return false;
+                return Int2ObjectNonBlockingMap.this.remove(e.getKey(), e.getValue());
+            }
+
+            @Override
+            public boolean contains(final Object o) {
+                if (!(o instanceof final Map.Entry<?, ?> e)) return false;
+                TypeV v = get(e.getKey());
+                return v != null && v.equals(e.getValue());
+            }
+
+            @Override
+            public Iterator<IntObjectEntry<TypeV>> iterator() {
+                return new SnapshotE();
+            }
+        };
+    }
+
+    // --- writeObject -------------------------------------------------------
+    // Write a NBHML to a stream
+    @Serial
+    private void writeObject(java.io.ObjectOutputStream s) throws IOException {
+        s.defaultWriteObject();     // Write nothing
+        for (int K : keySet()) {
+            final Object V = get(K);  // Do an official 'get'
+            s.writeInt(K);         // Write the <Integer,TypeV> pair
+            s.writeObject(V);
+        }
+        s.writeInt(NO_KEY);        // Sentinel to indicate end-of-data
+        s.writeObject(null);
+    }
+
+    // --- readObject --------------------------------------------------------
+    // Read a NBHML from a stream
+    @Serial
+    @SuppressWarnings("unchecked")
+    private void readObject(java.io.ObjectInputStream s) throws IOException, ClassNotFoundException {
+        s.defaultReadObject();      // Read nothing
+        initialize(MIN_SIZE);
+        for (; ; ) {
+            final int K = s.readInt();
+            final TypeV V = (TypeV) s.readObject();
+            if (K == NO_KEY && V == null) break;
+            put(K, V);               // Insert with an offical put
+        }
+    }
+
+    /**
+     * Creates a shallow copy of this hashtable. All the structure of the
+     * hashtable itself is copied, but the keys and values are not cloned.
+     * This is a relatively expensive operation.
+     *
+     * @return a clone of the hashtable.
+     */
+    @SuppressWarnings("unchecked")
+    @Override
+    public Int2ObjectNonBlockingMap<TypeV> clone() {
+        try {
+            // Must clone, to get the class right; NBHML might have been
+            // extended so it would be wrong to just make a new NBHML.
+            Int2ObjectNonBlockingMap<TypeV> t = (Int2ObjectNonBlockingMap<TypeV>) super.clone();
+            // But I don't have an atomic clone operation - the underlying _kvs
+            // structure is undergoing rapid change.  If I just clone the _kvs
+            // field, the CHM in _kvs[0] won't be in sync.
+            //
+            // Wipe out the cloned array (it was shallow anyways).
+            t.clear();
+            // Now copy sanely
+            for (int K : keySetInt())
+                t.put(K, get(K));
+            return t;
+        } catch (CloneNotSupportedException e) {
+            // this shouldn't happen, since we are Cloneable
+            throw new InternalError();
+        }
+    }
+
+    /**
+     * It is not possible to atomically compute a value in a ConcurrentMap without locks.
+     */
+    @Override
+    public TypeV computeIfAbsent(Integer key, Function<? super Integer, ? extends TypeV> mappingFunction) {
+        return ConcurrentMap.super.computeIfAbsent(key, mappingFunction);
+    }
+
+    /**
+     * It is not possible to atomically compute a value in a ConcurrentMap without locks.
+     */
+    @Override
+    public TypeV computeIfPresent(Integer key, BiFunction<? super Integer, ? super TypeV, ? extends TypeV> remappingFunction) {
+        return ConcurrentMap.super.computeIfPresent(key, remappingFunction);
+    }
+
+    /**
+     * It is not possible to atomically compute a value in a ConcurrentMap without locks.
+     */
+    @Override
+    public TypeV compute(Integer key, BiFunction<? super Integer, ? super TypeV, ? extends TypeV> remappingFunction) {
+        return ConcurrentMap.super.compute(key, remappingFunction);
+    }
+
+    /**
+     * It is not possible to atomically compute a value in a ConcurrentMap without locks.
+     */
+    @Override
+    public TypeV merge(Integer key, TypeV value, BiFunction<? super TypeV, ? super TypeV, ? extends TypeV> remappingFunction) {
+        return ConcurrentMap.super.merge(key, value, remappingFunction);
+    }
+
+    // --- Adding a 'prime' bit onto Values via wrapping with a junk wrapper class
+    private static final class Prime {
+        final Object _V;
+
+        Prime(Object V) {
+            _V = V;
+        }
+
+        static Object unbox(Object V) {
+            return V instanceof Prime ? ((Prime) V)._V : V;
+        }
+    }
 
     // --- CHM -----------------------------------------------------------------
     // The control structure for the Long2ObjectNonBlockingMap
     private static final class CHM implements Serializable {
-        // Back-pointer to top-level structure
-        final Int2ObjectNonBlockingMap _nbhml;
-
-        // Size in active K,V pairs
-        private ConcurrentAutoIntTable _size;
-
-        public int size() {
-            return (int) _size.get();
-        }
+        private static final AtomicReferenceFieldUpdater<CHM, CHM> _newchmUpdater =
+                AtomicReferenceFieldUpdater.newUpdater(CHM.class, CHM.class, "_newchm");
+        private static final AtomicLongFieldUpdater<CHM> _resizerUpdater =
+                AtomicLongFieldUpdater.newUpdater(CHM.class, "_resizers");
+        static private final AtomicLongFieldUpdater<CHM> _copyIdxUpdater =
+                AtomicLongFieldUpdater.newUpdater(CHM.class, "_copyIdx");
 
         // ---
         // These next 2 fields are used in the resizing heuristics, to judge when
@@ -537,14 +834,12 @@ public class Int2ObjectNonBlockingMap<TypeV>
         // last resize; if we are running back-to-back resizes without growing
         // (because there are only a few live keys but many slots full of dead
         // keys) then we need a larger table to cut down on the churn.
-
-        // Count of used slots, to tell when table is full of dead unusable slots
-        private ConcurrentAutoIntTable _slots;
-
-        public int slots() {
-            return (int) _slots.get();
-        }
-
+        static private final AtomicLongFieldUpdater<CHM> _copyDoneUpdater =
+                AtomicLongFieldUpdater.newUpdater(CHM.class, "_copyDone");
+        // Back-pointer to top-level structure
+        final Int2ObjectNonBlockingMap _nbhml;
+        final int[] _keys;
+        final Object[] _vals;
         // ---
         // New mappings, used during resizing.
         // The 'next' CHM - created during a resize operation.  This represents
@@ -553,14 +848,6 @@ public class Int2ObjectNonBlockingMap<TypeV>
         // the required memory orderings.  It monotonically transits from null to
         // set (once).
         volatile CHM _newchm;
-        private static final AtomicReferenceFieldUpdater<CHM, CHM> _newchmUpdater =
-                AtomicReferenceFieldUpdater.newUpdater(CHM.class, CHM.class, "_newchm");
-
-        // Set the _newchm field if we can.  AtomicUpdaters do not fail spuriously.
-        boolean CAS_newchm(CHM newchm) {
-            return _newchmUpdater.compareAndSet(this, null, newchm);
-        }
-
         // Sometimes many threads race to create a new very large table.  Only 1
         // wins the race, but the losers all allocate a junk large table with
         // hefty allocation costs.  Attempt to control the overkill here by
@@ -574,8 +861,42 @@ public class Int2ObjectNonBlockingMap<TypeV>
         // could in parallel initialize the array.  Java does not allow
         // un-initialized array creation (especially of ref arrays!).
         volatile long _resizers;    // count of threads attempting an initial resize
-        private static final AtomicLongFieldUpdater<CHM> _resizerUpdater =
-                AtomicLongFieldUpdater.newUpdater(CHM.class, "_resizers");
+        // The next part of the table to copy.  It monotonically transits from zero
+        // to _keys.length.  Visitors to the table can claim 'work chunks' by
+        // CAS'ing this field up, then copying the indicated indices from the old
+        // table to the new table.  Workers are not required to finish any chunk;
+        // the counter simply wraps and work is copied duplicately until somebody
+        // somewhere completes the count.
+        volatile long _copyIdx = 0;
+        // Work-done reporting.  Used to efficiently signal when we can move to
+        // the new table.  From 0 to len(oldkvs) refers to copying from the old
+        // table to the new.
+        volatile long _copyDone = 0;
+        // Size in active K,V pairs
+        private ConcurrentAutoIntTable _size;
+        // Count of used slots, to tell when table is full of dead unusable slots
+        private ConcurrentAutoIntTable _slots;
+        // Simple constructor
+        CHM(final Int2ObjectNonBlockingMap nbhml, ConcurrentAutoIntTable size, final int logsize) {
+            _nbhml = nbhml;
+            _size = size;
+            _slots = new ConcurrentAutoIntTable();
+            _keys = new int[1 << logsize];
+            _vals = new Object[1 << logsize];
+        }
+
+        public int size() {
+            return (int) _size.get();
+        }
+
+        public int slots() {
+            return (int) _slots.get();
+        }
+
+        // Set the _newchm field if we can.  AtomicUpdaters do not fail spuriously.
+        boolean CAS_newchm(CHM newchm) {
+            return _newchmUpdater.compareAndSet(this, null, newchm);
+        }
 
         // --- key,val -------------------------------------------------------------
         // Access K,V for a given idx
@@ -587,18 +908,6 @@ public class Int2ObjectNonBlockingMap<TypeV>
         private boolean CAS_val(int idx, Object old, Object val) {
             // return UNSAFE.compareAndSwapObject(_vals, rawIndex(_vals, idx), old, val);
             return _OHandler.compareAndSet(_vals, idx, old, val);
-        }
-
-        final int[] _keys;
-        final Object[] _vals;
-
-        // Simple constructor
-        CHM(final Int2ObjectNonBlockingMap nbhml, ConcurrentAutoIntTable size, final int logsize) {
-            _nbhml = nbhml;
-            _size = size;
-            _slots = new ConcurrentAutoIntTable();
-            _keys = new int[1 << logsize];
-            _vals = new Object[1 << logsize];
         }
 
         // Non-atomic clear
@@ -916,24 +1225,6 @@ public class Int2ObjectNonBlockingMap<TypeV>
             return newchm;
         }
 
-
-        // The next part of the table to copy.  It monotonically transits from zero
-        // to _keys.length.  Visitors to the table can claim 'work chunks' by
-        // CAS'ing this field up, then copying the indicated indices from the old
-        // table to the new table.  Workers are not required to finish any chunk;
-        // the counter simply wraps and work is copied duplicately until somebody
-        // somewhere completes the count.
-        volatile long _copyIdx = 0;
-        static private final AtomicLongFieldUpdater<CHM> _copyIdxUpdater =
-                AtomicLongFieldUpdater.newUpdater(CHM.class, "_copyIdx");
-
-        // Work-done reporting.  Used to efficiently signal when we can move to
-        // the new table.  From 0 to len(oldkvs) refers to copying from the old
-        // table to the new.
-        volatile long _copyDone = 0;
-        static private final AtomicLongFieldUpdater<CHM> _copyDoneUpdater =
-                AtomicLongFieldUpdater.newUpdater(CHM.class, "_copyDone");
-
         // --- help_copy_impl ----------------------------------------------------
         // Help along an existing resize operation.  We hope its the top-level
         // copy (it was when we started) but this CHM might have been promoted out
@@ -1102,12 +1393,14 @@ public class Int2ObjectNonBlockingMap<TypeV>
         } // end copy_slot
     } // End of CHM
 
-
     // --- Snapshot ------------------------------------------------------------
     // The main class for iterating over the NBHM.  It "snapshots" a clean
     // view of the K/V array.
     private class SnapshotV implements Iterator<TypeV>, Enumeration<TypeV> {
         final CHM _sschm;
+        private int _idx;           // -2 for NO_KEY, -1 for CHECK_NEW_TABLE_LONG, 0-keys.length
+        private int _nextK, _prevK; // Last 2 keys found
+        private TypeV _nextV, _prevV; // Last 2 values found
 
         public SnapshotV() {
             CHM topchm;
@@ -1135,10 +1428,6 @@ public class Int2ObjectNonBlockingMap<TypeV>
         int key(final int idx) {
             return _sschm._keys[idx];
         }
-
-        private int _idx;           // -2 for NO_KEY, -1 for CHECK_NEW_TABLE_LONG, 0-keys.length
-        private int _nextK, _prevK; // Last 2 keys found
-        private TypeV _nextV, _prevV; // Last 2 values found
 
         @Override
         public boolean hasNext() {
@@ -1196,60 +1485,6 @@ public class Int2ObjectNonBlockingMap<TypeV>
             return hasNext();
         }
     }
-
-    /**
-     * Returns an enumeration of the values in this table.
-     *
-     * @return an enumeration of the values in this table
-     * @see #values()
-     */
-    public Enumeration<TypeV> elements() {
-        return new SnapshotV();
-    }
-
-    // --- values --------------------------------------------------------------
-
-    /**
-     * Returns a {@link Collection} view of the values contained in this map.
-     * The collection is backed by the map, so changes to the map are reflected
-     * in the collection, and vice-versa.  The collection supports element
-     * removal, which removes the corresponding mapping from this map, via the
-     * <tt>Iterator.remove</tt>, <tt>Collection.remove</tt>,
-     * <tt>removeAll</tt>, <tt>retainAll</tt>, and <tt>clear</tt> operations.
-     * It does not support the <tt>add</tt> or <tt>addAll</tt> operations.
-     *
-     * <p>The view's <tt>iterator</tt> is a "weakly consistent" iterator that
-     * will never throw {@link ConcurrentModificationException}, and guarantees
-     * to traverse elements as they existed upon construction of the iterator,
-     * and may (but is not guaranteed to) reflect any modifications subsequent
-     * to construction.
-     */
-    @Override
-    public Collection<TypeV> values() {
-        return new AbstractCollection<>() {
-            @Override
-            public void clear() {
-                Int2ObjectNonBlockingMap.this.clear();
-            }
-
-            @Override
-            public int size() {
-                return Int2ObjectNonBlockingMap.this.size();
-            }
-
-            @Override
-            public boolean contains(Object v) {
-                return Int2ObjectNonBlockingMap.this.containsValue(v);
-            }
-
-            @Override
-            public Iterator<TypeV> iterator() {
-                return new SnapshotV();
-            }
-        };
-    }
-
-    // --- keySet --------------------------------------------------------------
 
     /**
      * A class which implements the {@link Iterator} and {@link Enumeration}
@@ -1315,79 +1550,6 @@ public class Int2ObjectNonBlockingMap<TypeV>
         public boolean hasMoreElements() {
             return hasNext();
         }
-    }
-
-    /**
-     * Returns an enumeration of the <strong>auto-boxed</strong> keys in this table.
-     * <strong>Warning:</strong> this version will auto-box all returned keys.
-     *
-     * @return an enumeration of the auto-boxed keys in this table
-     * @see #keySet()
-     */
-    public Enumeration<Integer> keys() {
-        return new IteratorInteger();
-    }
-
-    public IteratorInteger fastKeyIterator() {
-        return new IteratorInteger();
-    }
-
-    /**
-     * Returns a {@link Set} view of the keys contained in this map; with care
-     * the keys may be iterated over <strong>without auto-boxing</strong>.  The
-     * set is backed by the map, so changes to the map are reflected in the
-     * set, and vice-versa.  The set supports element removal, which removes
-     * the corresponding mapping from this map, via the
-     * <tt>Iterator.remove</tt>, <tt>Set.remove</tt>, <tt>removeAll</tt>,
-     * <tt>retainAll</tt>, and <tt>clear</tt> operations.  It does not support
-     * the <tt>add</tt> or <tt>addAll</tt> operations.
-     *
-     * <p>The view's <tt>iterator</tt> is a "weakly consistent" iterator that
-     * will never throw {@link ConcurrentModificationException}, and guarantees
-     * to traverse elements as they existed upon construction of the iterator,
-     * and may (but is not guaranteed to) reflect any modifications subsequent
-     * to construction.
-     */
-    @Override
-    public Set<Integer> keySet() {
-        return new AbstractIntSet() {
-            @Override
-            public void clear() {
-                Int2ObjectNonBlockingMap.this.clear();
-            }
-
-            @Override
-            public int size() {
-                return Int2ObjectNonBlockingMap.this.size();
-            }
-
-            @Override
-            public boolean contains(int k) {
-                return Int2ObjectNonBlockingMap.this.containsKey(k);
-            }
-
-            @Override
-            public boolean remove(int k) {
-                return Int2ObjectNonBlockingMap.this.remove(k) != null;
-            }
-
-            @Override
-            public IteratorInteger iterator() {
-                return new IteratorInteger();
-            }
-        };
-    }
-
-    /**
-     * Keys as a long array.  Array may be zero-padded if keys are concurrently deleted.
-     */
-    public int[] keySetInt() {
-        int[] dom = new int[size()];
-        IteratorInteger i = (IteratorInteger) keySet().iterator();
-        int j = 0;
-        while (j < dom.length && i.hasNext())
-            dom[j++] = i.nextInt();
-        return dom;
     }
 
     // --- entrySet ------------------------------------------------------------
@@ -1472,185 +1634,5 @@ public class Int2ObjectNonBlockingMap<TypeV>
         public boolean hasNext() {
             return _ss.hasNext();
         }
-    }
-
-    /**
-     * Returns a {@link Set} view of the mappings contained in this map.  The
-     * set is backed by the map, so changes to the map are reflected in the
-     * set, and vice-versa.  The set supports element removal, which removes
-     * the corresponding mapping from the map, via the
-     * <tt>Iterator.remove</tt>, <tt>Set.remove</tt>, <tt>removeAll</tt>,
-     * <tt>retainAll</tt>, and <tt>clear</tt> operations.  It does not support
-     * the <tt>add</tt> or <tt>addAll</tt> operations.
-     *
-     * <p>The view's <tt>iterator</tt> is a "weakly consistent" iterator
-     * that will never throw {@link ConcurrentModificationException},
-     * and guarantees to traverse elements as they existed upon
-     * construction of the iterator, and may (but is not guaranteed to)
-     * reflect any modifications subsequent to construction.
-     *
-     * <p><strong>Warning:</strong> the iterator associated with this Set
-     * requires the creation of {@link Entry} objects with each
-     * iteration.  The {@link Int2ObjectNonBlockingMap}
-     * does not normally create or using {@link Entry} objects so
-     * they will be created soley to support this iteration.  Iterating using
-     * {@link Map#keySet} or {@link Map#values} will be more efficient.  In addition,
-     * this version requires <strong>auto-boxing</strong> the keys.
-     */
-    @Override
-    @Deprecated
-    public Set<Entry<Integer, TypeV>> entrySet() {
-        return new AbstractSet<>() {
-            @Override
-            public void clear() {
-                Int2ObjectNonBlockingMap.this.clear();
-            }
-
-            @Override
-            public int size() {
-                return Int2ObjectNonBlockingMap.this.size();
-            }
-
-            @Override
-            public boolean remove(final Object o) {
-                if (!(o instanceof final Map.Entry<?, ?> e)) return false;
-                return Int2ObjectNonBlockingMap.this.remove(e.getKey(), e.getValue());
-            }
-
-            @Override
-            public boolean contains(final Object o) {
-                if (!(o instanceof final Map.Entry<?, ?> e)) return false;
-                TypeV v = get(e.getKey());
-                return v != null && v.equals(e.getValue());
-            }
-
-            @Override
-            public Iterator<Entry<Integer, TypeV>> iterator() {
-                return new SnapshotESlow();
-            }
-        };
-    }
-
-    public Set<IntObjectEntry<TypeV>> fastEntrySet() {
-        return new AbstractSet<>() {
-            @Override
-            public void clear() {
-                Int2ObjectNonBlockingMap.this.clear();
-            }
-
-            @Override
-            public int size() {
-                return Int2ObjectNonBlockingMap.this.size();
-            }
-
-            @Override
-            public boolean remove(final Object o) {
-                if (!(o instanceof final Map.Entry<?, ?> e)) return false;
-                return Int2ObjectNonBlockingMap.this.remove(e.getKey(), e.getValue());
-            }
-
-            @Override
-            public boolean contains(final Object o) {
-                if (!(o instanceof final Map.Entry<?, ?> e)) return false;
-                TypeV v = get(e.getKey());
-                return v != null && v.equals(e.getValue());
-            }
-
-            @Override
-            public Iterator<IntObjectEntry<TypeV>> iterator() {
-                return new SnapshotE();
-            }
-        };
-    }
-
-    // --- writeObject -------------------------------------------------------
-    // Write a NBHML to a stream
-    @Serial
-    private void writeObject(java.io.ObjectOutputStream s) throws IOException {
-        s.defaultWriteObject();     // Write nothing
-        for (int K : keySet()) {
-            final Object V = get(K);  // Do an official 'get'
-            s.writeInt(K);         // Write the <Integer,TypeV> pair
-            s.writeObject(V);
-        }
-        s.writeInt(NO_KEY);        // Sentinel to indicate end-of-data
-        s.writeObject(null);
-    }
-
-    // --- readObject --------------------------------------------------------
-    // Read a NBHML from a stream
-    @Serial
-    @SuppressWarnings("unchecked")
-    private void readObject(java.io.ObjectInputStream s) throws IOException, ClassNotFoundException {
-        s.defaultReadObject();      // Read nothing
-        initialize(MIN_SIZE);
-        for (; ; ) {
-            final int K = s.readInt();
-            final TypeV V = (TypeV) s.readObject();
-            if (K == NO_KEY && V == null) break;
-            put(K, V);               // Insert with an offical put
-        }
-    }
-
-    /**
-     * Creates a shallow copy of this hashtable. All the structure of the
-     * hashtable itself is copied, but the keys and values are not cloned.
-     * This is a relatively expensive operation.
-     *
-     * @return a clone of the hashtable.
-     */
-    @SuppressWarnings("unchecked")
-    @Override
-    public Int2ObjectNonBlockingMap<TypeV> clone() {
-        try {
-            // Must clone, to get the class right; NBHML might have been
-            // extended so it would be wrong to just make a new NBHML.
-            Int2ObjectNonBlockingMap<TypeV> t = (Int2ObjectNonBlockingMap<TypeV>) super.clone();
-            // But I don't have an atomic clone operation - the underlying _kvs
-            // structure is undergoing rapid change.  If I just clone the _kvs
-            // field, the CHM in _kvs[0] won't be in sync.
-            //
-            // Wipe out the cloned array (it was shallow anyways).
-            t.clear();
-            // Now copy sanely
-            for (int K : keySetInt())
-                t.put(K, get(K));
-            return t;
-        } catch (CloneNotSupportedException e) {
-            // this shouldn't happen, since we are Cloneable
-            throw new InternalError();
-        }
-    }
-
-    /**
-     * It is not possible to atomically compute a value in a ConcurrentMap without locks.
-     */
-    @Override
-    public TypeV computeIfAbsent(Integer key, Function<? super Integer, ? extends TypeV> mappingFunction) {
-        return ConcurrentMap.super.computeIfAbsent(key, mappingFunction);
-    }
-
-    /**
-     * It is not possible to atomically compute a value in a ConcurrentMap without locks.
-     */
-    @Override
-    public TypeV computeIfPresent(Integer key, BiFunction<? super Integer, ? super TypeV, ? extends TypeV> remappingFunction) {
-        return ConcurrentMap.super.computeIfPresent(key, remappingFunction);
-    }
-
-    /**
-     * It is not possible to atomically compute a value in a ConcurrentMap without locks.
-     */
-    @Override
-    public TypeV compute(Integer key, BiFunction<? super Integer, ? super TypeV, ? extends TypeV> remappingFunction) {
-        return ConcurrentMap.super.compute(key, remappingFunction);
-    }
-
-    /**
-     * It is not possible to atomically compute a value in a ConcurrentMap without locks.
-     */
-    @Override
-    public TypeV merge(Integer key, TypeV value, BiFunction<? super TypeV, ? super TypeV, ? extends TypeV> remappingFunction) {
-        return ConcurrentMap.super.merge(key, value, remappingFunction);
     }
 }  // End Long2ObjectNonBlockingMap class

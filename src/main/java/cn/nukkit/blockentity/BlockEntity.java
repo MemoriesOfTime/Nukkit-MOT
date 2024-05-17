@@ -53,11 +53,8 @@ public abstract class BlockEntity extends Position {
     public static final String DECORATED_POT = "DecoratedPot";
     public static final String TARGET = "Target";
     public static final String BRUSHABLE_BLOCK = "BrushableBlock";
-
-    public static long count = 1;
-
     private static final BiMap<String, Class<? extends BlockEntity>> knownBlockEntities = HashBiMap.create(30);
-
+    public static long count = 1;
     public FullChunk chunk;
     public String name;
     public long id;
@@ -89,8 +86,6 @@ public abstract class BlockEntity extends Position {
         this.chunk.addBlockEntity(this);
         this.getLevel().addBlockEntity(this);
     }
-
-    protected void initBlockEntity() {}
 
     public static BlockEntity createBlockEntity(String type, Position pos, CompoundTag nbt, Object... args) {
         return createBlockEntity(type, pos.getLevel().getChunk(pos.getFloorX() >> 4, pos.getFloorZ() >> 4), nbt, args);
@@ -127,7 +122,8 @@ public abstract class BlockEntity extends Position {
                         blockEntity = (BlockEntity) constructor.newInstance(objects);
 
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         } else {
             Server.getInstance().getLogger().warning("Tried to create block entity that doesn't exists: " + type);
@@ -143,6 +139,17 @@ public abstract class BlockEntity extends Position {
 
         knownBlockEntities.put(name, c);
         return true;
+    }
+
+    public static CompoundTag getDefaultCompound(Vector3 pos, String id) {
+        return new CompoundTag()
+                .putString("id", id)
+                .putInt("x", pos.getFloorX())
+                .putInt("y", pos.getFloorY())
+                .putInt("z", pos.getFloorZ());
+    }
+
+    protected void initBlockEntity() {
     }
 
     public final String getSaveId() {
@@ -199,7 +206,8 @@ public abstract class BlockEntity extends Position {
         }
     }
 
-    public void onBreak() {}
+    public void onBreak() {
+    }
 
     public void setDirty() {
         chunk.setChanged();
@@ -211,14 +219,6 @@ public abstract class BlockEntity extends Position {
 
     public boolean isMovable() {
         return movable;
-    }
-
-    public static CompoundTag getDefaultCompound(Vector3 pos, String id) {
-        return new CompoundTag()
-                .putString("id", id)
-                .putInt("x", pos.getFloorX())
-                .putInt("y", pos.getFloorY())
-                .putInt("z", pos.getFloorZ());
     }
 
     public boolean canSaveToStorage() {

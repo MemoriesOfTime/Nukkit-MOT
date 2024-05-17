@@ -11,16 +11,16 @@ public class BlockCoralFanHang extends BlockCoralFan implements Faceable {
     public BlockCoralFanHang() {
         this(0);
     }
-    
+
     public BlockCoralFanHang(int meta) {
         super(meta);
     }
-    
+
     @Override
     public int getId() {
         return CORAL_FAN_HANG;
     }
-    
+
     @Override
     public String getName() {
         String name = super.getName();
@@ -31,12 +31,12 @@ public class BlockCoralFanHang extends BlockCoralFan implements Faceable {
             return name + " Wall Fan";
         }
     }
-    
+
     @Override
     public boolean isDead() {
         return (this.getDamage() & 0b10) == 0b10;
     }
-    
+
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_RANDOM) {
@@ -45,7 +45,7 @@ public class BlockCoralFanHang extends BlockCoralFan implements Faceable {
             return super.onUpdate(type);
         }
     }
-    
+
     @Override
     public int getType() {
         if ((this.getDamage() & 0b1) == 0) {
@@ -54,7 +54,7 @@ public class BlockCoralFanHang extends BlockCoralFan implements Faceable {
             return BlockCoral.TYPE_BRAIN;
         }
     }
-    
+
     @Override
     public BlockFace getBlockFace() {
         int face = this.getDamage() >> 2 & 0x3;
@@ -70,14 +70,14 @@ public class BlockCoralFanHang extends BlockCoralFan implements Faceable {
                 return BlockFace.SOUTH;
         }
     }
-    
+
     @Override
     public BlockFace getRootsFace() {
         return this.getBlockFace().getOpposite();
     }
-    
+
     @Override
     public Item toItem() {
-        return new ItemBlock(this.isDead()? new BlockCoralFanDead() : new BlockCoralFan(), this.getType());
+        return new ItemBlock(this.isDead() ? new BlockCoralFanDead() : new BlockCoralFan(), this.getType());
     }
 }

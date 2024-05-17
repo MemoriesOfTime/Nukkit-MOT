@@ -39,82 +39,6 @@ public class ParticleCommand extends VanillaCommand {
         });
     }
 
-    @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
-        }
-
-        if (args.length < 4) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return true;
-        }
-
-        Position defaultPosition;
-        if (sender instanceof Player) {
-            defaultPosition = ((Player) sender).getPosition();
-        } else {
-            defaultPosition = new Position(0, 0, 0, sender.getServer().getDefaultLevel());
-        }
-
-        String name = args[0].toLowerCase();
-
-        double x;
-        double y;
-        double z;
-
-        try {
-            x = getDouble(args[1], defaultPosition.getX());
-            y = getDouble(args[2], defaultPosition.getY());
-            z = getDouble(args[3], defaultPosition.getZ());
-        } catch (Exception e) {
-            return false;
-        }
-        Position position = new Position(x, y, z, defaultPosition.getLevel());
-
-        int count = 1;
-        if (args.length > 4) {
-            try {
-                double c = Double.parseDouble(args[4]);
-                count = (int) c;
-            } catch (Exception ignored) {}
-        }
-        count = Math.max(1, count);
-
-        int data = -1;
-        if (args.length > 5) {
-            try {
-                double d = Double.parseDouble(args[8]);
-                data = (int) d;
-            } catch (Exception ignored) {}
-        }
-        if (showParticleEffect(name, position, position.getLevel(), count)) {
-            sender.sendMessage(new TranslationContainer("commands.particle.success", name, String.valueOf(count)));
-        } else {
-            Particle particle = getParticle(name, position, data);
-
-            if (particle == null) {
-                position.level.addParticleEffect(position.asVector3f(), args[0], -1, position.level.getDimension());
-                return true;
-            }
-
-            sender.sendMessage(new TranslationContainer("commands.particle.success", name, String.valueOf(count)));
-
-            ThreadLocalRandom random = ThreadLocalRandom.current();
-
-            for (int i = 0; i < count; i++) {
-                particle.setComponents(
-                        position.x + (random.nextFloat() * 2 - 1),
-                        position.y + (random.nextFloat() * 2 - 1),
-                        position.z + (random.nextFloat() * 2 - 1)
-                );
-                position.getLevel().addParticle(particle);
-            }
-        }
-
-        return true;
-    }
-
     private static Particle getParticle(String name, Vector3 pos, int data) {
         switch (name) {
             case "explode":
@@ -247,5 +171,83 @@ public class ParticleCommand extends VanillaCommand {
             return defaultValue + Double.parseDouble(relativePos);
         }
         return Double.parseDouble(arg);
+    }
+
+    @Override
+    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+        if (!this.testPermission(sender)) {
+            return true;
+        }
+
+        if (args.length < 4) {
+            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
+            return true;
+        }
+
+        Position defaultPosition;
+        if (sender instanceof Player) {
+            defaultPosition = ((Player) sender).getPosition();
+        } else {
+            defaultPosition = new Position(0, 0, 0, sender.getServer().getDefaultLevel());
+        }
+
+        String name = args[0].toLowerCase();
+
+        double x;
+        double y;
+        double z;
+
+        try {
+            x = getDouble(args[1], defaultPosition.getX());
+            y = getDouble(args[2], defaultPosition.getY());
+            z = getDouble(args[3], defaultPosition.getZ());
+        } catch (Exception e) {
+            return false;
+        }
+        Position position = new Position(x, y, z, defaultPosition.getLevel());
+
+        int count = 1;
+        if (args.length > 4) {
+            try {
+                double c = Double.parseDouble(args[4]);
+                count = (int) c;
+            } catch (Exception ignored) {
+            }
+        }
+        count = Math.max(1, count);
+
+        int data = -1;
+        if (args.length > 5) {
+            try {
+                double d = Double.parseDouble(args[8]);
+                data = (int) d;
+            } catch (Exception ignored) {
+            }
+        }
+        if (showParticleEffect(name, position, position.getLevel(), count)) {
+            sender.sendMessage(new TranslationContainer("commands.particle.success", name, String.valueOf(count)));
+        } else {
+            Particle particle = getParticle(name, position, data);
+
+            if (particle == null) {
+                position.level.addParticleEffect(position.asVector3f(), args[0], -1, position.level.getDimension());
+                return true;
+            }
+
+            sender.sendMessage(new TranslationContainer("commands.particle.success", name, String.valueOf(count)));
+
+            ThreadLocalRandom random = ThreadLocalRandom.current();
+
+            for (int i = 0; i < count; i++) {
+                particle.setComponents(
+                        position.x + (random.nextFloat() * 2 - 1),
+                        position.y + (random.nextFloat() * 2 - 1),
+                        position.z + (random.nextFloat() * 2 - 1)
+                );
+                position.getLevel().addParticle(particle);
+            }
+        }
+
+        return true;
     }
 }

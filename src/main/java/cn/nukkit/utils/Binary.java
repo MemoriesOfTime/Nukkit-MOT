@@ -38,10 +38,6 @@ public class Binary {
         return value << 48 >> 48;
     }
 
-    public int unsignShort(int value) {
-        return value & 0xffff;
-    }
-
     public static int signInt(int value) {
         return value << 32 >> 32;
     }
@@ -197,9 +193,9 @@ public class Binary {
                             if (dataVersions != null && dataVersions.length == 3) {
                                 if (protocol < ProtocolInfo.v1_2_13) {
                                     stream.putVarLong(dataVersions[0]);
-                                }else if (protocol < ProtocolInfo.v1_7_0) {
+                                } else if (protocol < ProtocolInfo.v1_7_0) {
                                     stream.putVarLong(dataVersions[1]);
-                                }else {
+                                } else {
                                     stream.putVarLong(dataVersions[2]);
                                 }
                                 break;
@@ -267,7 +263,8 @@ public class Binary {
                             throw new RuntimeException(e);
                         }
                         stream.setOffset(offset + (int) fbais.position());
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                     break;
                 case Entity.DATA_TYPE_POS:
                     BlockVector3 v3 = stream.getSignedBlockPosition();
@@ -595,5 +592,9 @@ public class Binary {
             index += b.length;
         }
         return appendedBytes;
+    }
+
+    public int unsignShort(int value) {
+        return value & 0xffff;
     }
 }

@@ -19,7 +19,7 @@ public final class BitArray {
         this.data = new long[(this.bitsPerEntry << 12) >> 6];
     }
 
-    public final void setAt(int index, int value) {
+    public void setAt(int index, int value) {
         int bitIndexStart = index * bitsPerEntry;
         int longIndexStart = bitIndexStart >> 6;
         int localBitIndexStart = bitIndexStart & 63;
@@ -33,26 +33,26 @@ public final class BitArray {
         }
     }
 
-    public final int getAt(int index) {
+    public int getAt(int index) {
         int bitIndexStart = index * bitsPerEntry;
 
         int longIndexStart = bitIndexStart >> 6;
 
         int localBitIndexStart = bitIndexStart & 63;
         if (localBitIndexStart <= maxSeqLocIndex) {
-            return (int)(this.data[longIndexStart] >>> localBitIndexStart & maxEntryValue);
+            return (int) (this.data[longIndexStart] >>> localBitIndexStart & maxEntryValue);
         } else {
             return (int) ((this.data[longIndexStart] >>> localBitIndexStart | this.data[longIndexStart + 1] << (64 - localBitIndexStart)) & maxEntryValue);
         }
     }
 
-    public final void fromRawSlow(char[] arr) {
+    public void fromRawSlow(char[] arr) {
         for (int i = 0; i < arr.length; i++) {
             setAt(i, arr[i]);
         }
     }
 
-    public final void fromRaw(char[] arr) {
+    public void fromRaw(char[] arr) {
         final long[] data = this.data;
         final int dataLength = data.length;
         final int bitsPerEntry = this.bitsPerEntry;
@@ -109,7 +109,7 @@ public final class BitArray {
         return newBitArray;
     }
 
-    public final char[] toRawSlow() {
+    public char[] toRawSlow() {
         char[] arr = new char[4096];
         for (int i = 0; i < arr.length; i++) {
             arr[i] = (char) getAt(i);
@@ -117,11 +117,11 @@ public final class BitArray {
         return arr;
     }
 
-    public final char[] toRaw() {
+    public char[] toRaw() {
         return toRaw(new char[4096]);
     }
 
-    protected final char[] toRaw(char[] buffer) {
+    private char[] toRaw(char[] buffer) {
         final long[] data = this.data;
         final int dataLength = data.length;
         final int bitsPerEntry = this.bitsPerEntry;

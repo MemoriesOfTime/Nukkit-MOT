@@ -59,13 +59,13 @@ public class BiomeDefinitionListPacket extends DataPacket {
         this.reset();
         if (this.protocol >= ProtocolInfo.v1_19_30_23) {
             this.put(TAG);
-        }else if (this.protocol >= ProtocolInfo.v1_19_0) {
+        } else if (this.protocol >= ProtocolInfo.v1_19_0) {
             this.put(TAG_527);
-        }else if (this.protocol >= ProtocolInfo.v1_18_10) {
+        } else if (this.protocol >= ProtocolInfo.v1_18_10) {
             this.put(TAG_486);
-        }else if (this.protocol >= ProtocolInfo.v1_16_100) {
+        } else if (this.protocol >= ProtocolInfo.v1_16_100) {
             this.put(TAG_419);
-        }else {
+        } else {
             this.put(TAG_361);
         }
     }

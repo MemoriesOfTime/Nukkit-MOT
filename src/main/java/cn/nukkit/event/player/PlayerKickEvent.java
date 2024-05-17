@@ -7,38 +7,10 @@ import cn.nukkit.lang.TextContainer;
 
 public class PlayerKickEvent extends PlayerEvent implements Cancellable {
     private static final HandlerList handlers = new HandlerList();
-
-    public enum Reason {
-        NEW_CONNECTION,
-        KICKED_BY_ADMIN,
-        NOT_WHITELISTED,
-        IP_BANNED,
-        NAME_BANNED,
-        INVALID_PVE,
-        INVALID_PVP,
-        LOGIN_TIMEOUT,
-        SERVER_FULL,
-        FLYING_DISABLED,
-        INVALID_PACKET,
-        UNKNOWN;
-
-        @Override
-        public String toString() {
-            return this.name();
-        }
-    }
-
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
-    protected TextContainer quitMessage;
-
     protected final Reason reason;
     protected final String reasonString;
-
     private final String extraData;
-
+    protected TextContainer quitMessage;
     public PlayerKickEvent(Player player, String reason, String quitMessage) {
         this(player, Reason.UNKNOWN, reason, new TextContainer(quitMessage));
     }
@@ -67,6 +39,10 @@ public class PlayerKickEvent extends PlayerEvent implements Cancellable {
         this.extraData = extraData;
     }
 
+    public static HandlerList getHandlers() {
+        return handlers;
+    }
+
     public String getReason() {
         return reasonString;
     }
@@ -89,5 +65,25 @@ public class PlayerKickEvent extends PlayerEvent implements Cancellable {
 
     public String getExtraData() {
         return extraData;
+    }
+
+    public enum Reason {
+        NEW_CONNECTION,
+        KICKED_BY_ADMIN,
+        NOT_WHITELISTED,
+        IP_BANNED,
+        NAME_BANNED,
+        INVALID_PVE,
+        INVALID_PVP,
+        LOGIN_TIMEOUT,
+        SERVER_FULL,
+        FLYING_DISABLED,
+        INVALID_PACKET,
+        UNKNOWN;
+
+        @Override
+        public String toString() {
+            return this.name();
+        }
     }
 }

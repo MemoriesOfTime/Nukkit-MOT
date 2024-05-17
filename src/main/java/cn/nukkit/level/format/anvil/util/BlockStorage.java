@@ -58,9 +58,9 @@ public class BlockStorage {
 
     private int getBlockData(int index) {
         int base = blockData.get(index) & 0xf;
-        int extra = hasBlockDataExtras? ((blockDataExtra.get(index) & 0xF) << 4) : 0;
-        int hyperA = hasBlockDataHyperA? ((blockDataHyperA[index] & 0xff) << 8) : 0;
-        int hyperB = hasBlockDataHyperB? ((blockDataHyperB[index] & 0xffff) << 16) : 0;
+        int extra = hasBlockDataExtras ? ((blockDataExtra.get(index) & 0xF) << 4) : 0;
+        int hyperA = hasBlockDataHyperA ? ((blockDataHyperA[index] & 0xff) << 8) : 0;
+        int hyperB = hasBlockDataHyperB ? ((blockDataHyperB[index] & 0xffff) << 16) : 0;
         return base | extra | hyperA | hyperB;
     }
 
@@ -91,7 +91,7 @@ public class BlockStorage {
     }
 
     private int getBlockId(int index) {
-        return (blockIds[index] & 0xFF) | (hasBlockIdExtras? (blockIdsExtra[index] & 0xFF) << 8 : 0);
+        return (blockIds[index] & 0xFF) | (hasBlockIdExtras ? (blockIdsExtra[index] & 0xFF) << 8 : 0);
     }
 
     public int getBlockIdBase(int x, int y, int z) {
@@ -193,7 +193,7 @@ public class BlockStorage {
         int oldData = getBlockData(index);
         setBlockId(index, id);
         setBlockData(index, meta);
-        return new int[] {oldId, oldData};
+        return new int[]{oldId, oldData};
     }
 
     public int getAndSetFullBlock(int x, int y, int z, int value) {
@@ -202,10 +202,10 @@ public class BlockStorage {
 
     private int getAndSetFullBlock(int index, int value) {
         Preconditions.checkArgument(value < (32767), "Invalid full block");
-        byte oldBlockExtra = hasBlockIdExtras? blockIdsExtra[index] : 0;
-        byte oldBlock = hasBlockIds? blockIds[index] : 0;
-        byte oldData = hasBlockIds? blockData.get(index) : 0;
-        byte oldDataExtra = hasBlockDataExtras? blockDataExtra.get(index) : 0;
+        byte oldBlockExtra = hasBlockIdExtras ? blockIdsExtra[index] : 0;
+        byte oldBlock = hasBlockIds ? blockIds[index] : 0;
+        byte oldData = hasBlockIds ? blockData.get(index) : 0;
+        byte oldDataExtra = hasBlockDataExtras ? blockDataExtra.get(index) : 0;
         byte newBlockExtra = (byte) ((value >> (14)) & 0xFF);
         byte newBlock = (byte) ((value >> Block.DATA_BITS) & 0xFF);
         byte newData = (byte) (value & 0xf);
@@ -244,7 +244,7 @@ public class BlockStorage {
 
     private int[] getBlockState(int index) {
         if (!hasBlockIds) {
-            return new int[]{0,0};
+            return new int[]{0, 0};
         }
         return new int[]{getBlockId(index), getBlockData(index)};
     }

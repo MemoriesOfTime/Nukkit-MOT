@@ -18,8 +18,8 @@ public interface EntitySpawner {
      * Run the spawner
      *
      * @param player player
-     * @param pos safe position
-     * @param level world
+     * @param pos    safe position
+     * @param level  world
      */
     void spawn(Player player, Position pos, Level level);
 

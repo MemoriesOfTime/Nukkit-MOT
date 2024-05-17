@@ -31,13 +31,13 @@ public class EntityStrider extends EntityWalkingAnimal implements EntityRideable
 
     private boolean saddled;
 
+    public EntityStrider(FullChunk chunk, CompoundTag nbt) {
+        super(chunk, nbt);
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
-    }
-
-    public EntityStrider(FullChunk chunk, CompoundTag nbt) {
-        super(chunk, nbt);
     }
 
     @Override

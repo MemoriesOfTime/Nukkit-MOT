@@ -126,11 +126,11 @@ public class EntityWolf extends EntityTameableMob {
         }
 
         if (!this.hasOwner() && distance <= 256 && (
-            creature instanceof EntitySkeleton && !creature.isInsideOfWater() ||
-                creature instanceof EntitySheep ||
-                creature instanceof EntityRabbit ||
-                creature instanceof EntityFox ||
-                creature instanceof EntityTurtle && ((EntityTurtle) creature).isBaby() && !creature.isInsideOfWater()
+                creature instanceof EntitySkeleton && !creature.isInsideOfWater() ||
+                        creature instanceof EntitySheep ||
+                        creature instanceof EntityRabbit ||
+                        creature instanceof EntityFox ||
+                        creature instanceof EntityTurtle && ((EntityTurtle) creature).isBaby() && !creature.isInsideOfWater()
         )) {
             this.isAngryTo = creature.getId();
             this.setAngry(true);
@@ -234,8 +234,8 @@ public class EntityWolf extends EntityTameableMob {
     @Override
     public void attackEntity(Entity entity) {
         if (entity instanceof Player && (
-            !this.isAngry() && this.isBeggingItem(((Player) entity).getInventory().getItemInHandFast()) ||
-                this.hasOwner() && entity.equals(this.getOwner())
+                !this.isAngry() && this.isBeggingItem(((Player) entity).getInventory().getItemInHandFast()) ||
+                        this.hasOwner() && entity.equals(this.getOwner())
         )) return;
 
         if (this.attackDelay > 23 && this.distanceSquared(entity) < 1.5) {
@@ -250,7 +250,7 @@ public class EntityWolf extends EntityTameableMob {
                 }
 
                 damage.put(EntityDamageEvent.DamageModifier.ARMOR,
-                    (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));
+                        (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));
             }
 
             this.setMotion(tempVector.setComponents(0, this.getGravity() * 6, 0)); // TODO: Jump before attack
@@ -321,31 +321,31 @@ public class EntityWolf extends EntityTameableMob {
 
     public boolean isBeggingItem(Item item) {
         return item.getId() == ItemID.BONE ||
-            item.getId() == ItemID.RAW_CHICKEN ||
-            item.getId() == ItemID.COOKED_CHICKEN ||
-            item.getId() == ItemID.RAW_BEEF ||
-            item.getId() == ItemID.COOKED_BEEF ||
-            item.getId() == ItemID.RAW_MUTTON ||
-            item.getId() == ItemID.COOKED_MUTTON ||
-            item.getId() == ItemID.RAW_PORKCHOP ||
-            item.getId() == ItemID.COOKED_PORKCHOP ||
-            item.getId() == ItemID.RAW_RABBIT ||
-            item.getId() == ItemID.COOKED_RABBIT ||
-            item.getId() == ItemID.ROTTEN_FLESH;
+                item.getId() == ItemID.RAW_CHICKEN ||
+                item.getId() == ItemID.COOKED_CHICKEN ||
+                item.getId() == ItemID.RAW_BEEF ||
+                item.getId() == ItemID.COOKED_BEEF ||
+                item.getId() == ItemID.RAW_MUTTON ||
+                item.getId() == ItemID.COOKED_MUTTON ||
+                item.getId() == ItemID.RAW_PORKCHOP ||
+                item.getId() == ItemID.COOKED_PORKCHOP ||
+                item.getId() == ItemID.RAW_RABBIT ||
+                item.getId() == ItemID.COOKED_RABBIT ||
+                item.getId() == ItemID.ROTTEN_FLESH;
     }
 
     public boolean isBreedingItem(Item item) {
         return item.getId() == ItemID.RAW_CHICKEN ||
-            item.getId() == ItemID.COOKED_CHICKEN ||
-            item.getId() == ItemID.RAW_BEEF ||
-            item.getId() == ItemID.COOKED_BEEF ||
-            item.getId() == ItemID.RAW_MUTTON ||
-            item.getId() == ItemID.COOKED_MUTTON ||
-            item.getId() == ItemID.RAW_PORKCHOP ||
-            item.getId() == ItemID.COOKED_PORKCHOP ||
-            item.getId() == ItemID.RAW_RABBIT ||
-            item.getId() == ItemID.COOKED_RABBIT ||
-            item.getId() == ItemID.ROTTEN_FLESH;
+                item.getId() == ItemID.COOKED_CHICKEN ||
+                item.getId() == ItemID.RAW_BEEF ||
+                item.getId() == ItemID.COOKED_BEEF ||
+                item.getId() == ItemID.RAW_MUTTON ||
+                item.getId() == ItemID.COOKED_MUTTON ||
+                item.getId() == ItemID.RAW_PORKCHOP ||
+                item.getId() == ItemID.COOKED_PORKCHOP ||
+                item.getId() == ItemID.RAW_RABBIT ||
+                item.getId() == ItemID.COOKED_RABBIT ||
+                item.getId() == ItemID.ROTTEN_FLESH;
     }
 
     public int getHealableItem(Item item) {

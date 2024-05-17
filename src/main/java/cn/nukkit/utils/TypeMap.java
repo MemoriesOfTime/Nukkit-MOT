@@ -32,25 +32,6 @@ public final class TypeMap<T> {
         this.toObject = toObject;
     }
 
-    public int getId(T value) {
-        checkNotNull(value, "value");
-        return toId.getInt(value);
-    }
-
-    public T getType(int id) {
-        return toObject.get(id);
-    }
-
-    public Builder<T> toBuilder() {
-        Builder<T> builder = new Builder<>(type);
-        this.toObject.forEach(builder::insert);
-        return builder;
-    }
-
-    public void forEach(BiConsumer<Integer, T> consumer) {
-        this.toObject.forEach(consumer);
-    }
-
     public static <T> Builder<T> builder(Class<T> typeClass) {
         return new Builder<>(typeClass.getSimpleName());
     }
@@ -76,6 +57,25 @@ public final class TypeMap<T> {
         value |= value >> 16;
         value++;
         return value;
+    }
+
+    public int getId(T value) {
+        checkNotNull(value, "value");
+        return toId.getInt(value);
+    }
+
+    public T getType(int id) {
+        return toObject.get(id);
+    }
+
+    public Builder<T> toBuilder() {
+        Builder<T> builder = new Builder<>(type);
+        this.toObject.forEach(builder::insert);
+        return builder;
+    }
+
+    public void forEach(BiConsumer<Integer, T> consumer) {
+        this.toObject.forEach(consumer);
     }
 
     public String prettyPrint() {

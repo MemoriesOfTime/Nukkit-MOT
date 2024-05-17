@@ -28,6 +28,8 @@ import java.util.regex.Pattern;
  */
 public class Anvil extends BaseLevelProvider {
 
+    private int lastPosition = 0;
+
     public Anvil(Level level, String path) throws IOException {
         super(level, path);
     }
@@ -92,6 +94,12 @@ public class Anvil extends BaseLevelProvider {
         NBTIO.writeGZIPCompressed(new CompoundTag().putCompound("Data", levelData), new FileOutputStream(path + "level.dat"), ByteOrder.BIG_ENDIAN);
     }
 
+    public static ChunkSection createChunkSection(int y) {
+        ChunkSection cs = new ChunkSection(y);
+        cs.hasSkyLight = true;
+        return cs;
+    }
+
     @Override
     public Chunk getEmptyChunk(int chunkX, int chunkZ) {
         return Chunk.getEmptyChunk(chunkX, chunkZ, this);
@@ -119,7 +127,7 @@ public class Anvil extends BaseLevelProvider {
                     );
                 }, level.antiXrayEnabled(), getLevel().getDimensionData());
             });
-        }else {
+        } else {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
                 this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
                         timestamp,
@@ -131,8 +139,6 @@ public class Anvil extends BaseLevelProvider {
             }, level.antiXrayEnabled(), this.level.getDimensionData());
         }
     }
-
-    private int lastPosition = 0;
 
     @Override
     public void doGarbageCollection(long time) {
@@ -196,7 +202,6 @@ public class Anvil extends BaseLevelProvider {
         }
     }
 
-
     @Override
     public synchronized void saveChunk(int x, int z, FullChunk chunk) {
         if (!(chunk instanceof Chunk)) {
@@ -212,12 +217,6 @@ public class Anvil extends BaseLevelProvider {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public static ChunkSection createChunkSection(int y) {
-        ChunkSection cs = new ChunkSection(y);
-        cs.hasSkyLight = true;
-        return cs;
     }
 
     protected synchronized BaseRegionLoader loadRegion(int x, int z) {

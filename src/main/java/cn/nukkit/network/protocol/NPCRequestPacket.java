@@ -13,16 +13,6 @@ public class NPCRequestPacket extends DataPacket {
     public int actionType;
     public String sceneName;
 
-    public enum RequestType {
-        SET_ACTIONS,
-        EXECUTE_ACTION,
-        EXECUTE_CLOSING_COMMANDS,
-        SET_NAME,
-        SET_SKIN,
-        SET_INTERACTION_TEXT,
-        EXECUTE_OPENING_COMMANDS
-    }
-
     @Override
     public byte pid() {
         return NETWORK_ID;
@@ -48,5 +38,15 @@ public class NPCRequestPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_17_10) {
             this.putString(this.sceneName);
         }
+    }
+
+    public enum RequestType {
+        SET_ACTIONS,
+        EXECUTE_ACTION,
+        EXECUTE_CLOSING_COMMANDS,
+        SET_NAME,
+        SET_SKIN,
+        SET_INTERACTION_TEXT,
+        EXECUTE_OPENING_COMMANDS
     }
 }

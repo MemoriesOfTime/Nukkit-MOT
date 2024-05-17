@@ -49,7 +49,7 @@ public class EntityCaveSpider extends EntityWalkingMob implements EntityArthropo
 
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 2, 3, 3 });
+        this.setDamage(new int[]{0, 2, 3, 3});
     }
 
     @Override

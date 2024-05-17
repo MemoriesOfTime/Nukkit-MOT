@@ -2,12 +2,6 @@ package cn.nukkit.item;
 
 public interface StringItem {
 
-    String getNamespaceId();
-
-    default String getNamespaceId(int protocolId) {
-        return this.getNamespaceId();
-    }
-
     static String notEmpty(String value) {
         if (value != null && value.trim().isEmpty()) {
             throw new IllegalArgumentException("The name cannot be empty");
@@ -25,6 +19,12 @@ public interface StringItem {
             }
         }
         return name.toString();
+    }
+
+    String getNamespaceId();
+
+    default String getNamespaceId(int protocolId) {
+        return this.getNamespaceId();
     }
 
     default int getId() {

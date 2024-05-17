@@ -111,11 +111,9 @@ public class BlockBarrel extends BlockSolidMeta implements Faceable, BlockEntity
             }
         }
 
-        if (!(blockEntity instanceof BlockEntityBarrel)) {
+        if (!(blockEntity instanceof BlockEntityBarrel barrel)) {
             return false;
         }
-
-        BlockEntityBarrel barrel = (BlockEntityBarrel) blockEntity;
 
         if (barrel.namedTag.contains("Lock") && barrel.namedTag.get("Lock") instanceof StringTag) {
             if (!barrel.namedTag.getString("Lock").equals(item.getCustomName())) {
@@ -173,7 +171,7 @@ public class BlockBarrel extends BlockSolidMeta implements Faceable, BlockEntity
     }
 
     public void setOpen(boolean open) {
-        this.setDamage((this.getDamage() & 0x7) | (open? 0x8 : 0x0));
+        this.setDamage((this.getDamage() & 0x7) | (open ? 0x8 : 0x0));
     }
 
 
@@ -196,20 +194,18 @@ public class BlockBarrel extends BlockSolidMeta implements Faceable, BlockEntity
     @Override
     public boolean canBePushed() {
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
-        if (!(blockEntity instanceof BlockEntityBarrel)) {
+        if (!(blockEntity instanceof BlockEntityBarrel chest)) {
             return super.canBePushed();
         }
-        BlockEntityBarrel chest = (BlockEntityBarrel) blockEntity;
         return chest.getInventory().getViewers().size() < 1;
     }
 
     @Override
     public boolean canBePulled() {
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
-        if (!(blockEntity instanceof BlockEntityBarrel)) {
+        if (!(blockEntity instanceof BlockEntityBarrel chest)) {
             return super.canBePulled();
         }
-        BlockEntityBarrel chest = (BlockEntityBarrel) blockEntity;
         return chest.getInventory().getViewers().size() < 1;
     }
 }

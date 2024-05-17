@@ -4,8 +4,8 @@ import cn.nukkit.network.protocol.types.DisplaySlot;
 import cn.nukkit.network.protocol.types.SortOrder;
 import cn.nukkit.scoreboard.displayer.IScoreboardViewer;
 import cn.nukkit.scoreboard.scorer.IScorer;
-import javax.annotation.Nullable;
 
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;

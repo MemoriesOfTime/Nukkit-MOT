@@ -30,10 +30,8 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
 
     public static final int STREAM_STORAGE_VERSION = 8;
     public static final int SAVE_STORAGE_VERSION = 7;
-
-    private final int y;
-
     protected final ReentrantReadWriteLock sectionLock = new ReentrantReadWriteLock();
+    private final int y;
     private final ReentrantLock skyLightLock = new ReentrantLock();
 
     private final List<BlockStorage> storage = new ArrayList<>(1);
@@ -163,7 +161,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
         sectionLock.readLock().lock();
         try {
             BlockStorage storage = getStorageIfExists(layer);
-            return storage != null? storage.getBlockId(x, y, z) : 0;
+            return storage != null ? storage.getBlockId(x, y, z) : 0;
         } finally {
             sectionLock.readLock().unlock();
         }
@@ -211,7 +209,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
         sectionLock.readLock().lock();
         try {
             BlockStorage storage = getStorageIfExists(layer);
-            return storage != null? storage.getBlockData(x, y, z) : 0;
+            return storage != null ? storage.getBlockData(x, y, z) : 0;
         } finally {
             sectionLock.readLock().unlock();
         }
@@ -242,7 +240,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
         sectionLock.readLock().lock();
         try {
             BlockStorage storage = getStorageIfExists(layer);
-            return storage != null? storage.getBlockState(x, y, z) : new int[]{0,0};
+            return storage != null ? storage.getBlockState(x, y, z) : new int[]{0, 0};
         } finally {
             sectionLock.readLock().unlock();
         }
@@ -253,7 +251,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
         sectionLock.readLock().lock();
         try {
             BlockStorage storage = getStorageIfExists(layer);
-            return storage != null? storage.getFullBlock(x, y, z) : 0;
+            return storage != null ? storage.getFullBlock(x, y, z) : 0;
         } finally {
             sectionLock.readLock().unlock();
         }
@@ -430,7 +428,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
             if (!hasA && !hasB) {
                 return new byte[0][];
             }
-            byte[][] hyperData = new byte[hasB? 3 : 1][4096];
+            byte[][] hyperData = new byte[hasB ? 3 : 1][4096];
             for (int x = 0; x < 16; x++) {
                 for (int z = 0; z < 16; z++) {
                     for (int y = 0; y < 16; y++) {
@@ -755,7 +753,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
         Preconditions.checkArgument(layer >= 0, "Negative storage layer");
         Preconditions.checkArgument(layer <= getMaximumLayer(), "Only layer 0 to %d are supported", getMaximumLayer());
         synchronized (storage) {
-            BlockStorage blockStorage = layer < storage.size()? storage.get(layer) : null;
+            BlockStorage blockStorage = layer < storage.size() ? storage.get(layer) : null;
             if (blockStorage == null) {
                 blockStorage = new BlockStorage();
                 for (int i = storage.size(); i < layer; i++) {
@@ -787,7 +785,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
         BlockStorage[] storageCopy = new BlockStorage[Math.min(this.storage.size(), getMaximumLayer() + 1)];
         for (int i = 0; i < storageCopy.length; i++) {
             BlockStorage blockStorage = this.getStorageIfExists(i);
-            storageCopy[i] = blockStorage != null? blockStorage.copy() : null;
+            storageCopy[i] = blockStorage != null ? blockStorage.copy() : null;
         }
         return new ChunkSection(
                 this.y,

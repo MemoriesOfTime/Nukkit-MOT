@@ -77,7 +77,7 @@ public class BlockOreLapis extends BlockSolid {
     public boolean canHarvestWithHand() {
         return false;
     }
-    
+
     @Override
     public boolean canSilkTouch() {
         return true;

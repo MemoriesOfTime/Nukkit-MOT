@@ -33,13 +33,11 @@ import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
 public class StateBlockStorage {
 
     private static final int SIZE = 16 * 16 * 16;
-
-    private List<BlockStateSnapshot> palette;
-    private BitArray bitArray;
-
     //用于兼容1.13以下版本
     private final byte[] blockIds;
     private final NibbleArray blockData;
+    private List<BlockStateSnapshot> palette;
+    private BitArray bitArray;
 
     public StateBlockStorage() {
         this(BitArrayVersion.V2);
@@ -63,6 +61,14 @@ public class StateBlockStorage {
 
     private static int getPaletteHeader(BitArrayVersion version, boolean runtime) {
         return (version.getId() << 1) | (runtime ? 1 : 0);
+    }
+
+    public static int elementIndex(int x, int y, int z) {
+        int index = (x << 8) | (z << 4) | y;
+        if (index < 0 || index >= SUB_CHUNK_SIZE) {
+            throw new IllegalArgumentException("Invalid index: " + x + ", " + y + ", " + z);
+        }
+        return index;
     }
 
     public void writeToStorage(ByteBuf byteBuf) {
@@ -368,13 +374,5 @@ public class StateBlockStorage {
                 new ObjectArrayList<>(this.palette),
                 blockIds.clone(),
                 this.blockData.copy());
-    }
-
-    public static int elementIndex(int x, int y, int z) {
-        int index = (x << 8) | (z << 4) | y;
-        if (index < 0 || index >= SUB_CHUNK_SIZE) {
-            throw new IllegalArgumentException("Invalid index: " + x + ", " + y + ", " + z);
-        }
-        return index;
     }
 }

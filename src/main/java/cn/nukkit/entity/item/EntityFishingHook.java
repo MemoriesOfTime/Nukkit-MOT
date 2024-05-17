@@ -47,11 +47,9 @@ public class EntityFishingHook extends EntitySlenderProjectile {
     public int caughtTimer = 0;
     public boolean canCollide = true;
     public Entity caughtEntity = null;
-    private long target = 0;
-
     public Vector3 fish = null;
-
     public Item rod = null;
+    private long target = 0;
 
     public EntityFishingHook(FullChunk chunk, CompoundTag nbt) {
         this(chunk, nbt, null);
@@ -243,8 +241,7 @@ public class EntityFishingHook extends EntitySlenderProjectile {
     }
 
     public void reelLine() {
-        if (this.shootingEntity instanceof Player) {
-            Player player = (Player) this.shootingEntity;
+        if (this.shootingEntity instanceof Player player) {
             if (this.caught) {
                 Item item = Fishing.getFishingResult(this.rod);
                 if (item instanceof ItemBookEnchanted) {

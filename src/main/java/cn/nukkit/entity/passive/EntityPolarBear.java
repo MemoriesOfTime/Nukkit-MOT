@@ -57,7 +57,7 @@ public class EntityPolarBear extends EntityWalkingMob {
 
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 4, 6, 9 });
+        this.setDamage(new int[]{0, 4, 6, 9});
 
         if (this.namedTag.contains("Angry")) {
             this.angry = this.namedTag.getInt("Angry");

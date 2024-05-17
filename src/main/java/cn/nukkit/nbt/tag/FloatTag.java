@@ -9,16 +9,6 @@ public class FloatTag extends NumberTag<Float> {
 
     public float data;
 
-    @Override
-    public Float getData() {
-        return data;
-    }
-
-    @Override
-    public void setData(Float data) {
-        this.data = data == null ? 0 : data;
-    }
-
     public FloatTag(String name) {
         super(name);
     }
@@ -31,6 +21,16 @@ public class FloatTag extends NumberTag<Float> {
     public FloatTag(String name, float data) {
         super(name);
         this.data = data;
+    }
+
+    @Override
+    public Float getData() {
+        return data;
+    }
+
+    @Override
+    public void setData(Float data) {
+        this.data = data == null ? 0 : data;
     }
 
     @Override

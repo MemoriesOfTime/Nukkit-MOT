@@ -41,9 +41,9 @@ public class ReadOnlyLegacyStructureTemplate extends AbstractLegacyStructureTemp
             final ListTag<IntTag> pos = block.getList("pos", IntTag.class);
 
             blockInfoList.add(new StructureBlockInfo(
-                new BlockVector3(pos.get(0).data, pos.get(1).data, pos.get(2).data),
-                palette.stateFor(block.getInt("state")),
-                block.contains("nbt") ? block.getCompound("nbt") : null)
+                    new BlockVector3(pos.get(0).data, pos.get(1).data, pos.get(2).data),
+                    palette.stateFor(block.getInt("state")),
+                    block.contains("nbt") ? block.getCompound("nbt") : null)
             );
         }
 
@@ -57,9 +57,9 @@ public class ReadOnlyLegacyStructureTemplate extends AbstractLegacyStructureTemp
                 final ListTag<IntTag> blockPos = entity.getList("blockPos", IntTag.class);
 
                 entityInfoList.add(new StructureEntityInfo(
-                    new Vector3(pos.get(0).data, pos.get(1).data, pos.get(2).data),
-                    new BlockVector3(blockPos.get(0).data, blockPos.get(1).data, blockPos.get(2).data),
-                    entity.getCompound("nbt")));
+                        new Vector3(pos.get(0).data, pos.get(1).data, pos.get(2).data),
+                        new BlockVector3(blockPos.get(0).data, blockPos.get(1).data, blockPos.get(2).data),
+                        entity.getCompound("nbt")));
             }
         }
 

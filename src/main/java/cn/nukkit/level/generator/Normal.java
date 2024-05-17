@@ -38,6 +38,7 @@ import java.util.SplittableRandom;
  */
 public class Normal extends Generator {
 
+    public static final int seaHeight = 64; // should be 62
     private static final float[] biomeWeights = new float[25];
 
     static {
@@ -48,54 +49,53 @@ public class Normal extends Generator {
         }
     }
 
-    private List<Populator> generationPopulators = ImmutableList.of(
-        new PopulatorBedrock(),
-        new PopulatorGroundCover()
-    );
-    private List<Populator> populators = ImmutableList.of(
-        new PopulatorOre(STONE, new OreType[]{
-            new OreType(Block.get(BlockID.COAL_ORE), 20, 17, 0, 128),
-            new OreType(Block.get(BlockID.IRON_ORE), 20, 9, 0, 64),
-            new OreType(Block.get(BlockID.REDSTONE_ORE), 8, 8, 0, 16),
-            new OreType(Block.get(BlockID.LAPIS_ORE), 1, 7, 0, 30),
-            new OreType(Block.get(BlockID.GOLD_ORE), 2, 9, 0, 32),
-            new OreType(Block.get(BlockID.DIAMOND_ORE), 1, 8, 0, 16),
-            new OreType(Block.get(BlockID.DIRT), 10, 33, 0, 128),
-            new OreType(Block.get(BlockID.GRAVEL), 8, 33, 0, 128),
-            new OreType(Block.get(BlockID.STONE, BlockStone.GRANITE), 10, 33, 0, 80),
-            new OreType(Block.get(BlockID.STONE, BlockStone.DIORITE), 10, 33, 0, 80),
-            new OreType(Block.get(BlockID.STONE, BlockStone.ANDESITE), 10, 33, 0, 80)
-        }),
-        new PopulatorCaves()
-    );
-    private List<Populator> structurePopulators = ImmutableList.of(
-        new PopulatorFossil(),
-        new PopulatorShipwreck(),
-        new PopulatorSwampHut(),
-        new PopulatorDesertPyramid(),
-        new PopulatorJungleTemple(),
-        new PopulatorIgloo(),
-        new PopulatorPillagerOutpost(),
-        new PopulatorOceanRuin(),
-        new PopulatorVillage(),
-        new PopulatorStronghold(),
-        new PopulatorMineshaft(),
-        new PopulatorDesertWell(),
-        new PopulatorDungeon()
-    );
-    public static final int seaHeight = 64; // should be 62
     public NoiseGeneratorOctavesF scaleNoise;
     public NoiseGeneratorOctavesF depthNoise;
+    private final List<Populator> generationPopulators = ImmutableList.of(
+            new PopulatorBedrock(),
+            new PopulatorGroundCover()
+    );
+    private final List<Populator> populators = ImmutableList.of(
+            new PopulatorOre(STONE, new OreType[]{
+                    new OreType(Block.get(BlockID.COAL_ORE), 20, 17, 0, 128),
+                    new OreType(Block.get(BlockID.IRON_ORE), 20, 9, 0, 64),
+                    new OreType(Block.get(BlockID.REDSTONE_ORE), 8, 8, 0, 16),
+                    new OreType(Block.get(BlockID.LAPIS_ORE), 1, 7, 0, 30),
+                    new OreType(Block.get(BlockID.GOLD_ORE), 2, 9, 0, 32),
+                    new OreType(Block.get(BlockID.DIAMOND_ORE), 1, 8, 0, 16),
+                    new OreType(Block.get(BlockID.DIRT), 10, 33, 0, 128),
+                    new OreType(Block.get(BlockID.GRAVEL), 8, 33, 0, 128),
+                    new OreType(Block.get(BlockID.STONE, BlockStone.GRANITE), 10, 33, 0, 80),
+                    new OreType(Block.get(BlockID.STONE, BlockStone.DIORITE), 10, 33, 0, 80),
+                    new OreType(Block.get(BlockID.STONE, BlockStone.ANDESITE), 10, 33, 0, 80)
+            }),
+            new PopulatorCaves()
+    );
+    private final List<Populator> structurePopulators = ImmutableList.of(
+            new PopulatorFossil(),
+            new PopulatorShipwreck(),
+            new PopulatorSwampHut(),
+            new PopulatorDesertPyramid(),
+            new PopulatorJungleTemple(),
+            new PopulatorIgloo(),
+            new PopulatorPillagerOutpost(),
+            new PopulatorOceanRuin(),
+            new PopulatorVillage(),
+            new PopulatorStronghold(),
+            new PopulatorMineshaft(),
+            new PopulatorDesertWell(),
+            new PopulatorDungeon()
+    );
     private ChunkManager level;
     private NukkitRandom nukkitRandom;
     private long localSeed1;
     private long localSeed2;
     private BiomeSelector selector;
-    private ThreadLocal<float[]> depthRegion = ThreadLocal.withInitial(() -> null);
-    private ThreadLocal<float[]> mainNoiseRegion = ThreadLocal.withInitial(() -> null);
-    private ThreadLocal<float[]> minLimitRegion = ThreadLocal.withInitial(() -> null);
-    private ThreadLocal<float[]> maxLimitRegion = ThreadLocal.withInitial(() -> null);
-    private ThreadLocal<float[]> heightMap = ThreadLocal.withInitial(() -> new float[825]);
+    private final ThreadLocal<float[]> depthRegion = ThreadLocal.withInitial(() -> null);
+    private final ThreadLocal<float[]> mainNoiseRegion = ThreadLocal.withInitial(() -> null);
+    private final ThreadLocal<float[]> minLimitRegion = ThreadLocal.withInitial(() -> null);
+    private final ThreadLocal<float[]> maxLimitRegion = ThreadLocal.withInitial(() -> null);
+    private final ThreadLocal<float[]> heightMap = ThreadLocal.withInitial(() -> new float[825]);
     private NoiseGeneratorOctavesF minLimitPerlinNoise;
     private NoiseGeneratorOctavesF maxLimitPerlinNoise;
     private NoiseGeneratorOctavesF mainPerlinNoise;
@@ -329,7 +329,7 @@ public class Normal extends Generator {
 
     @Override
     public void populateChunk(int chunkX, int chunkZ) {
-        this.nukkitRandom.setSeed(0xdeadbeef ^ (chunkX << 8) ^ chunkZ ^ this.level.getSeed());
+        this.nukkitRandom.setSeed(0xdeadbeef ^ ((long) chunkX << 8) ^ chunkZ ^ this.level.getSeed());
         for (Populator populator : this.populators) {
             populator.populate(this.level, chunkX, chunkZ, this.nukkitRandom, level.getChunk(chunkX, chunkZ));
         }

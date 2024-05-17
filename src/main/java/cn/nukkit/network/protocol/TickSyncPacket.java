@@ -6,22 +6,22 @@ import lombok.ToString;
 public class TickSyncPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.TICK_SYNC_PACKET;
-    
+
     private long requestTimestamp;
-    
+
     private long responseTimestamp;
-    
+
     @Override
     public byte pid() {
         return NETWORK_ID;
     }
-    
+
     @Override
     public void decode() {
         this.requestTimestamp = this.getLLong();
         this.responseTimestamp = this.getLLong();
     }
-    
+
     @Override
     public void encode() {
         this.reset();

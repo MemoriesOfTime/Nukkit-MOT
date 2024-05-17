@@ -8,9 +8,8 @@ import static cn.nukkit.api.API.Definition.UNIVERSAL;
 import static cn.nukkit.api.API.Usage.DEPRECATED;
 
 /**
- * @deprecated Removed in 1.19.30 (553). Use {@link UpdateAbilitiesPacket} and {@link UpdateAdventureSettingsPacket} instead.
- *
  * @author Nukkit Project Team
+ * @deprecated Removed in 1.19.30 (553). Use {@link UpdateAbilitiesPacket} and {@link UpdateAdventureSettingsPacket} instead.
  */
 @ToString
 @API(usage = DEPRECATED, definition = UNIVERSAL) //在1.19.30弃用

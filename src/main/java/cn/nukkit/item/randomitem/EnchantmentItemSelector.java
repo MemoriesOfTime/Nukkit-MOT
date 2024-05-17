@@ -18,7 +18,7 @@ public class EnchantmentItemSelector extends ConstantItemSelector {
     }
 
     public EnchantmentItemSelector(int id, Integer meta, Selector parent) {
-        this(id, meta, 1,  parent);
+        this(id, meta, 1, parent);
     }
 
     public EnchantmentItemSelector(int id, Integer meta, int count, Selector parent) {

@@ -12,7 +12,7 @@ public class FormWindowSimple extends FormWindow {
     private final String type = "form";
     private String title = "";
     private String content = "";
-    private List<ElementButton> buttons;
+    private final List<ElementButton> buttons;
 
     private FormResponseSimple response = null;
 

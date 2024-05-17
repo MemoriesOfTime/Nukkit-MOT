@@ -64,7 +64,7 @@ public abstract class Particle extends Vector3 {
     public static final int TYPE_NOTE = dynamic(44);
     public static final int TYPE_WITCH_SPELL = dynamic(45);
     public static final int TYPE_CARROT = dynamic(46);
-    public static final int TYPE_MOB_APPEARANCE  = dynamic(47);
+    public static final int TYPE_MOB_APPEARANCE = dynamic(47);
     public static final int TYPE_END_ROD = dynamic(48);
     public static final int TYPE_RISING_DRAGONS_BREATH = dynamic(49);
     public static final int TYPE_SPIT = dynamic(50);
@@ -127,11 +127,6 @@ public abstract class Particle extends Vector3 {
         super(x, y, z);
     }
 
-    public DataPacket[] encode() {
-        Server.mvw("Particle#encode()");
-        return this.mvEncode(ProtocolInfo.CURRENT_PROTOCOL);
-    }
-
     public static int getMultiversionId(int protocol, int particle) {
         int id = particle;
         if (protocol < ProtocolInfo.v1_20_70 && id == 91) {
@@ -157,8 +152,6 @@ public abstract class Particle extends Vector3 {
         }
     }
 
-    public abstract DataPacket[] mvEncode(int protocol);
-
     public static Integer getParticleIdByName(String name) {
         name = name.toUpperCase();
 
@@ -179,4 +172,11 @@ public abstract class Particle extends Vector3 {
     public static boolean particleExists(String name) {
         return getParticleIdByName(name) != null;
     }
+
+    public DataPacket[] encode() {
+        Server.mvw("Particle#encode()");
+        return this.mvEncode(ProtocolInfo.CURRENT_PROTOCOL);
+    }
+
+    public abstract DataPacket[] mvEncode(int protocol);
 }

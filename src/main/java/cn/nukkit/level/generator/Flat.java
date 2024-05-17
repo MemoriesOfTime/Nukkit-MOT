@@ -23,43 +23,15 @@ import java.util.regex.Pattern;
  */
 public class Flat extends Generator {
 
-    @Override
-    public int getId() {
-        return TYPE_FLAT;
-    }
-
-    private ChunkManager level;
-
-    private NukkitRandom random;
-
     private final List<Populator> populators = new ArrayList<>();
-
-    private int[][] structure;
-
     private final Map<String, Object> options;
-
+    private ChunkManager level;
+    private NukkitRandom random;
+    private int[][] structure;
     private int floorLevel;
-
     private String preset;
-
     private boolean init = false;
-
     private int biome;
-
-    @Override
-    public ChunkManager getChunkManager() {
-        return level;
-    }
-
-    @Override
-    public Map<String, Object> getSettings() {
-        return this.options;
-    }
-
-    @Override
-    public String getName() {
-        return "flat";
-    }
 
     public Flat() {
         this(new HashMap<>());
@@ -82,6 +54,26 @@ public class Flat extends Generator {
             });
             this.populators.add(ores);
         }
+    }
+
+    @Override
+    public int getId() {
+        return TYPE_FLAT;
+    }
+
+    @Override
+    public ChunkManager getChunkManager() {
+        return level;
+    }
+
+    @Override
+    public Map<String, Object> getSettings() {
+        return this.options;
+    }
+
+    @Override
+    public String getName() {
+        return "flat";
     }
 
     protected void parsePreset(String preset) {
@@ -183,7 +175,7 @@ public class Flat extends Generator {
 
     @Override
     public void populateChunk(int chunkX, int chunkZ) {
-        this.random.setSeed(0xdeadbeef ^ (chunkX << 8) ^ chunkZ ^ this.level.getSeed());
+        this.random.setSeed(0xdeadbeef ^ ((long) chunkX << 8) ^ chunkZ ^ this.level.getSeed());
         for (Populator populator : this.populators) {
             populator.populate(this.level, chunkX, chunkZ, this.random, level.getChunk(chunkX, chunkZ));
         }

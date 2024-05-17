@@ -15,25 +15,18 @@ import java.util.Iterator;
  */
 public class BlockIterator implements Iterator<Block> {
 
-    private final int maxDistance;
-
     private static final int gridSize = 16777216;
-
-    private boolean end = false;
-
+    private final int maxDistance;
     private final Block[] blockQueue;
-    private int currentBlock;
-
-    private Block currentBlockObject = null;
-    private int currentDistance;
-    private int maxDistanceInt;
-
-    private int secondError;
-    private int thirdError;
-
     private final int secondStep;
     private final int thirdStep;
-
+    private boolean end = false;
+    private int currentBlock;
+    private Block currentBlockObject = null;
+    private int currentDistance;
+    private final int maxDistanceInt;
+    private int secondError;
+    private int thirdError;
     private BlockFace mainFace;
     private BlockFace secondFace;
     private BlockFace thirdFace;

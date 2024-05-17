@@ -6,13 +6,12 @@ import lombok.ToString;
 public class ServerToClientHandshakePacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.SERVER_TO_CLIENT_HANDSHAKE_PACKET;
+    public String jwt;
 
     @Override
     public byte pid() {
         return NETWORK_ID;
     }
-
-    public String jwt;
 
     @Override
     public void decode() {
@@ -25,11 +24,11 @@ public class ServerToClientHandshakePacket extends DataPacket {
         this.putString(this.jwt);
     }
 
-    public void setJwt(String jwt) {
-        this.jwt = jwt;
-    }
-
     public String getJwt() {
         return jwt;
+    }
+
+    public void setJwt(String jwt) {
+        this.jwt = jwt;
     }
 }

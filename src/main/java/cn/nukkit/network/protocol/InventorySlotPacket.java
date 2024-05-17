@@ -11,16 +11,15 @@ import lombok.ToString;
 public class InventorySlotPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.INVENTORY_SLOT_PACKET;
+    public int inventoryId;
+    public int networkId;
+    public int slot;
+    public Item item;
 
     @Override
     public byte pid() {
         return NETWORK_ID;
     }
-
-    public int inventoryId;
-    public int networkId;
-    public int slot;
-    public Item item;
 
     @Override
     public void decode() {

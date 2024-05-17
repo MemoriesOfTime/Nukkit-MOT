@@ -22,16 +22,16 @@ public class NukkitRandom {
         this.setSeed(seeds);
     }
 
+    public final long getSeed() {
+        return seed;
+    }
+
     public void setSeed(long seeds) {
         CRC32 crc32 = new CRC32();
         ByteBuffer buffer = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN);
         buffer.putInt((int) seeds);
         crc32.update(buffer.array());
         this.seed = crc32.getValue();
-    }
-
-    public final long getSeed() {
-        return seed;
     }
 
     public int nextSignedInt() {

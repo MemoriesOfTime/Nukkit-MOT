@@ -24,6 +24,10 @@ public class EntityChicken extends EntityWalkingAnimal {
         super(chunk, nbt);
     }
 
+    private static int getRandomEggLayTime() {
+        return Utils.rand(6000, 12000);
+    }
+
     @Override
     public int getNetworkId() {
         return NETWORK_ID;
@@ -144,10 +148,6 @@ public class EntityChicken extends EntityWalkingAnimal {
         }
 
         return false;
-    }
-
-    private static  int getRandomEggLayTime() {
-        return Utils.rand(6000, 12000);
     }
 
     @Override

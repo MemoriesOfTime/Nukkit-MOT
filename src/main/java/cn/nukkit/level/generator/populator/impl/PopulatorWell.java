@@ -16,13 +16,13 @@ public class PopulatorWell extends Populator {
     @Override
     public void populate(ChunkManager level, int chunkX, int chunkZ, NukkitRandom random, FullChunk chunk) {
         if (random.nextBoundedInt(190) != 1) return;
-            int x = NukkitMath.randomRange(random, chunkX << 4, (chunkX << 4) + 15);
-            int z = NukkitMath.randomRange(random, chunkZ << 4, (chunkZ << 4) + 15);
-            int y = this.getHighestWorkableBlock(chunk, x, z);
-            if (y == -1 || y > 128) {
-                return;
-            }
-            new ObjectWell(level, x, y, z);
+        int x = NukkitMath.randomRange(random, chunkX << 4, (chunkX << 4) + 15);
+        int z = NukkitMath.randomRange(random, chunkZ << 4, (chunkZ << 4) + 15);
+        int y = this.getHighestWorkableBlock(chunk, x, z);
+        if (y == -1 || y > 128) {
+            return;
+        }
+        new ObjectWell(level, x, y, z);
     }
 
     private int getHighestWorkableBlock(FullChunk chunk, int x, int z) {

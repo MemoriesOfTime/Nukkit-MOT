@@ -7,33 +7,18 @@ import java.util.List;
 
 public class ElementDialogButton {
 
-    private String button_name; // json 格式需要，勿改
-
-    private String text;
-
-    private List<CmdLine> data;
-
     protected transient Dialog nextDialog = null;
-
-    public static class CmdLine{
-        public CmdLine(String cmd_line, int cmd_ver){
-            this.cmd_line = cmd_line;
-            this.cmd_ver = cmd_ver;
-        }
-        public String cmd_line;
-        public int cmd_ver;
-        public static transient final int CMD_VER = 19;
-    }
-
+    private String button_name; // json 格式需要，勿改
+    private String text;
+    private List<CmdLine> data;
     private int mode;
-
     private int type;
 
     public ElementDialogButton(String name, String text) {
         this(name, text, null);
     }
 
-    public ElementDialogButton(String name, String text, Dialog nextDialog){
+    public ElementDialogButton(String name, String text, Dialog nextDialog) {
         this(name, text, nextDialog, Mode.BUTTON_MODE);
     }
 
@@ -50,7 +35,7 @@ public class ElementDialogButton {
         this.type = type;
     }
 
-    public List<CmdLine> updateButtonData(){
+    public List<CmdLine> updateButtonData() {
         List<CmdLine> list = new ArrayList<>();
         String[] split = text.split("\n");
         for (String str : split) {
@@ -115,5 +100,15 @@ public class ElementDialogButton {
         BUTTON_MODE,
         ON_EXIT,
         ON_ENTER
+    }
+
+    public static class CmdLine {
+        public static final int CMD_VER = 19;
+        public String cmd_line;
+        public int cmd_ver;
+        public CmdLine(String cmd_line, int cmd_ver) {
+            this.cmd_line = cmd_line;
+            this.cmd_ver = cmd_ver;
+        }
     }
 }

@@ -11,7 +11,7 @@ import cn.nukkit.level.generator.populator.nether.BasaltDeltaPillarPopulator;
 public class BasaltDeltasBiome extends NetherBiome {
     public BasaltDeltasBiome() {
         addPopulator(new PopulatorOre(BlockID.BASALT, new OreType[]{
-            new OreType(Block.get(BlockID.BLACKSTONE), 4, 128, 0, 128, BlockID.BASALT)
+                new OreType(Block.get(BlockID.BLACKSTONE), 4, 128, 0, 128, BlockID.BASALT)
         }));
 
         addPopulator(new BasaltDeltaLavaPopulator());

@@ -11,9 +11,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ItemGoatHorn extends StringItemBase {
 
-    protected int coolDownTick = 140;
-
     private final AtomicBoolean banUse = new AtomicBoolean(false);
+    protected int coolDownTick = 140;
 
     public ItemGoatHorn() {
         this(0);

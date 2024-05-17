@@ -46,24 +46,24 @@ public class BlockTripWire extends BlockFlowable {
         return (this.getDamage() & 1) > 0;
     }
 
-    public boolean isAttached() {
-        return (this.getDamage() & 4) > 0;
-    }
-
-    public boolean isDisarmed() {
-        return (this.getDamage() & 8) > 0;
-    }
-
     public void setPowered(boolean value) {
         if (value ^ this.isPowered()) {
             this.setDamage(this.getDamage() ^ 0x01);
         }
     }
 
+    public boolean isAttached() {
+        return (this.getDamage() & 4) > 0;
+    }
+
     public void setAttached(boolean value) {
         if (value ^ this.isAttached()) {
             this.setDamage(this.getDamage() ^ 0x04);
         }
+    }
+
+    public boolean isDisarmed() {
+        return (this.getDamage() & 8) > 0;
     }
 
     public void setDisarmed(boolean value) {
@@ -94,8 +94,7 @@ public class BlockTripWire extends BlockFlowable {
             for (int i = 1; i < 42; ++i) {
                 Block block = this.getSide(side, i);
 
-                if (block instanceof BlockTripWireHook) {
-                    BlockTripWireHook hook = (BlockTripWireHook) block;
+                if (block instanceof BlockTripWireHook hook) {
 
                     if (hook.getFacing() == side.getOpposite()) {
                         hook.calculateState(false, true, i, this);

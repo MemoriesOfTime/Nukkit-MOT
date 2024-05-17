@@ -17,20 +17,20 @@ public class DigProperty {
         this.speed = speed;
     }
 
-    public void setSpeed(int speed) {
-        this.speed = speed;
-    }
-
     @Nullable
     public Integer getSpeed() {
         return speed;
     }
 
-    public void setStates(CompoundTag states) {
-        this.states = states;
+    public void setSpeed(int speed) {
+        this.speed = speed;
     }
 
     public CompoundTag getStates() {
         return states;
+    }
+
+    public void setStates(CompoundTag states) {
+        this.states = states;
     }
 }

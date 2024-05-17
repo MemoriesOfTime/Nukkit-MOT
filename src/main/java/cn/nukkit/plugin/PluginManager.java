@@ -25,25 +25,16 @@ import java.util.regex.Pattern;
 @Log4j2
 public class PluginManager {
 
-    private final Server server;
-
-    private final SimpleCommandMap commandMap;
-
     protected final Map<String, Plugin> plugins = new LinkedHashMap<>();
-
     protected final Map<String, Permission> permissions = new ConcurrentHashMap<>();
-
     protected final Map<String, Permission> defaultPerms = new ConcurrentHashMap<>();
-
     protected final Map<String, Permission> defaultPermsOp = new ConcurrentHashMap<>();
-
     protected final Map<String, Set<Permissible>> permSubs = new ConcurrentHashMap<>();
-
     protected final Set<Permissible> defSubs = new ConcurrentSet<>();
-
     protected final Set<Permissible> defSubsOp = new ConcurrentSet<>();
-
     protected final Map<String, PluginLoader> fileAssociations = new HashMap<>();
+    private final Server server;
+    private final SimpleCommandMap commandMap;
 
     public PluginManager(Server server, SimpleCommandMap commandMap) {
         this.server = server;

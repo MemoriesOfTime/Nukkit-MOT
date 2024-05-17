@@ -21,16 +21,16 @@ public class ItemFrameUseEvent extends BlockEvent implements Cancellable {
     protected final BlockEntityItemFrame itemFrame;
     protected final Action action;
 
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
     public ItemFrameUseEvent(@Nullable Player player, @NotNull Block block, @NotNull BlockEntityItemFrame itemFrame, @Nullable Item item, Action action) {
         super(block);
         this.player = player;
         this.itemFrame = itemFrame;
         this.item = item;
         this.action = action;
+    }
+
+    public static HandlerList getHandlers() {
+        return handlers;
     }
 
     /**

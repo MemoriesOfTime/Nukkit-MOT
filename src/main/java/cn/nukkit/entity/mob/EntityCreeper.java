@@ -192,7 +192,8 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
     }
 
     @Override
-    public void attackEntity(Entity player) {}
+    public void attackEntity(Entity player) {
+    }
 
     @Override
     public Item[] getDrops() {

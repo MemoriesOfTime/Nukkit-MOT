@@ -9,33 +9,27 @@ import cn.nukkit.math.BlockFace;
 
 /**
  * Event for Block being broken.
+ *
  * @author MagicDroidX
  */
 public class BlockBreakEvent extends BlockEvent implements Cancellable {
 
     private static final HandlerList handlers = new HandlerList();
-
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
     protected final Player player;
-
     protected final Item item;
     protected final BlockFace face;
-
     protected boolean instaBreak;
     protected Item[] blockDrops;
     protected int blockXP;
-
     protected boolean fastBreak;
 
     /**
      * This event is called when a block is broken.
+     *
      * @param player Player who broke the block.
-     * @param block Block that was broken.
-     * @param item Item used to break the block.
-     * @param drops Items dropped by the block.
+     * @param block  Block that was broken.
+     * @param item   Item used to break the block.
+     * @param drops  Items dropped by the block.
      */
     public BlockBreakEvent(Player player, Block block, Item item, Item[] drops) {
         this(player, block, item, drops, false, false);
@@ -60,6 +54,10 @@ public class BlockBreakEvent extends BlockEvent implements Cancellable {
         this.blockXP = block.getDropExp();
     }
 
+    public static HandlerList getHandlers() {
+        return handlers;
+    }
+
     public Player getPlayer() {
         return player;
     }
@@ -76,6 +74,10 @@ public class BlockBreakEvent extends BlockEvent implements Cancellable {
         return this.instaBreak;
     }
 
+    public void setInstaBreak(boolean instaBreak) {
+        this.instaBreak = instaBreak;
+    }
+
     public Item[] getDrops() {
         return blockDrops;
     }
@@ -90,10 +92,6 @@ public class BlockBreakEvent extends BlockEvent implements Cancellable {
 
     public void setDropExp(int xp) {
         this.blockXP = xp;
-    }
-
-    public void setInstaBreak(boolean instaBreak) {
-        this.instaBreak = instaBreak;
     }
 
     public boolean isFastBreak() {

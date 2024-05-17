@@ -86,7 +86,8 @@ public interface ProtocolInfo {
     int v1_20_80 = 671;
 
     int CURRENT_PROTOCOL = Utils.dynamic(v1_20_80);
-
+    String MINECRAFT_VERSION_NETWORK = Utils.getVersionByProtocol(CURRENT_PROTOCOL);
+    String MINECRAFT_VERSION = 'v' + MINECRAFT_VERSION_NETWORK;
     List<Integer> SUPPORTED_PROTOCOLS = Ints.asList(
             /*v1_1_0, */v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
             v1_8_0, v1_9_0, v1_10_0, v1_11_0, v1_12_0, v1_13_0, v1_14_0, v1_14_60, v1_16_0, v1_16_20, v1_16_100_0, v1_16_100_51,
@@ -95,10 +96,6 @@ public interface ProtocolInfo {
             v1_19_10, v1_19_20, v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50_20, v1_19_50, v1_19_60, v1_19_63, v1_19_70_24, v1_19_70,
             v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40, v1_20_50, v1_20_60, v1_20_70, v1_20_80
     );
-
-    String MINECRAFT_VERSION_NETWORK = Utils.getVersionByProtocol(CURRENT_PROTOCOL);
-    String MINECRAFT_VERSION = 'v' + MINECRAFT_VERSION_NETWORK;
-
     byte BATCH_PACKET = (byte) 0xff;
     byte LOGIN_PACKET = 0x01;
     byte PLAY_STATUS_PACKET = 0x02;

@@ -14,11 +14,15 @@ import static cn.nukkit.utils.Rail.Orientation.State.*;
 
 /**
  * INTERNAL helper class of railway
- * 
+ * <p>
  * By lmlstarqaq http://snake1999.com/
  * Creation time: 2017/7/1 17:42.
  */
 public final class Rail {
+
+    private Rail() {
+        //no instance
+    }
 
     /**
      * Check if the block is a rail block
@@ -29,6 +33,24 @@ public final class Rail {
     public static boolean isRailBlock(Block block) {
         Objects.requireNonNull(block, "Rail block predicate can not accept null block");
         return isRailBlock(block.getId());
+    }
+
+    /**
+     * Check if the block is a rail block
+     *
+     * @param blockId block id
+     * @return is rail block
+     */
+    public static boolean isRailBlock(int blockId) {
+        switch (blockId) {
+            case Block.RAIL:
+            case Block.POWERED_RAIL:
+            case Block.ACTIVATOR_RAIL:
+            case Block.DETECTOR_RAIL:
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**
@@ -47,6 +69,13 @@ public final class Rail {
         CURVED_NORTH_EAST(9, CURVED, NORTH, EAST, null);
 
         private static final Orientation[] META_LOOKUP = new Orientation[values().length];
+
+        static {
+            for (Orientation o : values()) {
+                META_LOOKUP[o.meta] = o;
+            }
+        }
+
         private final int meta;
         private final State state;
         private final List<BlockFace> connectingDirections;
@@ -127,13 +156,6 @@ public final class Rail {
             return Optional.ofNullable(ascendingDirection);
         }
 
-        /**
-         * Rail orientation state enum
-         */
-        public enum State {
-            STRAIGHT, ASCENDING, CURVED
-        }
-
         public boolean isStraight() {
             return state == STRAIGHT;
         }
@@ -146,32 +168,11 @@ public final class Rail {
             return state == CURVED;
         }
 
-        static {
-            for (Orientation o : values()) {
-                META_LOOKUP[o.meta] = o;
-            }
+        /**
+         * Rail orientation state enum
+         */
+        public enum State {
+            STRAIGHT, ASCENDING, CURVED
         }
-    }
-
-    /**
-     * Check if the block is a rail block
-     *
-     * @param blockId block id
-     * @return is rail block
-     */
-    public static boolean isRailBlock(int blockId) {
-        switch (blockId) {
-            case Block.RAIL:
-            case Block.POWERED_RAIL:
-            case Block.ACTIVATOR_RAIL:
-            case Block.DETECTOR_RAIL:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private Rail() {
-        //no instance
     }
 }

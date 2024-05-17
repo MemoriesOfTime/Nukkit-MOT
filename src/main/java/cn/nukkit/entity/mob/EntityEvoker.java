@@ -45,7 +45,7 @@ public class EntityEvoker extends EntityWalkingMob {
 
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 2, 3, 4 });
+        this.setDamage(new int[]{0, 2, 3, 4});
     }
 
     @Override

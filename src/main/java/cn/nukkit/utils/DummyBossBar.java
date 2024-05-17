@@ -11,6 +11,7 @@ import cn.nukkit.network.protocol.*;
 /**
  * DummyBossBar
  * ===============
+ *
  * @author boybook
  * Nukkit Project
  * ===============
@@ -30,42 +31,6 @@ public class DummyBossBar {
         this.text = builder.text;
         this.length = builder.length;
         this.color = builder.color;
-    }
-
-    /**
-     * Boss bar builder
-     */
-    public static class Builder {
-        private final Player player;
-        private final long bossBarId;
-
-        private String text = "";
-        private float length = 100;
-        private BossBarColor color = null;
-
-        public Builder(Player player) {
-            this.player = player;
-            this.bossBarId = 1095216660480L + Utils.random.nextLong(0, Integer.MAX_VALUE);
-        }
-
-        public Builder text(String text) {
-            this.text = text;
-            return this;
-        }
-
-        public Builder length(float length) {
-            if (length >= 0 && length <= 100) this.length = length;
-            return this;
-        }
-
-        public Builder color(BossBarColor color) {
-            this.color = color;
-            return this;
-        }
-
-        public DummyBossBar build() {
-            return new DummyBossBar(this);
-        }
     }
 
     /**
@@ -130,6 +95,19 @@ public class DummyBossBar {
         }
     }
 
+    @Deprecated
+    public void setColor(int red, int green, int blue) {
+        try {
+            throw new RuntimeException();
+        } catch (Exception e) {
+            Server.getInstance().getLogger().warning("Unsupported API usage: DummyBossBar.setColor(int,int,int)", e);
+        }
+    }
+
+    public BossBarColor getColor() {
+        return this.color;
+    }
+
     /**
      * @param color the boss bar color
      */
@@ -144,22 +122,9 @@ public class DummyBossBar {
     public void setColor(BlockColor blockColor) {
         try {
             throw new RuntimeException();
-        }catch (Exception e) {
+        } catch (Exception e) {
             Server.getInstance().getLogger().warning("Unsupported API usage: DummyBossBar.setColor(BlockColor)", e);
         }
-    }
-
-    @Deprecated
-    public void setColor(int red, int green, int blue) {
-        try {
-            throw new RuntimeException();
-        }catch (Exception e) {
-            Server.getInstance().getLogger().warning("Unsupported API usage: DummyBossBar.setColor(int,int,int)", e);
-        }
-    }
-
-    public BossBarColor getColor() {
-        return this.color;
     }
 
     private void createBossEntity() {
@@ -286,5 +251,41 @@ public class DummyBossBar {
     public void destroy() {
         sendHideBossBar();
         removeBossEntity();
+    }
+
+    /**
+     * Boss bar builder
+     */
+    public static class Builder {
+        private final Player player;
+        private final long bossBarId;
+
+        private String text = "";
+        private float length = 100;
+        private BossBarColor color = null;
+
+        public Builder(Player player) {
+            this.player = player;
+            this.bossBarId = 1095216660480L + Utils.random.nextLong(0, Integer.MAX_VALUE);
+        }
+
+        public Builder text(String text) {
+            this.text = text;
+            return this;
+        }
+
+        public Builder length(float length) {
+            if (length >= 0 && length <= 100) this.length = length;
+            return this;
+        }
+
+        public Builder color(BossBarColor color) {
+            this.color = color;
+            return this;
+        }
+
+        public DummyBossBar build() {
+            return new DummyBossBar(this);
+        }
     }
 }

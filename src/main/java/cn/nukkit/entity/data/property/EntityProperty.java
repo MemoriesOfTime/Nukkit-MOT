@@ -10,7 +10,7 @@ import java.util.*;
  * @author Peng_Lx
  */
 public abstract class EntityProperty {
-    
+
     private static final String PLAYER_KEY = "minecraft:player";
     private static final String PROPERTIES_KEY = "properties";
 
@@ -68,12 +68,6 @@ public abstract class EntityProperty {
         return entityPropertyMap.getOrDefault(identifier, new ArrayList<>());
     }
 
-    public String getIdentifier() {
-        return identifier;
-    }
-
-    public abstract void populateTag(CompoundTag tag);
-
     private static ListTag<CompoundTag> buildPropertyList(List<EntityProperty> properties) {
         ListTag<CompoundTag> listProperty = new ListTag<>();
         for (EntityProperty entityProperty : properties) {
@@ -84,4 +78,10 @@ public abstract class EntityProperty {
         }
         return listProperty;
     }
+
+    public String getIdentifier() {
+        return identifier;
+    }
+
+    public abstract void populateTag(CompoundTag tag);
 }

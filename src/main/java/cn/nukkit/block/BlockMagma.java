@@ -14,7 +14,7 @@ import cn.nukkit.potion.Effect;
 
 public class BlockMagma extends BlockSolid {
 
-    public BlockMagma(){
+    public BlockMagma() {
 
     }
 

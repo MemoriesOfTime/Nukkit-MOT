@@ -32,7 +32,7 @@ public class BlockEntityCauldron extends BlockEntitySpawnable {
         }
         potionId = namedTag.getShort("PotionId");
 
-        int potionType = (potionId & 0xFFFF) == 0xFFFF? POTION_TYPE_EMPTY : POTION_TYPE_NORMAL;
+        int potionType = (potionId & 0xFFFF) == 0xFFFF ? POTION_TYPE_EMPTY : POTION_TYPE_NORMAL;
         if (namedTag.getBoolean("SplashPotion")) {
             potionType = POTION_TYPE_SPLASH;
             namedTag.remove("SplashPotion");
@@ -58,12 +58,12 @@ public class BlockEntityCauldron extends BlockEntitySpawnable {
         return getPotionId() != 0xffff;
     }
 
-    public void setPotionType(int potionType) {
-        this.namedTag.putShort("PotionType", potionType & 0xFFFF);
-    }
-
     public int getPotionType() {
         return this.namedTag.getShort("PotionType") & 0xFFFF;
+    }
+
+    public void setPotionType(int potionType) {
+        this.namedTag.putShort("PotionType", potionType & 0xFFFF);
     }
 
     public boolean isSplashPotion() {

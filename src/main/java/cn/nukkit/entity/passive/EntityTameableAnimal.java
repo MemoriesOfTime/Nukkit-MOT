@@ -51,6 +51,13 @@ public abstract class EntityTameableAnimal extends cn.nukkit.entity.passive.Enti
     }
 
     @Override
+    public void setOwner(Player player) {
+        this.owner = player;
+        this.setDataProperty(new LongEntityData(DATA_OWNER_EID, player.getId()));
+        this.setTamed(true);
+    }
+
+    @Override
     public boolean hasOwner() {
         return hasOwner(true);
     }
@@ -66,13 +73,6 @@ public abstract class EntityTameableAnimal extends cn.nukkit.entity.passive.Enti
             }
             return false;
         }
-    }
-
-    @Override
-    public void setOwner(Player player) {
-        this.owner = player;
-        this.setDataProperty(new LongEntityData(DATA_OWNER_EID, player.getId()));
-        this.setTamed(true);
     }
 
     @Override

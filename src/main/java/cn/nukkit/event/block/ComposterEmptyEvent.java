@@ -25,6 +25,10 @@ public class ComposterEmptyEvent extends BlockEvent implements Cancellable {
         this.newLevel = Math.max(0, Math.min(newLevel, 8));
     }
 
+    public static HandlerList getHandlers() {
+        return handlers;
+    }
+
     public Player getPlayer() {
         return player;
     }
@@ -64,10 +68,6 @@ public class ComposterEmptyEvent extends BlockEvent implements Cancellable {
 
     public void setMotion(Vector3 motion) {
         this.motion = motion;
-    }
-
-    public static HandlerList getHandlers() {
-        return handlers;
     }
 
 }

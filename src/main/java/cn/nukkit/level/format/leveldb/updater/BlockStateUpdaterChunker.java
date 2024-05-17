@@ -28,8 +28,8 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
         this.addProperty(ctx, "minecraft:cobbled_deepslate_double_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:coral", "dead_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:coral_block", "dead_bit", (byte) 0);
-        this.addProperty(ctx, "minecraft:coral_fan", "coral_fan_direction", (int) 0);
-        this.addProperty(ctx, "minecraft:coral_fan_dead", "coral_fan_direction", (int) 0);
+        this.addProperty(ctx, "minecraft:coral_fan", "coral_fan_direction", 0);
+        this.addProperty(ctx, "minecraft:coral_fan_dead", "coral_fan_direction", 0);
         this.addProperty(ctx, "minecraft:coral_fan_hang", "dead_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:coral_fan_hang2", "dead_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:coral_fan_hang3", "dead_bit", (byte) 0);
@@ -48,7 +48,7 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
         this.addProperty(ctx, "minecraft:flower_pot", "update_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:frame", "item_frame_photo_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:frame", "item_frame_map_bit", (byte) 0);
-        this.addProperty(ctx, "minecraft:kelp", "kelp_age", (int) 0);
+        this.addProperty(ctx, "minecraft:kelp", "kelp_age", 0);
         this.addProperty(ctx, "minecraft:lava_cauldron", "cauldron_liquid", "lava");
         this.addProperty(ctx, "minecraft:leaves", "update_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:leaves2", "update_bit", (byte) 0);
@@ -62,13 +62,13 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
         this.addProperty(ctx, "minecraft:sand", "sand_type", "normal");
         this.addProperty(ctx, "minecraft:sandstone", "sand_stone_type", "default");
         this.addProperty(ctx, "minecraft:sea_pickle", "dead_bit", (byte) 0);
-        this.addProperty(ctx, "minecraft:soul_fire", "age", (int) 0);
+        this.addProperty(ctx, "minecraft:soul_fire", "age", 0);
         this.addProperty(ctx, "minecraft:sponge", "sponge_type", "dry");
         this.addProperty(ctx, "minecraft:structure_void", "structure_void_type", "void");
         this.addProperty(ctx, "minecraft:tnt", "allow_underwater_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:trip_wire", "suspended_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:warped_double_slab", "top_slot_bit", (byte) 0);
-        this.addProperty(ctx, "minecraft:water", "liquid_depth", (int) 0);
+        this.addProperty(ctx, "minecraft:water", "liquid_depth", 0);
         this.addProperty(ctx, "minecraft:waxed_double_cut_copper_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:waxed_exposed_double_cut_copper_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:waxed_oxidized_double_cut_copper_slab", "top_slot_bit", (byte) 0);

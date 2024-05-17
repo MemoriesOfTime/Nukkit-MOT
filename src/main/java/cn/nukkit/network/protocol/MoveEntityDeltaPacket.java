@@ -36,7 +36,7 @@ public class MoveEntityDeltaPacket extends DataPacket {
         this.getEntityRuntimeId();
         if (protocol >= ProtocolInfo.v1_13_0) {
             this.flags = this.getLShort();
-        }else {
+        } else {
             this.flags = this.getByte();
         }
         this.x = getCoordinate(FLAG_HAS_X);
@@ -53,7 +53,7 @@ public class MoveEntityDeltaPacket extends DataPacket {
         this.putEntityRuntimeId(this.eid);
         if (protocol >= ProtocolInfo.v1_13_0) {
             this.putLShort(this.flags);
-        }else {
+        } else {
             this.putByte((byte) flags);
         }
         putCoordinate(FLAG_HAS_X, this.x);

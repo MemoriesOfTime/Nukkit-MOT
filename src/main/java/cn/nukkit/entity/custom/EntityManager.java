@@ -23,14 +23,14 @@ public class EntityManager {
     private byte[] networkTagCached;
     private byte[] networkTagCachedOld;
 
-    public static EntityManager get() {
-        return ENTITY_MANAGER;
-    }
-
     public EntityManager() {
         for (Map.Entry<Integer, String> entry : Entity.getEntityRuntimeMapping(ProtocolInfo.CURRENT_PROTOCOL).entrySet()) {
             legacy_ids.put(entry.getValue(), entry.getKey());
         }
+    }
+
+    public static EntityManager get() {
+        return ENTITY_MANAGER;
     }
 
     public void registerDefinition(EntityDefinition entityDefinition) {
@@ -74,7 +74,7 @@ public class EntityManager {
 
     private void createNetworkTagCached(int protocol) {
         try {
-            CompoundTag compoundTag = (CompoundTag)NBTIO.readNetwork(new ByteArrayInputStream(AvailableEntityIdentifiersPacket.TAG));
+            CompoundTag compoundTag = (CompoundTag) NBTIO.readNetwork(new ByteArrayInputStream(AvailableEntityIdentifiersPacket.TAG));
             ListTag<CompoundTag> listTag = compoundTag.getList("idlist", CompoundTag.class);
             for (EntityDefinition entityDefinition : this.identifierToDefinition.values()) {
                 listTag.add(protocol <= 407 ? entityDefinition.getNetworkTagOld() : entityDefinition.getNetworkTag());
@@ -85,7 +85,7 @@ public class EntityManager {
             } else {
                 this.networkTagCachedOld = NBTIO.writeNetwork(compoundTag);
             }
-        }catch (Exception e) {
+        } catch (Exception e) {
             throw new RuntimeException("Unable to init entityIdentifiers", e);
         }
     }

@@ -18,6 +18,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
  */
 public abstract class EntityVehicle extends Entity implements EntityRideable, EntityInteractable {
 
+    protected boolean rollingDirection = true;
     private int hurtTime;
     private int hurtDirection;
     private int damage;
@@ -80,8 +81,6 @@ public abstract class EntityVehicle extends Entity implements EntityRideable, En
         updateMovement();
         return true;
     }
-
-    protected boolean rollingDirection = true;
 
     protected boolean performHurtAnimation() {
         setRollingAmplitude(9);

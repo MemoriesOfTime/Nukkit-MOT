@@ -21,11 +21,9 @@ import java.util.Arrays;
 public abstract class BaseChunk extends BaseFullChunk implements Chunk {
 
     public static final int CONTENT_VERSION = 1;
-
-    protected ChunkSection[] sections;
-
     private static final byte[] emptyIdArray = new byte[4096];
     private static final byte[] emptyDataArray = new byte[2048];
+    protected ChunkSection[] sections;
 
     @Override
     public BaseChunk clone() {

@@ -61,7 +61,7 @@ public class Nukkit {
 
     public static void main(String[] args) {
 
-        System.setProperty("java.net.preferIPv4Stack" , "true");
+        System.setProperty("java.net.preferIPv4Stack", "true");
         System.setProperty("log4j.skipJansi", "false");
         System.getProperties().putIfAbsent("io.netty.allocator.type", "unpooled"); // Disable memory pooling unless specified
 
@@ -141,16 +141,16 @@ public class Nukkit {
         return version.append(commitId).toString();
     }
 
+    public static Level getLogLevel() {
+        return ((LoggerContext) LogManager.getContext(false)).getConfiguration().getLoggerConfig(org.apache.logging.log4j.LogManager.ROOT_LOGGER_NAME).getLevel();
+    }
+
     public static void setLogLevel(Level level) {
         Preconditions.checkNotNull(level, "level");
         LoggerContext ctx = (LoggerContext) LogManager.getContext(false);
         LoggerConfig loggerConfig = ctx.getConfiguration().getLoggerConfig(org.apache.logging.log4j.LogManager.ROOT_LOGGER_NAME);
         loggerConfig.setLevel(level);
         ctx.updateLoggers();
-    }
-
-    public static Level getLogLevel() {
-        return ((LoggerContext) LogManager.getContext(false)).getConfiguration().getLoggerConfig(org.apache.logging.log4j.LogManager.ROOT_LOGGER_NAME).getLevel();
     }
 
     public static String getBranch() {

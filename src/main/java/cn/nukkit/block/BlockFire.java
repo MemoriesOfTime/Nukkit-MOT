@@ -37,6 +37,21 @@ public class BlockFire extends BlockFlowable {
         super(meta);
     }
 
+    private static int getChanceOfNeighborsEncouragingFire(Block block) {
+        if (block.getId() != AIR) {
+            return 0;
+        } else {
+            int chance = 0;
+            chance = Math.max(chance, block.east().getBurnChance());
+            chance = Math.max(chance, block.west().getBurnChance());
+            chance = Math.max(chance, block.down().getBurnChance());
+            chance = Math.max(chance, block.up().getBurnChance());
+            chance = Math.max(chance, block.south().getBurnChance());
+            chance = Math.max(chance, block.north().getBurnChance());
+            return chance;
+        }
+    }
+
     @Override
     public int getId() {
         return FIRE;
@@ -232,21 +247,6 @@ public class BlockFire extends BlockFlowable {
             if (block instanceof BlockTNT) {
                 ((BlockTNT) block).prime();
             }
-        }
-    }
-
-    private static int getChanceOfNeighborsEncouragingFire(Block block) {
-        if (block.getId() != AIR) {
-            return 0;
-        } else {
-            int chance = 0;
-            chance = Math.max(chance, block.east().getBurnChance());
-            chance = Math.max(chance, block.west().getBurnChance());
-            chance = Math.max(chance, block.down().getBurnChance());
-            chance = Math.max(chance, block.up().getBurnChance());
-            chance = Math.max(chance, block.south().getBurnChance());
-            chance = Math.max(chance, block.north().getBurnChance());
-            return chance;
         }
     }
 

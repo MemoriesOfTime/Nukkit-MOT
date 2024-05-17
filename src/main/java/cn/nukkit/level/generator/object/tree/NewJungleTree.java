@@ -41,6 +41,29 @@ public class NewJungleTree extends TreeGenerator {
         this.maxTreeHeight = maxTreeHeight;
     }
 
+    private static boolean isAirBlock(ChunkManager level, BlockVector3 v) {
+        return level.getBlockIdAt(v.x, v.y, v.z) == 0;
+    }
+
+    private static int getCocoaMeta(int side) {
+        int meta = 0;
+
+        //3 4 2 5
+        switch (side) {
+            case 4:
+                meta++;
+                break;
+            case 2:
+                meta += 2;
+                break;
+            case 5:
+                meta += 3;
+                break;
+        }
+
+        return meta;
+    }
+
     @Override
     public boolean generate(ChunkManager worldIn, NukkitRandom rand, Vector3 vectorPosition) {
         BlockVector3 position = new BlockVector3(vectorPosition.getFloorX(), vectorPosition.getFloorY(), vectorPosition.getFloorZ());
@@ -206,28 +229,5 @@ public class NewJungleTree extends TreeGenerator {
             this.addVine(worldIn, pos, meta);
             pos = pos.down();
         }
-    }
-
-    private static boolean isAirBlock(ChunkManager level, BlockVector3 v) {
-        return level.getBlockIdAt(v.x, v.y, v.z) == 0;
-    }
-
-    private static int getCocoaMeta(int side) {
-        int meta = 0;
-
-        //3 4 2 5
-        switch (side) {
-            case 4:
-                meta++;
-                break;
-            case 2:
-                meta += 2;
-                break;
-            case 5:
-                meta += 3;
-                break;
-        }
-
-        return meta;
     }
 }

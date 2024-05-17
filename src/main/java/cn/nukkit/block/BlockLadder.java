@@ -170,7 +170,7 @@ public class BlockLadder extends BlockTransparentMeta implements Faceable {
     @Override
     public Item[] getDrops(Item item) {
         return new Item[]{
-            new ItemLadder(0, 1)
+                new ItemLadder(0, 1)
         };
     }
 

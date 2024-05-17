@@ -21,14 +21,11 @@ import java.util.concurrent.locks.ReentrantLock;
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_2D_SIZE;
 
 public class LevelDBChunk extends BaseChunk {
+    public final Lock ioLock;
+    private final DimensionData dimensionData;
     protected PalettedBlockStorage[] biomes3d; //TODO
-
     protected boolean subChunksDirty;
     protected boolean heightmapOrBiomesDirty;
-
-    public final Lock ioLock;
-
-    private final DimensionData dimensionData;
     private ChunkState state;
 
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ) {
@@ -59,11 +56,11 @@ public class LevelDBChunk extends BaseChunk {
 
         this.heightMap = new byte[SUB_CHUNK_2D_SIZE];
         if (heightmap != null && heightmap.length == SUB_CHUNK_2D_SIZE) {
-            for (int i=0; i<heightmap.length; i++) {
+            for (int i = 0; i < heightmap.length; i++) {
                 this.heightMap[i] = (byte) heightmap[i];
             }
         } else {
-            Arrays.fill(this.heightMap, (byte)-1);
+            Arrays.fill(this.heightMap, (byte) -1);
             this.recalculateHeightMap();
         }
 
@@ -80,6 +77,23 @@ public class LevelDBChunk extends BaseChunk {
         this.state = state;
     }
 
+    @SuppressWarnings("unused")
+    public static LevelDBChunk getEmptyChunk(int chunkX, int chunkZ) {
+        return getEmptyChunk(chunkX, chunkZ, null);
+    }
+
+    public static LevelDBChunk getEmptyChunk(int chunkX, int chunkZ, LevelProvider provider) {
+        return new LevelDBChunk(provider, chunkX, chunkZ);
+    }
+
+    protected static int index2d(int x, int z) {
+        int index = (z << 4) | x;
+        if (index < 0 || index >= SUB_CHUNK_2D_SIZE) {
+            throw new IllegalArgumentException("Invalid index: " + x + ", " + z);
+        }
+        return index;
+    }
+
     public void setNbtBlockEntities(List<CompoundTag> blockEntities) {
         this.NBTtiles = blockEntities;
     }
@@ -93,22 +107,17 @@ public class LevelDBChunk extends BaseChunk {
         return this.dimensionData.getSectionOffset();
     }
 
-    public void setState(@NotNull ChunkState state) {
-        this.state = state;
-    }
-
     public ChunkState getState() {
         return state;
+    }
+
+    public void setState(@NotNull ChunkState state) {
+        this.state = state;
     }
 
     @Override
     public boolean isGenerated() {
         return this.state.ordinal() >= ChunkState.GENERATED.ordinal();
-    }
-
-    @Override
-    public void setGenerated() {
-        this.setGenerated(true);
     }
 
     @Override
@@ -124,6 +133,11 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @Override
+    public void setGenerated() {
+        this.setGenerated(true);
+    }
+
+    @Override
     public int[] getBiomeColorArray() {
         return new int[0];
     }
@@ -131,11 +145,6 @@ public class LevelDBChunk extends BaseChunk {
     @Override
     public boolean isPopulated() {
         return this.state.ordinal() >= ChunkState.POPULATED.ordinal();
-    }
-
-    @Override
-    public void setPopulated() {
-        this.setPopulated(true);
     }
 
     @Override
@@ -148,6 +157,11 @@ public class LevelDBChunk extends BaseChunk {
         } else if (this.state.ordinal() >= ChunkState.POPULATED.ordinal()) {
             this.setState(ChunkState.GENERATED);
         }
+    }
+
+    @Override
+    public void setPopulated() {
+        this.setPopulated(true);
     }
 
     @Override
@@ -198,7 +212,7 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @Override
-    public void setBiomeId(int x, int z, int biomeId)  {
+    public void setBiomeId(int x, int z, int biomeId) {
         for (int sectionIndex = 0; sectionIndex < this.sections.length; sectionIndex++) {
             int sectionStartY = (sectionIndex - this.getSectionOffset()) << 4;
             for (int y = 0; y < 16; y++) {
@@ -398,22 +412,5 @@ public class LevelDBChunk extends BaseChunk {
         }
 
         return chunk;
-    }
-
-    @SuppressWarnings("unused")
-    public static LevelDBChunk getEmptyChunk(int chunkX, int chunkZ) {
-        return getEmptyChunk(chunkX, chunkZ, null);
-    }
-
-    public static LevelDBChunk getEmptyChunk(int chunkX, int chunkZ, LevelProvider provider) {
-        return new LevelDBChunk(provider, chunkX, chunkZ);
-    }
-
-    protected static int index2d(int x, int z) {
-        int index = (z << 4) | x;
-        if (index < 0 || index >= SUB_CHUNK_2D_SIZE) {
-            throw new IllegalArgumentException("Invalid index: " + x + ", " + z );
-        }
-        return index;
     }
 }

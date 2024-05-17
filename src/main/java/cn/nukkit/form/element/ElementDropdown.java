@@ -10,7 +10,7 @@ public class ElementDropdown extends Element {
     @SuppressWarnings("unused")
     private final String type = "dropdown";
     private String text = "";
-    private List<String> options;
+    private final List<String> options;
     @SerializedName("default")
     private int defaultOptionIndex = 0;
 

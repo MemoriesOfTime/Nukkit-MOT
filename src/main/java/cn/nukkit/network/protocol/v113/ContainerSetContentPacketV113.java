@@ -10,22 +10,20 @@ import cn.nukkit.network.protocol.ProtocolInfo;
  */
 public class ContainerSetContentPacketV113 extends DataPacket {
     public static final byte NETWORK_ID = ProtocolInfo.CRAFTING_DATA_PACKET;
-
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
-    }
-
     public static final byte SPECIAL_INVENTORY = 0;
     public static final byte SPECIAL_ARMOR = 0x78;
     public static final byte SPECIAL_CREATIVE = 0x79;
     public static final byte SPECIAL_HOTBAR = 0x7a;
     public static final byte SPECIAL_FIXED_INVENTORY = 0x7b;
-
     public long windowid;
     public long eid;
     public Item[] slots = Item.EMPTY_ARRAY;
     public int[] hotbar = new int[0];
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
 
     @Override
     public DataPacket clean() {

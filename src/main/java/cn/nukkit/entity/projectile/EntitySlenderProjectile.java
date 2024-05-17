@@ -19,7 +19,7 @@ import java.util.function.Predicate;
 /**
  * @author PowerNukkitX Project Team
  * <a href="https://github.com/PowerNukkitX/PowerNukkitX/blob/master/src/main/java/cn/nukkit/entity/projectile/SlenderProjectile.java">powernukkitx original file</a>
- *
+ * <p>
  * 这个抽象类代表较为细长的投射物实体(例如弓箭,三叉戟),它通过重写{@link Entity#move}方法实现这些实体较为准确的碰撞箱计算。
  * <p>
  * This abstract class represents slender projectile entities (e.g.arrow, trident), and it realized a more accurate collision box calculation for these entities by overriding the {@link Entity#move} method.

@@ -10,12 +10,6 @@ import lombok.ToString;
 public class LevelChunkPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.FULL_CHUNK_DATA_PACKET;
-
-    @Override
-    public byte pid() {
-        return NETWORK_ID;
-    }
-
     public int chunkX;
     public int chunkZ;
     /**
@@ -34,6 +28,11 @@ public class LevelChunkPacket extends DataPacket {
     public int subChunkLimit;
     public long[] blobIds;
     public byte[] data;
+
+    @Override
+    public byte pid() {
+        return NETWORK_ID;
+    }
 
     @Override
     public void decode() {
@@ -57,7 +56,7 @@ public class LevelChunkPacket extends DataPacket {
                     this.putUnsignedVarInt(-2);
                     this.putUnsignedVarInt(this.subChunkLimit);
                 }
-            }else {
+            } else {
                 this.putUnsignedVarInt(this.subChunkCount);
             }
             this.putBoolean(cacheEnabled);

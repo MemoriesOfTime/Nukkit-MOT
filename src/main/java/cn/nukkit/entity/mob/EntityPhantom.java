@@ -47,7 +47,7 @@ public class EntityPhantom extends EntityFlyingMob implements EntitySmite {
 
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 4, 6, 9 });
+        this.setDamage(new int[]{0, 4, 6, 9});
     }
 
     @Override

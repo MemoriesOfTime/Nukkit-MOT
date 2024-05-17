@@ -10,15 +10,9 @@ import cn.nukkit.math.Vector3;
 
 public class PlayerTeleportEvent extends PlayerEvent implements Cancellable {
     private static final HandlerList handlers = new HandlerList();
-
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
     private TeleportCause cause;
     private Location from;
     private Location to;
-
     private PlayerTeleportEvent(Player player) {
         this.player = player;
     }
@@ -37,6 +31,16 @@ public class PlayerTeleportEvent extends PlayerEvent implements Cancellable {
         this.cause = cause;
     }
 
+    public static HandlerList getHandlers() {
+        return handlers;
+    }
+
+    private static Location vectorToLocation(Level baseLevel, Vector3 vector) {
+        if (vector instanceof Location) return (Location) vector;
+        if (vector instanceof Position) return ((Position) vector).getLocation();
+        return new Location(vector.getX(), vector.getY(), vector.getZ(), 0, 0, baseLevel);
+    }
+
     public Location getFrom() {
         return from;
     }
@@ -47,12 +51,6 @@ public class PlayerTeleportEvent extends PlayerEvent implements Cancellable {
 
     public TeleportCause getCause() {
         return cause;
-    }
-
-    private static Location vectorToLocation(Level baseLevel, Vector3 vector) {
-        if (vector instanceof Location) return (Location) vector;
-        if (vector instanceof Position) return ((Position) vector).getLocation();
-        return new Location(vector.getX(), vector.getY(), vector.getZ(), 0, 0, baseLevel);
     }
 
 

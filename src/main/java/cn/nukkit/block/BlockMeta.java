@@ -18,13 +18,13 @@ public abstract class BlockMeta extends Block {
         return this.meta;
     }
 
-    public int getDamage(int flagBit) {
-        return this.getDamage() & flagBit;
-    }
-
     @Override
     public void setDamage(int meta) {
         this.meta = meta;
+    }
+
+    public int getDamage(int flagBit) {
+        return this.getDamage() & flagBit;
     }
 
     public void setDamage(int flagBit, int data) {
@@ -33,7 +33,7 @@ public abstract class BlockMeta extends Block {
 
     private int getFlagBitLength(int flagBit) {
         int count = 0;
-        while(flagBit != 1) {
+        while (flagBit != 1) {
             if (((flagBit & 1) == 1)) {
                 break;
             }

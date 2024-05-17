@@ -8,6 +8,15 @@ import java.util.HashMap;
 public abstract class Profession {
 
     private static final HashMap<Integer, Profession> knownProfessions = new HashMap<>();
+    private final int index;
+    private final int blockid;
+    private final String name;
+
+    public Profession(int index, int blockid, String name) {
+        this.index = index;
+        this.blockid = blockid;
+        this.name = name;
+    }
 
     public static void registerProfession(Profession profession) {
         knownProfessions.put(profession.getIndex(), profession);
@@ -19,21 +28,6 @@ public abstract class Profession {
 
     public static Profession getProfession(int index) {
         return knownProfessions.get(index);
-    }
-
-    private final int index;
-    private final int blockid;
-    private final String name;
-
-    public Profession(int index, int blockid, String name) {
-        this.index = index;
-        this.blockid = blockid;
-        this.name = name;
-    }
-
-    public ListTag<Tag> buildTrades(int seed) {
-        ListTag<Tag> recipes = new ListTag<>("Recipes");
-        return recipes;
     }
 
     public static void init() {
@@ -50,6 +44,11 @@ public abstract class Profession {
         registerProfession(new ProfessionButcher());
         registerProfession(new ProfessionLeather());
         registerProfession(new ProfessionMason());
+    }
+
+    public ListTag<Tag> buildTrades(int seed) {
+        ListTag<Tag> recipes = new ListTag<>("Recipes");
+        return recipes;
     }
 
     public int getBlockID() {

@@ -43,7 +43,7 @@ public class CustomItemDefinition {
         this.identifier = identifier;
         this.nbt = nbt;
 
-        this.nbt465  = nbt.clone();
+        this.nbt465 = nbt.clone();
         CompoundTag components465 = this.nbt465.getCompound("components");
         components465
                 .getCompound("item_properties")
@@ -64,23 +64,6 @@ public class CustomItemDefinition {
         this.nbt419 = this.nbt465.clone();
         this.nbt419.getCompound("components").getCompound("item_properties").remove("minecraft:icon");
         this.nbt419.getCompound("components").putCompound("minecraft:icon", new CompoundTag().putString("texture", this.getTexture()));
-    }
-
-    public String identifier() {
-        return identifier;
-    }
-
-    public CompoundTag getNbt() {
-        return getNbt(ProtocolInfo.CURRENT_PROTOCOL);
-    }
-
-    public CompoundTag getNbt(int protocol) {
-        if (protocol >= ProtocolInfo.v1_20_60) {
-            return this.nbt;
-        } else if (protocol >= ProtocolInfo.v1_17_30) {
-            return this.nbt465;
-        }
-        return this.nbt419;
     }
 
     /**
@@ -144,6 +127,27 @@ public class CustomItemDefinition {
         return new CustomItemDefinition.EdibleBuilder(item, creativeCategory);
     }
 
+    public static int getRuntimeId(String identifier) {
+        return CustomItemDefinition.INTERNAL_ALLOCATION_ID_MAP.get(identifier);
+    }
+
+    public String identifier() {
+        return identifier;
+    }
+
+    public CompoundTag getNbt() {
+        return getNbt(ProtocolInfo.CURRENT_PROTOCOL);
+    }
+
+    public CompoundTag getNbt(int protocol) {
+        if (protocol >= ProtocolInfo.v1_20_60) {
+            return this.nbt;
+        } else if (protocol >= ProtocolInfo.v1_17_30) {
+            return this.nbt465;
+        }
+        return this.nbt419;
+    }
+
     @Nullable
     public String getDisplayName() {
         if (!this.nbt.getCompound("components").contains("minecraft:display_name")) return null;
@@ -159,10 +163,6 @@ public class CustomItemDefinition {
     }
 
     public int getRuntimeId() {
-        return CustomItemDefinition.INTERNAL_ALLOCATION_ID_MAP.get(identifier);
-    }
-
-    public static int getRuntimeId(String identifier) {
         return CustomItemDefinition.INTERNAL_ALLOCATION_ID_MAP.get(identifier);
     }
 
@@ -392,14 +392,6 @@ public class CustomItemDefinition {
     }
 
     public static class ToolBuilder extends SimpleBuilder {
-        private final ItemCustomTool item;
-        private Integer speed = null;
-        private final List<CompoundTag> blocks = new ArrayList<>();
-        private final List<String> blockTags = new ArrayList<>();
-        private final CompoundTag diggerRoot = new CompoundTag("minecraft:digger")
-                .putBoolean("use_efficiency", true)
-                .putList(new ListTag<>("destroy_speeds"));
-
         public static Map<Identifier, Map<String, DigProperty>> toolBlocks = new HashMap<>();
 
         static {
@@ -435,6 +427,14 @@ public class CustomItemDefinition {
             }
             toolBlocks.put(ItemTag.IS_SWORD, swordBlocks);
         }
+
+        private final ItemCustomTool item;
+        private final List<CompoundTag> blocks = new ArrayList<>();
+        private final List<String> blockTags = new ArrayList<>();
+        private final CompoundTag diggerRoot = new CompoundTag("minecraft:digger")
+                .putBoolean("use_efficiency", true)
+                .putList(new ListTag<>("destroy_speeds"));
+        private Integer speed = null;
 
         private ToolBuilder(ItemCustomTool item, ItemCreativeCategory creativeCategory) {
             super(item, creativeCategory);
@@ -559,8 +559,8 @@ public class CustomItemDefinition {
         }
 
         /**
-         * @deprecated  在1.20.60更改，会导致客户端收到错误数据包
-         *
+         * @deprecated 在1.20.60更改，会导致客户端收到错误数据包
+         * <p>
          * 物品的攻击力必须大于0才能生效<p>
          * 标记这个物品是否为武器，如果是，会在物品描述中提示{@code "+X 攻击伤害"}的信息
          * <p>
@@ -737,7 +737,7 @@ public class CustomItemDefinition {
                         .putString("enchantable_slot", "armor_head");
                 this.nbt.getCompound("components")
                         .getCompound("minecraft:wearable")
-                                .putString("slot", "slot.armor.head");
+                        .putString("slot", "slot.armor.head");
             } else if (item.isChestplate()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "armor_torso");
@@ -749,13 +749,13 @@ public class CustomItemDefinition {
                         .putString("enchantable_slot", "armor_legs");
                 this.nbt.getCompound("components")
                         .getCompound("minecraft:wearable")
-                                .putString("slot", "slot.armor.legs");
+                        .putString("slot", "slot.armor.legs");
             } else if (item.isBoots()) {
                 this.nbt.getCompound("components").getCompound("item_properties")
                         .putString("enchantable_slot", "armor_feet");
                 this.nbt.getCompound("components")
                         .getCompound("minecraft:wearable")
-                                .putString("slot", "slot.armor.feet");
+                        .putString("slot", "slot.armor.feet");
             }
             return calculateID();
         }

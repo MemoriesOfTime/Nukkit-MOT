@@ -55,7 +55,7 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
 
         super.initEntity();
 
-        this.setDamage(new int[] { 0, 2, 3, 4 });
+        this.setDamage(new int[]{0, 2, 3, 4});
 
         if (this.namedTag.contains("Item")) {
             this.tool = NBTIO.getItemHelper(this.namedTag.getCompound("Item"));
@@ -120,7 +120,7 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
             }
         }
     }
-    
+
     @Override
     public boolean entityBaseTick(int tickDiff) {
         if (getServer().getDifficulty() == 0) {

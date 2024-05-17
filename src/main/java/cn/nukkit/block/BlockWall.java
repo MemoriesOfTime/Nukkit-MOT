@@ -142,7 +142,7 @@ public class BlockWall extends BlockTransparentMeta {
         WallType(BlockColor color) {
             this.color = color;
             String name = Arrays.stream(name().split("_"))
-                    .map(part-> part.charAt(0) + part.substring(1).toLowerCase())
+                    .map(part -> part.charAt(0) + part.substring(1).toLowerCase())
                     .collect(Collectors.joining(" "));
             typeName = name + " Wall";
         }

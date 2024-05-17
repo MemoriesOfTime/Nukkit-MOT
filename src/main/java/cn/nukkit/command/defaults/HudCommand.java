@@ -57,7 +57,7 @@ public class HudCommand extends VanillaCommand {
             default -> null;
         };
 
-        if(visibility == null || element == null) {
+        if (visibility == null || element == null) {
             sender.sendMessage("Invalid visibility or element");
             return false;
         }

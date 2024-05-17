@@ -35,15 +35,12 @@ import java.util.Arrays;
  * @since 2020-09-28
  */
 public class SmithingInventory extends FakeBlockUIComponent {
+    public static final int SMITHING_EQUIPMENT_UI_SLOT = 51;
+    public static final int SMITHING_INGREDIENT_UI_SLOT = 52;
+    public static final int SMITHING_TEMPLATE_UI_SLOT = 53;
     private static final int EQUIPMENT = 0;
     private static final int INGREDIENT = 1;
     private static final int TEMPLATE = 2;
-
-    public static final int SMITHING_EQUIPMENT_UI_SLOT = 51;
-
-    public static final int SMITHING_INGREDIENT_UI_SLOT = 52;
-    public static final int SMITHING_TEMPLATE_UI_SLOT = 53;
-
     private Item currentResult = Item.get(0);
 
 
@@ -68,10 +65,6 @@ public class SmithingInventory extends FakeBlockUIComponent {
         setResult(this.getResult());
     }
 
-    private void setResult(Item result) {
-        this.currentResult = result;
-    }
-
     public Item getResult() {
         Item trimOutPutItem = this.getTrimOutPutItem();
         if (!trimOutPutItem.isNull()) {
@@ -82,6 +75,10 @@ public class SmithingInventory extends FakeBlockUIComponent {
             return Item.AIR_ITEM.clone();
         }
         return recipe.getFinalResult(getEquipment(), getTemplate());
+    }
+
+    private void setResult(Item result) {
+        this.currentResult = result;
     }
 
     public Item getTemplate() {

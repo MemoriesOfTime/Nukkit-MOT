@@ -31,6 +31,17 @@ public class BlockSweetBerryBush extends BlockFlowable {
         super(meta);
     }
 
+    public static boolean isSupportValid(Block block) {
+        switch (block.getId()) {
+            case GRASS:
+            case DIRT:
+            case PODZOL:
+                return true;
+            default:
+                return false;
+        }
+    }
+
     @Override
     public int getId() {
         return SWEET_BERRY_BUSH;
@@ -63,7 +74,7 @@ public class BlockSweetBerryBush extends BlockFlowable {
 
     @Override
     public double getHardness() {
-        return this.getDamage() == 0? 0 : 0.25;
+        return this.getDamage() == 0 ? 0 : 0.25;
     }
 
     @Override
@@ -92,7 +103,7 @@ public class BlockSweetBerryBush extends BlockFlowable {
             return true;
         }
 
-        if (age < 2){
+        if (age < 2) {
             return true;
         }
 
@@ -151,18 +162,6 @@ public class BlockSweetBerryBush extends BlockFlowable {
         return false;
     }
 
-
-    public static boolean isSupportValid(Block block) {
-        switch (block.getId()) {
-            case GRASS:
-            case DIRT:
-            case PODZOL:
-                return true;
-            default:
-                return false;
-        }
-    }
-
     @Override
     public boolean hasEntityCollision() {
         return this.getDamage() > 0;
@@ -187,7 +186,7 @@ public class BlockSweetBerryBush extends BlockFlowable {
             amount++;
         }
 
-        return new Item[]{ new ItemSweetBerries(0, amount) };
+        return new Item[]{new ItemSweetBerries(0, amount)};
     }
 
     @Override

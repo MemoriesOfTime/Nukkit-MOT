@@ -13,6 +13,15 @@ public class ChunkSectionSerializerV7 implements ChunkSectionSerializer {
 
     public static final ChunkSectionSerializer INSTANCE = new ChunkSectionSerializerV7();
 
+    private static StateBlockStorage deserialize(byte[] blocks, byte[] blockDataArray) {
+        NibbleArray blockData = new NibbleArray(blockDataArray);
+        StateBlockStorage storage = new StateBlockStorage();
+        for (int i = 0; i < SUB_CHUNK_SIZE; ++i) {
+            storage.set(i, BlockStateMapping.get().getState(blocks[i] << Block.DATA_BITS, blockData.get(i)));
+        }
+        return storage;
+    }
+
     @Override
     public void serializer(ByteBuf byteBuf, StateBlockStorage[] storages, int ySection) {
         throw new UnsupportedOperationException();
@@ -33,15 +42,6 @@ public class ChunkSectionSerializerV7 implements ChunkSectionSerializer {
         StateBlockStorage[] storages = new StateBlockStorage[2];
         storages[0] = ChunkSectionSerializerV7.deserialize(blocks, blockData);
         return storages;
-    }
-
-    private static StateBlockStorage deserialize(byte[] blocks, byte[] blockDataArray) {
-        NibbleArray blockData = new NibbleArray(blockDataArray);
-        StateBlockStorage storage = new StateBlockStorage();
-        for (int i = 0; i < SUB_CHUNK_SIZE; ++i) {
-            storage.set(i, BlockStateMapping.get().getState(blocks[i] << Block.DATA_BITS, blockData.get(i)));
-        }
-        return storage;
     }
 }
 

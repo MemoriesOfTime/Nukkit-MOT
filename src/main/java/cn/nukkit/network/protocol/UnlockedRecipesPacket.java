@@ -11,8 +11,8 @@ import java.util.List;
 public class UnlockedRecipesPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.UNLOCKED_RECIPES_PACKET;
-    public ActionType action;
     public final List<String> unlockedRecipes = new ObjectArrayList<>();
+    public ActionType action;
 
     @Override
     public byte pid() {

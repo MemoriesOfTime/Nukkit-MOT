@@ -20,6 +20,15 @@ public abstract class AbstractEntitySpawner implements EntitySpawner {
         this.spawnTask = spawnTask;
     }
 
+    private static boolean isTooNearOfPlayer(Position pos) {
+        for (Player p : pos.getLevel().getPlayers().values()) {
+            if (p.distanceSquared(pos) < 196) { // 14 blocks
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public void spawn() {
         for (Player player : Server.getInstance().getOnlinePlayers().values()) {
@@ -110,14 +119,5 @@ public abstract class AbstractEntitySpawner implements EntitySpawner {
             return !Utils.monstersList.contains(this.getEntityNetworkId());
         }
         return true;
-    }
-
-    private static boolean isTooNearOfPlayer(Position pos) {
-        for (Player p : pos.getLevel().getPlayers().values()) {
-            if (p.distanceSquared(pos) < 196) { // 14 blocks
-                return true;
-            }
-        }
-        return false;
     }
 }

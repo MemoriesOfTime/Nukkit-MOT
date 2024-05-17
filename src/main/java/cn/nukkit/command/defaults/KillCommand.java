@@ -2,7 +2,6 @@ package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
@@ -112,11 +111,10 @@ public class KillCommand extends VanillaCommand {
                     sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.permission"));
                     return true;
                 }
-                if (!(sender instanceof Player)) {
+                if (!(sender instanceof Player p)) {
                     sender.sendMessage(new TranslationContainer("%commands.generic.ingame"));
                     return true;
                 }
-                Player p = (Player) sender;
                 if (p.isCreative() || p.isSpectator()) {
                     sender.sendMessage(TextFormat.RED + "No targets matched selector");
                     return true;
@@ -136,8 +134,7 @@ public class KillCommand extends VanillaCommand {
                 }
                 for (Level level : Server.getInstance().getLevels().values()) {
                     for (Entity entity : level.getEntities()) {
-                        if (entity instanceof Player) {
-                            Player p = (Player) entity;
+                        if (entity instanceof Player p) {
                             if (p.isCreative() || p.isSpectator()) {
                                 continue;
                             }
@@ -157,12 +154,11 @@ public class KillCommand extends VanillaCommand {
             }
             return true;
         }
-        if (sender instanceof Player) {
+        if (sender instanceof Player player) {
             if (!sender.hasPermission("nukkit.command.kill.self")) {
                 sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.permission"));
                 return true;
             }
-            Player player = (Player) sender;
             if (player.isCreative() || player.isSpectator()) {
                 sender.sendMessage(TextFormat.RED + "No targets matched selector");
                 return true;

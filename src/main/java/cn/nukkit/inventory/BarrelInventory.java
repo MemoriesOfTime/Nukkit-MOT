@@ -32,8 +32,7 @@ public class BarrelInventory extends ContainerInventory {
         }
 
         Block block = barrel.getBlock();
-        if (block instanceof BlockBarrel) {
-            BlockBarrel blockBarrel = (BlockBarrel) block;
+        if (block instanceof BlockBarrel blockBarrel) {
             if (!blockBarrel.isOpen()) {
                 blockBarrel.setOpen(true);
                 level.setBlock(blockBarrel, blockBarrel, true, true);
@@ -56,8 +55,7 @@ public class BarrelInventory extends ContainerInventory {
         }
 
         Block block = barrel.getBlock();
-        if (block instanceof BlockBarrel) {
-            BlockBarrel blockBarrel = (BlockBarrel) block;
+        if (block instanceof BlockBarrel blockBarrel) {
             if (blockBarrel.isOpen()) {
                 blockBarrel.setOpen(false);
                 level.setBlock(blockBarrel, blockBarrel, true, true);

@@ -59,16 +59,12 @@ public class BlockLantern extends BlockFlowable {
             return (down.getDamage() & 0x08) == 0x08;
         } else if (down instanceof BlockStairs) {
             return (down.getDamage() & 0x04) == 0x04;
-        } else if (down.isSolid()) {
-            return true;
-        } else {
-            return false;
-        }
+        } else return down.isSolid();
     }
 
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        if(this.getLevelBlock() instanceof BlockLiquid || this.getLevelBlockAtLayer(1) instanceof BlockLiquid) {
+        if (this.getLevelBlock() instanceof BlockLiquid || this.getLevelBlockAtLayer(1) instanceof BlockLiquid) {
             return false;
         }
 
@@ -126,32 +122,32 @@ public class BlockLantern extends BlockFlowable {
 
     @Override
     public double getMinX() {
-        return x + (5.0/16);
+        return x + (5.0 / 16);
     }
 
     @Override
     public double getMinY() {
-        return y + (this.getDamage()==0?0: 1./16);
+        return y + (this.getDamage() == 0 ? 0 : 1. / 16);
     }
 
     @Override
     public double getMinZ() {
-        return z + (5.0/16);
+        return z + (5.0 / 16);
     }
 
     @Override
     public double getMaxX() {
-        return x + (11.0/16);
+        return x + (11.0 / 16);
     }
 
     @Override
     public double getMaxY() {
-        return y + (this.getDamage()==0? 7.0/16 : 8.0/16);
+        return y + (this.getDamage() == 0 ? 7.0 / 16 : 8.0 / 16);
     }
 
     @Override
     public double getMaxZ() {
-        return z + (11.0/16);
+        return z + (11.0 / 16);
     }
 
     @Override

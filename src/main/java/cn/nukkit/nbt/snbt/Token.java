@@ -17,13 +17,73 @@ public class Token implements SNBTConstants, Node {
     private boolean unparsed;
     private Node parent;
     private String image;
-
-    public void setImage(String image) {
-        this.image = image;
-    }
-
     private Token prependedToken, appendedToken;
     private boolean inserted;
+    /**
+     * @param type        the #TokenType of the token being constructed
+     * @param image       the String content of the token
+     * @param tokenSource the object that vended this token.
+     */
+    public Token(TokenType type, String image, SNBTLexer tokenSource) {
+        this.type = type;
+        this.image = image;
+        this.tokenSource = tokenSource;
+    }
+
+    protected Token() {
+    }
+
+    public Token(TokenType type, SNBTLexer tokenSource, int beginOffset, int endOffset) {
+        this.type = type;
+        this.tokenSource = tokenSource;
+        this.beginOffset = beginOffset;
+        this.endOffset = endOffset;
+    }
+
+    public static Token newToken(TokenType type, String image, SNBTLexer tokenSource) {
+        Token result = newToken(type, tokenSource, 0, 0);
+        result.setImage(image);
+        return result;
+    }
+
+    public static Token newToken(TokenType type, SNBTLexer tokenSource, int beginOffset, int endOffset) {
+        switch (type) {
+            case WHITESPACE:
+                return new WHITESPACE(TokenType.WHITESPACE, tokenSource, beginOffset, endOffset);
+            case COLON:
+                return new Delimiter(TokenType.COLON, tokenSource, beginOffset, endOffset);
+            case COMMA:
+                return new Delimiter(TokenType.COMMA, tokenSource, beginOffset, endOffset);
+            case OPEN_BRACKET:
+                return new Delimiter(TokenType.OPEN_BRACKET, tokenSource, beginOffset, endOffset);
+            case CLOSE_BRACKET:
+                return new Delimiter(TokenType.CLOSE_BRACKET, tokenSource, beginOffset, endOffset);
+            case OPEN_BRACE:
+                return new Delimiter(TokenType.OPEN_BRACE, tokenSource, beginOffset, endOffset);
+            case CLOSE_BRACE:
+                return new Delimiter(TokenType.CLOSE_BRACE, tokenSource, beginOffset, endOffset);
+            case BOOLEAN:
+                return new Literal(TokenType.BOOLEAN, tokenSource, beginOffset, endOffset);
+            case FLOAT:
+                return new Literal(TokenType.FLOAT, tokenSource, beginOffset, endOffset);
+            case DOUBLE:
+                return new Literal(TokenType.DOUBLE, tokenSource, beginOffset, endOffset);
+            case INTEGER:
+                return new Literal(TokenType.INTEGER, tokenSource, beginOffset, endOffset);
+            case LONG:
+                return new Literal(TokenType.LONG, tokenSource, beginOffset, endOffset);
+            case BYTE:
+                return new Literal(TokenType.BYTE, tokenSource, beginOffset, endOffset);
+            case SHORT:
+                return new Literal(TokenType.SHORT, tokenSource, beginOffset, endOffset);
+            case STRING:
+                return new Literal(TokenType.STRING, tokenSource, beginOffset, endOffset);
+            case INVALID:
+                return new InvalidToken(tokenSource, beginOffset, endOffset);
+            default:
+                return new Token(type, tokenSource, beginOffset, endOffset);
+        }
+    }
 
     public boolean isInserted() {
         return inserted;
@@ -44,43 +104,6 @@ public class Token implements SNBTConstants, Node {
 
     void unsetAppendedToken() {
         this.appendedToken = null;
-    }
-
-    /**
-     * @param type        the #TokenType of the token being constructed
-     * @param image       the String content of the token
-     * @param tokenSource the object that vended this token.
-     */
-    public Token(TokenType type, String image, SNBTLexer tokenSource) {
-        this.type = type;
-        this.image = image;
-        this.tokenSource = tokenSource;
-    }
-
-    public static Token newToken(TokenType type, String image, SNBTLexer tokenSource) {
-        Token result = newToken(type, tokenSource, 0, 0);
-        result.setImage(image);
-        return result;
-    }
-
-    /**
-     * It would be extremely rare that an application
-     * programmer would use this method. It needs to
-     * be public because it is part of the cn.nukkit.nbt.snbt.Node interface.
-     */
-    @Override
-    public void setBeginOffset(int beginOffset) {
-        this.beginOffset = beginOffset;
-    }
-
-    /**
-     * It would be extremely rare that an application
-     * programmer would use this method. It needs to
-     * be public because it is part of the cn.nukkit.nbt.snbt.Node interface.
-     */
-    @Override
-    public void setEndOffset(int endOffset) {
-        this.endOffset = endOffset;
     }
 
     /**
@@ -142,9 +165,29 @@ public class Token implements SNBTConstants, Node {
         return beginOffset;
     }
 
+    /**
+     * It would be extremely rare that an application
+     * programmer would use this method. It needs to
+     * be public because it is part of the cn.nukkit.nbt.snbt.Node interface.
+     */
+    @Override
+    public void setBeginOffset(int beginOffset) {
+        this.beginOffset = beginOffset;
+    }
+
     @Override
     public int getEndOffset() {
         return endOffset;
+    }
+
+    /**
+     * It would be extremely rare that an application
+     * programmer would use this method. It needs to
+     * be public because it is part of the cn.nukkit.nbt.snbt.Node interface.
+     */
+    @Override
+    public void setEndOffset(int endOffset) {
+        this.endOffset = endOffset;
     }
 
     /**
@@ -152,6 +195,10 @@ public class Token implements SNBTConstants, Node {
      */
     public String getImage() {
         return image != null ? image : getSource();
+    }
+
+    public void setImage(String image) {
+        this.image = image;
     }
 
     /**
@@ -227,16 +274,6 @@ public class Token implements SNBTConstants, Node {
         if (type == TokenType.EOF) return "";
         SNBTLexer flm = getTokenSource();
         return flm == null ? null : flm.getText(getBeginOffset(), getEndOffset());
-    }
-
-    protected Token() {
-    }
-
-    public Token(TokenType type, SNBTLexer tokenSource, int beginOffset, int endOffset) {
-        this.type = type;
-        this.tokenSource = tokenSource;
-        this.beginOffset = beginOffset;
-        this.endOffset = endOffset;
     }
 
     @Override
@@ -330,8 +367,7 @@ public class Token implements SNBTConstants, Node {
     @Override
     public void copyLocationInfo(Node from) {
         Node.super.copyLocationInfo(from);
-        if (from instanceof Token) {
-            Token otherTok = (Token) from;
+        if (from instanceof Token otherTok) {
             appendedToken = otherTok.appendedToken;
             prependedToken = otherTok.prependedToken;
         }
@@ -344,48 +380,8 @@ public class Token implements SNBTConstants, Node {
         if (start instanceof Token) {
             prependedToken = ((Token) start).prependedToken;
         }
-        if (end instanceof Token) {
-            Token endToken = (Token) end;
+        if (end instanceof Token endToken) {
             appendedToken = endToken.appendedToken;
-        }
-    }
-
-    public static Token newToken(TokenType type, SNBTLexer tokenSource, int beginOffset, int endOffset) {
-        switch (type) {
-            case WHITESPACE:
-                return new WHITESPACE(TokenType.WHITESPACE, tokenSource, beginOffset, endOffset);
-            case COLON:
-                return new Delimiter(TokenType.COLON, tokenSource, beginOffset, endOffset);
-            case COMMA:
-                return new Delimiter(TokenType.COMMA, tokenSource, beginOffset, endOffset);
-            case OPEN_BRACKET:
-                return new Delimiter(TokenType.OPEN_BRACKET, tokenSource, beginOffset, endOffset);
-            case CLOSE_BRACKET:
-                return new Delimiter(TokenType.CLOSE_BRACKET, tokenSource, beginOffset, endOffset);
-            case OPEN_BRACE:
-                return new Delimiter(TokenType.OPEN_BRACE, tokenSource, beginOffset, endOffset);
-            case CLOSE_BRACE:
-                return new Delimiter(TokenType.CLOSE_BRACE, tokenSource, beginOffset, endOffset);
-            case BOOLEAN:
-                return new Literal(TokenType.BOOLEAN, tokenSource, beginOffset, endOffset);
-            case FLOAT:
-                return new Literal(TokenType.FLOAT, tokenSource, beginOffset, endOffset);
-            case DOUBLE:
-                return new Literal(TokenType.DOUBLE, tokenSource, beginOffset, endOffset);
-            case INTEGER:
-                return new Literal(TokenType.INTEGER, tokenSource, beginOffset, endOffset);
-            case LONG:
-                return new Literal(TokenType.LONG, tokenSource, beginOffset, endOffset);
-            case BYTE:
-                return new Literal(TokenType.BYTE, tokenSource, beginOffset, endOffset);
-            case SHORT:
-                return new Literal(TokenType.SHORT, tokenSource, beginOffset, endOffset);
-            case STRING:
-                return new Literal(TokenType.STRING, tokenSource, beginOffset, endOffset);
-            case INVALID:
-                return new InvalidToken(tokenSource, beginOffset, endOffset);
-            default:
-                return new Token(type, tokenSource, beginOffset, endOffset);
         }
     }
 

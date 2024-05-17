@@ -31,6 +31,14 @@ public class BlockChain extends BlockTransparentMeta {
         return super.place(item, block, target, face, fx, fy, fz, player);
     }
 
+    public BlockFace.Axis getPillarAxis() {
+        return switch (this.getDamage() % 0x3) {
+            case 2 -> BlockFace.Axis.Z;
+            case 1 -> BlockFace.Axis.X;
+            default -> BlockFace.Axis.Y;
+        };
+    }
+
     public void setPillarAxis(BlockFace.Axis axis) {
         switch (axis) {
             case Y:
@@ -43,14 +51,6 @@ public class BlockChain extends BlockTransparentMeta {
                 this.setDamage(2);
                 break;
         }
-    }
-
-    public BlockFace.Axis getPillarAxis() {
-        return switch (this.getDamage() % 0x3) {
-            case 2 -> BlockFace.Axis.Z;
-            case 1 -> BlockFace.Axis.X;
-            default -> BlockFace.Axis.Y;
-        };
     }
 
     @Override

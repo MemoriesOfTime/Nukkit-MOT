@@ -13,7 +13,7 @@ import java.util.UUID;
  */
 public class RepairItemRecipe extends MultiRecipe {
 
-    public RepairItemRecipe(){
+    public RepairItemRecipe() {
         super(UUID.fromString(TYPE_REPAIR_ITEM));
     }
 

@@ -46,11 +46,11 @@ public class BlockChorusPlant extends BlockTransparent {
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = block.down();
         if (!(down instanceof BlockEndStone) &&
-        !(down instanceof BlockChorusPlant) &&
-        !(block.north() instanceof BlockChorusPlant) &&
-        !(block.east() instanceof BlockChorusPlant) &&
-        !(block.south() instanceof BlockChorusPlant) &&
-        !(block.west() instanceof BlockChorusPlant)) {
+                !(down instanceof BlockChorusPlant) &&
+                !(block.north() instanceof BlockChorusPlant) &&
+                !(block.east() instanceof BlockChorusPlant) &&
+                !(block.south() instanceof BlockChorusPlant) &&
+                !(block.west() instanceof BlockChorusPlant)) {
             return false;
         }
 
@@ -62,11 +62,11 @@ public class BlockChorusPlant extends BlockTransparent {
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
             if (this.down().isTransparent() &&
-            !(this.down() instanceof BlockChorusPlant) &&
-            !(this.north() instanceof BlockChorusPlant) &&
-            !(this.east() instanceof BlockChorusPlant) &&
-            !(this.south() instanceof BlockChorusPlant) &&
-            !(this.west() instanceof BlockChorusPlant)) {
+                    !(this.down() instanceof BlockChorusPlant) &&
+                    !(this.north() instanceof BlockChorusPlant) &&
+                    !(this.east() instanceof BlockChorusPlant) &&
+                    !(this.south() instanceof BlockChorusPlant) &&
+                    !(this.west() instanceof BlockChorusPlant)) {
                 this.getLevel().useBreakOn(this);
 
                 return Level.BLOCK_UPDATE_NORMAL;

@@ -42,7 +42,7 @@ public class Utils {
      * An empty damage array used when mobs have no attack damage.
      */
     @Deprecated
-    public static final int[] emptyDamageArray = new int[] { 0, 0, 0, 0 };
+    public static final int[] emptyDamageArray = new int[]{0, 0, 0, 0};
     /**
      * List of network ids of monsters. Currently used for example to check which entities will make players unable to sleep when nearby the bed.
      */
@@ -82,9 +82,9 @@ public class Utils {
     }
 
     public static int[] getEmptyDamageArray() {
-        return new int[] { 0, 0, 0, 0 };
+        return new int[]{0, 0, 0, 0};
     }
-    
+
     public static void writeFile(String fileName, String content) throws IOException {
         writeFile(fileName, new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
     }
@@ -237,13 +237,13 @@ public class Utils {
         long result = (int) r & 0xff;
         result |= ((int) g & 0xff) << 8;
         result |= ((int) b & 0xff) << 16;
-        result |= ((int) a & 0xff) << 24;
+        result |= (long) ((int) a & 0xff) << 24;
         return result & 0xFFFFFFFFL;
     }
 
     public static long toABGR(int argb) {
         long result = argb & 0xFF00FF00L;
-        result |= (argb << 16) & 0x00FF0000L; // B to R
+        result |= ((long) argb << 16) & 0x00FF0000L; // B to R
         result |= (argb >>> 16) & 0xFFL; // R to B
         return result & 0xFFFFFFFFL;
     }
@@ -255,7 +255,7 @@ public class Utils {
         }
 
         if (arrayToSplit.length <= chunkSize) {
-            return new Object[][] { arrayToSplit };
+            return new Object[][]{arrayToSplit};
         }
 
         int rest = arrayToSplit.length % chunkSize;
@@ -301,7 +301,7 @@ public class Utils {
         return newArray;
     }
 
-    public static <T,U,V> Map<U,V> getOrCreate(Map<T, Map<U, V>> map, T key) {
+    public static <T, U, V> Map<U, V> getOrCreate(Map<T, Map<U, V>> map, T key) {
         Map<U, V> existing = map.get(key);
         if (existing == null) {
             ConcurrentHashMap<U, V> toPut = new ConcurrentHashMap<>();
@@ -363,16 +363,16 @@ public class Utils {
             if (h == -1 || l == -1)
                 throw new IllegalArgumentException("contains illegal character for hexBinary: " + s);
 
-            out[(i >> 1)] = (byte)((h << 4) + l);
+            out[(i >> 1)] = (byte) ((h << 4) + l);
         }
 
         return out;
     }
 
-    private static int hexToBin( char ch ) {
-        if ('0' <= ch && ch <= '9')    return ch - '0';
-        if ('A' <= ch && ch <= 'F')    return ch - 'A' + 10;
-        if ('a' <= ch && ch <= 'f')    return ch - 'a' + 10;
+    private static int hexToBin(char ch) {
+        if ('0' <= ch && ch <= '9') return ch - '0';
+        if ('A' <= ch && ch <= 'F') return ch - 'A' + 10;
+        if ('a' <= ch && ch <= 'f') return ch - 'a' + 10;
         return -1;
     }
 
@@ -401,14 +401,14 @@ public class Utils {
         if (min == max) {
             return max;
         }
-        return min + random.nextDouble() * (max-min);
+        return min + random.nextDouble() * (max - min);
     }
 
     public static float rand(float min, float max) {
         if (min == max) {
             return max;
         }
-        return min + (float) Math.random() * (max-min);
+        return min + (float) Math.random() * (max - min);
     }
 
     /**
@@ -504,7 +504,7 @@ public class Utils {
      * @return operating system/device name
      */
     public static String getOS(Player player) {
-        switch(player.getLoginChainData().getDeviceOS()) {
+        switch (player.getLoginChainData().getDeviceOS()) {
             case 1:
                 return "Android";
             case 2:

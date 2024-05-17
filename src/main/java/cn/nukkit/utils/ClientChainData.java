@@ -18,27 +18,83 @@ import java.util.*;
 
 /**
  * ClientChainData is a container of chain data sent from clients.
- *
+ * <p>
  * Device information such as client UUID, xuid and serverAddress, can be
  * read from instances of this object.
- *
+ * <p>
  * To get chain data, you can use player.getLoginChainData() or read(loginPacket)
- *
+ * <p>
  * ===============
+ *
  * @author boybook
  * Nukkit Project
  * ===============
  */
 public final class ClientChainData implements LoginChainData {
 
+    public final static int UI_PROFILE_CLASSIC = 0;
+    public final static int UI_PROFILE_POCKET = 1;
     private static final Gson GSON = new Gson();
+    private final BinaryStream bs = new BinaryStream();
+    private boolean xboxAuthed;
+    private String username;
+    private UUID clientUUID;
+    private String xuid;
+    private String identityPublicKey;
+    private long clientId;
+    private String serverAddress;
+    private String deviceModel;
+    private int deviceOS;
+    private String deviceId;
+    private String gameVersion;
+    private int guiScale;
+    private String languageCode;
+    private int currentInputMode;
+    private int defaultInputMode;
+    private String waterdogIP;
+    private String waterdogXUID;
+    private int UIProfile;
+    private String capeData;
+    private JsonObject rawData;
+
+    private ClientChainData(byte[] buffer) {
+        bs.setBuffer(buffer, 0);
+        decodeChainData();
+        decodeSkinData();
+    }
 
     public static ClientChainData of(byte[] buffer) {
         return new ClientChainData(buffer);
     }
 
+    ///////////////////////////////////////////////////////////////////////////
+    // Override
+    ///////////////////////////////////////////////////////////////////////////
+
     public static ClientChainData read(LoginPacket pk) {
         return of(pk.getBuffer());
+    }
+
+    private static ECPublicKey generateKey(String base64) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        return (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(base64)));
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Internal
+    ///////////////////////////////////////////////////////////////////////////
+
+    private static JsonObject decodeToken(String token) {
+        String[] base = token.split("\\.");
+        if (base.length < 2) return null;
+        return GSON.fromJson(new String(Base64.getDecoder().decode(base[1]), StandardCharsets.UTF_8), JsonObject.class);
+    }
+
+    private static boolean verifyChain(List<String> chains) throws Exception {
+        try {
+            return EncryptionUtils.validateChain(chains).signed();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override
@@ -105,8 +161,6 @@ public final class ClientChainData implements LoginChainData {
         }
     }
 
-    private boolean xboxAuthed;
-
     @Override
     public int getCurrentInputMode() {
         return currentInputMode;
@@ -121,9 +175,6 @@ public final class ClientChainData implements LoginChainData {
     public String getCapeData() {
         return capeData;
     }
-
-    public final static int UI_PROFILE_CLASSIC = 0;
-    public final static int UI_PROFILE_POCKET = 1;
 
     @Override
     public int getUIProfile() {
@@ -155,10 +206,6 @@ public final class ClientChainData implements LoginChainData {
         return Server.getInstance().isWaterdogCapable();
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-    // Override
-    ///////////////////////////////////////////////////////////////////////////
-
     @Override
     public boolean equals(Object obj) {
         return obj instanceof ClientChainData && Objects.equals(bs, ((ClientChainData) obj).bs);
@@ -167,47 +214,6 @@ public final class ClientChainData implements LoginChainData {
     @Override
     public int hashCode() {
         return bs.hashCode();
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    // Internal
-    ///////////////////////////////////////////////////////////////////////////
-
-    private String username;
-    private UUID clientUUID;
-    private String xuid;
-
-    private static ECPublicKey generateKey(String base64) throws NoSuchAlgorithmException, InvalidKeySpecException {
-        return (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(base64)));
-    }
-
-    private String identityPublicKey;
-
-    private long clientId;
-    private String serverAddress;
-    private String deviceModel;
-    private int deviceOS;
-    private String deviceId;
-    private String gameVersion;
-    private int guiScale;
-    private String languageCode;
-    private int currentInputMode;
-    private int defaultInputMode;
-    private String waterdogIP;
-    private String waterdogXUID;
-
-    private int UIProfile;
-
-    private String capeData;
-
-    private JsonObject rawData;
-
-    private final BinaryStream bs = new BinaryStream();
-
-    private ClientChainData(byte[] buffer) {
-        bs.setBuffer(buffer, 0);
-        decodeChainData();
-        decodeSkinData();
     }
 
     @Override
@@ -243,12 +249,6 @@ public final class ClientChainData implements LoginChainData {
         this.rawData = skinToken;
     }
 
-    private static JsonObject decodeToken(String token) {
-        String[] base = token.split("\\.");
-        if (base.length < 2) return null;
-        return GSON.fromJson(new String(Base64.getDecoder().decode(base[1]), StandardCharsets.UTF_8), JsonObject.class);
-    }
-
     private void decodeChainData() {
         int size = bs.getLInt();
         if (size > 3000000) {
@@ -281,14 +281,6 @@ public final class ClientChainData implements LoginChainData {
 
         if (!xboxAuthed) {
             xuid = null;
-        }
-    }
-
-    private static boolean verifyChain(List<String> chains) throws Exception {
-        try {
-            return EncryptionUtils.validateChain(chains).signed();
-        } catch (Exception e) {
-            return false;
         }
     }
 

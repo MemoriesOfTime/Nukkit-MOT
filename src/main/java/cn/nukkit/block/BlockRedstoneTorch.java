@@ -124,7 +124,8 @@ public class BlockRedstoneTorch extends BlockTorch implements Faceable {
         BlockFace face = getBlockFace().getOpposite();
         return this.level.isSidePowered(this.getLocation().getSide(face), face);
     }
-     @Override
+
+    @Override
     public int tickRate() {
         return 2;
     }

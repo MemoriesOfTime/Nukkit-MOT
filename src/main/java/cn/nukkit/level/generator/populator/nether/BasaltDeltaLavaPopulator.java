@@ -32,11 +32,11 @@ public class BasaltDeltaLavaPopulator extends Populator {
         for (y = 128; y > 0; --y) {
             final int b = level.getBlockIdAt(x, y, z);
             if ((b == BlockID.BASALT || b == BlockID.BLACKSTONE) &&
-                level.getBlockIdAt(x, y + 1, z) == 0 &&
-                level.getBlockIdAt(x + 1, y, z) != 0 &&
-                level.getBlockIdAt(x - 1, y, z) != 0 &&
-                level.getBlockIdAt(x, y, z + 1) != 0 &&
-                level.getBlockIdAt(x, y, z - 1) != 0
+                    level.getBlockIdAt(x, y + 1, z) == 0 &&
+                    level.getBlockIdAt(x + 1, y, z) != 0 &&
+                    level.getBlockIdAt(x - 1, y, z) != 0 &&
+                    level.getBlockIdAt(x, y, z + 1) != 0 &&
+                    level.getBlockIdAt(x, y, z - 1) != 0
             ) {
                 blockYs.add(y);
             }

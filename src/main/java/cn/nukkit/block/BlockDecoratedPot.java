@@ -139,12 +139,12 @@ public class BlockDecoratedPot extends BlockTransparentMeta implements Faceable,
     }
 
     @Override
-    public void setBlockFace(BlockFace face) {
-        this.setDamage(DIRECTION_BIT, Objects.requireNonNullElse(face, BlockFace.SOUTH).getHorizontalIndex() & 0x3);
+    public BlockFace getBlockFace() {
+        return BlockFace.fromHorizontalIndex(this.getDamage(DIRECTION_BIT));
     }
 
     @Override
-    public BlockFace getBlockFace() {
-        return BlockFace.fromHorizontalIndex(this.getDamage(DIRECTION_BIT));
+    public void setBlockFace(BlockFace face) {
+        this.setDamage(DIRECTION_BIT, Objects.requireNonNullElse(face, BlockFace.SOUTH).getHorizontalIndex() & 0x3);
     }
 }

@@ -2,11 +2,11 @@ package cn.nukkit.utils;
 
 /**
  * Block color
- *
+ * <p>
  * Created by Snake1999 on 2016/1/10.
  * Package cn.nukkit.utils in project Nukkit
  */
-public class BlockColor  {
+public class BlockColor {
 
     public static final BlockColor TRANSPARENT_BLOCK_COLOR = new BlockColor(0x00, 0x00, 0x00, 0x00);
     public static final BlockColor VOID_BLOCK_COLOR = TRANSPARENT_BLOCK_COLOR;
@@ -120,12 +120,21 @@ public class BlockColor  {
         this.alpha = 0xff;
     }
 
+    /**
+     * Get BlockColor by dye item meta value
+     *
+     * @param dyeColorMeta dye item meta value
+     * @return BlockColor
+     */
+    public static BlockColor getDyeColor(int dyeColorMeta) {
+        return DyeColor.getByDyeData(dyeColorMeta).getColor();
+    }
+
     @Override
     public boolean equals(Object obj) {
-        if (!(obj instanceof BlockColor)) {
+        if (!(obj instanceof BlockColor other)) {
             return false;
         }
-        BlockColor other = (BlockColor) obj;
         return this.red == other.red && this.green == other.green &&
                 this.blue == other.blue && this.alpha == other.alpha;
     }
@@ -157,15 +166,5 @@ public class BlockColor  {
 
     public int getARGB() {
         return this.alpha << 24 | this.red << 16 | this.green << 8 | this.blue;
-    }
-
-    /**
-     * Get BlockColor by dye item meta value
-     *
-     * @param dyeColorMeta dye item meta value
-     * @return BlockColor
-     */
-    public static BlockColor getDyeColor(int dyeColorMeta) {
-        return DyeColor.getByDyeData(dyeColorMeta).getColor();
     }
 }

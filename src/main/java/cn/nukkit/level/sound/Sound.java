@@ -5,7 +5,7 @@ import cn.nukkit.network.protocol.DataPacket;
 
 /**
  * Legacy sound class
- *
+ * <p>
  * Everything in package cn.nukkit.level.sound will be removed in the future.
  * Please use cn.nukkit.level.Sound class instead.
  *

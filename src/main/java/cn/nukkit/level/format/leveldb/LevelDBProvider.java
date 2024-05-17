@@ -55,21 +55,21 @@ public class LevelDBProvider implements LevelProvider {
 
     private static final DBProvider JAVA_LDB_PROVIDER = (DBProvider) FeatureBuilder.create(LevelDBProvider.class).addJava("net.daporkchop.ldbjni.java.JavaDBProvider").build();
 
+    static {
+        log.info("native LevelDB provider: {}", Server.getInstance().useNativeLevelDB && LevelDB.PROVIDER.isNative());
+    }
+
     protected final Long2ObjectMap<LevelDBChunk> chunks = new Long2ObjectOpenHashMap<>();
     protected final ThreadLocal<WeakReference<LevelDBChunk>> lastChunk = new ThreadLocal<>();
-
     protected final DB db;
-
-    protected Level level;
-
     protected final String path;
 
     protected final CompoundTag levelData;
-
-    protected volatile boolean closed;
     protected final Lock gcLock;
-
+    protected Level level;
+    protected volatile boolean closed;
     protected boolean saveChunksOnClose = true;
+    private int lastPosition = 0;
 
     public LevelDBProvider(Level level, String path) {
         this.level = level;
@@ -245,6 +245,17 @@ public class LevelDBProvider implements LevelProvider {
                 .putByte("saved_with_toggled_experiments", 0));
     }
 
+    @SuppressWarnings("unused")
+    public static LevelDBChunkSection createChunkSection(int chunkY) {
+        return new LevelDBChunkSection(chunkY);
+    }
+
+    protected static BlockVector3 deserializeExtraDataKey(int chunkVersion, int key) {
+        return chunkVersion >= 3 ? new BlockVector3((key >> 12) & 0xf, key & 0xff, (key >> 8) & 0xf)
+                // pre-1.0, 7 bits were used because the build height limit was lower
+                : new BlockVector3((key >> 11) & 0xf, key & 0x7f, (key >> 7) & 0xf);
+    }
+
     @Override
     public void saveLevelData() {
         updateLevelData(levelData);
@@ -281,7 +292,7 @@ public class LevelDBProvider implements LevelProvider {
                     );
                 }, level.antiXrayEnabled(), getLevel().getDimensionData());
             });
-        }else {
+        } else {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
                 this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
                         timestamp,
@@ -691,11 +702,6 @@ public class LevelDBProvider implements LevelProvider {
         }
     }
 
-    @SuppressWarnings("unused")
-    public static LevelDBChunkSection createChunkSection(int chunkY) {
-        return new LevelDBChunkSection(chunkY);
-    }
-
     private boolean chunkExists(int chunkX, int chunkZ) {
         byte[] data = this.db.get(VERSION.getKey(chunkX, chunkZ, this.level.getDimension()));
         if (data == null || data.length == 0) {
@@ -868,8 +874,6 @@ public class LevelDBProvider implements LevelProvider {
         rules.writeBedrockNBT(this.levelData);
     }
 
-    private int lastPosition = 0;
-
     @Override
     public void doGarbageCollection() {
         //leveldb不需要回收regions
@@ -927,12 +931,6 @@ public class LevelDBProvider implements LevelProvider {
     @Override
     public int getMaxBlockY() {
         return this.level.getDimensionData().getMaxHeight();
-    }
-
-    protected static BlockVector3 deserializeExtraDataKey(int chunkVersion, int key) {
-        return chunkVersion >= 3 ? new BlockVector3((key >> 12) & 0xf, key & 0xff, (key >> 8) & 0xf)
-                // pre-1.0, 7 bits were used because the build height limit was lower
-                : new BlockVector3((key >> 11) & 0xf, key & 0x7f, (key >> 7) & 0xf);
     }
 
     protected StateBlockStorage[] deserializeLegacyExtraData(int chunkX, int chunkZ, int chunkVersion) {
@@ -1089,9 +1087,5 @@ public class LevelDBProvider implements LevelProvider {
         } catch (IOException e) {
             throw new RuntimeException("iteration failed", e);
         }
-    }
-
-    static {
-        log.info("native LevelDB provider: {}", Server.getInstance().useNativeLevelDB && LevelDB.PROVIDER.isNative());
     }
 }

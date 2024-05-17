@@ -17,21 +17,12 @@ import java.util.Map;
 public class EntityDamageEvent extends EntityEvent implements Cancellable {
 
     private static final HandlerList handlers = new HandlerList();
-
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
-    private int attackCooldown = 10;
-
     private final DamageCause cause;
-
     private final Map<DamageModifier, Float> modifiers;
     private final Map<DamageModifier, Float> originals;
-
+    private int attackCooldown = 10;
     private boolean breakShield = false;
     private int ShieldBreakCoolDown = 100;
-
     public EntityDamageEvent(Entity entity, DamageCause cause, float damage) {
         this(entity, cause, new DamageModifierFloatEnumMap(damage));
     }
@@ -49,6 +40,10 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
         if (entity.hasEffect(Effect.DAMAGE_RESISTANCE)) {
             this.setDamage((float) -(this.getDamage(DamageModifier.BASE) * 0.20 * (entity.getEffect(Effect.DAMAGE_RESISTANCE).getAmplifier() + 1)), DamageModifier.RESISTANCE);
         }
+    }
+
+    public static HandlerList getHandlers() {
+        return handlers;
     }
 
     public DamageCause getCause() {
@@ -71,16 +66,16 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
         return this.getDamage(DamageModifier.BASE);
     }
 
+    public void setDamage(float damage) {
+        this.setDamage(damage, DamageModifier.BASE);
+    }
+
     public float getDamage(DamageModifier type) {
         if (this.modifiers.containsKey(type)) {
             return this.modifiers.get(type);
         }
 
         return 0;
-    }
-
-    public void setDamage(float damage) {
-        this.setDamage(damage, DamageModifier.BASE);
     }
 
     public void setDamage(float damage, DamageModifier type) {

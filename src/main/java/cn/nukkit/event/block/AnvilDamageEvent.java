@@ -8,23 +8,18 @@ import cn.nukkit.event.HandlerList;
 public class AnvilDamageEvent extends BlockEvent implements Cancellable {
 
     private static final HandlerList handlers = new HandlerList();
-
-    public static HandlerList getHandlers() {
-        return handlers;
-    }
-
     private final int oldDamage;
+    private final Player player;
     private int newDamage;
     private DamageCause cause;
-    private final Player player;
-
     /**
      * This event is called when an anvil is damaged.
-     * @param block The block (anvil) that has been damaged.
+     *
+     * @param block     The block (anvil) that has been damaged.
      * @param oldDamage Old damage value.
      * @param newDamage New damage value.
-     * @param cause Cause of the anvil being damaged.
-     * @param player The player who used the anvil.
+     * @param cause     Cause of the anvil being damaged.
+     * @param player    The player who used the anvil.
      */
     public AnvilDamageEvent(Block block, int oldDamage, int newDamage, DamageCause cause, Player player) {
         super(block);
@@ -32,6 +27,10 @@ public class AnvilDamageEvent extends BlockEvent implements Cancellable {
         this.newDamage = newDamage;
         this.cause = cause;
         this.player = player;
+    }
+
+    public static HandlerList getHandlers() {
+        return handlers;
     }
 
     public int getOldDamage() {

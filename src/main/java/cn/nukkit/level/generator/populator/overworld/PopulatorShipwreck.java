@@ -51,39 +51,39 @@ public class PopulatorShipwreck extends Populator implements CallbackableTemplat
     protected static final ReadableStructureTemplate RIGHTSIDEUP_FRONTHALF_DEGRADED = new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/shipwreck/swrightsideupfronthalfdegraded.nbt"));
     protected static final ReadableStructureTemplate RIGHTSIDEUP_BACKHALF_DEGRADED = new ReadOnlyLegacyStructureTemplate().load(Generator.loadNBT("structures/shipwreck/swrightsideupbackhalfdegraded.nbt"));
     protected static final ReadableStructureTemplate[] STRUCTURE_LOCATION_BEACHED = new ReadableStructureTemplate[]{
-        WITH_MAST,
-        SIDEWAYS_FULL,
-        SIDEWAYS_FRONTHALF,
-        SIDEWAYS_BACKHALF,
-        RIGHTSIDEUP_FULL,
-        RIGHTSIDEUP_FRONTHALF,
-        RIGHTSIDEUP_BACKHALF,
-        WITH_MAST_DEGRADED,
-        RIGHTSIDEUP_FULL_DEGRADED,
-        RIGHTSIDEUP_FRONTHALF_DEGRADED,
-        RIGHTSIDEUP_BACKHALF_DEGRADED
+            WITH_MAST,
+            SIDEWAYS_FULL,
+            SIDEWAYS_FRONTHALF,
+            SIDEWAYS_BACKHALF,
+            RIGHTSIDEUP_FULL,
+            RIGHTSIDEUP_FRONTHALF,
+            RIGHTSIDEUP_BACKHALF,
+            WITH_MAST_DEGRADED,
+            RIGHTSIDEUP_FULL_DEGRADED,
+            RIGHTSIDEUP_FRONTHALF_DEGRADED,
+            RIGHTSIDEUP_BACKHALF_DEGRADED
     };
     protected static final ReadableStructureTemplate[] STRUCTURE_LOCATION_OCEAN = new ReadableStructureTemplate[]{
-        WITH_MAST,
-        UPSIDEDOWN_FULL,
-        UPSIDEDOWN_FRONTHALF,
-        UPSIDEDOWN_BACKHALF,
-        SIDEWAYS_FULL,
-        SIDEWAYS_FRONTHALF,
-        SIDEWAYS_BACKHALF,
-        RIGHTSIDEUP_FULL,
-        RIGHTSIDEUP_FRONTHALF,
-        RIGHTSIDEUP_BACKHALF,
-        WITH_MAST_DEGRADED,
-        UPSIDEDOWN_FULL_DEGRADED,
-        UPSIDEDOWN_FRONTHALF_DEGRADED,
-        UPSIDEDOWN_BACKHALF_DEGRADED,
-        SIDEWAYS_FULL_DEGRADED,
-        SIDEWAYS_FRONTHALF_DEGRADED,
-        SIDEWAYS_BACKHALF_DEGRADED,
-        RIGHTSIDEUP_FULL_DEGRADED,
-        RIGHTSIDEUP_FRONTHALF_DEGRADED,
-        RIGHTSIDEUP_BACKHALF_DEGRADED
+            WITH_MAST,
+            UPSIDEDOWN_FULL,
+            UPSIDEDOWN_FRONTHALF,
+            UPSIDEDOWN_BACKHALF,
+            SIDEWAYS_FULL,
+            SIDEWAYS_FRONTHALF,
+            SIDEWAYS_BACKHALF,
+            RIGHTSIDEUP_FULL,
+            RIGHTSIDEUP_FRONTHALF,
+            RIGHTSIDEUP_BACKHALF,
+            WITH_MAST_DEGRADED,
+            UPSIDEDOWN_FULL_DEGRADED,
+            UPSIDEDOWN_FRONTHALF_DEGRADED,
+            UPSIDEDOWN_BACKHALF_DEGRADED,
+            SIDEWAYS_FULL_DEGRADED,
+            SIDEWAYS_FRONTHALF_DEGRADED,
+            SIDEWAYS_BACKHALF_DEGRADED,
+            RIGHTSIDEUP_FULL_DEGRADED,
+            RIGHTSIDEUP_FRONTHALF_DEGRADED,
+            RIGHTSIDEUP_BACKHALF_DEGRADED
     };
     protected static final int SPACING = 24;
     protected static final int SEPARATION = 4;
@@ -130,21 +130,21 @@ public class PopulatorShipwreck extends Populator implements CallbackableTemplat
                         ShipwreckSupplyChest.get().create(itemList, random);
 
                         Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new LootSpawnTask(chunk.getProvider().getLevel(),
-                            new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
+                                new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
                         break;
                     case "mapChest":
                         itemList = new ListTag<>("Items");
                         ShipwreckMapChest.get().create(itemList, random);
 
                         Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new LootSpawnTask(chunk.getProvider().getLevel(),
-                            new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
+                                new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
                         break;
                     case "treasureChest":
                         itemList = new ListTag<>("Items");
                         ShipwreckTreasureChest.get().create(itemList, random);
 
                         Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, new LootSpawnTask(chunk.getProvider().getLevel(),
-                            new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
+                                new BlockVector3(nbt.getInt("x"), nbt.getInt("y") - 1, nbt.getInt("z")), itemList), 2);
                         break;
                 }
             }
@@ -155,8 +155,8 @@ public class PopulatorShipwreck extends Populator implements CallbackableTemplat
     public void populate(final ChunkManager level, final int chunkX, final int chunkZ, final NukkitRandom random, final FullChunk chunk) {
         final int biome = chunk.getBiomeId(5, 5);
         if ((biome == EnumBiome.BEACH.id || biome >= 44 && biome <= 50)
-            && chunkX == (chunkX < 0 ? chunkX - SPACING + 1 : chunkX) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)
-            && chunkZ == (chunkZ < 0 ? chunkZ - SPACING + 1 : chunkZ) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)
+                && chunkX == (chunkX < 0 ? chunkX - SPACING + 1 : chunkX) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)
+                && chunkZ == (chunkZ < 0 ? chunkZ - SPACING + 1 : chunkZ) / SPACING * SPACING + random.nextBoundedInt(SPACING - SEPARATION)
         ) {
             final ReadableStructureTemplate template;
 
@@ -215,8 +215,8 @@ public class PopulatorShipwreck extends Populator implements CallbackableTemplat
                 waitingChunks.put(Level.chunkHash(chunkX, chunkZ), indexes);
                 for (final BaseFullChunk ck : chunks) {
                     Server.getInstance().getScheduler().scheduleAsyncTask(InternalPlugin.INSTANCE, new CallbackableChunkGenerationTask<>(
-                        chunk.getProvider().getLevel(), ck, this,
-                        populator -> populator.generateChunkCallback(template, seed, level, chunkX, chunkZ, y, ck.getX(), ck.getZ())));
+                            chunk.getProvider().getLevel(), ck, this,
+                            populator -> populator.generateChunkCallback(template, seed, level, chunkX, chunkZ, y, ck.getX(), ck.getZ())));
                 }
                 return;
             }

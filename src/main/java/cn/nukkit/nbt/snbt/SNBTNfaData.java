@@ -12,15 +12,12 @@ import static cn.nukkit.nbt.snbt.SNBTConstants.TokenType.*;
  */
 class SNBTNfaData implements SNBTConstants {
 
-    // The functional interface that represents 
-    // the acceptance method of an NFA state
-    static interface NfaFunction {
-
-        TokenType apply(int ch, BitSet bs, EnumSet<TokenType> validTypes);
-
-    }
-
     static private NfaFunction[] nfaFunctions;
+
+    // Initialize the various NFA method tables
+    static {
+        SNBT.NFA_FUNCTIONS_init();
+    }
 
     // This data holder class is never instantiated
     private SNBTNfaData() {
@@ -35,9 +32,12 @@ class SNBTNfaData implements SNBTConstants {
         return nfaFunctions;
     }
 
-    // Initialize the various NFA method tables
-    static {
-        SNBT.NFA_FUNCTIONS_init();
+    // The functional interface that represents
+    // the acceptance method of an NFA state
+    interface NfaFunction {
+
+        TokenType apply(int ch, BitSet bs, EnumSet<TokenType> validTypes);
+
     }
 
     /**

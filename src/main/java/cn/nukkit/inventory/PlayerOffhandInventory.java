@@ -15,7 +15,6 @@ public class PlayerOffhandInventory extends BaseInventory {
      * Items that can be put to offhand inventory on Bedrock Edition
      */
     //private static final IntSet OFFHAND_ITEMS = new IntOpenHashSet(Arrays.asList(ItemID.SHIELD, ItemID.ARROW, ItemID.TOTEM, ItemID.MAP, ItemID.FIREWORKS, ItemID.NAUTILUS_SHELL, ItemID.SPARKLER));
-
     public PlayerOffhandInventory(EntityHumanType holder) {
         super(holder, InventoryType.OFFHAND);
     }

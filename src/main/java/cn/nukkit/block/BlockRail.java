@@ -267,7 +267,7 @@ public class BlockRail extends BlockFlowable implements Faceable {
     @Override
     public Item[] getDrops(Item item) {
         return new Item[]{
-            new ItemRail(0, 1)
+                new ItemRail(0, 1)
         };
     }
 

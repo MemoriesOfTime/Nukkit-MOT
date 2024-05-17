@@ -38,6 +38,25 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         super(meta);
     }
 
+    public static boolean canPush(Block block, BlockFace face, boolean destroyBlocks, boolean extending) {
+        Level level = block.getLevel();
+        int minBlockY = level.getMinBlockY();
+        int maxBlockY = level.getMaxBlockY();
+        if (block.getY() >= minBlockY && (face != BlockFace.DOWN || block.getY() != minBlockY) && block.getY() <= maxBlockY && (face != BlockFace.UP || block.getY() != maxBlockY)) {
+            if (extending && !block.canBePushed() || !extending && !block.canBePulled()) {
+                return false;
+            }
+
+            if (block.breaksWhenMoved()) {
+                return destroyBlocks || block.sticksToPiston();
+            }
+
+            BlockEntity be = block.level.getBlockEntity(block);
+            return be == null || be.isMovable();
+        }
+        return false;
+    }
+
     @NotNull
     @Override
     public Class<? extends BlockEntityPistonArm> getBlockEntityClass() {
@@ -80,7 +99,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         } else {
             this.setDamage(player.getHorizontalFacing().getIndex());
         }
-        if(this.level.getBlockEntity(this) != null) {
+        if (this.level.getBlockEntity(this) != null) {
             BlockEntity blockEntity = this.level.getBlockEntity(this);
             blockEntity.saveNBT();
             blockEntity.close();
@@ -126,8 +145,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         }
 
         BlockEntity blockEntity = this.level.getBlockEntity(this);
-        if (blockEntity instanceof BlockEntityPistonArm) {
-            BlockEntityPistonArm arm = (BlockEntityPistonArm) blockEntity;
+        if (blockEntity instanceof BlockEntityPistonArm arm) {
             boolean powered = this.isPowered();
 
             if (arm.state % 2 == 0 && arm.powered != powered && this.checkState(powered)) {
@@ -206,7 +224,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                 Block block = destroyBlocks.get(i);
                 this.level.useBreakOn(block, null, null, false);
 
-                if (Server.getInstance().dropSpawners && block instanceof BlockMobSpawner){
+                if (Server.getInstance().dropSpawners && block instanceof BlockMobSpawner) {
                     this.level.dropItem(block.add(0.5, 0.5, 0.5), Item.get(Item.MONSTER_SPAWNER, 0, 1));
                 }
             }
@@ -216,7 +234,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
             BlockFace side = extending ? direction : direction.getOpposite();
 
             List<CompoundTag> namedTags = new ArrayList<>();
-            for (Block oldBlock : newBlocks){
+            for (Block oldBlock : newBlocks) {
                 CompoundTag tag = null;
                 BlockEntity blockEntity = this.level.getBlockEntity(oldBlock);
                 if (blockEntity != null && !(blockEntity instanceof BlockEntityMovingBlock)) {
@@ -227,7 +245,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                 namedTags.add(tag);
             }
 
-            for (int i = 0; i < newBlocks.size(); i++){
+            for (int i = 0; i < newBlocks.size(); i++) {
                 Block newBlock = newBlocks.get(i);
                 Vector3 oldPos = newBlock.add(0);
                 newBlock.position(newBlock.add(0).getSide(side));
@@ -242,7 +260,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                                 .putInt("meta", newBlock.getDamage())
                         );
 
-                if (namedTags.get(i) != null){
+                if (namedTags.get(i) != null) {
                     nbt.putCompound("movingEntity", namedTags.get(i));
                 }
 
@@ -268,35 +286,26 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         return (BlockPistonHead) Block.get(this.getPistonHeadBlockId(), damage);
     }
 
-    public static boolean canPush(Block block, BlockFace face, boolean destroyBlocks, boolean extending) {
-        Level level = block.getLevel();
-        int minBlockY = level.getMinBlockY();
-        int maxBlockY = level.getMaxBlockY();
-        if (block.getY() >= minBlockY && (face != BlockFace.DOWN || block.getY() != minBlockY) && block.getY() <= maxBlockY && (face != BlockFace.UP || block.getY() != maxBlockY)) {
-            if (extending && !block.canBePushed() || !extending && !block.canBePulled()) {
-                return false;
-            }
+    @Override
+    public Item toItem() {
+        return new ItemBlock(this, 0);
+    }
 
-            if (block.breaksWhenMoved()) {
-                return destroyBlocks || block.sticksToPiston();
-            }
-
-            BlockEntity be = block.level.getBlockEntity(block);
-            return be == null || be.isMovable();
-        }
-        return false;
+    @Override
+    public BlockFace getBlockFace() {
+        BlockFace face = BlockFace.fromIndex(this.getDamage());
+        return face.getHorizontalIndex() >= 0 ? face.getOpposite() : face;
     }
 
     public class BlocksCalculator {
 
         private final Vector3 pistonPos;
-        private Vector3 armPos;
         private final Block blockToMove;
         private final BlockFace moveDirection;
         private final boolean extending;
-
         private final List<Block> toMove = new ArrayList<>();
         private final List<Block> toDestroy = new ArrayList<>();
+        private Vector3 armPos;
 
         public BlocksCalculator(boolean extending) {
             this.pistonPos = getLocation();
@@ -476,16 +485,5 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         public List<Block> getBlocksToDestroy() {
             return this.toDestroy;
         }
-    }
-
-    @Override
-    public Item toItem() {
-        return new ItemBlock(this, 0);
-    }
-
-    @Override
-    public BlockFace getBlockFace() {
-        BlockFace face = BlockFace.fromIndex(this.getDamage());
-        return face.getHorizontalIndex() >= 0 ? face.getOpposite() : face;
     }
 }

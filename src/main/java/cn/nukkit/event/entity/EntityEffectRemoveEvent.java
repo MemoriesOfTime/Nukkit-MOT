@@ -8,7 +8,7 @@ import cn.nukkit.potion.Effect;
 public class EntityEffectRemoveEvent extends EntityEvent implements Cancellable {
     private static final HandlerList handlers = new HandlerList();
 
-    private Effect removeEffect;
+    private final Effect removeEffect;
 
     public EntityEffectRemoveEvent(Entity entity, Effect effect) {
         this.entity = entity;

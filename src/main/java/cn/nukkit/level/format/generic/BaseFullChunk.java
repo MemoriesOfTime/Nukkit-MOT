@@ -35,7 +35,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     /**
      * encoded as:
-     *
+     * <p>
      * (x &lt;&lt; 4) | z
      */
     protected byte[] biomes;
@@ -58,16 +58,12 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected LevelProvider provider;
     protected Class<? extends LevelProvider> providerClass;
-
+    protected long changes;
+    protected boolean isInit;
+    protected Map<Integer, BatchPacket> chunkPackets;
     private int x;
     private int z;
     private long hash;
-
-    protected long changes;
-
-    protected boolean isInit;
-
-    protected Map<Integer, BatchPacket> chunkPackets;
 
     @Override
     public BaseFullChunk clone() {
@@ -106,7 +102,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     protected BaseFullChunk cloneForChunkSending() {
         BaseFullChunk chunk;
         try {
-            chunk = (BaseFullChunk)super.clone();
+            chunk = (BaseFullChunk) super.clone();
         } catch (CloneNotSupportedException e) {
             return null;
         }
@@ -209,25 +205,25 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     @Override
-    public final int getZ() {
-        return z;
-    }
-
-    @Override
-    public void setPosition(int x, int z) {
-        this.x = x;
-        this.z = z;
-        this.hash = Level.chunkHash(x, z);
-    }
-
-    @Override
     public final void setX(int x) {
         this.x = x;
         this.hash = Level.chunkHash(x, z);
     }
 
     @Override
+    public final int getZ() {
+        return z;
+    }
+
+    @Override
     public final void setZ(int z) {
+        this.z = z;
+        this.hash = Level.chunkHash(x, z);
+    }
+
+    @Override
+    public void setPosition(int x, int z) {
+        this.x = x;
         this.z = z;
         this.hash = Level.chunkHash(x, z);
     }
@@ -358,7 +354,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                     this.setBlockSkyLight(x, y, z, light);
 
                     if (light == 0) { // skipping block checks, because everything under a block that has a skylight value
-                                      // of 0 also has a skylight value of 0
+                        // of 0 also has a skylight value of 0
                         continue;
                     }
 
@@ -366,15 +362,15 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                     int id = this.getBlockId(x, y, z);
 
                     if (!Block.transparent[id]) { // if we encounter an opaque block, all the blocks under it will
-                                           // have a skylight value of 0 (the block itself has a value of 15, if it's a top-most block)
+                        // have a skylight value of 0 (the block itself has a value of 15, if it's a top-most block)
                         nextLight = 0;
                     } else if (Block.diffusesSkyLight[id]) {
                         nextDecrease += 1; // skylight value decreases by one for each block under a block
-                                           // that diffuses skylight. The block itself has a value of 15 (if it's a top-most block)
+                        // that diffuses skylight. The block itself has a value of 15 (if it's a top-most block)
                     } else {
                         nextDecrease -= Block.lightFilter[id]; // blocks under a light filtering block will have a skylight value
-                                                            // decreased by the lightFilter value of that block. The block itself
-                                                            // has a value of 15 (if it's a top-most block)
+                        // decreased by the lightFilter value of that block. The block itself
+                        // has a value of 15 (if it's a top-most block)
                     }
                     // END of checks for the next block
                 }
@@ -475,7 +471,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public BlockEntity getTile(int x, int y, int z) {
-        return this.tileList != null ? this.tileList.get((z << 12) | (x << 8) | y) : null;
+        return this.tileList != null ? this.tileList.get(((long) z << 12) | ((long) x << 8) | y) : null;
     }
 
     @Override
@@ -598,13 +594,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     @Override
-    public void setLightPopulated() {
-        this.setLightPopulated(true);
+    public void setLightPopulated(boolean value) {
+
     }
 
     @Override
-    public void setLightPopulated(boolean value) {
-
+    public void setLightPopulated() {
+        this.setLightPopulated(true);
     }
 
     @Override
@@ -661,7 +657,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             setBlockId(x & 15, y, z & 15, layer, id);
         }
     }
-    
+
     @Override
     public void setBlockAt(int x, int y, int z, int id, int data) {
         if (x >> 4 == getX() && z >> 4 == getZ()) {

@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * Simple config for Nukkit
- *
+ * <p>
  * Added 11/02/2016 by fromgate
  */
 public abstract class SimpleConfig {
@@ -34,6 +34,23 @@ public abstract class SimpleConfig {
     public SimpleConfig(File file) {
         this.configFile = file;
         configFile.getParentFile().mkdirs();
+    }
+
+    private static String getPath(Field field) {
+        String path = null;
+        if (field.isAnnotationPresent(Path.class)) {
+            Path pathDefine = field.getAnnotation(Path.class);
+            path = pathDefine.value();
+        }
+        if (path == null || path.isEmpty()) path = field.getName().replaceAll("_", ".");
+        if (Modifier.isFinal(field.getModifiers())) return null;
+        if (Modifier.isPrivate(field.getModifiers())) field.setAccessible(true);
+        return path;
+    }
+
+    private static boolean skipSave(Field field) {
+        if (!field.isAnnotationPresent(Skip.class)) return false;
+        return field.getAnnotation(Skip.class).skipSave();
     }
 
     /**
@@ -101,8 +118,7 @@ public abstract class SimpleConfig {
                     field.set(this, cfg.getSection(path));
                 else if (field.getType() == List.class) {
                     Type genericFieldType = field.getGenericType();
-                    if (genericFieldType instanceof ParameterizedType) {
-                        ParameterizedType aType = (ParameterizedType) genericFieldType;
+                    if (genericFieldType instanceof ParameterizedType aType) {
                         Class fieldArgClass = (Class) aType.getActualTypeArguments()[0];
                         if (fieldArgClass == Integer.class) field.set(this, cfg.getIntegerList(path));
                         else if (fieldArgClass == Boolean.class) field.set(this, cfg.getBooleanList(path));
@@ -121,23 +137,6 @@ public abstract class SimpleConfig {
             }
         }
         return true;
-    }
-
-    private static String getPath(Field field) {
-        String path = null;
-        if (field.isAnnotationPresent(Path.class)) {
-            Path pathDefine = field.getAnnotation(Path.class);
-            path = pathDefine.value();
-        }
-        if (path == null || path.isEmpty()) path = field.getName().replaceAll("_", ".");
-        if (Modifier.isFinal(field.getModifiers())) return null;
-        if (Modifier.isPrivate(field.getModifiers())) field.setAccessible(true);
-        return path;
-    }
-
-    private static boolean skipSave(Field field) {
-        if (!field.isAnnotationPresent(Skip.class)) return false;
-        return field.getAnnotation(Skip.class).skipSave();
     }
 
     @Retention(RetentionPolicy.RUNTIME)

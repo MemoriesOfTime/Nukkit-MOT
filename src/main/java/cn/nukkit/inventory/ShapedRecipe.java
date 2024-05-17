@@ -11,25 +11,19 @@ import java.util.*;
  */
 public class ShapedRecipe implements CraftingRecipe {
 
-    private String recipeId;
     private final Item primaryResult;
     private final List<Item> extraResults = new ArrayList<>();
-
     private final List<Item> ingredientsAggregate;
-
-    private long least, most;
-
     private final String[] shape;
     private final int priority;
-
     private final CharObjectHashMap<Item> ingredients = new CharObjectHashMap<>();
-
     private final int networkId;
-
     /**
      * @since v671
      */
     private final boolean assumeSymetry;
+    private String recipeId;
+    private long least, most;
 
     public ShapedRecipe(Item primaryResult, String[] shape, Map<Character, Item> ingredients, List<Item> extraResults) {
         this(null, 1, primaryResult, shape, ingredients, extraResults);
@@ -56,7 +50,7 @@ public class ShapedRecipe implements CraftingRecipe {
      * @param extraResults<br> List of additional result items to leave in the crafting grid afterwards. Used for things like cake recipe
      *                         empty buckets.
      * @param networkId        Unique network id of this recipe. If null, a new networkId will be assigned to this recipe.
-     *
+     *                         <p>
      *                         Note: Recipes **do not** need to be square. Do NOT add padding for empty rows/columns.
      */
     public ShapedRecipe(String recipeId, int priority, Item primaryResult, String[] shape, Map<Character, Item> ingredients, List<Item> extraResults, Integer networkId, boolean assumeSymetry) {
@@ -288,7 +282,7 @@ public class ShapedRecipe implements CraftingRecipe {
      * Returns whether the specified list of crafting grid inputs and outputs matches this recipe. Outputs DO NOT
      * include the primary result item.
      *
-     * @param inputList  list of items taken from the crafting grid
+     * @param inputList       list of items taken from the crafting grid
      * @param extraOutputList list of items put back into the crafting grid (secondary results)
      * @return bool
      */

@@ -44,13 +44,11 @@ import java.util.function.IntFunction;
 public class RakNetInterface implements AdvancedSourceInterface {
 
     private final Server server;
-    private Network network;
-
     private final Channel channel;
     private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new HashMap<>();
     private final Queue<RakNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
-
     private final long serverId = ThreadLocalRandom.current().nextLong();
+    private Network network;
 
     public RakNetInterface(Server server) {
         this.server = server;
@@ -99,11 +97,6 @@ public class RakNetInterface implements AdvancedSourceInterface {
         String address = Strings.isNullOrEmpty(this.server.getIp()) ? "0.0.0.0" : this.server.getIp();
 
         this.channel = bootstrap.bind(address, this.server.getPort()).awaitUninterruptibly().channel();
-    }
-
-    @Override
-    public void setNetwork(Network network) {
-        this.network = network;
     }
 
     @Override
@@ -228,6 +221,11 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
     public Network getNetwork() {
         return this.network;
+    }
+
+    @Override
+    public void setNetwork(Network network) {
+        this.network = network;
     }
 
     private static class Transport {

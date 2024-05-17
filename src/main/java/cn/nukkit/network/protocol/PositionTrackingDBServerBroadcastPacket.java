@@ -8,7 +8,6 @@ import cn.nukkit.nbt.tag.IntTag;
 import cn.nukkit.nbt.tag.ListTag;
 import io.netty.handler.codec.EncoderException;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
-import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import javax.annotation.Nullable;

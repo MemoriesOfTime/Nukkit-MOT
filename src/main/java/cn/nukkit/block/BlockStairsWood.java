@@ -66,8 +66,8 @@ public class BlockStairsWood extends BlockStairs {
 
     @Override
     public Item[] getDrops(Item item) {
-         return new Item[]{
-            toItem()
-            };
+        return new Item[]{
+                toItem()
+        };
     }
 }
