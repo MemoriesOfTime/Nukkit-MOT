@@ -477,6 +477,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[WARPED_FENCE] = BlockFenceWarped.class; //512
             list[CRIMSON_FENCE_GATE] = BlockFenceGateCrimson.class; //513
             list[WARPED_FENCE_GATE] = BlockFenceGateWarped.class; //514
+            list[CRIMSON_BUTTON] = BlockButtonCrimson.class; //515
+            list[WARPED_BUTTON] = BlockButtonWarped.class; //516
+            list[CRIMSON_PRESSURE_PLATE] = BlockPressurePlateCrimson.class; //517
+            list[WARPED_PRESSURE_PLATE] = BlockPressurePlateWarped.class; //518
 
             list[SOUL_TORCH] = BlockSoulTorch.class; //523
             list[SOUL_LANTERN] = BlockSoulLantern.class; //524
