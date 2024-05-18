@@ -30,6 +30,8 @@ public class BlockColor  {
     public static final BlockColor CHERRY_BLOCK_COLOR = new BlockColor(0xd1, 0xb1, 0xa1);
     public static final BlockColor MANGROVE_BLOCK_COLOR = new BlockColor(0x99, 0x33, 0x33);
 
+    public static final BlockColor NETHER_BLOCK_COLOR = new BlockColor(0x70, 0x02, 0x00);
+
     public static final BlockColor QUARTZ_BLOCK_COLOR = new BlockColor(0xff, 0xfc, 0xf5);
     public static final BlockColor ADOBE_BLOCK_COLOR = new BlockColor(0xd8, 0x7f, 0x33);
 
