@@ -437,7 +437,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[PISTON_HEAD_STICKY] = BlockPistonHeadSticky.class; //472
             list[BEE_NEST] = BlockBeeNest.class; //473
             list[BEEHIVE] = BlockBeehive.class; //474
-
+            list[HONEY_BLOCK] = BlockHoneyBlock.class; //475
+            list[HONEYCOMB_BLOCK] = BlockHoneycombBlock.class; //476
+            list[LODESTONE] = BlockLodestone.class; //477
             list[CRIMSON_ROOTS] = BlockRootsCrimson.class; //478
             list[WARPED_ROOTS] = BlockRootsWarped.class; //479
             list[CRIMSON_STEM] = BlockStemCrimson.class; //480
@@ -471,6 +473,14 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[WARPED_WALL_SIGN] = BlockWarpedWallSign.class; //508
             list[CRIMSON_STAIRS] = BlockStairsCrimson.class; //509
             list[WARPED_STAIRS] = BlockStairsWarped.class; //510
+            list[CRIMSON_FENCE] = BlockFenceCrimson.class; //511
+            list[WARPED_FENCE] = BlockFenceWarped.class; //512
+            list[CRIMSON_FENCE_GATE] = BlockFenceGateCrimson.class; //513
+            list[WARPED_FENCE_GATE] = BlockFenceGateWarped.class; //514
+            list[CRIMSON_BUTTON] = BlockButtonCrimson.class; //515
+            list[WARPED_BUTTON] = BlockButtonWarped.class; //516
+            list[CRIMSON_PRESSURE_PLATE] = BlockPressurePlateCrimson.class; //517
+            list[WARPED_PRESSURE_PLATE] = BlockPressurePlateWarped.class; //518
 
             list[SOUL_TORCH] = BlockSoulTorch.class; //523
             list[SOUL_LANTERN] = BlockSoulLantern.class; //524

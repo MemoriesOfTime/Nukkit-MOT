@@ -398,6 +398,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.ADD_ENTITY_PACKET, AddEntityPacket.class)
                 .registerPacket(ProtocolInfo.ADD_ITEM_ENTITY_PACKET, AddItemEntityPacket.class)
                 .registerPacket(ProtocolInfo.ADD_PAINTING_PACKET, AddPaintingPacket.class)
+                .registerPacket(ProtocolInfo.TICK_SYNC_PACKET, TickSyncPacket.class)
                 .registerPacket(ProtocolInfo.ADD_PLAYER_PACKET, AddPlayerPacket.class)
                 .registerPacket(ProtocolInfo.ADVENTURE_SETTINGS_PACKET, AdventureSettingsPacket.class)
                 .registerPacket(ProtocolInfo.ANIMATE_PACKET, AnimatePacket.class)
