@@ -1,5 +1,6 @@
 package cn.nukkit.inventory;
 
+import cn.nukkit.inventory.data.RecipeUnlockingRequirement;
 import cn.nukkit.item.Item;
 
 import java.util.ArrayList;
@@ -26,6 +27,11 @@ public class ShapelessRecipe implements CraftingRecipe {
 
     private final int networkId;
 
+    /**
+     * @since v685
+     */
+    private final RecipeUnlockingRequirement requirement;
+
     public ShapelessRecipe(Item result, Collection<Item> ingredients) {
         this(null, 10, result, ingredients);
     }
@@ -35,6 +41,10 @@ public class ShapelessRecipe implements CraftingRecipe {
     }
 
     public ShapelessRecipe(String recipeId, int priority, Item result, Collection<Item> ingredients, Integer networkId) {
+        this(recipeId, priority, result, ingredients, networkId, RecipeUnlockingRequirement.INVALID);
+    }
+
+    public ShapelessRecipe(String recipeId, int priority, Item result, Collection<Item> ingredients, Integer networkId, RecipeUnlockingRequirement requirement) {
         this.recipeId = recipeId;
         this.priority = priority;
         this.output = result.clone();
@@ -64,6 +74,7 @@ public class ShapelessRecipe implements CraftingRecipe {
 
         this.ingredientsAggregate.sort(CraftingManager.recipeComparator);
         this.networkId = networkId != null ? networkId : ++CraftingManager.NEXT_NETWORK_ID;
+        this.requirement = requirement;
     }
 
     @Override
@@ -231,5 +242,10 @@ public class ShapelessRecipe implements CraftingRecipe {
 
     public int getNetworkId() {
         return this.networkId;
+    }
+
+    @Override
+    public RecipeUnlockingRequirement getRequirement() {
+        return this.requirement;
     }
 }

@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import lombok.ToString;
 
 /**
@@ -18,11 +19,18 @@ public class ContainerClosePacket extends DataPacket {
 
     public int windowId;
     public boolean wasServerInitiated;
+    /**
+     * @since v685
+     */
+    public ContainerType type;
 
     @Override
     public void decode() {
         this.windowId = (byte) this.getByte();
         if (protocol >= ProtocolInfo.v1_16_100) {
+            if (protocol >= ProtocolInfo.v1_21_0) {
+                this.type = ContainerType.from(this.getByte());
+            }
             this.wasServerInitiated = this.getBoolean();
         }
     }
@@ -32,6 +40,9 @@ public class ContainerClosePacket extends DataPacket {
         this.reset();
         this.putByte((byte) this.windowId);
         if (protocol >= ProtocolInfo.v1_16_100) {
+            if (protocol >= ProtocolInfo.v1_21_0) {
+                this.putByte((byte) this.type.ordinal());
+            }
             this.putBoolean(this.wasServerInitiated);
         }
     }
