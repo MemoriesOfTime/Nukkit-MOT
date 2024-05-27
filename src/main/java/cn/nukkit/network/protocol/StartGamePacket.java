@@ -133,15 +133,15 @@ public class StartGamePacket extends DataPacket {
     /**
      * @since v685
      */
-    public String serverId;
+    public String serverId = "";
     /**
      * @since v685
      */
-    public String worldId;
+    public String worldId = "";
     /**
      * @since v685
      */
-    public String scenarioId;
+    public String scenarioId = "";
 
     @Override
     public void decode() {

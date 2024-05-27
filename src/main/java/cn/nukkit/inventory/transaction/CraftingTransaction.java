@@ -9,6 +9,7 @@ import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.ContainerClosePacket;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.plugin.InternalPlugin;
 
 import java.util.ArrayList;
@@ -140,6 +141,7 @@ public class CraftingTransaction extends InventoryTransaction {
         ContainerClosePacket pk = new ContainerClosePacket();
         pk.windowId = ContainerIds.NONE;
         pk.wasServerInitiated = true;
+        pk.type = ContainerType.NONE;
         source.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> source.dataPacket(pk), 10);
 
         this.source.resetCraftingGridType();

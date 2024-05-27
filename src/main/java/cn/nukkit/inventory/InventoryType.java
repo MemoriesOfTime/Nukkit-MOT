@@ -56,4 +56,13 @@ public enum InventoryType {
     public int getNetworkType() {
         return typeId;
     }
+
+    public static InventoryType from(int id) {
+        for (InventoryType type : values()) {
+            if (type.getNetworkType() == id) {
+                return type;
+            }
+        }
+        return null;
+    }
 }
