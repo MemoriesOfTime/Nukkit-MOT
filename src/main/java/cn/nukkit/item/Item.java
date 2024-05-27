@@ -529,8 +529,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCreativeItemsNew(ProtocolInfo.v1_20_60, ProtocolInfo.v1_20_60, creative649);
         registerCreativeItemsNew(ProtocolInfo.v1_20_70, ProtocolInfo.v1_20_70, creative662);
         registerCreativeItemsNew(ProtocolInfo.v1_20_80, ProtocolInfo.v1_20_80, creative671);
-        //TODO creativeitems685.json
-        //registerCreativeItemsNew(ProtocolInfo.v1_21_0, ProtocolInfo.v1_21_0, creative685);
+        registerCreativeItemsNew(ProtocolInfo.v1_21_0, ProtocolInfo.v1_21_0, creative685);
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -549,7 +548,13 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     private static void registerCreativeItemsNew(int protocol, int blockPaletteProtocol, List<Item> creativeItems) {
         JsonArray itemsArray;
-        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream("creativeitems" + protocol + ".json")) {
+        String file;
+        if (protocol >= ProtocolInfo.v1_21_0) {
+            file = "CreativeItems/creative_items_" + protocol + ".json";
+        } else {
+            file = "creativeitems" + protocol + ".json";
+        }
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(file)) {
             itemsArray = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("items");
         } catch (Exception e) {
             throw new AssertionError("Error loading required block states!", e);
