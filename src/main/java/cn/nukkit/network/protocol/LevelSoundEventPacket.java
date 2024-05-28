@@ -497,8 +497,72 @@ public class LevelSoundEventPacket extends DataPacket {
     public static final int SOUND_EQUIP_WOLF = 497;
     public static final int SOUND_UNEQUIP_WOLF = 498;
     public static final int SOUND_REFLECT = 499;
+    /**
+     * @since v662
+     */
+    public static final int SOUND_VAULT_OPEN_SHUTTER = 500;
+    /**
+     * @since v662
+     */
+    public static final int SOUND_VAULT_CLOSE_SHUTTER = 501;
+    /**
+     * @since v662
+     */
+    public static final int SOUND_VAULT_EJECT_ITEM = 502;
+    /**
+     * @since v662
+     */
+    public static final int SOUND_VAULT_INSERT_ITEM = 503;
+    /**
+     * @since v662
+     */
+    public static final int SOUND_VAULT_INSERT_ITEM_FAIL = 504;
+    /**
+     * @since v662
+     */
+    public static final int SOUND_VAULT_AMBIENT = 505;
+    /**
+     * @since v662
+     */
+    public static final int SOUND_VAULT_ACTIVATE = 506;
+    /**
+     * @since v662
+     */
+    public static final int SOUND_VAULT_DEACTIVATE = 507;
+    /**
+     * @since v662
+     */
+    public static final int SOUND_HURT_REDUCED = 508;
+    /**
+     * @since v662
+     */
+    public static final int SOUND_WIND_CHARGE_BURST = 509;
+    /**
+     * @since v671
+     */
+    public static final int SOUND_ARMOR_CRACK_WOLF = 511;
+    /**
+     * @since v671
+     */
+    public static final int SOUND_ARMOR_BREAK_WOLF = 512;
+    /**
+     * @since v671
+     */
+    public static final int SOUND_ARMOR_REPAIR_WOLF = 513;
+    /**
+     * @since v671
+     */
+    public static final int SOUND_MACE_SMASH_AIR = 514;
+    /**
+     * @since v671
+     */
+    public static final int SOUND_MACE_SMASH_GROUND = 515;
+    /**
+     * @since v671
+     */
+    public static final int SOUND_MACE_SMASH_HEAVY_GROUND = 520;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(500);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(521);
 
     public int sound;
     public float x;
