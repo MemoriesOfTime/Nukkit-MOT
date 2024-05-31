@@ -265,28 +265,16 @@ public class Effect implements Cloneable {
             }
 
             if (this.id == Effect.SPEED) {
-                /*if (oldEffect != null) {
-                    player.setMovementSpeed(player.getMovementSpeed() / (1 + 0.2f * (oldEffect.amplifier + 1)), false);
-                }
-                player.setMovementSpeed(player.getMovementSpeed() * (1 + 0.2f * (this.amplifier + 1)));*/
-                entityLiving.setMovementSpeed(Player.DEFAULT_SPEED * (1 + 0.2f * (this.amplifier + 1)));
-            }
-
-            if (this.id == Effect.SLOWNESS) {
-                /*if (oldEffect != null) {
-                    player.setMovementSpeed(player.getMovementSpeed() / (1 - 0.15f * (oldEffect.amplifier + 1)), false);
-                }
-                player.setMovementSpeed(player.getMovementSpeed() * (1 - 0.15f * (this.amplifier + 1)));*/
-                entityLiving.setMovementSpeed(Player.DEFAULT_SPEED * (1 - 0.15f * (this.amplifier + 1)));
+                entityLiving.setMovementSpeed(EntityLiving.MovementSpeedModifier.EFFECT, 1 + 0.2f * (this.amplifier + 1));
+            } else if (this.id == Effect.SLOWNESS) {
+                entityLiving.setMovementSpeed(EntityLiving.MovementSpeedModifier.EFFECT, 1 - 0.15f * (this.amplifier + 1));
             }
         }
 
         if (this.id == Effect.INVISIBILITY) {
             entity.setDataFlag(Entity.DATA_FLAGS, Entity.DATA_FLAG_INVISIBLE, true);
             entity.setNameTagVisible(false);
-        }
-
-        if (this.id == Effect.ABSORPTION) {
+        } else if (this.id == Effect.ABSORPTION) {
             int add = (this.amplifier + 1) * 4;
             if (add > entity.getAbsorption()) entity.setAbsorption(add);
         }
@@ -309,19 +297,17 @@ public class Effect implements Cloneable {
                 player.dataPacket(pk);
 
                 if (this.id == Effect.SPEED) {
-                    player.setMovementSpeed(player.isSprinting() ? Player.DEFAULT_SPEED * 1.3f : Player.DEFAULT_SPEED, false);
+                    player.setMovementSpeed(EntityLiving.MovementSpeedModifier.EFFECT, 0, false);
                     player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
-                }
-                if (this.id == Effect.SLOWNESS) {
-                    player.setMovementSpeed(player.isSprinting() ? Player.DEFAULT_SPEED * 1.3f : Player.DEFAULT_SPEED, false);
+                } else if (this.id == Effect.SLOWNESS) {
+                    player.setMovementSpeed(EntityLiving.MovementSpeedModifier.EFFECT, 0, false);
                     player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
                 }
             } else {
                 if (this.id == Effect.SPEED) {
-                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 + 0.2f * (this.amplifier + 1)));
-                }
-                if (this.id == Effect.SLOWNESS) {
-                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 - 0.15f * (this.amplifier + 1)));
+                    entityLiving.setMovementSpeed(EntityLiving.MovementSpeedModifier.EFFECT, 0);
+                } else if (this.id == Effect.SLOWNESS) {
+                    entityLiving.setMovementSpeed(EntityLiving.MovementSpeedModifier.EFFECT, 0);
                 }
             }
             if (this.id == Effect.HEALTH_BOOST) {
@@ -334,9 +320,7 @@ public class Effect implements Cloneable {
         if (this.id == Effect.INVISIBILITY) {
             entity.setDataFlag(Entity.DATA_FLAGS, Entity.DATA_FLAG_INVISIBLE, false);
             entity.setNameTagVisible(true);
-        }
-
-        if (this.id == Effect.ABSORPTION) {
+        } else if (this.id == Effect.ABSORPTION) {
             entity.setAbsorption(0);
         }
     }
