@@ -19,6 +19,7 @@ import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.BubbleParticle;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -30,9 +31,10 @@ import cn.nukkit.network.protocol.TextPacket;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockIterator;
 
-import java.util.*;
-
-import java.util.stream.StreamSupport;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @author MagicDroidX
@@ -109,76 +111,94 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     @Override
     public boolean attack(EntityDamageEvent source) {
-        return this.noDamageTicks <= 0 && this.attackTime <= 0 && !this.blockedByShield(source) &&
-                Optional.of(super.attack(source))
-                        .filter(Boolean::booleanValue)
-                        .map(success -> {
-                            if (source instanceof EntityDamageByEntityEvent event) {
-                                Entity damageEntity = event instanceof EntityDamageByChildEntityEvent childDamageEvent ? childDamageEvent.getChild() : event.getDamager();
+        if (this.noDamageTicks > 0) {
+            return false;
+        } else if (this.attackTime > 0) {
+            EntityDamageEvent lastCause = this.getLastDamageCause();
+            if (lastCause != null && lastCause.getDamage() >= source.getDamage()) {
+                return false;
+            }
+        }
 
-                                this.checkCriticalHit(damageEntity, source);
+        if (this.blockedByShield(source)) {
+            return false;
+        }
 
-                                if (damageEntity.isOnFire() && !(damageEntity instanceof Player)) {
-                                    this.setOnFire(this.server.getDifficulty() << 1);
-                                }
+        if (super.attack(source)) {
+            if (source instanceof EntityDamageByEntityEvent) {
+                Entity damager = ((EntityDamageByEntityEvent) source).getDamager();
+                if (source instanceof EntityDamageByChildEntityEvent) {
+                    damager = ((EntityDamageByChildEntityEvent) source).getChild();
+                }
 
-                                double deltaX = this.x - damageEntity.x;
-                                double deltaZ = this.z - damageEntity.z;
-                                this.knockBack(deltaX, deltaZ, event.getKnockBack());
-                            }
+                // Critical hit
+                if (damager instanceof Player && !damager.onGround) {
+                    AnimatePacket animate = new AnimatePacket();
+                    animate.action = AnimatePacket.Action.CRITICAL_HIT;
+                    animate.eid = getId();
 
-                            this.callBroadcastAnimation();
+                    this.getLevel().addChunkPacket(damager.getChunkX(), damager.getChunkZ(), animate);
+                    this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ATTACK_STRONG);
 
-                            this.attackTime = source.getAttackCooldown();
-                            this.scheduleUpdate();
-                            return true;
-                        })
-                        .orElse(false);
-    }
+                    source.setDamage(source.getDamage() * 1.5f);
+                }
 
-    private void checkCriticalHit(Entity damageEntity, EntityDamageEvent source) {
-        if (damageEntity instanceof Player && !damageEntity.onGround) {
-            AnimatePacket animate = new AnimatePacket();
-            animate.action = AnimatePacket.Action.CRITICAL_HIT;
-            animate.eid = getId();
-            this.getLevel().addChunkPacket(damageEntity.getChunkX(), damageEntity.getChunkZ(), animate);
-            this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ATTACK_STRONG);
-            source.setDamage(source.getDamage() * 1.5f);
+                if (damager.isOnFire() && !(damager instanceof Player)) {
+                    this.setOnFire(this.server.getDifficulty() << 1);
+                }
+
+                double deltaX = this.x - damager.x;
+                double deltaZ = this.z - damager.z;
+                this.knockBack(damager, source.getDamage(), deltaX, deltaZ, ((EntityDamageByEntityEvent) source).getKnockBack());
+            }
+
+            EntityEventPacket pk = new EntityEventPacket();
+            pk.eid = this.getId();
+            pk.event = this.getHealth() < 1 ? EntityEventPacket.DEATH_ANIMATION : EntityEventPacket.HURT_ANIMATION;
+            Server.broadcastPacket(this.hasSpawned.values(), pk);
+
+            this.attackTime = source.getAttackCooldown();
+            this.scheduleUpdate();
+            return true;
+        } else {
+            return false;
         }
     }
 
-    private void callBroadcastAnimation() {
-        EntityEventPacket pk = new EntityEventPacket();
-        pk.eid = this.getId();
-        pk.event = this.getHealth() < 1 ? EntityEventPacket.DEATH_ANIMATION : EntityEventPacket.HURT_ANIMATION;
-        Server.broadcastPacket(this.hasSpawned.values(), pk);
-    }
-
     protected boolean blockedByShield(EntityDamageEvent source) {
-        return this.isBlocking() && Optional.ofNullable(source)
-                .map(src -> src instanceof EntityDamageByChildEntityEvent event ? event.getChild() : src instanceof EntityDamageByEntityEvent event ? event.getDamager() : null)
-                .filter(damageEntity -> !(damageEntity instanceof EntityWeather))
-                .map(damageEntity -> {
-                    Vector3 direction = this.getDirectionVector();
-                    Vector3 normalizedVector = this.getPosition().subtract(damageEntity.getPosition()).normalize();
+        if (!this.isBlocking()) {
+            return false;
+        }
 
-                    boolean blocked = (normalizedVector.x * direction.x) + (normalizedVector.z * direction.z) < 0.0;
-                    boolean knockBack = !(damageEntity instanceof EntityProjectile);
-                    EntityDamageBlockedEvent event = new EntityDamageBlockedEvent(this, source, knockBack, true);
-                    if (!blocked || !source.canBeReducedByArmor() || (damageEntity instanceof EntityProjectile projectile && projectile.piercing > 0)) {
-                        event.setCancelled();
-                    }
+        Entity damager = source instanceof EntityDamageByChildEntityEvent ? ((EntityDamageByChildEntityEvent) source).getChild() : source instanceof EntityDamageByEntityEvent ? ((EntityDamageByEntityEvent) source).getDamager() : null;
+        if (damager == null || damager instanceof EntityWeather) {
+            return false;
+        }
 
-                    getServer().getPluginManager().callEvent(event);
-                    if (!event.isCancelled() && event.getKnockBackAttacker() && damageEntity instanceof EntityLiving living) {
-                        living.attackTime = source.getAttackCooldown();
-                        living.knockBack(damageEntity.getX() - this.getX(), damageEntity.getZ() - this.getZ());
-                    }
+        Vector3 entityPos = damager.getPosition();
+        Vector3 direction = this.getDirectionVector();
+        Vector3 normalizedVector = this.getPosition().subtract(entityPos).normalize();
+        boolean blocked = (normalizedVector.x * direction.x) + (normalizedVector.z * direction.z) < 0.0;
+        boolean knockBack = !(damager instanceof EntityProjectile);
+        EntityDamageBlockedEvent event = new EntityDamageBlockedEvent(this, source, knockBack, true);
+        if (!blocked || !source.canBeReducedByArmor() || damager instanceof EntityProjectile && ((EntityProjectile) damager).piercing > 0) {
+            event.setCancelled();
+        }
 
-                    onBlock(damageEntity, source, event.getAnimation());
-                    return true;
-                })
-                .orElse(false);
+        getServer().getPluginManager().callEvent(event);
+        if (event.isCancelled()) {
+            return false;
+        }
+
+        if (event.getKnockBackAttacker() && damager instanceof EntityLiving) {
+            double deltaX = damager.getX() - this.getX();
+            double deltaZ = damager.getZ() - this.getZ();
+            ((EntityLiving) damager).attackTime = source.getAttackCooldown();
+            ((EntityLiving) damager).knockBack(this, 0, deltaX, deltaZ);
+        }
+
+        onBlock(damager, source, event.getAnimation());
+        return true;
     }
 
     protected void onBlock(Entity entity, EntityDamageEvent event, boolean animate) {
@@ -187,11 +207,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         }
     }
 
-    public void knockBack(double x, double z) {
-        this.knockBack(x, z, 0.3);
+    public void knockBack(Entity attacker, double damage, double x, double z) {
+        this.knockBack(attacker, damage, x, z, 0.3);
     }
 
-    public void knockBack(double x, double z, double base) {
+    public void knockBack(Entity attacker, double damage, double x, double z, double base) {
         double f = Math.sqrt(x * x + z * z);
         if (f <= 0) {
             return;
@@ -219,28 +239,34 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     @Override
     public void kill() {
-        if (this.isAlive()) {
-            super.kill();
+        if (!this.isAlive()) {
+            return;
+        }
+        super.kill();
+        EntityDeathEvent ev = new EntityDeathEvent(this, this.getDrops());
+        this.server.getPluginManager().callEvent(ev);
 
-            EntityDeathEvent source = new EntityDeathEvent(this, this.getDrops());
-            this.server.getPluginManager().callEvent(source);
-            this.checkTameableEntityDeath();
+        this.checkTameableEntityDeath();
 
-            boolean doMobLoot = this.level.getGameRules().getBoolean(GameRule.DO_MOB_LOOT);
-            DamageCause lastDamageCause = this.lastDamageCause != null ? this.lastDamageCause.getCause() : null;
-            if (doMobLoot && lastDamageCause != null && DamageCause.VOID != lastDamageCause) {
-                if (source.getEntity() instanceof BaseEntity baseEntity) {
-                    EntityDamageEvent lastDamageCauseEvent = baseEntity.getLastDamageCause();
-                    if (lastDamageCauseEvent instanceof EntityDamageByEntityEvent event && event.getDamager() instanceof Player) {
+        if (this.level.getGameRules().getBoolean(GameRule.DO_MOB_LOOT) && this.lastDamageCause != null && DamageCause.VOID != this.lastDamageCause.getCause()) {
+            if (ev.getEntity() instanceof BaseEntity) {
+                BaseEntity baseEntity = (BaseEntity) ev.getEntity();
+                if (baseEntity.getLastDamageCause() instanceof EntityDamageByEntityEvent) {
+                    if (((EntityDamageByEntityEvent) baseEntity.getLastDamageCause()).getDamager() instanceof Player) {
                         this.getLevel().dropExpOrb(this, baseEntity.getKillExperience());
+
                         if (!this.dropsOnNaturalDeath()) {
-                            Arrays.stream(source.getDrops()).forEach(item -> this.getLevel().dropItem(this, item));
+                            for (cn.nukkit.item.Item item : ev.getDrops()) {
+                                this.getLevel().dropItem(this, item);
+                            }
                         }
                     }
                 }
+            }
 
-                if (this.dropsOnNaturalDeath()) {
-                    Arrays.stream(source.getDrops()).forEach(item -> this.getLevel().dropItem(this, item));
+            if (this.dropsOnNaturalDeath()) {
+                for (cn.nukkit.item.Item item : ev.getDrops()) {
+                    this.getLevel().dropItem(this, item);
                 }
             }
         }
@@ -255,10 +281,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public boolean entityBaseTick(int tickDiff) {
         boolean inWater = this.isSubmerged();
 
-        if (this instanceof Player player && !this.closed) {
+        if (this instanceof Player && !this.closed) {
+            Player p = (Player) this;
             boolean isBreathing = !inWater;
 
-            PlayerInventory inv = player.getInventory();
+            PlayerInventory inv = p.getInventory();
             if (isBreathing && inv != null && inv.getHelmetFast() instanceof ItemTurtleShell) {
                 turtleTicks = 200;
             } else if (turtleTicks > 0) {
@@ -266,11 +293,20 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 turtleTicks--;
             }
 
-            if (player.isCreative() || player.isSpectator()) {
+            if (p.isCreative() || p.isSpectator()) {
                 isBreathing = true;
             }
 
-            this.setDataFlagSelfOnly(DATA_FLAGS, player.protocol <= 282 ? (player.protocol <= 201 ? 33 : 34) : DATA_FLAG_BREATHING, isBreathing);
+            // HACK!
+            if (p.protocol <= 282) {
+                if (p.protocol <= 201) {
+                    this.setDataFlagSelfOnly(DATA_FLAGS, 33, isBreathing);
+                } else {
+                    this.setDataFlagSelfOnly(DATA_FLAGS, 34, isBreathing);
+                }
+            } else {
+                this.setDataFlagSelfOnly(DATA_FLAGS, DATA_FLAG_BREATHING, isBreathing);
+            }
         }
 
         boolean hasUpdate = super.entityBaseTick(tickDiff);
@@ -288,37 +324,56 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             if (inWater && !this.hasEffect(Effect.WATER_BREATHING)) {
                 if (this instanceof EntitySwimming || this.isDrowned || (this instanceof Player && (((Player) this).isCreative() || ((Player) this).isSpectator()))) {
                     this.setAirTicks(400);
-                } else if (turtleTicks == 0) {
-                    hasUpdate = true;
-                    int airTicks = this.getAirTicks() - tickDiff;
-                    airTicks = (airTicks <= -20) ? 0 : airTicks;
-                    this.setAirTicks(airTicks);
-                    if (airTicks == 0 && (!(this instanceof Player) || level.getGameRules().getBoolean(GameRule.DROWNING_DAMAGE))) {
-                        this.attack(new EntityDamageEvent(this, DamageCause.DROWNING, 2));
+                } else {
+                    if (turtleTicks == 0) {
+                        hasUpdate = true;
+                        int airTicks = this.getAirTicks() - tickDiff;
+
+                        if (airTicks <= -20) {
+                            airTicks = 0;
+                            if (!(this instanceof Player) || level.getGameRules().getBoolean(GameRule.DROWNING_DAMAGE)) {
+                                this.attack(new EntityDamageEvent(this, DamageCause.DROWNING, 2));
+                            }
+                        }
+
+                        this.setAirTicks(airTicks);
                     }
                 }
             } else {
                 if (this instanceof EntitySwimming) {
                     hasUpdate = true;
                     int airTicks = this.getAirTicks() - tickDiff;
-                    airTicks = (airTicks <= -20) ? 0 : airTicks;
-                    this.setAirTicks(airTicks);
-                    if (airTicks == 0) {
+
+                    if (airTicks <= -20) {
+                        airTicks = 0;
                         this.attack(new EntityDamageEvent(this, DamageCause.SUFFOCATION, 2));
                     }
-                } else if (getAirTicks() < 400) {
-                    setAirTicks(Math.min(400, getAirTicks() + tickDiff * 5));
+
+                    this.setAirTicks(airTicks);
+                } else {
+                    int airTicks = getAirTicks();
+                    if (airTicks < 400) {
+                        setAirTicks(Math.min(400, airTicks + tickDiff * 5));
+                    }
                 }
             }
 
-            if (this instanceof Player && this.age % 5 == 0) {
-                Block block = this.level.getBlock(getFloorX(), NukkitMath.floorDouble(this.y - 0.25), getFloorZ());
-                if (block instanceof BlockCactus || block instanceof BlockMagma) {
-                    block.onEntityCollide(this);
-                    if (block instanceof BlockMagma && this.isInsideOfWater()) {
+            // Check collisions with blocks
+            if (this instanceof Player) {
+                if (this.age % 5 == 0) {
+                    Block block = this.level.getBlock(getFloorX(), NukkitMath.floorDouble(this.y - 0.25), getFloorZ());
+                    if (block instanceof BlockCactus) {
+                        block.onEntityCollide(this);
+                    } else if (block instanceof BlockMagma) {
+                        block.onEntityCollide(this);
+                        if (this.isInsideOfWater()) {
+                            this.level.addParticle(new BubbleParticle(this));
+                            this.setMotion(this.getMotion().add(0, -0.3, 0));
+                        }
+                    } /*else if (block == Block.SOUL_SAND && this.isInsideOfWater()) {
                         this.level.addParticle(new BubbleParticle(this));
-                        this.setMotion(this.getMotion().add(0, -0.3, 0));
-                    }
+                        this.setMotion(this.getMotion().add(0, 0.3, 0));
+                    }*/
                 }
             }
 
@@ -328,9 +383,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             if (this.riding == null) {
-                Arrays.stream(level.getNearbyEntities(this.boundingBox.grow(0.2, 0.0, 0.2), this))
-                        .filter(entity -> entity instanceof EntityRideable)
-                        .forEach(this::collidingWith);
+                Entity[] e = level.getNearbyEntities(this.boundingBox.grow(0.20000000298023224, 0.0D, 0.20000000298023224), this);
+                for (Entity entity : e) {
+                    if (entity instanceof EntityRideable) {
+                        this.collidingWith(entity);
+                    }
+                }
             }
         }
 
@@ -354,16 +412,40 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public Block[] getLineOfSight(int maxDistance, int maxLength, Integer[] transparent) {
-        maxDistance = Math.min(maxDistance, 120);
-        transparent = transparent != null && transparent.length == 0 ? null : transparent;
-        Iterator<Block> iterator = new BlockIterator(this.level, this.getPosition(), this.getDirectionVector(), this.getEyeHeight(), maxDistance);
+        if (maxDistance > 120) {
+            maxDistance = 120;
+        }
 
-        Integer[] finalTransparent = transparent;
-        return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, Spliterator.ORDERED), false)
-                .takeWhile(block -> (finalTransparent == null && block.getId() != 0) || (finalTransparent != null &&
-                        !Arrays.asList(finalTransparent).contains(block.getId())))
-                .limit(maxLength == 0 ? Long.MAX_VALUE : maxLength)
-                .toArray(Block[]::new);
+        if (transparent != null && transparent.length == 0) {
+            transparent = null;
+        }
+
+        List<Block> blocks = new ArrayList<>();
+
+        BlockIterator itr = new BlockIterator(this.level, this.getPosition(), this.getDirectionVector(), this.getEyeHeight(), maxDistance);
+
+        while (itr.hasNext()) {
+            Block block = itr.next();
+            blocks.add(block);
+
+            if (maxLength != 0 && blocks.size() > maxLength) {
+                blocks.remove(0);
+            }
+
+            int id = block.getId();
+
+            if (transparent == null) {
+                if (id != 0) {
+                    break;
+                }
+            } else {
+                if (Arrays.binarySearch(transparent, id) < 0) {
+                    break;
+                }
+            }
+        }
+
+        return blocks.toArray(new Block[0]);
     }
 
     public Block getTargetBlock(int maxDistance) {
@@ -375,10 +457,19 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public Block getTargetBlock(int maxDistance, Integer[] transparent) {
-        Block[] blocks = this.getLineOfSight(maxDistance, 1, transparent);
-        if (blocks.length > 0 && (transparent == null || transparent.length == 0 || Arrays.binarySearch(transparent, blocks[0].getId()) < 0)) {
-            return blocks[0];
-        }
+        try {
+            Block[] blocks = this.getLineOfSight(maxDistance, 1, transparent);
+            Block block = blocks[0];
+            if (block != null) {
+                if (transparent != null && transparent.length != 0) {
+                    if (Arrays.binarySearch(transparent, block.getId()) < 0) {
+                        return block;
+                    }
+                } else {
+                    return block;
+                }
+            }
+        } catch (Exception ignored) {}
 
         return null;
     }
@@ -421,12 +512,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     private void checkTameableEntityDeath() {
-        if (this instanceof EntityTameable entity) {
-            if (!entity.hasOwner()) {
+        if (this instanceof EntityTameable) {
+            if (!((EntityTameable) this).hasOwner()) {
                 return;
             }
 
-            if (entity.getOwner() == null) {
+            if (((EntityTameable) this).getOwner() == null) {
                 return;
             }
 
@@ -439,13 +530,14 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             TranslationContainer deathMessage = new TranslationContainer("death.attack.generic", killedEntity);
-            if (this.getLastDamageCause() instanceof EntityDamageByEntityEvent event) {
-                Entity damageEntity = event.getDamager();
+            if (this.getLastDamageCause() instanceof EntityDamageByEntityEvent) {
+                Entity damageEntity = ((EntityDamageByEntityEvent) this.getLastDamageCause()).getDamager();
                 if (damageEntity instanceof Player) {
                     deathMessage = new TranslationContainer("death.attack.player", killedEntity, damageEntity.getName());
                 } else {
-                    if (damageEntity instanceof EntityWolf wolf)
-                        wolf.setAngry(false);
+                    if (damageEntity instanceof EntityWolf) {
+                        ((EntityWolf) damageEntity).setAngry(false);
+                    }
                     deathMessage = new TranslationContainer("death.attack.mob", killedEntity, damageEntity.getName());
                 }
             }
@@ -455,7 +547,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             tameDeathMessage.message = deathMessage.getText();
             tameDeathMessage.parameters = deathMessage.getParameters();
             tameDeathMessage.isLocalized = true;
-            entity.getOwner().dataPacket(tameDeathMessage);
+            ((EntityTameable) this).getOwner().dataPacket(tameDeathMessage);
         }
     }
 
@@ -477,11 +569,14 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public EntityHuman getNearbyHuman(double distance) {
-        return Arrays.stream(this.level.getCollidingEntities(this.boundingBox.clone().expand(distance, distance, distance)))
-                .filter(EntityHuman.class::isInstance)
-                .map(EntityHuman.class::cast)
-                .findFirst()
-                .orElse(null);
+        AxisAlignedBB bb = this.boundingBox.clone().expand(distance, distance, distance);
+        EntityHuman human = null;
+        for (Entity collidingEntity : this.level.getCollidingEntities(bb)) {
+            if (collidingEntity instanceof EntityHuman) {
+                human = (EntityHuman) collidingEntity;
+                break;
+            }
+        }
+        return human;
     }
-
 }
