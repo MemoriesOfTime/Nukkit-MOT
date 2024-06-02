@@ -8,9 +8,9 @@ import org.cloudburstmc.nbt.NbtMapBuilder;
 import org.cloudburstmc.nbt.NbtType;
 import org.cloudburstmc.nbt.NbtUtils;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Objects;
 
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.PALETTE_VERSION;
 
@@ -27,9 +27,8 @@ public class NukkitLegacyMapper implements LegacyStateMapper {
                 builder.remove("name_hash");
                 nbtMap = builder.build();
             }
-            //生成并缓存hashCode
             //noinspection ResultOfMethodCallIgnored
-            nbtMap.hashCode();
+            nbtMap.hashCode(); // cache hashCode
             blockStateMapping.registerState(i, nbtMap);
         }
     }
@@ -37,12 +36,9 @@ public class NukkitLegacyMapper implements LegacyStateMapper {
     public static List<NbtMap> loadBlockPalette() {
         List<NbtMap> nbtMaps;
         try (InputStream stream = Server.class.getClassLoader().getResourceAsStream("leveldb_palette.nbt")) {
-            if (stream == null) {
-                throw new AssertionError("Unable to load leveldb_palette.nbt");
-            }
-            nbtMaps = ((NbtMap) NbtUtils.createGZIPReader(stream).readTag()).getList("blocks", NbtType.COMPOUND);
-        } catch (IOException e) {
-            throw new AssertionError("Unable to load leveldb_palette.nbt", e);
+            nbtMaps = ((NbtMap) NbtUtils.createGZIPReader(Objects.requireNonNull(stream)).readTag()).getList("blocks", NbtType.COMPOUND);
+        } catch (Exception e) {
+            throw new AssertionError("Error loading block palette leveldb_palette.nbt", e);
         }
         return nbtMaps;
     }
