@@ -832,6 +832,8 @@ public class Server {
             }
         });
 
+        Runtime.getRuntime().addShutdownHook(new Thread(this::forceShutdown));
+
         this.start();
     }
 
