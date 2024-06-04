@@ -474,7 +474,10 @@ public interface BlockID {
     int WARPED_BUTTON = 516;
     int CRIMSON_PRESSURE_PLATE = 517;
     int WARPED_PRESSURE_PLATE = 518;
-
+    int CRIMSON_SLAB = 519;
+    int WARPED_SLAB = 520;
+    int CRIMSON_DOUBLE_SLAB = 521;
+    int WARPED_DOUBLE_SLAB = 522;
     int SOUL_TORCH = 523;
     int SOUL_LANTERN = 524;
     int NETHERITE_BLOCK = 525;
