@@ -7,7 +7,7 @@ import cn.nukkit.utils.BlockColor;
 
 public class BlockDoubleSlabCrimson extends BlockSolid {
     public BlockDoubleSlabCrimson() {
-        this(0);
+        
     }
 
     @Override
