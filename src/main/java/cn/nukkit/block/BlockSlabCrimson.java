@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockSlabCrimson extends BlockSlab {
 
@@ -30,6 +31,11 @@ public class BlockSlabCrimson extends BlockSlab {
     @Override
     public int getToolType() {
         return ItemTool.TYPE_AXE;
+    }
+    
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.CRIMSON_STEM_BLOCK_COLOR;
     }
 
 }

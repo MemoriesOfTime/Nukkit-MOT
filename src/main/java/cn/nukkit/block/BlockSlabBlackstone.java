@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockSlabBlackstone extends BlockSlab {
     public BlockSlabBlackstone() {
@@ -46,5 +47,10 @@ public class BlockSlabBlackstone extends BlockSlab {
     @Override
     public boolean canHarvestWithHand() {
         return false;
+    }
+    
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.BLACK_BLOCK_COLOR;
     }
 }

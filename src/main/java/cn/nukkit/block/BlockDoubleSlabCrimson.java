@@ -3,10 +3,11 @@ package cn.nukkit.block;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockDoubleSlabCrimson extends BlockSolid {
     public BlockDoubleSlabCrimson() {
-        
+        this(0);
     }
 
     @Override
@@ -43,5 +44,10 @@ public class BlockDoubleSlabCrimson extends BlockSolid {
         } else {
             return new Item[0];
         }
+    }
+    
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.CRIMSON_STEM_BLOCK_COLOR;
     }
 }

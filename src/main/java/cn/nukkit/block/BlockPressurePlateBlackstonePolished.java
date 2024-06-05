@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockColor;
+
 public class BlockPressurePlateBlackstonePolished extends BlockPressurePlateStone {
     public BlockPressurePlateBlackstonePolished() {
         // Does nothing
@@ -17,6 +19,11 @@ public class BlockPressurePlateBlackstonePolished extends BlockPressurePlateSton
     @Override
     public String getName() {
         return "Polished Blackstone Pressure Plate";
+    }
+    
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.BLACK_BLOCK_COLOR;
     }
 
 }

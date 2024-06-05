@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockDoubleSlabBlackstone extends BlockSolid {
     public BlockDoubleSlabBlackstone() {
@@ -53,5 +54,10 @@ public class BlockDoubleSlabBlackstone extends BlockSolid {
         } else {
             return new Item[0];
         }
+    }
+    
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.BLACK_BLOCK_COLOR;
     }
 }
