@@ -28,7 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
@@ -39,7 +39,7 @@ public class Anvil2LevelDBConverter {
 
     private final Level sourceLevel;
     private final Level targetLevel;
-    private final Executor executor;
+    private final ExecutorService executor;
 
     public Anvil2LevelDBConverter(Level sourceLevel) {
         this.sourceLevel = sourceLevel;
@@ -73,6 +73,10 @@ public class Anvil2LevelDBConverter {
             return this.convertUnsafe();
         } catch (Exception e) {
             throw new RuntimeException("Failed to convert level " + this.sourceLevel.getFolderName(), e);
+        } finally {
+            if (this.executor != null) {
+                this.executor.shutdown();
+            }
         }
     }
 

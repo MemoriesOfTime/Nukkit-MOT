@@ -183,6 +183,9 @@ public abstract class BlockEntity extends Position {
     }
 
     public final void scheduleUpdate() {
+        if (this.level.isBeingConverted) {
+            return;
+        }
         this.level.scheduleBlockEntityUpdate(this);
     }
 
