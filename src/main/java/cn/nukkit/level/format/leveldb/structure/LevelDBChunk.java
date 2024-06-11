@@ -1,35 +1,47 @@
 package cn.nukkit.level.format.leveldb.structure;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.entity.Entity;
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.DimensionEnum;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseChunk;
+import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.ByteTag;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.BlockUpdateEntry;
+import cn.nukkit.utils.Zlib;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
-import java.util.Arrays;
-import java.util.List;
+import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_2D_SIZE;
 
 public class LevelDBChunk extends BaseChunk {
-    protected PalettedBlockStorage[] biomes3d; //TODO
+
+    private ChunkState state;
+
+    protected PalettedBlockStorage[] biomes3d;
 
     protected boolean subChunksDirty;
     protected boolean heightmapOrBiomesDirty;
 
-    public final Lock ioLock;
+    private final Lock writeLock = new ReentrantLock();
 
     private final DimensionData dimensionData;
-    private ChunkState state;
 
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ) {
         this(level, chunkX, chunkZ, new LevelDBChunkSection[0], new int[SUB_CHUNK_2D_SIZE], null, null, null, null, ChunkState.NEW);
@@ -38,7 +50,6 @@ public class LevelDBChunk extends BaseChunk {
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ, @NotNull ChunkSection[] sections,
                         @Nullable int[] heightmap, @Nullable byte[] biomes2d, @Nullable PalettedBlockStorage[] biomes3d,
                         @Nullable List<CompoundTag> entities, @Nullable List<CompoundTag> blockEntities, @NotNull ChunkState state) {
-        this.ioLock = new ReentrantLock();
         this.provider = level;
         this.setPosition(chunkX, chunkZ);
 
@@ -112,11 +123,15 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @Override
-    public void setGenerated(boolean newState) {
-        if (newState) {
+    public void setGenerated(boolean value) {
+        if (this.isGenerated() == value) {
+            return;
+        }
+        this.setChanged();
+
+        if (value) {
             if (this.state.ordinal() < ChunkState.GENERATED.ordinal()) {
                 this.setState(ChunkState.GENERATED);
-                this.setChanged();
             }
         } else if (this.state.ordinal() >= ChunkState.GENERATED.ordinal()) {
             this.setState(ChunkState.NEW);
@@ -139,14 +154,26 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @Override
-    public void setPopulated(boolean newState) {
-        if (newState) {
+    public void setPopulated(boolean value) {
+        if (this.isPopulated() == value) {
+            return;
+        }
+        this.setChanged();
+
+        if (value) {
             if (this.state.ordinal() < ChunkState.POPULATED.ordinal()) {
                 this.setState(ChunkState.POPULATED);
-                this.setChanged();
             }
         } else if (this.state.ordinal() >= ChunkState.POPULATED.ordinal()) {
             this.setState(ChunkState.GENERATED);
+        }
+    }
+
+    @Override
+    public void setBiomeIdArray(byte[] biomeIdArray) {
+        super.setBiomeIdArray(biomeIdArray);
+        if (this.has3dBiomes()) {
+            this.convertBiomesTo3d(biomeIdArray);
         }
     }
 
@@ -157,7 +184,11 @@ public class LevelDBChunk extends BaseChunk {
 
     @Override
     public PalettedBlockStorage getBiomeStorage(int y) {
-        int index = y + this.dimensionData.getSectionOffset();
+        if (!this.has3dBiomes()) {
+            throw new IllegalStateException("Chunk does not have 3D biomes");
+        }
+
+        int index = y + this.getSectionOffset();
         if (index >= this.biomes3d.length) {
             index = 0;
         }
@@ -191,7 +222,7 @@ public class LevelDBChunk extends BaseChunk {
     @Override
     public void setBiomeId(int x, int y, int z, int biomeId) {
         if (!this.has3dBiomes()) {
-            this.convert2DBiomesTo3D(this.biomes);
+            this.convertBiomesTo3d(this.biomes);
         }
         this.getBiomeStorage(y >> 4).setBlock(x, y & 0xf, z, biomeId);
         this.setChanged();
@@ -227,7 +258,7 @@ public class LevelDBChunk extends BaseChunk {
         setBiomeId(x, z, biome.getId());
     }
 
-    protected void convert2DBiomesTo3D(byte[] biomes) {
+    protected void convertBiomesTo3d(byte[] biomes) {
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createWithDefaultState(BitArrayVersion.V0, Biome.getBiomeIdOrCorrect(biomes[0] & 0xFF));
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
@@ -246,6 +277,23 @@ public class LevelDBChunk extends BaseChunk {
 
         this.biomes3d = storages;
         this.setChanged();
+    }
+
+    public void setBiomes3d(PalettedBlockStorage[] biomes3d) {
+        this.biomes3d = biomes3d;
+    }
+
+    public void setBiomes3d(int y, PalettedBlockStorage biomes3d) {
+        if (!this.has3dBiomes()) {
+            this.convertBiomesTo3d(this.biomes);
+        }
+
+        int index = y + this.getSectionOffset();
+        if (index >= this.biomes3d.length) {
+            index = 0;
+        }
+
+        this.biomes3d[index] = biomes3d;
     }
 
     @Override
@@ -368,10 +416,124 @@ public class LevelDBChunk extends BaseChunk {
         this.heightmapOrBiomesDirty = true;
     }
 
-    @Deprecated
     @Override
+    @Deprecated
+    public byte[] toFastBinary() {
+        CompoundTag chunk = chunkNBT();
+
+        try {
+            return NBTIO.write(chunk, ByteOrder.BIG_ENDIAN);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    @Deprecated
     public byte[] toBinary() {
-        return new byte[0];
+        CompoundTag chunk = chunkNBT();
+
+        try {
+            return Zlib.deflate(NBTIO.write(chunk, ByteOrder.BIG_ENDIAN), 7);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private CompoundTag chunkNBT() {
+        CompoundTag nbt = this.getNBT().copy();
+        nbt.remove("BiomeColors");
+
+        nbt.putInt("xPos", this.getX());
+        nbt.putInt("zPos", this.getZ());
+
+        ListTag<CompoundTag> sectionList = new ListTag<>("Sections");
+        for (ChunkSection section : this.getSections()) {
+            if (section instanceof EmptyChunkSection) {
+                continue;
+            }
+            CompoundTag s = new CompoundTag();
+            s.putByte("Y", (section.getY()));
+            s.putByteArray("Blocks", section.getIdArray());
+            s.putByteArray("Data", section.getDataArray());
+            s.putByteArray("BlockLight", section.getLightArray());
+            s.putByteArray("SkyLight", section.getSkyLightArray());
+            sectionList.add(s);
+        }
+        nbt.putList(sectionList);
+
+        nbt.putByteArray("Biomes", this.getBiomeIdArray());
+
+        int[] heightInts = new int[256];
+        byte[] heightBytes = this.getHeightMapArray();
+        for (int i = 0; i < heightInts.length; i++) {
+            heightInts[i] = heightBytes[i] & 0xFF;
+        }
+        nbt.putIntArray("HeightMap", heightInts);
+
+        ArrayList<CompoundTag> entities = new ArrayList<>();
+        for (Entity entity : this.getEntities().values()) {
+            if (entity.canBeSavedWithChunk() && !entity.closed) {
+                entity.saveNBT();
+                entities.add(entity.namedTag);
+            }
+        }
+
+        ListTag<CompoundTag> entityListTag = new ListTag<>("Entities");
+        entityListTag.setAll(entities);
+        nbt.putList(entityListTag);
+
+        ArrayList<CompoundTag> tiles = new ArrayList<>();
+        for (BlockEntity blockEntity : this.getBlockEntities().values()) {
+            if (blockEntity.canSaveToStorage()) {
+                blockEntity.saveNBT();
+                tiles.add(blockEntity.namedTag);
+            }
+        }
+        ListTag<CompoundTag> tileListTag = new ListTag<>("TileEntities");
+        tileListTag.setAll(tiles);
+        nbt.putList(tileListTag);
+
+        Set<BlockUpdateEntry> entries = this.provider.getLevel().getPendingBlockUpdates(this);
+        if (entries != null) {
+            ListTag<CompoundTag> tileTickTag = new ListTag<>("TileTicks");
+            long totalTime = this.provider.getLevel().getCurrentTick();
+
+            for (BlockUpdateEntry entry : entries) {
+                CompoundTag entryNBT = new CompoundTag()
+                        .putString("i", entry.block.getSaveId())
+                        .putInt("x", entry.pos.getFloorX())
+                        .putInt("y", entry.pos.getFloorY())
+                        .putInt("z", entry.pos.getFloorZ())
+                        .putInt("t", (int) (entry.delay - totalTime))
+                        .putInt("p", entry.priority);
+                tileTickTag.add(entryNBT);
+            }
+
+            nbt.putList(tileTickTag);
+        }
+
+        BinaryStream extraData = new BinaryStream();
+        Map<Integer, Integer> extraDataArray = this.getBlockExtraDataArray();
+        extraData.putInt(extraDataArray.size());
+        for (Map.Entry<Integer, Integer> entry : extraDataArray.entrySet()) {
+            extraData.putInt(entry.getKey());
+            extraData.putShort(entry.getValue());
+        }
+        nbt.putByteArray("ExtraData", extraData.getBuffer());
+
+        CompoundTag chunk = new CompoundTag("");
+        chunk.putCompound("Level", nbt);
+        return chunk;
+    }
+
+    private CompoundTag getNBT() {
+        CompoundTag tag = new CompoundTag();
+        tag.put("LightPopulated", new ByteTag("LightPopulated", (byte) (this.isLightPopulated() ? 1 : 0)));
+        tag.put("V", new ByteTag("V", (byte) 1));
+        tag.put("TerrainGenerated", new ByteTag("TerrainGenerated", (byte) (this.isGenerated() ? 1 : 0)));
+        tag.put("TerrainPopulated", new ByteTag("TerrainPopulated", (byte) (this.isPopulated() ? 1 : 0)));
+        return tag;
     }
 
     @Override
@@ -397,6 +559,40 @@ public class LevelDBChunk extends BaseChunk {
             ((LevelDBChunkSection) section).setParent(chunk);
         }
 
+        if (this.has3dBiomes()) {
+            PalettedBlockStorage[] biomes = new PalettedBlockStorage[this.biomes3d.length];
+            for (int i = 0; i < this.biomes3d.length; i++) {
+                biomes[i] = this.biomes3d[i].copy();
+            }
+            chunk.setBiomes3d(biomes);
+        }
+
+        return chunk;
+    }
+
+    @Override
+    public LevelDBChunk cloneForChunkSending() {
+        LevelDBChunk chunk = (LevelDBChunk) super.cloneForChunkSending();
+
+        for (int i = 0; i < chunk.sections.length; i++) {
+            ChunkSection section = chunk.sections[i];
+            if (section == null) {
+                continue;
+            }
+            ((LevelDBChunkSection) section).setParent(chunk);
+        }
+
+        if (this.has3dBiomes()) {
+            PalettedBlockStorage[] biomes = new PalettedBlockStorage[this.biomes3d.length];
+            for (int i = 0; i < this.biomes3d.length; i++) {
+                PalettedBlockStorage storage = this.biomes3d[i];
+                if (storage != null) {
+                    biomes[i] = storage.copy();
+                }
+            }
+            chunk.setBiomes3d(biomes);
+        }
+
         return chunk;
     }
 
@@ -415,5 +611,9 @@ public class LevelDBChunk extends BaseChunk {
             throw new IllegalArgumentException("Invalid index: " + x + ", " + z );
         }
         return index;
+    }
+
+    public Lock writeLock() {
+        return this.writeLock;
     }
 }

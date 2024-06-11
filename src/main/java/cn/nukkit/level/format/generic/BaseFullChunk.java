@@ -559,6 +559,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     @Override
+    public void setBiomeIdArray(byte[] biomeIdArray) {
+        this.biomes = biomeIdArray;
+    }
+
+    @Override
     public byte[] getHeightMapArray() {
         return this.heightMap;
     }

@@ -126,6 +126,8 @@ public abstract class DefaultPermissions {
         registerPermission(new Permission("nukkit.command.difficulty", "Allows the user to change difficulty", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.camera", "Allows the user to control camera", Permission.DEFAULT_OP), commands);
         registerPermission(new Permission("nukkit.command.camerashake", "Allows the user to shake camera", Permission.DEFAULT_OP), commands);
+        registerPermission(new Permission("nukkit.command.world.convert", "Allows the user to convert worlds to LevelDB format", Permission.DEFAULT_FALSE), commands); // Console only
+
         registerPermission(new Permission("nukkit.textcolor", "Allows the user to write colored text", Permission.DEFAULT_OP), commands);
 
         commands.recalculatePermissibles();
