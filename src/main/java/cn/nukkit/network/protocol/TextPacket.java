@@ -23,7 +23,6 @@ public class TextPacket extends DataPacket {
     public static final byte TYPE_ANNOUNCEMENT = 8;
     public static final byte TYPE_OBJECT = 9;
     public static final byte TYPE_OBJECT_WHISPER = 10;
-
     /**
      * @since v553
      */
@@ -36,6 +35,10 @@ public class TextPacket extends DataPacket {
     public boolean isLocalized = false;
     public String xboxUserId = "";
     public String platformChatId = "";
+    /**
+     * @since v685
+     */
+    public String filteredMessage = "";
 
     @Override
     public void decode() {
@@ -74,6 +77,9 @@ public class TextPacket extends DataPacket {
         if (protocol >= 223) {
             this.xboxUserId = this.getString();
             this.platformChatId = this.getString();
+            if (protocol >= ProtocolInfo.v1_21_0) {
+                this.filteredMessage = this.getString();
+            }
         }
     }
 
@@ -114,6 +120,9 @@ public class TextPacket extends DataPacket {
         if (protocol >= 223) {
             this.putString(this.xboxUserId);
             this.putString(this.platformChatId);
+            if (protocol >= ProtocolInfo.v1_21_0) {
+                this.putString(this.filteredMessage);
+            }
         }
     }
 }

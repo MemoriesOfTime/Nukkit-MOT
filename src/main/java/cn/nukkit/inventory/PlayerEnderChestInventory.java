@@ -9,6 +9,7 @@ import cn.nukkit.network.protocol.BlockEventPacket;
 import cn.nukkit.network.protocol.ContainerClosePacket;
 import cn.nukkit.network.protocol.ContainerOpenPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
 
 public class PlayerEnderChestInventory extends BaseInventory {
 
@@ -64,6 +65,7 @@ public class PlayerEnderChestInventory extends BaseInventory {
         ContainerClosePacket containerClosePacket = new ContainerClosePacket();
         containerClosePacket.windowId = who.getWindowId(this);
         containerClosePacket.wasServerInitiated = who.getClosingWindowId() != containerClosePacket.windowId;
+        containerClosePacket.type = ContainerType.from(this.type.getNetworkType());
         who.dataPacket(containerClosePacket);
         super.onClose(who);
 

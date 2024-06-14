@@ -4495,7 +4495,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                                 float itemDamage = item.getAttackDamage();
                                 for (Enchantment enchantment : enchantments) {
-                                    itemDamage += enchantment.getDamageBonus(target);
+                                    itemDamage += enchantment.getDamageBonus(target, this);
                                 }
 
                                 Map<DamageModifier, Float> damage = new EnumMap<>(DamageModifier.class);

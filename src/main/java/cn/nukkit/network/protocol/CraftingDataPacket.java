@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.data.RecipeUnlockingRequirement;
 import cn.nukkit.item.Item;
 import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
@@ -100,7 +101,7 @@ public class CraftingDataPacket extends DataPacket {
                                 this.putRecipeIngredient(this.protocol, ingredient);
                             }
                         }
-                        this.putUnsignedVarInt(1);
+                        this.putUnsignedVarInt(1); // Results length
                         this.putSlot(protocol, shapeless.getResult(), protocol >= ProtocolInfo.v1_16_100);
                         this.putUUID(shapeless.getId());
                         if (protocol >= 354) {
@@ -108,6 +109,9 @@ public class CraftingDataPacket extends DataPacket {
                             if (protocol >= 361) {
                                 this.putVarInt(shapeless.getPriority());
                                 if (protocol >= 407) {
+                                    if (protocol >= ProtocolInfo.v1_21_0) {
+                                        this.writeRequirement(shapeless);
+                                    }
                                     this.putUnsignedVarInt(shapeless.getNetworkId());
                                 }
                             }
@@ -158,6 +162,9 @@ public class CraftingDataPacket extends DataPacket {
                                     this.putBoolean(shaped.isAssumeSymetry());
                                 }
                                 if (protocol >= 407) {
+                                    if (protocol >= ProtocolInfo.v1_21_0) {
+                                        this.writeRequirement(shaped);
+                                    }
                                     this.putUnsignedVarInt(shaped.getNetworkId());
                                 }
                             }
@@ -231,6 +238,13 @@ public class CraftingDataPacket extends DataPacket {
     @Override
     public byte pid() {
         return NETWORK_ID;
+    }
+
+    protected void writeRequirement(CraftingRecipe recipe) {
+        this.putByte((byte) recipe.getRequirement().getContext().ordinal());
+        if (recipe.getRequirement().getContext().equals(RecipeUnlockingRequirement.UnlockingContext.NONE)) {
+            this.putArray(recipe.getRequirement().getIngredients(), (ingredient) -> this.putRecipeIngredient(protocol, ingredient));
+        }
     }
 
     private int writeEntryLegacy(Object entry, BinaryStream stream) {

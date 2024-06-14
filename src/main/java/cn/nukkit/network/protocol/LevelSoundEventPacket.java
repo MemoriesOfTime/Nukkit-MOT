@@ -561,8 +561,56 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v671
      */
     public static final int SOUND_MACE_SMASH_HEAVY_GROUND = 520;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_TRAIL_SPAWNER_CHARGE_ACTIVATE = 516;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_TRAIL_SPAWNER_AMBIENT_OMINOUS = 517;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_OMINOUS_ITEM_SPAWNER_SPAWN_ITEM = 518;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_OMINOUS_BOTTLE_END_USE = 519;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_OMINOUS_ITEM_SPAWNER_SPAWN_ITEM_BEGIN = 521;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_APPLY_EFFECT_BAD_OMEN = 523;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_APPLY_EFFECT_RAID_OMEN = 524;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_APPLY_EFFECT_TRIAL_OMEN = 525;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_OMINOUS_ITEM_SPAWNER_ABOUT_TO_SPAWN_ITEM = 526;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_RECORD_CREATOR = 527;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_RECORD_CREATOR_MUSIC_BOX = 528;
+    /**
+     * @since v685
+     */
+    public static final int SOUND_RECORD_PRECIPICE = 529;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(521);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(530);
 
     public int sound;
     public float x;
