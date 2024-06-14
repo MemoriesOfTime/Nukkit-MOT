@@ -64,6 +64,10 @@ public class Potion implements Cloneable {
     public static final int SLOW_FALLING_LONG = 41;
     public static final int SLOWNESS_LONG_II = 42;
     public static final int SLOWNESS_IV = 43;
+    public static final int WIND_CHARGED = 44;
+    public static final int WEAVING = 45;
+    public static final int OOZING = 46;
+    public static final int INFESTED = 47;
 
     protected static Potion[] potions;
 
@@ -114,6 +118,10 @@ public class Potion implements Cloneable {
         potions[Potion.SLOW_FALLING_LONG] = new Potion(Potion.SLOW_FALLING_LONG);
         potions[Potion.SLOWNESS_LONG_II] = new Potion(Potion.SLOWNESS_LONG_II, 2);
         potions[Potion.SLOWNESS_IV] = new Potion(Potion.SLOWNESS, 4);
+        potions[Potion.WIND_CHARGED] = new Potion(Potion.WIND_CHARGED);
+        potions[Potion.WEAVING] = new Potion(Potion.WEAVING);
+        potions[Potion.OOZING] = new Potion(Potion.OOZING);
+        potions[Potion.INFESTED] = new Potion(Potion.INFESTED);
     }
 
     public static Potion getPotion(int id) {
@@ -316,6 +324,18 @@ public class Potion implements Cloneable {
             case WITHER_II:
                 effect = Effect.getEffect(Effect.WITHER);
                 break;
+            case WIND_CHARGED:
+                effect = Effect.getEffect(Effect.WIND_CHARGED);
+                break;
+            case WEAVING:
+                effect = Effect.getEffect(Effect.WEAVING);
+                break;
+            case OOZING:
+                effect = Effect.getEffect(Effect.OOZING);
+                break;
+            case INFESTED:
+                effect = Effect.getEffect(Effect.INFESTED);
+                break;
             default:
                 return null;
         }
@@ -448,6 +468,10 @@ public class Potion implements Cloneable {
             case WEAKNESS_LONG -> 240;
             case WITHER_II -> 30;
             case SLOWNESS_IV -> 20;
+            case WIND_CHARGED -> 180;
+            case WEAVING -> 180;
+            case OOZING -> 180;
+            case INFESTED -> 180;
             default -> 0;
         };
     }
