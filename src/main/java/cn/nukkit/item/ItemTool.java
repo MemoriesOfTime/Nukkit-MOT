@@ -47,6 +47,8 @@ public abstract class ItemTool extends Item implements ItemDurable {
     public static final int DURABILITY_SHIELD = 337;
     public static final int DURABILITY_BRUSH = 64;
 
+    public static final int DURABILITY_MACE = 500;
+
     public ItemTool(int id) {
         this(id, 0, 1, UNKNOWN_STR);
     }
