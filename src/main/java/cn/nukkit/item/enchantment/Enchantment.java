@@ -17,6 +17,9 @@ import cn.nukkit.item.enchantment.damage.EnchantmentDamageSmite;
 import cn.nukkit.item.enchantment.loot.EnchantmentLootDigging;
 import cn.nukkit.item.enchantment.loot.EnchantmentLootFishing;
 import cn.nukkit.item.enchantment.loot.EnchantmentLootWeapon;
+import cn.nukkit.item.enchantment.mace.EnchantmentMaceBreach;
+import cn.nukkit.item.enchantment.mace.EnchantmentMaceDensity;
+import cn.nukkit.item.enchantment.mace.EnchantmentMaceWindBurst;
 import cn.nukkit.item.enchantment.protection.*;
 import cn.nukkit.item.enchantment.trident.EnchantmentTridentChanneling;
 import cn.nukkit.item.enchantment.trident.EnchantmentTridentImpaling;
@@ -170,6 +173,18 @@ public abstract class Enchantment implements Cloneable {
     public static final int ID_SWIFT_SNEAK = 37;
     public static final String NAME_SWIFT_SNEAK = "swift_sneak";
 
+    public static final int ID_WIND_BURST = 38;
+
+    public static final String NAME_WIND_BURST = "wind_burst";
+
+    public static final int ID_DENSITY = 39;
+
+    public static final String NAME_DENSITY = "density";
+
+    public static final int ID_BREACH = 40;
+
+    public static final String NAME_BREACH = "breach";
+
     public static void init() {
         enchantments = new Enchantment[256];
 
@@ -211,6 +226,9 @@ public abstract class Enchantment implements Cloneable {
         enchantments[ID_CROSSBOW_QUICK_CHARGE] = new EnchantmentCrossbowQuickCharge();
         enchantments[ID_SOUL_SPEED] = new EnchantmentSoulSpeed();
         enchantments[ID_SWIFT_SNEAK] = new EnchantmentSwiftSneak();
+        enchantments[ID_WIND_BURST] = new EnchantmentMaceWindBurst();
+        enchantments[ID_DENSITY] = new EnchantmentMaceDensity();
+        enchantments[ID_BREACH] = new EnchantmentMaceBreach();
 
         //custom
         customEnchantments.put(new Identifier("minecraft", NAME_PROTECTION_ALL), enchantments[0]);
@@ -251,6 +269,9 @@ public abstract class Enchantment implements Cloneable {
         customEnchantments.put(new Identifier("minecraft", NAME_CROSSBOW_QUICK_CHARGE), enchantments[35]);
         customEnchantments.put(new Identifier("minecraft", NAME_SOUL_SPEED), enchantments[36]);
         customEnchantments.put(new Identifier("minecraft", NAME_SWIFT_SNEAK), enchantments[37]);
+        customEnchantments.put(new Identifier("minecraft", NAME_WIND_BURST), enchantments[38]);
+        customEnchantments.put(new Identifier("minecraft", NAME_DENSITY), enchantments[39]);
+        customEnchantments.put(new Identifier("minecraft", NAME_BREACH), enchantments[40]);
     }
 
     public static OK<?> register(Enchantment enchantment, boolean registerItem) {
@@ -482,7 +503,7 @@ public abstract class Enchantment implements Cloneable {
         return 0;
     }
 
-    public double getDamageBonus(Entity entity) {
+    public double getDamageBonus(Entity entity, Entity attacker) {
         return 0;
     }
 

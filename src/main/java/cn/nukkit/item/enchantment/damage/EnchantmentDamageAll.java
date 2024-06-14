@@ -28,7 +28,7 @@ public class EnchantmentDamageAll extends EnchantmentDamage {
     }
 
     @Override
-    public double getDamageBonus(Entity entity) {
+    public double getDamageBonus(Entity entity, Entity attacker) {
         return this.getLevel() * 1.25;
     }
 }

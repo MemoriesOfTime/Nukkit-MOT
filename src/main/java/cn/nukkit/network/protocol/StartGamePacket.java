@@ -130,6 +130,18 @@ public class StartGamePacket extends DataPacket {
      * @since v671
      */
     public boolean hardcore;
+    /**
+     * @since v685
+     */
+    public String serverId = "";
+    /**
+     * @since v685
+     */
+    public String worldId = "";
+    /**
+     * @since v685
+     */
+    public String scenarioId = "";
 
     @Override
     public void decode() {
@@ -271,6 +283,11 @@ public class StartGamePacket extends DataPacket {
                 if (protocol >= ProtocolInfo.v1_19_20) {
                     this.putByte(this.chatRestrictionLevel);
                     this.putBoolean(this.disablePlayerInteractions);
+                    if (protocol >= ProtocolInfo.v1_21_0) {
+                        this.putString(this.serverId);
+                        this.putString(this.worldId);
+                        this.putString(this.scenarioId);
+                    }
                 }
             }
         }

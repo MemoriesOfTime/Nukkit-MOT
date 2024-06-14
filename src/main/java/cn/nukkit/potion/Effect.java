@@ -56,6 +56,13 @@ public class Effect implements Cloneable {
     public static final int BAD_OMEN = 28;
     public static final int VILLAGE_HERO = 29;
     public static final int DARKNESS = 30;
+    public static final int TRIAL_OMEN = 31;
+    public static final int WIND_CHARGED = 32;
+    public static final int WEAVING = 33;
+    public static final int OOZING = 34;
+    public static final int INFESTED = 35;
+    public static final int RAID_OMEN = 36;
+
 
     protected static Effect[] effects;
 
@@ -92,6 +99,12 @@ public class Effect implements Cloneable {
         effects[Effect.BAD_OMEN] = new Effect(Effect.BAD_OMEN, "%effect.badOmen", 11, 97, 56, true);
         effects[Effect.VILLAGE_HERO] = new Effect(Effect.VILLAGE_HERO, "%effect.villageHero", 68, 255, 68).setVisible(false);
         effects[Effect.DARKNESS] = new Effect(Effect.DARKNESS, "%effect.darkness", 41, 39, 33, true).setVisible(false);
+        effects[Effect.TRIAL_OMEN] = new Effect(Effect.TRIAL_OMEN, "%effect.trial_omen", 22, 166, 166).setVisible(false);
+        effects[Effect.WIND_CHARGED] = new Effect(Effect.WIND_CHARGED, "%effect.wind_charged", 189, 201, 255).setVisible(false);
+        effects[Effect.WEAVING] = new Effect(Effect.WEAVING, "%effect.weaving", 120, 105, 90, true).setVisible(false);
+        effects[Effect.OOZING] = new Effect(Effect.OOZING, "%effect.oozing", 153, 255, 163).setVisible(false);
+        effects[Effect.INFESTED] = new Effect(Effect.INFESTED, "%effect.infested", 140, 155, 140, true).setVisible(false);
+        effects[Effect.RAID_OMEN] = new Effect(Effect.RAID_OMEN, "%effect.raid_omen", 222, 64, 88).setVisible(false);
     }
 
     public static Effect getEffect(int id) {

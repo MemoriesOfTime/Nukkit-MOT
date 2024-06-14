@@ -7,6 +7,7 @@ import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.ContainerClosePacket;
 import cn.nukkit.network.protocol.ContainerOpenPacket;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
 
 import java.util.Map;
 
@@ -60,6 +61,7 @@ public abstract class ContainerInventory extends BaseInventory {
         ContainerClosePacket pk = new ContainerClosePacket();
         pk.windowId = who.getWindowId(this);
         pk.wasServerInitiated = who.getClosingWindowId() != pk.windowId;
+        pk.type = ContainerType.from(this.type.getNetworkType());
         who.dataPacket(pk);
         super.onClose(who);
     }

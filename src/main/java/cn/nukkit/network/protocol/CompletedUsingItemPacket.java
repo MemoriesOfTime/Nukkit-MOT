@@ -23,7 +23,14 @@ public class CompletedUsingItemPacket extends DataPacket {
     public static final int ACTION_RETRIEVE = 12;
     public static final int ACTION_DYED = 13;
     public static final int ACTION_TRADED = 14;
+    /**
+     * @since 594
+     */
     public static final int ACTION_BRUSHING_COMPLETED = 15;
+    /**
+     * @since v685
+     */
+    public static final int ACTION_OPENED_VAULT = 16;
 
     public int itemId;
     public int action;
