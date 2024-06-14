@@ -534,6 +534,8 @@ public class Utils {
                 return "Xbox";
             case 14:
                 return "Windows Phone";
+            case 15:
+                return "Linux";
             default:
                 return "Unknown";
         }

@@ -71,6 +71,7 @@ import it.unimi.dsi.fastutil.objects.ObjectList;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -234,6 +235,10 @@ public class Level implements ChunkManager, Metadatable {
     private final int chunkPopulationQueueSize;
 
     private boolean autoSave;
+    @Getter
+    @Setter
+    private boolean saveOnUnloadEnabled = true;
+    public boolean isBeingConverted;
 
     private BlockMetadataStore blockMetadata;
 
@@ -4426,6 +4431,10 @@ public class Level implements ChunkManager, Metadatable {
             players = this.getPlayers().values();
         }
         this.sendWeather(players.toArray(Player.EMPTY_ARRAY));
+    }
+
+    public void setDimensionData(DimensionData data) {
+        this.dimensionData = data;
     }
 
     public DimensionData getDimensionData() {
