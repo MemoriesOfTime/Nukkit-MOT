@@ -41,7 +41,7 @@ public class ShapelessRecipe implements CraftingRecipe {
     }
 
     public ShapelessRecipe(String recipeId, int priority, Item result, Collection<Item> ingredients, Integer networkId) {
-        this(recipeId, priority, result, ingredients, networkId, RecipeUnlockingRequirement.INVALID);
+        this(recipeId, priority, result, ingredients, networkId, RecipeUnlockingRequirement.ALWAYS_UNLOCKED);
     }
 
     public ShapelessRecipe(String recipeId, int priority, Item result, Collection<Item> ingredients, Integer networkId, RecipeUnlockingRequirement requirement) {

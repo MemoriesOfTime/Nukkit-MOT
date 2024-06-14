@@ -70,7 +70,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     public static Class<?>[] list = null;
     public static final Map<String, Supplier<Item>> NAMESPACED_ID_ITEM = new HashMap<>();
 
-    private static final HashMap<String,  Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
+    private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
 
     protected Block block = null;

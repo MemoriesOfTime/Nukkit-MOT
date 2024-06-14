@@ -101,7 +101,7 @@ public class CraftingDataPacket extends DataPacket {
                                 this.putRecipeIngredient(this.protocol, ingredient);
                             }
                         }
-                        this.putUnsignedVarInt(1);
+                        this.putUnsignedVarInt(1); // Results length
                         this.putSlot(protocol, shapeless.getResult(), protocol >= ProtocolInfo.v1_16_100);
                         this.putUUID(shapeless.getId());
                         if (protocol >= 354) {

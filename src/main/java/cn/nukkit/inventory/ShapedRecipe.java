@@ -50,7 +50,7 @@ public class ShapedRecipe implements CraftingRecipe {
     }
 
     public ShapedRecipe(String recipeId, int priority, Item primaryResult, String[] shape, Map<Character, Item> ingredients, List<Item> extraResults, Integer networkId, boolean assumeSymetry) {
-        this(recipeId, priority, primaryResult, shape, ingredients, extraResults, networkId, assumeSymetry, RecipeUnlockingRequirement.INVALID);
+        this(recipeId, priority, primaryResult, shape, ingredients, extraResults, networkId, assumeSymetry, RecipeUnlockingRequirement.ALWAYS_UNLOCKED);
     }
 
     /**

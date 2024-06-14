@@ -171,6 +171,6 @@ public class SmithingRecipe extends ShapelessRecipe {
 
     @Override
     public RecipeUnlockingRequirement getRequirement() {
-        return RecipeUnlockingRequirement.INVALID;
+        return RecipeUnlockingRequirement.ALWAYS_UNLOCKED;
     }
 }

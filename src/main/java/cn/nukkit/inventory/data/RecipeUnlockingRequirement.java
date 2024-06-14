@@ -10,6 +10,7 @@ import java.util.List;
 public class RecipeUnlockingRequirement {
 
     public static final RecipeUnlockingRequirement INVALID = new RecipeUnlockingRequirement(UnlockingContext.NONE);
+    public static final RecipeUnlockingRequirement ALWAYS_UNLOCKED = new RecipeUnlockingRequirement(UnlockingContext.ALWAYS_UNLOCKED);
 
     UnlockingContext context;
     List<Item> ingredients = new ObjectArrayList<>();
