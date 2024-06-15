@@ -109,7 +109,14 @@ public abstract class Particle extends Vector3 {
     public static final int TYPE_WHITE_SMOKE = dynamic(89);
     public static final int TYPE_VAULT_CONNECTION = dynamic(90);
     public static final int TYPE_WIND_EXPLOSION = dynamic(91);
+    /**
+     * @since v671
+     */
     public static final int TYPE_WOLF_ARMOR_BREAK = dynamic(92);
+    /**
+     * @since v685
+     */
+    public static final int TYPE_OMINOUS_ITEM_SPAWNER = dynamic(93);
 
     public Particle() {
         super(0, 0, 0);
