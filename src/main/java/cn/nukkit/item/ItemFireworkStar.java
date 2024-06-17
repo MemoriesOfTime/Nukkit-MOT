@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.Server;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
@@ -36,6 +37,13 @@ public class ItemFireworkStar extends Item {
             tag = new CompoundTag();
         } else {
             tag = this.getNamedTag();
+        }
+        if (color == -15132391) {
+            Server.getInstance().getLogger().info("黑色的 firework star");
+            return;
+        } else {
+            Server.getInstance().getLogger().info("其它颜色的 firework star, rgb: "+r+" "+g+" "+b);
+            Server.getInstance().getLogger().info("color: "+color);
         }
         tag.putInt("customColor", color);
         this.setNamedTag(tag);
