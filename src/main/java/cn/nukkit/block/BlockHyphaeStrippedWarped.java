@@ -5,7 +5,11 @@ import cn.nukkit.utils.BlockColor;
 public class BlockHyphaeStrippedWarped extends BlockStemStripped {
 
     public BlockHyphaeStrippedWarped() {
-        
+        super();
+    }
+
+    public BlockHyphaeStrippedWarped(int meta) {
+        super(meta);
     }
 
     @Override

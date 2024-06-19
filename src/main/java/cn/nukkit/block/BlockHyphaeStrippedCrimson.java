@@ -5,7 +5,11 @@ import cn.nukkit.utils.BlockColor;
 public class BlockHyphaeStrippedCrimson extends BlockStemStripped {
 
     public BlockHyphaeStrippedCrimson() {
-        
+        super();
+    }
+
+    public BlockHyphaeStrippedCrimson(int meta) {
+        super(meta);
     }
 
     @Override
