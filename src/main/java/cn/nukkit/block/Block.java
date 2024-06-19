@@ -481,20 +481,48 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[WARPED_BUTTON] = BlockButtonWarped.class; //516
             list[CRIMSON_PRESSURE_PLATE] = BlockPressurePlateCrimson.class; //517
             list[WARPED_PRESSURE_PLATE] = BlockPressurePlateWarped.class; //518
-
+            list[CRIMSON_SLAB] = BlockSlabCrimson.class; //519
+            list[WARPED_SLAB] = BlockSlabWarped.class; //520
+            list[CRIMSON_DOUBLE_SLAB] = BlockDoubleSlabCrimson.class; //521
+            list[WARPED_DOUBLE_SLAB] = BlockDoubleSlabWarped.class; //522
             list[SOUL_TORCH] = BlockSoulTorch.class; //523
             list[SOUL_LANTERN] = BlockSoulLantern.class; //524
             list[NETHERITE_BLOCK] = BlockNetheriteBlock.class; //525
             list[ANCIENT_DEBRIS] = BlockAncientDebris.class; //526
             list[RESPAWN_ANCHOR] = BlockRespawnAnchor.class; //527
             list[BLACKSTONE] = BlockBlackstone.class; //528
-
+            list[POLISHED_BLACKSTONE_BRICKS] = BlockBricksBlackstonePolished.class; //529
+            list[POLISHED_BLACKSTONE_BRICK_STAIRS] = BlockStairsBrickBlackstonePolished.class; //530
+            list[BLACKSTONE_STAIRS] = BlockStairsBlackstone.class; //531
+            list[BLACKSTONE_WALL] = BlockWallBlackstone.class; //532
+            list[POLISHED_BLACKSTONE_BRICK_WALL] = BlockWallBrickBlackstonePolished.class; //533
+            list[CHISELED_POLISHED_BLACKSTONE] = BlockBlackstonePolishedChiseled.class; //534
+            list[CRACKED_POLISHED_BLACKSTONE_BRICKS] = BlockBricksBlackstonePolishedCracked.class; //535
+            list[GILDED_BLACKSTONE] = BlockBlackstoneGilded.class; //536
+            list[BLACKSTONE_SLAB] = BlockSlabBlackstone.class; //537
+            list[BLACKSTONE_DOUBLE_SLAB] = BlockDoubleSlabBlackstone.class; //538
+            list[POLISHED_BLACKSTONE_BRICK_SLAB] = BlockSlabBrickBlackstonePolished.class; //539
+            list[POLISHED_BLACKSTONE_BRICK_DOUBLE_SLAB] = BlockDoubleSlabBrickBlackstonePolished.class; //540
             list[CHAIN_BLOCK] = BlockChain.class; //541
-
+            list[TWISTING_VINES] = BlockVinesTwisting.class; //542
             list[NETHER_GOLD_ORE] = BlockOreGoldNether.class; //543
             list[CRYING_OBSIDIAN] = BlockCryingObsidian.class; //544
             list[SOUL_CAMPFIRE_BLOCK] = BlockCampfireSoul.class; //545
-
+            list[POLISHED_BLACKSTONE] = BlockBlackstonePolished.class; //546
+            list[POLISHED_BLACKSTONE_STAIRS] = BlockStairsBlackstonePolished.class; //547
+            list[POLISHED_BLACKSTONE_SLAB] = BlockSlabBlackstonePolished.class; //548
+            list[POLISHED_BLACKSTONE_DOUBLE_SLAB] = BlockDoubleSlabBlackstonePolished.class; //549
+            list[POLISHED_BLACKSTONE_PRESSURE_PLATE] = BlockPressurePlateBlackstonePolished.class; //550
+            list[POLISHED_BLACKSTONE_BUTTON] = BlockButtonBlackstonePolished.class; //551
+            list[POLISHED_BLACKSTONE_WALL] = BlockWallBlackstonePolished.class; //552
+            list[WARPED_HYPHAE] = BlockHyphaeWarped.class; //553
+            list[CRIMSON_HYPHAE] = BlockHyphaeCrimson.class; //554
+            list[STRIPPED_CRIMSON_HYPHAE] = BlockHyphaeStrippedCrimson.class; //555
+            list[STRIPPED_WARPED_HYPHAE] = BlockHyphaeStrippedWarped.class; //556
+            list[CHISELED_NETHER_BRICKS] = BlockBricksNetherChiseled.class; //557
+            list[CRACKED_NETHER_BRICKS] = BlockBricksNetherCracked.class; //558
+            list[QUARTZ_BRICKS] = BlockBricksQuartz.class; //559
+            
             list[COPPER_ORE] = BlockOreCopper.class; // 566
 
             list[AMETHYST_BLOCK] = BlockAmethyst.class; //582
@@ -964,7 +992,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         return id;
-	}
+    }
 
     /**
      * The full id is a combination of the id and data.
