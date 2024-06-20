@@ -36,4 +36,9 @@ public class BlockCopperBulb extends BlockCopperBulbBase {
     public BlockColor getColor() {
         return BlockColor.AIR_BLOCK_COLOR;
     }
+
+    @Override
+    public int getLightLevel() {
+        return 15;
+    }
 }

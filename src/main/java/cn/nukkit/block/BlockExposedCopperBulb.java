@@ -19,4 +19,9 @@ public class BlockExposedCopperBulb extends BlockCopperBulbBase {
     public int getId() {
         return EXPOSED_COPPER_BULB;
     }
+
+    @Override
+    public int getLightLevel() {
+        return 12;
+    }
 }

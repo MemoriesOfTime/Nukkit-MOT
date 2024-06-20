@@ -19,4 +19,9 @@ public class BlockWeatheredCopperBulb extends BlockCopperBulbBase {
     public int getId() {
         return WEATHERED_COPPER_BULB;
     }
+
+    @Override
+    public int getLightLevel() {
+        return 8;
+    }
 }

@@ -591,14 +591,14 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[SUSPICIOUS_GRAVEL] = BlockSuspiciousGravel.class; // 828
 
-            list[COPPER_BULB] = BlockCopperBulb.class; // 1031
-            list[EXPOSED_COPPER_BULB] = BlockExposedCopperBulb.class; // 1032
-            list[WEATHERED_COPPER_BULB] = BlockWeatheredCopperBulb.class; // 1033
-            list[OXIDIZED_COPPER_BULB] = BlockOxidizedCopperBulb.class; // 1034
-            list[WAXED_COPPER_BULB] = BlockWaxedCopperBulb.class; // 1035
-            list[WAXED_EXPOSED_COPPER_BULB] = BlockWaxedCopperBulb.class; // 1036
-            list[WAXED_WEATHERED_COPPER_BULB] = BlockWaxedWeatheredCopperBulb.class; // 1037
-            list[WAXED_OXIDIZED_COPPER_BULB] = BlockWaxedOxidizedCopperBulb.class; // 1038
+            list[COPPER_BULB] = BlockCopperBulb.class; // 1031 l15
+            list[EXPOSED_COPPER_BULB] = BlockExposedCopperBulb.class; // 1032 l12
+            list[WEATHERED_COPPER_BULB] = BlockWeatheredCopperBulb.class; // 1033 l8
+            list[OXIDIZED_COPPER_BULB] = BlockOxidizedCopperBulb.class; // 1034 l4
+            list[WAXED_COPPER_BULB] = BlockWaxedCopperBulb.class; // 1035 l15
+            list[WAXED_EXPOSED_COPPER_BULB] = BlockWaxedExposedCopperBulb.class; // 1036 l12
+            list[WAXED_WEATHERED_COPPER_BULB] = BlockWaxedWeatheredCopperBulb.class; // 1037 l8
+            list[WAXED_OXIDIZED_COPPER_BULB] = BlockWaxedOxidizedCopperBulb.class; // 1038 l4
 
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];

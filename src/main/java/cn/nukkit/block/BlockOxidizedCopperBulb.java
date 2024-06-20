@@ -19,4 +19,9 @@ public class BlockOxidizedCopperBulb extends BlockCopperBulbBase {
     public int getId() {
         return OXIDIZED_COPPER_BULB;
     }
+
+    @Override
+    public int getLightLevel() {
+        return 4;
+    }
 }
