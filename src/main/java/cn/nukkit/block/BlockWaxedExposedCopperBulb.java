@@ -22,6 +22,6 @@ public class BlockWaxedExposedCopperBulb extends BlockCopperBulbBase {
 
     @Override
     public int getLightLevel() {
-        return 12;
+        return this.isLit() ? 12 : 0;
     }
 }
