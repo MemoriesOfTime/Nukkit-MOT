@@ -2,6 +2,14 @@ package cn.nukkit.block;
 
 public class BlockOxidizedCopperBulb extends BlockCopperBulbBase {
 
+    public BlockOxidizedCopperBulb() {
+        this(0);
+    }
+
+    public BlockOxidizedCopperBulb(int meta) {
+        super(meta);
+    }
+
     @Override
     public String getName() {
         return "Oxidized Copper Bulb";

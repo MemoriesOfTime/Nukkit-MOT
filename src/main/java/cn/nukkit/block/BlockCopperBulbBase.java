@@ -9,7 +9,7 @@ import cn.nukkit.math.BlockFace;
 /**
  * @author glorydark
  */
-public class BlockCopperBulbBase extends BlockSolidMeta {
+public abstract class BlockCopperBulbBase extends BlockSolidMeta {
 
     public static final int LIT_BIT = 0x01; // 0001
 

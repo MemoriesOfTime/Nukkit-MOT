@@ -7,6 +7,14 @@ import cn.nukkit.utils.BlockColor;
 
 public class BlockCopperBulb extends BlockCopperBulbBase {
 
+    public BlockCopperBulb() {
+        this(0);
+    }
+
+    public BlockCopperBulb(int meta) {
+        super(meta);
+    }
+
     @Override
     public String getName() {
         return "Copper Bulb";

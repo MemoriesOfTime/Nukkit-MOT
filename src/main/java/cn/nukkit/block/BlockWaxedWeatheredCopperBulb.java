@@ -2,6 +2,14 @@ package cn.nukkit.block;
 
 public class BlockWaxedWeatheredCopperBulb extends BlockCopperBulbBase {
 
+    public BlockWaxedWeatheredCopperBulb() {
+        this(0);
+    }
+
+    public BlockWaxedWeatheredCopperBulb(int meta) {
+        super(meta);
+    }
+
     @Override
     public String getName() {
         return "Waxed Weathered Copper Bulb";
