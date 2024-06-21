@@ -1,8 +1,5 @@
 package cn.nukkit.block;
 
-import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemBlock;
-
 /**
  * @author glorydark
  */
