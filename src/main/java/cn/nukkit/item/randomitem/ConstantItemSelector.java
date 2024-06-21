@@ -50,7 +50,7 @@ public class ConstantItemSelector extends Selector {
     @Override
     public Object select() {
         Item result = item.clone();
-        if (randomDurability) {
+        if (this.randomDurability) {
             result.setDamage(result.getMaxDurability() - Utils.rand(0, result.getMaxDurability() - 1));
         }
         return result;

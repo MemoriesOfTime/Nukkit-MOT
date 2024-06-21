@@ -61,7 +61,7 @@ public class EnchantmentItemSelector extends ConstantItemSelector {
         } else {
             endowRandomEnchantmentByItem(result);
         }
-        if (randomDurability) {
+        if (this.randomDurability) {
             result.setDamage(result.getMaxDurability() - Utils.rand(0, result.getMaxDurability() - 1));
         }
         return result;
