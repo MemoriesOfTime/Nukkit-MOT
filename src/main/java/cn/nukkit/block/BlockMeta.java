@@ -19,7 +19,7 @@ public abstract class BlockMeta extends Block {
     }
 
     public int getDamage(int flagBit) {
-        return this.getDamage() & flagBit;
+        return (this.getDamage() & flagBit) >> getFlagBitLength(flagBit);
     }
 
     @Override

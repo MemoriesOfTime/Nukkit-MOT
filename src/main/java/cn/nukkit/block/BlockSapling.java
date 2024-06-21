@@ -236,7 +236,7 @@ public class BlockSapling extends BlockFlowable {
     }
 
     public boolean isAged() {
-        return this.getDamage(AGED_BIT) == 1;
+        return this.getDamage(AGED_BIT) != 0;
     }
 
     public void setAged(boolean aged) {
