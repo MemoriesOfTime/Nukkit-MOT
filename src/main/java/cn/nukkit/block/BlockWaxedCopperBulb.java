@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockColor;
+
 public class BlockWaxedCopperBulb extends BlockCopperBulbBase {
 
     public BlockWaxedCopperBulb() {
@@ -18,6 +20,11 @@ public class BlockWaxedCopperBulb extends BlockCopperBulbBase {
     @Override
     public int getId() {
         return WAXED_COPPER_BULB;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.ADOBE_BLOCK_COLOR;
     }
 
     @Override

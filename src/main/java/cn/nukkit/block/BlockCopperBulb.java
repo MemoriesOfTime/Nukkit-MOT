@@ -34,7 +34,7 @@ public class BlockCopperBulb extends BlockCopperBulbBase {
 
     @Override
     public BlockColor getColor() {
-        return BlockColor.AIR_BLOCK_COLOR;
+        return BlockColor.ADOBE_BLOCK_COLOR;
     }
 
     @Override

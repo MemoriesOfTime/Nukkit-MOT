@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockColor;
+
 public class BlockWaxedOxidizedCopperBulb extends BlockCopperBulbBase {
 
     public BlockWaxedOxidizedCopperBulb() {
@@ -18,6 +20,11 @@ public class BlockWaxedOxidizedCopperBulb extends BlockCopperBulbBase {
     @Override
     public int getId() {
         return WAXED_OXIDIZED_COPPER_BULB;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.WARPED_NYLIUM_BLOCK_COLOR;
     }
 
     @Override

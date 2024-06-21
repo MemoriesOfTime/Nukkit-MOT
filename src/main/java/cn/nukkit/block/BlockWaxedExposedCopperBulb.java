@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockColor;
+
 public class BlockWaxedExposedCopperBulb extends BlockCopperBulbBase {
 
     public BlockWaxedExposedCopperBulb() {
@@ -18,6 +20,11 @@ public class BlockWaxedExposedCopperBulb extends BlockCopperBulbBase {
     @Override
     public int getId() {
         return WAXED_EXPOSED_COPPER_BULB;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.LIGHT_GRAY_TERRACOTA_BLOCK_COLOR;
     }
 
     @Override

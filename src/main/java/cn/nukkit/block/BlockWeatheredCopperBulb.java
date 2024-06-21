@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockColor;
+
 public class BlockWeatheredCopperBulb extends BlockCopperBulbBase {
 
     public BlockWeatheredCopperBulb() {
@@ -18,6 +20,11 @@ public class BlockWeatheredCopperBulb extends BlockCopperBulbBase {
     @Override
     public int getId() {
         return WEATHERED_COPPER_BULB;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.WARPED_STEM_BLOCK_COLOR;
     }
 
     @Override
