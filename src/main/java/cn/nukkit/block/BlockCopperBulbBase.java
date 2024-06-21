@@ -24,22 +24,12 @@ public abstract class BlockCopperBulbBase extends BlockSolidMeta {
     }
 
     @Override
-    public String getName() {
-        return "";
-    }
-
-    @Override
-    public int getId() {
-        return 0;
-    }
-
-    @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         if (this.level.isBlockPowered(this.getLocation())) {
             this.setLit(true);
             this.setPowered(true);
         }
-        return true;
+        return this.getLevel().setBlock(this, this, true, true);
     }
 
     @Override
@@ -54,7 +44,13 @@ public abstract class BlockCopperBulbBase extends BlockSolidMeta {
             if (this.level.isBlockPowered(this.getLocation())) {
                 this.setLit(true);
                 this.setPowered(true);
-                return 1;
+                this.level.setBlock(this, this, true);
+                return type;
+            } else if (this.isLit() || this.isPowered()) {
+                this.setLit(false);
+                this.setPowered(false);
+                this.level.setBlock(this, this, true);
+                return type;
             }
         }
         return 0;
