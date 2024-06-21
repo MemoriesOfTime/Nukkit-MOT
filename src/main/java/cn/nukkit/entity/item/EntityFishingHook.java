@@ -247,12 +247,6 @@ public class EntityFishingHook extends EntitySlenderProjectile {
             Player player = (Player) this.shootingEntity;
             if (this.caught) {
                 Item item = Fishing.getFishingResult(this.rod);
-                if (item instanceof ItemBookEnchanted) {
-                    if (!item.hasEnchantments()) {
-                        item = item.clone();
-                        item.addEnchantment(Enchantment.getEnchantment(Utils.rand(0, 36)));
-                    }
-                }
                 int experience = Utils.random.nextInt(3) + 1;
                 Vector3 pos = new Vector3(this.x, this.getWaterHeight(), this.z); //实体生成在水面上
                 Vector3 motion = player.subtract(pos).multiply(0.1);
