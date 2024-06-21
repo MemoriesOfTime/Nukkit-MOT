@@ -22,9 +22,9 @@ public final class Fishing {
     public static final Selector SALMON = putSelector(new ConstantItemSelector(Item.RAW_SALMON, FISHES), 0.25F);
     public static final Selector CLOWNFISH = putSelector(new ConstantItemSelector(Item.CLOWNFISH, FISHES), 0.02F);
     public static final Selector PUFFERFISH = putSelector(new ConstantItemSelector(Item.PUFFERFISH, FISHES), 0.13F);
-    public static final Selector TREASURE_BOW = putSelector(new ConstantItemSelector(Item.BOW, TREASURES), 0.1667F);
-    public static final Selector TREASURE_ENCHANTED_BOOK = putSelector(new EnchantmentItemSelector(Item.ENCHANTED_BOOK, TREASURES),  0.1667F);
-    public static final Selector TREASURE_FISHING_ROD = putSelector(new ConstantItemSelector(Item.FISHING_ROD, TREASURES), 0.1667F);
+    public static final Selector TREASURE_BOW = putSelector(new EnchantmentItemSelector(Item.BOW, TREASURES), 0.1667F);
+    public static final Selector TREASURE_ENCHANTED_BOOK = putSelector(new EnchantmentItemSelector(Item.ENCHANTED_BOOK, TREASURES), 0.1667F);
+    public static final Selector TREASURE_FISHING_ROD = putSelector(new EnchantmentItemSelector(Item.FISHING_ROD, TREASURES), 0.1667F);
     public static final Selector TREASURE_NAME_TAG = putSelector(new ConstantItemSelector(Item.NAME_TAG, TREASURES), 0.1667F);
     public static final Selector TREASURE_SADDLE = putSelector(new ConstantItemSelector(Item.SADDLE, TREASURES), 0.1667F);
     public static final Selector TREASURE_NAUTILUS_SHELL = putSelector(new ConstantItemSelector(Item.NAUTILUS_SHELL, TREASURES), 0.1667F);
