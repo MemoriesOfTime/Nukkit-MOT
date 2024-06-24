@@ -67,7 +67,7 @@ public class ConstantItemSelector extends Selector {
         if (ThreadLocalRandom.current().nextDouble() < 0.2) {
             item.setDamage(Utils.rand(0, splitValue));
         } else {
-            item.setDamage(Utils.rand(splitValue, maxDurability));
+            item.setDamage(maxDurability - Utils.rand(splitValue, maxDurability - 1));
         }
     }
 }
