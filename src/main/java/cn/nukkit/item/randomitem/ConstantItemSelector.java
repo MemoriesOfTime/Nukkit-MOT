@@ -63,11 +63,11 @@ public class ConstantItemSelector extends Selector {
         if (maxDurability == -1) {
             return;
         }
-        int splitValue = maxDurability / 10;
+        int splitValue = maxDurability - (maxDurability / 10); // get the upper part of durability range
         if (ThreadLocalRandom.current().nextDouble() < 0.2) {
             item.setDamage(Utils.rand(0, splitValue));
         } else {
-            item.setDamage(maxDurability - Utils.rand(splitValue, maxDurability - 1));
+            item.setDamage(Utils.rand(splitValue, maxDurability - 1));
         }
     }
 }
