@@ -3,6 +3,8 @@ package cn.nukkit.item.randomitem;
 import cn.nukkit.item.Item;
 import cn.nukkit.utils.Utils;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * Created by Snake1999 on 2016/1/15.
  * Package cn.nukkit.item.randomitem in project nukkit.
@@ -51,8 +53,21 @@ public class ConstantItemSelector extends Selector {
     public Object select() {
         Item result = item.clone();
         if (this.randomDurability) {
-            result.setDamage(result.getMaxDurability() - Utils.rand(0, result.getMaxDurability() - 1));
+            this.endowRandomDurability(result);
         }
         return result;
+    }
+
+    public void endowRandomDurability(Item item) {
+        int maxDurability = item.getMaxDurability();
+        if (maxDurability == -1) {
+            return;
+        }
+        int splitValue = maxDurability / 10;
+        if (ThreadLocalRandom.current().nextDouble() < 0.2) {
+            item.setDamage(Utils.rand(0, splitValue));
+        } else {
+            item.setDamage(Utils.rand(splitValue, maxDurability));
+        }
     }
 }
