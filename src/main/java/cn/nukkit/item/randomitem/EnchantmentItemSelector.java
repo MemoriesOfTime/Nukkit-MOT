@@ -52,17 +52,17 @@ public class EnchantmentItemSelector extends ConstantItemSelector {
         double random = ThreadLocalRandom.current().nextDouble();
         if (random < 0.1) {
             for (int i = 0; i < 3; i++) {
-                endowRandomEnchantmentByItem(result);
+                this.endowRandomEnchantmentByItem(result);
             }
         } else if (random < 0.2) {
             for (int i = 0; i < 2; i++) {
-                endowRandomEnchantmentByItem(result);
+                this.endowRandomEnchantmentByItem(result);
             }
         } else {
-            endowRandomEnchantmentByItem(result);
+            this.endowRandomEnchantmentByItem(result);
         }
         if (this.randomDurability) {
-            result.setDamage(result.getMaxDurability() - Utils.rand(0, result.getMaxDurability() - 1));
+            this.endowRandomDurability(result);
         }
         return result;
     }
