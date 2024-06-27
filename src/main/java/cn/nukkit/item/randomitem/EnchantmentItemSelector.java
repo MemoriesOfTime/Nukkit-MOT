@@ -13,29 +13,72 @@ import java.util.concurrent.ThreadLocalRandom;
  * @author LT_Name
  */
 public class EnchantmentItemSelector extends ConstantItemSelector {
+
     public EnchantmentItemSelector(int id, Selector parent) {
         this(id, 0, parent);
     }
 
+    public EnchantmentItemSelector(int id, Selector parent, boolean randomDurability) {
+        this(id, 0, parent, randomDurability);
+    }
+
     public EnchantmentItemSelector(int id, Integer meta, Selector parent) {
-        this(id, meta, 1,  parent);
+        this(id, meta, 1, parent);
+    }
+
+    public EnchantmentItemSelector(int id, Integer meta, Selector parent, boolean randomDurability) {
+        this(id, meta, 1, parent, randomDurability);
     }
 
     public EnchantmentItemSelector(int id, Integer meta, int count, Selector parent) {
         this(Item.get(id, meta, count), parent);
     }
 
+    public EnchantmentItemSelector(int id, Integer meta, int count, Selector parent, boolean randomDurability) {
+        this(Item.get(id, meta, count), parent, randomDurability);
+    }
+
     public EnchantmentItemSelector(Item item, Selector parent) {
-        super(item, parent);
-        //TODO 贴近原版附魔概率
-        List<Enchantment> enchantments = getSupportEnchantments(item);
-        if (!enchantments.isEmpty()) {
-            Random random = ThreadLocalRandom.current();
-            Enchantment enchantment = enchantments.get(random.nextInt(enchantments.size()));
-            if (random.nextDouble() < 0.3) { //减少高等级附魔概率
-                enchantment.setLevel(Utils.rand(1, enchantment.getMaxLevel()));
+        super(item, parent, false);
+    }
+
+    public EnchantmentItemSelector(Item item, Selector parent, boolean randomDurability) {
+        super(item, parent, randomDurability);
+    }
+
+    @Override
+    public Object select() {
+        Item result = item.clone();
+        double random = ThreadLocalRandom.current().nextDouble();
+        if (random < 0.1) {
+            for (int i = 0; i < 3; i++) {
+                this.endowRandomEnchantmentByItem(result);
             }
-            item.addEnchantment(enchantment);
+        } else if (random < 0.2) {
+            for (int i = 0; i < 2; i++) {
+                this.endowRandomEnchantmentByItem(result);
+            }
+        } else {
+            this.endowRandomEnchantmentByItem(result);
+        }
+        if (this.randomDurability) {
+            this.endowRandomDurability(result);
+        }
+        return result;
+    }
+
+    public void endowRandomEnchantmentByItem(Item randomItem) {
+        Random random = ThreadLocalRandom.current();
+        List<Enchantment> enchantments = getSupportEnchantments(randomItem);
+        if (!enchantments.isEmpty()) {
+            Enchantment enchantment = enchantments.get(random.nextInt(enchantments.size()));
+            double randomDouble = random.nextDouble();
+            if (randomDouble < 0.05) { //减少高等级附魔概率
+                enchantment.setLevel(Utils.rand(Math.min(3, enchantment.getLevel()), enchantment.getMaxLevel()));
+            } else {
+                enchantment.setLevel(Utils.rand(1, Math.min(2, enchantment.getMaxLevel())));
+            }
+            randomItem.addEnchantment(enchantment);
         }
     }
 

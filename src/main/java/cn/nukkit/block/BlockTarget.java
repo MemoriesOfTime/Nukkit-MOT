@@ -11,9 +11,11 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
-import cn.nukkit.math.*;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Axis;
 import cn.nukkit.plugin.PluginManager;
+import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.Vector3;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;

@@ -1041,5 +1041,13 @@
   "minecraft:music_disc_5": 636,
   "minecraft:disc_fragment_5": 637,
   "minecraft:glow_berries": 654,
-  "minecraft:music_disc_relic": 701
+  "minecraft:music_disc_relic": 701,
+  "minecraft:copper_bulb": -776,
+  "minecraft:exposed_copper_bulb": -777,
+  "minecraft:weathered_copper_bulb": -778,
+  "minecraft:oxidized_copper_bulb": -779,
+  "minecraft:waxed_copper_bulb": -780,
+  "minecraft:waxed_exposed_copper_bulb": -781,
+  "minecraft:waxed_weathered_copper_bulb": -782,
+  "minecraft:waxed_oxidized_copper_bulb": -783
 }

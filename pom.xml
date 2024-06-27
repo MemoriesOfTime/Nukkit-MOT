@@ -16,7 +16,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
         <jline.version>3.21.0</jline.version>
-        <block-state-updater.version>1.20.50-SNAPSHOT</block-state-updater.version>
+        <block-state-updater.version>1.21.0-SNAPSHOT</block-state-updater.version>
     </properties>
 
     <distributionManagement>
@@ -208,7 +208,7 @@
         <dependency>
             <groupId>org.iq80.snappy</groupId>
             <artifactId>snappy</artifactId>
-            <version>0.4</version>
+            <version>0.5</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -228,6 +228,10 @@
                 <exclusion>
                     <groupId>net.daporkchop.lib</groupId>
                     <artifactId>natives</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.iq80.snappy</groupId>
+                    <artifactId>snappy</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
