@@ -1840,8 +1840,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.portalPos = portalPos;
             }
 
+            EntityPortalEnterEvent ev = new EntityPortalEnterEvent(this, EntityPortalEnterEvent.PortalType.NETHER);
+            boolean isSpawn = Objects.equals(this.getLevel().getName(), Server.getInstance().getDefaultLevel().getName());
+            if (isSpawn && this.inPortalTicks == 1) {
+                ev = new EntityPortalEnterEvent(this, EntityPortalEnterEvent.PortalType.NETHER);
+                this.getServer().getPluginManager().callEvent(ev);
+                if (ev.isCancelled()) {
+                    this.portalPos = null;
+                    return;
+                }
+            }
+
             if (this.inPortalTicks == 80 || (this.server.vanillaPortals && this.inPortalTicks == 25 && this.gamemode == CREATIVE)) {
-                EntityPortalEnterEvent ev = new EntityPortalEnterEvent(this, EntityPortalEnterEvent.PortalType.NETHER);
                 this.getServer().getPluginManager().callEvent(ev);
 
                 if (ev.isCancelled()) {
@@ -2543,15 +2553,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        for (Player p : new ArrayList<>(this.server.playerList.values())) {
-            if (p != this && p.username != null) {
-                if (p.username.equalsIgnoreCase(this.username) || this.getUniqueId().equals(p.getUniqueId())) {
-                    p.close("", "disconnectionScreen.loggedinOtherLocation");
-                    break;
-                }
-            }
-        }
-
         CompoundTag nbt;
         File legacyDataFile = new File(server.getDataPath() + "players/" + lowerName + ".dat");
         File dataFile = new File(server.getDataPath() + "players/" + this.uuid.toString() + ".dat");
@@ -2695,7 +2696,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.forceMovement = this.teleportPosition = this.getPosition();
 
         ResourcePacksInfoPacket infoPacket = new ResourcePacksInfoPacket();
-        infoPacket.resourcePackEntries = this.server.getResourcePackManager().getResourceStack();
+
+        for (ResourcePack pack : this.server.getResourcePackManager().getResourceStack()) {
+            switch (pack.getPackName()) {
+                case "<1.19.70":
+                    if (protocol >= ProtocolInfo.v1_19_60) {
+                        infoPacket.resourcePackEntries = new ResourcePack[]{pack};
+                    }
+                    break;
+                case ">1.19.70":
+                    if (protocol < ProtocolInfo.v1_19_60) {
+                        infoPacket.resourcePackEntries = new ResourcePack[]{pack};
+                    }
+                    break;
+                default:
+                    infoPacket.resourcePackEntries = this.server.getResourcePackManager().getResourceStack();
+                    break;
+            }
+        }
+
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
     }
@@ -2906,6 +2925,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         packetswitch:
         switch (pidOld) {
             case ProtocolInfo.LOGIN_PACKET:
+                LoginPacket loginPacket = (LoginPacket) packet;
+
                 if (this.loginPacketReceived) {
                     this.close("", "Invalid login packet");
                     return;
@@ -2913,11 +2934,31 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.loginPacketReceived = true;
 
-                LoginPacket loginPacket = (LoginPacket) packet;
+                for (Player p : new ArrayList<>(this.server.playerList.values())) {
+                    if (p != this && p.username != null) {
+                        if (p.username.equalsIgnoreCase(loginPacket.username) || loginPacket.clientUUID.equals(p.getUniqueId())) {
+                            PlayerDuplicateLoginEvent event = new PlayerDuplicateLoginEvent(this, p);
+                            event.call();
+
+                            if (!event.isCancelled()) {
+                                p.close("", "disconnectionScreen.loggedinOtherLocation");
+                            } else {
+                                this.close("", "disconnectionScreen.loggedinOtherLocation");
+                                return;
+                            }
+                            break;
+                        }
+                    }
+                }
 
                 this.protocol = loginPacket.getProtocol();
 
-                this.username = TextFormat.clean(loginPacket.username);
+                if (protocol >= ProtocolInfo.v1_16_0) {
+                    this.username = TextFormat.clean(loginPacket.username)
+                            .replace(" ", "_");
+                } else {
+                    this.username = TextFormat.clean(loginPacket.username);
+                }
 
                 if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
                     this.close("", "You are running unsupported Minecraft version");
@@ -5101,7 +5142,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.perm = null;
         }
 
-        this.inventory = null;
         this.chunk = null;
 
         this.server.removePlayer(this);

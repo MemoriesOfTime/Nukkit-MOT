@@ -452,7 +452,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                         damage = legacyEntry.getDamage();
                     }
                     Item item = Item.get(id, damage);
-                    if (item.getId() != 0 && !NAMESPACED_ID_ITEM.containsKey(entity.getKey())) {
+                    if (item.getId() != 0) {
                         NAMESPACED_ID_ITEM.put(entity.getKey(), () -> item);
                     }
                 } catch (Exception ignored) {

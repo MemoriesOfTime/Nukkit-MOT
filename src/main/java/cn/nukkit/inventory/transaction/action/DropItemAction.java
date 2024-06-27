@@ -28,6 +28,7 @@ public class DropItemAction extends InventoryAction {
         source.getServer().getPluginManager().callEvent(ev = new PlayerDropItemEvent(source, this.targetItem));
 
         if(ev.isCancelled()) {
+            source.getUIInventory().clearAll();
             source.stopAction();
         }
 

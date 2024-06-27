@@ -6,12 +6,14 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntitySmallFireBall;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
+import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Axis;
+import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import org.jetbrains.annotations.NotNull;
@@ -113,8 +115,13 @@ public class BlockTarget extends BlockTransparent implements BlockEntityHolder<B
     public void onEntityCollide(@NotNull Entity entity) {
         int ticks = 8;
         if (entity instanceof EntityArrow || entity instanceof EntityThrownTrident || entity instanceof EntitySmallFireBall) {
+            BlockRedstoneEvent ev = new BlockRedstoneEvent(this, 15, 0);
+            PluginManager pluginManager = level.getServer().getPluginManager();
+            pluginManager.callEvent(ev);
+
             ticks = 20;
         }
+
         Position position = entity.getPosition();
         Vector3 motion = position.add(new Vector3(entity.lastMotionX, entity.lastMotionY, entity.lastMotionZ));
         MovingObjectPosition intercept = calculateIntercept(position, position.add(motion.multiply(2)));

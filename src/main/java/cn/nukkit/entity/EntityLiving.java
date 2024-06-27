@@ -149,7 +149,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
                 double deltaX = this.x - damager.x;
                 double deltaZ = this.z - damager.z;
-                this.knockBack(damager, source.getDamage(), deltaX, deltaZ, ((EntityDamageByEntityEvent) source).getKnockBack());
+                this.knockBack(deltaX, deltaZ);
             }
 
             EntityEventPacket pk = new EntityEventPacket();
@@ -194,7 +194,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             double deltaX = damager.getX() - this.getX();
             double deltaZ = damager.getZ() - this.getZ();
             ((EntityLiving) damager).attackTime = source.getAttackCooldown();
-            ((EntityLiving) damager).knockBack(this, 0, deltaX, deltaZ);
+            ((EntityLiving) damager).knockBack(deltaX, deltaZ);
         }
 
         onBlock(damager, source, event.getAnimation());
@@ -207,11 +207,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         }
     }
 
-    public void knockBack(Entity attacker, double damage, double x, double z) {
-        this.knockBack(attacker, damage, x, z, 0.3);
-    }
-
-    public void knockBack(Entity attacker, double damage, double x, double z, double base) {
+    public void knockBack(double x, double z) {
         double f = Math.sqrt(x * x + z * z);
         if (f <= 0) {
             return;
@@ -224,12 +220,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         motion.x /= 2d;
         motion.y /= 2d;
         motion.z /= 2d;
-        motion.x += x * f * base;
-        motion.y += base;
-        motion.z += z * f * base;
+        motion.x += x * f * 0.3;
+        motion.y += 0.3;
+        motion.z += z * f * 0.3;
 
-        if (motion.y > base) {
-            motion.y = base;
+        if (motion.y > 0.3) {
+            motion.y = 0.3;
         }
 
         this.resetFallDistance();
@@ -481,7 +477,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public float getMovementSpeed() {
         return this.movementSpeed;
     }
-    
+
     public int getAirTicks() {
         return this.airTicks;
     }
@@ -579,5 +575,4 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         }
         return human;
     }
-
 }
