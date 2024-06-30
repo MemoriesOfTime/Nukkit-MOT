@@ -147,6 +147,7 @@ public class ChunkBuilder {
 
         if (this.dirty) {
             levelDBChunk.setChanged();
+            levelDBChunk.subChunksDirty = true;
         }
 
         return levelDBChunk;
