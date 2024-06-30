@@ -3191,7 +3191,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (playerToggleSprintEvent.isCancelled()) {
                         this.needSendData = true;
                     } else {
-                        this.setSprinting(true, false);
+                        this.setSprinting(true);
                     }
                     this.setUsingItem(false);
                 }
@@ -3205,7 +3205,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (playerToggleSneakEvent.isCancelled()) {
                         this.needSendData = true;
                     } else {
-                        this.setSprinting(false, false);
+                        this.setSprinting(false);
                     }
                 }
 
@@ -5490,7 +5490,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.sendData(this);
 
-        this.setMovementSpeed(DEFAULT_SPEED);
+        this.setMovementSpeed(MovementSpeedModifier.BASE, DEFAULT_SPEED);
 
         this.adventureSettings.update();
         this.inventory.sendContents(this);
@@ -5607,15 +5607,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.dataPacket(pk);
     }
 
+    @Deprecated
     @Override
     public void setMovementSpeed(float speed) {
         setMovementSpeed(speed, true);
     }
 
+    @Override
+    public void setMovementSpeed(MovementSpeedModifier modifier, float speed) {
+        this.setMovementSpeed(modifier, speed, true);
+    }
+
+    @Deprecated
     public void setMovementSpeed(float speed, boolean send) {
-        super.setMovementSpeed(speed);
+        this.setMovementSpeed(MovementSpeedModifier.BASE, speed, send);
+    }
+
+    public void setMovementSpeed(MovementSpeedModifier modifier, float speed, boolean send) {
+        super.setMovementSpeed(modifier, speed);
         if (this.spawned && send) {
-            this.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speed).setDefaultValue(speed));
+            float finalSpeed = this.getMovementSpeed();
+            this.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(finalSpeed).setDefaultValue(finalSpeed));
         }
     }
 
@@ -6518,7 +6530,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void setSprinting(boolean value, boolean send) {
         if (isSprinting() != value) {
             super.setSprinting(value);
-            this.setMovementSpeed(value ? getMovementSpeed() * 1.3f : getMovementSpeed() / 1.3f, send);
+            //this.setMovementSpeed(value ? getMovementSpeed() * 1.3f : getMovementSpeed() / 1.3f, send);
+            this.setMovementSpeed(MovementSpeedModifier.ACTION, value ? 1.3f : 0, send);
         }
     }
 

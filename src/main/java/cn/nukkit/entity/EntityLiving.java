@@ -30,17 +30,18 @@ import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.TextPacket;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
 public abstract class EntityLiving extends Entity implements EntityDamageable {
+
+    private static final Logger log = LoggerFactory.getLogger(EntityLiving.class);
 
     public EntityLiving(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -58,7 +59,9 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
     protected int attackTime = 0;
 
+    @Deprecated
     protected float movementSpeed = 0.1f;
+    protected Map<MovementSpeedModifier, Float> movementSpeedModifiers = new EnumMap<>(MovementSpeedModifier.class);
 
     protected int turtleTicks = 0;
 
@@ -69,6 +72,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     @Override
     protected void initEntity() {
         super.initEntity();
+
+        if (this.movementSpeedModifiers == null) {
+            this.movementSpeedModifiers = new EnumMap<>(MovementSpeedModifier.class);
+        }
+        this.movementSpeedModifiers.put(MovementSpeedModifier.BASE, 0.1f);
 
         if (this.namedTag.contains("HealF")) {
             this.namedTag.putFloat("Health", this.namedTag.getShort("HealF"));
@@ -474,12 +482,36 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         return null;
     }
 
+    @Deprecated
     public void setMovementSpeed(float speed) {
         this.movementSpeed = speed;
+        this.setMovementSpeed(MovementSpeedModifier.BASE, speed);
+    }
+
+    public void setMovementSpeed(MovementSpeedModifier modifier, float speed) {
+        this.movementSpeedModifiers.put(modifier, speed);
+        if (modifier == MovementSpeedModifier.BASE) {
+            log.info("test {}", speed);
+        }
     }
 
     public float getMovementSpeed() {
-        return this.movementSpeed;
+        float finalSpeed = 0;
+        for (Map.Entry<MovementSpeedModifier, Float> entry : this.movementSpeedModifiers.entrySet()) {
+            float value = entry.getValue();
+            if (entry.getKey().getCalculation() == MovementSpeedModifier.CALCULATION.MULTIPLY) {
+                if (value != 0) {
+                    finalSpeed *= value;
+                }
+            } else {
+                finalSpeed += value;
+            }
+        }
+        return finalSpeed;
+    }
+
+    public float getMovementSpeed(MovementSpeedModifier modifier) {
+        return this.movementSpeedModifiers.getOrDefault(modifier, 0f);
     }
     
     public int getAirTicks() {
@@ -578,6 +610,37 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
         }
         return human;
+    }
+
+    public enum MovementSpeedModifier {
+        /**
+         * 基础速度
+         */
+        BASE(CALCULATION.ADD),
+        /**
+         * 药水
+         */
+        EFFECT(CALCULATION.MULTIPLY),
+        /**
+         * 潜行/冲刺/爬行等动作
+         */
+        ACTION(CALCULATION.MULTIPLY),
+        ;
+
+        private final CALCULATION calculation;
+
+        MovementSpeedModifier(CALCULATION calculation) {
+            this.calculation = calculation;
+        }
+
+        public CALCULATION getCalculation() {
+            return this.calculation;
+        }
+
+        public enum CALCULATION {
+            ADD,
+            MULTIPLY
+        }
     }
 
 }
