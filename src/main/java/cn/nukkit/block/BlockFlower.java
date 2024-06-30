@@ -24,12 +24,13 @@ public class BlockFlower extends BlockFlowable {
     public static final int TYPE_WHITE_TULIP = 6;
     public static final int TYPE_PINK_TULIP = 7;
     public static final int TYPE_OXEYE_DAISY = 8;
-    public static final int CORNFLOWER = 9;
-    public static final int LILY_OF_THE_VALLEY = 10;
+    public static final int TYPE_CORNFLOWER = 9;
+    public static final int TYPE_LILY_OF_THE_VALLEY = 10;
 
-    //兼容nkx插件
-    public static final int TYPE_CORNFLOWER = CORNFLOWER;
-    public static final int TYPE_LILY_OF_THE_VALLEY = LILY_OF_THE_VALLEY;
+    @Deprecated
+    public static final int CORNFLOWER = TYPE_CORNFLOWER;
+    @Deprecated
+    public static final int LILY_OF_THE_VALLEY = TYPE_LILY_OF_THE_VALLEY;
 
     private static final String[] names = new String[]{
             "Poppy",
