@@ -5,7 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.LongEntityData;
-import cn.nukkit.entity.projectile.EntitySlenderProjectile;
+import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.EntityDamageByChildEntityEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
@@ -13,7 +13,6 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.ProjectileHitEvent;
 import cn.nukkit.event.player.PlayerFishEvent;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemBookEnchanted;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.randomitem.Fishing;
 import cn.nukkit.level.MovingObjectPosition;
@@ -35,7 +34,7 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Created by PetteriM1
  */
-public class EntityFishingHook extends EntitySlenderProjectile {
+public class EntityFishingHook extends EntityProjectile {
 
     public static final int NETWORK_ID = 77;
 

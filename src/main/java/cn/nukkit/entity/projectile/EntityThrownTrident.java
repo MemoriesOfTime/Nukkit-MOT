@@ -30,7 +30,7 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Created by PetteriM1
  */
-public class EntityThrownTrident extends EntitySlenderProjectile {
+public class EntityThrownTrident extends EntityProjectile {
 
     public static final int NETWORK_ID = 73;
     private static final String TAG_PICKUP = "pickup";
