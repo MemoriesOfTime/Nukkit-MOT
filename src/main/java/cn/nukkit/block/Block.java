@@ -429,6 +429,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[SWEET_BERRY_BUSH] = BlockSweetBerryBush.class; //462
             list[LANTERN] = BlockLantern.class; //463
             list[CAMPFIRE_BLOCK] = BlockCampfire.class; //464
+            list[LAVA_CAULDRON] = BlockCauldronLava.class; //465
             list[WOOD_BARK] = BlockWoodBark.class; //467
             list[COMPOSTER] = BlockComposter.class; //468
             list[LIT_BLAST_FURNACE] = BlockBlastFurnaceLit.class; //469
