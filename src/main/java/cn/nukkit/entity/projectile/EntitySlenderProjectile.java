@@ -2,6 +2,7 @@ package cn.nukkit.entity.projectile;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.ProjectileHitEvent;
 import cn.nukkit.level.MovingObjectPosition;
@@ -14,12 +15,13 @@ import cn.nukkit.nbt.tag.CompoundTag;
 
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
 import java.util.function.Predicate;
 
 /**
  * @author PowerNukkitX Project Team
  * <a href="https://github.com/PowerNukkitX/PowerNukkitX/blob/master/src/main/java/cn/nukkit/entity/projectile/SlenderProjectile.java">powernukkitx original file</a>
- *
+ * <p>
  * 这个抽象类代表较为细长的投射物实体(例如弓箭,三叉戟),它通过重写{@link Entity#move}方法实现这些实体较为准确的碰撞箱计算。
  * <p>
  * This abstract class represents slender projectile entities (e.g.arrow, trident), and it realized a more accurate collision box calculation for these entities by overriding the {@link Entity#move} method.
@@ -72,11 +74,12 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
         Entity collisionEntity = null;
         Block collisionBlock = null;
         for (int i = 0; i < SPLIT_NUMBER; ++i) {
-            var collisionBlocks = this.level.getCollisionBlocks(currentAABB.offset(dirVector.x, dirVector.y, dirVector.z));
-            var collisionEntities = this.getLevel().getCollidingEntities(currentAABB, this);
-            if (collisionBlocks.length != 0) {
+            Block[] collisionBlocks = this.level.getCollisionBlocks(currentAABB.offset(dirVector.x, dirVector.y, dirVector.z));
+            List<Block> filteredBlocks = Arrays.stream(collisionBlocks).filter(block -> block.getId() != BlockID.BARRIER).toList();
+            Entity[] collisionEntities = this.getLevel().getCollidingEntities(currentAABB, this);
+            if (filteredBlocks.size() != 0) {
                 currentAABB.offset(-dirVector.x, -dirVector.y, -dirVector.z);
-                collisionBlock = Arrays.stream(collisionBlocks).min(Comparator.comparingDouble(projectile::distanceSquared)).get();
+                collisionBlock = filteredBlocks.stream().min(Comparator.comparingDouble(projectile::distanceSquared)).get();
                 break;
             }
             collisionEntity = Arrays.stream(collisionEntities)
@@ -206,7 +209,6 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
                 updateRotation();
                 this.move(this.motionX, this.motionY, this.motionZ);
                 this.updateMovement();
-
             }
             return this.entityBaseTick(tickDiff);
         }
