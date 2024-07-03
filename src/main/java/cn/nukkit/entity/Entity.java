@@ -2560,6 +2560,15 @@ public abstract class Entity extends Location implements Metadatable {
         return true;
     }
 
+    /**
+     * Whether the entity can pass through barrier blocks.
+     *
+     * @return passes through barriers
+     **/
+    public boolean canPassThroughBarrier() {
+        return false;
+    }
+
     protected void checkChunks() {
         int cx = (int) this.x >> 4;
         int cz = (int) this.z >> 4;
