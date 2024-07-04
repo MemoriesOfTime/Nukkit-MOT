@@ -264,7 +264,8 @@ public class BlockEntitySign extends BlockEntitySpawnable {
 
         if (!signChangeEvent.isCancelled()) {
             this.setText(signChangeEvent.getLines());
-            this.setEditorEntityRuntimeId(null);
+            //低版本任何改动都会触发updateCompoundTag，暂时不用把他设置为null
+            //this.setEditorEntityRuntimeId(null);
             return true;
         }
 
