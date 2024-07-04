@@ -249,9 +249,4 @@ public abstract class EntityProjectile extends Entity {
             block.onEntityCollide(this);
         }
     }
-
-    @Override
-    public boolean canPassThroughBarrier() {
-        return true;
-    }
 }
