@@ -1079,7 +1079,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 try {
                     Item item = constructor.get();
                     if (meta.isPresent()) {
-                        item.setDamage(meta.getAsInt());
+                        int metaValue = meta.getAsInt();
+                        if (metaValue != 0) {
+                            item.setDamage(metaValue);
+                        }
                     }
                     // Avoid the upcoming changes to the original item object
                     return item.clone();
