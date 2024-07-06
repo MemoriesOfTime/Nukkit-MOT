@@ -254,7 +254,7 @@ public abstract class EntityProjectile extends Entity {
 
     @Override
     public boolean canPassThroughBarrier() {
-        return passThroughBarrier;
+        return this.passThroughBarrier;
     }
 
     public void setPassThroughBarrier(boolean passThroughBarrier) {
