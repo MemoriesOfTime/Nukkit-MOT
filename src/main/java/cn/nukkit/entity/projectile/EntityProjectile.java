@@ -34,17 +34,11 @@ public abstract class EntityProjectile extends Entity {
 
     public Entity shootingEntity;
 
-    protected double getDamage() {
-        return namedTag.contains("damage") ? namedTag.getDouble("damage") : getBaseDamage();
-    }
-
-    protected double getBaseDamage() {
-        return 0;
-    }
-
     public boolean hadCollision = false;
 
     public int piercing;
+
+    protected boolean passThroughBarrier = false;
 
     public EntityProjectile(FullChunk chunk, CompoundTag nbt) {
         this(chunk, nbt, null);
@@ -56,6 +50,14 @@ public abstract class EntityProjectile extends Entity {
         /*if (shootingEntity != null) {
             this.setDataProperty(new LongEntityData(DATA_SHOOTER_ID, shootingEntity.getId()));
         }*/
+    }
+
+    protected double getDamage() {
+        return namedTag.contains("damage") ? namedTag.getDouble("damage") : getBaseDamage();
+    }
+
+    protected double getBaseDamage() {
+        return 0;
     }
 
     public int getResultDamage() {
@@ -252,6 +254,10 @@ public abstract class EntityProjectile extends Entity {
 
     @Override
     public boolean canPassThroughBarrier() {
-        return true;
+        return passThroughBarrier;
+    }
+
+    public void setPassThroughBarrier(boolean passThroughBarrier) {
+        this.passThroughBarrier = passThroughBarrier;
     }
 }
