@@ -38,8 +38,6 @@ public abstract class EntityProjectile extends Entity {
 
     public int piercing;
 
-    protected boolean passThroughBarrier = false;
-
     public EntityProjectile(FullChunk chunk, CompoundTag nbt) {
         this(chunk, nbt, null);
     }
@@ -250,14 +248,5 @@ public abstract class EntityProjectile extends Entity {
         if (block.hasEntityCollision()) {
             block.onEntityCollide(this);
         }
-    }
-
-    @Override
-    public boolean canPassThroughBarrier() {
-        return this.passThroughBarrier;
-    }
-
-    public void setPassThroughBarrier(boolean passThroughBarrier) {
-        this.passThroughBarrier = passThroughBarrier;
     }
 }
