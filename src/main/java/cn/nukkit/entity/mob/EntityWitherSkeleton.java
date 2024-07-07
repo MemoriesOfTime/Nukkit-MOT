@@ -111,4 +111,12 @@ public class EntityWitherSkeleton extends EntityWalkingMob implements EntitySmit
     public String getName() {
         return this.hasCustomName() ? this.getNameTag() : "Wither Skeleton";
     }
+
+    @Override
+    public boolean canBeAffected(int effectId) {
+        if (effectId == Effect.WITHER) {
+            return false;
+        }
+        return super.canBeAffected(effectId);
+    }
 }

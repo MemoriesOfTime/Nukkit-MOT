@@ -154,4 +154,9 @@ public class EntityEnderDragon extends EntityFlyingMob implements EntityBoss {
     protected boolean isInTickingRange() {
         return true;
     }
+
+    @Override
+    public boolean canBeAffected(int effectId) {
+        return false;
+    }
 }
