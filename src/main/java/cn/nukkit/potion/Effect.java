@@ -11,8 +11,10 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityEffectRemoveEvent;
 import cn.nukkit.event.entity.EntityEffectUpdateEvent;
 import cn.nukkit.event.entity.EntityRegainHealthEvent;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.MobEffectPacket;
 import cn.nukkit.utils.ServerException;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * @author MagicDroidX
@@ -375,6 +377,34 @@ public class Effect implements Cloneable {
         } catch (CloneNotSupportedException e) {
             return null;
         }
+    }
+
+    public CompoundTag save() {
+        return save(new CompoundTag());
+    }
+
+    public CompoundTag save(CompoundTag tag) {
+        return tag.putByte("Id", this.id)
+                .putByte("Amplifier", this.amplifier)
+                .putInt("Duration", this.duration)
+                .putInt("DurationEasy", this.duration)
+                .putInt("DurationNormal", this.duration)
+                .putInt("DurationHard", this.duration)
+                .putBoolean("Ambient", this.ambient)
+                .putBoolean("ShowParticles", this.show)
+                .putBoolean("DisplayOnScreenTextureAnimation", false);
+    }
+
+    @Nullable
+    public static Effect load(CompoundTag tag) {
+        Effect effect = getEffect(tag.getByte("Id"));
+        if (effect == null) {
+            return null;
+        }
+        return effect.setAmplifier(tag.getByte("Amplifier"))
+                .setDuration(tag.getInt("Duration"))
+                .setAmbient(tag.getBoolean("Ambient"))
+                .setVisible(tag.getBoolean("ShowParticles"));
     }
 
     public static int calculateColor(Effect... effects) {
