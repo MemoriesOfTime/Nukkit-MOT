@@ -283,12 +283,10 @@ public class EntityAreaEffectCloud extends Entity {
         ListTag<CompoundTag> mobEffects = this.namedTag.getList("mobEffects", CompoundTag.class);
         this.mobEffects = new Int2ObjectOpenHashMap<>(mobEffects.size());
         for (CompoundTag effectTag : mobEffects.getAll()) {
-            Effect effect = Effect.getEffect(effectTag.getByte("Id"))
-                    .setAmbient(effectTag.getBoolean("Ambient"))
-                    .setAmplifier(effectTag.getByte("Amplifier"))
-                    .setVisible(effectTag.getBoolean("DisplayOnScreenTextureAnimation"))
-                    .setDuration(effectTag.getInt("Duration"));
-            this.mobEffects.put(effect.getId(), effect);
+            Effect effect = Effect.load(effectTag);
+            if (effect != null) {
+                this.mobEffects.put(effect.getId(), effect);
+            }
         }
 
         this.recalculatePotionColor(false);
