@@ -20,6 +20,7 @@ import cn.nukkit.utils.ServerException;
  */
 public class Effect implements Cloneable {
 
+    public static final int NO_EFFECT = 0;
     public static final int SPEED = 1;
     public static final int SLOWNESS = 2;
     public static final int HASTE = 3;
@@ -69,6 +70,7 @@ public class Effect implements Cloneable {
     public static void init() {
         effects = new Effect[256];
 
+        effects[Effect.NO_EFFECT] = new Effect(NO_EFFECT, "%potion.empty", 56, 93, 198);
         effects[Effect.SPEED] = new Effect(Effect.SPEED, "%potion.moveSpeed", 124, 175, 198);
         effects[Effect.SLOWNESS] = new Effect(Effect.SLOWNESS, "%potion.moveSlowdown", 90, 108, 129, true);
         effects[Effect.HASTE] = new Effect(Effect.HASTE, "%potion.digSpeed", 217, 192, 67);
@@ -247,6 +249,18 @@ public class Effect implements Cloneable {
         return new int[]{this.color >> 16, (this.color >> 8) & 0xff, this.color & 0xff};
     }
 
+    public int getRed() {
+        return this.color >> 16;
+    }
+
+    public int getGreen() {
+        return (this.color >> 8) & 0xff;
+    }
+
+    public int getBlue() {
+        return this.color & 0xff;
+    }
+
     public void setColor(int r, int g, int b) {
         this.color = ((r & 0xff) << 16) + ((g & 0xff) << 8) + (b & 0xff);
     }
@@ -361,5 +375,35 @@ public class Effect implements Cloneable {
         } catch (CloneNotSupportedException e) {
             return null;
         }
+    }
+
+    public static int calculateColor(Effect... effects) {
+        int total = 0;
+        int r = 0;
+        int g = 0;
+        int b = 0;
+
+        for (Effect effect : effects) {
+            if (!effect.isVisible()) {
+                continue;
+            }
+
+            int level = effect.getAmplifier() + 1;
+
+            r += effect.getRed() * level;
+            g += effect.getGreen() * level;
+            b += effect.getBlue() * level;
+
+            total += level;
+        }
+
+        if (total == 0) {
+            return 0;
+        }
+
+        r = (r / total) & 0xff;
+        g = (g / total) & 0xff;
+        b = (b / total) & 0xff;
+        return (r << 16) | (g << 8) | b;
     }
 }

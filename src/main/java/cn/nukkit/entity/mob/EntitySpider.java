@@ -13,6 +13,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
@@ -158,5 +159,13 @@ public class EntitySpider extends EntityWalkingMob implements EntityArthropod {
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
         return this.isAngry() && super.targetOption(creature, distance);
+    }
+
+    @Override
+    public boolean canBeAffected(int effectId) {
+        if (effectId == Effect.POISON) {
+            return false;
+        }
+        return super.canBeAffected(effectId);
     }
 }

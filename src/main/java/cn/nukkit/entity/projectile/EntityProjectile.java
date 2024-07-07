@@ -34,14 +34,6 @@ public abstract class EntityProjectile extends Entity {
 
     public Entity shootingEntity;
 
-    protected double getDamage() {
-        return namedTag.contains("damage") ? namedTag.getDouble("damage") : getBaseDamage();
-    }
-
-    protected double getBaseDamage() {
-        return 0;
-    }
-
     public boolean hadCollision = false;
 
     public int piercing;
@@ -56,6 +48,14 @@ public abstract class EntityProjectile extends Entity {
         /*if (shootingEntity != null) {
             this.setDataProperty(new LongEntityData(DATA_SHOOTER_ID, shootingEntity.getId()));
         }*/
+    }
+
+    protected double getDamage() {
+        return namedTag.contains("damage") ? namedTag.getDouble("damage") : getBaseDamage();
+    }
+
+    protected double getBaseDamage() {
+        return 0;
     }
 
     public int getResultDamage() {
@@ -248,10 +248,5 @@ public abstract class EntityProjectile extends Entity {
         if (block.hasEntityCollision()) {
             block.onEntityCollide(this);
         }
-    }
-
-    @Override
-    public boolean canPassThroughBarrier() {
-        return true;
     }
 }
