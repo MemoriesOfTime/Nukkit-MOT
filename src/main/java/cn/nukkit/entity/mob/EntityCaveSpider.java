@@ -96,4 +96,12 @@ public class EntityCaveSpider extends EntityWalkingMob implements EntityArthropo
     public String getName() {
         return this.hasCustomName() ? this.getNameTag() : "Cave Spider";
     }
+
+    @Override
+    public boolean canBeAffected(int effectId) {
+        if (effectId == Effect.POISON) {
+            return false;
+        }
+        return super.canBeAffected(effectId);
+    }
 }

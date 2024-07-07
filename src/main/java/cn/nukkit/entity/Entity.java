@@ -80,7 +80,7 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_OWNER_EID = 5; //long
     public static final int DATA_TARGET_EID = 6; //long
     public static final int DATA_AIR = 7; //short
-    public static final int DATA_POTION_COLOR = 8; //int (ARGB!)
+    public static final int DATA_EFFECT_COLOR = 8, DATA_POTION_COLOR = DATA_EFFECT_COLOR; //int (ARGB!)
     public static final int DATA_POTION_AMBIENT = 9; //byte
     public static final int DATA_JUMP_DURATION = 10; //long
     public static final int DATA_HURT_TIME = 11; //int (minecart/boat)
@@ -107,7 +107,7 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FISH_X = 33;
     public static final int DATA_FISH_Z = 34;
     public static final int DATA_FISH_ANGLE = 35;
-    public static final int DATA_POTION_AUX_VALUE = 36; //short
+    public static final int DATA_AUX_VALUE_DATA = 36, DATA_POTION_AUX_VALUE = DATA_AUX_VALUE_DATA; //short
     public static final int DATA_LEAD_HOLDER_EID = 37; //long
     public static final int DATA_SCALE = 38; //float
     public static final int DATA_HAS_NPC_COMPONENT = 39; //byte
@@ -170,19 +170,19 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FLAGS_EXTENDED = 92, DATA_FLAGS2 = DATA_FLAGS_EXTENDED; //long (extended data flags)
     public static final int DATA_LAYING_AMOUNT = 93;
     public static final int DATA_LAYING_AMOUNT_PREVIOUS = 94;
-    public static final int DATA_DURATION = 95;
-    public static final int DATA_SPAWN_TIME = 96;
-    public static final int DATA_CHANGE_RATE = 97;
-    public static final int DATA_CHANGE_ON_PICKUP = 98;
-    public static final int DATA_PICKUP_COUNT = 99;
-    public static final int DATA_INTERACTIVE_TAG = 100; //string (button text)
+    public static final int DATA_AREA_EFFECT_CLOUD_DURATION = 95, DATA_DURATION = DATA_AREA_EFFECT_CLOUD_DURATION; // int
+    public static final int DATA_AREA_EFFECT_CLOUD_SPAWN_TIME = 96, DATA_SPAWN_TIME = DATA_AREA_EFFECT_CLOUD_SPAWN_TIME; // int
+    public static final int DATA_AREA_EFFECT_CLOUD_CHANGE_RATE = 97, DATA_CHANGE_RATE = DATA_AREA_EFFECT_CLOUD_CHANGE_RATE; // float
+    public static final int DATA_AREA_EFFECT_CLOUD_CHANGE_ON_PICKUP = 98, DATA_CHANGE_ON_PICKUP = DATA_AREA_EFFECT_CLOUD_CHANGE_ON_PICKUP; // float
+    public static final int DATA_AREA_EFFECT_CLOUD_PICKUP_COUNT = 99, DATA_PICKUP_COUNT = DATA_AREA_EFFECT_CLOUD_PICKUP_COUNT; //int
+    public static final int DATA_INTERACTIVE_TAG = 100; // string (button text)
     public static final int DATA_TRADE_TIER = 101;
     public static final int DATA_MAX_TRADE_TIER = 102;
     public static final int DATA_TRADE_EXPERIENCE = 103;
     public static final int DATA_SKIN_ID = 104; // int
     public static final int DATA_SPAWNING_FRAMES = 105;
-    public static final int DATA_COMMAND_BLOCK_TICK_DELAY = 106; //int
-    public static final int DATA_COMMAND_BLOCK_EXECUTE_ON_FIRST_TICK = 107; //byte
+    public static final int DATA_COMMAND_BLOCK_TICK_DELAY = 106; // int
+    public static final int DATA_COMMAND_BLOCK_EXECUTE_ON_FIRST_TICK = 107; // byte
     public static final int DATA_AMBIENT_SOUND_INTERVAL = 108;
     public static final int DATA_AMBIENT_SOUND_INTERVAL_RANGE = 109;
     public static final int DATA_AMBIENT_SOUND_EVENT_NAME = 110;
@@ -902,9 +902,23 @@ public abstract class Entity extends Location implements Metadatable {
         return this.effects.containsKey(effectId);
     }
 
+    /**
+     * Check if the entity can be affected by the effect
+     *
+     * @param effectId the effect id
+     * @return true if the entity can be affected by the effect
+     */
+    public boolean canBeAffected(int effectId) {
+        return false;
+    }
+
     public void addEffect(Effect effect) {
         if (effect == null) {
             return; //here add null means add nothing
+        }
+
+        if (!canBeAffected(effect.getId())) {
+            return;
         }
 
         effect.add(this);

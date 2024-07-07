@@ -22,6 +22,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
 import cn.nukkit.network.protocol.BossEventPacket;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
@@ -275,5 +276,10 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     public String getName() {
         String name = this.getNameTag();
         return !name.isEmpty() ? name : "Wither";
+    }
+
+    @Override
+    public boolean canBeAffected(int effectId) {
+        return effectId == Effect.INSTANT_DAMAGE || effectId == Effect.INSTANT_HEALTH;
     }
 }
