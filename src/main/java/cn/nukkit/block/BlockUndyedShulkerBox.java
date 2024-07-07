@@ -1,9 +1,11 @@
 package cn.nukkit.block;
 
+import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityShulkerBox;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.inventory.InventoryHolder;
+import cn.nukkit.item.Item;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 import org.jetbrains.annotations.NotNull;
@@ -64,5 +66,15 @@ public class BlockUndyedShulkerBox extends BlockShulkerBox implements BlockEntit
         }
 
         return ContainerInventory.calculateRedstone(((InventoryHolder) be).getInventory());
+    }
+
+    @Override
+    public boolean onActivate(Item item, Player player) {
+        if (item.getId() == Item.DYE) {
+            this.getLevel().setBlock(this, Block.get(SHULKER_BOX, DyeColor.getByDyeData(item.getDamage()).getWoolData()), true, true);
+            return true;
+        }
+
+        return super.onActivate(item, player);
     }
 }
