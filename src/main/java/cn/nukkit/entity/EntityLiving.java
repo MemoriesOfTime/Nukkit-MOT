@@ -110,6 +110,11 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     @Override
+    public boolean canBeAffected(int effectId) {
+        return !(this instanceof EntitySmite) || effectId != Effect.REGENERATION && effectId != Effect.POISON;
+    }
+
+    @Override
     public boolean attack(EntityDamageEvent source) {
         if (this.noDamageTicks > 0) {
             return false;

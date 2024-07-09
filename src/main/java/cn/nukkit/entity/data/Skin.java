@@ -49,6 +49,7 @@ public class Skin {
         NO_PERSONA_SKIN = skin;
     }
 
+    private boolean noPlayFab; // Don't attempt to generate missing play fab id multiple times
     private String fullSkinId = UUID.randomUUID().toString();
     private String skinId;
     private String playFabId = "";
@@ -320,19 +321,41 @@ public class Skin {
 
     public void setFullSkinId(String fullSkinId) {
         this.fullSkinId = fullSkinId;
+        this.noPlayFab = false; // Allow another attempt to generate it using the new id
     }
 
     public String getFullSkinId() {
-        return fullSkinId;
+        if (this.fullSkinId == null) {
+            this.fullSkinId = this.getSkinId() + this.getCapeId();
+            this.noPlayFab = false; // Allow another attempt to generate it using the new id
+        }
+        return this.fullSkinId;
     }
 
     public void setPlayFabId(String playFabId) {
         this.playFabId = playFabId;
+        this.noPlayFab = false;
     }
 
     public String getPlayFabId() {
-        if (this.playFabId == null || this.playFabId.isEmpty()) {
-            this.playFabId = this.fullSkinId.replace("-", "").substring(16);
+        if (this.noPlayFab) {
+            return "";
+        }
+        if ((this.playFabId == null || this.playFabId.isEmpty())) {
+            String[] split = this.getFullSkinId().split("-", 6);
+            if (split.length > 5) {
+                this.playFabId = split[5];
+                this.noPlayFab = false;
+            } else {
+                try {
+                    this.playFabId = this.getFullSkinId().replace("-", "").substring(16);
+                    this.noPlayFab = false;
+                } catch (Exception ignore) {
+                    Server.getInstance().getLogger().debug("Couldn't generate Skin playFabId for " + this.getFullSkinId());
+                    this.playFabId = "";
+                    this.noPlayFab = true;
+                }
+            }
         }
         return this.playFabId;
     }

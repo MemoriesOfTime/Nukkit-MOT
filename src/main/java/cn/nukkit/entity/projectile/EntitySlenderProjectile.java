@@ -75,7 +75,12 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
         Block collisionBlock = null;
         for (int i = 0; i < SPLIT_NUMBER; ++i) {
             Block[] collisionBlocks = this.level.getCollisionBlocks(currentAABB.offset(dirVector.x, dirVector.y, dirVector.z));
-            List<Block> filteredBlocks = Arrays.stream(collisionBlocks).filter(block -> block.getId() != BlockID.BARRIER).toList();
+            List<Block> filteredBlocks;
+            if (this.canPassThroughBarrier()) {
+                filteredBlocks = Arrays.stream(collisionBlocks).filter(block -> block.getId() != BlockID.BARRIER).toList();
+            } else {
+                filteredBlocks = Arrays.asList(collisionBlocks);
+            }
             Entity[] collisionEntities = this.getLevel().getCollidingEntities(currentAABB, this);
             if (filteredBlocks.size() != 0) {
                 currentAABB.offset(-dirVector.x, -dirVector.y, -dirVector.z);

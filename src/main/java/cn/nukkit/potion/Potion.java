@@ -220,6 +220,9 @@ public class Potion implements Cloneable {
         switch (this.id) {
             case INSTANT_HEALTH:
             case INSTANT_HEALTH_II:
+                if (!entity.canBeAffected(this.id)) {
+                    break;
+                }
                 if (entity instanceof EntitySmite) {
                     entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * (6 << (applyEffect.getAmplifier() + 1)))));
                 } else {
@@ -227,6 +230,9 @@ public class Potion implements Cloneable {
                 }
                 break;
             case HARMING:
+                if (!entity.canBeAffected(this.id)) {
+                    break;
+                }
                 if (entity instanceof EntitySmite) {
                     entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
                 } else {
@@ -234,6 +240,9 @@ public class Potion implements Cloneable {
                 }
                 break;
             case HARMING_II:
+                if (!entity.canBeAffected(this.id)) {
+                    break;
+                }
                 if (entity instanceof EntitySmite) {
                     entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
                 } else {

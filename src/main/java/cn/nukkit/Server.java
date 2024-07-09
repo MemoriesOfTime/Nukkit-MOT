@@ -2355,7 +2355,7 @@ public class Server {
         }
 
         if (provider == null) {
-            provider = LevelProviderManager.getProviderByName("anvil");
+            provider = LevelProviderManager.getProviderByName("leveldb");
         }
 
         String path;
@@ -2920,6 +2920,7 @@ public class Server {
         //Others
         Entity.registerEntity("Human", EntityHuman.class, true);
         Entity.registerEntity("Lightning", EntityLightning.class);
+        Entity.registerEntity("AreaEffectCloud", EntityAreaEffectCloud.class);
     }
 
     /**
