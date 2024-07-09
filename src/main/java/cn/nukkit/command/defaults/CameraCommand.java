@@ -141,10 +141,16 @@ public class CameraCommand extends VanillaCommand {
 
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+        if (!this.testPermission(sender)) {
+            return true;
+        }
         CameraInstructionPacket pk = new CameraInstructionPacket();
         Player player = Server.getInstance().getPlayer(args[0]);
         if (player == null) {
             sender.sendMessage(new TranslationContainer("nukkit.camera.unknownPlayer"));
+            return false;
+        }
+        if (player.isLockCameraInput()) {
             return false;
         }
         switch (args[1]) {
