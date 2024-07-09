@@ -1,6 +1,7 @@
 package cn.nukkit.entity.projectile;
 
 import cn.nukkit.entity.Entity;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
@@ -148,7 +149,7 @@ public class EntityArrow extends EntitySlenderProjectile {
         super.onCollideWithEntity(entity);
 
         if (this.isFromStray) {
-            entity.addEffect(Effect.getEffect(Effect.SLOWNESS).setDuration(600));
+            entity.addEffect(Effect.getEffect(Effect.SLOWNESS).setDuration(600), EntityPotionEffectEvent.Cause.ARROW);
         }
     }
 }

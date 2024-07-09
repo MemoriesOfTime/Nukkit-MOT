@@ -2,6 +2,7 @@ package cn.nukkit.entity.projectile;
 
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -80,6 +81,6 @@ public class EntityShulkerBullet extends EntityProjectile {
     public void onCollideWithEntity(Entity entity) {
         super.onCollideWithEntity(entity);
         this.level.addSoundToViewers(this, Sound.MOB_SHULKER_BULLET_HIT);
-        entity.addEffect(Effect.getEffect(Effect.LEVITATION).setDuration(200));
+        entity.addEffect(Effect.getEffect(Effect.LEVITATION).setDuration(200), EntityPotionEffectEvent.Cause.ATTACK);
     }
 }

@@ -9,6 +9,7 @@ import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.entity.data.ShortEntityData;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.event.entity.EntityRegainHealthEvent;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.Particle;
@@ -460,7 +461,7 @@ public class EntityAreaEffectCloud extends Entity {
                         }
                         break;
                     default:
-                        entity.addEffect(effect.clone().setDuration(effect.getDuration() / 4));
+                        entity.addEffect(effect.clone().setDuration(effect.getDuration() / 4), EntityPotionEffectEvent.Cause.AREA_EFFECT_CLOUD);
                         break;
                 }
             }
