@@ -1,6 +1,7 @@
 package cn.nukkit.item;
 
 import cn.nukkit.Player;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.potion.Effect;
 
@@ -34,7 +35,7 @@ public class ItemHoneyBottle extends ItemEdible {
         super.onUse(player, ticksUsed);
 
         if (player.hasEffect(Effect.POISON)) {
-            player.removeEffect(Effect.POISON);
+            player.removeEffect(Effect.POISON, EntityPotionEffectEvent.Cause.FOOD);
         }
 
         if (!player.isCreative()) {

@@ -5345,7 +5345,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
 
             this.extinguish();
-            this.removeAllEffects();
+            this.removeAllEffects(EntityPotionEffectEvent.Cause.DEATH);
             this.health = 0;
             this.scheduleUpdate();
             this.timeSinceRest = 0;
@@ -5484,7 +5484,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.deadTicks = 0;
         this.noDamageTicks = 60;
 
-        this.removeAllEffects();
+        this.removeAllEffects(EntityPotionEffectEvent.Cause.DEATH);
         this.setHealth(this.getMaxHealth());
         this.foodData.setLevel(20, 20);
 
