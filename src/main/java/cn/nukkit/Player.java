@@ -387,10 +387,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private int inputLockData = 0;
 
-    private final int cameraOffset = 1 << 1;
-
-    private final int movementOffset = 1 << 2;
-
     public int getStartActionTick() {
         return startAction;
     }
@@ -7162,32 +7158,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void lockInputs(boolean camera, boolean movement) {
         UpdateClientInputLocksPacket packet = new UpdateClientInputLocksPacket();
-        final int cameraOffset = 1 << 1;
-        final int movementOffset = 1 << 2;
 
-        int result = 0;
         if (camera) {
-            result |= cameraOffset;
+            packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_CAMERA;
         }
-        // it seems that locking inputs is based on server rather than client
         if (movement) {
-            result |= movementOffset;
-            this.setImmobile(true);
-        } else {
-            this.setImmobile(false);
+            packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_MOVEMENT;
         }
-        packet.setLockComponentData(result);
-        this.inputLockData = result;
-        packet.setServerPosition(this.getLocation().add(0, 1, 0).asVector3f()); // To avoid in the ground?
+        this.inputLockData = packet.getLockComponentData();
+        packet.setServerPosition(this.getLocation().add(0, this.getBaseOffset(), 0).asVector3f());
 
         this.dataPacket(packet);
     }
 
     public boolean isLockCameraInput() {
-        return (this.inputLockData & this.cameraOffset) != 0;
+        return (this.inputLockData & UpdateClientInputLocksPacket.FLAG_CAMERA) != 0;
     }
 
     public boolean isLockMovementInput() {
-        return (this.inputLockData & this.movementOffset) != 0;
+        return (this.inputLockData & UpdateClientInputLocksPacket.FLAG_MOVEMENT) != 0;
     }
 }
