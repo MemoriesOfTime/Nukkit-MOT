@@ -385,7 +385,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     private static final String MSG_FLYING_NOT_ENABLED = "Flying is not enabled on this server";
 
-    private int inputLockData = 0;
+    private boolean lockCameraInput;
+
+    private boolean lockMovementInput;
 
     public int getStartActionTick() {
         return startAction;
@@ -7156,26 +7158,37 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return false;
     }
 
-    public void lockInputs(boolean camera, boolean movement) {
-        UpdateClientInputLocksPacket packet = new UpdateClientInputLocksPacket();
+    public void setLockCameraInput(boolean lockCameraInput) {
+        this.lockInputs(lockCameraInput, this.lockMovementInput);
+    }
 
-        if (camera) {
-            packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_CAMERA;
-        }
-        if (movement) {
-            packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_MOVEMENT;
-        }
-        this.inputLockData = packet.getLockComponentData();
-        packet.setServerPosition(this.getLocation().add(0, this.getBaseOffset(), 0).asVector3f());
+    public void setLockMovementInput(boolean lockMovementInput) {
+        this.lockInputs(this.lockCameraInput, lockMovementInput);
+    }
 
-        this.dataPacket(packet);
+    public void lockInputs(boolean lockCameraInput, boolean lockMovementInput) {
+        boolean needSendPack = (lockCameraInput != this.lockCameraInput) || (lockMovementInput != this.lockMovementInput);
+        if (needSendPack) {
+            UpdateClientInputLocksPacket packet = new UpdateClientInputLocksPacket();
+            this.lockCameraInput = lockCameraInput;
+            this.lockMovementInput = lockMovementInput;
+            if (lockCameraInput) {
+                packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_CAMERA;
+            }
+            if (lockMovementInput) {
+                packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_MOVEMENT;
+            }
+            packet.setServerPosition(this.getLocation().add(0, this.getBaseOffset(), 0).asVector3f());
+
+            this.dataPacket(packet);
+        }
     }
 
     public boolean isLockCameraInput() {
-        return (this.inputLockData & UpdateClientInputLocksPacket.FLAG_CAMERA) != 0;
+        return this.lockCameraInput;
     }
 
     public boolean isLockMovementInput() {
-        return (this.inputLockData & UpdateClientInputLocksPacket.FLAG_MOVEMENT) != 0;
+        return this.lockMovementInput;
     }
 }
