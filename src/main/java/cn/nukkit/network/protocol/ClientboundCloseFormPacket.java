@@ -6,7 +6,7 @@ import lombok.ToString;
  * @since 686
  */
 @ToString
-public class ClientBoundCloseFormPacket extends DataPacket {
+public class ClientboundCloseFormPacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET;
 

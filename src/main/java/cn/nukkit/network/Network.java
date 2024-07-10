@@ -412,7 +412,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.BOSS_EVENT_PACKET, BossEventPacket.class)
                 .registerPacket(ProtocolInfo.CHANGE_DIMENSION_PACKET, ChangeDimensionPacket.class)
                 .registerPacket(ProtocolInfo.CHUNK_RADIUS_UPDATED_PACKET, ChunkRadiusUpdatedPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_MAP_ITEM_DATA_PACKET, ClientBoundMapItemDataPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_MAP_ITEM_DATA_PACKET, ClientboundMapItemDataPacket.class)
                 .registerPacket(ProtocolInfo.COMMAND_REQUEST_PACKET, CommandRequestPacket.class)
                 .registerPacket(ProtocolInfo.CONTAINER_CLOSE_PACKET, ContainerClosePacket.class)
                 .registerPacket(ProtocolInfo.CONTAINER_OPEN_PACKET, ContainerOpenPacket.class)
@@ -536,7 +536,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class)
                 .registerPacket(ProtocolInfo.SET_HUD_PACKET, SetHudPacket.class)
                 .registerPacket(ProtocolInfo.AWARD_ACHIEVEMENT_PACKET, AwardAchievementPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET, ClientBoundCloseFormPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET, ClientboundCloseFormPacket.class)
                 .build();
     }
 

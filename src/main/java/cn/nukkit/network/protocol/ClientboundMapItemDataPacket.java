@@ -11,7 +11,7 @@ import java.awt.image.BufferedImage;
  * Created by CreeperFace on 5.3.2017.
  */
 @ToString
-public class ClientBoundMapItemDataPacket extends DataPacket {
+public class ClientboundMapItemDataPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.CLIENTBOUND_MAP_ITEM_DATA_PACKET;
     public static final long[] EMPTY_LONGS = new long[0];

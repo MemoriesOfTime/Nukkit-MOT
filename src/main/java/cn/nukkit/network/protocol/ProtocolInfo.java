@@ -307,6 +307,7 @@ public interface ProtocolInfo {
     int SET_HUD_PACKET = 308;
     int AWARD_ACHIEVEMENT_PACKET = 309;
     int CLIENTBOUND_CLOSE_FORM_PACKET = 310;
+
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;
     }
