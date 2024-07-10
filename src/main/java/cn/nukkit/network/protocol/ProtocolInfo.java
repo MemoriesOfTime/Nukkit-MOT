@@ -305,6 +305,8 @@ public interface ProtocolInfo {
     int TOGGLE_CRAFTER_SLOT_REQUEST_PACKET = 306;
     int SET_PLAYER_INVENTORY_OPTIONS_PACKET = 307;
     int SET_HUD_PACKET = 308;
+    int AWARD_ACHIEVEMENT_PACKET = 309;
+    int CLIENTBOUND_CLOSE_FORM_PACKET = 310;
 
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;
