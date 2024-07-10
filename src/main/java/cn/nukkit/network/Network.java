@@ -535,6 +535,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.TOGGLE_CRAFTER_SLOT_REQUEST_PACKET, ToggleCrafterSlotRequestPacket.class)
                 .registerPacket(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class)
                 .registerPacket(ProtocolInfo.SET_HUD_PACKET, SetHudPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET, ClientBoundCloseFormPacket.class)
                 .build();
     }
 
