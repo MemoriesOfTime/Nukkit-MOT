@@ -4,7 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.level.Level;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.ClientboundMapItemDataPacket;
+import cn.nukkit.network.protocol.ClientBoundMapItemDataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.MainLogger;
@@ -89,7 +89,7 @@ public class ItemMap extends Item {
         // Don't load the image from NBT if it has been done before
         BufferedImage image = this.image != null ? this.image : loadImageFromNBT();
 
-        ClientboundMapItemDataPacket pk = new ClientboundMapItemDataPacket();
+        ClientBoundMapItemDataPacket pk = new ClientBoundMapItemDataPacket();
         pk.mapId = getMapId();
         pk.scale = 0;
         pk.width = 128;
