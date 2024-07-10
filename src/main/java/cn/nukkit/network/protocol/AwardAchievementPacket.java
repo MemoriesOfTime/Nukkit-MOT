@@ -3,7 +3,7 @@ package cn.nukkit.network.protocol;
 import lombok.ToString;
 
 /**
- * @since 534
+ * @since 685
  */
 @ToString
 public class AwardAchievementPacket extends DataPacket {
