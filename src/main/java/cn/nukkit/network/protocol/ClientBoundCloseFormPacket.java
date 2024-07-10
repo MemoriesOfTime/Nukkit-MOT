@@ -6,7 +6,7 @@ import lombok.ToString;
  * @since 686
  */
 @ToString
-public class ClientboundCloseFormPacket extends DataPacket {
+public class ClientBoundCloseFormPacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET;
 
@@ -27,6 +27,6 @@ public class ClientboundCloseFormPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return 0;
+        throw new UnsupportedOperationException("Not supported.");
     }
 }

@@ -29,6 +29,6 @@ public class AwardAchievementPacket extends DataPacket {
 
     @Override
     public byte pid() {
-        return 0;
+        throw new UnsupportedOperationException("Not supported.");
     }
 }
