@@ -126,7 +126,8 @@ public final class DataPacketManager {
                 ServerSettingsRequestProcessor.INSTANCE,
                 SetDifficultyProcessor.INSTANCE,
                 SetPlayerGameTypeProcessor.INSTANCE,
-                TextProcessor.INSTANCE
+                TextProcessor.INSTANCE,
+                PlayerInputProcessor.INSTANCE
         );
 
         registerProcessor(
