@@ -119,6 +119,7 @@ public final class DataPacketManager {
                 NPCRequestProcessor.INSTANCE,
                 PacketViolationWarningProcessor.INSTANCE,
                 PlayerHotbarProcessor.INSTANCE,
+                PlayerInputProcessor.INSTANCE,
                 PlayerSkinProcessor.INSTANCE,
                 RequestChunkRadiusProcessor.INSTANCE,
                 ResourcePackChunkRequestProcessor.INSTANCE,
@@ -126,8 +127,7 @@ public final class DataPacketManager {
                 ServerSettingsRequestProcessor.INSTANCE,
                 SetDifficultyProcessor.INSTANCE,
                 SetPlayerGameTypeProcessor.INSTANCE,
-                TextProcessor.INSTANCE,
-                PlayerInputProcessor.INSTANCE
+                TextProcessor.INSTANCE
         );
 
         registerProcessor(

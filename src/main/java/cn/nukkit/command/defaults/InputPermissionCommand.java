@@ -66,8 +66,8 @@ public class InputPermissionCommand extends VanillaCommand {
                     String permission_type = args[2];
                     boolean lock = args[3].equals("disabled");
                     switch (permission_type) {
-                        case "camera" -> player.lockInputs(lock, player.isLockMovementInput());
-                        case "movement" -> player.lockInputs(player.isLockCameraInput(), lock);
+                        case "camera" -> player.setLockCameraInput(lock);
+                        case "movement" -> player.setLockMovementInput(lock);
                         default -> {
                             sender.sendMessage(new TextContainer("commands.inputpermission.set.missingpermission"));
                             return false;

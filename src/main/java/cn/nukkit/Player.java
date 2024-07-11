@@ -338,6 +338,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private boolean needSendInventory;
     private boolean needSendHeldItem;
     private boolean dimensionFix560;
+    private boolean needSendUpdateClientInputLocksPacket;
 
     /**
      * 用于修复1.20.0连续执行despawnFromAll和spawnToAll导致玩家移动不显示问题
@@ -7146,6 +7147,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.needSendHeldItem = false;
             this.syncHeldItem();
         }
+        if (this.needSendUpdateClientInputLocksPacket) {
+            this.needSendUpdateClientInputLocksPacket = false;
+            this.sendUpdateClientInputLocksPacket();
+        }
     }
 
     /**
@@ -7165,32 +7170,40 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setLockCameraInput(boolean lockCameraInput) {
-        this.lockInputs(lockCameraInput, this.lockMovementInput);
+        if (this.lockCameraInput != lockCameraInput) {
+            this.lockCameraInput = lockCameraInput;
+            if (this.protocol >= ProtocolInfo.v1_19_50) {
+                this.needSendUpdateClientInputLocksPacket = true;
+            }
+        }
     }
 
     public void setLockMovementInput(boolean lockMovementInput) {
-        this.lockInputs(this.lockCameraInput, lockMovementInput);
+        if (this.lockMovementInput != lockMovementInput) {
+            this.lockMovementInput = lockMovementInput;
+            if (this.protocol >= ProtocolInfo.v1_19_50) {
+                this.needSendUpdateClientInputLocksPacket = true;
+            } else {
+                this.setImmobile(lockMovementInput);
+            }
+        }
     }
 
-    public void lockInputs(boolean lockCameraInput, boolean lockMovementInput) {
+    protected void sendUpdateClientInputLocksPacket() {
         if (this.protocol < ProtocolInfo.v1_19_50) {
             return;
         }
-        boolean needSendPack = (lockCameraInput != this.lockCameraInput) || (lockMovementInput != this.lockMovementInput);
-        if (needSendPack) {
-            UpdateClientInputLocksPacket packet = new UpdateClientInputLocksPacket();
-            this.lockCameraInput = lockCameraInput;
-            this.lockMovementInput = lockMovementInput;
-            if (lockCameraInput) {
-                packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_CAMERA;
-            }
-            if (lockMovementInput) {
-                packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_MOVEMENT;
-            }
-            packet.setServerPosition(this.getLocation().add(0, this.getBaseOffset(), 0).asVector3f());
 
-            this.dataPacket(packet);
+        UpdateClientInputLocksPacket packet = new UpdateClientInputLocksPacket();
+        if (lockCameraInput) {
+            packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_CAMERA;
         }
+        if (lockMovementInput) {
+            packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_MOVEMENT;
+        }
+        packet.setServerPosition(this.getLocation().add(0, this.getBaseOffset(), 0).asVector3f());
+
+        this.dataPacket(packet);
     }
 
     public boolean isLockCameraInput() {
