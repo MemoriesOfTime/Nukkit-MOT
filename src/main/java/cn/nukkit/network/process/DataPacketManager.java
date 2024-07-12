@@ -119,6 +119,7 @@ public final class DataPacketManager {
                 NPCRequestProcessor.INSTANCE,
                 PacketViolationWarningProcessor.INSTANCE,
                 PlayerHotbarProcessor.INSTANCE,
+                PlayerInputProcessor.INSTANCE,
                 PlayerSkinProcessor.INSTANCE,
                 RequestChunkRadiusProcessor.INSTANCE,
                 ResourcePackChunkRequestProcessor.INSTANCE,
