@@ -172,14 +172,14 @@ public class CameraCommand extends VanillaCommand {
                         switch (args[subStartIndex]) {
                             case "time" -> {
                                 pk.getFadeInstruction().setTimeData(new CameraFadeInstruction.TimeData(Float.parseFloat(args[subStartIndex + 1]), Float.parseFloat(args[subStartIndex + 2]), Float.parseFloat(args[subStartIndex + 3])));
-                                if (subStartIndex + 7 < args.length) { // color
+                                if (subStartIndex + 7 < args.length) {
                                     pk.getFadeInstruction().setColor(new Color(Float.parseFloat(args[subStartIndex + 5]), Float.parseFloat(args[subStartIndex + 6]), Float.parseFloat(args[subStartIndex + 7])));
                                 }
-                                i += 9;
+                                i += 8;
                             }
                             case "color" -> {
                                 pk.getFadeInstruction().setColor(new Color(Float.parseFloat(args[subStartIndex + 1]), Float.parseFloat(args[subStartIndex + 2]), Float.parseFloat(args[subStartIndex + 3])));
-                                i += 5;
+                                i += 4;
                             }
                         }
                     }
