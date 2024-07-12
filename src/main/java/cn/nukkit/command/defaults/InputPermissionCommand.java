@@ -12,7 +12,7 @@ import cn.nukkit.utils.TextFormat;
 public class InputPermissionCommand extends VanillaCommand {
 
     public InputPermissionCommand(String name) {
-        super(name, "commands.inputpermission.description", "");
+        super(name, "commands.inputpermission.description", "/inputpermission <query|set> <player> <camera|movement> [disabled|enabled]");
         this.setPermission("nukkit.command.inputpermission");
         this.commandParameters.clear();
         this.commandParameters.put("query", new CommandParameter[]{
