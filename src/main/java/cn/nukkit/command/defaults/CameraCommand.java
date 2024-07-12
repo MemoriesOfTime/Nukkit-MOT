@@ -150,9 +150,6 @@ public class CameraCommand extends VanillaCommand {
             sender.sendMessage(new TranslationContainer("nukkit.camera.unknownPlayer"));
             return false;
         }
-        if (player.isLockCameraInput()) {
-            return false;
-        }
         switch (args[1]) {
             case "clear" -> {
                 pk.setClear(OptionalBoolean.of(true));
