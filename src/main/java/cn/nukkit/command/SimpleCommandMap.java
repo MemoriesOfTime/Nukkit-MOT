@@ -85,6 +85,7 @@ public class SimpleCommandMap implements CommandMap {
         this.register("nukkit", new CameraCommand("camera"));
         this.register("nukkit", new TimingsCommand("timings"));
         this.register("nukkit", new ConvertCommand("convert"));
+        this.register("nukkit", new InputPermissionCommand("inputpermission"));
     }
 
     @Override
