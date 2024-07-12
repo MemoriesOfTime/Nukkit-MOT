@@ -3066,7 +3066,7 @@ public class Server {
         this.forceGamemode = this.getPropertyBoolean("force-gamemode", true);
         this.doNotLimitInteractions = this.getPropertyBoolean("do-not-limit-interactions", false);
         this.motd = this.getPropertyString("motd", "Minecraft Server");
-        this.viewDistance = this.getPropertyInt("view-distance", 8);
+        this.viewDistance = Math.max(1, this.getPropertyInt("view-distance", 8));
         this.mobDespawnTicks = this.getPropertyInt("ticks-per-entity-despawns", 12000);
         this.port = this.getPropertyInt("server-port", 19132);
         this.ip = this.getPropertyString("server-ip", "0.0.0.0");
