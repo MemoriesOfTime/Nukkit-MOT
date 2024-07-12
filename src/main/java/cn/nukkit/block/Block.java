@@ -1048,11 +1048,19 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public Item[] getDrops(Item item) {
+        return this.getDrops(null, item);
+    }
+
+    public Item[] getDrops(Player player, Item item) {
+        if (player != null && !player.isSurvival()) {
+            return Item.EMPTY_ARRAY;
+        }
+
         if (this.getId() < 0 || this.getId() > list.length) {
             return Item.EMPTY_ARRAY;
         }
 
-        if(this.canHarvestWithHand() || this.canHarvest(item)) {
+        if (this.canHarvestWithHand() || this.canHarvest(item)) {
             return new Item[]{this.toItem()};
         }
         return Item.EMPTY_ARRAY;

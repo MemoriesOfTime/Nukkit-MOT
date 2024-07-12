@@ -177,4 +177,15 @@ public class BlockShulkerBox extends BlockTransparentMeta {
     public boolean alwaysDropsOnExplosion() {
         return true;
     }
+
+    @Override
+    public Item[] getDrops(Player player, Item item) {
+        BlockEntityShulkerBox t = (BlockEntityShulkerBox) this.getLevel().getBlockEntity(this);
+        if (t != null) {
+            if (player.getGamemode() == 1 && t.getRealInventory().slots.size() > 0) {
+                return new Item[]{this.toItem()};
+            }
+        }
+        return super.getDrops(player, item);
+    }
 }
