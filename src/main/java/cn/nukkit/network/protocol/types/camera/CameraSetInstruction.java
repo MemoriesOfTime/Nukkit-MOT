@@ -22,7 +22,7 @@ public class CameraSetInstruction {
     @Data
     @AllArgsConstructor
     public static class EaseData {
-        private CameraEase easeType;
-        private float time;
+        private final CameraEase easeType;
+        private final float time;
     }
 }

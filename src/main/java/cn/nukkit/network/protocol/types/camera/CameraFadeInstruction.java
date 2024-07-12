@@ -16,8 +16,8 @@ public class CameraFadeInstruction {
     @Data
     @AllArgsConstructor
     public static class TimeData {
-        private float fadeInTime;
-        private float waitTime;
-        private float fadeOutTime;
+        private final float fadeInTime;
+        private final float waitTime;
+        private final float fadeOutTime;
     }
 }
