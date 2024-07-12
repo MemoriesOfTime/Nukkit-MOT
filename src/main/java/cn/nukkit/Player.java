@@ -7195,10 +7195,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         UpdateClientInputLocksPacket packet = new UpdateClientInputLocksPacket();
-        if (lockCameraInput) {
+        if (this.lockCameraInput) {
             packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_CAMERA;
         }
-        if (lockMovementInput) {
+        if (this.lockMovementInput) {
             packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_MOVEMENT;
         }
         packet.setServerPosition(this.getLocation().add(0, this.getBaseOffset(), 0).asVector3f());
