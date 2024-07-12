@@ -9,8 +9,12 @@ import lombok.ToString;
 @EqualsAndHashCode(doNotUseGetters = true, callSuper = false)
 @ToString(doNotUseGetters = true)
 public class UpdateClientInputLocksPacket extends DataPacket {
-    private int lockComponentData;
-    private Vector3f serverPosition;
+
+    public static final int FLAG_CAMERA = 1 << 1;
+    public static final int FLAG_MOVEMENT = 1 << 2;
+
+    public int lockComponentData;
+    public Vector3f serverPosition;
 
 
     @Override
@@ -20,14 +24,14 @@ public class UpdateClientInputLocksPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.lockComponentData = this.getVarInt();
+        this.lockComponentData = (int) this.getUnsignedVarInt();
         this.serverPosition = this.getVector3f();
     }
 
     @Override
     public void encode() {
         this.reset();
-        this.putVarInt(lockComponentData);
+        this.putUnsignedVarInt(lockComponentData);
         this.putVector3f(serverPosition);
     }
 }

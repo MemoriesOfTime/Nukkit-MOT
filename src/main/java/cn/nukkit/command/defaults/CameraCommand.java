@@ -141,6 +141,9 @@ public class CameraCommand extends VanillaCommand {
 
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+        if (!this.testPermission(sender)) {
+            return true;
+        }
         CameraInstructionPacket pk = new CameraInstructionPacket();
         Player player = Server.getInstance().getPlayer(args[0]);
         if (player == null) {
