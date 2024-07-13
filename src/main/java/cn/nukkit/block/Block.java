@@ -1051,8 +1051,8 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getDrops(null, item);
     }
 
-    public Item[] getDrops(Player player, Item item) {
-        if (player != null && !player.isSurvival()) {
+    public Item[] getDrops(@Nullable Player player, Item item) {
+        if (player != null && !player.isSurvival() && !player.isAdventure()) {
             return Item.EMPTY_ARRAY;
         }
 

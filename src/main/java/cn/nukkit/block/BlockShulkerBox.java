@@ -14,6 +14,8 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
 
+import javax.annotation.Nullable;
+
 /**
  * Created by PetteriM1
  */
@@ -179,12 +181,12 @@ public class BlockShulkerBox extends BlockTransparentMeta {
     }
 
     @Override
-    public Item[] getDrops(Player player, Item item) {
-        BlockEntityShulkerBox t = (BlockEntityShulkerBox) this.getLevel().getBlockEntity(this);
-        if (t != null) {
-            if (player.getGamemode() == 1 && t.getRealInventory().slots.size() > 0) {
-                return new Item[]{this.toItem()};
-            }
+    public Item[] getDrops(@Nullable Player player, Item item) {
+        if (player != null
+                && player.isCreative()
+                && this.getLevel().getBlockEntity(this) instanceof BlockEntityShulkerBox t
+                && !t.getRealInventory().isEmpty()) {
+            return new Item[]{this.toItem()};
         }
         return super.getDrops(player, item);
     }
