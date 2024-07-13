@@ -2,6 +2,7 @@ package cn.nukkit.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.EntityShootBowEvent;
@@ -10,11 +11,12 @@ import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.nbt.tag.DoubleTag;
-import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.potion.Potion;
 import cn.nukkit.utils.Utils;
+
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author MagicDroidX
@@ -64,12 +66,15 @@ public class ItemBow extends ItemTool {
 
         Inventory inventory = player.getOffhandInventory();
 
-        if ((player.isSurvival() || player.isAdventure()) &&
-                (itemArrow = this.getArrow(inventory)) == null &&
+        if ((itemArrow = this.getArrow(inventory)) == null &&
                 (itemArrow = this.getArrow(inventory = player.getInventory())) == null) {
-            player.getOffhandInventory().sendContents(player);
-            inventory.sendContents(player);
-            return false;
+            if (player.isCreative()) {
+                itemArrow = Item.get(Item.ARROW, 0, 1);
+            } else {
+                player.getOffhandInventory().sendContents(player);
+                inventory.sendContents(player);
+                return false;
+            }
         }
 
         double damage = 2;
@@ -81,20 +86,13 @@ public class ItemBow extends ItemTool {
         Enchantment flameEnchant = this.getEnchantment(Enchantment.ID_BOW_FLAME);
         boolean flame = flameEnchant != null && flameEnchant.getLevel() > 0;
 
-        CompoundTag nbt = new CompoundTag()
-                .putList(new ListTag<DoubleTag>("Pos")
-                        .add(new DoubleTag("", player.x))
-                        .add(new DoubleTag("", player.y + player.getEyeHeight()))
-                        .add(new DoubleTag("", player.z)))
-                .putList(new ListTag<DoubleTag>("Motion")
-                        .add(new DoubleTag("", -Math.sin(player.yaw / 180 * Math.PI) * Math.cos(player.pitch / 180 * Math.PI)))
-                        .add(new DoubleTag("", -Math.sin(player.pitch / 180 * Math.PI)))
-                        .add(new DoubleTag("", Math.cos(player.yaw / 180 * Math.PI) * Math.cos(player.pitch / 180 * Math.PI))))
-                .putList(new ListTag<FloatTag>("Rotation")
-                        .add(new FloatTag("", (player.yaw > 180 ? 360 : 0) - (float) player.yaw))
-                        .add(new FloatTag("", (float) -player.pitch)))
-                .putShort("Fire", flame ? 2700 : 0)
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        Vector3 dir = Vector3.directionFromRotation(player.pitch, player.yaw)
+                .add(0.0075 * random.nextGaussian(), 0.0075 * random.nextGaussian(), 0.0075 * random.nextGaussian());
+        CompoundTag nbt = Entity.getDefaultNBT(player.getEyePosition(), dir.multiply(1.2), (float) dir.yRotFromDirection(), (float) dir.xRotFromDirection())
+                .putShort("Fire", flame ? 45 * 60 : 0)
                 .putDouble("damage", damage)
+                .putByte("auxValue", itemArrow.getDamage())
                 .putCompound("item", new CompoundTag()
                         .putInt("id", itemArrow.getId())
                         .putInt("Damage", itemArrow.getDamage())
@@ -102,6 +100,15 @@ public class ItemBow extends ItemTool {
 
         if (itemArrow.hasCompoundTag()) {
             nbt.getCompound("item").putCompound("tag", itemArrow.getNamedTag());
+        }
+
+        if (itemArrow.getDamage() != ItemArrow.NORMAL_ARROW) {
+            Potion potion = Potion.getPotion(itemArrow.getDamage() - ItemArrow.TIPPED_ARROW);
+            if (potion != null) {
+                ListTag<CompoundTag> mobEffects = new ListTag<>("mobEffects");
+                mobEffects.add(potion.getEffect().save());
+                nbt.putList(mobEffects);
+            }
         }
 
         double p = (double) ticksUsed / 20;
@@ -127,7 +134,7 @@ public class ItemBow extends ItemTool {
                 ((EntityArrow) projectile).setPickupMode(EntityArrow.PICKUP_CREATIVE);
             }
             if (!player.isCreative()) {
-                if (!infinity || itemArrow.getDamage() != 0) {
+                if (!infinity || itemArrow.getDamage() != ItemArrow.NORMAL_ARROW) {
                     inventory.removeItem(itemArrow);
                 }
 

@@ -90,7 +90,9 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_EXPERIENCE_VALUE = 15; //int (xp orb)
     public static final int DATA_DISPLAY_ITEM = 16; //int (id | (data << 16))
     public static final int DATA_DISPLAY_OFFSET = 17; //int
+    public static final int DATA_FIREWORK_DIRECTION = DATA_DISPLAY_OFFSET; //vec3f
     public static final int DATA_HAS_DISPLAY = 18; //byte (must be 1 for minecart to show block inside)
+    public static final int DATA_ARROW_AUX_VALUE = DATA_HAS_DISPLAY; //byte (tipped arrow item meta)
     public static final int DATA_SWELL = 19;
     public static final int DATA_OLD_SWELL = 20;
     public static final int DATA_SWELL_DIR = 21;
@@ -478,6 +480,14 @@ public abstract class Entity extends Location implements Metadatable {
 
     public float getEyeHeight() {
         return this.getHeight() / 2 + 0.1f;
+    }
+
+    public float getEyeY() {
+        return (float) y + getEyeHeight();
+    }
+
+    public Vector3 getEyePosition() {
+        return new Vector3(getX(), getEyeY(), getZ());
     }
 
     public float getWidth() {
