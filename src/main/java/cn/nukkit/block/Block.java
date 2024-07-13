@@ -1048,14 +1048,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public Item[] getDrops(Item item) {
-        return this.getDrops(null, item);
-    }
-
-    public Item[] getDrops(@Nullable Player player, Item item) {
-        if (player != null && !player.isSurvival() && !player.isAdventure()) {
-            return Item.EMPTY_ARRAY;
-        }
-
         if (this.getId() < 0 || this.getId() > list.length) {
             return Item.EMPTY_ARRAY;
         }
@@ -1064,6 +1056,15 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             return new Item[]{this.toItem()};
         }
         return Item.EMPTY_ARRAY;
+    }
+
+    public Item[] getDrops(@Nullable Player player, Item item) {
+        if (player != null && !player.isSurvival() && !player.isAdventure()) {
+            return Item.EMPTY_ARRAY;
+        }
+
+        // 几乎所有方块都是重写getDrops(Item)方法，所以我们需要调用这个方法
+        return this.getDrops(item);
     }
 
     private double toolBreakTimeBonus0(Item item) {
