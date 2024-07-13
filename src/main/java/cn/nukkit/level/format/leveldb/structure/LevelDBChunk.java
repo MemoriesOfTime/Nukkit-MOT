@@ -175,6 +175,8 @@ public class LevelDBChunk extends BaseChunk {
         if (this.has3dBiomes()) {
             this.convertBiomesTo3d(biomeIdArray);
         }
+        this.setHeightmapOrBiomesDirty();
+        this.setChanged();
     }
 
     @Override
@@ -225,6 +227,7 @@ public class LevelDBChunk extends BaseChunk {
             this.convertBiomesTo3d(this.biomes);
         }
         this.getBiomeStorage(y >> 4).setBlock(x, y & 0xf, z, biomeId);
+        this.setHeightmapOrBiomesDirty();
         this.setChanged();
     }
 
@@ -276,11 +279,12 @@ public class LevelDBChunk extends BaseChunk {
         }
 
         this.biomes3d = storages;
-        this.setChanged();
     }
 
     public void setBiomes3d(PalettedBlockStorage[] biomes3d) {
         this.biomes3d = biomes3d;
+        this.setHeightmapOrBiomesDirty();
+        this.setChanged();
     }
 
     public void setBiomes3d(int y, PalettedBlockStorage biomes3d) {
@@ -294,6 +298,8 @@ public class LevelDBChunk extends BaseChunk {
         }
 
         this.biomes3d[index] = biomes3d;
+        this.setHeightmapOrBiomesDirty();
+        this.setChanged();
     }
 
     @Override
@@ -339,7 +345,7 @@ public class LevelDBChunk extends BaseChunk {
     public void setHeightMap(int x, int z, int value) {
         super.setHeightMap(x, z, value);
 
-        this.heightmapOrBiomesDirty = true;
+        this.setHeightmapOrBiomesDirty();
         this.setChanged();
     }
 
@@ -406,6 +412,16 @@ public class LevelDBChunk extends BaseChunk {
 
     public boolean isSubChunksDirty() {
         return this.subChunksDirty;
+    }
+
+    public void setAllSubChunksDirty() {
+        this.subChunksDirty = true;
+
+        for (ChunkSection chunkSection : this.sections) {
+            if (chunkSection != null) {
+                chunkSection.setDirty();
+            }
+        }
     }
 
     public boolean isHeightmapOrBiomesDirty() {
