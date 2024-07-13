@@ -20,7 +20,6 @@ public class CameraSetInstruction {
     private OptionalBoolean defaultPreset = OptionalBoolean.empty();
 
     @Data
-    @AllArgsConstructor
     public static class EaseData {
         private final CameraEase easeType;
         private final float time;

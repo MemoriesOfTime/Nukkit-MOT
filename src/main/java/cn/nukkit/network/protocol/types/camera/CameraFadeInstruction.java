@@ -14,7 +14,6 @@ public class CameraFadeInstruction {
     private Color color;
 
     @Data
-    @AllArgsConstructor
     public static class TimeData {
         private final float fadeInTime;
         private final float waitTime;
