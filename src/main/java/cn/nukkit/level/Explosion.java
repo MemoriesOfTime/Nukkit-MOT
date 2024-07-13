@@ -1,6 +1,7 @@
 package cn.nukkit.level;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockTNT;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityShulkerBox;
@@ -44,6 +45,8 @@ public class Explosion {
 
     private final Object what;
     private boolean doesDamage = true;
+
+    private double fireChance = 0.0; // 0.0 .. 1.0
 
     public Explosion(Position center, double size, Entity what) {
         this(center, size, (Object) what);
@@ -215,6 +218,10 @@ public class Explosion {
 
             this.level.setBlockAt((int) block.x, (int) block.y, (int) block.z, Block.AIR);
 
+            if (Math.random() < fireChance) {
+                this.level.setBlockAt((int) block.x, (int) block.y, (int) block.z, BlockID.FIRE);
+            }
+
             Vector3 pos = new Vector3(block.x, block.y, block.z);
 
             for (BlockFace side : BlockFace.values()) {
@@ -235,5 +242,9 @@ public class Explosion {
         this.level.addParticle(new HugeExplodeSeedParticle(this.source));
         this.level.addLevelSoundEvent(source, LevelSoundEventPacket.SOUND_EXPLODE);
         return true;
+    }
+
+    public void setFireChance(double fireChance) {
+        this.fireChance = fireChance;
     }
 }
