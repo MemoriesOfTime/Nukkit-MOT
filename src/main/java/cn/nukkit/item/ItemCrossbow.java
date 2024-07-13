@@ -91,6 +91,7 @@ public class ItemCrossbow extends ItemBow {
                         this.setDamage(this.getDamage() + (chargedItem.getId() == ItemID.FIREWORKS ? 3 : 1));
                         if (this.getDamage() >= DURABILITY_CROSSBOW) {
                             this.count--;
+                            player.level.addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_BREAK);
                         }
                         player.getInventory().setItemInHand(this);
                     }
@@ -105,6 +106,8 @@ public class ItemCrossbow extends ItemBow {
             }
 
             this.loadArrow(player, chargedItem);
+
+            player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_CROSSBOW_LOADING_END);
 
             EntityEventPacket packet = new EntityEventPacket();
             packet.event = EntityEventPacket.CHARGED_CROSSBOW;

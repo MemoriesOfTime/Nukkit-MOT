@@ -13,6 +13,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -185,6 +186,11 @@ public class EntityArrow extends EntitySlenderProjectile {
 
     public boolean isFullEffect() {
         return this.isFullEffect;
+    }
+
+    @Override
+    public void onHit() {
+        this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BOW_HIT);
     }
 
     @Override

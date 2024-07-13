@@ -94,7 +94,7 @@ public class BlockRespawnAnchor extends BlockMeta {
 
         level.setBlock(this, get(AIR));
         Explosion explosion = new Explosion(this, event.getForce(), this);
-        //explosion.setFireChance(event.getFireChance());
+        explosion.setFireChance(event.getFireChance());
         if (event.isBlockBreaking()) {
             explosion.explodeA();
         }
