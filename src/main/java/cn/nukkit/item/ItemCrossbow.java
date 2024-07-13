@@ -152,6 +152,7 @@ public class ItemCrossbow extends ItemBow {
             Vector3 aimDir = Vector3.directionFromRotation(player.pitch, player.yaw);
             ThreadLocalRandom random = ThreadLocalRandom.current();
             if (chargedItem.getId() == ARROW) {
+                CompoundTag itemTag = (CompoundTag) this.getNamedTagEntry("chargedItem");
                 for (int i = 0; i < count; i++) {
                     float angleOffset = count == 1 ? 0 : i * MULTISHOT_ANGLE_DELTA - MULTISHOT_ANGLE_DELTA;
                     Vector3 dir = aimDir.yRot(angleOffset * NukkitMath.DEG_TO_RAD)
@@ -159,7 +160,7 @@ public class ItemCrossbow extends ItemBow {
                     CompoundTag nbt = Entity.getDefaultNBT(pos, dir.multiply(ARROW_POWER), (float) dir.yRotFromDirection(), (float) dir.xRotFromDirection())
                             .putByte("PierceLevel", penetrationLevel)
                             .putByte("auxValue", chargedItem.getDamage())
-                            .putCompound("item", (CompoundTag) this.getNamedTagEntry("chargedItem"));
+                            .putCompound("item", itemTag);
 
                     EntityArrow arrow = new EntityArrow(player.chunk, nbt, player, false);
                     arrow.piercing = penetrationLevel;
