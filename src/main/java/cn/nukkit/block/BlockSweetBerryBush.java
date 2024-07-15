@@ -111,6 +111,7 @@ public class BlockSweetBerryBush extends BlockFlowable {
                 Position dropPos = add(0.5, 0.5, 0.5);
                 for (Item drop : drops) {
                     if (drop != null) {
+                        drop.setLore("Собрано на спавне");
                         this.getLevel().dropItem(dropPos, drop);
                     }
                 }
