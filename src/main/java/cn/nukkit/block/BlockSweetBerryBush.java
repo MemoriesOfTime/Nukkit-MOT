@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.event.block.BlockHarvestEvent;
@@ -111,7 +112,9 @@ public class BlockSweetBerryBush extends BlockFlowable {
                 Position dropPos = add(0.5, 0.5, 0.5);
                 for (Item drop : drops) {
                     if (drop != null) {
-                        drop.setLore("Собрано на спавне");
+                        if (Server.getInstance().getDefaultLevel().getSpawnLocation().distance(this) <= 100) {
+                            drop.setLore("Собрано на спавне");
+                        }
                         this.getLevel().dropItem(dropPos, drop);
                     }
                 }
