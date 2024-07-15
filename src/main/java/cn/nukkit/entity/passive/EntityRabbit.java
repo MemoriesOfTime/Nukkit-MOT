@@ -36,6 +36,14 @@ public class EntityRabbit extends EntityJumpingAnimal {
     }
 
     @Override
+    public float getLength() {
+        if (this.isBaby()) {
+            return 0.2f;
+        }
+        return 0.4f;
+    }
+
+    @Override
     public float getHeight() {
         if (this.isBaby()) {
             return 0.25f;

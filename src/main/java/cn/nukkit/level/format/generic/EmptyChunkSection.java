@@ -252,4 +252,9 @@ public class EmptyChunkSection implements ChunkSection {
     public int getContentVersion() {
         return 0;
     }
+
+    @Override
+    public boolean isDirty() {
+        return false;
+    }
 }

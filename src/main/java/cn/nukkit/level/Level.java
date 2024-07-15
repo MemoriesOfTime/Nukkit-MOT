@@ -2444,12 +2444,10 @@ public class Level implements ChunkManager, Metadatable {
             breakTime -= 0.15;
 
             Item[] eventDrops;
-            if (!player.isSurvival()) {
-                eventDrops = Item.EMPTY_ARRAY;
-            } else if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
+            if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
                 eventDrops = new Item[]{target.toItem()};
             } else {
-                eventDrops = target.getDrops(item);
+                eventDrops = target.getDrops(player, item);
             }
             //TODO 直接加1000可能会影响其他判断，需要进一步改进
             boolean fastBreak = (player.lastBreak + breakTime * 1000) > Long.sum(System.currentTimeMillis(), 1000);
@@ -2477,7 +2475,7 @@ public class Level implements ChunkManager, Metadatable {
         } else if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
             drops = new Item[]{target.toItem()};
         } else {
-            drops = target.getDrops(item);
+            drops = target.getDrops(null, item);
         }
 
         Vector3 above = new Vector3(target.x, target.y + 1, target.z);
@@ -2514,11 +2512,9 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
 
-            if (player == null || player.isSurvival() || player.isAdventure()) {
-                for (Item drop : drops) {
-                    if (drop.getCount() > 0) {
-                        this.dropItem(vector.add(0.5, 0.5, 0.5), drop);
-                    }
+            for (Item drop : drops) {
+                if (drop.getCount() > 0) {
+                    this.dropItem(vector.add(0.5, 0.5, 0.5), drop);
                 }
             }
         }
