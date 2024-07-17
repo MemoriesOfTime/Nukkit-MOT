@@ -1,7 +1,6 @@
 package cn.nukkit.entity.mob;
 
 import cn.nukkit.Player;
-import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntityExplosive;
@@ -13,15 +12,11 @@ import cn.nukkit.item.ItemSkull;
 import cn.nukkit.level.Explosion;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.sound.TNTPrimeSound;
-import cn.nukkit.math.NukkitMath;
-import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
-import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.Utils;
-import org.apache.commons.math3.util.FastMath;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,7 +26,7 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
     public static final int NETWORK_ID = 33;
 
     private short bombTime = 0;
-    private boolean exploding;
+    private int explodeTimer;
 
     public EntityCreeper(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -70,7 +65,9 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
 
     @Override
     public void explode() {
-        if (this.closed) return;
+        if (this.closed) {
+            return;
+        }
 
         EntityExplosionPrimeEvent ev = new EntityExplosionPrimeEvent(this, this.isPowered() ? 6 : 3);
         this.server.getPluginManager().callEvent(ev);
@@ -90,6 +87,10 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
 
     @Override
     public boolean onUpdate(int currentTick) {
+        if (this.closed) {
+            return false;
+        }
+
         if (this.server.getDifficulty() < 1) {
             this.close();
             return false;
@@ -103,6 +104,14 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
             return true;
         }
 
+        if (this.explodeTimer > 0) {
+            if (this.explodeTimer == 1) {
+                this.explode();
+                return false;
+            }
+            this.explodeTimer--;
+        }
+
         int tickDiff = currentTick - this.lastUpdate;
         this.lastUpdate = currentTick;
         this.entityBaseTick(tickDiff);
@@ -111,83 +120,33 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
             return true;
         }
 
-        if (this.isKnockback()) {
-            this.move(this.motionX, this.motionY, this.motionZ);
-            this.motionY -= this.getGravity();
-            this.updateMovement();
-            return true;
-        }
-
-        if (this.getServer().getMobAiEnabled()) {
-            Vector3 before = this.target;
-            this.checkTarget();
-
-            if (this.target instanceof EntityCreature || before != this.target) {
-                double x = this.target.x - this.x;
-                double z = this.target.z - this.z;
-
-                double diff = Math.abs(x) + Math.abs(z);
-                double distance = target.distanceSquared(this);
-                if (distance <= 16) { // 4 blocks
-                    if (target instanceof EntityCreature) {
-                        if (!exploding) {
-                            if (bombTime == 0) {
-                                this.level.addSound(new TNTPrimeSound(this.add(0, getEyeHeight())));
-                                this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, true);
-                            }
-                            this.bombTime += tickDiff;
-                            if (this.bombTime >= 30) {
-                                this.explode();
-                                return false;
-                            }
+        Vector3 target = this.updateMove(tickDiff);
+        if (target != null) {
+            double distance = target.distanceSquared(this);
+            if (distance <= 16) { // 4 blocks
+                if (target instanceof EntityCreature) {
+                    if (this.explodeTimer <= 0) {
+                        if (bombTime == 0) {
+                            this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_TNT);
+                            this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, true);
                         }
-                        if (distance <= 1) {
-                            this.stayTime = 10;
+                        this.bombTime += tickDiff;
+                        if (this.bombTime >= 30) {
+                            this.explode();
+                            return false;
                         }
                     }
-                } else {
-                    if (!exploding) {
-                        this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, false);
-                        this.bombTime = 0;
+                    if (distance <= 1) {
+                        this.stayTime = 10;
                     }
-
-                    this.motionX = this.getSpeed() * 0.15 * (x / diff);
-                    this.motionZ = this.getSpeed() * 0.15 * (z / diff);
-                }
-                if (this.stayTime <= 0 || Utils.rand())
-                    this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
-            }
-        }
-
-        double dx = this.motionX;
-        double dz = this.motionZ;
-        boolean isJump = this.checkJump(dx, dz);
-        if (this.stayTime > 0) {
-            this.stayTime -= tickDiff;
-            this.move(0, this.motionY, 0);
-        } else {
-            Vector2 be = new Vector2(this.x + dx, this.z + dz);
-            this.move(dx, this.motionY, dz);
-            Vector2 af = new Vector2(this.x, this.z);
-
-            if ((be.x != af.x || be.y != af.y) && !isJump) {
-                this.moveTime -= 90;
-            }
-        }
-
-        if (!isJump) {
-            if (this.onGround) {
-                this.motionY = 0;
-            } else if (this.motionY > -this.getGravity() * 4) {
-                int b = this.level.getBlockIdAt(chunk, NukkitMath.floorDouble(this.x), (int) (this.y + 0.8), NukkitMath.floorDouble(this.z));
-                if (b != BlockID.WATER && b != BlockID.STILL_WATER) {
-                    this.motionY -= this.getGravity();
                 }
             } else {
-                this.motionY -= this.getGravity();
+                if (this.explodeTimer <= 0) {
+                    this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, false);
+                    this.bombTime = 0;
+                }
             }
         }
-        this.updateMovement();
         return true;
     }
 
@@ -224,12 +183,12 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getId() == Item.FLINT_AND_STEEL && !exploding) {
-            this.exploding = true;
+        if (item.getId() == Item.FLINT_AND_STEEL && this.explodeTimer <= 0) {
             level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_IGNITE);
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_IGNITED, true);
-            level.addSound(new TNTPrimeSound(this.add(0, getEyeHeight())));
-            level.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, this::explode, 30);
+            this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_TNT);
+            this.stayTime = 31;
+            this.explodeTimer = 31;
             return true;
         }
 
@@ -252,8 +211,8 @@ public class EntityCreeper extends EntityWalkingMob implements EntityExplosive {
     }
 
     @Override
-    public void onStruckByLightning(Entity entity) {
-        if (this.attack(new EntityDamageByEntityEvent(entity, this, EntityDamageEvent.DamageCause.LIGHTNING, 5))) {
+    public void onStruckByLightning(Entity lightning) {
+        if (this.attack(new EntityDamageByEntityEvent(lightning, this, EntityDamageEvent.DamageCause.LIGHTNING, 5))) {
             if (this.fireTicks < 160) {
                 this.setOnFire(8);
             }

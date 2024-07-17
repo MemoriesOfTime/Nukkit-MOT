@@ -69,9 +69,6 @@ public class EntityZombiePigman extends EntityWalkingMob implements EntitySmite 
 
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
-        if (distance <= 100 && this.isAngry() && creature instanceof EntityZombiePigman && !((EntityZombiePigman) creature).isAngry()) {
-            ((EntityZombiePigman) creature).setAngry(2400);
-        }
         return this.isAngry() && super.targetOption(creature, distance);
     }
 
@@ -101,7 +98,19 @@ public class EntityZombiePigman extends EntityWalkingMob implements EntitySmite 
     }
 
     public void setAngry(int val) {
+        this.setAngry(val, false);
+    }
+
+    public void setAngry(int val, boolean others) {
         this.angry = val;
+
+        if (others && val > 0) {
+            for (Entity creature : this.level.getEntities()) {
+                if (creature instanceof EntityZombiePigman entityZombiePigman && !entityZombiePigman.isAngry() && this.distanceSquared(creature) <= 400) { // 20 blocks
+                    entityZombiePigman.setAngry(val);
+                }
+            }
+        }
     }
 
     @Override
@@ -110,7 +119,7 @@ public class EntityZombiePigman extends EntityWalkingMob implements EntitySmite 
 
         if (!ev.isCancelled() && ev instanceof EntityDamageByEntityEvent) {
             if (((EntityDamageByEntityEvent) ev).getDamager() instanceof Player) {
-                this.setAngry(2400);
+                this.setAngry(2400, true);
             }
         }
 
@@ -148,7 +157,7 @@ public class EntityZombiePigman extends EntityWalkingMob implements EntitySmite 
 
     @Override
     public String getName() {
-        return this.hasCustomName() ? this.getNameTag() : "Zombie Pigman";
+        return this.hasCustomName() ? this.getNameTag() : "Zombified Piglin";
     }
 
     @Override

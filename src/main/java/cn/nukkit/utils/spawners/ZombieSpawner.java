@@ -17,7 +17,7 @@ public class ZombieSpawner extends AbstractEntitySpawner {
 
     @Override
     public void spawn(Player player, Position pos, Level level) {
-        if (level.getBlockLightAt((int) pos.x, (int) pos.y, (int) pos.z) <= 7) {
+        if (level.getBlockLightAt((int) pos.x, (int) pos.y + 1, (int) pos.z) <= 7) {
             if (level.isMobSpawningAllowedByTime()) {
                 if (Utils.rand(1, 40) == 30) {
                     BaseEntity entity = this.spawnTask.createEntity("ZombieVillager", pos.add(0.5, 1, 0.5));

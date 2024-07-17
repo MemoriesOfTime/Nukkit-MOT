@@ -23,7 +23,8 @@ public class TurtleSpawner extends AbstractEntitySpawner {
         }
         final int blockId = level.getBlockIdAt((int) pos.x, (int) pos.y, (int) pos.z);
         if (blockId == Block.WATER || blockId == Block.STILL_WATER) {
-            if (level.getBiomeId((int) pos.x, (int) pos.z) == 0) {
+            final int biomeId = level.getBiomeId((int) pos.x, (int) pos.z);
+            if (biomeId == 0 || biomeId == 40 || biomeId == 42) {
                 if (level.isAnimalSpawningAllowedByTime()) {
                     final int b = level.getBlockIdAt((int) pos.x, (int) (pos.y - 1), (int) pos.z);
                     if (b == Block.WATER || b == Block.STILL_WATER) {

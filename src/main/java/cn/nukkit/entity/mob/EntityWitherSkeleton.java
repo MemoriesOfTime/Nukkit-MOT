@@ -3,12 +3,15 @@ package cn.nukkit.entity.mob;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntitySmite;
+import cn.nukkit.entity.projectile.EntityArrow;
+import cn.nukkit.event.entity.EntityDamageByChildEntityEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemSwordStone;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.Vector2;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.potion.Effect;
@@ -119,5 +122,23 @@ public class EntityWitherSkeleton extends EntityWalkingMob implements EntitySmit
             return false;
         }
         return super.canBeAffected(effectId);
+    }
+
+    @Override
+    public void kill() {
+        if (!this.isAlive()) {
+            return;
+        }
+
+        super.kill();
+
+        if (this.lastDamageCause instanceof EntityDamageByChildEntityEvent) {
+            Entity damager;
+            if (((EntityDamageByChildEntityEvent) this.lastDamageCause).getChild() instanceof EntityArrow && (damager = ((EntityDamageByChildEntityEvent) this.lastDamageCause).getDamager()) instanceof Player) {
+                if (new Vector2(this.x, this.z).distance(new Vector2(damager.x, damager.z)) >= 50) {
+                    ((Player) damager).awardAchievement("snipeSkeleton");
+                }
+            }
+        }
     }
 }

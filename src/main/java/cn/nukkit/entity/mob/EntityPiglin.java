@@ -116,6 +116,9 @@ public class EntityPiglin extends EntityWalkingMob {
 
     private static boolean isWearingGold(Player p) {
         PlayerInventory i = p.getInventory();
+        if (i == null) {
+            return false;
+        }
         return i.getHelmetFast().getId() == Item.GOLD_HELMET || i.getChestplateFast().getId() == Item.GOLD_CHESTPLATE || i.getLeggingsFast().getId() == Item.GOLD_LEGGINGS || i.getBootsFast().getId() == Item.GOLD_BOOTS;
     }
 
