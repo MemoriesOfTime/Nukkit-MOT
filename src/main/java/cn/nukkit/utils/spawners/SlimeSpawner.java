@@ -17,7 +17,7 @@ public class SlimeSpawner extends AbstractEntitySpawner {
     public void spawn(Player player, Position pos, Level level) {
         final int biomeId = level.getBiomeId((int) pos.x, (int) pos.z);
         if (pos.y < 70 && (biomeId == 6 || biomeId == 134)) {
-            if (level.getBlockLightAt((int) pos.x, (int) pos.y, (int) pos.z) <= 7) {
+            if (level.getBlockLightAt((int) pos.x, (int) pos.y + 1, (int) pos.z) <= 7) {
                 if (level.isMobSpawningAllowedByTime()) {
                     this.spawnTask.createEntity("Slime", pos.add(0.5, 1, 0.5));
                 }

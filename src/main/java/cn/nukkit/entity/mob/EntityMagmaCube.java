@@ -48,11 +48,6 @@ public class EntityMagmaCube extends EntityJumpingMob {
 
     @Override
     protected void initEntity() {
-        super.initEntity();
-
-        this.fireProof = true;
-        this.noFallDamage = true;
-
         if (this.namedTag.contains("Size")) {
             this.size = this.namedTag.getInt("Size");
         } else {
@@ -69,6 +64,13 @@ public class EntityMagmaCube extends EntityJumpingMob {
             this.setMaxHealth(1);
         }
 
+        super.initEntity();
+
+        this.fireProof = true;
+        this.noFallDamage = true;
+
+        this.setScale(0.51f + size * 0.51f);
+
         if (size == SIZE_BIG) {
             this.setDamage(new int[] { 0, 3, 4, 6 });
         } else if (size == SIZE_MEDIUM) {
@@ -82,7 +84,7 @@ public class EntityMagmaCube extends EntityJumpingMob {
     public void saveNBT() {
         super.saveNBT();
 
-        this.namedTag.putInt("Size", this.size);
+        this.namedTag.putInt("Size", this.getSlimeSize());
     }
 
     @Override
@@ -107,46 +109,69 @@ public class EntityMagmaCube extends EntityJumpingMob {
     }
 
     @Override
-    public Item[] getDrops() {
+    public void kill() {
+        if (this.closed || !this.isAlive() || this.chunk == null) {
+            return;
+        }
+
+        super.kill();
+
         if (this.size == SIZE_BIG) {
-            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
+            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, this.namedTag, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
             level.getServer().getPluginManager().callEvent(ev);
 
             if (ev.isCancelled()) {
-                return Item.EMPTY_ARRAY;
+                return;
             }
 
-            EntityMagmaCube entity = (EntityMagmaCube) Entity.createEntity("MagmaCube", this);
-            entity.size = SIZE_MEDIUM;
-            entity.setScale(0.51f + entity.size * 0.51f);
-            entity.spawnToAll();
-
-            return Item.EMPTY_ARRAY;
+            for (int i = 0; i < 2; i++) {
+                EntityMagmaCube entity = (EntityMagmaCube) Entity.createEntity("MagmaCube", this.chunk, Entity.getDefaultNBT(this).putInt("Size", SIZE_MEDIUM));
+                if (entity != null) {
+                    entity.spawnToAll();
+                }
+            }
         } else if (this.size == SIZE_MEDIUM) {
-            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
+            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, this.namedTag, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
             level.getServer().getPluginManager().callEvent(ev);
 
             if (ev.isCancelled()) {
-                return Item.EMPTY_ARRAY;
+                return;
             }
 
-            EntityMagmaCube entity = (EntityMagmaCube) Entity.createEntity("MagmaCube", this);
-            entity.size = SIZE_SMALL;
-            entity.setScale(0.51f + entity.size * 0.51f);
-            entity.spawnToAll();
-
-            return Item.EMPTY_ARRAY;
-        } else {
-            return new Item[]{Item.get(Item.MAGMA_CREAM, 0, Utils.rand(0, 1))};
+            for (int i = 0; i < 2; i++) {
+                EntityMagmaCube entity = (EntityMagmaCube) Entity.createEntity("MagmaCube", this.chunk, Entity.getDefaultNBT(this).putInt("Size", SIZE_SMALL));
+                if (entity != null) {
+                    entity.spawnToAll();
+                }
+            }
         }
     }
 
     @Override
+    public Item[] getDrops() {
+        if (this.size == SIZE_SMALL) {
+            return new Item[]{Item.get(Item.MAGMA_CREAM, 0, Utils.rand(0, 1))};
+        }
+
+        return Item.EMPTY_ARRAY;
+    }
+
+    @Override
     public int getKillExperience() {
-        if (this.size == SIZE_BIG) return 4;
-        if (this.size == SIZE_MEDIUM) return 2;
-        if (this.size == SIZE_SMALL) return 1;
+        if (this.size == SIZE_BIG) {
+            return 4;
+        }
+        if (this.size == SIZE_MEDIUM) {
+            return 2;
+        }
+        if (this.size == SIZE_SMALL) {
+            return 1;
+        }
         return 0;
+    }
+
+    public int getSlimeSize() {
+        return this.size;
     }
 
     @Override

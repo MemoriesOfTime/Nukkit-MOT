@@ -48,8 +48,6 @@ public class EntitySlime extends EntityJumpingMob {
 
     @Override
     protected void initEntity() {
-        super.initEntity();
-
         if (this.namedTag.contains("Size")) {
             this.size = this.namedTag.getInt("Size");
         } else {
@@ -59,8 +57,6 @@ public class EntitySlime extends EntityJumpingMob {
             }
         }
 
-        this.setScale(0.51f + size * 0.51f);
-
         if (size == SIZE_BIG) {
             this.setMaxHealth(16);
         } else if (size == SIZE_MEDIUM) {
@@ -68,6 +64,10 @@ public class EntitySlime extends EntityJumpingMob {
         } else if (size == SIZE_SMALL) {
             this.setMaxHealth(1);
         }
+
+        super.initEntity();
+
+        this.setScale(0.51f + size * 0.51f);
 
         if (size == SIZE_BIG) {
             this.setDamage(new int[] { 0, 3, 4, 6 });
@@ -82,7 +82,7 @@ public class EntitySlime extends EntityJumpingMob {
     public void saveNBT() {
         super.saveNBT();
 
-        this.namedTag.putInt("Size", this.size);
+        this.namedTag.putInt("Size", this.getSlimeSize());
     }
 
     @Override
@@ -107,44 +107,51 @@ public class EntitySlime extends EntityJumpingMob {
     }
 
     @Override
-    public Item[] getDrops() {
+    public void kill() {
+        if (this.closed || !this.isAlive() || this.chunk == null) {
+            return;
+        }
+
+        super.kill();
+
         if (this.size == SIZE_BIG) {
-            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
+            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, this.namedTag, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
             level.getServer().getPluginManager().callEvent(ev);
 
             if (ev.isCancelled()) {
-                return Item.EMPTY_ARRAY;
+                return;
             }
 
-            EntitySlime entity = (EntitySlime) Entity.createEntity("Slime", this);
-
-            if (entity != null) {
-                entity.size = SIZE_MEDIUM;
-                entity.setScale(0.51f + entity.size * 0.51f);
-                entity.spawnToAll();
+            for (int i = 0; i < 2; i++) {
+                EntitySlime entity = (EntitySlime) Entity.createEntity("Slime", this.chunk, Entity.getDefaultNBT(this).putInt("Size", SIZE_MEDIUM));
+                if (entity != null) {
+                    entity.spawnToAll();
+                }
             }
-
-            return Item.EMPTY_ARRAY;
         } else if (this.size == SIZE_MEDIUM) {
-            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
+            CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, this, this.namedTag, CreatureSpawnEvent.SpawnReason.SLIME_SPLIT);
             level.getServer().getPluginManager().callEvent(ev);
 
             if (ev.isCancelled()) {
-                return Item.EMPTY_ARRAY;
+                return;
             }
 
-            EntitySlime entity = (EntitySlime) Entity.createEntity("Slime", this);
-
-            if (entity != null) {
-                entity.size = SIZE_SMALL;
-                entity.setScale(0.51f + entity.size * 0.51f);
-                entity.spawnToAll();
+            for (int i = 0; i < 2; i++) {
+                EntitySlime entity = (EntitySlime) Entity.createEntity("Slime", this.chunk, Entity.getDefaultNBT(this).putInt("Size", SIZE_SMALL));
+                if (entity != null) {
+                    entity.spawnToAll();
+                }
             }
+        }
+    }
 
-            return Item.EMPTY_ARRAY;
-        } else {
+    @Override
+    public Item[] getDrops() {
+        if (this.size == SIZE_SMALL) {
             return new Item[]{Item.get(Item.SLIMEBALL, 0, Utils.rand(0, 2))};
         }
+
+        return Item.EMPTY_ARRAY;
     }
 
     @Override

@@ -57,6 +57,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     protected int attackTime = 0;
+    protected int knockBackTime = 0;
 
     protected float movementSpeed = 0.1f;
 
@@ -240,6 +241,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         this.resetFallDistance();
 
         this.setMotion(motion);
+
+        this.knockBackTime = 10;
     }
 
     @Override
@@ -385,6 +388,10 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             if (this.attackTime > 0) {
                 this.attackTime -= tickDiff;
                 hasUpdate = true;
+            }
+
+            if (this.knockBackTime > 0) {
+                this.knockBackTime -= tickDiff;
             }
 
             if (this.riding == null) {

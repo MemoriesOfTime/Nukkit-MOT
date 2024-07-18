@@ -1,6 +1,7 @@
 package cn.nukkit.entity;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
@@ -10,6 +11,8 @@ import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
 public abstract class EntitySwimming extends BaseEntity {
+
+    private boolean inWaterCached = true;
 
     public EntitySwimming(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -94,14 +97,14 @@ public abstract class EntitySwimming extends BaseEntity {
                     double z = this.followTarget.z - this.z;
 
                     double diff = Math.abs(x) + Math.abs(z);
-                    if (this.stayTime > 0 || this.distance(this.followTarget) <= (this.getWidth() / 2 + 0.05)) {
+                    if (diff == 0 || this.stayTime > 0 || this.distance(this.followTarget) <= (this.getWidth() / 2 + 0.05)) {
                         this.motionX = 0;
                         this.motionZ = 0;
                     } else {
                         this.motionX = this.getSpeed() * 0.1 * (x / diff);
                         this.motionZ = this.getSpeed() * 0.1 * (z / diff);
                     }
-                    if (this.stayTime <= 0 || Utils.rand()) {
+                    if ((this.stayTime <= 0 || Utils.rand()) && diff != 0) {
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                     return this.followTarget;
@@ -114,14 +117,14 @@ public abstract class EntitySwimming extends BaseEntity {
                     double z = this.target.z - this.z;
 
                     double diff = Math.abs(x) + Math.abs(z);
-                    if (this.stayTime > 0 || this.distance(this.target) <= (this.getWidth() / 2 + 0.05) * nearbyDistanceMultiplier()) {
+                    if (diff == 0 ||this.stayTime > 0 || this.distance(this.target) <= (this.getWidth() / 2 + 0.05) * nearbyDistanceMultiplier()) {
                         this.motionX = 0;
                         this.motionZ = 0;
                     } else {
                         this.motionX = this.getSpeed() * 0.15 * (x / diff);
                         this.motionZ = this.getSpeed() * 0.15 * (z / diff);
                     }
-                    if (this.stayTime <= 0 || Utils.rand()) {
+                    if ((this.stayTime <= 0 || Utils.rand()) && diff != 0) {
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                 }
@@ -131,6 +134,7 @@ public abstract class EntitySwimming extends BaseEntity {
             double dz = this.motionZ;
 
             boolean inWater = this.isInsideOfWater();
+            this.inWaterCached = inWater;
             if (inWater && (this.motionX > 0 || this.motionZ > 0)) {
                 this.motionY = Utils.rand(-0.12, 0.12);
             } else if (!this.isOnGround() && !inWater) {
@@ -162,5 +166,23 @@ public abstract class EntitySwimming extends BaseEntity {
         }
 
         return null;
+    }
+
+    @Override
+    public boolean entityBaseTick(int tickDiff) {
+        boolean result = super.entityBaseTick(tickDiff);
+        if (this.inWaterCached) {
+            this.setAirTicks(300);
+        } else {
+            int airTicks = getAirTicks() - tickDiff * 6;
+
+            if (airTicks <= -20) {
+                airTicks = 0;
+                this.attack(new EntityDamageEvent(this, EntityDamageEvent.DamageCause.SUFFOCATION, 2));
+            }
+
+            setAirTicks(airTicks);
+        }
+        return result;
     }
 }

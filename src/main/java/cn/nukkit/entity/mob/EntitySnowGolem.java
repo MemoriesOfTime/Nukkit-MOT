@@ -4,16 +4,15 @@ import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
-import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntitySnowball;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
-import cn.nukkit.event.entity.EntityShootBowEvent;
 import cn.nukkit.event.entity.ProjectileLaunchEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Location;
+import cn.nukkit.level.Sound;
 import cn.nukkit.level.biome.EnumBiome;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
@@ -86,20 +85,15 @@ public class EntitySnowGolem extends EntityWalkingMob {
             EntitySnowball snowball = (EntitySnowball) k;
             snowball.setMotion(new Vector3(-Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f, -Math.sin(FastMath.toRadians(pitch)) * f * f, Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * f * f).multiply(f));
 
-            EntityShootBowEvent ev = new EntityShootBowEvent(this, Item.get(Item.ARROW, 0, 1), snowball, f);
-            this.server.getPluginManager().callEvent(ev);
-
-            EntityProjectile projectile = ev.getProjectile();
-            if (ev.isCancelled()) {
-                projectile.close();
-            } else if (projectile != null) {
-                ProjectileLaunchEvent launch = new ProjectileLaunchEvent(projectile);
-                this.server.getPluginManager().callEvent(launch);
-                if (launch.isCancelled()) {
-                    projectile.close();
-                } else {
-                    projectile.spawnToAll();
+            ProjectileLaunchEvent launch = new ProjectileLaunchEvent(snowball);
+            this.server.getPluginManager().callEvent(launch);
+            if (launch.isCancelled()) {
+                if (this.stayTime > 0 || this.distance(this.target) <= ((this.getWidth()) / 2 + 0.05) * nearbyDistanceMultiplier()) {
+                    snowball.close();
                 }
+            } else {
+                snowball.spawnToAll();
+                this.level.addSound(this, Sound.MOB_SNOWGOLEM_SHOOT);
             }
         }
     }

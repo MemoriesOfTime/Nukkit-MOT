@@ -3121,6 +3121,11 @@ public abstract class Entity extends Location implements Metadatable {
         return blockId == Block.LADDER || blockId == Block.VINES || blockId == Block.COBWEB || blockId == Block.SCAFFOLDING;
     }
 
+    /**
+     * Get mounted entity y offset. Used to determine the height for heart particle spawning.
+     *
+     * @return entity height * 0.75
+     */
     public float getMountedYOffset() {
         return getHeight() * 0.75F;
     }

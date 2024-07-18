@@ -4,11 +4,11 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
-import cn.nukkit.entity.mob.EntityEnderDragon;
 import cn.nukkit.entity.mob.EntityFlyingMob;
 import cn.nukkit.entity.mob.EntityMob;
 import cn.nukkit.entity.mob.EntityRavager;
 import cn.nukkit.entity.passive.EntityAnimal;
+import cn.nukkit.entity.passive.EntityCow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
@@ -31,29 +31,6 @@ import java.util.concurrent.ThreadLocalRandom;
  * The base class of all entities that have an AI
  */
 public abstract class BaseEntity extends EntityCreature implements EntityAgeable {
-
-    /**
-     * Empty inventory
-     * Used to fix the problem of getting the player's hand-held item null pointer
-     */
-    protected static PlayerInventory EMPTY_INVENTORY;
-
-    public int stayTime = 0;
-    protected int moveTime = 0;
-
-    protected float moveMultiplier = 1.0f;
-
-    protected Vector3 target = null;
-    protected Entity followTarget = null;
-    protected int attackDelay = 0;
-    private short inLoveTicks = 0;
-    private short inLoveCooldown = 0;
-
-    private boolean baby = false;
-    private boolean movement = true;
-    private boolean friendly = false;
-
-    public Item[] armor;
 
     private static final Int2ObjectMap<Float> ARMOR_POINTS = new Int2ObjectOpenHashMap<>() {
         {
@@ -85,6 +62,30 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         }
     };
 
+    /**
+     * Empty inventory
+     * Used to fix the problem of getting the player's hand-held item null pointer
+     */
+    protected static PlayerInventory EMPTY_INVENTORY;
+
+    public int stayTime = 0;
+    protected int moveTime = 0;
+
+    protected float moveMultiplier = 1.0f;
+
+    protected Vector3 target = null;
+    protected Entity followTarget = null;
+    protected int attackDelay = 0;
+    protected Player lastInteract;
+    private short inLoveTicks = 0;
+    private short inLoveCooldown = 0;
+
+    private boolean baby = false;
+    private boolean movement = true;
+    private boolean friendly = false;
+
+    public Item[] armor;
+
     public BaseEntity(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
 
@@ -109,7 +110,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     public boolean isKnockback() {
-        return this.attackTime > 0;
+        return this.knockBackTime > 0;
     }
 
     public void setFriendly(boolean bool) {
@@ -214,11 +215,11 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             return true;
         }
 
+        boolean hasUpdate = super.entityBaseTick(tickDiff);
+
         if (this instanceof EntityMob && this.attackDelay < 200) {
             this.attackDelay++;
         }
-
-        boolean hasUpdate = super.entityBaseTick(tickDiff);
 
         if (this.moveTime > 0) {
             this.moveTime -= tickDiff;
@@ -256,6 +257,9 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             return false;
         }
 
+        Player player = baseEntity.lastInteract;
+        baseEntity.lastInteract = null;
+
         this.setInLove(false);
         baseEntity.setInLove(false);
 
@@ -275,9 +279,14 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             }
         }
 
-        BaseEntity newEntity = (BaseEntity) Entity.createEntity(getNetworkId(), this, new Object[0]);
-        newEntity.setBaby(true);
-        newEntity.spawnToAll();
+        BaseEntity baby = (BaseEntity) Entity.createEntity(getNetworkId(), this, new Object[0]);
+        baby.setBaby(true);
+        baby.spawnToAll();
+        if (baby instanceof EntityCow) {
+            if (player != null) {
+                player.awardAchievement("breedCow");
+            }
+        }
         this.level.dropExpOrb(this, Utils.rand(1, 7));
         return true;
     }
@@ -357,14 +366,15 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     @Override
-    public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getId() == Item.NAME_TAG && !player.isAdventure()) {
-            if (item.hasCustomName() && !(this instanceof EntityEnderDragon)) {
-                this.setNameTag(item.getCustomName());
-                this.setNameTagVisible(true);
-                //player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-                return true;
-            }
+    protected boolean applyNameTag(Player player, Item nameTag) {
+        String name = nameTag.getCustomName();
+
+        if (!name.isEmpty()) {
+            this.namedTag.putString("CustomName", name);
+            this.namedTag.putBoolean("CustomNameVisible", true);
+            this.setNameTag(name);
+            this.setNameTagVisible(true);
+            return true; // onInteract: true = decrease count
         }
 
         return false;
@@ -398,6 +408,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     /**
      * Check if the entity can swim in the block
+     *
      * @param block block id
      * @return can swim
      */
@@ -407,6 +418,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     /**
      * Get a random set of armor
+     *
      * @return armor items
      */
     public Item[] getRandomArmor() {

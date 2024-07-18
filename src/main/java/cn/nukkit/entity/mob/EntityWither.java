@@ -70,6 +70,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         this.setDamage(new int[]{0, 2, 4, 6});
         if (this.age == 0) {
             this.setDataProperty(new IntEntityData(DATA_WITHER_INVULNERABLE_TICKS, 200));
+
+            this.stayTime = 220;
         }
     }
 
@@ -181,6 +183,12 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         }
 
         if (!this.exploded && this.lastDamageCause != null && EntityDamageEvent.DamageCause.SUICIDE != this.lastDamageCause.getCause()) {
+            if (this.lastDamageCause instanceof EntityDamageByEntityEvent event) {
+                if (event.getDamager() instanceof Player player) {
+                    player.awardAchievement("killWither");
+                }
+            }
+
             this.exploded = true;
             this.explode();
         }

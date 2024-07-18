@@ -19,7 +19,7 @@ public class EntityShulkerBullet extends EntityProjectile {
 
     @Override
     public float getGravity() {
-        return 0.001f;
+        return -0.001f;
     }
 
     @Override

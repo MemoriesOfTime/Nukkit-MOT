@@ -58,10 +58,13 @@ public class EntityPufferfish extends EntityFish {
     public boolean attack(EntityDamageEvent ev) {
         super.attack(ev);
 
-        if (ev instanceof EntityDamageByEntityEvent && ev.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK) {
-            Entity damager = ((EntityDamageByEntityEvent) ev).getDamager();
+        if (ev.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK
+                && ev instanceof EntityDamageByEntityEvent event) {
+            Entity damager = event.getDamager();
             if (damager instanceof Player) {
-                if (this.puffed > 0) return true;
+                if (this.puffed > 0) {
+                    return true;
+                }
                 this.puffed = 200;
                 damager.addEffect(Effect.getEffect(Effect.POISON).setDuration(200), EntityPotionEffectEvent.Cause.ATTACK);
                 this.setDataProperty(new ByteEntityData(DATA_PUFFERFISH_SIZE, 2));
