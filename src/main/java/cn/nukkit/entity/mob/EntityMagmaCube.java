@@ -20,7 +20,7 @@ public class EntityMagmaCube extends EntityJumpingMob {
     public static final int SIZE_MEDIUM = 2;
     public static final int SIZE_BIG = 3;
 
-    protected int size = SIZE_BIG;
+    protected int size;
 
     public EntityMagmaCube(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
