@@ -247,14 +247,6 @@ public class Vector3 implements Cloneable {
         return this.maxPlainDistance(x.x, x.z);
     }
 
-    public double horizontalDistance() {
-        return Math.sqrt(this.horizontalDistanceSquared());
-    }
-
-    public double horizontalDistanceSquared() {
-        return this.x * this.x + this.z * this.z;
-    }
-
     /**
      * Calculates the Length of this Vector
      *
@@ -392,51 +384,6 @@ public class Vector3 implements Cloneable {
         this.y = pos.y;
         this.z = pos.z;
         return this;
-    }
-
-    public Vector3 xz() {
-        return new Vector3(this.x, 0, this.z);
-    }
-
-    public Vector3 xRot(double rads) {
-        double cos = NukkitMath.cos(rads);
-        double sin = NukkitMath.sin(rads);
-        return new Vector3(this.x, this.y * cos + this.z * sin, this.z * cos - this.y * sin);
-    }
-
-    public Vector3 yRot(double rads) {
-        double cos = NukkitMath.cos(rads);
-        double sin = NukkitMath.sin(rads);
-        return new Vector3(this.x * cos + this.z * sin, this.y, this.z * cos - this.x * sin);
-    }
-
-    public Vector3 zRot(double rads) {
-        double cos = NukkitMath.cos(rads);
-        double sin = NukkitMath.sin(rads);
-        return new Vector3(this.x * cos + this.y * sin, this.y * cos - this.x * sin, this.z);
-    }
-
-    /**
-     * @return pitch
-     */
-    public double xRotFromDirection() {
-        return NukkitMath.atan2(this.y, this.horizontalDistance()) * NukkitMath.RAD_TO_DEG;
-    }
-
-    /**
-     * @return yaw
-     */
-    public double yRotFromDirection() {
-        return NukkitMath.atan2(this.x, this.z) * NukkitMath.RAD_TO_DEG;
-    }
-
-    /**
-     * @param xRot pitch
-     * @param yRot yaw
-     */
-    public static Vector3 directionFromRotation(double xRot, double yRot) {
-        double xCos = -NukkitMath.cos(-xRot * NukkitMath.DEG_TO_RAD);
-        return new Vector3(NukkitMath.sin(-yRot * NukkitMath.DEG_TO_RAD - NukkitMath.PI) * xCos, NukkitMath.sin(-xRot * NukkitMath.DEG_TO_RAD), NukkitMath.cos(-yRot * NukkitMath.DEG_TO_RAD - NukkitMath.PI) * xCos);
     }
 
     @Override

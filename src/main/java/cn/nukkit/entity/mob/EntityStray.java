@@ -19,7 +19,6 @@ import cn.nukkit.math.Vector2;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
-import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
@@ -99,8 +98,7 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
                     this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
             if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) == Block.AIR) {
                 EntityArrow arrow = (EntityArrow) Entity.createEntity("Arrow", pos, this);
-                arrow.getMobEffects().put(Effect.SLOWNESS, Effect.getEffect(Effect.SLOWNESS).setDuration(600));
-                arrow.setFullEffect(true);
+                arrow.isFromStray = true;
                 setProjectileMotion(arrow, pitch, yawR, pitchR, f);
 
                 EntityShootBowEvent ev = new EntityShootBowEvent(this, Item.get(Item.ARROW, 0, 1), arrow, f);
