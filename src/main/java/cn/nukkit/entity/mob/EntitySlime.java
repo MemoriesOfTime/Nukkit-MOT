@@ -20,7 +20,7 @@ public class EntitySlime extends EntityJumpingMob {
     public static final int SIZE_MEDIUM = 2;
     public static final int SIZE_BIG = 4;
 
-    protected int size = SIZE_BIG;
+    protected int size;
 
     public EntitySlime(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
