@@ -1093,11 +1093,12 @@ public class LevelDBProvider implements LevelProvider {
         }
 
         int currentTick = ticks.getInt("currentTick");
-        for (NbtMap state : ticks.getList("tickList", NbtType.COMPOUND)) {
+        for (NbtMap nbtMap : ticks.getList("tickList", NbtType.COMPOUND)) {
             Block block = null;
+
+            NbtMap state = nbtMap.getCompound("blockState");
             //noinspection ResultOfMethodCallIgnored
             state.hashCode();
-
             if (state.containsKey("name")) {
                 BlockStateSnapshot blockState = BlockStateMapping.get().getStateUnsafe(state);
                 if (blockState == null) {
@@ -1105,21 +1106,21 @@ public class LevelDBProvider implements LevelProvider {
                     blockState = BlockStateMapping.get().getUpdatedOrCustom(state, updatedState);
                 }
                 block = blockState.getBlock();
-            } else if (state.containsKey("tileID")) {
-                block = Block.get(state.getByte("tileID") & 0xff);
+            } else if (nbtMap.containsKey("tileID")) {
+                block = Block.get(nbtMap.getByte("tileID") & 0xff);
             }
 
             if (block == null) {
-                log.debug("Unavailable block ticking entry skipped: {}", state);
+                log.debug("Unavailable block ticking entry skipped: {}", nbtMap);
                 continue;
             }
-            block.x = state.getInt("x");
-            block.y = state.getInt("y");
-            block.z = state.getInt("z");
+            block.x = nbtMap.getInt("x");
+            block.y = nbtMap.getInt("y");
+            block.z = nbtMap.getInt("z");
             block.level = level;
 
-            int delay = (int) (state.getLong("time") - currentTick);
-            int priority = state.getInt("p"); // Nukkit only
+            int delay = (int) (nbtMap.getLong("time") - currentTick);
+            int priority = nbtMap.getInt("p"); // Nukkit only
 
             if (!tickingQueueTypeIsRandom) {
                 level.scheduleUpdate(block, block, delay, priority, false);
