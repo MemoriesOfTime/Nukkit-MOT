@@ -169,7 +169,7 @@ public class ItemCrossbow extends ItemBow {
                     arrow.piercing = penetrationLevel;
                     if (chargedItem.getDamage() != ItemArrow.NORMAL_ARROW) {
                         Potion potion = Potion.getPotion(chargedItem.getDamage() - ItemArrow.TIPPED_ARROW);
-                        if (potion != null) {
+                        if (potion != null && potion.getEffect() != null) {
                             ListTag<CompoundTag> mobEffects = new ListTag<>("mobEffects");
                             mobEffects.add(potion.getEffect().save());
                             nbt.putList(mobEffects);

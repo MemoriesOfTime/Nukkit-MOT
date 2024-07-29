@@ -104,7 +104,7 @@ public class ItemBow extends ItemTool {
 
         if (itemArrow.getDamage() != ItemArrow.NORMAL_ARROW) {
             Potion potion = Potion.getPotion(itemArrow.getDamage() - ItemArrow.TIPPED_ARROW);
-            if (potion != null) {
+            if (potion != null && potion.getEffect() != null) {
                 ListTag<CompoundTag> mobEffects = new ListTag<>("mobEffects");
                 mobEffects.add(potion.getEffect().save());
                 nbt.putList(mobEffects);
