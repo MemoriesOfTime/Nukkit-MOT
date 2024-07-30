@@ -6,6 +6,7 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityRegainHealthEvent;
 import cn.nukkit.event.player.PlayerFoodLevelChangeEvent;
 import cn.nukkit.item.food.Food;
+import cn.nukkit.level.GameRule;
 import cn.nukkit.potion.Effect;
 
 /**
@@ -141,7 +142,8 @@ public class PlayerFood {
             if (this.foodLevel > 17 || diff == 0) {
                 this.foodTickTimer += tickDiff;
                 if (this.foodTickTimer >= 80) {
-                    if (this.player.getHealth() < this.player.getMaxHealth()) {
+                    if (this.player.getLevel().getGameRules().getBoolean(GameRule.NATURAL_REGENERATION)
+                            && this.player.getHealth() < this.player.getMaxHealth()) {
                         EntityRegainHealthEvent ev = new EntityRegainHealthEvent(this.player, 1, EntityRegainHealthEvent.CAUSE_EATING);
                         this.player.heal(ev);
                         if (!ev.isCancelled()) {
@@ -150,7 +152,7 @@ public class PlayerFood {
                     }
                     this.foodTickTimer = 0;
                 }
-            } else if (this.foodLevel == 0) {
+            } else if (this.foodLevel <= 0) {
                 this.foodTickTimer += tickDiff;
                 if (this.foodTickTimer >= 80) {
                     EntityDamageEvent ev = new EntityDamageEvent(this.player, DamageCause.HUNGER, 1);
@@ -165,7 +167,10 @@ public class PlayerFood {
 
                     this.foodTickTimer = 0;
                 }
+            } else {
+                this.foodTickTimer = 0;
             }
+
             if (this.player.hasEffect(Effect.HUNGER)) {
                 this.updateFoodExpLevel(0.1 * (this.getPlayer().getEffect(Effect.HUNGER).getAmplifier() + 1));
             }

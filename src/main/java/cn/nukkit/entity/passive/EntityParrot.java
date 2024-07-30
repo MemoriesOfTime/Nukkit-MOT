@@ -69,8 +69,11 @@ public class EntityParrot extends EntityFlyingAnimal {
     @Override
     public boolean targetOption(EntityCreature creature, double distance) {
         if (creature instanceof Player player) {
+            if (player.closed) {
+                return false;
+            }
             int id = player.getInventory().getItemInHandFast().getId();
-            return player.spawned && player.isAlive() && !player.closed
+            return player.spawned && player.isAlive()
                     && (id == Item.SEEDS
                     || id == Item.BEETROOT_SEEDS
                     || id == Item.PUMPKIN_SEEDS

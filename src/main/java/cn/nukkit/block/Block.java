@@ -429,6 +429,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[SWEET_BERRY_BUSH] = BlockSweetBerryBush.class; //462
             list[LANTERN] = BlockLantern.class; //463
             list[CAMPFIRE_BLOCK] = BlockCampfire.class; //464
+            list[LAVA_CAULDRON] = BlockCauldronLava.class; //465
             list[WOOD_BARK] = BlockWoodBark.class; //467
             list[COMPOSTER] = BlockComposter.class; //468
             list[LIT_BLAST_FURNACE] = BlockBlastFurnaceLit.class; //469
@@ -1051,10 +1052,19 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             return Item.EMPTY_ARRAY;
         }
 
-        if(this.canHarvestWithHand() || this.canHarvest(item)) {
+        if (this.canHarvestWithHand() || this.canHarvest(item)) {
             return new Item[]{this.toItem()};
         }
         return Item.EMPTY_ARRAY;
+    }
+
+    public Item[] getDrops(@Nullable Player player, Item item) {
+        if (player != null && !player.isSurvival() && !player.isAdventure()) {
+            return Item.EMPTY_ARRAY;
+        }
+
+        // 几乎所有方块都是重写getDrops(Item)方法，所以我们需要调用这个方法
+        return this.getDrops(item);
     }
 
     private double toolBreakTimeBonus0(Item item) {

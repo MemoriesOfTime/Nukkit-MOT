@@ -22,7 +22,7 @@ public class PandaSpawner extends AbstractEntitySpawner {
             return;
         }
         final int biomeId = level.getBiomeId((int) pos.x, (int) pos.z);
-        if ((biomeId == 21 && Utils.rand(1, 10) != 1) || biomeId != 168 && biomeId != 169 && biomeId != 21) {
+        if (((biomeId == 21 || biomeId == 22) && Utils.rand(1, 10) != 1) || biomeId != 48 && biomeId != 49 && biomeId != 21 && biomeId != 22) {
             return;
         }
         if (!level.isAnimalSpawningAllowedByTime() || level.getBlockIdAt((int) pos.x, (int) pos.y, (int) pos.z) != Block.GRASS) {

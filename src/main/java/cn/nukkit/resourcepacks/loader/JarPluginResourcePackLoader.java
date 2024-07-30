@@ -35,10 +35,10 @@ public class JarPluginResourcePackLoader implements ResourcePackLoader {
                 }
                 if (resourcePack != null) {
                     loadedResourcePacks.add(resourcePack);
-                    log.info(baseLang.translateString("nukkit.resources.plugin.loaded", jar.getName(), resourcePack.getPackName()));
+                    log.info(baseLang.translateString("nukkit.resources.plugin.loaded", new String[]{jar.getName(), resourcePack.getPackName()}));
                 }
             } catch (IllegalArgumentException e) {
-                log.warn(baseLang.translateString("nukkit.resources.fail", jar.getName(), e.getMessage()), e);
+                log.warn(baseLang.translateString("nukkit.resources.fail", new String[]{jar.getName(), e.getMessage()}), e);
             }
         }
         return loadedResourcePacks;

@@ -72,6 +72,7 @@ public class EntityCow extends EntityWalkingAnimal {
             }
             this.level.addParticle(new ItemBreakParticle(this.add(0, this.getMountedYOffset(), 0), Item.get(Item.WHEAT)));
             this.setInLove();
+            this.lastInteract = player;
             return false;
         }
 

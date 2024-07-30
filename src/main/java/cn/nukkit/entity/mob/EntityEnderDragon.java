@@ -8,6 +8,7 @@ import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.item.EntityEndCrystal;
 import cn.nukkit.entity.projectile.EntityEnderCharge;
 import cn.nukkit.event.entity.ProjectileLaunchEvent;
+import cn.nukkit.item.Item;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
@@ -153,5 +154,15 @@ public class EntityEnderDragon extends EntityFlyingMob implements EntityBoss {
     @Override
     protected boolean isInTickingRange() {
         return true;
+    }
+
+    @Override
+    public boolean canBeAffected(int effectId) {
+        return false;
+    }
+
+    @Override
+    protected boolean applyNameTag(Player player, Item item) {
+        return false;
     }
 }

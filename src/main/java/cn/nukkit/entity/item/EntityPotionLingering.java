@@ -20,4 +20,16 @@ public class EntityPotionLingering extends EntityPotion {
     public int getNetworkId() {
         return NETWORK_ID;
     }
+
+    @Override
+    protected void initEntity() {
+        super.initEntity();
+
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_LINGER, true);
+    }
+
+    @Override
+    public boolean isLinger() {
+        return true;
+    }
 }

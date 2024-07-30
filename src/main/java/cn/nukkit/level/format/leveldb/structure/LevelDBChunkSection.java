@@ -746,4 +746,14 @@ public class LevelDBChunkSection implements ChunkSection {
             this.readLock.unlock();
         }
     }
+
+    @Override
+    public boolean isDirty() {
+        return this.dirty;
+    }
+
+    @Override
+    public void setDirty() {
+        this.dirty = true;
+    }
 }

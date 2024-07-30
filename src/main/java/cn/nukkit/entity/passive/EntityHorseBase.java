@@ -58,7 +58,7 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
     }
 
     @Override
-    public boolean mountEntity(Entity entity) {
+    public boolean mountEntity(Entity entity, byte mode) {
         Objects.requireNonNull(entity, "The target of the mounting entity can't be null");
 
         if (entity.riding != null) {
@@ -67,6 +67,10 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
             this.motionZ = 0;
             this.stayTime = 20;
         } else {
+            if (entity instanceof Player && ((Player) entity).isSleeping()) {
+                return false;
+            }
+
             if (this.isPassenger(entity)) {
                 return false;
             }
@@ -86,7 +90,7 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
         if (this.isFeedItem(item) && !this.isInLoveCooldown()) {
             this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_EAT);
-            this.level.addParticle(new ItemBreakParticle(this.add(0,this.getMountedYOffset(), 0), Item.get(item.getId(), 0, 1)));
+            this.level.addParticle(new ItemBreakParticle(this.add(0, this.getMountedYOffset(), 0), Item.get(item.getId(), 0, 1)));
             this.setInLove();
             return true;
         } else if (this.canBeSaddled() && !this.isSaddled() && item.getId() == Item.SADDLE) {
@@ -154,7 +158,9 @@ public class EntityHorseBase extends EntityWalkingAnimal implements EntityRideab
         this.target = null;
         this.setBothYaw(player.yaw);
 
-        if (forward < 0) forward = forward / 2;
+        if (forward < 0) {
+            forward = forward / 2;
+        }
 
         strafe *= 0.4;
 

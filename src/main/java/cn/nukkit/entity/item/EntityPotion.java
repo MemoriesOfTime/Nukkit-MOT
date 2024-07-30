@@ -8,6 +8,7 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.Particle;
 import cn.nukkit.level.particle.SpellParticle;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
@@ -123,6 +124,20 @@ public class EntityPotion extends EntityProjectile {
         this.getLevel().addParticle(particle);
         this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_GLASS);
 
+        if (this.isLinger()) {
+            CompoundTag nbt = Entity.getDefaultNBT(this);
+            nbt.putShort("PotionId", this.potionId);
+            if (effect != null) {
+                nbt.putList("mobEffects", new ListTag<>().add(effect.save()));
+            }
+            Entity entity = Entity.createEntity("AreaEffectCloud", this.chunk, nbt);
+            if (entity instanceof EntityAreaEffectCloud entityAreaEffectCloud) {
+                entityAreaEffectCloud.setOwner(this.shootingEntity);
+            }
+            entity.spawnToAll();
+            return;
+        }
+
         Entity[] entities = this.getLevel().getNearbyEntities(this.getBoundingBox().grow(4.125, 2.125, 4.125));
         for (Entity anEntity : entities) {
             double distance = anEntity.distanceSquared(this);
@@ -155,5 +170,9 @@ public class EntityPotion extends EntityProjectile {
         }
 
         return super.onUpdate(currentTick);
+    }
+
+    public boolean isLinger() {
+        return false;
     }
 }

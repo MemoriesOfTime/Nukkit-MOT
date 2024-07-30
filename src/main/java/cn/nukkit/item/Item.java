@@ -721,6 +721,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_20_80:
                 return new ArrayList<>(Item.creative671);
             case v1_21_0:
+            case v1_21_2:
                 return new ArrayList<>(Item.creative685);
             // TODO Multiversion
             default:
@@ -1079,7 +1080,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 try {
                     Item item = constructor.get();
                     if (meta.isPresent()) {
-                        item.setDamage(meta.getAsInt());
+                        int metaValue = meta.getAsInt();
+                        if (metaValue != 0) {
+                            item.setDamage(metaValue);
+                        }
                     }
                     // Avoid the upcoming changes to the original item object
                     return item.clone();

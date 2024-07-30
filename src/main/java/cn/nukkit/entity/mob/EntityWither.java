@@ -22,6 +22,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
 import cn.nukkit.network.protocol.BossEventPacket;
 import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
@@ -69,6 +70,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         this.setDamage(new int[]{0, 2, 4, 6});
         if (this.age == 0) {
             this.setDataProperty(new IntEntityData(DATA_WITHER_INVULNERABLE_TICKS, 200));
+
+            this.stayTime = 220;
         }
     }
 
@@ -180,6 +183,12 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         }
 
         if (!this.exploded && this.lastDamageCause != null && EntityDamageEvent.DamageCause.SUICIDE != this.lastDamageCause.getCause()) {
+            if (this.lastDamageCause instanceof EntityDamageByEntityEvent event) {
+                if (event.getDamager() instanceof Player player) {
+                    player.awardAchievement("killWither");
+                }
+            }
+
             this.exploded = true;
             this.explode();
         }
@@ -275,5 +284,10 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     public String getName() {
         String name = this.getNameTag();
         return !name.isEmpty() ? name : "Wither";
+    }
+
+    @Override
+    public boolean canBeAffected(int effectId) {
+        return effectId == Effect.INSTANT_DAMAGE || effectId == Effect.INSTANT_HEALTH;
     }
 }

@@ -8,6 +8,7 @@ import cn.nukkit.entity.mob.EntityPhantom;
 import cn.nukkit.entity.passive.EntityStrider;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.format.FullChunk;
 
 /**
  * Base class of the default mob spawners
@@ -50,7 +51,8 @@ public abstract class AbstractEntitySpawner implements EntitySpawner {
                 pos.x += SpawnerTask.getRandomSafeXZCoord(Utils.rand(48, 52), Utils.rand(24, 28), Utils.rand(4, 8));
                 pos.z += SpawnerTask.getRandomSafeXZCoord(Utils.rand(48, 52), Utils.rand(24, 28), Utils.rand(4, 8));
 
-                if (!level.isChunkLoaded((int) pos.x >> 4, (int) pos.z >> 4) || !level.isChunkGenerated((int) pos.x >> 4, (int) pos.z >> 4)) {
+                FullChunk chunk = level.getChunkIfLoaded((int) pos.x >> 4, (int) pos.z >> 4); // pos is already floored
+                if (chunk == null || !chunk.isGenerated() || !chunk.isPopulated()) {
                     return;
                 }
 
@@ -58,8 +60,20 @@ public abstract class AbstractEntitySpawner implements EntitySpawner {
                     return;
                 }
 
+                if (Utils.monstersList.contains(this.getEntityNetworkId())) {
+                    int biome = chunk.getBiomeId(((int) pos.x) & 0x0f, ((int) pos.z) & 0x0f);
+                    if (biome == 14 || biome == 15) {
+                        return; // Hostile mobs don't spawn on mushroom island
+                    }
+                }
+
                 pos.y = SpawnerTask.getSafeYCoord(level, pos);
-                if (pos.y < level.getMinBlockY() + 1 || pos.y > level.getMaxBlockY() || level.getDimension() == 1 && pos.y > 125.0) {
+
+                if (this.isWaterMob()) {
+                    pos.y--;
+                }
+
+                if (pos.y <= level.getMinBlockY() || pos.y > level.getMaxBlockY() || level.getDimension() == 1 && pos.y > 125.0) {
                     return;
                 }
 
@@ -85,7 +99,7 @@ public abstract class AbstractEntitySpawner implements EntitySpawner {
                 }
 
                 try {
-                    spawn(player, pos, level);
+                    this.spawn(player, pos, level);
                 } catch (Exception e) {
                     Server.getInstance().getLogger().error("Error while spawning entity", e);
                 }

@@ -120,4 +120,12 @@ public interface ChunkSection {
     default boolean compress() {
         return false;
     }
+
+    default boolean isDirty() {
+        return true;
+    }
+
+    default void setDirty() {
+
+    }
 }

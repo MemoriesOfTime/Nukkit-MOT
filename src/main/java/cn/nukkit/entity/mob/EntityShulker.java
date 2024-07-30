@@ -52,6 +52,12 @@ public class EntityShulker extends EntityWalkingMob {
         this.fireProof = true;
         this.noFallDamage = true;
         this.setDamage(Utils.getEmptyDamageArray());
+
+        if (this.namedTag.contains("Color")) {
+            this.dataProperties.putInt(DATA_VARIANT, this.namedTag.getByte("Color"));
+        } else {
+            this.dataProperties.putInt(DATA_VARIANT, 16);
+        }
     }
 
     @Override

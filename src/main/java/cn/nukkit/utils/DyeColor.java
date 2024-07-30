@@ -1,5 +1,7 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.item.ItemDye;
+
 /**
  * Dye color enum
  */
@@ -111,7 +113,7 @@ public enum DyeColor {
      * @return DyeColor
      */
     public static DyeColor getByDyeData(int dyeColorMeta) {
-        return BY_DYE_DATA[dyeColorMeta & 0x0f];
+        return BY_DYE_DATA[convertNewToOld(dyeColorMeta) & 0x0f];
     }
 
     /**
@@ -121,6 +123,16 @@ public enum DyeColor {
      * @return DyeColor
      */
     public static DyeColor getByWoolData(int woolColorMeta) {
-        return BY_WOOL_DATA[woolColorMeta & 0x0f];
+        return BY_WOOL_DATA[convertNewToOld(woolColorMeta) & 0x0f];
+    }
+
+    private static int convertNewToOld(int meta) {
+        return switch (meta) {
+            case ItemDye.BLACK_NEW -> ItemDye.BLACK;
+            case ItemDye.BROWN_NEW -> ItemDye.BROWN;
+            case ItemDye.BLUE_NEW -> ItemDye.BLUE;
+            case ItemDye.WHITE_NEW -> ItemDye.WHITE;
+            default -> meta;
+        };
     }
 }

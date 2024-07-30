@@ -9,6 +9,7 @@ import cn.nukkit.entity.mob.EntitySnowGolem;
 import cn.nukkit.entity.passive.EntityStrider;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.event.entity.EntityRegainHealthEvent;
 import cn.nukkit.event.potion.PotionApplyEvent;
 import cn.nukkit.utils.ServerException;
@@ -220,6 +221,9 @@ public class Potion implements Cloneable {
         switch (this.id) {
             case INSTANT_HEALTH:
             case INSTANT_HEALTH_II:
+                if (!entity.canBeAffected(this.id)) {
+                    break;
+                }
                 if (entity instanceof EntitySmite) {
                     entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * (6 << (applyEffect.getAmplifier() + 1)))));
                 } else {
@@ -227,6 +231,9 @@ public class Potion implements Cloneable {
                 }
                 break;
             case HARMING:
+                if (!entity.canBeAffected(this.id)) {
+                    break;
+                }
                 if (entity instanceof EntitySmite) {
                     entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
                 } else {
@@ -234,6 +241,9 @@ public class Potion implements Cloneable {
                 }
                 break;
             case HARMING_II:
+                if (!entity.canBeAffected(this.id)) {
+                    break;
+                }
                 if (entity instanceof EntitySmite) {
                     entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
                 } else {
@@ -242,7 +252,7 @@ public class Potion implements Cloneable {
                 break;
             default:
                 applyEffect.setDuration((int) ((splash ? health : 1) * (double) applyEffect.getDuration() + 0.5));
-                entity.addEffect(applyEffect);
+                entity.addEffect(applyEffect, this.splash ? EntityPotionEffectEvent.Cause.POTION_SPLASH : EntityPotionEffectEvent.Cause.POTION_DRINK);
         }
     }
 

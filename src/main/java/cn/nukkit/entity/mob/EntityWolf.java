@@ -165,29 +165,29 @@ public class EntityWolf extends EntityTameableMob {
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
         int healable = this.getHealableItem(item);
 
-        if (item.getId() == ItemID.BONE && !this.hasOwner() && !this.isAngry()) {
-            if (Utils.rand(1, 3) == 3) {
+        if (item.getId() == ItemID.BONE) {
+            if (!this.hasOwner() && !this.isAngry()) {
+                if (Utils.rand(1, 3) == 3) {
+                    EntityEventPacket packet = new EntityEventPacket();
+                    packet.eid = this.getId();
+                    packet.event = EntityEventPacket.TAME_SUCCESS;
+                    player.dataPacket(packet);
+
+                    this.setMaxHealth(20);
+                    this.setHealth(20);
+                    this.setOwner(player);
+                    this.setCollarColor(DyeColor.RED);
+                    this.getLevel().dropExpOrb(this, Utils.rand(1, 7));
+                }
+
                 EntityEventPacket packet = new EntityEventPacket();
                 packet.eid = this.getId();
-                packet.event = EntityEventPacket.TAME_SUCCESS;
+                packet.event = EntityEventPacket.TAME_FAIL;
                 player.dataPacket(packet);
 
-                this.setMaxHealth(20);
-                this.setHealth(20);
-                this.setOwner(player);
-                this.setCollarColor(DyeColor.RED);
-                this.getLevel().dropExpOrb(this, Utils.rand(1, 7));
+                return true;
             }
-
-            EntityEventPacket packet = new EntityEventPacket();
-            packet.eid = this.getId();
-            packet.event = EntityEventPacket.TAME_FAIL;
-            player.dataPacket(packet);
-
-            return true;
-        }
-
-        if (item.getId() == Item.DYE) {
+        } else if (item.getId() == Item.DYE) {
             if (this.hasOwner() && player.equals(this.getOwner())) {
                 this.setCollarColor(((ItemDye) item).getDyeColor());
                 return true;
@@ -196,7 +196,9 @@ public class EntityWolf extends EntityTameableMob {
             if (!this.isInLove() || healable != 0 && this.getHealth() < this.getMaxHealth()) {
                 this.getLevel().addSound(this, Sound.RANDOM_EAT);
                 this.getLevel().addParticle(new ItemBreakParticle(this.add(0, this.getHeight() * 0.75F, 0), Item.get(item.getId(), 0, 1)));
-                this.setInLove();
+                if (!this.isInLoveCooldown()) {
+                    this.setInLove();
+                }
 
                 if (healable != 0) {
                     this.setHealth(Math.max(this.getMaxHealth(), this.getHealth() + healable));
@@ -253,7 +255,7 @@ public class EntityWolf extends EntityTameableMob {
                     (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));
             }
 
-            this.setMotion(tempVector.setComponents(0, this.getGravity() * 6, 0)); // TODO: Jump before attack
+            this.setMotion(tempVector.setComponents(0, this.getGravity() * 5, 0)); // TODO: Jump before attack
 
             entity.attack(new EntityDamageByEntityEvent(this, entity, EntityDamageEvent.DamageCause.ENTITY_ATTACK, damage));
         }
@@ -315,7 +317,9 @@ public class EntityWolf extends EntityTameableMob {
 
     @Override
     public boolean canDespawn() {
-        if (this.hasOwner(false)) return false;
+        if (this.hasOwner(false)) {
+            return false;
+        }
         return super.canDespawn();
     }
 

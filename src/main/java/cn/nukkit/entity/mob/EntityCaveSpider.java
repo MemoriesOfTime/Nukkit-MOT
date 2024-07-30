@@ -5,6 +5,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityArthropod;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -71,7 +72,7 @@ public class EntityCaveSpider extends EntityWalkingMob implements EntityArthropo
                 EntityDamageByEntityEvent ev = new EntityDamageByEntityEvent(this, player, EntityDamageEvent.DamageCause.ENTITY_ATTACK, damage);
 
                 if (player.attack(ev) && !ev.isCancelled() && this.server.getDifficulty() > 0) {
-                    player.addEffect(Effect.getEffect(Effect.POISON).setDuration(this.server.getDifficulty() > 1 ? 300 : 140));
+                    player.addEffect(Effect.getEffect(Effect.POISON).setDuration(this.server.getDifficulty() > 1 ? 300 : 140), EntityPotionEffectEvent.Cause.ATTACK);
                 }
             }
         }
@@ -95,5 +96,13 @@ public class EntityCaveSpider extends EntityWalkingMob implements EntityArthropo
     @Override
     public String getName() {
         return this.hasCustomName() ? this.getNameTag() : "Cave Spider";
+    }
+
+    @Override
+    public boolean canBeAffected(int effectId) {
+        if (effectId == Effect.POISON) {
+            return false;
+        }
+        return super.canBeAffected(effectId);
     }
 }

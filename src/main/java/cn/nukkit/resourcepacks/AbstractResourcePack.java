@@ -46,4 +46,15 @@ public abstract class AbstractResourcePack implements ResourcePack {
                 version.get(1).getAsString(),
                 version.get(2).getAsString());
     }
+
+    @Override
+    public int hashCode() {
+        return this.getPackId().hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (!(obj instanceof ResourcePack anotherPack)) return false;
+        return this.getPackId().equals(anotherPack.getPackId());
+    }
 }
