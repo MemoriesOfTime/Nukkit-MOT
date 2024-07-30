@@ -2,15 +2,19 @@ package cn.nukkit.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityFirework;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
-import cn.nukkit.nbt.tag.*;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.DyeColor;
 import org.apache.commons.math3.util.FastMath;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -116,23 +120,18 @@ public class ItemFirework extends Item {
         this.getNamedTag().getCompound("Fireworks").putList(new ListTag<CompoundTag>("Explosions"));
     }
 
-    private void spawnFirework(Level level, Vector3 pos) {
-        CompoundTag nbt = new CompoundTag()
-                .putList(new ListTag<DoubleTag>("Pos")
-                        .add(new DoubleTag("", pos.x + 0.5))
-                        .add(new DoubleTag("", pos.y + 0.5))
-                        .add(new DoubleTag("", pos.z + 0.5)))
-                .putList(new ListTag<DoubleTag>("Motion")
-                        .add(new DoubleTag("", 0))
-                        .add(new DoubleTag("", 0))
-                        .add(new DoubleTag("", 0)))
-                .putList(new ListTag<FloatTag>("Rotation")
-                        .add(new FloatTag("", 0))
-                        .add(new FloatTag("", 0)))
+    public EntityFirework spawnFirework(Level level, Vector3 pos) {
+        return spawnFirework(level, pos, null);
+    }
+
+    public EntityFirework spawnFirework(Level level, Vector3 pos, @Nullable Vector3 motion) {
+        boolean projectile = motion != null;
+        CompoundTag nbt = Entity.getDefaultNBT(pos, motion, projectile ? (float) motion.yRotFromDirection() : 0, projectile ? (float) motion.xRotFromDirection() : 0)
                 .putCompound("FireworkItem", NBTIO.putItemHelper(this));
 
-        EntityFirework entity = new EntityFirework(level.getChunk(pos.getFloorX() >> 4, pos.getFloorZ() >> 4), nbt);
+        EntityFirework entity = new EntityFirework(level.getChunk(pos.getChunkX(), pos.getChunkZ()), nbt, projectile);
         entity.spawnToAll();
+        return entity;
     }
 
     public int getFlight() {

@@ -408,11 +408,12 @@ public class BlockStorage {
 
         for (int i = 0; i < SECTION_SIZE; i++) {
             int bid = getBlockId(i);
+            int blockData = getBlockData(i);
             if (antiXray && bid < Block.MAX_BLOCK_ID && Level.xrayableBlocks[bid]) {
                 bid = Block.STONE;
+                blockData = 0;
             }
-            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, getBlockData(i));
-            palettedBlockStorage.setBlock(i, runtimeId);
+            palettedBlockStorage.setBlock(i, GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, blockData));
         }
 
         palettedBlockStorage.writeTo(stream);
