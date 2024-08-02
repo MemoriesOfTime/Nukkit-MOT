@@ -12,6 +12,7 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
@@ -1699,5 +1700,20 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public boolean isSuspiciousBlock() {
         return false;
+    }
+
+    public PersistentDataContainer getPersistentDataContainer() {
+        if (!this.isValid()) {
+            throw new IllegalStateException("Block does not have valid level");
+        }
+        return this.level.getPersistentDataContainer(this);
+    }
+
+    @SuppressWarnings("unused")
+    public boolean hasPersistentDataContainer() {
+        if (!this.isValid()) {
+            throw new IllegalStateException("Block does not have valid level");
+        }
+        return this.level.hasPersistentDataContainer(this);
     }
 }
