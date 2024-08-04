@@ -7,7 +7,6 @@ import org.jetbrains.annotations.NotNull;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-
 public class Geometry implements NBTData {
     private final String geometryName;
     private String culling = "";

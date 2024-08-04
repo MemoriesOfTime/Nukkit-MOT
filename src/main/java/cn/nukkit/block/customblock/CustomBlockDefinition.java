@@ -11,7 +11,7 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.tag.*;
 import com.google.common.base.Preconditions;
-import lombok.extern.slf4j.Slf4j;
+import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -24,7 +24,7 @@ import java.util.function.Consumer;
  * <p>
  * CustomBlockDefinition is used to get the data of the block behavior_pack sent to the client. The methods provided in {@link Builder} control the data sent to the client, if you need to control some of the server-side behavior, please override the methods in {@link Block Block}.
  */
-@Slf4j
+@Log4j2
 public record CustomBlockDefinition(String identifier, CompoundTag nbt, int legacyId,  Class<? extends BlockContainer> typeOf) {
 
     /**

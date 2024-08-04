@@ -7,8 +7,6 @@ import cn.nukkit.nbt.tag.StringTag;
 /**
  * The type Permutation builder.
  */
-
-
 public record Permutation(Component component, String condition, String[] blockTags) implements NBTData {
     public Permutation(Component component, String condition) {
         this(component, condition, new String[]{});

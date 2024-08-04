@@ -8,7 +8,6 @@ import lombok.Getter;
 
 import javax.annotation.Nullable;
 
-
 @Builder
 @Getter
 public class Component implements NBTData {

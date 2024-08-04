@@ -10,8 +10,6 @@ import java.util.Locale;
  * <p>
  * Used to map the face of a block to a material instance, and set the rendering method and parameters.
  */
-
-
 public class Materials implements NBTData {
     private final CompoundTag tag;
 
