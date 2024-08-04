@@ -23,6 +23,10 @@ public class ByteTag extends NumberTag<Integer> {
         super(name);
     }
 
+    public ByteTag(int data) {
+        this("", data);
+    }
+
     public ByteTag(String name, int data) {
         super(name);
         this.data = data;

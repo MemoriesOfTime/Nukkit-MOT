@@ -2,21 +2,21 @@ package cn.nukkit.customblock;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.customblock.container.BlockContainer;
+import cn.nukkit.customblock.container.BlockStorageContainer;
 import cn.nukkit.customblock.container.data.*;
+import cn.nukkit.customblock.properties.*;
 import cn.nukkit.item.customitem.data.ItemCreativeCategory;
 import cn.nukkit.item.customitem.data.ItemCreativeGroup;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
-import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.nbt.tag.FloatTag;
-import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.nbt.tag.StringTag;
+import cn.nukkit.nbt.tag.*;
 import com.google.common.base.Preconditions;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -328,36 +328,39 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
          */
         @Nullable
         private ListTag<CompoundTag> getPropertiesNBT() {
-            //TODO
-            /*if (this.customBlock instanceof Block block) {
-                var properties = block.getProperties();
-                Set<BlockPropertyType<?>> propertyTypeSet = properties.getPropertyTypeSet();
+            if (this.blockContainer instanceof BlockStorageContainer block) {
+                BlockProperties properties = block.getBlockProperties();
+                Set<BlockProperty<?>> propertyTypeSet = properties.getPropertyTypeSet();
                 if (propertyTypeSet.isEmpty()) {
                     return null;
                 }
                 var nbtList = new ListTag<CompoundTag>();
                 for (var each : propertyTypeSet) {
-                    if (each instanceof BooleanPropertyType booleanBlockProperty) {
+                    if (each instanceof BooleanBlockProperty booleanBlockProperty) {
                         nbtList.add(new CompoundTag().putString("name", booleanBlockProperty.getName())
                                 .putList("enum", new ListTag<>()
                                         .add(new ByteTag(0))
                                         .add(new ByteTag(1))));
-                    } else if (each instanceof IntPropertyType intBlockProperty) {
+                    } else if (each instanceof IntBlockProperty intBlockProperty) {
                         var enumList = new ListTag<IntTag>();
-                        for (int i = intBlockProperty.getMin(); i <= intBlockProperty.getMax(); i++) {
+                        for (int i = intBlockProperty.getMinValue(); i <= intBlockProperty.getMaxValue(); i++) {
                             enumList.add(new IntTag(i));
                         }
                         nbtList.add(new CompoundTag().putString("name", intBlockProperty.getName()).putList("enum", enumList));
-                    } else if (each instanceof EnumPropertyType<?> arrayBlockProperty) {
+                    } else if (each instanceof EnumBlockProperty<?> arrayBlockProperty) {
                         var enumList = new ListTag<StringTag>();
-                        for (var e : arrayBlockProperty.getValidValues()) {
-                            enumList.add(new StringTag(e.name().toLowerCase(Locale.ENGLISH)));
+                        for (var e : arrayBlockProperty.getValues()) {
+                            if (e instanceof Enum<?> en) {
+                                enumList.add(new StringTag(en.name().toLowerCase(Locale.ENGLISH)));
+                            } else {
+                                enumList.add(new StringTag(e.toString().toLowerCase(Locale.ENGLISH)));
+                            }
                         }
                         nbtList.add(new CompoundTag().putString("name", arrayBlockProperty.getName()).putList("enum", enumList));
                     }
                 }
                 return nbtList;
-            }*/
+            }
             return null;
         }
 

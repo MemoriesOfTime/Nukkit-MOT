@@ -47,7 +47,7 @@ import java.util.function.Supplier;
 public class CustomBlockManager {
 
     public static final Path BIN_PATH = Paths.get("bin/");
-    public static final int LOWEST_CUSTOM_BLOCK_ID = 5000;
+    public static final int LOWEST_CUSTOM_BLOCK_ID = 10000;
 
     private static CustomBlockManager instance;
 

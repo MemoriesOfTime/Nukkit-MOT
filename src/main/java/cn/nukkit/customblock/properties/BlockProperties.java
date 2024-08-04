@@ -4,8 +4,10 @@ import cn.nukkit.customblock.properties.exception.BlockPropertyNotFoundException
 import cn.nukkit.utils.functional.ToIntTriFunctionTwoInts;
 import cn.nukkit.utils.functional.ToLongTriFunctionOneIntOneLong;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import net.daporkchop.lib.common.function.plain.TriFunction;
+import org.jetbrains.annotations.UnmodifiableView;
 
 import java.io.Serializable;
 import java.math.BigInteger;
@@ -14,6 +16,7 @@ import java.util.function.Consumer;
 import java.util.function.ObjIntConsumer;
 
 public class BlockProperties {
+    private final Set<BlockProperty<?>> propertyTypeSet;
     private final Map<String, RegisteredBlockProperty> byName;
     private final int bitSize;
     private final BlockProperties itemBlockProperties;
@@ -28,6 +31,8 @@ public class BlockProperties {
         } else {
             this.itemBlockProperties = itemBlockProperties;
         }
+
+        this.propertyTypeSet = Sets.newHashSet(properties);
 
         Map<String, RegisteredBlockProperty> registry = new Object2ObjectLinkedOpenHashMap<>(properties.length);
         Map<String, RegisteredBlockProperty> byPersistenceName = new Object2ObjectLinkedOpenHashMap<>(properties.length);
@@ -407,6 +412,11 @@ public class BlockProperties {
         for (RegisteredBlockProperty registry : this.byName.values()) {
             consumer.accept(registry.getProperty());
         }
+    }
+
+    @UnmodifiableView
+    public Set<BlockProperty<?>> getPropertyTypeSet() {
+        return Collections.unmodifiableSet(propertyTypeSet);
     }
 
     @Override
