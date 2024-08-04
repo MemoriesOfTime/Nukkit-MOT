@@ -532,6 +532,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             list[DEEPSLATE] = BlockDeepslate.class; // 633
 
+            list[GLOW_LICHEN] = BlockGlowLichen.class; //666
             list[CANDLE] = BlockCandle.class; //667
             list[WHITE_CANDLE] = BlockCandleWhite.class; //668
             list[ORANGE_CANDLE] = BlockCandleOrange.class; //669
@@ -854,7 +855,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        return this.getLevel().setBlock(this, this, true, true);
+        return this.canPlaceOn(block.down(), target) && this.getLevel().setBlock(this, this, true, true);
+    }
+
+    public boolean canPlaceOn(Block floor, Position pos) {
+        return this.canBePlaced();
     }
 
     public boolean canHarvestWithHand() {

@@ -532,6 +532,7 @@ public interface BlockID {
 
     int DEEPSLATE = 633;
 
+    int GLOW_LICHEN = 666;
     int CANDLE = 667;
     int WHITE_CANDLE = 668;
     int ORANGE_CANDLE = 669;
