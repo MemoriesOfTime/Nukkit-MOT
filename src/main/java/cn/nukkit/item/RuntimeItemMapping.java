@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.item.RuntimeItems.MappingEntry;
 import cn.nukkit.item.customitem.CustomItem;
@@ -94,18 +95,7 @@ public class RuntimeItemMapping {
                 }
             }
 
-            int fullId = this.getFullId(legacyId, damage);
-            LegacyEntry legacyEntry = new LegacyEntry(legacyId, hasDamage, damage);
-
-            this.runtime2Legacy.put(runtimeId, legacyEntry);
-            this.identifier2Legacy.put(identifier, legacyEntry);
-            if (!hasDamage && this.legacy2Runtime.containsKey(fullId)) {
-                log.debug("RuntimeItemMapping contains duplicated legacy item state runtimeId=" + runtimeId + " identifier=" + identifier);
-            } else {
-                RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, runtimeId, hasDamage);
-                this.legacy2Runtime.put(fullId, runtimeEntry);
-                this.itemPaletteEntries.add(runtimeEntry);
-            }
+            this.registerItem(identifier, runtimeId, legacyId, damage, hasDamage);
         }
 
         this.generatePalette();
@@ -113,6 +103,34 @@ public class RuntimeItemMapping {
 
     Object2IntMap<String> getName2RuntimeId() {
         return name2RuntimeId;
+    }
+
+    public void registerItem(String identifier, int runtimeId, int legacyId, int damage) {
+        this.registerItem(identifier, runtimeId, legacyId, damage, false);
+    }
+
+    public void registerItem(String identifier, int runtimeId, int legacyId, int damage, boolean hasDamage) {
+        int fullId = this.getFullId(legacyId, damage);
+        LegacyEntry legacyEntry = new LegacyEntry(legacyId, hasDamage, damage);
+
+        if (Nukkit.DEBUG > 1) {
+            if (this.runtime2Legacy.containsKey(runtimeId)) {
+                log.warn("RuntimeItemMapping: Registering " + identifier + " but runtime id " + runtimeId + " is already used");
+            }
+        }
+
+        this.runtimeId2Name.put(runtimeId, identifier);
+        this.name2RuntimeId.put(identifier, runtimeId);
+
+        this.runtime2Legacy.put(runtimeId, legacyEntry);
+        this.identifier2Legacy.put(identifier, legacyEntry);
+        if (!hasDamage && this.legacy2Runtime.containsKey(fullId)) {
+            log.debug("RuntimeItemMapping contains duplicated legacy item state runtimeId=" + runtimeId + " identifier=" + identifier);
+        } else {
+            RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, runtimeId, hasDamage);
+            this.legacy2Runtime.put(fullId, runtimeEntry);
+            this.itemPaletteEntries.add(runtimeEntry);
+        }
     }
 
     synchronized boolean registerCustomItem(CustomItem customItem) {
@@ -166,7 +184,7 @@ public class RuntimeItemMapping {
         this.legacy2Runtime.put(fullId, new RuntimeEntry(identifier, legacyId, false));
     }
 
-    private void generatePalette() {
+    public void generatePalette() {
         BinaryStream paletteBuffer = new BinaryStream();
         int size = 0;
         for (RuntimeEntry entry : this.itemPaletteEntries) {

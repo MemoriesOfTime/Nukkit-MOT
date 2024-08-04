@@ -2,6 +2,7 @@ package cn.nukkit.utils;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.customblock.CustomBlockManager;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.NukkitRandom;
@@ -75,6 +76,9 @@ public class Utils {
     public static boolean hasItemOrBlock(int id) {
         if (id < 0) {
             int blockId = 255 - id;
+            if (blockId > CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+                return CustomBlockManager.get().getBlock(blockId) != null;
+            }
             return blockId < Block.MAX_BLOCK_ID && Block.list[blockId] != null;
         } else {
             return id < Item.list.length && Item.list[id] != null;

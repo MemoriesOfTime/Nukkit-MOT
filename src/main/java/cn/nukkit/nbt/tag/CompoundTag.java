@@ -304,6 +304,12 @@ public class CompoundTag extends Tag implements Cloneable {
         return ((ByteArrayTag) tags.get(name)).data;
     }
 
+    public byte[] getByteArray(String name, int defaultSize) {
+        Tag t = tags.get(name);
+        if (t == null) return new byte[defaultSize];
+        return ((ByteArrayTag) t).data;
+    }
+
     public int[] getIntArray(String name) {
         if (!tags.containsKey(name)) return new int[0];
         return ((IntArrayTag) tags.get(name)).data;

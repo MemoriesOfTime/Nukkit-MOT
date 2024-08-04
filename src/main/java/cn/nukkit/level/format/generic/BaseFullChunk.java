@@ -3,11 +3,14 @@ package cn.nukkit.level.format.generic;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.PersistentDataContainerBlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.persistence.PersistentDataContainer;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.NumberTag;
@@ -452,10 +455,21 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             this.tiles.remove(blockEntity.getId());
             int index = ((blockEntity.getFloorZ() & 0x0f) << 12) | ((blockEntity.getFloorX() & 0x0f) << 8) | (blockEntity.getFloorY() & 0xff);
             this.tileList.remove(index);
+
+            if (!(blockEntity instanceof PersistentDataContainerBlockEntity) && blockEntity.hasPersistentDataContainer()) {
+                this.createPersistentBlockContainer(blockEntity, blockEntity.getPersistentDataContainer().getStorage());
+            }
+
             if (this.isInit) {
                 this.setChanged();
             }
         }
+    }
+
+    private BlockEntity createPersistentBlockContainer(Vector3 pos, CompoundTag storage) {
+        CompoundTag tag = BlockEntity.getDefaultCompound(pos, BlockEntity.PERSISTENT_CONTAINER);
+        tag.putCompound(PersistentDataContainer.STORAGE_TAG, storage);
+        return BlockEntity.createBlockEntity(BlockEntity.PERSISTENT_CONTAINER, this, tag);
     }
 
     @Override

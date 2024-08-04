@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.customblock.CustomBlockManager;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
@@ -12,6 +13,7 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
@@ -681,6 +683,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id < 0) {
             id = 255 - id;
         }
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         int fullId = id << DATA_BITS;
         if (meta != null) {
             int iMeta = meta;
@@ -718,6 +725,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             id = 255 - id;
         }
 
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         Block block;
         int fullId = id << DATA_BITS;
         if (meta != null && meta > DATA_SIZE) {
@@ -751,6 +762,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id < 0) {
             id = 255 - id;
         }
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         int fullId = id << DATA_BITS;
         if (fullId >= fullList.length) {
             log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, data);
@@ -775,8 +791,13 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int fullId, Level level, int x, int y, int z, int layer) {
+        int id = fullId << DATA_BITS;
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         if (fullId >= fullList.length || fullList[fullId] == null) {
-            int id = fullId << DATA_BITS;
             int meta = fullId & DATA_BITS;
             log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
             return new BlockUnknown(id, meta);
@@ -795,6 +816,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int id, int meta, Level level, int x, int y, int z, int layer) {
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         Block block;
         if (meta <= DATA_SIZE) {
             block = fullList[id << DATA_BITS | meta].clone();
@@ -808,6 +833,20 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         block.level = level;
         //block.layer = layer;
         return block;
+    }
+
+    public static int getBlockLight(int blockId) {
+        if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return light[0]; // TODO: just temporary
+        }
+        return light[blockId];
+    }
+
+    public static int getBlockLightFilter(int blockId) {
+        if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return lightFilter[0]; // TODO: just temporary
+        }
+        return lightFilter[blockId];
     }
 
     public static Block fromFullId(int fullId) {
@@ -1699,5 +1738,20 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public boolean isSuspiciousBlock() {
         return false;
+    }
+
+    public PersistentDataContainer getPersistentDataContainer() {
+        if (!this.isValid()) {
+            throw new IllegalStateException("Block does not have valid level");
+        }
+        return this.level.getPersistentDataContainer(this);
+    }
+
+    @SuppressWarnings("unused")
+    public boolean hasPersistentDataContainer() {
+        if (!this.isValid()) {
+            throw new IllegalStateException("Block does not have valid level");
+        }
+        return this.level.hasPersistentDataContainer(this);
     }
 }

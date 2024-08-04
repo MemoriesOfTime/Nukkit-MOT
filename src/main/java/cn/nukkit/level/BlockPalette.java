@@ -1,6 +1,7 @@
 package cn.nukkit.level;
 
 import cn.nukkit.Server;
+import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -10,6 +11,7 @@ import cn.nukkit.utils.Utils;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntMaps;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
@@ -32,6 +34,8 @@ public class BlockPalette {
     private final Map<CompoundTag, Integer> stateToLegacy = new HashMap<>();
 
     private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
+
+    private volatile boolean locked;
 
     public BlockPalette(int protocol) {
         this.protocol = protocol;
@@ -95,10 +99,53 @@ public class BlockPalette {
         }
     }
 
+    public int getProtocol() {
+        return this.protocol;
+    }
+
+    public Int2IntMap getLegacyToRuntimeIdMap() {
+        return Int2IntMaps.unmodifiable(this.legacyToRuntimeId);
+    }
+
     public void clearStates() {
+        this.locked = false;
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
         this.stateToLegacy.clear();
+    }
+
+    public void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
+        if (this.locked) {
+            throw new IllegalStateException("Block palette is already locked!");
+        }
+
+        int legacyId = blockId << Block.DATA_BITS | data;
+        this.legacyToRuntimeId.put(legacyId, runtimeId);
+        this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
+        this.stateToLegacy.putIfAbsent(blockState, legacyId);
+
+        // Hack: Map IDs for item frame up & down states
+        if (blockId == BlockID.ITEM_FRAME_BLOCK || blockId == BlockID.GLOW_FRAME) {
+            if (data == 7) {
+                int offset = 5;
+
+                runtimeId = runtimeId + offset;
+                legacyId = blockId << Block.DATA_BITS | 5; // Up
+                this.legacyToRuntimeId.put(legacyId, runtimeId);
+                this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
+
+                int offset2 = 0;
+
+                runtimeId = runtimeId + offset + offset2;
+                legacyId = blockId << Block.DATA_BITS | 4; // Down
+                this.legacyToRuntimeId.put(legacyId, runtimeId);
+                this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
+            }
+        }
+    }
+
+    public void lock() {
+        this.locked = true;
     }
 
     public int getRuntimeId(int id) {
