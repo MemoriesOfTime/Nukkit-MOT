@@ -1,6 +1,8 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
+import cn.nukkit.customblock.CustomBlockDefinition;
+import cn.nukkit.customblock.CustomBlockManager;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -13,6 +15,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -93,6 +96,7 @@ public class StartGamePacket extends DataPacket {
     public boolean isServerAuthoritativeBlockBreaking;
     public long currentTick;
     public int enchantmentSeed;
+    public Collection<CustomBlockDefinition> blockDefinitions = CustomBlockManager.get().getBlockDefinitions();
     public String multiplayerCorrelationId = "";
     public boolean isDisablingPersonas;
     public boolean isDisablingCustomSkins;
@@ -316,7 +320,15 @@ public class StartGamePacket extends DataPacket {
         }
         if (protocol > ProtocolInfo.v1_5_0) {
             if (protocol >= ProtocolInfo.v1_16_100) {
-                this.putUnsignedVarInt(0); // Custom blocks
+                if (this.blockDefinitions != null && !this.blockDefinitions.isEmpty()) {
+                    this.putUnsignedVarInt(this.blockDefinitions.size());
+                    for (CustomBlockDefinition definition : this.blockDefinitions) {
+                        this.putString(definition.getIdentifier());
+                        this.putNbtTag(definition.getNetworkData());
+                    }
+                } else {
+                    this.putUnsignedVarInt(0); // No custom blocks
+                }
             } else {
                 this.put(GlobalBlockPalette.getCompiledTable(this.protocol));
             }

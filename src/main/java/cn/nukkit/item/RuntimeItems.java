@@ -43,6 +43,8 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping671;
     private static RuntimeItemMapping mapping685;
 
+    public static RuntimeItemMapping[] VALUES;
+
     private static boolean initialized;
 
     public static void init() {
@@ -104,6 +106,30 @@ public class RuntimeItems {
         mapping662 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_70);
         mapping671 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_80);
         mapping685 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_0);
+
+        VALUES = new RuntimeItemMapping[]{
+                mapping361,
+                mapping419,
+                mapping440,
+                mapping448,
+                mapping475,
+                mapping486,
+                mapping503,
+                mapping527,
+                mapping534,
+                mapping560,
+                mapping567,
+                mapping575,
+                mapping582,
+                mapping589,
+                mapping594,
+                mapping618,
+                mapping630,
+                mapping649,
+                mapping662,
+                mapping671,
+                mapping685
+        };
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {

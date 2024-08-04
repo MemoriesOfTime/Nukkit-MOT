@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.customblock.CustomBlockManager;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
@@ -682,6 +683,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id < 0) {
             id = 255 - id;
         }
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         int fullId = id << DATA_BITS;
         if (meta != null) {
             int iMeta = meta;
@@ -719,6 +725,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             id = 255 - id;
         }
 
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         Block block;
         int fullId = id << DATA_BITS;
         if (meta != null && meta > DATA_SIZE) {
@@ -752,6 +762,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id < 0) {
             id = 255 - id;
         }
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         int fullId = id << DATA_BITS;
         if (fullId >= fullList.length) {
             log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, data);
@@ -776,8 +791,13 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int fullId, Level level, int x, int y, int z, int layer) {
+        int id = fullId << DATA_BITS;
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         if (fullId >= fullList.length || fullList[fullId] == null) {
-            int id = fullId << DATA_BITS;
             int meta = fullId & DATA_BITS;
             log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
             return new BlockUnknown(id, meta);
@@ -796,6 +816,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int id, int meta, Level level, int x, int y, int z, int layer) {
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         Block block;
         if (meta <= DATA_SIZE) {
             block = fullList[id << DATA_BITS | meta].clone();
