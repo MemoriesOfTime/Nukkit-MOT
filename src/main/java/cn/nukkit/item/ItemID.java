@@ -346,4 +346,6 @@ public interface ItemID {
     int RECORD_OTHERSIDE = 773;
 
     int SOUL_CAMPFIRE = 801;
+
+    int GLOW_ITEM_FRAME = 850;
 }

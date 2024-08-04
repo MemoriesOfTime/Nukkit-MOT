@@ -385,6 +385,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
             list[SOUL_CAMPFIRE] = ItemCampfireSoul.class; //801
 
+            list[GLOW_ITEM_FRAME] = ItemItemFrameGlow.class; //850
+
             for (int i = 0; i < 256; ++i) {
                 if (Block.list[i] != null) {
                     list[i] = Block.list[i];
