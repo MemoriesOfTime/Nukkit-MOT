@@ -835,6 +835,20 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return block;
     }
 
+    public static int getBlockLight(int blockId) {
+        if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return light[0]; // TODO: just temporary
+        }
+        return light[blockId];
+    }
+
+    public static int getBlockLightFilter(int blockId) {
+        if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return lightFilter[0]; // TODO: just temporary
+        }
+        return lightFilter[blockId];
+    }
+
     public static Block fromFullId(int fullId) {
         return get(fullId >> DATA_BITS, fullId & DATA_MASK);
     }

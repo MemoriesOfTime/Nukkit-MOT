@@ -119,6 +119,9 @@ public class RuntimeItemMapping {
             }
         }
 
+        this.runtimeId2Name.put(runtimeId, identifier);
+        this.name2RuntimeId.put(identifier, runtimeId);
+
         this.runtime2Legacy.put(runtimeId, legacyEntry);
         this.identifier2Legacy.put(identifier, legacyEntry);
         if (!hasDamage && this.legacy2Runtime.containsKey(fullId)) {

@@ -21,6 +21,11 @@ public class CustomBlockMeta extends BlockMeta implements BlockStorageContainer 
     }
 
     @Override
+    public String getIdentifier() {
+        return this.blockName;
+    }
+
+    @Override
     public int getId() {
         return this.blockId;
     }

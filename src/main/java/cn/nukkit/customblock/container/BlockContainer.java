@@ -4,6 +4,8 @@ import cn.nukkit.level.GlobalBlockPalette;
 
 public interface BlockContainer {
 
+    String getIdentifier();
+
     int getNukkitId();
 
     default int getNukkitDamage() {

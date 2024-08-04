@@ -13,8 +13,11 @@ import cn.nukkit.network.protocol.types.NetworkPermissions;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -29,6 +32,7 @@ public class StartGamePacket extends DataPacket {
     public static final int GAME_PUBLISH_SETTING_FRIENDS_ONLY = 2;
     public static final int GAME_PUBLISH_SETTING_FRIENDS_OF_FRIENDS = 3;
     public static final int GAME_PUBLISH_SETTING_PUBLIC = 4;
+    private static final Logger log = LoggerFactory.getLogger(StartGamePacket.class);
 
     @Override
     public byte pid() {
@@ -323,8 +327,12 @@ public class StartGamePacket extends DataPacket {
                 if (this.blockDefinitions != null && !this.blockDefinitions.isEmpty()) {
                     this.putUnsignedVarInt(this.blockDefinitions.size());
                     for (CustomBlockDefinition definition : this.blockDefinitions) {
-                        this.putString(definition.getIdentifier());
-                        this.putNbtTag(definition.getNetworkData());
+                        this.putString(definition.identifier());
+                        try {
+                            this.put(NBTIO.write(definition.nbt(), ByteOrder.LITTLE_ENDIAN, true));
+                        } catch (IOException e) {
+                            log.error("Error while encoding NBT data of CustomBlockDefinition");
+                        }
                     }
                 } else {
                     this.putUnsignedVarInt(0); // No custom blocks

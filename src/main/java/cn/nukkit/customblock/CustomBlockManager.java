@@ -83,14 +83,14 @@ public class CustomBlockManager {
     }
 
     public void registerCustomBlock(String identifier, int nukkitId, Supplier<BlockContainer> factory) {
-        this.registerCustomBlock(identifier, nukkitId, NbtMap.EMPTY, factory);
+        this.registerCustomBlock(identifier, nukkitId, CustomBlockDefinition.builder(factory.get()).build(), factory);
     }
 
-    public void registerCustomBlock(String identifier, int nukkitId, NbtMap networkData, Supplier<BlockContainer> factory) {
-        this.registerCustomBlock(identifier, nukkitId, null, networkData, meta -> factory.get());
+    public void registerCustomBlock(String identifier, int nukkitId, CustomBlockDefinition blockDefinition, Supplier<BlockContainer> factory) {
+        this.registerCustomBlock(identifier, nukkitId, null, blockDefinition, meta -> factory.get());
     }
 
-    public void registerCustomBlock(String identifier, int nukkitId, BlockProperties properties, NbtMap networkData, BlockContainerFactory factory) {
+    public void registerCustomBlock(String identifier, int nukkitId, BlockProperties properties, CustomBlockDefinition blockDefinition, BlockContainerFactory factory) {
         if (this.closed) {
             throw new IllegalStateException("Block registry was already closed");
         }
@@ -105,7 +105,7 @@ public class CustomBlockManager {
             log.warn("Custom block {} was registered using wrong method! Trying to use sample properties!", identifier);
         }
 
-        if (properties != null && networkData.isEmpty()) {
+        if (properties != null && blockDefinition == null) {
             throw new IllegalArgumentException("Block network data can not be empty for block with more permutations: " + identifier);
         }
 
@@ -113,8 +113,7 @@ public class CustomBlockManager {
         this.legacy2CustomState.put(defaultState.getLegacyId(), defaultState);
 
         // TODO: unsure if this is per state or not
-        CustomBlockDefinition definition = new CustomBlockDefinition(identifier, networkData, defaultState.getLegacyId(), blockSample.getClass());
-        this.blockDefinitions.put(defaultState.getLegacyId(), definition);
+        this.blockDefinitions.put(defaultState.getLegacyId(), blockDefinition);
 
         int itemId = 255 - nukkitId;
         for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
@@ -164,7 +163,7 @@ public class CustomBlockManager {
 
         this.closed = true;
         if (this.legacy2CustomState.isEmpty()) {
-            //return false;
+            return false;
         }
 
         long startTime = System.currentTimeMillis();
@@ -319,7 +318,7 @@ public class CustomBlockManager {
         if (definition == null) {
             return null;
         }
-        return definition.getTypeOf();
+        return definition.typeOf();
     }
 
     private Path getBinPath() {
@@ -333,7 +332,7 @@ public class CustomBlockManager {
     private static int legacyToFullId(int legacyId) {
         int blockId = legacyId >> Block.DATA_BITS;
         int meta = legacyId & Block.DATA_MASK;
-        return (blockId << 6) | meta;
+        return (blockId << Block.DATA_BITS) | meta;
     }
 
     public static CompoundTag convertNbtMap(NbtMap nbt) {

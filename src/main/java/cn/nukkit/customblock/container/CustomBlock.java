@@ -13,6 +13,11 @@ public class CustomBlock extends Block implements BlockContainer {
     }
 
     @Override
+    public String getIdentifier() {
+        return this.blockName;
+    }
+
+    @Override
     public int getId() {
         return this.blockId;
     }
