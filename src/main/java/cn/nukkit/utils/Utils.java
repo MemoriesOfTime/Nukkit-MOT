@@ -2,7 +2,7 @@ package cn.nukkit.utils;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
-import cn.nukkit.customblock.CustomBlockManager;
+import cn.nukkit.block.customblock.CustomBlockManager;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.NukkitRandom;
