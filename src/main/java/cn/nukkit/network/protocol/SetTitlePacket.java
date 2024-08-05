@@ -22,8 +22,12 @@ public class SetTitlePacket extends DataPacket {
     public int fadeInTime = 0;
     public int stayTime = 0;
     public int fadeOutTime = 0;
-    private String xuid = "";
-    private String platformOnlineId = "";
+    public String xuid = "";
+    public String platformOnlineId = "";
+    /**
+     * @since v712
+     */
+    public String filteredTitleText = "";
 
     @Override
     public byte pid() {
@@ -37,23 +41,29 @@ public class SetTitlePacket extends DataPacket {
         this.fadeInTime = this.getVarInt();
         this.stayTime = this.getVarInt();
         this.fadeOutTime = this.getVarInt();
-        if (protocol >= ProtocolInfo.v1_17_10) {
+        if (this.protocol >= ProtocolInfo.v1_17_10) {
             this.xuid = this.getString();
             this.platformOnlineId = this.getString();
+            if (this.protocol >= ProtocolInfo.v1_21_20) {
+                this.filteredTitleText = this.getString();
+            }
         }
     }
 
     @Override
     public void encode() {
         this.reset();
-        this.putVarInt(type);
-        this.putString(text);
-        this.putVarInt(fadeInTime);
-        this.putVarInt(stayTime);
-        this.putVarInt(fadeOutTime);
-        if (protocol >= ProtocolInfo.v1_17_10) {
-            this.putString(xuid);
-            this.putString(platformOnlineId);
+        this.putVarInt(this.type);
+        this.putString(this.text);
+        this.putVarInt(this.fadeInTime);
+        this.putVarInt(this.stayTime);
+        this.putVarInt(this.fadeOutTime);
+        if (this.protocol >= ProtocolInfo.v1_17_10) {
+            this.putString(this.xuid);
+            this.putString(this.platformOnlineId);
+            if (this.protocol >= ProtocolInfo.v1_21_20) {
+                this.putString(this.filteredTitleText);
+            }
         }
     }
 }

@@ -538,6 +538,10 @@ public class LevelSoundEventPacket extends DataPacket {
      */
     public static final int SOUND_WIND_CHARGE_BURST = 509;
     /**
+     * @since v712
+     */
+    public static final int SOUND_IMITATE_BOGGED = 510;
+    /**
      * @since v671
      */
     public static final int SOUND_ARMOR_CRACK_WOLF = 511;
@@ -609,8 +613,12 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v685
      */
     public static final int SOUND_RECORD_PRECIPICE = 529;
+    /**
+     * @since v712
+     */
+    public static final int SOUND_VAULT_REJECT_REWARDED_PLAYER = 530;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(530);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(531);
 
     public int sound;
     public float x;

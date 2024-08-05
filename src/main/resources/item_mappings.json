@@ -1,4 +1,97 @@
 {
+  "minecraft:dirt": {
+    "protocol": 712,
+    "0": "minecraft:dirt",
+    "1": "minecraft:coarse_dirt"
+  },
+  "minecraft:yellow_flower": {
+    "protocol": 712,
+    "0": "minecraft:dandelion"
+  },
+  "minecraft:sand": {
+    "protocol": 712,
+    "0": "minecraft:sand",
+    "1": "minecraft:red_sand"
+  },
+  "minecraft:prismarine": {
+    "protocol": 712,
+    "0": "minecraft:prismarine",
+    "1": "minecraft:dark_prismarine",
+    "2": "minecraft:prismarine_bricks"
+  },
+  "minecraft:sandstone": {
+    "protocol": 712,
+    "0": "minecraft:sandstone",
+    "1": "minecraft:chiseled_sandstone",
+    "2": "minecraft:cut_sandstone",
+    "3": "minecraft:smooth_sandstone"
+  },
+  "minecraft:red_sandstone": {
+    "protocol": 712,
+    "0": "minecraft:red_sandstone",
+    "1": "minecraft:chiseled_red_sandstone",
+    "2": "minecraft:cut_red_sandstone",
+    "3": "minecraft:smooth_red_sandstone"
+  },
+  "minecraft:quartz_block": {
+    "protocol": 712,
+    "0": "minecraft:quartz_block",
+    "1": "minecraft:chiseled_quartz_block",
+    "2": "minecraft:quartz_pillar",
+    "3": "minecraft:smooth_quartz"
+  },
+  "minecraft:stone_block_slab2": {
+    "protocol": 712,
+    "0": "minecraft:red_sandstone_slab",
+    "1": "minecraft:purpur_slab",
+    "2": "minecraft:prismarine_slab",
+    "3": "minecraft:dark_prismarine_slab",
+    "4": "minecraft:prismarine_brick_slab",
+    "5": "minecraft:mossy_cobblestone_slab",
+    "6": "minecraft:smooth_sandstone_slab",
+    "7": "minecraft:red_nether_brick_slab"
+  },
+  "minecraft:stone_block_slab3": {
+    "protocol": 712,
+    "0": "minecraft:end_stone_brick_slab",
+    "1": "minecraft:smooth_red_sandstone_slab",
+    "2": "minecraft:polished_andesite_slab",
+    "3": "minecraft:andesite_slab",
+    "4": "minecraft:diorite_slab",
+    "5": "minecraft:polished_diorite_slab",
+    "6": "minecraft:granite_slab",
+    "7": "minecraft:polished_granite_slab"
+  },
+  "minecraft:stone_block_slab4": {
+    "protocol": 712,
+    "0": "minecraft:mossy_stone_brick_slab",
+    "1": "minecraft:smooth_quartz_slab",
+    "2": "minecraft:normal_stone_slab",
+    "3": "minecraft:cut_sandstone_slab",
+    "4": "minecraft:cut_red_sandstone_slab"
+  },
+  "minecraft:monster_egg": {
+    "protocol": 712,
+    "0": "minecraft:infested_stone",
+    "1": "minecraft:infested_cobblestone",
+    "2": "minecraft:infested_stone_bricks",
+    "3": "minecraft:infested_mossy_stone_bricks",
+    "4": "minecraft:infested_cracked_stone_bricks",
+    "5": "minecraft:infested_chiseled_stone_bricks"
+  },
+  "minecraft:stonebrick": {
+    "protocol": 712,
+    "0": "minecraft:stone_bricks",
+    "1": "minecraft:mossy_stone_bricks",
+    "2": "minecraft:cracked_stone_bricks",
+    "3": "minecraft:chiseled_stone_bricks"
+  },
+  "minecraft:anvil": {
+    "protocol": 712,
+    "0": "minecraft:anvil",
+    "4": "minecraft:chipped_anvil",
+    "8": "minecraft:damaged_anvil"
+  },
   "minecraft:stone_block_slab": {
     "0": "minecraft:smooth_stone_slab",
     "1": "minecraft:sandstone_slab",
