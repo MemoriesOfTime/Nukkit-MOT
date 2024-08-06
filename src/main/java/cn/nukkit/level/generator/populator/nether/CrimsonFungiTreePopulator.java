@@ -20,7 +20,7 @@ public class CrimsonFungiTreePopulator extends Populator {
         for (int i = 0; i < amount; ++i) {
             final int x = NukkitMath.randomRange(random, chunkX << 4, (chunkX << 4) + 15);
             final int z = NukkitMath.randomRange(random, chunkZ << 4, (chunkZ << 4) + 15);
-            final IntArrayList ys = getHighestWorkableBlocks(x, z);
+            final IntArrayList ys = getHighestWorkableBlocks(level, x, z);
             for (final int y : ys) {
                 if (y <= 1) continue;
                 if (random.nextBoundedInt(4) == 1) continue;
@@ -29,10 +29,10 @@ public class CrimsonFungiTreePopulator extends Populator {
         }
     }
 
-    private IntArrayList getHighestWorkableBlocks(final int x, final int z) {
+    private IntArrayList getHighestWorkableBlocks(final ChunkManager level, final int x, final int z) {
         int y;
         final IntArrayList blockYs = new IntArrayList();
-        for (y = 128; y > 0; --y) {
+        for (y = level.getMaxBlockY(); y > level.getMinBlockY(); --y) {
             final int b = level.getBlockIdAt(x, y, z);
             if (b == Block.CRIMSON_NYLIUM && level.getBlockIdAt(x, y + 1, z) == 0) {
                 blockYs.add(y + 1);

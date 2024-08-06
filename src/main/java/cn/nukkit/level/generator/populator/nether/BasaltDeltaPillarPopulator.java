@@ -20,24 +20,27 @@ public class BasaltDeltaPillarPopulator extends Populator {
         for (int i = 0; i < amount; ++i) {
             final int x = NukkitMath.randomRange(random, chunkX << 4, (chunkX << 4) + 15);
             final int z = NukkitMath.randomRange(random, chunkZ << 4, (chunkZ << 4) + 15);
-            final IntArrayList ys = getHighestWorkableBlocks(x, z);
+            final IntArrayList ys = getHighestWorkableBlocks(level, x, z);
             for (final int y : ys) {
                 if (y <= 1) continue;
                 if (random.nextBoundedInt(5) == 0) continue;
                 for (int randomHeight = 0; randomHeight < random.nextBoundedInt(5) + 1; randomHeight++) {
                     final int placeLocation = y + randomHeight;
+                    if (placeLocation > level.getMaxBlockY()) {
+                        continue;
+                    }
                     this.level.setBlockAt(x, placeLocation, z, BlockID.BASALT);
                 }
             }
         }
     }
 
-    private IntArrayList getHighestWorkableBlocks(final int x, final int z) {
+    private IntArrayList getHighestWorkableBlocks(final ChunkManager level, final int x, final int z) {
         int y;
         final IntArrayList blockYs = new IntArrayList();
-        for (y = 128; y > 0; --y) {
+        for (y = level.getMaxBlockY() - 1; y > level.getMinBlockY(); --y) {
             final int b = level.getBlockIdAt(x, y, z);
-            if ((b == Block.BASALT || b == Block.BLACKSTONE) && level.getBlockIdAt(x, y + 1, z) == 0) {
+            if ((b == Block.BASALT || b == Block.BLACKSTONE) && level.getBlockIdAt(x, y + 1, z) == Block.AIR) {
                 blockYs.add(y + 1);
             }
         }

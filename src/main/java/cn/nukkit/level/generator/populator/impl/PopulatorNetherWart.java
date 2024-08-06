@@ -42,7 +42,7 @@ public class PopulatorNetherWart extends Populator {
     private static int getHighestWorkableBlock(FullChunk chunk, int x, int z) {
         int y;
 
-        for (y = 0; y <= 127; ++y) {
+        for (y = chunk.getProvider().getMinBlockY(); y < chunk.getProvider().getMaxBlockY(); ++y) {
             int b = chunk.getBlockId(x, y, z);
             if (b == Block.AIR) {
                 break;
