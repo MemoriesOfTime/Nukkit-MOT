@@ -2,9 +2,9 @@ package cn.nukkit.level.generator.task;
 
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.SimpleChunkManager;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.generator.Generator;
+import cn.nukkit.level.generator.SimpleChunkManager;
 import cn.nukkit.level.generator.populator.overworld.PopulatorScatteredStructure;
 import cn.nukkit.level.generator.structure.ScatteredStructurePiece;
 import cn.nukkit.scheduler.AsyncTask;
