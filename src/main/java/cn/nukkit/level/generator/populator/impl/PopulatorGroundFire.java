@@ -32,7 +32,7 @@ public class PopulatorGroundFire extends PopulatorSurfaceBlock {
     @Override
     protected int getHighestWorkableBlock(ChunkManager level, int x, int z, FullChunk chunk) {
         int y;
-        for (y = level.getMinBlockY(); y < level.getMaxBlockY(); ++y) {
+        for (y = 0; y < 127; ++y) {
             int b = chunk.getBlockId(x, y, z);
             if (b == Block.AIR) {
                 break;
