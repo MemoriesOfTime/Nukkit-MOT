@@ -562,6 +562,7 @@ public class LevelDBProvider implements LevelProvider {
                     NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
                     outputStream.writeTag(ticks);
                     writeBatch.put(pendingScheduledTicksKey, Utils.convertByteBuf2Array(byteBuf));
+                    byteBuf.release();
                 } else {
                     writeBatch.delete(pendingScheduledTicksKey);
                 }

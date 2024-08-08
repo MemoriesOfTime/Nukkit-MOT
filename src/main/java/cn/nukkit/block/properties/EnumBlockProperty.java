@@ -165,6 +165,10 @@ public class EnumBlockProperty<E extends Serializable> extends BlockProperty<E> 
     public E[] getValues() {
         return this.values.clone();
     }
+
+    public String[] getPersistenceNames() {
+        return this.persistenceNames.clone();
+    }
     
     public boolean isOrdinal() {
         return this.ordinal;

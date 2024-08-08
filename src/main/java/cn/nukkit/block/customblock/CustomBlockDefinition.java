@@ -349,12 +349,8 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
                         nbtList.add(new CompoundTag().putString("name", intBlockProperty.getName()).putList("enum", enumList));
                     } else if (each instanceof EnumBlockProperty<?> arrayBlockProperty) {
                         var enumList = new ListTag<StringTag>();
-                        for (var e : arrayBlockProperty.getValues()) {
-                            if (e instanceof Enum<?> en) {
-                                enumList.add(new StringTag(en.name().toLowerCase(Locale.ENGLISH)));
-                            } else {
-                                enumList.add(new StringTag(e.toString().toLowerCase(Locale.ENGLISH)));
-                            }
+                        for (String string : arrayBlockProperty.getPersistenceNames()) {
+                            enumList.add(new StringTag("", string));
                         }
                         nbtList.add(new CompoundTag().putString("name", arrayBlockProperty.getName()).putList("enum", enumList));
                     }

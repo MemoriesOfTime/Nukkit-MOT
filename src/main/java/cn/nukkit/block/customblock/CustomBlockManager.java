@@ -223,13 +223,21 @@ public class CustomBlockManager {
             legacyIds.add(entry.getIntKey());
         }
 
+        top:
         for (CustomBlockState definition : this.legacy2CustomState.values()) {
             NbtMap state = definition.getBlockState();
             if (state.getInt("version") != paletteVersion) {
                 state = state.toBuilder().putInt("version", paletteVersion).build();
             }
-            vanillaPaletteList.add(state);
             state2Legacy.computeIfAbsent(state, s -> new IntOpenHashSet()).add(legacyToFullId(definition.getLegacyId()));
+            //生成runtimeId时忽略重复的状态
+            for (NbtMap hasState : vanillaPaletteList) {
+                if (hasState.getString("name").equals(state.getString("name")) &&
+                        hasState.getCompound("states").equals(state.getCompound("states"))) {
+                    continue top;
+                }
+            }
+            vanillaPaletteList.add(state);
         }
 
         if (palette.getProtocol() >= ProtocolInfo.v1_18_30) {

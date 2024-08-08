@@ -330,8 +330,8 @@ public class StartGamePacket extends DataPacket {
                         this.putString(definition.identifier());
                         try {
                             this.put(NBTIO.write(definition.nbt(), ByteOrder.LITTLE_ENDIAN, true));
-                        } catch (IOException e) {
-                            log.error("Error while encoding NBT data of CustomBlockDefinition");
+                        } catch (Exception e) {
+                             log.error("Error while encoding NBT data of CustomBlockDefinition", e);
                         }
                     }
                 } else {
