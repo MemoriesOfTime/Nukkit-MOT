@@ -9,6 +9,10 @@ public class StopSoundPacket extends DataPacket {
 
     public String name;
     public boolean stopAll;
+    /**
+     * @since v712
+     */
+    public boolean stopMusicLegacy;
 
     @Override
     public byte pid() {
@@ -24,5 +28,8 @@ public class StopSoundPacket extends DataPacket {
         this.reset();
         this.putString(this.name);
         this.putBoolean(this.stopAll);
+        if (this.protocol >= ProtocolInfo.v1_21_20) {
+            this.putBoolean(this.stopMusicLegacy);
+        }
     }
 }

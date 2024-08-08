@@ -64,6 +64,7 @@ public class CraftingManager {
     public static DataPacket packet662;
     public static DataPacket packet671;
     public static DataPacket packet685;
+    public static DataPacket packet712;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -728,6 +729,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet712 = packetFor(ProtocolInfo.v1_21_20).compress(Deflater.BEST_COMPRESSION);
         packet685 = packetFor(ProtocolInfo.v1_21_0).compress(Deflater.BEST_COMPRESSION);
         packet671 = packetFor(ProtocolInfo.v1_20_80).compress(Deflater.BEST_COMPRESSION);
         packet662 = packetFor(ProtocolInfo.v1_20_70).compress(Deflater.BEST_COMPRESSION);

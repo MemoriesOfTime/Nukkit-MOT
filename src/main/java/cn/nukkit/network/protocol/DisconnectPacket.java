@@ -11,6 +11,10 @@ public class DisconnectPacket extends DataPacket {
     public DisconnectFailReason reason = DisconnectFailReason.UNKNOWN;
     public boolean hideDisconnectionScreen = false;
     public String message;
+    /**
+     * @since v712
+     */
+    public String filteredMessage = "";
 
     @Override
     public byte pid() {
@@ -23,7 +27,12 @@ public class DisconnectPacket extends DataPacket {
             this.reason = DisconnectFailReason.values()[this.getVarInt()];
         }
         this.hideDisconnectionScreen = this.getBoolean();
-        this.message = this.getString();
+        if (!this.hideDisconnectionScreen) {
+            this.message = this.getString();
+            if (protocol >= ProtocolInfo.v1_21_20) {
+                this.filteredMessage = this.getString();
+            }
+        }
     }
 
     @Override
@@ -35,6 +44,9 @@ public class DisconnectPacket extends DataPacket {
         this.putBoolean(this.hideDisconnectionScreen);
         if (!this.hideDisconnectionScreen) {
             this.putString(this.message);
+            if (protocol >= ProtocolInfo.v1_21_20) {
+                this.putString(this.filteredMessage);
+            }
         }
     }
 }

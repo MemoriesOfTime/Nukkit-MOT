@@ -27,6 +27,10 @@ public class InventoryContentPacket extends DataPacket {
     public int inventoryId;
     public int networkId;
     public Item[] slots = Item.EMPTY_ARRAY;
+    /**
+     * @since v712
+     */
+    public int dynamicContainerId;
 
     @Override
     public DataPacket clean() {
@@ -55,6 +59,9 @@ public class InventoryContentPacket extends DataPacket {
                 this.putVarInt(networkId);
             }
             this.putSlot(protocol, slot);
+        }
+        if (this.protocol >= ProtocolInfo.v1_21_20) {
+            this.putUnsignedVarInt(this.dynamicContainerId);
         }
     }
 

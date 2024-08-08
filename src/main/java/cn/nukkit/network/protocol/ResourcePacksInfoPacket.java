@@ -88,6 +88,9 @@ public class ResourcePacksInfoPacket extends DataPacket {
                     this.putBoolean(false); // scripting
                     if (protocol >= ProtocolInfo.v1_16_200) {
                         this.putBoolean(false); // raytracing capable
+                        if (protocol >= ProtocolInfo.v1_21_20) {
+                            this.putBoolean(entry.isAddonPack());
+                        }
                     }
                 }
             }

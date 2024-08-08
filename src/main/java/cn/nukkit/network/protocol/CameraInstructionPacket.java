@@ -10,6 +10,7 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.types.camera.CameraEase;
 import cn.nukkit.network.protocol.types.camera.CameraFadeInstruction;
 import cn.nukkit.network.protocol.types.camera.CameraSetInstruction;
+import cn.nukkit.network.protocol.types.camera.CameraTargetInstruction;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.CameraPresetManager;
 import lombok.Getter;
@@ -32,6 +33,14 @@ public class CameraInstructionPacket extends DataPacket {
     private CameraSetInstruction setInstruction;
     private CameraFadeInstruction fadeInstruction;
     private OptionalBoolean clear = OptionalBoolean.empty();
+    /**
+     * @since v712
+     */
+    private CameraTargetInstruction targetInstruction;
+    /**
+     * @since v712
+     */
+    private OptionalBoolean removeTarget = OptionalBoolean.empty();
 
     @Override
     @Deprecated
@@ -69,6 +78,15 @@ public class CameraInstructionPacket extends DataPacket {
             });
 
             this.setFadeInstruction(fade);
+
+            if (protocol >= ProtocolInfo.v1_21_20) {
+                this.setTargetInstruction(this.getOptional(null, buf -> {
+                    Vector3f targetCenterOffset = this.getOptional(null, BinaryStream::getVector3f);
+                    long uniqueEntityId = this.getLLong();
+                    return new CameraTargetInstruction(targetCenterOffset, uniqueEntityId);
+                }));
+                this.setRemoveTarget(this.getOptional(OptionalBoolean.empty(), buf -> OptionalBoolean.of(buf.getBoolean())));
+            }
         } else {
             CompoundTag data = this.getTag();
             if (data.contains("set", CompoundTag.class)) {
@@ -163,6 +181,15 @@ public class CameraInstructionPacket extends DataPacket {
                 b.putOptionalNull(fade.getTimeData(), this::putTimeData);
                 b.putOptionalNull(fade.getColor(), this::putColor);
             });
+
+            if (this.protocol >= ProtocolInfo.v1_21_20) {
+                this.putOptionalNull(this.getTargetInstruction(), (b, targetInstruction) -> {
+                    b.putOptionalNull(targetInstruction.getTargetCenterOffset(), BinaryStream::putVector3f);
+                    b.putLLong(targetInstruction.getUniqueEntityId());
+                });
+                this.putOptional(OptionalBoolean::isPresent, this.getRemoveTarget(),
+                        (b, optional) -> b.putBoolean(optional.getAsBoolean()));
+            }
         } else {
             CompoundTag data = new CompoundTag();
             if (this.getSetInstruction() != null) {
