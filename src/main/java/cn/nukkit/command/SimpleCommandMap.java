@@ -89,6 +89,20 @@ public class SimpleCommandMap implements CommandMap {
         this.register("nukkit", new TimingsCommand("timings"));
         this.register("nukkit", new ConvertCommand("convert"));
         this.register("nukkit", new InputPermissionCommand("inputpermission"));
+        this.register("nukkit", new AbilityCommand("ability"));
+        this.register("nukkit", new DamageCommand("damage"));
+        this.register("nukkit", new DayLockCommand("daylock"));
+        this.register("nukkit", new FillCommand("fill"));
+        this.register("nukkit", new SetBlockCommand("setblock"));
+        this.register("nukkit", new PlayAnimationCommand("playanimation"));
+        this.register("nukkit", new ScoreboardCommand("scoreboard"));
+        this.register("nukkit", new SetMaxPlayersCommand("setmaxplayers"));
+        this.register("nukkit", new SpreadPlayersCommand("spreadplayers"));
+        this.register("nukkit", new TagCommand("tag"));
+        this.register("nukkit", new TellrawCommand("tellraw"));
+        this.register("nukkit", new TitlerawCommand("titleraw"));
+        this.register("nukkit", new TestForCommand("testfor"));
+        this.register("nukkit", new TestForBlockCommand("testforblock"));
     }
 
     @Override

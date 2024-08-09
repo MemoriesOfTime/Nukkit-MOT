@@ -4937,6 +4937,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.dataPacket(pk);
     }
 
+    /**
+     * 设置一个JSON文本副标题。
+     * <p>
+     * Set a JSON text subtitle.
+     *
+     * @param text JSON文本<br>JSON text
+     */
+    public void setRawTextSubTitle(RawText text) {
+        SetTitlePacket pk = new SetTitlePacket();
+        pk.type = SetTitlePacket.TYPE_SUBTITLE_JSON;
+        pk.text = text.toRawText();
+        this.dataPacket(pk);
+    }
+
     public void setTitleAnimationTimes(int fadein, int duration, int fadeout) {
         SetTitlePacket pk = new SetTitlePacket();
         pk.type = SetTitlePacket.TYPE_ANIMATION_TIMES;
@@ -4970,6 +4984,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.setTitle(Strings.isNullOrEmpty(title) ? " " : title);
     }
 
+    /**
+     * 设置一个JSON文本标题。
+     * <p>
+     * Set a JSON text title.
+     *
+     * @param text JSON文本<br>JSON text
+     */
+    public void setRawTextTitle(RawText text) {
+        SetTitlePacket pk = new SetTitlePacket();
+        pk.type = SetTitlePacket.TYPE_TITLE_JSON;
+        pk.text = text.toRawText();
+        this.dataPacket(pk);
+    }
+
     public void sendActionBar(String title) {
         this.sendActionBar(title, 1, 0, 1);
     }
@@ -4978,6 +5006,35 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         SetTitlePacket pk = new SetTitlePacket();
         pk.type = SetTitlePacket.TYPE_ACTION_BAR;
         pk.text = Strings.isNullOrEmpty(title) ? " " : title;
+        pk.fadeInTime = fadein;
+        pk.stayTime = duration;
+        pk.fadeOutTime = fadeout;
+        this.dataPacket(pk);
+    }
+
+    /**
+     * fadein=1,duration=0,fadeout=1
+     *
+     * @see #setRawTextActionBar(RawText, int, int, int)
+     */
+    public void setRawTextActionBar(RawText text) {
+        this.setRawTextActionBar(text, 1, 0, 1);
+    }
+
+    /**
+     * 设置一个JSON ActionBar消息。
+     * <p>
+     * Set a JSON ActionBar text.
+     *
+     * @param text     JSON文本<br>JSON text
+     * @param fadein   淡入时间
+     * @param duration 持续时间
+     * @param fadeout  淡出时间
+     */
+    public void setRawTextActionBar(RawText text, int fadein, int duration, int fadeout) {
+        SetTitlePacket pk = new SetTitlePacket();
+        pk.type = SetTitlePacket.TYPE_ACTIONBAR_JSON;
+        pk.text = text.toRawText();
         pk.fadeInTime = fadein;
         pk.stayTime = duration;
         pk.fadeOutTime = fadeout;

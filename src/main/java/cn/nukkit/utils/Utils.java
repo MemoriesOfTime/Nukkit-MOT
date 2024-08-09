@@ -5,7 +5,11 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.customblock.CustomBlockManager;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Level;
+import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.NukkitRandom;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -619,5 +623,27 @@ public class Utils {
             }
         }
         return results;
+    }
+
+    public static Block[] getLevelBlocks(Level level, AxisAlignedBB bb) {
+        int minX = NukkitMath.floorDouble(Math.min(bb.getMinX(), bb.getMaxX()));
+        int minY = NukkitMath.floorDouble(Math.min(bb.getMinY(), bb.getMaxY()));
+        int minZ = NukkitMath.floorDouble(Math.min(bb.getMinZ(), bb.getMaxZ()));
+        int maxX = NukkitMath.floorDouble(Math.max(bb.getMinX(), bb.getMaxX()));
+        int maxY = NukkitMath.floorDouble(Math.max(bb.getMinY(), bb.getMaxY()));
+        int maxZ = NukkitMath.floorDouble(Math.max(bb.getMinZ(), bb.getMaxZ()));
+
+        List<Block> blocks = new ArrayList<>();
+        Vector3 vec = new Vector3();
+
+        for (int z = minZ; z <= maxZ; ++z) {
+            for (int x = minX; x <= maxX; ++x) {
+                for (int y = minY; y <= maxY; ++y) {
+                    blocks.add(level.getBlock(vec.setComponents(x, y, z), false));
+                }
+            }
+        }
+
+        return blocks.toArray(new Block[0]);
     }
 }
