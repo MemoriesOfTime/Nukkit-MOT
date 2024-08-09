@@ -5,9 +5,8 @@ import cn.nukkit.command.exceptions.SelectorSyntaxException;
 
 /**
  * 一些有关目标选择器解析的常用静态函数
+ * @author PowerNukkitX Project Team
  */
-
-
 public class ParseUtils {
     /**
      * 解析偏移int值

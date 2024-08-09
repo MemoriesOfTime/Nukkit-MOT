@@ -17,7 +17,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
-
+/**
+ * @author PowerNukkitX Project Team
+ */
 public class ParamTree {
     private final Map<String, ParamList> root;
     private final Command command;

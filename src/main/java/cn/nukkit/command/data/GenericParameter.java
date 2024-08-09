@@ -3,6 +3,9 @@ package cn.nukkit.command.data;
 import cn.nukkit.command.tree.node.ChainedCommandNode;
 import cn.nukkit.command.tree.node.ItemNode;
 
+/**
+ * @author PowerNukkitX Project Team
+ */
 public interface GenericParameter {
     CommandParameterSupplier<CommandParameter> OBJECTIVES = (optional) -> CommandParameter.newEnum("objective", optional, CommandEnum.SCOREBOARD_OBJECTIVES);
     CommandParameterSupplier<CommandParameter> TARGET_OBJECTIVES = (optional) -> CommandParameter.newEnum("targetObjective", optional, CommandEnum.SCOREBOARD_OBJECTIVES);

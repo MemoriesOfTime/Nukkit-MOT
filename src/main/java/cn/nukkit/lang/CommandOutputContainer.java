@@ -7,6 +7,7 @@ import java.util.List;
 
 /**
  * {@link cn.nukkit.network.protocol.CommandOutputPacket CommandOutputPacket} 负载消息的容器，支持同时发送多条消息
+ * @author PowerNukkitX Project Team
  */
 public class CommandOutputContainer implements Cloneable {
     public static final String[] EMPTY_STRING = new String[]{};

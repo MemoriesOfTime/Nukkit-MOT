@@ -5,9 +5,8 @@ import lombok.Getter;
 
 /**
  * 所有可能的选择器类型
+ * @author PowerNukkitX Project Team
  */
-
-
 public enum SelectorType {
     ALL_PLAYERS("a"),
     ALL_ENTITIES("e"),

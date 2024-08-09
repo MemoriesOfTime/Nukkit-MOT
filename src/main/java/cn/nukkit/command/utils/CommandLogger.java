@@ -24,7 +24,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
-
+/**
+ * @author PowerNukkitX Project Team
+ */
 public record CommandLogger(Command command,
                             CommandSender sender,
                             String commandLabel,

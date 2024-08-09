@@ -34,9 +34,8 @@ import static cn.nukkit.command.selector.SelectorType.parseSelectorType;
 /**
  * 目标选择器API<p/>
  * 通过{@code getAPI()}方法获取API对象
+ * @author PowerNukkitX Project Team
  */
-
-
 public class EntitySelectorAPI {
     private static final EntitySelectorAPI API = new EntitySelectorAPI();
 

@@ -16,6 +16,9 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.Nullable;
 import java.util.Map;
 
+/**
+ * @author PowerNukkitX Project Team
+ */
 public class ExecutorCommandSender implements CommandSender {
 
     private final CommandSender executor;

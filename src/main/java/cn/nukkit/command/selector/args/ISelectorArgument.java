@@ -15,9 +15,8 @@ import java.util.function.Predicate;
 
 /**
  * 此接口描述了一个选择器参数<p/>
+ * @author PowerNukkitX Project Team
  */
-
-
 public interface ISelectorArgument extends Comparable<ISelectorArgument>{
     /**
      * 根据给定的参数表返回特定的{@code List<Predicate<Entity>>}

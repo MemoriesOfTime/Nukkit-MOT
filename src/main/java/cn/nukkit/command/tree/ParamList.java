@@ -7,7 +7,9 @@ import org.jetbrains.annotations.ApiStatus;
 
 import java.util.ArrayList;
 
-
+/**
+ * @author PowerNukkitX Project Team
+ */
 public class ParamList extends ArrayList<IParamNode<?>> {
     private int error = Integer.MIN_VALUE;
     private int index = 0;
