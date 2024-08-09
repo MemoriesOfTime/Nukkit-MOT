@@ -27,23 +27,12 @@ public class CommandEnum {
      * @since 618
      */
     public static final CommandEnum SCOREBOARD_OBJECTIVES = new CommandEnum("ScoreboardObjectives", () -> Server.getInstance().getScoreboardManager().getScoreboards().keySet());
-    public static final CommandEnum ENUM_BLOCK;
-    public static final CommandEnum ENUM_ITEM;
+    public static final CommandEnum CHAINED_COMMAND_ENUM = new CommandEnum("ExecuteChainedOption_0", "run", "as", "at", "positioned", "if", "unless", "in", "align", "anchored", "rotated", "facing");
+    public static final CommandEnum ENUM_BLOCK = new CommandEnum("Block", Collections.emptyList());
 
-    static {
-        /*ImmutableList.Builder<String> blocks = ImmutableList.builder();
-        for (Field field : BlockID.class.getDeclaredFields()) {
-            blocks.add(field.getName().toLowerCase());
-        }*/
-        ENUM_BLOCK = new CommandEnum("Block", /*blocks.build()*/ Collections.emptyList());
+    public static final CommandEnum ENUM_ITEM = new CommandEnum("Item", Collections.emptyList());
 
-        /*ImmutableList.Builder<String> items = ImmutableList.builder();
-        for (Field field : ItemID.class.getDeclaredFields()) {
-            items.add(field.getName().toLowerCase());
-        }
-        items.addAll(ENUM_BLOCK.getValues());*/
-        ENUM_ITEM = new CommandEnum("Item", /*items.build()*/ Collections.emptyList());
-    }
+    public static final CommandEnum ENUM_ENTITY = new CommandEnum("Entity", Collections.emptyList());
 
     private final String name;
     private final List<String> values;

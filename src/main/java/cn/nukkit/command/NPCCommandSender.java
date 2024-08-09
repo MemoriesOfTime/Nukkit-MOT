@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.passive.EntityNPCEntity;
+import cn.nukkit.lang.CommandOutputContainer;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.Position;
@@ -42,6 +43,10 @@ public class NPCCommandSender implements CommandSender {
 
     @Override
     public void sendMessage(TextContainer message) {
+    }
+
+    @Override
+    public void sendCommandOutput(CommandOutputContainer container) {
     }
 
     @Override

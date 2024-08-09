@@ -595,6 +595,7 @@ public class Server {
         }
 
         this.baseLang = new BaseLang(this.getPropertyString("language", BaseLang.FALLBACK_LANGUAGE));
+
         computeThreadPool = new ForkJoinPool(Math.min(0x7fff, Runtime.getRuntime().availableProcessors()), new ComputeThreadPoolThreadFactory(), null, false);
 
         Object poolSize = this.getProperty("async-workers", "auto");
@@ -990,13 +991,7 @@ public class Server {
             throw new ServerException("CommandSender is not valid");
         }
 
-        if (this.commandMap.dispatch(sender, commandLine)) {
-            return true;
-        }
-
-        sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.unknown", commandLine));
-
-        return false;
+        return this.commandMap.dispatch(sender, commandLine);
     }
 
     public ConsoleCommandSender getConsoleSender() {

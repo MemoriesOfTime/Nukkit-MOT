@@ -10,6 +10,7 @@ import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandDataVersions;
 import cn.nukkit.command.defaults.HelpCommand;
+import cn.nukkit.command.utils.RawText;
 import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.data.property.EntityProperty;
@@ -45,6 +46,7 @@ import cn.nukkit.item.*;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.item.trim.TrimFactory;
+import cn.nukkit.lang.CommandOutputContainer;
 import cn.nukkit.lang.LangCode;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
@@ -4843,6 +4845,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
         this.sendMessage(message.getText());
+    }
+
+    public void sendCommandOutput(CommandOutputContainer container) {
+        if (this.level.getGameRules().getBoolean(GameRule.SEND_COMMAND_FEEDBACK)) {
+            var pk = new CommandOutputPacket();
+            pk.messages.addAll(container.getMessages());
+            pk.commandOriginData = new CommandOriginData(CommandOriginData.Origin.PLAYER, this.getUniqueId(), "", null);//Only players can effect
+            pk.type = CommandOutputType.ALL_OUTPUT;//Useless
+            pk.successCount = container.getSuccessCount();//Useless,maybe used for server-client interaction
+            this.dataPacket(pk);
+        }
+    }
+
+    public void sendRawTextMessage(RawText text) {
+        TextPacket pk = new TextPacket();
+        pk.type = TextPacket.TYPE_OBJECT;
+        pk.message = text.toRawText();
+        this.dataPacket(pk);
     }
 
     public void sendTranslation(String message) {
