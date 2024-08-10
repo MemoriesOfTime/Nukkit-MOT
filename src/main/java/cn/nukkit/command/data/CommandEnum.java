@@ -33,7 +33,11 @@ public class CommandEnum {
     public static final CommandEnum ENUM_BLOCK = new CommandEnum("Block", Collections.emptyList());
     public static final CommandEnum ENUM_ITEM = new CommandEnum("Item", Collections.emptyList());
     public static final CommandEnum ENUM_ENTITY = new CommandEnum("Entity", Collections.emptyList());
-    public static final CommandEnum ENUM_EFFECT = new CommandEnum("Effect", Collections.emptyList());
+    public static final CommandEnum ENUM_EFFECT = new CommandEnum("Effect", Arrays.stream(Effect.class.getDeclaredFields())
+            .filter(field -> field.getType() == int.class)
+            .filter(field -> (field.getModifiers() & (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)) == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL))
+            .map(field -> field.getName().toLowerCase())
+            .toList());
     public static final CommandEnum ENUM_ENCHANTMENT = new CommandEnum("enchantmentName", () -> Enchantment.getEnchantmentName2IDMap().keySet().stream()
             .map(name -> name.startsWith(Identifier.DEFAULT_NAMESPACE) ? name.substring(10) : name)
             .toList());
