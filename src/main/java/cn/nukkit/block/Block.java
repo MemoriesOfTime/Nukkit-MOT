@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.customblock.CustomBlockManager;
+import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
@@ -19,6 +20,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.metadata.Metadatable;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
@@ -1645,6 +1647,26 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return !isTransparent() && isSolid() && !isPowerSource();
     }
 
+    /**
+     * Compare whether two blocks are the same, this method compares block entities
+     *
+     * @param obj the obj
+     * @return the boolean
+     */
+    public boolean equalsBlock(Object obj) {
+        if (obj instanceof Block otherBlock) {
+            if (!(this instanceof BlockEntityHolder<?>) && !(otherBlock instanceof BlockEntityHolder<?>)) {
+                return this.getId() == otherBlock.getId() && this.getDamage() == otherBlock.getDamage();
+            }
+            if (this instanceof BlockEntityHolder<?> holder1 && otherBlock instanceof BlockEntityHolder<?> holder2) {
+                BlockEntity be1 = holder1.getOrCreateBlockEntity();
+                BlockEntity be2 = holder2.getOrCreateBlockEntity();
+                return this.getId() == otherBlock.getId() && this.getDamage() == otherBlock.getDamage() && be1.getCleanedNBT().equals(be2.getCleanedNBT());
+            }
+        }
+        return false;
+    }
+
     public static boolean equals(Block b1, Block b2) {
         return equals(b1, b2, true);
     }
@@ -1760,5 +1782,33 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             throw new IllegalStateException("Block does not have valid level");
         }
         return this.level.hasPersistentDataContainer(this);
+    }
+
+    public boolean cloneTo(Position pos) {
+        return cloneTo(pos, true);
+    }
+
+    /**
+     * 将方块克隆到指定位置<p/>
+     * 此方法会连带克隆方块实体<p/>
+     * 注意，此方法会先清除指定位置的方块为空气再进行克隆
+     *
+     * @param pos    要克隆到的位置
+     * @param update 是否需要更新克隆的方块
+     * @return 是否克隆成功
+     */
+    @SuppressWarnings("null")
+    public boolean cloneTo(Position pos, boolean update) {
+        //清除旧方块
+        level.setBlock(pos, this.layer, Block.get(Block.AIR), false, false);
+        if (this instanceof BlockEntityHolder<?> holder && holder.getBlockEntity() != null) {
+            var clonedBlock = this.clone();
+            clonedBlock.position(pos);
+            CompoundTag tag = holder.getBlockEntity().getCleanedNBT();
+            //方块实体要求direct=true
+            return BlockEntityHolder.setBlockAndCreateEntity((BlockEntityHolder<?>) clonedBlock, true, update, tag) != null;
+        } else {
+            return pos.level.setBlock(pos, this.layer, this.clone(), true, update);
+        }
     }
 }
