@@ -103,6 +103,7 @@ public class SimpleCommandMap implements CommandMap {
         this.register("nukkit", new TitlerawCommand("titleraw"));
         this.register("nukkit", new TestForCommand("testfor"));
         this.register("nukkit", new TestForBlockCommand("testforblock"));
+        this.register("nukkit", new ClearSpawnPointCommand("clearspawnpoint"));
     }
 
     @Override
