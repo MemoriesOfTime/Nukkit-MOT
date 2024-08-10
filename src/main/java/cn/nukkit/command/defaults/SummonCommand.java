@@ -1,69 +1,99 @@
 package cn.nukkit.command.defaults;
 
-import cn.nukkit.Player;
-import cn.nukkit.Server;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
+import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.selector.args.impl.Type;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Position;
+import cn.nukkit.network.protocol.AddEntityPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
-public class SummonCommand extends Command {
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class SummonCommand extends VanillaCommand {
 
     public SummonCommand(String name) {
-        super(name, "%nukkit.command.summon.description", "%nukkit.command.summon.usage");
+        super(name, "commands.summon.description");
         this.setPermission("nukkit.command.summon");
         this.commandParameters.clear();
+
+        List<String> entity_key = new ArrayList<>();
+        Map<Integer, String> entity_ids = new HashMap<>();
+
+        AddEntityPacket.setupLegacyIdentifiers(entity_ids, ProtocolInfo.CURRENT_PROTOCOL);
+        for (String key : entity_ids.values()) {
+            entity_key.add(key);
+            entity_key.add(key.substring(10));
+        }
+
         this.commandParameters.put("default", new CommandParameter[]{
-                CommandParameter.newEnum("entityType", false, Entity.getEntityRuntimeMapping().values().toArray(new String[0])),
-                CommandParameter.newType("player", true, CommandParamType.TARGET)
+                CommandParameter.newEnum("entityType", false, entity_key.toArray(new String[0]), true),
+                CommandParameter.newType("spawnPos", true, CommandParamType.POSITION),
+                CommandParameter.newType("nameTag", true, CommandParamType.STRING),
+                CommandParameter.newEnum("nameTagAlwaysVisible", true, CommandEnum.ENUM_BOOLEAN)
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        String entityType = completionPrefix(list.getResult(0));
+        if (entityType.equals("minecraft:player")) {
+            log.addError("commands.summon.failed").output();
+            return 0;
         }
-
-        if (args.length == 0 || (args.length == 1 && !(sender instanceof Player))) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return false;
+        Integer entityId = Type.ENTITY_TYPE2ID.get(entityType);
+        Position pos = sender.getPosition();
+        if (list.hasResult(1)) {
+            pos = list.getResult(1);
         }
-
-        // Convert Minecraft format to the format what Nukkit uses
-        String mob = args[0].toLowerCase().replace("minecraft:", "");
-        mob = Character.toUpperCase(mob.charAt(0)) + mob.substring(1);
-        int max = mob.length() - 1;
-        for (int x = 2; x < max; x++) {
-            if (mob.charAt(x) == '_') {
-                mob = mob.substring(0, x) + Character.toUpperCase(mob.charAt(x + 1)) + mob.substring(x + 2);
-            }
+        if (!pos.level.isYInRange((int) pos.y) || !pos.getChunk().isLoaded()) {
+            log.addError("commands.summon.outOfWorld").output();
+            return 0;
         }
-
-        Player playerThatSpawns;
-
-        if (args.length == 2) {
-            playerThatSpawns = Server.getInstance().getPlayerExact(args[1].replace("@s", sender.getName()));
+        String nameTag = null;
+        if (list.hasResult(2)) {
+            nameTag = list.getResult(2);
+        }
+        boolean nameTagAlwaysVisible = false;
+        if (list.hasResult(3)) {
+            nameTagAlwaysVisible = list.getResult(3);
+        }
+        Entity entity;
+        if (entityId != null) {
+            //原版生物
+            entity = Entity.createEntity(entityId, pos);
         } else {
-            playerThatSpawns = (Player) sender;
+            //自定义生物
+            entity = Entity.createEntity(entityType, pos);
         }
-
-        if (playerThatSpawns != null) {
-            Position pos = playerThatSpawns.getPosition().floor().add(0.5, 0, 0.5);
-            Entity ent;
-            if ((ent = Entity.createEntity(mob, pos)) != null) {
-                ent.spawnToAll();
-                sender.sendMessage(new TranslationContainer("nukkit.command.summon.spawned", mob, playerThatSpawns.getName()));
-            } else {
-                sender.sendMessage(new TranslationContainer("nukkit.command.summon.unable", mob));
-            }
-        } else {
-            sender.sendMessage(new TranslationContainer("nukkit.command.summon.unknownPlayer"));
+        if (entity == null) {
+            log.addError("commands.summon.failed").output();
+            return 0;
         }
+        if (nameTag != null) {
+            entity.setNameTag(nameTag);
+            entity.setNameTagAlwaysVisible(nameTagAlwaysVisible);
+        }
+        entity.spawnToAll();
+        log.addSuccess("commands.summon.success").output();
+        return 1;
+    }
 
-        return true;
+    protected String completionPrefix(String type) {
+        var completed = type.startsWith("minecraft:") ? type : "minecraft:" + type;
+        if (!Type.ENTITY_TYPE2ID.containsKey(type) && !Type.ENTITY_TYPE2ID.containsKey(completed)) {
+            //是自定义生物，不需要补全
+            return type;
+        }
+        return completed;
     }
 }

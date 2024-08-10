@@ -1,78 +1,101 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
+import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
-import cn.nukkit.lang.TranslationContainer;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.PlayersNode;
+import cn.nukkit.command.utils.CommandLogger;
+import cn.nukkit.level.Position;
+import cn.nukkit.level.Sound;
+import cn.nukkit.network.protocol.PlaySoundPacket;
+import com.google.common.collect.Lists;
 
-/**
- * Created by PetteriM1
- */
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+
 public class PlaySoundCommand extends VanillaCommand {
 
     public PlaySoundCommand(String name) {
-        super(name, "%nukkit.command.playsound.description", "%commands.playsound.usage");
+        super(name, "commands.playsound.description");
         this.setPermission("nukkit.command.playsound");
-        this.commandParameters.clear();
-        this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("sound", CommandParamType.STRING, false),
-                new CommandParameter("player", CommandParamType.TARGET, true)
+        this.getCommandParameters().clear();
+        this.addCommandParameters("default", new CommandParameter[]{
+                CommandParameter.newEnum("sound", false, new CommandEnum("sound", Arrays.stream(Sound.values()).map(Sound::getSound).toList(), true)),
+                CommandParameter.newType("player", true, CommandParamType.TARGET, new PlayersNode()),
+                CommandParameter.newType("position", true, CommandParamType.POSITION),
+                CommandParameter.newType("volume", true, CommandParamType.FLOAT),
+                CommandParameter.newType("pitch", true, CommandParamType.FLOAT),
+                CommandParameter.newType("minimumVolume", true, CommandParamType.FLOAT)
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        String sound = list.getResult(0);
+        List<Player> targets = null;
+        Position position = null;
+        float volume = 1;
+        float pitch = 1;
+        float minimumVolume = 0;
+        if (list.hasResult(1)) targets = list.getResult(1);
+        if (list.hasResult(2)) position = list.getResult(2);
+        if (list.hasResult(3)) volume = list.getResult(3);
+        if (list.hasResult(4)) pitch = list.getResult(4);
+        if (list.hasResult(5)) minimumVolume = list.getResult(5);
+        if (minimumVolume < 0) {
+            log.addNumTooSmall(5, 0).output();
+            return 0;
         }
 
-        if (args.length == 0) {
-            sender.sendMessage(new TranslationContainer("%commands.playsound.usage", this.usageMessage));
-            return false;
+        if (targets == null || targets.isEmpty()) {
+            if (sender.isPlayer()) {
+                targets = Lists.newArrayList(sender.asPlayer());
+            } else {
+                log.addError("commands.generic.noTargetMatch").output();
+                return 0;
+            }
+        }
+        if (position == null) {
+            position = targets.get(0).getPosition();
         }
 
-        if (args.length == 1) {
-            if (!(sender instanceof Player p)) {
-                sender.sendMessage(new TranslationContainer("commands.generic.ingame"));
-                return true;
+        double maxDistance = volume > 1 ? volume * 16 : 16;
+
+        List<String> successes = Lists.newArrayList();
+        for (Player player : targets) {
+            String name = player.getName();
+            PlaySoundPacket packet = new PlaySoundPacket();
+            if (position.distance(player) > maxDistance) {
+                if (minimumVolume <= 0) {
+                    log.addError("commands.playsound.playerTooFar", name);
+                    continue;
+                }
+
+                packet.volume = minimumVolume;
+                packet.x = player.getFloorX();
+                packet.y = player.getFloorY();
+                packet.z = player.getFloorZ();
+            } else {
+                packet.volume = volume;
+                packet.x = position.getFloorX();
+                packet.y = position.getFloorY();
+                packet.z = position.getFloorZ();
             }
 
-            p.getLevel().addSound(p, args[0], p);
-            p.sendMessage(new TranslationContainer("commands.playsound.success", args[0], p.getName()));
-            return true;
+            packet.name = sound;
+            packet.pitch = pitch;
+            player.dataPacket(packet);
+
+            successes.add(name);
         }
-
-        if (args[1].equalsIgnoreCase("@a")) {
-            for (Player p : Server.getInstance().getOnlinePlayers().values()) {
-                p.getLevel().addSound(p, args[0], p);
-            }
-
-            sender.sendMessage(new TranslationContainer("commands.playsound.success", args[0], "@a"));
-
-            return true;
-        }
-
-        if (args[1].equalsIgnoreCase("@s") && sender instanceof Player) {
-            Player p = (Player) sender;
-
-            p.getLevel().addSound(p, args[0], p);
-            sender.sendMessage(new TranslationContainer("commands.playsound.success", args[0], p.getName()));
-
-            return true;
-        }
-
-        Player p = Server.getInstance().getPlayer(args[1]);
-
-        if (p == null) {
-            sender.sendMessage(new TranslationContainer("commands.generic.player.notFound"));
-            return true;
-        }
-
-        p.getLevel().addSound(p, args[0], p);
-        sender.sendMessage(new TranslationContainer("commands.playsound.success", args[0], p.getName()));
-
-        return true;
+        log.addSuccess("commands.playsound.success", sound, String.join(", ", successes)).successCount(successes.size()).output();
+        return successes.size();
     }
 }

@@ -1,55 +1,52 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.IPlayer;
-import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
-import cn.nukkit.lang.TranslationContainer;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.IPlayersNode;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.utils.TextFormat;
 
+import java.util.List;
+import java.util.Map;
+
 /**
- * Created on 2015/11/12 by xtypr.
- * Package cn.nukkit.command.defaults in project Nukkit .
+ * @author xtypr
+ * @since 2015/11/12
  */
 public class OpCommand extends VanillaCommand {
 
     public OpCommand(String name) {
-        super(name, "%nukkit.command.op.description", "%nukkit.command.op.usage");
+        super(name, "commands.op.description");
         this.setPermission("nukkit.command.op.give");
         this.commandParameters.clear();
         this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false)
+                CommandParameter.newType("player", CommandParamType.TARGET, new IPlayersNode())
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
-        }
-        
-        if (sender instanceof Player && !(Server.getInstance().opInGame)) {
-            sender.sendMessage("\u00A7cCan't use this command in game");
-            return true;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        List<IPlayer> IPlayers = result.getValue().getResult(0);
+        if (IPlayers.isEmpty()) {
+            log.addNoTargetMatch().output();
+            return 0;
         }
 
-        if (args.length == 0) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return false;
+        for (IPlayer player : IPlayers) {
+            if (player.isOp()) {
+                log.addError("commands.op.failed", player.getName()).output();
+            } else {
+                player.setOp(true);
+                if (player.isOnline()) {
+                    log.outputObjectWhisper(player.getPlayer(), TextFormat.GRAY + "%commands.op.message");
+                }
+                log.addSuccess("commands.op.success", player.getName()).output(true);
+            }
         }
-
-        String name = args[0];
-        IPlayer player = sender.getServer().getOfflinePlayer(name);
-
-        broadcastCommandMessage(sender, new TranslationContainer("commands.op.success", player.getName()));
-        if (player instanceof Player) {
-            ((Player) player).sendMessage(new TranslationContainer(TextFormat.GRAY + "%commands.op.message"));
-        }
-
-        player.setOp(true);
-
-        return true;
+        return IPlayers.size();
     }
 }
