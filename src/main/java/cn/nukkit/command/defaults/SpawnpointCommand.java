@@ -1,91 +1,85 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.PlayersNode;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.utils.TextFormat;
 
 import java.text.DecimalFormat;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * Created on 2015/12/13 by xtypr.
- * Package cn.nukkit.command.defaults in project Nukkit .
+ * @author xtypr
+ * @since 2015/12/13
  */
 public class SpawnpointCommand extends VanillaCommand {
-
     public SpawnpointCommand(String name) {
-        super(name, "%nukkit.command.spawnpoint.description", "%commands.spawnpoint.usage");
+        super(name, "commands.spawnpoint.description");
         this.setPermission("nukkit.command.spawnpoint");
         this.commandParameters.clear();
         this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("blockPos", CommandParamType.POSITION, true),
+                CommandParameter.newType("player", true, CommandParamType.TARGET, new PlayersNode()),
+                CommandParameter.newType("spawnPos", true, CommandParamType.POSITION),
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
-        }
-        Player target;
-        if (args.length == 0) {
-            if (sender instanceof Player) {
-                target = (Player) sender;
-            } else {
-                sender.sendMessage(new TranslationContainer("commands.generic.ingame"));
-                return true;
-            }
-        } else {
-            target = sender.getServer().getPlayer(args[0]);
-            if (target == null) {
-                sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.player.notFound"));
-                return true;
-            }
-        }
-        Level level = target.getLevel();
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        List<Player> players = sender.isPlayer() ? Collections.singletonList(sender.asPlayer()) : List.of();
         DecimalFormat round2 = new DecimalFormat("##0.00");
-        if (args.length == 4) {
-            if (level != null) {
-                int x;
-                int y;
-                int z;
-                try {
-                    x = Integer.parseInt(args[1]);
-                    y = Integer.parseInt(args[2]);
-                    z = Integer.parseInt(args[3]);
-                } catch (NumberFormatException e1) {
-                    sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-                    return true;
+        if (list.hasResult(0)) {
+            players = list.getResult(0);
+            if (players.isEmpty()) {
+                log.addNoTargetMatch().output();
+                return 0;
+            }
+            Level level = sender.getPosition().getLevel();
+            if (list.hasResult(1)) {
+                if (level != null) {
+                    Position position = list.getResult(1);
+                    if (level.getDimension() == 0) {
+                        if (position.y < -64) position.y = -64;
+                        if (position.y > 320) position.y = 320;
+                    } else {
+                        if (position.y < 0) position.y = 0;
+                        if (position.y > 255) position.y = 255;
+                    }
+                    for (Player player : players) {
+                        player.setSpawn(position);
+                    }
+                    log.addSuccess("commands.spawnpoint.success.multiple.specific", players.stream().map(Player::getName).collect(Collectors.joining(" ")),
+                            round2.format(position.x),
+                            round2.format(position.y),
+                            round2.format(position.z)).successCount(players.size()).output(true);
+                    return players.size();
                 }
-                if (y < 0) y = 0;
-                if (y > 256) y = 256;
-                target.setSpawn(new Position(x, y, z, level));
-                broadcastCommandMessage(sender, new TranslationContainer("commands.spawnpoint.success", target.getName(),
-                        round2.format(x),
-                        round2.format(y),
-                        round2.format(z)));
-                return true;
             }
-        } else if (args.length <= 1) {
-            if (sender instanceof Player) {
-                Position pos = (Position) sender;
-                target.setSpawn(pos);
-                broadcastCommandMessage(sender, new TranslationContainer("commands.spawnpoint.success", target.getName(),
-                        round2.format(pos.x),
-                        round2.format(pos.y),
-                        round2.format(pos.z)));
-                return true;
-            } else {
-                sender.sendMessage(new TranslationContainer("commands.generic.ingame"));
-                return true;
-            }
+            log.addSyntaxErrors(1).output();
+            return 0;
         }
-        sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-        return true;
+        if (!players.isEmpty()) {
+            Position pos = players.get(0).getPosition();
+            players.get(0).setSpawn(pos);
+            log.addSuccess("commands.spawnpoint.success.single", sender.getName(),
+                    round2.format(pos.x),
+                    round2.format(pos.y),
+                    round2.format(pos.z)).output(true);
+            return 1;
+        } else {
+            sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.noTargetMatch"));
+            return 0;
+        }
     }
 }

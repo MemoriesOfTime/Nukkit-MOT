@@ -1,14 +1,16 @@
 package cn.nukkit.command.data;
 
 import cn.nukkit.Server;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.network.protocol.UpdateSoftEnumPacket;
+import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.CameraPresetManager;
+import cn.nukkit.utils.Identifier;
 import com.google.common.collect.ImmutableList;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.*;
 import java.util.function.Supplier;
 
 /**
@@ -27,23 +29,18 @@ public class CommandEnum {
      * @since 618
      */
     public static final CommandEnum SCOREBOARD_OBJECTIVES = new CommandEnum("ScoreboardObjectives", () -> Server.getInstance().getScoreboardManager().getScoreboards().keySet());
-    public static final CommandEnum ENUM_BLOCK;
-    public static final CommandEnum ENUM_ITEM;
-
-    static {
-        /*ImmutableList.Builder<String> blocks = ImmutableList.builder();
-        for (Field field : BlockID.class.getDeclaredFields()) {
-            blocks.add(field.getName().toLowerCase());
-        }*/
-        ENUM_BLOCK = new CommandEnum("Block", /*blocks.build()*/ Collections.emptyList());
-
-        /*ImmutableList.Builder<String> items = ImmutableList.builder();
-        for (Field field : ItemID.class.getDeclaredFields()) {
-            items.add(field.getName().toLowerCase());
-        }
-        items.addAll(ENUM_BLOCK.getValues());*/
-        ENUM_ITEM = new CommandEnum("Item", /*items.build()*/ Collections.emptyList());
-    }
+    public static final CommandEnum CHAINED_COMMAND_ENUM = new CommandEnum("ExecuteChainedOption_0", "run", "as", "at", "positioned", "if", "unless", "in", "align", "anchored", "rotated", "facing");
+    public static final CommandEnum ENUM_BLOCK = new CommandEnum("Block", Collections.emptyList());
+    public static final CommandEnum ENUM_ITEM = new CommandEnum("Item", Collections.emptyList());
+    public static final CommandEnum ENUM_ENTITY = new CommandEnum("Entity", Collections.emptyList());
+    public static final CommandEnum ENUM_EFFECT = new CommandEnum("Effect", Arrays.stream(Effect.class.getDeclaredFields())
+            .filter(field -> field.getType() == int.class)
+            .filter(field -> (field.getModifiers() & (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)) == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL))
+            .map(field -> field.getName().toLowerCase())
+            .toList());
+    public static final CommandEnum ENUM_ENCHANTMENT = new CommandEnum("enchantmentName", () -> Enchantment.getEnchantmentName2IDMap().keySet().stream()
+            .map(name -> name.startsWith(Identifier.DEFAULT_NAMESPACE) ? name.substring(10) : name)
+            .toList());
 
     private final String name;
     private final List<String> values;

@@ -1,50 +1,50 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.IPlayer;
-import cn.nukkit.Player;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
-import cn.nukkit.lang.TranslationContainer;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.IPlayersNode;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.utils.TextFormat;
 
+import java.util.List;
+import java.util.Map;
+
 /**
- * Created on 2015/11/12 by xtypr.
- * Package cn.nukkit.command.defaults in project Nukkit .
+ * @author xtypr
+ * @since 2015/11/12
  */
 public class DeopCommand extends VanillaCommand {
 
     public DeopCommand(String name) {
-        super(name, "%nukkit.command.deop.description", "%commands.deop.usage");
+        super(name, "commands.deop.description");
         this.setPermission("nukkit.command.op.take");
-        this.commandParameters.clear();
         this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false)
+                CommandParameter.newType("player", CommandParamType.TARGET, new IPlayersNode())
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        List<IPlayer> IPlayers = result.getValue().getResult(0);
+        if (IPlayers.isEmpty()) {
+            log.addNoTargetMatch().output();
+            return 0;
         }
-
-        if (args.length == 0) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return false;
+        for (IPlayer player : IPlayers) {
+            if (!player.isOp()) {
+                log.addError("Privileges cannot be revoked (revoked or with higher privileges)").output();//no translation in client
+                return 0;
+            }
+            player.setOp(false);
+            if (player.isOnline()) {
+                log.outputObjectWhisper(player.getPlayer(), TextFormat.GRAY + "%commands.deop.message");
+            }
+            log.addSuccess("commands.deop.success", player.getName()).output(true);
         }
-
-        String playerName = args[0].replace("@s", sender.getName());
-        IPlayer player = sender.getServer().getOfflinePlayer(playerName);
-        player.setOp(false);
-
-        if (player instanceof Player) {
-            ((Player) player).sendMessage(new TranslationContainer(TextFormat.GRAY + "%commands.deop.message"));
-        }
-
-        broadcastCommandMessage(sender, new TranslationContainer("commands.deop.success", new String[]{player.getName()}));
-
-        return true;
+        return IPlayers.size();
     }
 }

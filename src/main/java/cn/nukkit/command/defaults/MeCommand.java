@@ -1,57 +1,41 @@
 package cn.nukkit.command.defaults;
 
-import cn.nukkit.Player;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.utils.TextFormat;
 
+import java.util.Map;
+
 /**
- * Created on 2015/11/12 by xtypr.
- * Package cn.nukkit.command.defaults in project Nukkit .
+ * @author xtypr
+ * @since 2015/11/12
  */
 public class MeCommand extends VanillaCommand {
 
     public MeCommand(String name) {
-        super(name, "%nukkit.command.me.description", "%nukkit.command.me.usage");
+        super(name, "commands.me.description", "nukkit.command.me.usage");
         this.setPermission("nukkit.command.me");
         this.commandParameters.clear();
-        this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("action ...", CommandParamType.RAWTEXT, false)
+        this.commandParameters.put("message", new CommandParameter[]{
+                CommandParameter.newType("message", CommandParamType.MESSAGE)
         });
+        this.commandParameters.put("default", new CommandParameter[0]);
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        String name = sender.getName();
+        String message = "";
+        if (result.getKey().equals("message")) {
+            message = result.getValue().getResult(0);
         }
 
-        if (args.length == 0) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-
-            return false;
-        }
-
-        String name;
-        if (sender instanceof Player) {
-            name = ((Player) sender).getDisplayName();
-        } else {
-            name = sender.getName();
-        }
-
-        StringBuilder msg = new StringBuilder();
-        for (String arg : args) {
-            msg.append(arg).append(' ');
-        }
-
-        if (msg.length() > 0) {
-            msg = new StringBuilder(msg.substring(0, msg.length() - 1));
-        }
-
-        sender.getServer().broadcastMessage(new TranslationContainer("chat.type.emote", name, TextFormat.WHITE + msg.toString()));
-
-        return true;
+        broadcastCommandMessage(sender, new TranslationContainer("chat.type.emote", name, TextFormat.WHITE + message), true);
+        return 1;
     }
 }
