@@ -1,92 +1,106 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.BlockUnknown;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.data.GenericParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.PlayersNode;
+import cn.nukkit.command.tree.node.RemainStringNode;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.item.Item;
-import cn.nukkit.lang.TranslationContainer;
-import cn.nukkit.utils.TextFormat;
+import cn.nukkit.item.ItemBlock;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * Created on 2015/12/9 by xtypr.
- * Package cn.nukkit.command.defaults in project Nukkit .
+ * @author xtypr
+ * @since 2015/12/9
  */
 public class GiveCommand extends VanillaCommand {
 
     public GiveCommand(String name) {
-        super(name, "%nukkit.command.give.description", "%nukkit.command.give.usage");
+        super(name, "commands.give.description");
         this.setPermission("nukkit.command.give");
         this.commandParameters.clear();
         this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("itemName", false, CommandParameter.ENUM_TYPE_ITEM_LIST),
-                new CommandParameter("amount", CommandParamType.INT, true),
-                new CommandParameter("meta", CommandParamType.INT, true),
-                new CommandParameter("tags...", CommandParamType.RAWTEXT, true)
+                CommandParameter.newType("player", CommandParamType.TARGET, new PlayersNode()),
+                GenericParameter.ITEM_NAME.get(false),
+                CommandParameter.newType("amount", true, CommandParamType.INT),
+                CommandParameter.newType("data", true, CommandParamType.INT),
+                CommandParameter.newType("components", true, CommandParamType.JSON, new RemainStringNode())
         });
-        this.commandParameters.put("toPlayerById", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("item ID", CommandParamType.INT, false),
-                new CommandParameter("amount", CommandParamType.INT, true),
-                new CommandParameter("tags...", CommandParamType.RAWTEXT, true)
-        });
-        this.commandParameters.put("toPlayerByIdMeta", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("item ID:meta", CommandParamType.RAWTEXT, false),
-                new CommandParameter("amount", CommandParamType.INT, true),
-                new CommandParameter("tags...", CommandParamType.RAWTEXT, true)
-        });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        List<Player> players = list.getResult(0);
+
+        if (players.isEmpty()) {
+            log.addNoTargetMatch().output();
+            return 0;
         }
 
-        if (args.length < 2) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return true;
+        Item item = list.getResult(1);
+        if (item.isNull()) {
+            log.addError("commands.give.item.notFound", item.getDisplayName()).output();
+            return 0;
         }
-
-        Player player = sender.getServer().getPlayer(args[0].replace("@s", sender.getName()));
-        Item item;
-
-        try {
-            item = Item.fromString(args[1]);
-        } catch (Exception e) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return true;
+        if (item instanceof ItemBlock && item.getBlock() instanceof BlockUnknown) {
+            log.addError("commands.give.block.notFound", item.getDisplayName()).output();
+            return 0;
         }
-
-        if (item.getDamage() < 0) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return true;
-        }
-
-        try {
-            item.setCount(Integer.parseInt(args[2]));
-        } catch (Exception e) {
-            item.setCount(item.getMaxStackSize());
-        }
-
-        if (player != null) {
-            if (item.getId() == 0) {
-                sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.give.item.notFound", args[1]));
-                return true;
+        int count;
+        if (list.hasResult(2)) {
+            count = list.getResult(2);
+            if (count <= 0) {
+                log.addNumTooSmall(2, 1).output();
+                return 0;
             }
-            player.getInventory().addItem(item.clone());
-        } else {
-            sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.player.notFound"));
-            return true;
+            item.setCount(count);
+        }
+        if (list.hasResult(3)) {
+            int damage = list.getResult(3);
+            item.setDamage(damage);
         }
 
-        broadcastCommandMessage(sender, new TranslationContainer(
-                "%commands.give.success",
-                item.getName() + " (" + item.getId() + ':' + item.getDamage() + ')',
+        for (Player player : players) {
+            Item[] returns = player.getInventory().addItem(item.clone());
+            List<Item> drops = new ArrayList<>();
+            for (Item returned : returns) {
+                int maxStackSize = returned.getMaxStackSize();
+                if (returned.getCount() <= maxStackSize) {
+                    drops.add(returned);
+                } else {
+                    while (returned.getCount() > maxStackSize) {
+                        Item drop = returned.clone();
+                        int toDrop = Math.min(returned.getCount(), maxStackSize);
+                        drop.setCount(toDrop);
+                        returned.setCount(returned.getCount() - toDrop);
+                        drops.add(drop);
+                    }
+                    if (!returned.isNull()) {
+                        drops.add(returned);
+                    }
+                }
+            }
+
+            for (Item drop : drops) {
+                player.dropItem(drop);
+            }
+            log.outputObjectWhisper(player, "commands.give.successRecipient", item.getDisplayName() + " (" + item.getId() + (item.getDamage() != 0 ? ":" + item.getDamage() : "") + ")",
+                    String.valueOf(item.getCount()));
+        }
+        log.addSuccess("commands.give.success", item.getDisplayName() + " (" + item.getId() + (item.getDamage() != 0 ? ":" + item.getDamage() : "") + ")",
                 String.valueOf(item.getCount()),
-                player.getName()));
-        return true;
+                players.stream().map(Player::getName).collect(Collectors.joining(","))).successCount(players.size()).output(true);
+        return players.size();
     }
 }

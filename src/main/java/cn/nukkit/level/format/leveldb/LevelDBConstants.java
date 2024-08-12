@@ -7,6 +7,8 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static org.cloudburstmc.blockstateupdater.util.tagupdater.CompoundTagUpdaterContext.makeVersion;
+
 public final class LevelDBConstants {
     public static final int SUB_CHUNK_2D_SIZE = 16 * 16;
     public static final int SUB_CHUNK_SIZE = 16 * SUB_CHUNK_2D_SIZE;
@@ -37,6 +39,8 @@ public final class LevelDBConstants {
     public static final int STATE_MAYOR_VERSION = 1;
     public static final int STATE_MINOR_VERSION = 21;
     public static final int STATE_PATCH_VERSION = 0;
+
+    public static final int STATE_VERSION = makeVersion(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION) + 3; // ? 3 updaters were added in 1.21.0 ?
 
     public static final List<IntTag> CURRENT_LEVEL_VERSION = Collections.unmodifiableList(ObjectArrayList.of(
             new IntTag("", STATE_MAYOR_VERSION), // major

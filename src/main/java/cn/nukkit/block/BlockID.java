@@ -528,8 +528,11 @@ public interface BlockID {
 
     int AMETHYST_BLOCK = 582;
 
+    int GLOW_FRAME = 594;
+
     int DEEPSLATE = 633;
 
+    int GLOW_LICHEN = 666;
     int CANDLE = 667;
     int WHITE_CANDLE = 668;
     int ORANGE_CANDLE = 669;

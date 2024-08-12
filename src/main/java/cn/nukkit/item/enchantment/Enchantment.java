@@ -531,6 +531,10 @@ public abstract class Enchantment implements Cloneable {
         return "%enchantment." + this.name;
     }
 
+    public String getOriginalName() {
+        return this.name;
+    }
+
     public boolean canEnchant(Item item) {
         return this.type.canEnchantItem(item);
     }

@@ -32,7 +32,7 @@ public class WarpedFungiTreePopulator extends Populator {
     private IntArrayList getHighestWorkableBlocks(final int x, final int z) {
         int y;
         final IntArrayList blockYs = new IntArrayList();
-        for (y = 128; y > 0; --y) {
+        for (y = 127; y > 0; --y) {
             final int b = level.getBlockIdAt(x, y, z);
             if (b == Block.WARPED_NYLIUM && level.getBlockIdAt(x, y + 1, z) == 0) {
                 blockYs.add(y + 1);

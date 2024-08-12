@@ -26,7 +26,7 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class BlockItemFrame extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityItemFrame> {
 
-    private final static int[] FACING = new int[]{4, 5, 3, 2, 1, 0}; // TODO when 1.13 support arrives, add UP/DOWN facings
+    protected final static int[] FACING = new int[]{4, 5, 3, 2, 1, 0}; // TODO when 1.13 support arrives, add UP/DOWN facings
 
     //TODO fix runtime_block_states
     private final static int FACING_BITMASK = 0x3; //11

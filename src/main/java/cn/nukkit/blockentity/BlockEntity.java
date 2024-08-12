@@ -4,6 +4,8 @@ import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.persistence.PersistentDataContainer;
+import cn.nukkit.level.persistence.impl.PersistentDataContainerBlockWrapper;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.ChunkException;
@@ -32,6 +34,7 @@ public abstract class BlockEntity extends Position {
     public static final String DAYLIGHT_DETECTOR = "DaylightDetector";
     public static final String MUSIC = "Music";
     public static final String ITEM_FRAME = "ItemFrame";
+    public static final String GLOW_ITEM_FRAME = "GlowItemFrame";
     public static final String CAULDRON = "Cauldron";
     public static final String BEACON = "Beacon";
     public static final String PISTON_ARM = "PistonArm";
@@ -54,6 +57,9 @@ public abstract class BlockEntity extends Position {
     public static final String TARGET = "Target";
     public static final String BRUSHABLE_BLOCK = "BrushableBlock";
 
+    // Not a vanilla block entity
+    public static final String PERSISTENT_CONTAINER = "PersistentContainer";
+
     public static long count = 1;
 
     private static final BiMap<String, Class<? extends BlockEntity>> knownBlockEntities = HashBiMap.create(30);
@@ -67,6 +73,8 @@ public abstract class BlockEntity extends Position {
     public boolean closed = false;
     public CompoundTag namedTag;
     protected Server server;
+
+    private PersistentDataContainer persistentContainer;
 
     public BlockEntity(FullChunk chunk, CompoundTag nbt) {
         if (chunk == null || chunk.getProvider() == null) {
@@ -222,6 +230,26 @@ public abstract class BlockEntity extends Position {
                 .putInt("x", pos.getFloorX())
                 .putInt("y", pos.getFloorY())
                 .putInt("z", pos.getFloorZ());
+    }
+
+    public PersistentDataContainer getPersistentDataContainer() {
+        if (this.persistentContainer == null) {
+            this.persistentContainer = new PersistentDataContainerBlockWrapper(this);
+        }
+        return this.persistentContainer;
+    }
+
+    public boolean hasPersistentDataContainer() {
+        return !this.getPersistentDataContainer().isEmpty();
+    }
+
+    public void onReplacedWith(BlockEntity blockEntity) {
+        blockEntity.getPersistentDataContainer().setStorage(this.getPersistentDataContainer().getStorage().clone());
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof BlockEntity && this.getClass().equals(obj.getClass()) && super.equals(obj);
     }
 
     public boolean canSaveToStorage() {

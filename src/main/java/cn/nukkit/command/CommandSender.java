@@ -3,6 +3,7 @@ package cn.nukkit.command;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.lang.CommandOutputContainer;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.Position;
@@ -42,6 +43,13 @@ public interface CommandSender extends Permissible {
      * @since Nukkit 1.0 | Nukkit API 1.0.0
      */
     void sendMessage(TextContainer message);
+
+    /**
+     * Send command output.
+     *
+     * @param container the container
+     */
+    void sendCommandOutput(CommandOutputContainer container);
 
     /**
      * 返回命令发送者所在的服务器。<br>

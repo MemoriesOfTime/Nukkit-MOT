@@ -33,9 +33,12 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import it.unimi.dsi.fastutil.io.FastByteArrayInputStream;
 import lombok.SneakyThrows;
+import org.cloudburstmc.nbt.NBTOutputStream;
+import org.cloudburstmc.nbt.NbtUtils;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.nio.ByteOrder;
@@ -1604,6 +1607,16 @@ public class BinaryStream {
         return (minCapacity > MAX_ARRAY_SIZE) ?
                 Integer.MAX_VALUE :
                 MAX_ARRAY_SIZE;
+    }
+
+    public <T> void putNbtTag(T tag) {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        try (NBTOutputStream writer = NbtUtils.createNetworkWriter(stream)) {
+            writer.writeTag(tag);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        this.put(stream.toByteArray());
     }
 
     public ItemStackRequest readItemStackRequest() {

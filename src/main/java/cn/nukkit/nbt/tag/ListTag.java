@@ -25,6 +25,10 @@ public class ListTag<T extends Tag> extends Tag {
         super(name);
     }
 
+    public ListTag(List<T> list) {
+        this("", list);
+    }
+
     public ListTag(String name, List<T> list) {
         super(name);
         this.list = list;

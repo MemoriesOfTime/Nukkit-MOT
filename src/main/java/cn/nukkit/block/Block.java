@@ -2,6 +2,8 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.customblock.CustomBlockManager;
+import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
@@ -12,11 +14,13 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.metadata.Metadatable;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
@@ -524,12 +528,15 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[CRACKED_NETHER_BRICKS] = BlockBricksNetherCracked.class; //558
             list[QUARTZ_BRICKS] = BlockBricksQuartz.class; //559
             
-            list[COPPER_ORE] = BlockOreCopper.class; // 566
+            list[COPPER_ORE] = BlockOreCopper.class; //566
 
             list[AMETHYST_BLOCK] = BlockAmethyst.class; //582
 
+            list[GLOW_FRAME] = BlockItemFrameGlow.class; //594
+
             list[DEEPSLATE] = BlockDeepslate.class; // 633
 
+            list[GLOW_LICHEN] = BlockGlowLichen.class; //666
             list[CANDLE] = BlockCandle.class; //667
             list[WHITE_CANDLE] = BlockCandleWhite.class; //668
             list[ORANGE_CANDLE] = BlockCandleOrange.class; //669
@@ -681,6 +688,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id < 0) {
             id = 255 - id;
         }
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         int fullId = id << DATA_BITS;
         if (meta != null) {
             int iMeta = meta;
@@ -718,6 +730,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             id = 255 - id;
         }
 
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         Block block;
         int fullId = id << DATA_BITS;
         if (meta != null && meta > DATA_SIZE) {
@@ -751,6 +767,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id < 0) {
             id = 255 - id;
         }
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         int fullId = id << DATA_BITS;
         if (fullId >= fullList.length) {
             log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, data);
@@ -775,8 +796,13 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int fullId, Level level, int x, int y, int z, int layer) {
+        int id = fullId << DATA_BITS;
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         if (fullId >= fullList.length || fullList[fullId] == null) {
-            int id = fullId << DATA_BITS;
             int meta = fullId & DATA_BITS;
             log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
             return new BlockUnknown(id, meta);
@@ -795,6 +821,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int id, int meta, Level level, int x, int y, int z, int layer) {
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         Block block;
         if (meta <= DATA_SIZE) {
             block = fullList[id << DATA_BITS | meta].clone();
@@ -810,12 +840,30 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return block;
     }
 
+    public static int getBlockLight(int blockId) {
+        if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return light[0]; // TODO: just temporary
+        }
+        return light[blockId];
+    }
+
+    public static int getBlockLightFilter(int blockId) {
+        if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return lightFilter[0]; // TODO: just temporary
+        }
+        return lightFilter[blockId];
+    }
+
     public static Block fromFullId(int fullId) {
         return get(fullId >> DATA_BITS, fullId & DATA_MASK);
     }
 
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        return this.getLevel().setBlock(this, this, true, true);
+        return this.canPlaceOn(block.down(), target) && this.getLevel().setBlock(this, this, true, true);
+    }
+
+    public boolean canPlaceOn(Block floor, Position pos) {
+        return this.canBePlaced();
     }
 
     public boolean canHarvestWithHand() {
@@ -1599,6 +1647,26 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return !isTransparent() && isSolid() && !isPowerSource();
     }
 
+    /**
+     * Compare whether two blocks are the same, this method compares block entities
+     *
+     * @param obj the obj
+     * @return the boolean
+     */
+    public boolean equalsBlock(Object obj) {
+        if (obj instanceof Block otherBlock) {
+            if (!(this instanceof BlockEntityHolder<?>) && !(otherBlock instanceof BlockEntityHolder<?>)) {
+                return this.getId() == otherBlock.getId() && this.getDamage() == otherBlock.getDamage();
+            }
+            if (this instanceof BlockEntityHolder<?> holder1 && otherBlock instanceof BlockEntityHolder<?> holder2) {
+                BlockEntity be1 = holder1.getOrCreateBlockEntity();
+                BlockEntity be2 = holder2.getOrCreateBlockEntity();
+                return this.getId() == otherBlock.getId() && this.getDamage() == otherBlock.getDamage() && be1.getCleanedNBT().equals(be2.getCleanedNBT());
+            }
+        }
+        return false;
+    }
+
     public static boolean equals(Block b1, Block b2) {
         return equals(b1, b2, true);
     }
@@ -1699,5 +1767,48 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public boolean isSuspiciousBlock() {
         return false;
+    }
+
+    public PersistentDataContainer getPersistentDataContainer() {
+        if (!this.isValid()) {
+            throw new IllegalStateException("Block does not have valid level");
+        }
+        return this.level.getPersistentDataContainer(this);
+    }
+
+    @SuppressWarnings("unused")
+    public boolean hasPersistentDataContainer() {
+        if (!this.isValid()) {
+            throw new IllegalStateException("Block does not have valid level");
+        }
+        return this.level.hasPersistentDataContainer(this);
+    }
+
+    public boolean cloneTo(Position pos) {
+        return cloneTo(pos, true);
+    }
+
+    /**
+     * 将方块克隆到指定位置<p/>
+     * 此方法会连带克隆方块实体<p/>
+     * 注意，此方法会先清除指定位置的方块为空气再进行克隆
+     *
+     * @param pos    要克隆到的位置
+     * @param update 是否需要更新克隆的方块
+     * @return 是否克隆成功
+     */
+    @SuppressWarnings("null")
+    public boolean cloneTo(Position pos, boolean update) {
+        //清除旧方块
+        level.setBlock(pos, this.layer, Block.get(Block.AIR), false, false);
+        if (this instanceof BlockEntityHolder<?> holder && holder.getBlockEntity() != null) {
+            var clonedBlock = this.clone();
+            clonedBlock.position(pos);
+            CompoundTag tag = holder.getBlockEntity().getCleanedNBT();
+            //方块实体要求direct=true
+            return BlockEntityHolder.setBlockAndCreateEntity((BlockEntityHolder<?>) clonedBlock, true, update, tag) != null;
+        } else {
+            return pos.level.setBlock(pos, this.layer, this.clone(), true, update);
+        }
     }
 }

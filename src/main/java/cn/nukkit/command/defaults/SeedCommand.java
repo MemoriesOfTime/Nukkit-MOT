@@ -2,35 +2,34 @@ package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
 import cn.nukkit.command.CommandSender;
-import cn.nukkit.lang.TranslationContainer;
+import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.utils.CommandLogger;
+
+import java.util.Map;
 
 /**
- * @author MagicDroidX
- * Nukkit Project
+ * @author MagicDroidX (Nukkit Project)
  */
 public class SeedCommand extends VanillaCommand {
 
     public SeedCommand(String name) {
-        super(name, "%nukkit.command.seed.description", "%commands.seed.usage");
+        super(name, "Show the level's seed");//no translation in client
         this.setPermission("nukkit.command.seed");
         this.commandParameters.clear();
+        this.commandParameters.put("default", new CommandParameter[0]);
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
-        }
-
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
         long seed;
-        if (sender instanceof Player) {
-            seed = ((Player) sender).getLevel().getSeed();
+        if (sender instanceof Player player) {
+            seed = player.getLevel().getSeed();
         } else {
             seed = sender.getServer().getDefaultLevel().getSeed();
         }
-
-        sender.sendMessage(new TranslationContainer("commands.seed.success", String.valueOf(seed)));
-
-        return true;
+        log.addSuccess("commands.seed.success", String.valueOf(seed)).output();
+        return 1;
     }
 }

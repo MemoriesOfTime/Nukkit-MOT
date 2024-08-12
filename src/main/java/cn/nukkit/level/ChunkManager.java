@@ -49,4 +49,8 @@ public interface ChunkManager {
     void setChunk(int chunkX, int chunkZ, BaseFullChunk chunk);
 
     long getSeed();
+
+    int getMinBlockY();
+
+    int getMaxBlockY();
 }
