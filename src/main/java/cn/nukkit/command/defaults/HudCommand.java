@@ -1,13 +1,17 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.PlayersNode;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.network.protocol.SetHudPacket;
 import cn.nukkit.network.protocol.types.hub.HudElement;
 import cn.nukkit.network.protocol.types.hub.HudVisibility;
+import java.util.List;
+import java.util.Map;
 
 public class HudCommand extends VanillaCommand {
 
@@ -16,30 +20,30 @@ public class HudCommand extends VanillaCommand {
         this.setPermission("nukkit.command.hud");
         this.getCommandParameters().clear();
         this.addCommandParameters("default", new CommandParameter[]{
-                CommandParameter.newType("player", false, CommandParamType.TARGET),
+                CommandParameter.newType("player", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("visible", false, new String[]{"hide", "reset"}),
                 CommandParameter.newEnum("hud_element", false, new String[]{"armor", "air_bubbles_bar", "crosshair", "food_bar", "health", "hotbar", "paper_doll", "tool_tips", "progress_bar", "touch_controls", "vehicle_health"})
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        Player player = Server.getInstance().getPlayerExact(args[0]);
-        if (player == null) {
-            sender.sendMessage("Player + " + args[0] + " + not found");
-            return true;
-        }
-        if (args.length < 3) {
-            return false;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+
+        List<Player> players = list.getResult(0);
+        if (players.isEmpty()) {
+            log.addNoTargetMatch().output();
+            return 0;
         }
 
-        HudVisibility visibility = switch (args[1]) {
+        HudVisibility visibility = switch ((String) list.getResult(1)) {
             case "hide" -> HudVisibility.HIDE;
             case "reset" -> HudVisibility.RESET;
             default -> null;
         };
 
-        HudElement element = switch (args[2]) {
+        HudElement element = switch ((String) list.getResult(2)) {
             case "armor" -> HudElement.ARMOR;
             case "air_bubbles_bar" -> HudElement.AIR_BUBBLES_BAR;
             case "crosshair" -> HudElement.CROSSHAIR;
@@ -51,24 +55,24 @@ public class HudCommand extends VanillaCommand {
             case "progress_bar" -> HudElement.PROGRESS_BAR;
             case "touch_controls" -> HudElement.TOUCH_CONTROLS;
             case "vehicle_health" -> HudElement.VEHICLE_HEALTH;
-            case "effects_bar" -> HudElement.EFFECTS_BAR;
-            case "item_text_popup" -> HudElement.ITEM_TEXT_POPUP;
 
             default -> null;
         };
 
-        if(visibility == null || element == null) {
-            sender.sendMessage("Invalid visibility or element");
-            return false;
+        if (visibility == null || element == null) {
+            return 0;
         }
 
-        SetHudPacket packet = new SetHudPacket();
-        packet.elements.add(element);
-        packet.visibility = visibility;
-        player.dataPacket(packet);
 
-        sender.sendMessage("HUD element " + element.name() + " is now " + visibility.name() + " for " + player.getName());
+        for (Player player : players) {
+            SetHudPacket packet = new SetHudPacket();
+            packet.elements.add(element);
+            packet.visibility = visibility;
+            player.dataPacket(packet);
 
-        return true;
+            return 1;
+        }
+
+        return 0;
     }
 }

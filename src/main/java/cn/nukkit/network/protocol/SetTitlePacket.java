@@ -16,6 +16,9 @@ public class SetTitlePacket extends DataPacket {
     public static final int TYPE_SUBTITLE = 3;
     public static final int TYPE_ACTION_BAR = 4;
     public static final int TYPE_ANIMATION_TIMES = 5;
+    public static final int TYPE_TITLE_JSON = 6;
+    public static final int TYPE_SUBTITLE_JSON = 7;
+    public static final int TYPE_ACTIONBAR_JSON = 8;
 
     public int type;
     public String text = "";

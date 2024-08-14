@@ -53,10 +53,10 @@ public class OreType {
             final double randVec1 = (double) (MathHelper.sin((float) Math.PI * sizeIncr) + 1.0F) * randSizeOffset + 1.0D;
             final double randVec2 = (double) (MathHelper.sin((float) Math.PI * sizeIncr) + 1.0F) * randSizeOffset + 1.0D;
             final int minX = NukkitMath.floorDouble(scaleX - randVec1 / 2.0D);
-            final int minY = NukkitMath.floorDouble(scaleY - randVec2 / 2.0D);
+            final int minY = Math.max(NukkitMath.floorDouble(scaleY - randVec2 / 2.0D), level.getMinBlockY());
             final int minZ = NukkitMath.floorDouble(scaleZ - randVec1 / 2.0D);
             final int maxX = NukkitMath.floorDouble(scaleX + randVec1 / 2.0D);
-            final int maxY = NukkitMath.floorDouble(scaleY + randVec2 / 2.0D);
+            final int maxY = Math.min(NukkitMath.floorDouble(scaleY + randVec2 / 2.0D), level.getMaxBlockY());
             final int maxZ = NukkitMath.floorDouble(scaleZ + randVec1 / 2.0D);
 
             for (int xSeg = minX; xSeg <= maxX; ++xSeg) {

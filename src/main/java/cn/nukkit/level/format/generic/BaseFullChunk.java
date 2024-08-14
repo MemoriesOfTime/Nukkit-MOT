@@ -340,7 +340,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
                 int y;
 
-                for (y = 255; y > top; --y) {
+                for (y = this.getProvider().getMaxBlockY(); y > top; --y) {
                     // all the blocks above & including the top-most block in a column are exposed to sun and
                     // thus have a skylight value of 15
                     this.setBlockSkyLight(x, y, z, 15);
@@ -350,7 +350,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 int nextDecrease = 0; // decrease that that will be applied starting with the next block
 
                 // TODO: remove nextLight & nextDecrease, use only light & decrease variables
-                for (y = top; y >= 0; --y) { // going under the top-most block
+                for (y = top; y >= this.getProvider().getMinBlockY(); --y) { // going under the top-most block
                     nextLight -= nextDecrease;
                     int light = nextLight; // this light value will be applied for this block. The following checks are all about the next blocks
 
@@ -394,11 +394,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     public int getHighestBlockAt(int x, int z, boolean cache) {
         if (cache) {
             int h = this.getHeightMap(x, z);
-            if (h != 0 && h != 255) {
+            if (h != this.getProvider().getMinBlockY() && h != this.getProvider().getMaxBlockY()) {
                 return h;
             }
         }
-        for (int y = 255; y >= 0; --y) {
+        for (int y = this.getProvider().getMaxBlockY(); y >= this.getProvider().getMinBlockY(); --y) {
             if (getBlockId(x, y, z) != 0x00) {
                 if (cache) {
                     this.setHeightMap(x, z, y);
@@ -732,6 +732,16 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public long getSeed() {
         throw new UnsupportedOperationException("Chunk does not have a seed");
+    }
+
+    @Override
+    public int getMinBlockY() {
+        return this.getProvider().getMinBlockY();
+    }
+
+    @Override
+    public int getMaxBlockY() {
+        return this.getProvider().getMaxBlockY();
     }
 
     public boolean compress() {

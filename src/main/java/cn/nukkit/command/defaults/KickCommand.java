@@ -1,64 +1,56 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.PlayersNode;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.event.player.PlayerKickEvent;
-import cn.nukkit.lang.TranslationContainer;
-import cn.nukkit.utils.TextFormat;
+
+import java.util.List;
+import java.util.Map;
 
 /**
- * Created on 2015/11/11 by xtypr.
- * Package cn.nukkit.command.defaults in project Nukkit .
+ * @author xtypr
+ * @since 2015/11/11
  */
 public class KickCommand extends VanillaCommand {
 
     public KickCommand(String name) {
-        super(name, "%nukkit.command.kick.description", "%commands.kick.usage");
+        super(name, "commands.kick.description");
         this.setPermission("nukkit.command.kick");
         this.commandParameters.clear();
         this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("reason", CommandParamType.STRING, false),
+                CommandParameter.newType("player", CommandParamType.TARGET, new PlayersNode()),
+                CommandParameter.newType("reason", true, CommandParamType.MESSAGE)
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        List<Player> players = list.getResult(0);
+        if (players.isEmpty()) {
+            log.addNoTargetMatch().output();
+            return 0;
         }
-        if (args.length == 0) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return false;
-        }
-
-        String name = args[0].replace("@s", sender.getName());
-
-        StringBuilder reason = new StringBuilder();
-        for (int i = 1; i < args.length; i++) {
-            reason.append(args[i]).append(' ');
+        String reason = "";
+        if (list.hasResult(1)) {
+            reason = list.getResult(1);
         }
 
-        if (reason.length() > 0) {
-            reason = new StringBuilder(reason.substring(0, reason.length() - 1));
-        }
-
-        Player player = sender.getServer().getPlayer(name);
-        if (player != null) {
-            player.kick(PlayerKickEvent.Reason.KICKED_BY_ADMIN, reason.toString(), true, "source=" + sender.getName() + ", reason=" + reason.toString());
-            if (reason.length() >= 1) {
-                broadcastCommandMessage(sender, new TranslationContainer("commands.kick.success.reason", player.getName(), reason.toString())
-                );
+        for (Player player : players) {
+            player.kick(PlayerKickEvent.Reason.KICKED_BY_ADMIN, reason);
+            if (!reason.isEmpty()) {
+                log.addSuccess("commands.kick.success.reason", player.getName(), reason);
             } else {
-                broadcastCommandMessage(sender, new TranslationContainer("commands.kick.success", player.getName()));
+                log.addSuccess("commands.kick.success", player.getName());
             }
-        } else {
-            sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.player.notFound"));
         }
-
-        return true;
+        log.successCount(players.size()).output(true);
+        return players.size();
     }
 }

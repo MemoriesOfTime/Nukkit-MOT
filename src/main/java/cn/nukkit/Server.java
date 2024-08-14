@@ -43,6 +43,9 @@ import cn.nukkit.level.format.LevelProviderManager;
 import cn.nukkit.level.format.anvil.Anvil;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
 import cn.nukkit.level.generator.*;
+import cn.nukkit.level.tickingarea.manager.SimpleTickingAreaManager;
+import cn.nukkit.level.tickingarea.manager.TickingAreaManager;
+import cn.nukkit.level.tickingarea.storage.JSONTickingAreaStorage;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.metadata.EntityMetadataStore;
 import cn.nukkit.metadata.LevelMetadataStore;
@@ -153,6 +156,8 @@ public class Server {
     private final ResourcePackManager resourcePackManager;
     private final ConsoleCommandSender consoleSender;
     private final IScoreboardManager scoreboardManager;
+
+    private final TickingAreaManager tickingAreaManager;
 
     private int maxPlayers;
     private boolean autoSave = true;
@@ -595,6 +600,7 @@ public class Server {
         }
 
         this.baseLang = new BaseLang(this.getPropertyString("language", BaseLang.FALLBACK_LANGUAGE));
+
         computeThreadPool = new ForkJoinPool(Math.min(0x7fff, Runtime.getRuntime().availableProcessors()), new ComputeThreadPoolThreadFactory(), null, false);
 
         Object poolSize = this.getProperty("async-workers", "auto");
@@ -626,6 +632,7 @@ public class Server {
         this.playerMetadata = new PlayerMetadataStore();
         this.levelMetadata = new LevelMetadataStore();
         this.scoreboardManager = new ScoreboardManager(new JSONScoreboardStorage(this.dataPath + "scoreboard.json"));
+        this.tickingAreaManager = new SimpleTickingAreaManager(new JSONTickingAreaStorage(this.dataPath + "worlds/"));
 
         this.operators = new Config(this.dataPath + "ops.txt", Config.ENUM);
         this.whitelist = new Config(this.dataPath + "white-list.txt", Config.ENUM);
@@ -990,13 +997,7 @@ public class Server {
             throw new ServerException("CommandSender is not valid");
         }
 
-        if (this.commandMap.dispatch(sender, commandLine)) {
-            return true;
-        }
-
-        sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.unknown", commandLine));
-
-        return false;
+        return this.commandMap.dispatch(sender, commandLine);
     }
 
     public ConsoleCommandSender getConsoleSender() {
@@ -3011,6 +3012,10 @@ public class Server {
      */
     public void setPlayerDataSerializer(PlayerDataSerializer playerDataSerializer) {
         this.playerDataSerializer = Preconditions.checkNotNull(playerDataSerializer, "playerDataSerializer");
+    }
+
+    public TickingAreaManager getTickingAreaManager() {
+        return tickingAreaManager;
     }
 
     /**

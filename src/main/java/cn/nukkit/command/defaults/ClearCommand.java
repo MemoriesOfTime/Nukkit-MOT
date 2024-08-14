@@ -2,15 +2,17 @@ package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
 import cn.nukkit.command.CommandSender;
-import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.data.GenericParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.PlayersNode;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.PlayerOffhandInventory;
 import cn.nukkit.item.Item;
-import cn.nukkit.lang.TranslationContainer;
-import cn.nukkit.utils.TextFormat;
 
+import java.util.List;
 import java.util.Map;
 
 public class ClearCommand extends VanillaCommand {
@@ -18,50 +20,44 @@ public class ClearCommand extends VanillaCommand {
     public ClearCommand(String name) {
         super(name, "commands.clear.description", "commands.clear.usage");
         this.setPermission("nukkit.command.clear");
-        this.commandParameters.clear();
-        this.commandParameters.put("default", new CommandParameter[]{
-                CommandParameter.newType("player", true, CommandParamType.TARGET),
-                CommandParameter.newEnum("itemName", true, CommandEnum.ENUM_ITEM),
+        this.getCommandParameters().clear();
+        this.addCommandParameters("default", new CommandParameter[]{
+                CommandParameter.newType("player", true, CommandParamType.TARGET, new PlayersNode()),
+                GenericParameter.ITEM_NAME.get(true),
                 CommandParameter.newType("data", true, CommandParamType.INT),
                 CommandParameter.newType("maxCount", true, CommandParamType.INT)
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return false;
-        }
-
-        Player target;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        List<Player> targets = sender.isPlayer() ? List.of(sender.asPlayer()) : null;
         int maxCount = -1;
-
         Item item = null;
 
-        if (args.length > 0) {
-            target = sender.getServer().getPlayer(args[0]);
-
-            if (args.length > 1) {
-                String id = args[1];
-                int meta = 0;
-
-                if (args.length > 2) {
-                    meta = Integer.parseInt(args[2]);
-                    if (args.length > 3) {
-                        maxCount = Integer.parseInt(args[3]);
+        if (list.hasResult(0)) {
+            targets = list.getResult(0);
+            if (list.hasResult(1)) {
+                item = list.getResult(1);
+                int data = -1;
+                if (list.hasResult(2)) {
+                    data = list.getResult(2);
+                    if (list.hasResult(3)) {
+                        maxCount = list.getResult(3);
                     }
                 }
-
-                item = Item.fromString(id + ':' + meta);
+                item.setDamage(data);
             }
-        } else if (sender.isPlayer()) {
-            target = (Player) sender;
-        } else {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return false;
         }
 
-        if (target != null) {
+        if (targets == null || targets.isEmpty()) {
+            log.addNoTargetMatch().output();
+            return 0;
+        }
+
+        for (Player target : targets) {
             PlayerInventory inventory = target.getInventory();
             PlayerOffhandInventory offhand = target.getOffhandInventory();
 
@@ -83,9 +79,9 @@ public class ClearCommand extends VanillaCommand {
                 }
 
                 if (count == 0) {
-                    sender.sendMessage(new TranslationContainer(TextFormat.RED + "commands.clear.failure.no.items", target.getName()));
+                    log.addError("commands.clear.failure.no.items", target.getName()).output();
                 } else {
-                    sender.sendMessage(new TranslationContainer("commands.clear.success", target.getName(), String.valueOf(count)));
+                    log.addSuccess("commands.clear.success", target.getName(), String.valueOf(count)).output();
                 }
             } else if (maxCount == 0) {
                 int count = 0;
@@ -104,11 +100,11 @@ public class ClearCommand extends VanillaCommand {
                 }
 
                 if (count == 0) {
-                    sender.sendMessage(new TranslationContainer(TextFormat.RED + "commands.clear.failure.no.items", target.getName()));
-                    return false;
+                    log.addError("commands.clear.failure.no.items", target.getName()).output();
+                    return 0;
+                } else {
+                    log.addSuccess("commands.clear.testing", target.getName(), String.valueOf(count)).output();
                 }
-
-                sender.sendMessage(new TranslationContainer("commands.clear.testing", target.getName(), String.valueOf(count)));
             } else if (maxCount == -1) {
                 int count = 0;
 
@@ -128,11 +124,11 @@ public class ClearCommand extends VanillaCommand {
                 }
 
                 if (count == 0) {
-                    sender.sendMessage(new TranslationContainer(TextFormat.RED + "commands.clear.failure.no.items", target.getName()));
-                    return false;
+                    log.addError("commands.clear.failure.no.items", target.getName()).output();
+                    return 0;
+                } else {
+                    log.addSuccess("commands.clear.success", target.getName(), String.valueOf(count)).output();
                 }
-
-                sender.sendMessage(new TranslationContainer("commands.clear.success", target.getName(), String.valueOf(count)));
             } else {
                 int remaining = maxCount;
 
@@ -165,14 +161,13 @@ public class ClearCommand extends VanillaCommand {
                 }
 
                 if (remaining == maxCount) {
-                    sender.sendMessage(new TranslationContainer(TextFormat.RED + "commands.clear.failure.no.items", target.getName()));
-                    return false;
+                    log.addError("commands.clear.failure.no.items", target.getName()).output();
+                    return 0;
+                } else {
+                    log.addSuccess("commands.clear.success", target.getName(), String.valueOf(maxCount - remaining)).output();
                 }
-
-                sender.sendMessage(new TranslationContainer("commands.clear.success", target.getName(), String.valueOf(maxCount - remaining)));
             }
         }
-
-        return true;
+        return targets.size();
     }
 }

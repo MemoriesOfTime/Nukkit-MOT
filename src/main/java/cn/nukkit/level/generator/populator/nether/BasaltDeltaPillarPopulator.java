@@ -26,6 +26,9 @@ public class BasaltDeltaPillarPopulator extends Populator {
                 if (random.nextBoundedInt(5) == 0) continue;
                 for (int randomHeight = 0; randomHeight < random.nextBoundedInt(5) + 1; randomHeight++) {
                     final int placeLocation = y + randomHeight;
+                    if (placeLocation > level.getMaxBlockY()) {
+                        continue;
+                    }
                     this.level.setBlockAt(x, placeLocation, z, BlockID.BASALT);
                 }
             }
@@ -35,9 +38,9 @@ public class BasaltDeltaPillarPopulator extends Populator {
     private IntArrayList getHighestWorkableBlocks(final int x, final int z) {
         int y;
         final IntArrayList blockYs = new IntArrayList();
-        for (y = 128; y > 0; --y) {
+        for (y = 127; y > 0; --y) {
             final int b = level.getBlockIdAt(x, y, z);
-            if ((b == Block.BASALT || b == Block.BLACKSTONE) && level.getBlockIdAt(x, y + 1, z) == 0) {
+            if ((b == Block.BASALT || b == Block.BLACKSTONE) && level.getBlockIdAt(x, y + 1, z) == Block.AIR) {
                 blockYs.add(y + 1);
             }
         }

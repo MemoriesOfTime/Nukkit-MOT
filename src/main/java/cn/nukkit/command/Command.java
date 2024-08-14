@@ -2,23 +2,37 @@ package cn.nukkit.command;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.command.data.*;
+import cn.nukkit.command.data.CommandData;
+import cn.nukkit.command.data.CommandDataVersions;
+import cn.nukkit.command.data.CommandEnum;
+import cn.nukkit.command.data.CommandOverload;
+import cn.nukkit.command.data.CommandParamType;
+import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.ParamTree;
+import cn.nukkit.command.utils.CommandLogger;
+import cn.nukkit.lang.PluginI18nManager;
 import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.permission.Permissible;
+import cn.nukkit.plugin.InternalPlugin;
+import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.utils.TextFormat;
+import io.netty.util.internal.EmptyArrays;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * @author MagicDroidX
- * Nukkit Project
+ * @author MagicDroidX (Nukkit Project)
  */
 public abstract class Command {
-
-    private static CommandData defaultDataTemplate = null;
-
-    protected CommandData commandData;
 
     private final String name;
 
@@ -30,40 +44,47 @@ public abstract class Command {
 
     private String[] activeAliases;
 
-    private CommandMap commandMap = null;
+    private CommandMap commandMap;
 
     protected String description;
 
     protected String usageMessage;
 
-    private String permission = null;
+    private String permission;
 
-    private String permissionMessage = null;
+    private String permissionMessage;
 
     protected Map<String, CommandParameter[]> commandParameters = new HashMap<>();
 
+
+    protected ParamTree paramTree;
+
+    protected CommandData commandData;
+
+    protected boolean serverSideOnly;
+
     public Command(String name) {
-        this(name, "", null, new String[0]);
+        this(name, "", null, EmptyArrays.EMPTY_STRINGS);
     }
 
     public Command(String name, String description) {
-        this(name, description, null, new String[0]);
+        this(name, description, null, EmptyArrays.EMPTY_STRINGS);
     }
 
     public Command(String name, String description, String usageMessage) {
-        this(name, description, usageMessage, new String[0]);
+        this(name, description, usageMessage, EmptyArrays.EMPTY_STRINGS);
     }
 
     public Command(String name, String description, String usageMessage, String[] aliases) {
         this.commandData = new CommandData();
-        this.name = name.toLowerCase(); // Prevent client crash
+        this.name = name.toLowerCase(Locale.ENGLISH); // Uppercase letters crash the client?!?
         this.nextLabel = name;
         this.label = name;
         this.description = description;
-        this.usageMessage = usageMessage == null ? '/' + name : usageMessage;
+        this.usageMessage = usageMessage == null ? "/" + name : usageMessage;
         this.aliases = aliases;
         this.activeAliases = aliases;
-        this.commandParameters.put("default", new CommandParameter[]{new CommandParameter("args", CommandParamType.RAWTEXT, true)});
+        this.commandParameters.put("default", new CommandParameter[]{CommandParameter.newType("args", true, CommandParamType.RAWTEXT)});
     }
 
     /**
@@ -103,33 +124,65 @@ public abstract class Command {
             return null;
         }
 
+        var plugin = this instanceof PluginCommand<?> pluginCommand ? pluginCommand.getPlugin() : InternalPlugin.INSTANCE;
+
         CommandData customData = this.commandData.clone();
 
-        if (this.getAliases().length > 0) {
-            List<String> aliases = new ArrayList<>(Arrays.asList(this.getAliases()));
+        if (getAliases().length > 0) {
+            List<String> aliases = new ArrayList<>(Arrays.asList(getAliases()));
             if (!aliases.contains(this.name)) {
                 aliases.add(this.name);
             }
+
             customData.aliases = new CommandEnum(this.name + "Aliases", aliases);
         }
 
-        customData.description = player.getServer().getLanguage().translateString(this.description);
-        this.commandParameters.forEach((key, par) -> {
+        if (plugin == InternalPlugin.INSTANCE) {
+            customData.description = player.getServer().getLanguage().translateString(this.getDescription());
+        } else if (plugin instanceof PluginBase pluginBase) {
+            var i18n = PluginI18nManager.getI18n(pluginBase);
+            if (i18n != null) {
+                customData.description = i18n.tr(player.getLanguageCode(), this.getDescription());
+            } else {
+                customData.description = player.getServer().getLanguage().translateString(this.getDescription());
+            }
+        }
+
+        this.commandParameters.forEach((key, params) -> {
             CommandOverload overload = new CommandOverload();
-            overload.input.parameters = par;
+            overload.input.parameters = params;
             customData.overloads.put(key, overload);
         });
-        if (customData.overloads.isEmpty()) customData.overloads.put("default", new CommandOverload());
+
+        if (customData.overloads.isEmpty()) {
+            customData.overloads.put("default", new CommandOverload());
+        }
+
         CommandDataVersions versions = new CommandDataVersions();
         versions.versions.add(customData);
         return versions;
     }
 
     public Map<String, CommandOverload> getOverloads() {
-        return this.commandData.overloads;
+        return commandData.overloads;
     }
 
-    public abstract boolean execute(CommandSender sender, String commandLabel, String[] args);
+    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Execute int.
+     *
+     * @param sender       命令发送者
+     * @param commandLabel the command label
+     * @param result       解析的命令结果
+     * @param log          命令输出工具
+     * @return int 返回0代表执行失败, 返回大于等于1代表执行成功
+     */
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        throw new UnsupportedOperationException();
+    }
 
     public String getName() {
         return name;
@@ -227,6 +280,35 @@ public abstract class Command {
         return usageMessage;
     }
 
+    public boolean isServerSideOnly() {
+        return serverSideOnly;
+    }
+
+    public String getCommandFormatTips() {
+        StringBuilder builder = new StringBuilder();
+        for (String form : this.getCommandParameters().keySet()) {
+            CommandParameter[] commandParameters = this.getCommandParameters().get(form);
+            builder.append("- /" + this.getName());
+            for (CommandParameter commandParameter : commandParameters) {
+                if (!commandParameter.optional) {
+                    if (commandParameter.enumData == null) {
+                        builder.append(" <").append(commandParameter.name + ": " + commandParameter.type.name().toLowerCase(Locale.ENGLISH)).append(">");
+                    } else {
+                        builder.append(" <").append(commandParameter.enumData.getValues().subList(0, Math.min(commandParameter.enumData.getValues().size(), 10)).stream().collect(Collectors.joining("|"))).append(commandParameter.enumData.getValues().size() > 10 ? "|..." : "").append(">");
+                    }
+                } else {
+                    if (commandParameter.enumData == null) {
+                        builder.append(" [").append(commandParameter.name + ": " + commandParameter.type.name().toLowerCase(Locale.ENGLISH)).append("]");
+                    } else {
+                        builder.append(" [").append(commandParameter.enumData.getValues().subList(0, Math.min(commandParameter.enumData.getValues().size(), 10)).stream().collect(Collectors.joining("|"))).append(commandParameter.enumData.getValues().size() > 10 ? "|..." : "").append("]");
+                    }
+                }
+            }
+            builder.append("\n");
+        }
+        return builder.toString();
+    }
+
     public void setAliases(String[] aliases) {
         this.aliases = aliases;
         if (!this.isRegistered()) {
@@ -246,8 +328,19 @@ public abstract class Command {
         this.usageMessage = usageMessage;
     }
 
-    public static CommandData generateDefaultData() {
-        return defaultDataTemplate.clone();
+    public boolean hasParamTree() {
+        return this.paramTree != null;
+    }
+
+    /**
+     * 若调用此方法，则将启用ParamTree用于解析命令参数
+     */
+    public void enableParamTree() {
+        this.paramTree = new ParamTree(this);
+    }
+
+    public ParamTree getParamTree() {
+        return paramTree;
     }
 
     public static void broadcastCommandMessage(CommandSender source, String message) {
@@ -266,11 +359,11 @@ public abstract class Command {
         }
 
         for (Permissible user : users) {
-            if (user instanceof CommandSender) {
-                if (user instanceof ConsoleCommandSender) {
-                    ((ConsoleCommandSender) user).sendMessage(result);
+            if (user instanceof CommandSender sender) {
+                if (user instanceof ConsoleCommandSender consoleSender) {
+                    consoleSender.sendMessage(result);
                 } else if (!user.equals(source)) {
-                    ((CommandSender) user).sendMessage(colored);
+                    sender.sendMessage(colored);
                 }
             }
         }
@@ -282,7 +375,7 @@ public abstract class Command {
 
     public static void broadcastCommandMessage(CommandSender source, TextContainer message, boolean sendToSource) {
         TextContainer m = message.clone();
-        String resultStr = '[' + source.getName() + ": " + (!m.getText().equals(source.getServer().getLanguage().get(m.getText())) ? "%" : "") + m.getText() + ']';
+        String resultStr = "[" + source.getName() + ": " + (!m.getText().equals(source.getServer().getLanguage().get(m.getText())) ? "%" : "") + m.getText() + "]";
 
         Set<Permissible> users = source.getServer().getPluginManager().getPermissionSubscriptions(Server.BROADCAST_CHANNEL_ADMINISTRATIVE);
 
@@ -298,11 +391,11 @@ public abstract class Command {
         }
 
         for (Permissible user : users) {
-            if (user instanceof CommandSender) {
-                if (user instanceof ConsoleCommandSender) {
-                    ((ConsoleCommandSender) user).sendMessage(result);
+            if (user instanceof CommandSender sender) {
+                if (user instanceof ConsoleCommandSender consoleSender) {
+                    consoleSender.sendMessage(result);
                 } else if (!user.equals(source)) {
-                    ((CommandSender) user).sendMessage(colored);
+                    sender.sendMessage(colored);
                 }
             }
         }

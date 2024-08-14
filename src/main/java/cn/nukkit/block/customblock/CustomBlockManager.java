@@ -121,11 +121,12 @@ public class CustomBlockManager {
         }
 
         if (properties != null) {
-            for (int meta = 1; meta < (1 << Block.DATA_BITS); meta++) {
+            for (int meta = 1; meta < properties.getBitSize(); meta++) {
                 CustomBlockState state;
                 try {
                     state = this.createBlockState(identifier, (nukkitId << Block.DATA_BITS) | meta, properties, factory);
                 } catch (InvalidBlockPropertyMetaException e) {
+                    log.error(e);
                     break; // Nukkit has more states than our block
                 }
                 this.legacy2CustomState.put(state.getLegacyId(), state);
@@ -228,8 +229,8 @@ public class CustomBlockManager {
             if (state.getInt("version") != paletteVersion) {
                 state = state.toBuilder().putInt("version", paletteVersion).build();
             }
-            vanillaPaletteList.add(state);
             state2Legacy.computeIfAbsent(state, s -> new IntOpenHashSet()).add(legacyToFullId(definition.getLegacyId()));
+            vanillaPaletteList.add(state);
         }
 
         if (palette.getProtocol() >= ProtocolInfo.v1_18_30) {

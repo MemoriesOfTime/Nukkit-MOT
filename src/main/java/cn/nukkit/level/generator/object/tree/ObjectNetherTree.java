@@ -2,7 +2,6 @@ package cn.nukkit.level.generator.object.tree;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.level.ChunkManager;
-import cn.nukkit.level.Level;
 import cn.nukkit.math.NukkitRandom;
 
 public abstract class ObjectNetherTree extends ObjectTree {
@@ -107,26 +106,19 @@ public abstract class ObjectNetherTree extends ObjectTree {
 
         for (int xCanopy = x - mid + 1; xCanopy <= x + mid - 1; xCanopy++) {
             for (int zCanopy = z - mid + 1; zCanopy <= z + mid - 1; zCanopy++) {
-                if (!Block.solid[level.getBlockIdAt(xCanopy, y + treeHeight, zCanopy)]) {
-                    level.setBlockAt(xCanopy, y + treeHeight, zCanopy, getLeafBlock());
+                int y1 = y + treeHeight;
+                if (checkY(level, y1)) {
+                    continue;
+                }
+                if (!Block.solid[level.getBlockIdAt(xCanopy, y1, zCanopy)]) {
+                    level.setBlockAt(xCanopy, y1, zCanopy, getLeafBlock());
                 }
             }
         }
     }
 
     private boolean checkY(final ChunkManager chunkManager, final int y) {
-        if (chunkManager instanceof final Level level) {
-            if (level.getDimension() == Level.DIMENSION_NETHER) {
-                return y > 126;
-            }
-            if (level.getDimension() == Level.DIMENSION_OVERWORLD) {
-                return y > 318;
-            }
-            if (level.getDimension() == Level.DIMENSION_THE_END) {
-                return y > 254;
-            }
-        }
-        return false;
+        return y > chunkManager.getMaxBlockY() - 1;
     }
 
     @Override

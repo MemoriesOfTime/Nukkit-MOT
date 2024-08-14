@@ -16,6 +16,7 @@ import io.netty.util.collection.CharObjectHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import javax.annotation.Nullable;
 import java.util.*;
@@ -470,7 +471,7 @@ public class CraftingManager {
     }
 
     private List<ShapedRecipe> loadShapedRecipes(List<Map<String, Object>> recipes) {
-        ArrayList<ShapedRecipe> recipesList = new ArrayList<>();
+        List<ShapedRecipe> recipesList = new ObjectArrayList<>();
         for (Map<String, Object> recipe : recipes) {
             top:
             {
@@ -675,8 +676,11 @@ public class CraftingManager {
             Map<String, Map<String, Object>> input = (Map) recipe.get("input");
             for (Map.Entry<String, Map<String, Object>> ingredientEntry : input.entrySet()) {
                 char ingredientChar = ingredientEntry.getKey().charAt(0);
-                ingredientEntry.getValue().put("damage", 0);
-                Item ingredient = Item.fromJson(ingredientEntry.getValue(), true);
+                Map<String, Object> value = ingredientEntry.getValue();
+                if ((int) value.getOrDefault("damage", -1) < 0) {
+                    value.put("damage", 0);
+                }
+                Item ingredient = Item.fromJson(value, true);
                 if (ingredient.getId() == Item.PLANKS) {
                     ingredient.setDamage(planksMeta);
                 }

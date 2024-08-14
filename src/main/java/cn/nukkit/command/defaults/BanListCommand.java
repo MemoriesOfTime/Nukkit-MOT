@@ -3,18 +3,21 @@ package cn.nukkit.command.defaults;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParameter;
-import cn.nukkit.lang.TranslationContainer;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.permission.BanEntry;
 import cn.nukkit.permission.BanList;
+import cn.nukkit.utils.TextFormat;
 
 import java.util.Iterator;
+import java.util.Locale;
+import java.util.Map;
 
 /**
- * Created on 2015/11/11 by xtypr.
- * Package cn.nukkit.command.defaults in project Nukkit .
+ * @author xtypr
+ * @since 2015/11/11
  */
 public class BanListCommand extends VanillaCommand {
-
     public BanListCommand(String name) {
         super(name, "%nukkit.command.banlist.description", "%commands.banlist.usage");
         this.setPermission("nukkit.command.ban.list");
@@ -22,28 +25,27 @@ public class BanListCommand extends VanillaCommand {
         this.commandParameters.put("default", new CommandParameter[]{
                 CommandParameter.newEnum("type", true, new CommandEnum("BanListType", "ips", "players"))
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
-        }
-
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var paramList = result.getValue();
         BanList list;
         boolean ips = false;
-        if (args.length > 0) {
-            switch (args[0].toLowerCase()) {
-                case "ips":
+
+        if (paramList.hasResult(0)) {
+            String type = paramList.getResult(0);
+            switch (type.toLowerCase(Locale.ENGLISH)) {
+                case "ips" -> {
                     list = sender.getServer().getIPBans();
                     ips = true;
-                    break;
-                case "players":
-                    list = sender.getServer().getNameBans();
-                    break;
-                default:
-                    sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-                    return false;
+                }
+                case "players" -> list = sender.getServer().getNameBans();
+                default -> {
+                    log.addSyntaxErrors(0).output();
+                    return 0;
+                }
             }
         } else {
             list = sender.getServer().getNameBans();
@@ -57,13 +59,13 @@ public class BanListCommand extends VanillaCommand {
                 builder.append(", ");
             }
         }
-
+        int size = list.getEntires().size();
         if (ips) {
-            sender.sendMessage(new TranslationContainer("commands.banlist.ips", String.valueOf(list.getEntires().size())));
+            log.addSuccess("commands.banlist.ips", String.valueOf(size));
         } else {
-            sender.sendMessage(new TranslationContainer("commands.banlist.players", String.valueOf(list.getEntires().size())));
+            log.addSuccess("commands.banlist.players", String.valueOf(size));
         }
-        sender.sendMessage(builder.toString());
-        return true;
+        log.addSuccess(TextFormat.GREEN + builder.toString()).successCount(size).output();
+        return size;
     }
 }

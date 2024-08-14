@@ -1,62 +1,48 @@
 package cn.nukkit.command.defaults;
 
-import cn.nukkit.Player;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
-import cn.nukkit.lang.TranslationContainer;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.Vector3;
-import cn.nukkit.utils.Utils;
 
 import java.text.DecimalFormat;
+import java.util.Map;
 
 /**
- * Created on 2015/12/13 by xtypr.
- * Package cn.nukkit.command.defaults in project Nukkit .
+ * @author xtypr
+ * @since 2015/12/13
  */
 public class SetWorldSpawnCommand extends VanillaCommand {
-
     public SetWorldSpawnCommand(String name) {
-        super(name, "%nukkit.command.setworldspawn.description", "%commands.setworldspawn.usage");
+        super(name, "commands.setworldspawn.description");
         this.setPermission("nukkit.command.setworldspawn");
         this.commandParameters.clear();
-        this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("blockPos", CommandParamType.POSITION, true)
+        this.commandParameters.put("default", new CommandParameter[0]);
+        this.commandParameters.put("spawnPoint", new CommandParameter[]{
+                CommandParameter.newType("spawnPoint", true, CommandParamType.POSITION)
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
-        }
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
         Level level;
         Vector3 pos;
-        if (args.length == 0) {
-            if (sender instanceof Player) {
-                level = ((Player) sender).getLevel();
-                pos = ((Player) sender).round();
-            } else {
-                sender.sendMessage(new TranslationContainer("commands.generic.ingame"));
-                return true;
-            }
-        } else if (args.length == 3) {
-            level = sender.getServer().getDefaultLevel();
-            try {
-                pos = new Vector3(Utils.toInt(args[0]), Utils.toInt(args[1]), Utils.toInt(args[2]));
-            } catch (NumberFormatException e1) {
-                sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-                return true;
-            }
+        if (!result.getValue().hasResult(0)) {
+            level = sender.getPosition().level;
+            pos = sender.getPosition().round();
         } else {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return true;
+            level = sender.getServer().getDefaultLevel();
+            pos = result.getValue().getResult(0);
         }
         level.setSpawnLocation(pos);
         DecimalFormat round2 = new DecimalFormat("##0.00");
-        broadcastCommandMessage(sender, new TranslationContainer("commands.setworldspawn.success", round2.format(pos.x), round2.format(pos.y), round2.format(pos.z)));
-        return true;
+        log.addSuccess("commands.setworldspawn.success", round2.format(pos.x),
+                round2.format(pos.y),
+                round2.format(pos.z)).output(true);
+        return 1;
     }
 }
