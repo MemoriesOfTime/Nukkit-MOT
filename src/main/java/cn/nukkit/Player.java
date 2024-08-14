@@ -6079,6 +6079,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return id;
     }
 
+    /**
+     * Close form windows sent with showFormWindow
+     */
+    public void closeFormWindows() {
+        if (this.protocol < ProtocolInfo.v1_21_2) {
+            return;
+        }
+        this.formWindows.clear();
+        this.dataPacket(new ClientboundCloseFormPacket());
+    }
+
     public void showDialogWindow(FormWindowDialog dialog) {
         showDialogWindow(dialog, true);
     }

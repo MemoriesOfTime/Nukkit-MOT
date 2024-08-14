@@ -536,7 +536,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class)
                 .registerPacket(ProtocolInfo.SET_HUD_PACKET, SetHudPacket.class)
                 .registerPacket(ProtocolInfo.AWARD_ACHIEVEMENT_PACKET, AwardAchievementPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET, ClientBoundCloseFormPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET, ClientboundCloseFormPacket.class)
                 .build();
     }
 

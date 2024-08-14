@@ -22,7 +22,7 @@ public class MobArmorEquipmentPacket extends DataPacket {
     /**
      * @since v712
      */
-    public Item body;
+    public Item body = Item.AIR_ITEM;
 
     @Override
     public void decode() {

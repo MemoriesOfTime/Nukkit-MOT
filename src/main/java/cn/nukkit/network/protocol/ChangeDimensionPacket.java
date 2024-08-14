@@ -24,7 +24,7 @@ public class ChangeDimensionPacket extends DataPacket {
      * Will be serialized as optional not present if null
      * @since v712
      */
-    public Integer loadingScreenId;
+    public Integer loadingScreenId = null;
 
     @Override
     public void decode() {
