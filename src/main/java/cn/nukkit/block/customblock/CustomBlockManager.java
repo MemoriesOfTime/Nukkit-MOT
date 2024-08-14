@@ -121,11 +121,12 @@ public class CustomBlockManager {
         }
 
         if (properties != null) {
-            for (int meta = 1; meta < (1 << Block.DATA_BITS); meta++) {
+            for (int meta = 1; meta < properties.getBitSize(); meta++) {
                 CustomBlockState state;
                 try {
                     state = this.createBlockState(identifier, (nukkitId << Block.DATA_BITS) | meta, properties, factory);
                 } catch (InvalidBlockPropertyMetaException e) {
+                    log.error(e);
                     break; // Nukkit has more states than our block
                 }
                 this.legacy2CustomState.put(state.getLegacyId(), state);
@@ -223,20 +224,12 @@ public class CustomBlockManager {
             legacyIds.add(entry.getIntKey());
         }
 
-        top:
         for (CustomBlockState definition : this.legacy2CustomState.values()) {
             NbtMap state = definition.getBlockState();
             if (state.getInt("version") != paletteVersion) {
                 state = state.toBuilder().putInt("version", paletteVersion).build();
             }
             state2Legacy.computeIfAbsent(state, s -> new IntOpenHashSet()).add(legacyToFullId(definition.getLegacyId()));
-            //生成runtimeId时忽略重复的状态
-            for (NbtMap hasState : vanillaPaletteList) {
-                if (hasState.getString("name").equals(state.getString("name")) &&
-                        hasState.getCompound("states").equals(state.getCompound("states"))) {
-                    continue top;
-                }
-            }
             vanillaPaletteList.add(state);
         }
 
