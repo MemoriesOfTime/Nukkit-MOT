@@ -22,7 +22,7 @@ public class ResourcePackClientResponsePacket extends DataPacket {
         this.responseStatus = (byte) this.getByte();
         this.packEntries = new Entry[Math.min(this.getLShort(), 1024)];
         for (int i = 0; i < this.packEntries.length; i++) {
-            String[] entry = this.getString().split("_");
+            String[] entry = this.getString().split("_", 3);
             String version = "1.2.0";
             if (protocol >= ProtocolInfo.v1_6_0_5) {
                 version = entry[1];
