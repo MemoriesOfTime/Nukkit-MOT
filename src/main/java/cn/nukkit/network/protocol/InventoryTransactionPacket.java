@@ -84,14 +84,20 @@ public class InventoryTransactionPacket extends DataPacket {
                 UseItemData useItemData = (UseItemData) this.transactionData;
 
                 this.putUnsignedVarInt(useItemData.actionType);
+                if (this.protocol >= ProtocolInfo.v1_21_20) {
+                    this.putUnsignedVarInt(useItemData.triggerType);
+                }
                 this.putBlockVector3(useItemData.blockPos);
                 this.putBlockFace(useItemData.face);
                 this.putVarInt(useItemData.hotbarSlot);
                 this.putSlot(protocol, useItemData.itemInHand);
                 this.putVector3f(useItemData.playerPos.asVector3f());
                 this.putVector3f(useItemData.clickPos);
-                if (protocol >= 354) { // Idk in which version this added
+                if (this.protocol >= ProtocolInfo.v1_16_210) {
                     this.putUnsignedVarInt(useItemData.blockRuntimeId);
+                    if (this.protocol >= ProtocolInfo.v1_21_20) {
+                        this.putUnsignedVarInt(useItemData.clientInteractPrediction);
+                    }
                 }
                 break;
             case TYPE_USE_ITEM_ON_ENTITY:
@@ -152,13 +158,21 @@ public class InventoryTransactionPacket extends DataPacket {
                 UseItemData itemData = new UseItemData();
 
                 itemData.actionType = (int) this.getUnsignedVarInt();
+                if (this.protocol >= ProtocolInfo.v1_21_20) {
+                    itemData.triggerType = (int) this.getUnsignedVarInt();
+                }
                 itemData.blockPos = this.getBlockVector3();
                 itemData.face = this.getBlockFace();
                 itemData.hotbarSlot = this.getVarInt();
                 itemData.itemInHand = this.getSlot(this.protocol);
                 itemData.playerPos = this.getVector3f().asVector3();
                 itemData.clickPos = this.getVector3f();
-                try { itemData.blockRuntimeId = (int) this.getUnsignedVarInt(); } catch (Exception ignore) {}
+                if (this.protocol >= ProtocolInfo.v1_16_210) {
+                    itemData.blockRuntimeId = (int) this.getUnsignedVarInt();
+                    if (this.protocol >= ProtocolInfo.v1_21_20) {
+                        itemData.clientInteractPrediction = (int) this.getUnsignedVarInt();
+                    }
+                }
 
                 this.transactionData = itemData;
                 break;

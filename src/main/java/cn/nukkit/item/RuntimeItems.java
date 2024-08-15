@@ -42,6 +42,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping662;
     private static RuntimeItemMapping mapping671;
     private static RuntimeItemMapping mapping685;
+    private static RuntimeItemMapping mapping712;
 
     public static RuntimeItemMapping[] VALUES;
 
@@ -74,6 +75,9 @@ public class RuntimeItems {
         for (String legacyName : itemMapping.keySet()) {
             JsonObject convertData = itemMapping.getAsJsonObject(legacyName);
             for (String damageStr : convertData.keySet()) {
+                if ("protocol".equalsIgnoreCase(damageStr)) {
+                    continue;
+                }
                 String identifier = convertData.get(damageStr).getAsString();
                 int damage = Integer.parseInt(damageStr);
                 MappingEntry value = new MappingEntry(legacyName, damage);
@@ -106,6 +110,7 @@ public class RuntimeItems {
         mapping662 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_70);
         mapping671 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_80);
         mapping685 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_0);
+        mapping712 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_20);
 
         VALUES = new RuntimeItemMapping[]{
                 mapping361,
@@ -128,12 +133,15 @@ public class RuntimeItems {
                 mapping649,
                 mapping662,
                 mapping671,
-                mapping685
+                mapping685,
+                mapping712
         };
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_21_0) {
+        if (protocolId >= ProtocolInfo.v1_21_20) {
+            return mapping712;
+        } else if (protocolId >= ProtocolInfo.v1_21_0) {
             return mapping685;
         } else if (protocolId >= ProtocolInfo.v1_20_80) {
             return mapping671;

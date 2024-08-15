@@ -1459,6 +1459,9 @@ public class BinaryStream {
         putBoolean(link.immediate);
         if (protocol >= 407) {
             putBoolean(link.riderInitiated);
+            if (protocol >= ProtocolInfo.v1_21_20) {
+                putLFloat(link.vehicleAngularVelocity);
+            }
         }
     }
 
@@ -1468,7 +1471,8 @@ public class BinaryStream {
                 getEntityUniqueId(),
                 (byte) getByte(),
                 getBoolean(),
-                getBoolean() //1.16+
+                getBoolean(), //1.16+
+                getLFloat() //1.21.20+
         );
     }
 
