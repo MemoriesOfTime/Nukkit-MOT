@@ -309,6 +309,11 @@ public interface ProtocolInfo {
     int AWARD_ACHIEVEMENT_PACKET = 309;
     int CLIENTBOUND_CLOSE_FORM_PACKET = 310;
 
+    int SERVERBOUND_LOADING_SCREEN_PACKET = 312;
+    int JIGSAW_STRUCTURE_DATA_PACKET = 313;
+    int CURRENT_STRUCTURE_FEATURE_PACKET = 314;
+    int SERVERBOUND_DIAGNOSTICS_PACKET = 315;
+
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;
     }
