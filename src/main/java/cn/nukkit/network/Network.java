@@ -536,7 +536,11 @@ public class Network {
                 .registerPacket(ProtocolInfo.SET_PLAYER_INVENTORY_OPTIONS_PACKET, SetPlayerInventoryOptionsPacket.class)
                 .registerPacket(ProtocolInfo.SET_HUD_PACKET, SetHudPacket.class)
                 .registerPacket(ProtocolInfo.AWARD_ACHIEVEMENT_PACKET, AwardAchievementPacket.class)
-                .registerPacket(ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET, ClientBoundCloseFormPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_CLOSE_FORM_PACKET, ClientboundCloseFormPacket.class)
+                .registerPacket(ProtocolInfo.SERVERBOUND_LOADING_SCREEN_PACKET, ServerboundLoadingScreenPacket.class)
+                .registerPacket(ProtocolInfo.JIGSAW_STRUCTURE_DATA_PACKET, JigsawStructureDataPacket.class)
+                .registerPacket(ProtocolInfo.CURRENT_STRUCTURE_FEATURE_PACKET, CurrentStructureFeaturePacket.class)
+                .registerPacket(ProtocolInfo.SERVERBOUND_DIAGNOSTICS_PACKET, ServerboundDiagnosticsPacket.class)
                 .build();
     }
 
