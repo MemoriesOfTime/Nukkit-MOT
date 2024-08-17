@@ -49,11 +49,11 @@ public class BaseLang {
     }
 
     public Map<String, String> getLangMap() {
-        return lang;
+        return this.lang;
     }
 
     public Map<String, String> getFallbackLangMap() {
-        return fallbackLang;
+        return this.fallbackLang;
     }
 
     public String getName() {
@@ -61,34 +61,13 @@ public class BaseLang {
     }
 
     public String getLang() {
-        return langName;
+        return this.langName;
     }
 
     protected static Map<String, String> loadLang(String path) {
         try {
-            String content = Utils.readFile(path);
-            Map<String, String> d = new HashMap<>();
-            for (String line : content.split("\n")) {
-                line = line.trim();
-                if (line.isEmpty() || line.charAt(0) == '#') {
-                    continue;
-                }
-                String[] t = line.split("=");
-                if (t.length < 2) {
-                    continue;
-                }
-                String key = t[0];
-                StringBuilder value = new StringBuilder();
-                for (int i = 1; i < t.length - 1; i++) {
-                    value.append(t[i]).append('=');
-                }
-                value.append(t[t.length - 1]);
-                if (value.length() == 0) {
-                    continue;
-                }
-                d.put(key, value.toString());
-            }
-            return d;
+            return getKeys(Utils.readFile(path));
+
         } catch (IOException e) {
             Server.getInstance().getLogger().logException(e);
             return null;
@@ -97,29 +76,7 @@ public class BaseLang {
 
     protected static Map<String, String> loadLang(InputStream stream) {
         try {
-            String content = Utils.readFile(stream);
-            Map<String, String> d = new HashMap<>();
-            for (String line : content.split("\n")) {
-                line = line.trim();
-                if (line.isEmpty() || line.charAt(0) == '#') {
-                    continue;
-                }
-                String[] t = line.split("=");
-                if (t.length < 2) {
-                    continue;
-                }
-                String key = t[0];
-                StringBuilder value = new StringBuilder();
-                for (int i = 1; i < t.length - 1; i++) {
-                    value.append(t[i]).append('=');
-                }
-                value.append(t[t.length - 1]);
-                if (value.length() == 0) {
-                    continue;
-                }
-                d.put(key, value.toString());
-            }
-            return d;
+            return getKeys(Utils.readFile(stream));
         } catch (IOException e) {
             Server.getInstance().getLogger().logException(e);
             return null;
@@ -131,10 +88,7 @@ public class BaseLang {
     }
 
     public String translateString(String str, String... params) {
-        if (params != null) {
-            return this.translateString(str, params, null);
-        }
-        return this.translateString(str, new String[0], null);
+        return this.translateString(str, params == null ? new String[0] : params, null);
     }
 
     public String translateString(String str, Object... params) {
@@ -242,5 +196,21 @@ public class BaseLang {
             }
         }
         return newString.toString();
+    }
+
+    private static Map<String, String> getKeys(String content) {
+        Map<String, String> d = new HashMap<>();
+        for (String line : content.split("\n")) {
+            line = line.trim();
+            if (line.isEmpty() || line.charAt(0) == '#') {
+                continue;
+            }
+            String[] t = line.split("=", 2);
+            if (t.length != 2) {
+                continue;
+            }
+            d.put(t[0], t[1]);
+        }
+        return d;
     }
 }
