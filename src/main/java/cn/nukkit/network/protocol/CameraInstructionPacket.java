@@ -55,7 +55,7 @@ public class CameraInstructionPacket extends DataPacket {
 
     @Override
     public void decode() {
-        if (protocol >= ProtocolInfo.v1_20_30_24) {
+        if (this.protocol >= ProtocolInfo.v1_20_30_24) {
             CameraSetInstruction set = this.getOptional(null, b -> {
                 int runtimeId = b.getLInt();
                 NamedDefinition definition = CameraPresetManager.getCameraPresetDefinitions().getDefinition(runtimeId);
@@ -64,8 +64,12 @@ public class CameraInstructionPacket extends DataPacket {
                 Vector3f pos = b.getOptional(null, BinaryStream::getVector3f);
                 Vector2f rot = b.getOptional(null, BinaryStream::getVector2f);
                 Vector3f facing = b.getOptional(null, BinaryStream::getVector3f);
+                Vector2f viewOffset = null;
+                if (this.protocol >= ProtocolInfo.v1_21_20) {
+                    viewOffset = b.getOptional(null, BinaryStream::getVector2f);
+                }
                 OptionalBoolean defaultPreset = b.getOptional(OptionalBoolean.empty(), b1 -> OptionalBoolean.of(b1.getBoolean()));
-                return new CameraSetInstruction(definition, ease, pos, rot, facing, defaultPreset);
+                return new CameraSetInstruction(definition, ease, pos, rot, facing, viewOffset, defaultPreset);
             });
 
             this.setSetInstruction(set);
@@ -79,7 +83,7 @@ public class CameraInstructionPacket extends DataPacket {
 
             this.setFadeInstruction(fade);
 
-            if (protocol >= ProtocolInfo.v1_21_20) {
+            if (this.protocol >= ProtocolInfo.v1_21_20) {
                 this.setTargetInstruction(this.getOptional(null, buf -> {
                     Vector3f targetCenterOffset = this.getOptional(null, BinaryStream::getVector3f);
                     long uniqueEntityId = this.getLLong();
@@ -161,7 +165,7 @@ public class CameraInstructionPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (protocol >= ProtocolInfo.v1_20_30_24) {
+        if (this.protocol >= ProtocolInfo.v1_20_30_24) {
             this.putOptionalNull(this.getSetInstruction(), (b, set) -> {
                 DefinitionUtils.checkDefinition(CameraPresetManager.getCameraPresetDefinitions(), set.getPreset());
                 b.putLInt(set.getPreset().getRuntimeId());
@@ -170,6 +174,9 @@ public class CameraInstructionPacket extends DataPacket {
                 b.putOptionalNull(set.getPos(), BinaryStream::putVector3f);
                 b.putOptionalNull(set.getRot(), BinaryStream::putVector2f);
                 b.putOptionalNull(set.getFacing(), BinaryStream::putVector3f);
+                if (this.protocol >= ProtocolInfo.v1_21_20) {
+                    b.putOptionalNull(set.getViewOffset(), BinaryStream::putVector2f);
+                }
                 b.putOptional(OptionalBoolean::isPresent, set.getDefaultPreset(),
                         (b1, optional) -> b1.putBoolean(optional.getAsBoolean()));
             });
