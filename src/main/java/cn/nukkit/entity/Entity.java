@@ -208,6 +208,10 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_PLAYER_LAST_DEATH_DIMENSION = 128;
     public static final int DATA_PLAYER_HAS_DIED = 129;
     public static final int DATA_COLLISION_BOX = 130; //vector3f
+    /**
+     * @since v685
+     */
+    public static final int DATA_VISIBLE_MOB_EFFECTS = 131; //long
 
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
@@ -1016,6 +1020,8 @@ public abstract class Entity extends Location implements Metadatable {
         int[] color = new int[3];
         int count = 0;
         boolean ambient = true;
+        long effectsData = 0;
+        int packedEffectsCount = 0;
         for (Effect effect : this.effects.values()) {
             if (effect.isVisible()) {
                 int[] c = effect.getColor();
@@ -1025,6 +1031,10 @@ public abstract class Entity extends Location implements Metadatable {
                 count += effect.getAmplifier() + 1;
                 if (!effect.isAmbient()) {
                     ambient = false;
+                }
+                if (packedEffectsCount < 8) {
+                    effectsData = effectsData << 7 | (effect.getId() & 0x3f << 1) | (effect.isAmbient() ? 1 : 0);
+                    packedEffectsCount++;
                 }
             }
         }
@@ -1040,6 +1050,7 @@ public abstract class Entity extends Location implements Metadatable {
             this.setDataProperty(new IntEntityData(Entity.DATA_POTION_COLOR, 0));
             this.setDataProperty(new ByteEntityData(Entity.DATA_POTION_AMBIENT, 0));
         }
+        this.setDataProperty(new LongEntityData(Entity.DATA_VISIBLE_MOB_EFFECTS, effectsData));
     }
 
     public static Entity createEntity(String name, Position pos, Object... args) {
