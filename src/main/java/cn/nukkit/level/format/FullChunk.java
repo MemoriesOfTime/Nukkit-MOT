@@ -242,4 +242,6 @@ public interface FullChunk extends Cloneable {
     void setChanged();
 
     void setChanged(boolean changed);
+
+    boolean compress();
 }

@@ -160,6 +160,12 @@ public class Server {
 
     private int maxPlayers;
     private boolean autoSave = true;
+    /**
+     * Automatic compression of the world
+     */
+    private boolean autoCompaction = true;
+    private int autoCompactionTicks = 60 * 30 * 20;
+
     private RCON rcon;
 
     private final EntityMetadataStore entityMetadata;
@@ -642,6 +648,9 @@ public class Server {
 
         this.maxPlayers = this.getPropertyInt("max-players", 50);
         this.setAutoSave(this.getPropertyBoolean("auto-save", true));
+
+        this.autoCompaction = this.getPropertyBoolean("level-auto-compaction", true);
+        this.autoCompactionTicks = Math.max(60 * 20, this.getPropertyInt("level-auto-compaction-ticks", 60 * 30 * 20));
 
         if (this.isHardcore && this.difficulty < 3) {
             this.setDifficulty(3);
@@ -1627,6 +1636,19 @@ public class Server {
         for (Level level : this.levelArray) {
             level.setAutoSave(this.autoSave);
         }
+    }
+
+    public boolean isAutoCompactionEnabled() {
+        return this.autoCompaction;
+    }
+
+    public void setAutoCompactionTicks(int ticks) {
+        Preconditions.checkArgument(ticks > 0, "ticks");
+        this.autoCompactionTicks = ticks;
+    }
+
+    public int getAutoCompactionTicks() {
+        return this.autoCompactionTicks;
     }
 
     public String getLevelType() {
@@ -3203,6 +3225,9 @@ public class Server {
             put("rcon.port", 25575);
 
             put("auto-save", true);
+            put("level-auto-compaction", true);
+            put("level-auto-compaction-ticks", 60 * 30 * 20);
+
             put("force-resources", false);
             put("force-resources-allow-client-packs", false);
             put("xbox-auth", true);
