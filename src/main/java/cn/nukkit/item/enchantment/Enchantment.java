@@ -28,11 +28,11 @@ import cn.nukkit.item.enchantment.trident.EnchantmentTridentRiptide;
 import cn.nukkit.utils.Identifier;
 import cn.nukkit.utils.OK;
 import cn.nukkit.utils.Utils;
-import com.nimbusds.jose.shaded.ow2asm.ClassWriter;
-import com.nimbusds.jose.shaded.ow2asm.Label;
-import com.nimbusds.jose.shaded.ow2asm.MethodVisitor;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.jetbrains.annotations.NotNull;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
 
 import javax.annotation.Nullable;
 import java.lang.ref.WeakReference;
@@ -43,7 +43,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static cn.nukkit.utils.Utils.dynamic;
-import static com.nimbusds.jose.shaded.ow2asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.*;
 
 /**
  * @author MagicDroidX
