@@ -1213,7 +1213,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
-        this.nextChunkOrderRun = 200;
+        this.nextChunkOrderRun = 20;
 
         loadQueue.clear();
         Long2ObjectOpenHashMap<Boolean> lastChunk = new Long2ObjectOpenHashMap<>(this.usedChunks);
@@ -6976,10 +6976,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.setItemCoolDown(event.getShieldBreakCoolDown(), "shield");
         }
         if (animate) {
-            this.setDataFlag(DATA_FLAGS, DATA_FLAG_BLOCKED_USING_DAMAGED_SHIELD, true);
+            this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_BLOCKED_USING_DAMAGED_SHIELD, true);
             this.getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
                 if (this.isOnline()) {
-                    this.setDataFlag(DATA_FLAGS, DATA_FLAG_BLOCKED_USING_DAMAGED_SHIELD, false);
+                    this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_BLOCKED_USING_DAMAGED_SHIELD, false);
                 }
             });
         }

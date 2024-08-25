@@ -17,6 +17,8 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.plugin.InternalPlugin;
+import cn.nukkit.scheduler.Task;
 import cn.nukkit.utils.*;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -47,6 +49,8 @@ import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
@@ -112,6 +116,20 @@ public class LevelDBProvider implements LevelProvider {
         builder.setNameFormat("LevelDB Executor-" + this.getName() + " #%s");
         builder.setUncaughtExceptionHandler((thread, ex) -> Server.getInstance().getLogger().error("Exception in " + thread.getName(), ex));
         this.executor = Executors.newFixedThreadPool(3, builder.build());
+
+        if (level.isAutoCompaction()) {
+            int delay = level.getServer().getAutoCompactionTicks();
+            level.getServer().getScheduler().scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, new Task() {
+                @Override
+                public void onRun(int currentTick) {
+                    if (closed || !level.isAutoCompaction()) {
+                        this.cancel();
+                        return;
+                    }
+                    CompletableFuture.runAsync(new AutoCompaction(), LevelDBProvider.this.executor);
+                }
+            }, delay + ThreadLocalRandom.current().nextInt(delay), delay);
+        }
     }
 
     @SuppressWarnings("unused")
@@ -997,34 +1015,6 @@ public class LevelDBProvider implements LevelProvider {
         //leveldb不需要回收regions
     }
 
-    @Override
-    public void doGarbageCollection(long time) {
-        long start = System.currentTimeMillis();
-        int maxIterations = this.chunks.size();
-        if (lastPosition > maxIterations) lastPosition = 0;
-        int i;
-        synchronized (chunks) {
-            Iterator<LevelDBChunk> iter = chunks.values().iterator();
-            if (lastPosition != 0) {
-                int tmpI = lastPosition;
-                while (tmpI-- != 0 && iter.hasNext()) iter.next();
-            }
-            for (i = 0; i < maxIterations; i++) {
-                if (!iter.hasNext()) {
-                    iter = chunks.values().iterator();
-                }
-                if (!iter.hasNext()) break;
-                BaseFullChunk chunk = iter.next();
-                if (chunk == null) continue;
-                if (chunk.isGenerated() && chunk.isPopulated()) {
-                    chunk.compress();
-                    if (System.currentTimeMillis() - start >= time) break;
-                }
-            }
-        }
-        lastPosition += i;
-    }
-
     public CompoundTag getLevelData() {
         return levelData;
     }
@@ -1211,6 +1201,50 @@ public class LevelDBProvider implements LevelProvider {
             }
         } catch (IOException e) {
             throw new RuntimeException("iteration failed", e);
+        }
+    }
+
+    private class AutoCompaction implements Runnable {
+        @Override
+        public void run() {
+            if (!level.isAutoCompaction() || !canRun()) {
+                return;
+            }
+
+            log.debug("Running AutoCompaction... ({})", path);
+            try {
+                gcLock.lock();
+
+                if (!canRun()) {
+                    return;
+                }
+
+                AtomicInteger count = new AtomicInteger();
+                forEachChunks(chunk -> {
+                    //TODO: chunk.compressBiomes();
+                    boolean next;
+                    if (chunk.compress()) {
+                        chunk.setChanged();
+
+                        count.incrementAndGet();
+
+                        next = canRun();
+                        if (next) {
+//                            writeChunk((LevelDbChunk) chunk, true, true); //TODO: save subchunks
+                        }
+                    } else {
+                        next = canRun();
+                    }
+                    return next;
+                }, true);
+                log.debug("{} chunks have been compressed ({})", count, path);
+            } finally {
+                gcLock.unlock();
+            }
+        }
+
+        private boolean canRun() {
+            return !closed && level != null && level.getPlayers().isEmpty();
         }
     }
 

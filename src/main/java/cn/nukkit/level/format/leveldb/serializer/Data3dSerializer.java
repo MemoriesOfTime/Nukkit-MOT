@@ -43,7 +43,6 @@ public class Data3dSerializer {
             return;
         }
 
-
         int[] heightMap = new int[512];
         PalettedBlockStorage[] biomes = new PalettedBlockStorage[dimensionData.getHeight() >> 4];
 
