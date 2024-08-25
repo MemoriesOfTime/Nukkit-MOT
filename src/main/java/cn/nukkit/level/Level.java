@@ -266,7 +266,9 @@ public class Level implements ChunkManager, Metadatable {
 
     // Notice: These shouldn't be used in the internal methods
     // Check the dimension id instead
+    @Deprecated
     public final boolean isNether;
+    @Deprecated
     public final boolean isEnd;
 
     private final Class<? extends Generator> generatorClass;
@@ -4454,6 +4456,18 @@ public class Level implements ChunkManager, Metadatable {
 
     public int getDimension() {
         return this.dimensionData.getDimensionId();
+    }
+
+    public final boolean isOverWorld() {
+        return this.getDimension() == DIMENSION_OVERWORLD;
+    }
+
+    public final boolean isNether() {
+        return this.getDimension() == DIMENSION_NETHER;
+    }
+
+    public final boolean isTheEnd() {
+        return this.getDimension() == DIMENSION_THE_END;
     }
 
     public final boolean isYInRange(int y) {
