@@ -4,8 +4,8 @@ import cn.nukkit.command.data.*;
 import cn.nukkit.network.protocol.types.CommandParam;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.SequencedHashSet;
-import cn.nukkit.utils.TypeMap;
 import lombok.ToString;
+import org.cloudburstmc.protocol.common.util.TypeMap;
 
 import java.util.*;
 import java.util.function.ObjIntConsumer;

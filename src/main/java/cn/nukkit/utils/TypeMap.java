@@ -18,7 +18,8 @@ import java.util.function.BiConsumer;
 
 import static org.cloudburstmc.protocol.common.util.Preconditions.*;
 
-public final class TypeMap<T> {
+@Deprecated
+public final class TypeMap<T>{
 
     private static final InternalLogger log = InternalLoggerFactory.getInstance(TypeMap.class);
 

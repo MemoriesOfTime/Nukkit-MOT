@@ -144,6 +144,12 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+            <version>9.7</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
             <version>${log4j2.version}</version>

@@ -1,8 +1,8 @@
 package cn.nukkit.network.protocol.types;
 
-import cn.nukkit.utils.TypeMap;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.cloudburstmc.protocol.common.util.TypeMap;
 
 @RequiredArgsConstructor
 @Getter
