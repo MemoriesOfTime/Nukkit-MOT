@@ -1,13 +1,14 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.plugin.Plugin;
 import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.math.BigInteger;
 import java.net.URL;
 import java.nio.file.Files;
@@ -40,30 +41,44 @@ public class SparkInstaller {
                         try {
                             if (spark != null) {
                                 server.getPluginManager().disablePlugin(spark);
-                                System.gc();
                             }
+                            System.gc();
+                            Thread.sleep(100);
                             Files.delete(sparkFile.toPath());
-                        } catch (IOException e) {
-                            download = false;
-                            log.warn("Failed to delete spark: " + e.getMessage(), e);
+                        } catch (Exception e) {
+                            //download = false;
+                            if (Nukkit.DEBUG > 1) {
+                                log.warn("Failed to delete spark: {}", e.getMessage(), e);
+                            }
                         }
                     }
                 }
             } catch (Exception e) {
                 download = false;
-                log.warn("Failed to check spark update: " + e.getMessage(), e);
+                log.warn("Failed to check spark update: {}", e.getMessage(), e);
             }
         } else {
             download = true;
         }
 
         if (download) {
+            log.info("Downloading spark...");
+            log.info("If the download fails, please download it manually from https://sparkapi.lucko.me/download/nukkit");
+            log.info("Or set enable-spark=off in server.properties to disable automatic download.");
             try (InputStream in = new URL("https://sparkapi.lucko.me/download/nukkit").openStream()) {
-                Files.copy(in, sparkFile.toPath());
+                try (OutputStream out = Files.newOutputStream(sparkFile.toPath())) {
+                    byte[] buff = new byte[1024 * 10];
+                    int len;
+                    while ((len = in.read(buff)) != -1) {
+                        out.write(buff, 0, len);
+                        out.flush();
+                    }
+                }
+                //Files.copy(in, sparkFile.toPath());
                 server.getPluginManager().loadPlugin(sparkFile);
                 log.info("Spark has been installed.");
             } catch (Throwable e) {
-                log.warn("Failed to download spark: " + e.getMessage(), e);
+                log.warn("Failed to download spark: {}", e.getMessage(), e);
             }
         }
 
