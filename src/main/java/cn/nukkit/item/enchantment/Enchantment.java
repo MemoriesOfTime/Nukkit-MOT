@@ -25,6 +25,7 @@ import cn.nukkit.item.enchantment.trident.EnchantmentTridentChanneling;
 import cn.nukkit.item.enchantment.trident.EnchantmentTridentImpaling;
 import cn.nukkit.item.enchantment.trident.EnchantmentTridentLoyalty;
 import cn.nukkit.item.enchantment.trident.EnchantmentTridentRiptide;
+import cn.nukkit.utils.DynamicClassLoader;
 import cn.nukkit.utils.Identifier;
 import cn.nukkit.utils.OK;
 import cn.nukkit.utils.Utils;
@@ -328,12 +329,6 @@ public abstract class Enchantment implements Cloneable {
             }
         }
         return OK.TRUE;
-    }
-
-    private static class DynamicClassLoader extends ClassLoader {
-        public Class<?> defineClass(String name, byte[] b) {
-            return defineClass(name, b, 0, b.length);
-        }
     }
 
     public static String getLevelString(int level) {
