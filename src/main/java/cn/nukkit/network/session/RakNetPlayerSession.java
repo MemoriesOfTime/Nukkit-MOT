@@ -154,7 +154,9 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     try {
                         InetAddress address = this.channel.remoteAddress().getAddress();
                         this.channel.unsafe().close(this.channel.voidPromise());
-                        this.server.blockAddress(address, 60);
+                        if (!address.isSiteLocalAddress()) {
+                            this.server.blockAddress(address, 60);
+                        }
                     } catch (Throwable throwable) {
                         if (Nukkit.DEBUG > 1) {
                             log.info("Error while closing channel", throwable);
