@@ -1915,7 +1915,7 @@ public class Server {
             Optional<UUID> uuid = lookupName(name);
             return getOfflinePlayerDataInternal(uuid.map(UUID::toString).orElse(name), true, create);
         } else {
-            return getOfflinePlayerDataInternal(name, true, create);
+            return getOfflinePlayerDataInternal(name.toLowerCase(), true, create);
         }
     }
 
