@@ -21,12 +21,16 @@ public class InventorySlotPacket extends DataPacket {
     public int networkId;
     public int slot;
     public Item item;
+    /**
+     * @since v712
+     */
+    public int dynamicContainerId;
 
     @Override
     public void decode() {
-        this.inventoryId = (int) this.getUnsignedVarInt();
+        /*this.inventoryId = (int) this.getUnsignedVarInt();
         this.slot = (int) this.getUnsignedVarInt();
-        this.item = this.getSlot(this.protocol);
+        this.item = this.getSlot(this.protocol);*/
     }
 
     @Override
@@ -34,6 +38,9 @@ public class InventorySlotPacket extends DataPacket {
         this.reset();
         this.putUnsignedVarInt(this.inventoryId);
         this.putUnsignedVarInt(this.slot);
+        if (this.protocol >= ProtocolInfo.v1_21_20) {
+            this.putUnsignedVarInt(this.dynamicContainerId);
+        }
         if (protocol >= 407 && protocol < ProtocolInfo.v1_16_220) {
             this.putVarInt(networkId);
         }

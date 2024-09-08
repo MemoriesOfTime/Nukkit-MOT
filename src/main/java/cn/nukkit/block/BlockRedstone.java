@@ -59,9 +59,4 @@ public class BlockRedstone extends BlockSolid {
     public boolean canHarvestWithHand() {
         return false;
     }
-
-    @Override
-    public boolean canBePushed() {
-        return false; // anti crash machine
-    }
 }

@@ -7,6 +7,7 @@ import cn.nukkit.level.Position;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.ContainerClosePacket;
 import cn.nukkit.network.protocol.ContainerOpenPacket;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
 
 public class FakeBlockUIComponent extends PlayerUIComponent {
 
@@ -61,6 +62,7 @@ public class FakeBlockUIComponent extends PlayerUIComponent {
         ContainerClosePacket pk = new ContainerClosePacket();
         pk.windowId = who.getWindowId(this);
         pk.wasServerInitiated = who.getClosingWindowId() != pk.windowId;
+        pk.type = ContainerType.from(this.type.getNetworkType());
         who.dataPacket(pk);
         super.onClose(who);
     }

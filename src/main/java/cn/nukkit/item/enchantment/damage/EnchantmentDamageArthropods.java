@@ -2,6 +2,7 @@ package cn.nukkit.item.enchantment.damage;
 
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityArthropod;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 
@@ -26,7 +27,7 @@ public class EnchantmentDamageArthropods extends EnchantmentDamage {
     }
 
     @Override
-    public double getDamageBonus(Entity entity) {
+    public double getDamageBonus(Entity entity, Entity attacker) {
         if (entity instanceof EntityArthropod) {
             return getLevel() * 2.5;
         }
@@ -37,7 +38,10 @@ public class EnchantmentDamageArthropods extends EnchantmentDamage {
     @Override
     public void doPostAttack(Entity attacker, Entity entity) {
         if (entity instanceof EntityArthropod) {
-            entity.addEffect(Effect.getEffect(Effect.SLOWNESS).setDuration(20 + Utils.random.nextInt(10 * this.level)).setAmplifier(3));
+            entity.addEffect(
+                    Effect.getEffect(Effect.SLOWNESS).setDuration(20 + Utils.random.nextInt(10 * this.level)).setAmplifier(3),
+                    EntityPotionEffectEvent.Cause.ATTACK
+            );
         }
     }
 }

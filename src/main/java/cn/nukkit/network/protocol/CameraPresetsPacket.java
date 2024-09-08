@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -106,6 +107,13 @@ public class CameraPresetsPacket extends DataPacket {
         this.putOptionalNull(preset.getPos(), (pos) -> this.putLFloat(pos.getZ()));
         this.putOptionalNull(preset.getPitch(), this::putLFloat);
         this.putOptionalNull(preset.getYaw(), this::putLFloat);
+        if (this.protocol >= ProtocolInfo.v1_21_20) {
+            this.putOptionalNull(preset.getViewOffset(), (viewOffset) -> {
+                this.putLFloat(viewOffset.getX());
+                this.putLFloat(viewOffset.getY());
+            });
+            this.putOptionalNull(preset.getRadius(), this::putLFloat);
+        }
         this.putOptionalNull(preset.getListener(), (listener) -> this.putByte((byte) listener.ordinal()));
         this.putOptional(o -> o != null && o.isPresent(), preset.getPlayEffect(), (optional) -> this.putBoolean(optional.getAsBoolean()));
     }
@@ -122,8 +130,15 @@ public class CameraPresetsPacket extends DataPacket {
         Float pitch = this.getOptional(null, BinaryStream::getLFloat);
         Float yaw = this.getOptional(null, BinaryStream::getLFloat);
 
+        Vector2f viewOffset = null;
+        Float radius = null;
+        if (this.protocol >= ProtocolInfo.v1_21_20) {
+            viewOffset = this.getOptional(null, binaryStream -> new Vector2f(binaryStream.getLFloat(), binaryStream.getLFloat()));
+            radius = this.getOptional(null, BinaryStream::getLFloat);
+        }
+
         CameraAudioListener listener = this.getOptional(null, binaryStream -> CameraAudioListener.values()[binaryStream.getByte()]);
         OptionalBoolean effects = this.getOptional(OptionalBoolean.empty(), binaryStream -> OptionalBoolean.of(binaryStream.getBoolean()));
-        return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, listener, effects);
+        return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, viewOffset, radius, listener, effects);
     }
 }

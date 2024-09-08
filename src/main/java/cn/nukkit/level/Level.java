@@ -45,6 +45,8 @@ import cn.nukkit.level.generator.task.PopulationTask;
 import cn.nukkit.level.particle.DestroyBlockParticle;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.Particle;
+import cn.nukkit.level.persistence.PersistentDataContainer;
+import cn.nukkit.level.persistence.impl.DelegatePersistentDataContainer;
 import cn.nukkit.level.sound.Sound;
 import cn.nukkit.math.*;
 import cn.nukkit.math.BlockFace.Plane;
@@ -71,6 +73,7 @@ import it.unimi.dsi.fastutil.objects.ObjectList;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -234,6 +237,11 @@ public class Level implements ChunkManager, Metadatable {
     private final int chunkPopulationQueueSize;
 
     private boolean autoSave;
+    private boolean autoCompaction;
+    @Getter
+    @Setter
+    private boolean saveOnUnloadEnabled = true;
+    public boolean isBeingConverted;
 
     private BlockMetadataStore blockMetadata;
 
@@ -258,7 +266,9 @@ public class Level implements ChunkManager, Metadatable {
 
     // Notice: These shouldn't be used in the internal methods
     // Check the dimension id instead
+    @Deprecated
     public final boolean isNether;
+    @Deprecated
     public final boolean isEnd;
 
     private final Class<? extends Generator> generatorClass;
@@ -271,7 +281,7 @@ public class Level implements ChunkManager, Metadatable {
                 if (Server.getInstance().isPrimaryThread()) {
                     generator.init(Level.this, rand);
                 }
-                generator.init(new PopChunkManager(getSeed()), rand);
+                generator.init(new PopChunkManager(getSeed(), Level.this::getDimensionData), rand);
                 return generator;
             } catch (Throwable e) {
                 Server.getInstance().getLogger().logException(e);
@@ -312,6 +322,7 @@ public class Level implements ChunkManager, Metadatable {
         this.blockMetadata = new BlockMetadataStore(this);
         this.server = server;
         this.autoSave = server.getAutoSave();
+        this.autoCompaction = server.isAutoCompactionEnabled();
 
         try {
             this.provider = provider.getConstructor(Level.class, String.class).newInstance(this, path);
@@ -766,6 +777,14 @@ public class Level implements ChunkManager, Metadatable {
 
     public void setAutoSave(boolean autoSave) {
         this.autoSave = autoSave;
+    }
+
+    public boolean isAutoCompaction() {
+        return this.autoCompaction && this.autoSave;
+    }
+
+    public void setAutoCompaction(boolean autoCompaction) {
+        this.autoCompaction = autoCompaction;
     }
 
     public boolean unload() {
@@ -1712,6 +1731,9 @@ public class Level implements ChunkManager, Metadatable {
             for (int x = minX; x <= maxX; ++x) {
                 for (int y = minY; y <= maxY; ++y) {
                     Block block = this.getBlock(x, y, z, false);
+                    if (block.getId() == BlockID.BARRIER && entity.canPassThroughBarrier()) {
+                        continue;
+                    }
                     if (!block.canPassThrough() && block.collidesWithBB(bb)) {
                         collides.add(block.getBoundingBox());
                     }
@@ -1941,7 +1963,7 @@ public class Level implements ChunkManager, Metadatable {
                     int lcx = x & 0xF;
                     int lcz = z & 0xF;
                     int oldLevel = chunk.getBlockLight(lcx, y, lcz);
-                    int newLevel = Block.light[chunk.getBlockId(lcx, y, lcz)];
+                    int newLevel = Block.getBlockLight(chunk.getBlockId(lcx, y, lcz));
                     if (oldLevel != newLevel) {
                         this.setBlockLightAt(x, y, z, newLevel);
                         long hash = Hash.hashBlock(x, y, z);
@@ -2439,12 +2461,10 @@ public class Level implements ChunkManager, Metadatable {
             breakTime -= 0.15;
 
             Item[] eventDrops;
-            if (!player.isSurvival()) {
-                eventDrops = Item.EMPTY_ARRAY;
-            } else if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
+            if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
                 eventDrops = new Item[]{target.toItem()};
             } else {
-                eventDrops = target.getDrops(item);
+                eventDrops = target.getDrops(player, item);
             }
             //TODO 直接加1000可能会影响其他判断，需要进一步改进
             boolean fastBreak = (player.lastBreak + breakTime * 1000) > Long.sum(System.currentTimeMillis(), 1000);
@@ -2472,7 +2492,7 @@ public class Level implements ChunkManager, Metadatable {
         } else if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
             drops = new Item[]{target.toItem()};
         } else {
-            drops = target.getDrops(item);
+            drops = target.getDrops(null, item);
         }
 
         Vector3 above = new Vector3(target.x, target.y + 1, target.z);
@@ -2509,11 +2529,9 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
 
-            if (player == null || player.isSurvival() || player.isAdventure()) {
-                for (Item drop : drops) {
-                    if (drop.getCount() > 0) {
-                        this.dropItem(vector.add(0.5, 0.5, 0.5), drop);
-                    }
+            for (Item drop : drops) {
+                if (drop.getCount() > 0) {
+                    this.dropItem(vector.add(0.5, 0.5, 0.5), drop);
                 }
             }
         }
@@ -4428,12 +4446,28 @@ public class Level implements ChunkManager, Metadatable {
         this.sendWeather(players.toArray(Player.EMPTY_ARRAY));
     }
 
+    public void setDimensionData(DimensionData data) {
+        this.dimensionData = data;
+    }
+
     public DimensionData getDimensionData() {
         return this.dimensionData;
     }
 
     public int getDimension() {
         return this.dimensionData.getDimensionId();
+    }
+
+    public final boolean isOverWorld() {
+        return this.getDimension() == DIMENSION_OVERWORLD;
+    }
+
+    public final boolean isNether() {
+        return this.getDimension() == DIMENSION_NETHER;
+    }
+
+    public final boolean isTheEnd() {
+        return this.getDimension() == DIMENSION_THE_END;
     }
 
     public final boolean isYInRange(int y) {
@@ -4444,10 +4478,12 @@ public class Level implements ChunkManager, Metadatable {
         return y >= getMinBlockY() && y <= getMaxBlockY();
     }
 
+    @Override
     public int getMinBlockY() {
         return this.requireProvider().getMinBlockY();
     }
 
+    @Override
     public int getMaxBlockY() {
         return this.requireProvider().getMaxBlockY();
     }
@@ -4920,6 +4956,39 @@ public class Level implements ChunkManager, Metadatable {
         callbackChunkPacketSend.remove(id);
     }
 
+    public PersistentDataContainer getPersistentDataContainer(Vector3 position) {
+        return this.getPersistentDataContainer(position, false);
+    }
+
+    public PersistentDataContainer getPersistentDataContainer(Vector3 position, boolean create) {
+        BlockEntity blockEntity = this.getBlockEntity(position);
+        if (blockEntity != null) {
+            return blockEntity.getPersistentDataContainer();
+        }
+
+        if (create) {
+            CompoundTag compound = BlockEntity.getDefaultCompound(position, BlockEntity.PERSISTENT_CONTAINER);
+            blockEntity = BlockEntity.createBlockEntity(BlockEntity.PERSISTENT_CONTAINER, this.getChunk(position.getChunkX(), position.getChunkZ()), compound);
+
+            if (blockEntity == null) {
+                throw new IllegalStateException("Failed to create persistent container block entity at " + position);
+            }
+            return blockEntity.getPersistentDataContainer();
+        }
+
+        return new DelegatePersistentDataContainer() {
+            @Override
+            protected PersistentDataContainer createDelegate() {
+                return getPersistentDataContainer(position, true);
+            }
+        };
+    }
+
+    public boolean hasPersistentDataContainer(Vector3 position) {
+        BlockEntity blockEntity = this.getBlockEntity(position);
+        return blockEntity != null && blockEntity.hasPersistentDataContainer();
+    }
+
     private ConcurrentMap<Long, Int2ObjectMap<Player>> getChunkSendQueue(int protocol) {
         int protocolId = this.getChunkProtocol(protocol);
         return this.chunkSendQueues.computeIfAbsent(protocolId, i -> new ConcurrentHashMap<>());
@@ -4931,7 +5000,11 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_20_80) {
+        if (protocol >= ProtocolInfo.v1_21_20) {
+            return ProtocolInfo.v1_21_20;
+        } else if (protocol >= ProtocolInfo.v1_21_0) {
+            return ProtocolInfo.v1_21_0;
+        } else if (protocol >= ProtocolInfo.v1_20_80) {
             return ProtocolInfo.v1_20_80;
         } else if (protocol >= ProtocolInfo.v1_20_70) {
             return ProtocolInfo.v1_20_70;
@@ -5037,7 +5110,10 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_20_50) if (player == ProtocolInfo.v1_20_50) return true;
         if (chunk == ProtocolInfo.v1_20_60) if (player == ProtocolInfo.v1_20_60) return true;
         if (chunk == ProtocolInfo.v1_20_70) if (player == ProtocolInfo.v1_20_70) return true;
-        if (chunk == ProtocolInfo.v1_20_80) if (player >= ProtocolInfo.v1_20_80) return true;
+        if (chunk == ProtocolInfo.v1_20_80) if (player == ProtocolInfo.v1_20_80) return true;
+        if (chunk == ProtocolInfo.v1_21_0)
+            if (player >= ProtocolInfo.v1_21_0) if (player < ProtocolInfo.v1_21_20) return true;
+        if (chunk == ProtocolInfo.v1_21_20) if (player >= ProtocolInfo.v1_21_20) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

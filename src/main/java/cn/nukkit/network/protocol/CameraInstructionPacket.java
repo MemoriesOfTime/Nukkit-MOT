@@ -10,6 +10,7 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.types.camera.CameraEase;
 import cn.nukkit.network.protocol.types.camera.CameraFadeInstruction;
 import cn.nukkit.network.protocol.types.camera.CameraSetInstruction;
+import cn.nukkit.network.protocol.types.camera.CameraTargetInstruction;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.CameraPresetManager;
 import lombok.Getter;
@@ -32,6 +33,14 @@ public class CameraInstructionPacket extends DataPacket {
     private CameraSetInstruction setInstruction;
     private CameraFadeInstruction fadeInstruction;
     private OptionalBoolean clear = OptionalBoolean.empty();
+    /**
+     * @since v712
+     */
+    private CameraTargetInstruction targetInstruction;
+    /**
+     * @since v712
+     */
+    private OptionalBoolean removeTarget = OptionalBoolean.empty();
 
     @Override
     @Deprecated
@@ -46,7 +55,7 @@ public class CameraInstructionPacket extends DataPacket {
 
     @Override
     public void decode() {
-        if (protocol >= ProtocolInfo.v1_20_30_24) {
+        if (this.protocol >= ProtocolInfo.v1_20_30_24) {
             CameraSetInstruction set = this.getOptional(null, b -> {
                 int runtimeId = b.getLInt();
                 NamedDefinition definition = CameraPresetManager.getCameraPresetDefinitions().getDefinition(runtimeId);
@@ -55,8 +64,12 @@ public class CameraInstructionPacket extends DataPacket {
                 Vector3f pos = b.getOptional(null, BinaryStream::getVector3f);
                 Vector2f rot = b.getOptional(null, BinaryStream::getVector2f);
                 Vector3f facing = b.getOptional(null, BinaryStream::getVector3f);
+                Vector2f viewOffset = null;
+                if (this.protocol >= ProtocolInfo.v1_21_20) {
+                    viewOffset = b.getOptional(null, BinaryStream::getVector2f);
+                }
                 OptionalBoolean defaultPreset = b.getOptional(OptionalBoolean.empty(), b1 -> OptionalBoolean.of(b1.getBoolean()));
-                return new CameraSetInstruction(definition, ease, pos, rot, facing, defaultPreset);
+                return new CameraSetInstruction(definition, ease, pos, rot, facing, viewOffset, defaultPreset);
             });
 
             this.setSetInstruction(set);
@@ -69,6 +82,15 @@ public class CameraInstructionPacket extends DataPacket {
             });
 
             this.setFadeInstruction(fade);
+
+            if (this.protocol >= ProtocolInfo.v1_21_20) {
+                this.setTargetInstruction(this.getOptional(null, buf -> {
+                    Vector3f targetCenterOffset = this.getOptional(null, BinaryStream::getVector3f);
+                    long uniqueEntityId = this.getLLong();
+                    return new CameraTargetInstruction(targetCenterOffset, uniqueEntityId);
+                }));
+                this.setRemoveTarget(this.getOptional(OptionalBoolean.empty(), buf -> OptionalBoolean.of(buf.getBoolean())));
+            }
         } else {
             CompoundTag data = this.getTag();
             if (data.contains("set", CompoundTag.class)) {
@@ -143,7 +165,7 @@ public class CameraInstructionPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (protocol >= ProtocolInfo.v1_20_30_24) {
+        if (this.protocol >= ProtocolInfo.v1_20_30_24) {
             this.putOptionalNull(this.getSetInstruction(), (b, set) -> {
                 DefinitionUtils.checkDefinition(CameraPresetManager.getCameraPresetDefinitions(), set.getPreset());
                 b.putLInt(set.getPreset().getRuntimeId());
@@ -152,6 +174,9 @@ public class CameraInstructionPacket extends DataPacket {
                 b.putOptionalNull(set.getPos(), BinaryStream::putVector3f);
                 b.putOptionalNull(set.getRot(), BinaryStream::putVector2f);
                 b.putOptionalNull(set.getFacing(), BinaryStream::putVector3f);
+                if (this.protocol >= ProtocolInfo.v1_21_20) {
+                    b.putOptionalNull(set.getViewOffset(), BinaryStream::putVector2f);
+                }
                 b.putOptional(OptionalBoolean::isPresent, set.getDefaultPreset(),
                         (b1, optional) -> b1.putBoolean(optional.getAsBoolean()));
             });
@@ -163,6 +188,15 @@ public class CameraInstructionPacket extends DataPacket {
                 b.putOptionalNull(fade.getTimeData(), this::putTimeData);
                 b.putOptionalNull(fade.getColor(), this::putColor);
             });
+
+            if (this.protocol >= ProtocolInfo.v1_21_20) {
+                this.putOptionalNull(this.getTargetInstruction(), (b, targetInstruction) -> {
+                    b.putOptionalNull(targetInstruction.getTargetCenterOffset(), BinaryStream::putVector3f);
+                    b.putLLong(targetInstruction.getUniqueEntityId());
+                });
+                this.putOptional(OptionalBoolean::isPresent, this.getRemoveTarget(),
+                        (b, optional) -> b.putBoolean(optional.getAsBoolean()));
+            }
         } else {
             CompoundTag data = new CompoundTag();
             if (this.getSetInstruction() != null) {

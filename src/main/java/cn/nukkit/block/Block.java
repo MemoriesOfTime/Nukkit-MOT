@@ -2,6 +2,8 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.block.customblock.CustomBlockManager;
+import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
@@ -12,11 +14,13 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.metadata.MetadataValue;
 import cn.nukkit.metadata.Metadatable;
+import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
@@ -39,7 +43,7 @@ import static cn.nukkit.utils.Utils.dynamic;
  */
 @Log4j2
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
-    public static final int MAX_BLOCK_ID = dynamic(829);
+    public static final int MAX_BLOCK_ID = dynamic(1039);
     public static final int DATA_BITS = dynamic(6);
     public static final int ID_MASK = 0xfff; //max 4095
     public static final int DATA_SIZE = dynamic(1 << DATA_BITS);
@@ -429,6 +433,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[SWEET_BERRY_BUSH] = BlockSweetBerryBush.class; //462
             list[LANTERN] = BlockLantern.class; //463
             list[CAMPFIRE_BLOCK] = BlockCampfire.class; //464
+            list[LAVA_CAULDRON] = BlockCauldronLava.class; //465
             list[WOOD_BARK] = BlockWoodBark.class; //467
             list[COMPOSTER] = BlockComposter.class; //468
             list[LIT_BLAST_FURNACE] = BlockBlastFurnaceLit.class; //469
@@ -481,26 +486,57 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[WARPED_BUTTON] = BlockButtonWarped.class; //516
             list[CRIMSON_PRESSURE_PLATE] = BlockPressurePlateCrimson.class; //517
             list[WARPED_PRESSURE_PLATE] = BlockPressurePlateWarped.class; //518
-
+            list[CRIMSON_SLAB] = BlockSlabCrimson.class; //519
+            list[WARPED_SLAB] = BlockSlabWarped.class; //520
+            list[CRIMSON_DOUBLE_SLAB] = BlockDoubleSlabCrimson.class; //521
+            list[WARPED_DOUBLE_SLAB] = BlockDoubleSlabWarped.class; //522
             list[SOUL_TORCH] = BlockSoulTorch.class; //523
             list[SOUL_LANTERN] = BlockSoulLantern.class; //524
             list[NETHERITE_BLOCK] = BlockNetheriteBlock.class; //525
             list[ANCIENT_DEBRIS] = BlockAncientDebris.class; //526
             list[RESPAWN_ANCHOR] = BlockRespawnAnchor.class; //527
             list[BLACKSTONE] = BlockBlackstone.class; //528
-
+            list[POLISHED_BLACKSTONE_BRICKS] = BlockBricksBlackstonePolished.class; //529
+            list[POLISHED_BLACKSTONE_BRICK_STAIRS] = BlockStairsBrickBlackstonePolished.class; //530
+            list[BLACKSTONE_STAIRS] = BlockStairsBlackstone.class; //531
+            list[BLACKSTONE_WALL] = BlockWallBlackstone.class; //532
+            list[POLISHED_BLACKSTONE_BRICK_WALL] = BlockWallBrickBlackstonePolished.class; //533
+            list[CHISELED_POLISHED_BLACKSTONE] = BlockBlackstonePolishedChiseled.class; //534
+            list[CRACKED_POLISHED_BLACKSTONE_BRICKS] = BlockBricksBlackstonePolishedCracked.class; //535
+            list[GILDED_BLACKSTONE] = BlockBlackstoneGilded.class; //536
+            list[BLACKSTONE_SLAB] = BlockSlabBlackstone.class; //537
+            list[BLACKSTONE_DOUBLE_SLAB] = BlockDoubleSlabBlackstone.class; //538
+            list[POLISHED_BLACKSTONE_BRICK_SLAB] = BlockSlabBrickBlackstonePolished.class; //539
+            list[POLISHED_BLACKSTONE_BRICK_DOUBLE_SLAB] = BlockDoubleSlabBrickBlackstonePolished.class; //540
             list[CHAIN_BLOCK] = BlockChain.class; //541
-
+            list[TWISTING_VINES] = BlockVinesTwisting.class; //542
             list[NETHER_GOLD_ORE] = BlockOreGoldNether.class; //543
             list[CRYING_OBSIDIAN] = BlockCryingObsidian.class; //544
             list[SOUL_CAMPFIRE_BLOCK] = BlockCampfireSoul.class; //545
-
-            list[COPPER_ORE] = BlockOreCopper.class; // 566
+            list[POLISHED_BLACKSTONE] = BlockBlackstonePolished.class; //546
+            list[POLISHED_BLACKSTONE_STAIRS] = BlockStairsBlackstonePolished.class; //547
+            list[POLISHED_BLACKSTONE_SLAB] = BlockSlabBlackstonePolished.class; //548
+            list[POLISHED_BLACKSTONE_DOUBLE_SLAB] = BlockDoubleSlabBlackstonePolished.class; //549
+            list[POLISHED_BLACKSTONE_PRESSURE_PLATE] = BlockPressurePlateBlackstonePolished.class; //550
+            list[POLISHED_BLACKSTONE_BUTTON] = BlockButtonBlackstonePolished.class; //551
+            list[POLISHED_BLACKSTONE_WALL] = BlockWallBlackstonePolished.class; //552
+            list[WARPED_HYPHAE] = BlockHyphaeWarped.class; //553
+            list[CRIMSON_HYPHAE] = BlockHyphaeCrimson.class; //554
+            list[STRIPPED_CRIMSON_HYPHAE] = BlockHyphaeStrippedCrimson.class; //555
+            list[STRIPPED_WARPED_HYPHAE] = BlockHyphaeStrippedWarped.class; //556
+            list[CHISELED_NETHER_BRICKS] = BlockBricksNetherChiseled.class; //557
+            list[CRACKED_NETHER_BRICKS] = BlockBricksNetherCracked.class; //558
+            list[QUARTZ_BRICKS] = BlockBricksQuartz.class; //559
+            
+            list[COPPER_ORE] = BlockOreCopper.class; //566
 
             list[AMETHYST_BLOCK] = BlockAmethyst.class; //582
 
+            list[GLOW_FRAME] = BlockItemFrameGlow.class; //594
+
             list[DEEPSLATE] = BlockDeepslate.class; // 633
 
+            list[GLOW_LICHEN] = BlockGlowLichen.class; //666
             list[CANDLE] = BlockCandle.class; //667
             list[WHITE_CANDLE] = BlockCandleWhite.class; //668
             list[ORANGE_CANDLE] = BlockCandleOrange.class; //669
@@ -554,14 +590,23 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[CHERRY_LOG] = BlockCherryLog.class; //791
             list[CHERRY_PLANKS] = BlockPlanksCherry.class; //792
 
-            list[STRIPPED_CHERRY_WOOD] = BlockWoodStrippedCherry.class;//800
+            list[STRIPPED_CHERRY_WOOD] = BlockWoodStrippedCherry.class; //800
             list[CHERRY_WOOD] = BlockWoodCherry.class; //801
             list[CHERRY_SAPLING] = BlockCherrySapling.class; //802
             list[CHERRY_LEAVES] = BlockCherryLeaves.class; //803
 
             list[DECORATED_POT] = BlockDecoratedPot.class; //806
 
-            list[SUSPICIOUS_GRAVEL] = BlockSuspiciousGravel.class; // 828
+            list[SUSPICIOUS_GRAVEL] = BlockSuspiciousGravel.class; //828
+
+            list[COPPER_BULB] = BlockCopperBulb.class; //1031
+            list[EXPOSED_COPPER_BULB] = BlockExposedCopperBulb.class; //1032
+            list[WEATHERED_COPPER_BULB] = BlockWeatheredCopperBulb.class; //1033
+            list[OXIDIZED_COPPER_BULB] = BlockOxidizedCopperBulb.class; //1034
+            list[WAXED_COPPER_BULB] = BlockWaxedCopperBulb.class; //1035
+            list[WAXED_EXPOSED_COPPER_BULB] = BlockWaxedExposedCopperBulb.class; //1036
+            list[WAXED_WEATHERED_COPPER_BULB] = BlockWaxedWeatheredCopperBulb.class; //1037
+            list[WAXED_OXIDIZED_COPPER_BULB] = BlockWaxedOxidizedCopperBulb.class; //1038
 
             for (int id = 0; id < MAX_BLOCK_ID; id++) {
                 Class<?> c = list[id];
@@ -643,6 +688,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id < 0) {
             id = 255 - id;
         }
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         int fullId = id << DATA_BITS;
         if (meta != null) {
             int iMeta = meta;
@@ -680,6 +730,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             id = 255 - id;
         }
 
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         Block block;
         int fullId = id << DATA_BITS;
         if (meta != null && meta > DATA_SIZE) {
@@ -713,6 +767,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (id < 0) {
             id = 255 - id;
         }
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         int fullId = id << DATA_BITS;
         if (fullId >= fullList.length) {
             log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, data);
@@ -737,8 +796,13 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int fullId, Level level, int x, int y, int z, int layer) {
+        int id = fullId << DATA_BITS;
+
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         if (fullId >= fullList.length || fullList[fullId] == null) {
-            int id = fullId << DATA_BITS;
             int meta = fullId & DATA_BITS;
             log.warn("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
             return new BlockUnknown(id, meta);
@@ -757,6 +821,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int id, int meta, Level level, int x, int y, int z, int layer) {
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getBlock(id, 0);
+        }
+
         Block block;
         if (meta <= DATA_SIZE) {
             block = fullList[id << DATA_BITS | meta].clone();
@@ -772,12 +840,30 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return block;
     }
 
+    public static int getBlockLight(int blockId) {
+        if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return light[0]; // TODO: just temporary
+        }
+        return light[blockId];
+    }
+
+    public static int getBlockLightFilter(int blockId) {
+        if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return lightFilter[0]; // TODO: just temporary
+        }
+        return lightFilter[blockId];
+    }
+
     public static Block fromFullId(int fullId) {
         return get(fullId >> DATA_BITS, fullId & DATA_MASK);
     }
 
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        return this.getLevel().setBlock(this, this, true, true);
+        return this.canPlaceOn(block.down(), target) && this.getLevel().setBlock(this, this, true, true);
+    }
+
+    public boolean canPlaceOn(Block floor, Position pos) {
+        return this.canBePlaced();
     }
 
     public boolean canHarvestWithHand() {
@@ -964,7 +1050,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         return id;
-	}
+    }
 
     /**
      * The full id is a combination of the id and data.
@@ -1014,10 +1100,19 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             return Item.EMPTY_ARRAY;
         }
 
-        if(this.canHarvestWithHand() || this.canHarvest(item)) {
+        if (this.canHarvestWithHand() || this.canHarvest(item)) {
             return new Item[]{this.toItem()};
         }
         return Item.EMPTY_ARRAY;
+    }
+
+    public Item[] getDrops(@Nullable Player player, Item item) {
+        if (player != null && !player.isSurvival() && !player.isAdventure()) {
+            return Item.EMPTY_ARRAY;
+        }
+
+        // 几乎所有方块都是重写getDrops(Item)方法，所以我们需要调用这个方法
+        return this.getDrops(item);
     }
 
     private double toolBreakTimeBonus0(Item item) {
@@ -1552,6 +1647,26 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return !isTransparent() && isSolid() && !isPowerSource();
     }
 
+    /**
+     * Compare whether two blocks are the same, this method compares block entities
+     *
+     * @param obj the obj
+     * @return the boolean
+     */
+    public boolean equalsBlock(Object obj) {
+        if (obj instanceof Block otherBlock) {
+            if (!(this instanceof BlockEntityHolder<?>) && !(otherBlock instanceof BlockEntityHolder<?>)) {
+                return this.getId() == otherBlock.getId() && this.getDamage() == otherBlock.getDamage();
+            }
+            if (this instanceof BlockEntityHolder<?> holder1 && otherBlock instanceof BlockEntityHolder<?> holder2) {
+                BlockEntity be1 = holder1.getOrCreateBlockEntity();
+                BlockEntity be2 = holder2.getOrCreateBlockEntity();
+                return this.getId() == otherBlock.getId() && this.getDamage() == otherBlock.getDamage() && be1.getCleanedNBT().equals(be2.getCleanedNBT());
+            }
+        }
+        return false;
+    }
+
     public static boolean equals(Block b1, Block b2) {
         return equals(b1, b2, true);
     }
@@ -1652,5 +1767,48 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public boolean isSuspiciousBlock() {
         return false;
+    }
+
+    public PersistentDataContainer getPersistentDataContainer() {
+        if (!this.isValid()) {
+            throw new IllegalStateException("Block does not have valid level");
+        }
+        return this.level.getPersistentDataContainer(this);
+    }
+
+    @SuppressWarnings("unused")
+    public boolean hasPersistentDataContainer() {
+        if (!this.isValid()) {
+            throw new IllegalStateException("Block does not have valid level");
+        }
+        return this.level.hasPersistentDataContainer(this);
+    }
+
+    public boolean cloneTo(Position pos) {
+        return cloneTo(pos, true);
+    }
+
+    /**
+     * 将方块克隆到指定位置<p/>
+     * 此方法会连带克隆方块实体<p/>
+     * 注意，此方法会先清除指定位置的方块为空气再进行克隆
+     *
+     * @param pos    要克隆到的位置
+     * @param update 是否需要更新克隆的方块
+     * @return 是否克隆成功
+     */
+    @SuppressWarnings("null")
+    public boolean cloneTo(Position pos, boolean update) {
+        //清除旧方块
+        level.setBlock(pos, this.layer, Block.get(Block.AIR), false, false);
+        if (this instanceof BlockEntityHolder<?> holder && holder.getBlockEntity() != null) {
+            var clonedBlock = this.clone();
+            clonedBlock.position(pos);
+            CompoundTag tag = holder.getBlockEntity().getCleanedNBT();
+            //方块实体要求direct=true
+            return BlockEntityHolder.setBlockAndCreateEntity((BlockEntityHolder<?>) clonedBlock, true, update, tag) != null;
+        } else {
+            return pos.level.setBlock(pos, this.layer, this.clone(), true, update);
+        }
     }
 }

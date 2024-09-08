@@ -90,6 +90,13 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_19_80.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_20_0.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_20_10.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_20_30.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_20_40.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_20_50.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_20_60.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_20_70.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_20_80.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_0.INSTANCE);
 
         blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
 

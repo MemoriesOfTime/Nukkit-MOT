@@ -22,7 +22,7 @@ public class PlayerInputProcessor extends DataPacketProcessor<PlayerInputPacket>
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull PlayerInputPacket pk) {
         Player player = playerHandle.player;
-        if (!player.isAlive() || !player.spawned || player.isMovementServerAuthoritative()) {
+        if (!player.isAlive() || !player.spawned || player.isMovementServerAuthoritative() || player.isLockMovementInput()) {
             return;
         }
 

@@ -1,6 +1,7 @@
 package cn.nukkit;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.customblock.CustomBlockManager;
 import cn.nukkit.blockentity.*;
 import cn.nukkit.command.*;
 import cn.nukkit.console.NukkitConsole;
@@ -26,11 +27,11 @@ import cn.nukkit.event.server.ServerStopEvent;
 import cn.nukkit.inventory.CraftingManager;
 import cn.nukkit.inventory.Recipe;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.RuntimeItemMapping;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.lang.BaseLang;
 import cn.nukkit.lang.TextContainer;
-import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.EnumLevel;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
@@ -41,6 +42,9 @@ import cn.nukkit.level.format.LevelProviderManager;
 import cn.nukkit.level.format.anvil.Anvil;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
 import cn.nukkit.level.generator.*;
+import cn.nukkit.level.tickingarea.manager.SimpleTickingAreaManager;
+import cn.nukkit.level.tickingarea.manager.TickingAreaManager;
+import cn.nukkit.level.tickingarea.storage.JSONTickingAreaStorage;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.metadata.EntityMetadataStore;
 import cn.nukkit.metadata.LevelMetadataStore;
@@ -152,8 +156,16 @@ public class Server {
     private final ConsoleCommandSender consoleSender;
     private final IScoreboardManager scoreboardManager;
 
+    private final TickingAreaManager tickingAreaManager;
+
     private int maxPlayers;
     private boolean autoSave = true;
+    /**
+     * Automatic compression of the world
+     */
+    private boolean autoCompaction = true;
+    private int autoCompactionTicks = 60 * 30 * 20;
+
     private RCON rcon;
 
     private final EntityMetadataStore entityMetadata;
@@ -593,6 +605,7 @@ public class Server {
         }
 
         this.baseLang = new BaseLang(this.getPropertyString("language", BaseLang.FALLBACK_LANGUAGE));
+
         computeThreadPool = new ForkJoinPool(Math.min(0x7fff, Runtime.getRuntime().availableProcessors()), new ComputeThreadPoolThreadFactory(), null, false);
 
         Object poolSize = this.getProperty("async-workers", "auto");
@@ -624,6 +637,7 @@ public class Server {
         this.playerMetadata = new PlayerMetadataStore();
         this.levelMetadata = new LevelMetadataStore();
         this.scoreboardManager = new ScoreboardManager(new JSONScoreboardStorage(this.dataPath + "scoreboard.json"));
+        this.tickingAreaManager = new SimpleTickingAreaManager(new JSONTickingAreaStorage(this.dataPath + "worlds/"));
 
         this.operators = new Config(this.dataPath + "ops.txt", Config.ENUM);
         this.whitelist = new Config(this.dataPath + "white-list.txt", Config.ENUM);
@@ -634,6 +648,9 @@ public class Server {
 
         this.maxPlayers = this.getPropertyInt("max-players", 50);
         this.setAutoSave(this.getPropertyBoolean("auto-save", true));
+
+        this.autoCompaction = this.getPropertyBoolean("level-auto-compaction", true);
+        this.autoCompactionTicks = Math.max(60 * 20, this.getPropertyInt("level-auto-compaction-ticks", 60 * 30 * 20));
 
         if (this.isHardcore && this.difficulty < 3) {
             this.setDifficulty(3);
@@ -668,6 +685,7 @@ public class Server {
         Potion.init();
         Attribute.init();
         DispenseBehaviorRegister.init();
+        CustomBlockManager.init(this);
         GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, 0, 0);
 
         // Convert legacy data before plugins get the chance to mess with it
@@ -706,11 +724,23 @@ public class Server {
 
         this.pluginManager.loadInternalPlugin();
         if (loadPlugins) {
+            this.pluginManager.loadPlugins(this.pluginPath);
             if (this.enableSpark) {
                 SparkInstaller.initSpark(this);
             }
-            this.pluginManager.loadPlugins(this.pluginPath);
             this.enablePlugins(PluginLoadOrder.STARTUP);
+        }
+
+        try {
+            if (CustomBlockManager.get().closeRegistry()) {
+                for (RuntimeItemMapping runtimeItemMapping : RuntimeItems.VALUES) {
+                    runtimeItemMapping.generatePalette();
+                }
+            }
+
+            Item.initCreativeItems();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to init custom blocks", e);
         }
 
         LevelProviderManager.addProvider(this, Anvil.class);
@@ -975,13 +1005,7 @@ public class Server {
             throw new ServerException("CommandSender is not valid");
         }
 
-        if (this.commandMap.dispatch(sender, commandLine)) {
-            return true;
-        }
-
-        sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.unknown", commandLine));
-
-        return false;
+        return this.commandMap.dispatch(sender, commandLine);
     }
 
     public ConsoleCommandSender getConsoleSender() {
@@ -1026,10 +1050,10 @@ public class Server {
         }
 
         this.pluginManager.registerInterface(JavaPluginLoader.class);
+        this.pluginManager.loadPlugins(this.pluginPath);
         if (this.enableSpark) {
             SparkInstaller.initSpark(this);
         }
-        this.pluginManager.loadPlugins(this.pluginPath);
         this.enablePlugins(PluginLoadOrder.STARTUP);
         this.enablePlugins(PluginLoadOrder.POSTWORLD);
     }
@@ -1164,7 +1188,10 @@ public class Server {
                             int offset = 0;
                             for (int i = 0; i < levelArray.length; i++) {
                                 offset = (i + lastLevelGC) % levelArray.length;
-                                levelArray[offset].doGarbageCollection(allocated - 1);
+                                Level level = levelArray[offset];
+                                if (!level.isBeingConverted) {
+                                    level.doGarbageCollection(allocated - 1);
+                                }
                                 allocated = next - System.currentTimeMillis();
                                 if (allocated <= 0) break;
                             }
@@ -1204,6 +1231,9 @@ public class Server {
     }
 
     public void removeOnlinePlayer(Player player) {
+        if (player.getUniqueId() == null) {
+            return;
+        }
         if (this.playerList.containsKey(player.getUniqueId())) {
             this.playerList.remove(player.getUniqueId());
 
@@ -1283,7 +1313,11 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_20_80) {
+        if (player.protocol >= ProtocolInfo.v1_21_20) {
+            player.dataPacket(CraftingManager.packet712);
+        } else if (player.protocol >= ProtocolInfo.v1_21_0) {
+            player.dataPacket(CraftingManager.packet685);
+        } else if (player.protocol >= ProtocolInfo.v1_20_80) {
             player.dataPacket(CraftingManager.packet671);
         } else if (player.protocol >= ProtocolInfo.v1_20_70) {
             player.dataPacket(CraftingManager.packet662);
@@ -1358,7 +1392,7 @@ public class Server {
 
         // Do level ticks
         for (Level level : this.levelArray) {
-            if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
+            if (level.isBeingConverted || (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0)) {
                 continue;
             }
 
@@ -1478,7 +1512,9 @@ public class Server {
 
         if (this.tickCounter % 100 == 0) {
             for (Level level : this.levelArray) {
-                level.doChunkGarbageCollection();
+                if (!level.isBeingConverted) {
+                    level.doChunkGarbageCollection();
+                }
             }
         }
 
@@ -1600,6 +1636,19 @@ public class Server {
         for (Level level : this.levelArray) {
             level.setAutoSave(this.autoSave);
         }
+    }
+
+    public boolean isAutoCompactionEnabled() {
+        return this.autoCompaction;
+    }
+
+    public void setAutoCompactionTicks(int ticks) {
+        Preconditions.checkArgument(ticks > 0, "ticks");
+        this.autoCompactionTicks = ticks;
+    }
+
+    public int getAutoCompactionTicks() {
+        return this.autoCompactionTicks;
     }
 
     public String getLevelType() {
@@ -1866,7 +1915,7 @@ public class Server {
             Optional<UUID> uuid = lookupName(name);
             return getOfflinePlayerDataInternal(uuid.map(UUID::toString).orElse(name), true, create);
         } else {
-            return getOfflinePlayerDataInternal(name, true, create);
+            return getOfflinePlayerDataInternal(name.toLowerCase(), true, create);
         }
     }
 
@@ -2348,7 +2397,7 @@ public class Server {
         }
 
         if (provider == null) {
-            provider = LevelProviderManager.getProviderByName("anvil");
+            provider = LevelProviderManager.getProviderByName("leveldb");
         }
 
         String path;
@@ -2913,6 +2962,7 @@ public class Server {
         //Others
         Entity.registerEntity("Human", EntityHuman.class, true);
         Entity.registerEntity("Lightning", EntityLightning.class);
+        Entity.registerEntity("AreaEffectCloud", EntityAreaEffectCloud.class);
     }
 
     /**
@@ -2929,6 +2979,7 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.FLOWER_POT, BlockEntityFlowerPot.class);
         BlockEntity.registerBlockEntity(BlockEntity.BREWING_STAND, BlockEntityBrewingStand.class);
         BlockEntity.registerBlockEntity(BlockEntity.ITEM_FRAME, BlockEntityItemFrame.class);
+        BlockEntity.registerBlockEntity(BlockEntity.GLOW_ITEM_FRAME, BlockEntityItemFrameGlow.class);
         BlockEntity.registerBlockEntity(BlockEntity.CAULDRON, BlockEntityCauldron.class);
         BlockEntity.registerBlockEntity(BlockEntity.ENDER_CHEST, BlockEntityEnderChest.class);
         BlockEntity.registerBlockEntity(BlockEntity.BEACON, BlockEntityBeacon.class);
@@ -2953,6 +3004,7 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.DECORATED_POT, BlockEntityDecoratedPot.class);
         BlockEntity.registerBlockEntity(BlockEntity.TARGET, BlockEntityTarget.class);
         BlockEntity.registerBlockEntity(BlockEntity.BRUSHABLE_BLOCK, BlockEntityBrushableBlock.class);
+        BlockEntity.registerBlockEntity(BlockEntity.PERSISTENT_CONTAINER, PersistentDataContainerBlockEntity.class);
     }
 
     /**
@@ -2984,6 +3036,10 @@ public class Server {
      */
     public void setPlayerDataSerializer(PlayerDataSerializer playerDataSerializer) {
         this.playerDataSerializer = Preconditions.checkNotNull(playerDataSerializer, "playerDataSerializer");
+    }
+
+    public TickingAreaManager getTickingAreaManager() {
+        return tickingAreaManager;
     }
 
     /**
@@ -3058,7 +3114,7 @@ public class Server {
         this.forceGamemode = this.getPropertyBoolean("force-gamemode", true);
         this.doNotLimitInteractions = this.getPropertyBoolean("do-not-limit-interactions", false);
         this.motd = this.getPropertyString("motd", "Minecraft Server");
-        this.viewDistance = this.getPropertyInt("view-distance", 8);
+        this.viewDistance = Math.max(1, this.getPropertyInt("view-distance", 8));
         this.mobDespawnTicks = this.getPropertyInt("ticks-per-entity-despawns", 12000);
         this.port = this.getPropertyInt("server-port", 19132);
         this.ip = this.getPropertyString("server-ip", "0.0.0.0");
@@ -3169,6 +3225,9 @@ public class Server {
             put("rcon.port", 25575);
 
             put("auto-save", true);
+            put("level-auto-compaction", true);
+            put("level-auto-compaction-ticks", 60 * 30 * 20);
+
             put("force-resources", false);
             put("force-resources-allow-client-packs", false);
             put("xbox-auth", true);
@@ -3194,7 +3253,7 @@ public class Server {
             put("zlib-provider", 2);
             put("compression-level", 4);
             put("compression-threshold", "256");
-            put("use-snappy-compression", true);
+            put("use-snappy-compression", false);
             put("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
             put("timeout-milliseconds", 25000);
 

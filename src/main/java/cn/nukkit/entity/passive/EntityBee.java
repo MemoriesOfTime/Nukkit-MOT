@@ -7,6 +7,7 @@ import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.mob.EntityFlyingMob;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -81,9 +82,9 @@ public class EntityBee extends EntityFlyingMob { // A mob because it needs to ha
             }
             if (player.attack(new EntityDamageByEntityEvent(this, player, EntityDamageEvent.DamageCause.ENTITY_ATTACK, damage))) {
                 if (this.getServer().getDifficulty() == 2) {
-                    player.addEffect(Effect.getEffect(Effect.POISON).setDuration(200));
+                    player.addEffect(Effect.getEffect(Effect.POISON).setDuration(200), EntityPotionEffectEvent.Cause.ATTACK);
                 } else if (this.getServer().getDifficulty() == 3) {
-                    player.addEffect(Effect.getEffect(Effect.POISON).setDuration(360));
+                    player.addEffect(Effect.getEffect(Effect.POISON).setDuration(360), EntityPotionEffectEvent.Cause.ATTACK);
                 }
             }
         }

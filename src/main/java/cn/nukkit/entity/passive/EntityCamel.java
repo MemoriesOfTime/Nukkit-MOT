@@ -2,6 +2,7 @@ package cn.nukkit.entity.passive;
 
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.utils.Utils;
 
 public class EntityCamel extends EntityWalkingAnimal {
 
@@ -41,6 +42,6 @@ public class EntityCamel extends EntityWalkingAnimal {
 
     @Override
     public int getKillExperience() {
-        return 0;
+        return Utils.rand(1, 3);
     }
 }

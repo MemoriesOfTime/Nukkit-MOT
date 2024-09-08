@@ -47,7 +47,9 @@ public class EntityCat extends EntityWalkingAnimal {
     public Item[] getDrops() {
         if (!this.isBaby()) {
             int c = Utils.rand(0, 2);
-            if (c > 0) return new Item[]{Item.get(Item.STRING, 0, c)};
+            if (c > 0) {
+                return new Item[]{Item.get(Item.STRING, 0, c)};
+            }
         }
 
         return Item.EMPTY_ARRAY;

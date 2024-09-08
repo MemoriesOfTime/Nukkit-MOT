@@ -35,7 +35,7 @@ public class PopulatorOre extends Populator {
             for (int i = 0; i < type.clusterCount; i++) {
                 final int x = NukkitMath.randomRange(random, sx, ex);
                 final int z = NukkitMath.randomRange(random, sz, ez);
-                final int y = NukkitMath.randomRange(random, type.minHeight, type.maxHeight);
+                final int y = NukkitMath.randomRange(random, Math.max(type.minHeight, level.getMinBlockY()), Math.min(type.maxHeight, level.getMaxBlockY()));
                 if (level.getBlockIdAt(x, y, z) == replaceId) {
                     type.spawn(level, random, replaceId, x, y, z);
                 }

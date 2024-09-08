@@ -2,9 +2,14 @@ package cn.nukkit.utils;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.customblock.CustomBlockManager;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.item.Item;
+import cn.nukkit.level.Level;
+import cn.nukkit.math.AxisAlignedBB;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.NukkitRandom;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -75,6 +80,9 @@ public class Utils {
     public static boolean hasItemOrBlock(int id) {
         if (id < 0) {
             int blockId = 255 - id;
+            if (blockId > CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+                return CustomBlockManager.get().getBlock(blockId) != null;
+            }
             return blockId < Block.MAX_BLOCK_ID && Block.list[blockId] != null;
         } else {
             return id < Item.list.length && Item.list[id] != null;
@@ -491,6 +499,9 @@ public class Utils {
             case ProtocolInfo.v1_20_60 -> "1.20.60";
             case ProtocolInfo.v1_20_70 -> "1.20.70";
             case ProtocolInfo.v1_20_80 -> "1.20.80";
+            case ProtocolInfo.v1_21_0 -> "1.21.0";
+            case ProtocolInfo.v1_21_2 -> "1.21.2";
+            case ProtocolInfo.v1_21_20 -> "1.21.20";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };
@@ -533,6 +544,8 @@ public class Utils {
                 return "Xbox";
             case 14:
                 return "Windows Phone";
+            case 15:
+                return "Linux";
             default:
                 return "Unknown";
         }
@@ -571,5 +584,67 @@ public class Utils {
         byte[] payload = new byte[buf.readableBytes()];
         buf.readBytes(payload);
         return payload;
+    }
+
+    /**
+     * @see #fastSplit(String, String, int)
+     */
+
+    public static List<String> fastSplit(String delimiter, String str) {
+        return fastSplit(delimiter, str, Integer.MAX_VALUE);
+    }
+
+    /**
+     * 在短字符串上(通常只有一个分割)处理比{@link String#split(String)}快
+     * <p>
+     * Processing on short strings(There is usually only one split) is faster than {@link String#split(String)}
+     *
+     * @param delimiter the delimiter
+     * @param str       the str
+     * @param limit     the limit
+     * @return the list
+     */
+
+    public static List<String> fastSplit(String delimiter, String str, int limit) {
+        var tmp = str;
+        var results = new ArrayList<String>();
+        var count = 1;
+        while (true) {
+            int j = tmp.indexOf(delimiter);
+            if (j < 0) {
+                results.add(tmp);
+                break;
+            }
+            results.add(tmp.substring(0, j));
+            count++;
+            tmp = tmp.substring(j + 1);
+            if (count == limit || tmp.isEmpty()) {
+                results.add(tmp);
+                break;
+            }
+        }
+        return results;
+    }
+
+    public static Block[] getLevelBlocks(Level level, AxisAlignedBB bb) {
+        int minX = NukkitMath.floorDouble(Math.min(bb.getMinX(), bb.getMaxX()));
+        int minY = NukkitMath.floorDouble(Math.min(bb.getMinY(), bb.getMaxY()));
+        int minZ = NukkitMath.floorDouble(Math.min(bb.getMinZ(), bb.getMaxZ()));
+        int maxX = NukkitMath.floorDouble(Math.max(bb.getMinX(), bb.getMaxX()));
+        int maxY = NukkitMath.floorDouble(Math.max(bb.getMinY(), bb.getMaxY()));
+        int maxZ = NukkitMath.floorDouble(Math.max(bb.getMinZ(), bb.getMaxZ()));
+
+        List<Block> blocks = new ArrayList<>();
+        Vector3 vec = new Vector3();
+
+        for (int z = minZ; z <= maxZ; ++z) {
+            for (int x = minX; x <= maxX; ++x) {
+                for (int y = minY; y <= maxY; ++y) {
+                    blocks.add(level.getBlock(vec.setComponents(x, y, z), false));
+                }
+            }
+        }
+
+        return blocks.toArray(new Block[0]);
     }
 }

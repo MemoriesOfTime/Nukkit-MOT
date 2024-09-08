@@ -4,70 +4,49 @@ import cn.nukkit.Player;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.PlayersNode;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.lang.TranslationContainer;
-import cn.nukkit.utils.TextFormat;
 
-import java.util.Objects;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Created on 2015/11/12 by xtypr.
- * Package cn.nukkit.command.defaults in project Nukkit .
+ * @author xtypr
+ * @since 2015/11/12
  */
 public class TellCommand extends VanillaCommand {
 
     public TellCommand(String name) {
-        super(name, "%nukkit.command.tell.description", "%commands.message.usage", new String[]{"w", "msg"});
+        super(name, "commands.tell.description", "", new String[]{"w", "msg"});
         this.setPermission("nukkit.command.tell");
         this.commandParameters.clear();
         this.commandParameters.put("default", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("message", CommandParamType.TEXT, false)
+                CommandParameter.newType("player", CommandParamType.TARGET, new PlayersNode()),
+                CommandParameter.newType("message", CommandParamType.MESSAGE)
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        List<Player> players = list.getResult(0);
+        if (players.isEmpty()) {
+            log.addNoTargetMatch().output();
+            return 0;
         }
-
-        if (args.length < 2) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return false;
+        String msg = list.getResult(1);
+        for (Player player : players) {
+            if (player == sender) {
+                log.addError("commands.message.sameTarget").output();
+                continue;
+            }
+            log.addSuccess("commands.message.display.outgoing", player.getName(), msg);
+            player.sendMessage(new TranslationContainer("commands.message.display.incoming", sender.getName(), msg));
         }
-
-        String name = args[0].toLowerCase().replace("@s", sender.getName());
-
-        Player player = sender.getServer().getPlayer(name);
-        if (player == null) {
-            sender.sendMessage(new TranslationContainer("commands.generic.player.notFound"));
-            return true;
-        }
-
-        if (Objects.equals(player, sender)) {
-            sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.message.sameTarget"));
-            return true;
-        }
-
-        StringBuilder msg = new StringBuilder();
-        for (int i = 1; i < args.length; i++) {
-            msg.append(args[i]).append(' ');
-        }
-        if (msg.length() > 512) {
-            sender.sendMessage(TextFormat.RED + "The message is too long");
-            return true;
-        } else if (msg.length() > 0) {
-            msg = new StringBuilder(msg.substring(0, msg.length() - 1));
-        }
-
-        String displayName = (sender instanceof Player ? ((Player) sender).getDisplayName() : sender.getName());
-
-        sender.sendMessage('[' + sender.getName() + " -> " + player.getDisplayName() + "] " + msg);
-        player.sendMessage('[' + displayName + " -> " + player.getName() + "] " + msg);
-        if (sender instanceof Player) {
-            sender.getServer().getLogger().info('[' + sender.getName() + " -> " + player.getDisplayName() + "] " + msg);
-        }
-
-        return true;
+        log.output();
+        return 1;
     }
 }

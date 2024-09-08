@@ -9,6 +9,7 @@ import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.ContainerClosePacket;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.plugin.InternalPlugin;
 
 import java.util.ArrayList;
@@ -131,6 +132,10 @@ public class CraftingTransaction extends InventoryTransaction {
     protected void sendInventories() {
         super.sendInventories();
 
+        if (source.craftingType == Player.CRAFTING_SMALL) {
+            return; // Already closed
+        }
+
         /*
          * TODO: HACK!
          * we can't resend the contents of the crafting window, so we force the client to close it instead.
@@ -140,7 +145,8 @@ public class CraftingTransaction extends InventoryTransaction {
         ContainerClosePacket pk = new ContainerClosePacket();
         pk.windowId = ContainerIds.NONE;
         pk.wasServerInitiated = true;
-        source.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> source.dataPacket(pk), 10);
+        pk.type = ContainerType.NONE;
+        source.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> source.dataPacket(pk), 20);
 
         this.source.resetCraftingGridType();
     }

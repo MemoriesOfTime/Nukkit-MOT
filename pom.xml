@@ -16,7 +16,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
         <jline.version>3.21.0</jline.version>
-        <block-state-updater.version>1.20.50-SNAPSHOT</block-state-updater.version>
+        <block-state-updater.version>1.21.0-SNAPSHOT</block-state-updater.version>
     </properties>
 
     <distributionManagement>
@@ -79,7 +79,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>common</artifactId>
-            <version>3.0.0.Beta1-SNAPSHOT</version>
+            <version>3.0.0.Beta3-SNAPSHOT</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -111,6 +111,21 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>3.1.8</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.checkerframework</groupId>
+                    <artifactId>checker-qual</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.errorprone</groupId>
+                    <artifactId>error_prone_annotations</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
             <version>2.0</version>
@@ -125,7 +140,13 @@
         <dependency>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
-            <version>9.13</version>
+            <version>9.37.2</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.ow2.asm</groupId>
+            <artifactId>asm</artifactId>
+            <version>9.7</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -208,7 +229,7 @@
         <dependency>
             <groupId>org.iq80.snappy</groupId>
             <artifactId>snappy</artifactId>
-            <version>0.4</version>
+            <version>0.5</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -228,6 +249,10 @@
                 <exclusion>
                     <groupId>net.daporkchop.lib</groupId>
                     <artifactId>natives</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.iq80.snappy</groupId>
+                    <artifactId>snappy</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -268,9 +293,10 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>com.intellij</groupId>
+            <groupId>org.jetbrains</groupId>
             <artifactId>annotations</artifactId>
-            <version>12.0</version>
+            <version>24.1.0</version>
+            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.bitbucket.b_c</groupId>

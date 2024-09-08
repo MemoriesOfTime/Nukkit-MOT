@@ -26,8 +26,17 @@ public class ChunkSerializerV3 implements ChunkSerializer {
     public void serializer(WriteBatch writeBatch, Chunk chunk) {
         DimensionData dimensionData = chunk.getProvider().getLevel().getDimensionData();
         for (int ySection = dimensionData.getMinSectionY(); ySection <= dimensionData.getMaxSectionY(); ++ySection) {
+            byte[] key = LevelDBKey.CHUNK_SECTION_PREFIX.getKey(
+                    chunk.getX(), chunk.getZ(), ySection, dimensionData.getDimensionId()
+            );
+
             LevelDBChunkSection section = (LevelDBChunkSection) chunk.getSection(ySection);
             if (section == null) {
+                writeBatch.delete(key);
+                continue;
+            }
+
+            if (!section.isDirty()) {
                 continue;
             }
 
@@ -35,10 +44,7 @@ public class ChunkSerializerV3 implements ChunkSerializer {
             try {
                 byteBuf.writeByte(CURRENT_LEVEL_SUBCHUNK_VERSION);
                 ChunkSectionSerializers.serializer(byteBuf, section.getStorages(), ySection, CURRENT_LEVEL_SUBCHUNK_VERSION);
-                writeBatch.put(
-                        LevelDBKey.CHUNK_SECTION_PREFIX.getKey(
-                                chunk.getX(), chunk.getZ(), ySection, dimensionData.getDimensionId()
-                        ), Utils.convertByteBuf2Array(byteBuf));
+                writeBatch.put(key, Utils.convertByteBuf2Array(byteBuf));
             } finally {
                 byteBuf.release();
             }

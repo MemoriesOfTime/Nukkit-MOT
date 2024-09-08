@@ -1,6 +1,8 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
+import cn.nukkit.block.customblock.CustomBlockDefinition;
+import cn.nukkit.block.customblock.CustomBlockManager;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -11,8 +13,12 @@ import cn.nukkit.network.protocol.types.NetworkPermissions;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +32,7 @@ public class StartGamePacket extends DataPacket {
     public static final int GAME_PUBLISH_SETTING_FRIENDS_ONLY = 2;
     public static final int GAME_PUBLISH_SETTING_FRIENDS_OF_FRIENDS = 3;
     public static final int GAME_PUBLISH_SETTING_PUBLIC = 4;
+    private static final Logger log = LoggerFactory.getLogger(StartGamePacket.class);
 
     @Override
     public byte pid() {
@@ -93,6 +100,7 @@ public class StartGamePacket extends DataPacket {
     public boolean isServerAuthoritativeBlockBreaking;
     public long currentTick;
     public int enchantmentSeed;
+    public Collection<CustomBlockDefinition> blockDefinitions = CustomBlockManager.get().getBlockDefinitions();
     public String multiplayerCorrelationId = "";
     public boolean isDisablingPersonas;
     public boolean isDisablingCustomSkins;
@@ -130,6 +138,18 @@ public class StartGamePacket extends DataPacket {
      * @since v671
      */
     public boolean hardcore;
+    /**
+     * @since v685
+     */
+    public String serverId = "";
+    /**
+     * @since v685
+     */
+    public String worldId = "";
+    /**
+     * @since v685
+     */
+    public String scenarioId = "";
 
     @Override
     public void decode() {
@@ -271,6 +291,11 @@ public class StartGamePacket extends DataPacket {
                 if (protocol >= ProtocolInfo.v1_19_20) {
                     this.putByte(this.chatRestrictionLevel);
                     this.putBoolean(this.disablePlayerInteractions);
+                    if (protocol >= ProtocolInfo.v1_21_0) {
+                        this.putString(this.serverId);
+                        this.putString(this.worldId);
+                        this.putString(this.scenarioId);
+                    }
                 }
             }
         }
@@ -299,7 +324,19 @@ public class StartGamePacket extends DataPacket {
         }
         if (protocol > ProtocolInfo.v1_5_0) {
             if (protocol >= ProtocolInfo.v1_16_100) {
-                this.putUnsignedVarInt(0); // Custom blocks
+                if (this.blockDefinitions != null && !this.blockDefinitions.isEmpty()) {
+                    this.putUnsignedVarInt(this.blockDefinitions.size());
+                    for (CustomBlockDefinition definition : this.blockDefinitions) {
+                        this.putString(definition.identifier());
+                        try {
+                            this.put(NBTIO.write(definition.nbt(), ByteOrder.LITTLE_ENDIAN, true));
+                        } catch (Exception e) {
+                             log.error("Error while encoding NBT data of CustomBlockDefinition", e);
+                        }
+                    }
+                } else {
+                    this.putUnsignedVarInt(0); // No custom blocks
+                }
             } else {
                 this.put(GlobalBlockPalette.getCompiledTable(this.protocol));
             }

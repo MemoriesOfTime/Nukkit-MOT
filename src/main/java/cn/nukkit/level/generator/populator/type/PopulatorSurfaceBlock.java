@@ -29,8 +29,9 @@ public abstract class PopulatorSurfaceBlock extends PopulatorCount {
     @Override
     protected int getHighestWorkableBlock(ChunkManager level, int x, int z, FullChunk chunk) {
         int y;
-        // Start at 254 because we add one afterwards
-        for (y = 254; y >= 0; --y) {
+        // Start at (level.getMaxBlockY() - 1) because we add one afterwards
+        // anvil地图格式尚不支持384世界高度，暂时将高度限制在255以下
+        for (y = Math.min(level.getMaxBlockY(), 254) - 1; y >= 0; --y) {
             if (!PopulatorHelpers.isNonSolid(chunk.getBlockId(x, y, z))) {
                 break;
             }

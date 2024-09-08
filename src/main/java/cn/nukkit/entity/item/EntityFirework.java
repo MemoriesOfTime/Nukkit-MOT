@@ -26,19 +26,24 @@ import java.util.concurrent.ThreadLocalRandom;
 public class EntityFirework extends Entity {
 
     public static final int NETWORK_ID = 72;
+
+    private static final Vector3f DEFAULT_DIRECTION = new Vector3f(0, 1, 0);
+
     @Getter
     @Setter
-    private int lifetime;
+    protected int lifetime;
 
-    private Item firework;
+    protected Item firework;
+
+    protected boolean isProjectile;
 
     public EntityFirework(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
     }
 
-    @Override
-    public void initEntity() {
-        super.initEntity();
+    public EntityFirework(FullChunk chunk, CompoundTag nbt, boolean projectile) {
+        super(chunk, nbt);
+        this.isProjectile = projectile;
 
         ThreadLocalRandom rand = ThreadLocalRandom.current();
 
@@ -51,14 +56,20 @@ public class EntityFirework extends Entity {
         }
         this.setLifetime(lifetime);
 
-        this.motionX = rand.nextGaussian() * 0.001D;
-        this.motionZ = rand.nextGaussian() * 0.001D;
-        this.motionY = 0.05D;
-
         if (namedTag.contains("FireworkItem")) {
             this.setFirework(NBTIO.getItemHelper(this.namedTag.getCompound("FireworkItem")));
-            this.setDataProperty(new Vector3fEntityData(Entity.DATA_DISPLAY_OFFSET, new Vector3f(0, 1, 0)));
-            this.setDataProperty(new LongEntityData(Entity.DATA_HAS_DISPLAY, -1));
+            this.setDataProperty(new Vector3fEntityData(Entity.DATA_FIREWORK_DIRECTION, this.isProjectile ? new Vector3f((float) motionX, (float) motionY, (float) motionZ) : DEFAULT_DIRECTION), false);
+            this.setDataProperty(new LongEntityData(Entity.DATA_HAS_DISPLAY, -1), false);
+        }
+
+        if (this.isProjectile) {
+            this.motionX = rand.nextGaussian() * 0.001 + this.motionX * 0.02;
+            this.motionY = rand.nextGaussian() * 0.001 + this.motionY * 0.02;
+            this.motionZ = rand.nextGaussian() * 0.001 + this.motionZ * 0.02;
+        } else {
+            this.motionX = rand.nextGaussian() * 0.001;
+            this.motionY = rand.nextGaussian() * 0.001 + 1 * 0.02;
+            this.motionZ = rand.nextGaussian() * 0.001;
         }
     }
 
@@ -94,9 +105,11 @@ public class EntityFirework extends Entity {
 
         if (this.isAlive()) {
 
-            this.motionX *= 1.15D;
-            this.motionZ *= 1.15D;
-            this.motionY += 0.04D;
+            Vector3f dir = getDataPropertyVector3f(DATA_FIREWORK_DIRECTION);
+            this.motionX = this.motionX * 1.05 + dir.x * 0.03;
+            this.motionY = this.motionY * 1.05 + dir.y * 0.03;
+            this.motionZ = this.motionZ * 1.05 + dir.z * 0.03;
+
             this.move(this.motionX, this.motionY, this.motionZ);
 
             this.updateMovement();

@@ -3,11 +3,14 @@ package cn.nukkit.level.format.generic;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.PersistentDataContainerBlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
+import cn.nukkit.level.persistence.PersistentDataContainer;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.NumberTag;
@@ -337,7 +340,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
                 int y;
 
-                for (y = 255; y > top; --y) {
+                for (y = this.getProvider().getMaxBlockY(); y > top; --y) {
                     // all the blocks above & including the top-most block in a column are exposed to sun and
                     // thus have a skylight value of 15
                     this.setBlockSkyLight(x, y, z, 15);
@@ -347,7 +350,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 int nextDecrease = 0; // decrease that that will be applied starting with the next block
 
                 // TODO: remove nextLight & nextDecrease, use only light & decrease variables
-                for (y = top; y >= 0; --y) { // going under the top-most block
+                for (y = top; y >= this.getProvider().getMinBlockY(); --y) { // going under the top-most block
                     nextLight -= nextDecrease;
                     int light = nextLight; // this light value will be applied for this block. The following checks are all about the next blocks
 
@@ -391,11 +394,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     public int getHighestBlockAt(int x, int z, boolean cache) {
         if (cache) {
             int h = this.getHeightMap(x, z);
-            if (h != 0 && h != 255) {
+            if (h != this.getProvider().getMinBlockY() && h != this.getProvider().getMaxBlockY()) {
                 return h;
             }
         }
-        for (int y = 255; y >= 0; --y) {
+        for (int y = this.getProvider().getMaxBlockY(); y >= this.getProvider().getMinBlockY(); --y) {
             if (getBlockId(x, y, z) != 0x00) {
                 if (cache) {
                     this.setHeightMap(x, z, y);
@@ -452,10 +455,21 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             this.tiles.remove(blockEntity.getId());
             int index = ((blockEntity.getFloorZ() & 0x0f) << 12) | ((blockEntity.getFloorX() & 0x0f) << 8) | (blockEntity.getFloorY() & 0xff);
             this.tileList.remove(index);
+
+            if (!(blockEntity instanceof PersistentDataContainerBlockEntity) && blockEntity.hasPersistentDataContainer()) {
+                this.createPersistentBlockContainer(blockEntity, blockEntity.getPersistentDataContainer().getStorage());
+            }
+
             if (this.isInit) {
                 this.setChanged();
             }
         }
+    }
+
+    private BlockEntity createPersistentBlockContainer(Vector3 pos, CompoundTag storage) {
+        CompoundTag tag = BlockEntity.getDefaultCompound(pos, BlockEntity.PERSISTENT_CONTAINER);
+        tag.putCompound(PersistentDataContainer.STORAGE_TAG, storage);
+        return BlockEntity.createBlockEntity(BlockEntity.PERSISTENT_CONTAINER, this, tag);
     }
 
     @Override
@@ -556,6 +570,11 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public byte[] getBiomeIdArray() {
         return this.biomes;
+    }
+
+    @Override
+    public void setBiomeIdArray(byte[] biomeIdArray) {
+        this.biomes = biomeIdArray;
     }
 
     @Override
@@ -713,6 +732,16 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public long getSeed() {
         throw new UnsupportedOperationException("Chunk does not have a seed");
+    }
+
+    @Override
+    public int getMinBlockY() {
+        return this.getProvider().getMinBlockY();
+    }
+
+    @Override
+    public int getMaxBlockY() {
+        return this.getProvider().getMaxBlockY();
     }
 
     public boolean compress() {

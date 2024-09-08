@@ -72,6 +72,10 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_TYPE_LONG = 7;
     public static final int DATA_TYPE_VECTOR3F = 8;
 
+    /**
+     * 0~63 DATA_FLAGS
+     * 64~128 DATA_FLAGS_EXTENDED (DATA_FLAGS2)
+     */
     public static final int DATA_FLAGS = 0;
     public static final int DATA_HEALTH = 1; //int (minecart/boat)
     public static final int DATA_VARIANT = 2; //int
@@ -80,7 +84,7 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_OWNER_EID = 5; //long
     public static final int DATA_TARGET_EID = 6; //long
     public static final int DATA_AIR = 7; //short
-    public static final int DATA_POTION_COLOR = 8; //int (ARGB!)
+    public static final int DATA_EFFECT_COLOR = 8, DATA_POTION_COLOR = DATA_EFFECT_COLOR; //int (ARGB!)
     public static final int DATA_POTION_AMBIENT = 9; //byte
     public static final int DATA_JUMP_DURATION = 10; //long
     public static final int DATA_HURT_TIME = 11; //int (minecart/boat)
@@ -90,7 +94,9 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_EXPERIENCE_VALUE = 15; //int (xp orb)
     public static final int DATA_DISPLAY_ITEM = 16; //int (id | (data << 16))
     public static final int DATA_DISPLAY_OFFSET = 17; //int
+    public static final int DATA_FIREWORK_DIRECTION = DATA_DISPLAY_OFFSET; //vec3f
     public static final int DATA_HAS_DISPLAY = 18; //byte (must be 1 for minecart to show block inside)
+    public static final int DATA_ARROW_AUX_VALUE = DATA_HAS_DISPLAY; //byte (tipped arrow item meta)
     public static final int DATA_SWELL = 19;
     public static final int DATA_OLD_SWELL = 20;
     public static final int DATA_SWELL_DIR = 21;
@@ -107,7 +113,7 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FISH_X = 33;
     public static final int DATA_FISH_Z = 34;
     public static final int DATA_FISH_ANGLE = 35;
-    public static final int DATA_POTION_AUX_VALUE = 36; //short
+    public static final int DATA_AUX_VALUE_DATA = 36, DATA_POTION_AUX_VALUE = DATA_AUX_VALUE_DATA; //short
     public static final int DATA_LEAD_HOLDER_EID = 37; //long
     public static final int DATA_SCALE = 38; //float
     public static final int DATA_HAS_NPC_COMPONENT = 39; //byte
@@ -170,19 +176,19 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FLAGS_EXTENDED = 92, DATA_FLAGS2 = DATA_FLAGS_EXTENDED; //long (extended data flags)
     public static final int DATA_LAYING_AMOUNT = 93;
     public static final int DATA_LAYING_AMOUNT_PREVIOUS = 94;
-    public static final int DATA_DURATION = 95;
-    public static final int DATA_SPAWN_TIME = 96;
-    public static final int DATA_CHANGE_RATE = 97;
-    public static final int DATA_CHANGE_ON_PICKUP = 98;
-    public static final int DATA_PICKUP_COUNT = 99;
-    public static final int DATA_INTERACTIVE_TAG = 100; //string (button text)
+    public static final int DATA_AREA_EFFECT_CLOUD_DURATION = 95, DATA_DURATION = DATA_AREA_EFFECT_CLOUD_DURATION; // int
+    public static final int DATA_AREA_EFFECT_CLOUD_SPAWN_TIME = 96, DATA_SPAWN_TIME = DATA_AREA_EFFECT_CLOUD_SPAWN_TIME; // int
+    public static final int DATA_AREA_EFFECT_CLOUD_CHANGE_RATE = 97, DATA_CHANGE_RATE = DATA_AREA_EFFECT_CLOUD_CHANGE_RATE; // float
+    public static final int DATA_AREA_EFFECT_CLOUD_CHANGE_ON_PICKUP = 98, DATA_CHANGE_ON_PICKUP = DATA_AREA_EFFECT_CLOUD_CHANGE_ON_PICKUP; // float
+    public static final int DATA_AREA_EFFECT_CLOUD_PICKUP_COUNT = 99, DATA_PICKUP_COUNT = DATA_AREA_EFFECT_CLOUD_PICKUP_COUNT; //int
+    public static final int DATA_INTERACTIVE_TAG = 100; // string (button text)
     public static final int DATA_TRADE_TIER = 101;
     public static final int DATA_MAX_TRADE_TIER = 102;
     public static final int DATA_TRADE_EXPERIENCE = 103;
     public static final int DATA_SKIN_ID = 104; // int
     public static final int DATA_SPAWNING_FRAMES = 105;
-    public static final int DATA_COMMAND_BLOCK_TICK_DELAY = 106; //int
-    public static final int DATA_COMMAND_BLOCK_EXECUTE_ON_FIRST_TICK = 107; //byte
+    public static final int DATA_COMMAND_BLOCK_TICK_DELAY = 106; // int
+    public static final int DATA_COMMAND_BLOCK_EXECUTE_ON_FIRST_TICK = 107; // byte
     public static final int DATA_AMBIENT_SOUND_INTERVAL = 108;
     public static final int DATA_AMBIENT_SOUND_INTERVAL_RANGE = 109;
     public static final int DATA_AMBIENT_SOUND_EVENT_NAME = 110;
@@ -206,6 +212,10 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_PLAYER_LAST_DEATH_DIMENSION = 128;
     public static final int DATA_PLAYER_HAS_DIED = 129;
     public static final int DATA_COLLISION_BOX = 130; //vector3f
+    /**
+     * @since v685
+     */
+    public static final int DATA_VISIBLE_MOB_EFFECTS = 131; //long
 
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
@@ -467,6 +477,8 @@ public abstract class Entity extends Location implements Metadatable {
 
     protected volatile boolean saveWithChunk = true;
 
+    protected boolean passThroughBarrier = false;
+
     private Map<String, Integer> intProperties = new LinkedHashMap<>();
     private Map<String, Float> floatProperties = new LinkedHashMap<>();
 
@@ -476,6 +488,14 @@ public abstract class Entity extends Location implements Metadatable {
 
     public float getEyeHeight() {
         return this.getHeight() / 2 + 0.1f;
+    }
+
+    public float getEyeY() {
+        return (float) y + getEyeHeight();
+    }
+
+    public Vector3 getEyePosition() {
+        return new Vector3(getX(), getEyeY(), getZ());
     }
 
     public float getWidth() {
@@ -537,7 +557,7 @@ public abstract class Entity extends Location implements Metadatable {
 
                 effect.setAmplifier(e.getByte("Amplifier")).setDuration(e.getInt("Duration")).setVisible(e.getBoolean("ShowParticles"));
 
-                this.addEffect(effect);
+                this.addEffect(effect, null); // No event
             }
         }
 
@@ -791,7 +811,7 @@ public abstract class Entity extends Location implements Metadatable {
     public void setCrawling(boolean value) {
         if (this.crawling != value) {
             this.crawling = value;
-            this.setDataFlag(DATA_FLAGS, DATA_FLAG_CRAWLING, value);
+            this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_CRAWLING, value);
             this.recalculateBoundingBox(true);
         }
     }
@@ -878,16 +898,40 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void removeAllEffects() {
+        this.removeAllEffects(EntityPotionEffectEvent.Cause.UNKNOWN);
+    }
+
+    public void removeAllEffects(EntityPotionEffectEvent.Cause cause) {
         for (Effect effect : this.effects.values()) {
-            this.removeEffect(effect.getId());
+            this.removeEffect(effect.getId(), cause);
         }
     }
 
     public void removeEffect(int effectId) {
+        this.removeEffect(effectId, EntityPotionEffectEvent.Cause.UNKNOWN);
+    }
+
+    /**
+     * Remove an effect from the entity
+     * @param effectId the effect id
+     * @param cause the cause of the removal
+     */
+    public void removeEffect(int effectId, EntityPotionEffectEvent.Cause cause) {
         if (this.effects.containsKey(effectId)) {
             Effect effect = this.effects.get(effectId);
+
+            if (cause != null) {
+                EntityPotionEffectEvent event = new EntityPotionEffectEvent(this, effect, null, EntityPotionEffectEvent.Action.REMOVED, cause);
+                event.call();
+                if (event.isCancelled()) {
+                    return;
+                }
+            }
+
             this.effects.remove(effectId);
+
             effect.remove(this);
+
             this.recalculateEffectColor();
         }
     }
@@ -900,9 +944,44 @@ public abstract class Entity extends Location implements Metadatable {
         return this.effects.containsKey(effectId);
     }
 
+    /**
+     * Check if the entity can be affected by the effect
+     *
+     * @param effectId the effect id
+     * @return true if the entity can be affected by the effect
+     */
+    public boolean canBeAffected(int effectId) {
+        return false;
+    }
+
     public void addEffect(Effect effect) {
+        this.addEffect(effect, EntityPotionEffectEvent.Cause.UNKNOWN);
+    }
+
+    public void addEffect(Effect effect, EntityPotionEffectEvent.Cause cause) {
         if (effect == null) {
-            return; //here add null means add nothing
+            return;
+        }
+
+        if (cause != null) {
+            Effect oldEffect = this.effects.get(effect.getId());
+
+            EntityPotionEffectEvent event = new EntityPotionEffectEvent(
+                    this,
+                    oldEffect,
+                    effect,
+                    oldEffect == null ? EntityPotionEffectEvent.Action.ADDED : EntityPotionEffectEvent.Action.CHANGED,
+                    cause);
+
+            if (!canBeAffected(effect.getId())) {
+                event.setCancelled();
+            }
+            event.call();
+            if (event.isCancelled()) {
+                return;
+            }
+        } else if (!canBeAffected(effect.getId())) {
+            return;
         }
 
         effect.add(this);
@@ -945,6 +1024,8 @@ public abstract class Entity extends Location implements Metadatable {
         int[] color = new int[3];
         int count = 0;
         boolean ambient = true;
+        long effectsData = 0;
+        int packedEffectsCount = 0;
         for (Effect effect : this.effects.values()) {
             if (effect.isVisible()) {
                 int[] c = effect.getColor();
@@ -954,6 +1035,10 @@ public abstract class Entity extends Location implements Metadatable {
                 count += effect.getAmplifier() + 1;
                 if (!effect.isAmbient()) {
                     ambient = false;
+                }
+                if (packedEffectsCount < 8) {
+                    effectsData = effectsData << 7 | ((effect.getId() & 0x3f) << 1) | (effect.isAmbient() ? 1 : 0);
+                    packedEffectsCount++;
                 }
             }
         }
@@ -969,6 +1054,7 @@ public abstract class Entity extends Location implements Metadatable {
             this.setDataProperty(new IntEntityData(Entity.DATA_POTION_COLOR, 0));
             this.setDataProperty(new ByteEntityData(Entity.DATA_POTION_AMBIENT, 0));
         }
+        this.setDataProperty(new LongEntityData(Entity.DATA_VISIBLE_MOB_EFFECTS, effectsData));
     }
 
     public static Entity createEntity(String name, Position pos, Object... args) {
@@ -1450,12 +1536,12 @@ public abstract class Entity extends Location implements Metadatable {
                     this.getLevel().addParticleEffect(this, ParticleEffect.TOTEM);
 
                     this.extinguish();
-                    this.removeAllEffects();
+                    this.removeAllEffects(EntityPotionEffectEvent.Cause.TOTEM);
                     this.setHealth(1);
 
-                    this.addEffect(Effect.getEffect(Effect.REGENERATION).setDuration(800).setAmplifier(1));
-                    this.addEffect(Effect.getEffect(Effect.FIRE_RESISTANCE).setDuration(800));
-                    this.addEffect(Effect.getEffect(Effect.ABSORPTION).setDuration(100).setAmplifier(1));
+                    this.addEffect(Effect.getEffect(Effect.REGENERATION).setDuration(800).setAmplifier(1), EntityPotionEffectEvent.Cause.TOTEM);
+                    this.addEffect(Effect.getEffect(Effect.FIRE_RESISTANCE).setDuration(800), EntityPotionEffectEvent.Cause.TOTEM);
+                    this.addEffect(Effect.getEffect(Effect.ABSORPTION).setDuration(100).setAmplifier(1), EntityPotionEffectEvent.Cause.TOTEM);
 
                     EntityEventPacket pk = new EntityEventPacket();
                     pk.eid = this.getId();
@@ -1663,7 +1749,7 @@ public abstract class Entity extends Location implements Metadatable {
         this.justCreated = false;
 
         if (!this.isAlive()) {
-            //this.removeAllEffects(); // Why to remove them if the entity is dead anyways?
+            this.removeAllEffects(EntityPotionEffectEvent.Cause.DEATH);
             this.despawnFromAll();
             if (!this.isPlayer) {
                 this.close();
@@ -1684,7 +1770,7 @@ public abstract class Entity extends Location implements Metadatable {
                 effect.setDuration(effect.getDuration() - tickDiff);
 
                 if (effect.getDuration() <= 0) {
-                    this.removeEffect(effect.getId());
+                    this.removeEffect(effect.getId(), EntityPotionEffectEvent.Cause.EXPIRATION);
                 }
             }
         }
@@ -1983,7 +2069,9 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final void scheduleUpdate() {
-        this.level.updateEntities.put(this.id, this);
+        if (!this.closed && !this.level.isBeingConverted) {
+            this.level.updateEntities.put(this.id, this);
+        }
     }
 
     public boolean isOnFire() {
@@ -3048,6 +3136,11 @@ public abstract class Entity extends Location implements Metadatable {
         return blockId == Block.LADDER || blockId == Block.VINES || blockId == Block.COBWEB || blockId == Block.SCAFFOLDING;
     }
 
+    /**
+     * Get mounted entity y offset. Used to determine the height for heart particle spawning.
+     *
+     * @return entity height * 0.75
+     */
     public float getMountedYOffset() {
         return getHeight() * 0.75F;
     }
@@ -3214,4 +3307,16 @@ public abstract class Entity extends Location implements Metadatable {
         playAnimationOnEntities(animation, entities, viewers);
     }
 
+    /**
+     * Whether the entity can pass through barrier blocks.
+     *
+     * @return passes through barriers
+     **/
+    public boolean canPassThroughBarrier() {
+        return this.passThroughBarrier;
+    }
+
+    public void setPassThroughBarrier(boolean passThroughBarrier) {
+        this.passThroughBarrier = passThroughBarrier;
+    }
 }

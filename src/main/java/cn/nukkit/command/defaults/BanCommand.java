@@ -1,60 +1,44 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.event.player.PlayerKickEvent;
-import cn.nukkit.lang.TranslationContainer;
+
+import java.util.Map;
 
 /**
- * @author MagicDroidX
- * Nukkit Project
+ * @author MagicDroidX (Nukkit Project)
  */
 public class BanCommand extends VanillaCommand {
 
     public BanCommand(String name) {
-        super(name, "%nukkit.command.ban.player.description", "%commands.ban.usage");
+        super(name, "commands.ban.description", "%commands.ban.usage");
         this.setPermission("nukkit.command.ban.player");
         this.commandParameters.clear();
         this.commandParameters.put("default",
                 new CommandParameter[]{
-                        new CommandParameter("player", CommandParamType.TARGET, false),
-                        new CommandParameter("reason", CommandParamType.STRING, true)
+                        CommandParameter.newType("player", CommandParamType.STRING),
+                        CommandParameter.newType("reason", true, CommandParamType.STRING)
                 });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
-        }
-
-        if (args.length == 0) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return false;
-        }
-
-        String name = args[0].replace("@s", sender.getName());
-        StringBuilder reason = new StringBuilder();
-        for (int i = 1; i < args.length; i++) {
-            reason.append(args[i]).append(' ');
-        }
-
-        if (reason.length() > 0) {
-            reason = new StringBuilder(reason.substring(0, reason.length() - 1));
-        }
-
-        sender.getServer().getNameBans().addBan(name, reason.toString(), null, sender.getName());
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        String name = list.getResult(0);
+        String reason = list.getResult(1);
+        sender.getServer().getNameBans().addBan(name, reason, null, sender.getName());
 
         Player player = sender.getServer().getPlayerExact(name);
         if (player != null) {
-            player.kick(PlayerKickEvent.Reason.NAME_BANNED, (reason.length() > 0) ? "You are banned! Reason: " + reason : "You are banned!", true, "source=" + sender.getName() + ", reason=" + reason);
+            player.kick(PlayerKickEvent.Reason.NAME_BANNED, (reason != null && !reason.isEmpty()) ? "Banned by admin. Reason: " + reason : "Banned by admin");
         }
-
-        broadcastCommandMessage(sender, new TranslationContainer("%commands.ban.success", player != null ? player.getName() : name));
-
-        return true;
+        log.addSuccess("commands.ban.success", player != null ? player.getName() : name).output(true);
+        return 1;
     }
 }

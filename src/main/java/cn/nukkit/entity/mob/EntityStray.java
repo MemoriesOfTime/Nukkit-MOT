@@ -8,15 +8,18 @@ import cn.nukkit.entity.EntitySmite;
 import cn.nukkit.entity.data.LongEntityData;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
+import cn.nukkit.event.entity.EntityDamageByChildEntityEvent;
 import cn.nukkit.event.entity.EntityShootBowEvent;
 import cn.nukkit.event.entity.ProjectileLaunchEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBow;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.Vector2;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
+import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
@@ -96,7 +99,8 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
                     this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
             if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) == Block.AIR) {
                 EntityArrow arrow = (EntityArrow) Entity.createEntity("Arrow", pos, this);
-                arrow.isFromStray = true;
+                arrow.getMobEffects().put(Effect.SLOWNESS, Effect.getEffect(Effect.SLOWNESS).setDuration(600));
+                arrow.setFullEffect(true);
                 setProjectileMotion(arrow, pitch, yawR, pitchR, f);
 
                 EntityShootBowEvent ev = new EntityShootBowEvent(this, Item.get(Item.ARROW, 0, 1), arrow, f);
@@ -104,12 +108,16 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
 
                 EntityProjectile projectile = ev.getProjectile();
                 if (ev.isCancelled()) {
-                    projectile.close();
+                    if (this.stayTime > 0 || this.distance(this.target) <= ((this.getWidth()) / 2 + 0.05) * nearbyDistanceMultiplier()) {
+                        projectile.close();
+                    }
                 } else {
                     ProjectileLaunchEvent launch = new ProjectileLaunchEvent(projectile);
                     this.server.getPluginManager().callEvent(launch);
                     if (launch.isCancelled()) {
-                        projectile.close();
+                        if (this.stayTime > 0 || this.distance(this.target) <= ((this.getWidth()) / 2 + 0.05) * nearbyDistanceMultiplier()) {
+                            projectile.close();
+                        }
                     } else {
                         projectile.spawnToAll();
                         ((EntityArrow) projectile).setPickupMode(EntityArrow.PICKUP_NONE);
@@ -161,5 +169,23 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
             }
         }
         return hasTarget;
+    }
+
+    @Override
+    public void kill() {
+        if (!this.isAlive()) {
+            return;
+        }
+
+        super.kill();
+
+        if (this.lastDamageCause instanceof EntityDamageByChildEntityEvent) {
+            Entity damager;
+            if (((EntityDamageByChildEntityEvent) this.lastDamageCause).getChild() instanceof EntityArrow && (damager = ((EntityDamageByChildEntityEvent) this.lastDamageCause).getDamager()) instanceof Player) {
+                if (new Vector2(this.x, this.z).distance(new Vector2(damager.x, damager.z)) >= 50) {
+                    ((Player) damager).awardAchievement("snipeSkeleton");
+                }
+            }
+        }
     }
 }

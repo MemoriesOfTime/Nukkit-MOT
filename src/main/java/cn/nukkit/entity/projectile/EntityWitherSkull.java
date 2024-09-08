@@ -1,6 +1,7 @@
 package cn.nukkit.entity.projectile;
 
 import cn.nukkit.entity.Entity;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.SmokeParticle;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -37,7 +38,7 @@ public class EntityWitherSkull extends EntityProjectile {
 
     @Override
     public float getGravity() {
-        return 0.005f;
+        return 0.001f;
     }
 
     @Override
@@ -81,6 +82,6 @@ public class EntityWitherSkull extends EntityProjectile {
     @Override
     public void onCollideWithEntity(Entity entity) {
         super.onCollideWithEntity(entity);
-        entity.addEffect(Effect.getEffect(Effect.WITHER).setDuration(200));
+        entity.addEffect(Effect.getEffect(Effect.WITHER).setDuration(200), EntityPotionEffectEvent.Cause.ATTACK);
     }
 }

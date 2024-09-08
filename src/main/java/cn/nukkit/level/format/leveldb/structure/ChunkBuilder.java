@@ -146,6 +146,7 @@ public class ChunkBuilder {
         this.chunkDataLoaders.forEach(loader -> loader.initChunk(levelDBChunk, this.provider));
 
         if (this.dirty) {
+            levelDBChunk.setAllSubChunksDirty();
             levelDBChunk.setChanged();
         }
 

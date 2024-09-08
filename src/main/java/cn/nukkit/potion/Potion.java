@@ -9,9 +9,9 @@ import cn.nukkit.entity.mob.EntitySnowGolem;
 import cn.nukkit.entity.passive.EntityStrider;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.event.entity.EntityRegainHealthEvent;
 import cn.nukkit.event.potion.PotionApplyEvent;
-import cn.nukkit.utils.ServerException;
 
 /**
  * @author MagicDroidX
@@ -64,6 +64,10 @@ public class Potion implements Cloneable {
     public static final int SLOW_FALLING_LONG = 41;
     public static final int SLOWNESS_LONG_II = 42;
     public static final int SLOWNESS_IV = 43;
+    public static final int WIND_CHARGED = 44;
+    public static final int WEAVING = 45;
+    public static final int OOZING = 46;
+    public static final int INFESTED = 47;
 
     protected static Potion[] potions;
 
@@ -114,13 +118,17 @@ public class Potion implements Cloneable {
         potions[Potion.SLOW_FALLING_LONG] = new Potion(Potion.SLOW_FALLING_LONG);
         potions[Potion.SLOWNESS_LONG_II] = new Potion(Potion.SLOWNESS_LONG_II, 2);
         potions[Potion.SLOWNESS_IV] = new Potion(Potion.SLOWNESS, 4);
+        potions[Potion.WIND_CHARGED] = new Potion(Potion.WIND_CHARGED);
+        potions[Potion.WEAVING] = new Potion(Potion.WEAVING);
+        potions[Potion.OOZING] = new Potion(Potion.OOZING);
+        potions[Potion.INFESTED] = new Potion(Potion.INFESTED);
     }
 
     public static Potion getPotion(int id) {
         if (id >= 0 && id < potions.length && potions[id] != null) {
             return potions[id].clone();
         } else {
-            throw new ServerException("Effect id: " + id + " not found");
+            return null;
         }
     }
 
@@ -129,7 +137,7 @@ public class Potion implements Cloneable {
             byte id = Potion.class.getField(name.toUpperCase()).getByte(null);
             return getPotion(id);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            return null;
         }
     }
 
@@ -212,6 +220,9 @@ public class Potion implements Cloneable {
         switch (this.id) {
             case INSTANT_HEALTH:
             case INSTANT_HEALTH_II:
+                if (!entity.canBeAffected(this.id)) {
+                    break;
+                }
                 if (entity instanceof EntitySmite) {
                     entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * (6 << (applyEffect.getAmplifier() + 1)))));
                 } else {
@@ -219,6 +230,9 @@ public class Potion implements Cloneable {
                 }
                 break;
             case HARMING:
+                if (!entity.canBeAffected(this.id)) {
+                    break;
+                }
                 if (entity instanceof EntitySmite) {
                     entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
                 } else {
@@ -226,6 +240,9 @@ public class Potion implements Cloneable {
                 }
                 break;
             case HARMING_II:
+                if (!entity.canBeAffected(this.id)) {
+                    break;
+                }
                 if (entity instanceof EntitySmite) {
                     entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
                 } else {
@@ -234,7 +251,7 @@ public class Potion implements Cloneable {
                 break;
             default:
                 applyEffect.setDuration((int) ((splash ? health : 1) * (double) applyEffect.getDuration() + 0.5));
-                entity.addEffect(applyEffect);
+                entity.addEffect(applyEffect, this.splash ? EntityPotionEffectEvent.Cause.POTION_SPLASH : EntityPotionEffectEvent.Cause.POTION_DRINK);
         }
     }
 
@@ -315,6 +332,18 @@ public class Potion implements Cloneable {
                 break;
             case WITHER_II:
                 effect = Effect.getEffect(Effect.WITHER);
+                break;
+            case WIND_CHARGED:
+                effect = Effect.getEffect(Effect.WIND_CHARGED);
+                break;
+            case WEAVING:
+                effect = Effect.getEffect(Effect.WEAVING);
+                break;
+            case OOZING:
+                effect = Effect.getEffect(Effect.OOZING);
+                break;
+            case INFESTED:
+                effect = Effect.getEffect(Effect.INFESTED);
                 break;
             default:
                 return null;
@@ -448,6 +477,10 @@ public class Potion implements Cloneable {
             case WEAKNESS_LONG -> 240;
             case WITHER_II -> 30;
             case SLOWNESS_IV -> 20;
+            case WIND_CHARGED -> 180;
+            case WEAVING -> 180;
+            case OOZING -> 180;
+            case INFESTED -> 180;
             default -> 0;
         };
     }

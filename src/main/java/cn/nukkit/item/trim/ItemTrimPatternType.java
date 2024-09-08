@@ -24,7 +24,9 @@ public enum ItemTrimPatternType {
     RAISER_ARMOR_TRIM_ARMOR_TRIM("raiser"),
     SHAPER_ARMOR_TRIM("shaper"),
     SILENCE_ARMOR_TRIM("silence"),
-    WAYFINDER_ARMOR_TRIM("wayfinder");
+    WAYFINDER_ARMOR_TRIM("wayfinder"),
+    FLOW_ARMOR_TRIM("flow"),
+    BOLT_ARMOR_TRIM("bolt");
 
     @Nullable
     public static ItemTrimMaterialType fromTrimPattern(@NotNull String trimPattern) {

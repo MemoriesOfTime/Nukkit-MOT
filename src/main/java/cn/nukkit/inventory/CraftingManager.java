@@ -16,6 +16,7 @@ import io.netty.util.collection.CharObjectHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import javax.annotation.Nullable;
 import java.util.*;
@@ -63,6 +64,8 @@ public class CraftingManager {
     public static DataPacket packet649;
     public static DataPacket packet662;
     public static DataPacket packet671;
+    public static DataPacket packet685;
+    public static DataPacket packet712;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -468,7 +471,7 @@ public class CraftingManager {
     }
 
     private List<ShapedRecipe> loadShapedRecipes(List<Map<String, Object>> recipes) {
-        ArrayList<ShapedRecipe> recipesList = new ArrayList<>();
+        List<ShapedRecipe> recipesList = new ObjectArrayList<>();
         for (Map<String, Object> recipe : recipes) {
             top:
             {
@@ -673,8 +676,11 @@ public class CraftingManager {
             Map<String, Map<String, Object>> input = (Map) recipe.get("input");
             for (Map.Entry<String, Map<String, Object>> ingredientEntry : input.entrySet()) {
                 char ingredientChar = ingredientEntry.getKey().charAt(0);
-                ingredientEntry.getValue().put("damage", 0);
-                Item ingredient = Item.fromJson(ingredientEntry.getValue(), true);
+                Map<String, Object> value = ingredientEntry.getValue();
+                if ((int) value.getOrDefault("damage", -1) < 0) {
+                    value.put("damage", 0);
+                }
+                Item ingredient = Item.fromJson(value, true);
                 if (ingredient.getId() == Item.PLANKS) {
                     ingredient.setDamage(planksMeta);
                 }
@@ -727,6 +733,8 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet712 = packetFor(ProtocolInfo.v1_21_20).compress(Deflater.BEST_COMPRESSION);
+        packet685 = packetFor(ProtocolInfo.v1_21_0).compress(Deflater.BEST_COMPRESSION);
         packet671 = packetFor(ProtocolInfo.v1_20_80).compress(Deflater.BEST_COMPRESSION);
         packet662 = packetFor(ProtocolInfo.v1_20_70).compress(Deflater.BEST_COMPRESSION);
         packet649 = packetFor(ProtocolInfo.v1_20_60).compress(Deflater.BEST_COMPRESSION);

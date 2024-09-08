@@ -5,6 +5,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntitySmite;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -84,7 +85,7 @@ public class EntityHusk extends EntityWalkingMob implements EntitySmite {
                         (float) (damage.getOrDefault(EntityDamageEvent.DamageModifier.ARMOR, 0f) - Math.floor(damage.getOrDefault(EntityDamageEvent.DamageModifier.BASE, 1f) * points * 0.04)));
             }
             if (player.attack(new EntityDamageByEntityEvent(this, player, EntityDamageEvent.DamageCause.ENTITY_ATTACK, damage))) {
-                player.addEffect(Effect.getEffect(Effect.HUNGER).setDuration(140));
+                player.addEffect(Effect.getEffect(Effect.HUNGER).setDuration(140), EntityPotionEffectEvent.Cause.ATTACK);
             }
             this.playAttack();
         }

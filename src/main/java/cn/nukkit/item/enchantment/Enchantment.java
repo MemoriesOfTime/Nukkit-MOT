@@ -17,30 +17,30 @@ import cn.nukkit.item.enchantment.damage.EnchantmentDamageSmite;
 import cn.nukkit.item.enchantment.loot.EnchantmentLootDigging;
 import cn.nukkit.item.enchantment.loot.EnchantmentLootFishing;
 import cn.nukkit.item.enchantment.loot.EnchantmentLootWeapon;
+import cn.nukkit.item.enchantment.mace.EnchantmentMaceBreach;
+import cn.nukkit.item.enchantment.mace.EnchantmentMaceDensity;
+import cn.nukkit.item.enchantment.mace.EnchantmentMaceWindBurst;
 import cn.nukkit.item.enchantment.protection.*;
 import cn.nukkit.item.enchantment.trident.EnchantmentTridentChanneling;
 import cn.nukkit.item.enchantment.trident.EnchantmentTridentImpaling;
 import cn.nukkit.item.enchantment.trident.EnchantmentTridentLoyalty;
 import cn.nukkit.item.enchantment.trident.EnchantmentTridentRiptide;
+import cn.nukkit.utils.DynamicClassLoader;
 import cn.nukkit.utils.Identifier;
 import cn.nukkit.utils.OK;
 import cn.nukkit.utils.Utils;
-import com.nimbusds.jose.shaded.ow2asm.ClassWriter;
-import com.nimbusds.jose.shaded.ow2asm.Label;
-import com.nimbusds.jose.shaded.ow2asm.MethodVisitor;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import org.jetbrains.annotations.NotNull;
+import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
 
 import javax.annotation.Nullable;
-import java.lang.ref.WeakReference;
-import java.lang.reflect.InaccessibleObjectException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import static cn.nukkit.utils.Utils.dynamic;
-import static com.nimbusds.jose.shaded.ow2asm.Opcodes.*;
+import static org.objectweb.asm.Opcodes.*;
 
 /**
  * @author MagicDroidX
@@ -170,6 +170,18 @@ public abstract class Enchantment implements Cloneable {
     public static final int ID_SWIFT_SNEAK = 37;
     public static final String NAME_SWIFT_SNEAK = "swift_sneak";
 
+    public static final int ID_WIND_BURST = 38;
+
+    public static final String NAME_WIND_BURST = "wind_burst";
+
+    public static final int ID_DENSITY = 39;
+
+    public static final String NAME_DENSITY = "density";
+
+    public static final int ID_BREACH = 40;
+
+    public static final String NAME_BREACH = "breach";
+
     public static void init() {
         enchantments = new Enchantment[256];
 
@@ -211,6 +223,9 @@ public abstract class Enchantment implements Cloneable {
         enchantments[ID_CROSSBOW_QUICK_CHARGE] = new EnchantmentCrossbowQuickCharge();
         enchantments[ID_SOUL_SPEED] = new EnchantmentSoulSpeed();
         enchantments[ID_SWIFT_SNEAK] = new EnchantmentSwiftSneak();
+        enchantments[ID_WIND_BURST] = new EnchantmentMaceWindBurst();
+        enchantments[ID_DENSITY] = new EnchantmentMaceDensity();
+        enchantments[ID_BREACH] = new EnchantmentMaceBreach();
 
         //custom
         customEnchantments.put(new Identifier("minecraft", NAME_PROTECTION_ALL), enchantments[0]);
@@ -251,6 +266,9 @@ public abstract class Enchantment implements Cloneable {
         customEnchantments.put(new Identifier("minecraft", NAME_CROSSBOW_QUICK_CHARGE), enchantments[35]);
         customEnchantments.put(new Identifier("minecraft", NAME_SOUL_SPEED), enchantments[36]);
         customEnchantments.put(new Identifier("minecraft", NAME_SWIFT_SNEAK), enchantments[37]);
+        customEnchantments.put(new Identifier("minecraft", NAME_WIND_BURST), enchantments[38]);
+        customEnchantments.put(new Identifier("minecraft", NAME_DENSITY), enchantments[39]);
+        customEnchantments.put(new Identifier("minecraft", NAME_BREACH), enchantments[40]);
     }
 
     public static OK<?> register(Enchantment enchantment, boolean registerItem) {
@@ -304,37 +322,13 @@ public abstract class Enchantment implements Cloneable {
             classWriter.visitEnd();
             BOOK_NUMBER++;
             try {
-                Class<? extends CustomItem> clazz = (Class<? extends CustomItem>) loadClass(Thread.currentThread().getContextClassLoader(), "cn.nukkit.item.customitem." + className, classWriter.toByteArray());
+                Class<? extends CustomItem> clazz = (Class<? extends CustomItem>) new DynamicClassLoader().defineClass("cn.nukkit.item.customitem." + className, classWriter.toByteArray());
                 Item.registerCustomItem(clazz).assertOK();
-            } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException |
-                     IllegalAccessException | AssertionError e) {
+            } catch (AssertionError e) {
                 return new OK<>(false, e);
             }
         }
         return OK.TRUE;
-    }
-
-    private static WeakReference<Method> defineClassMethodRef = new WeakReference<>(null);
-
-    @SuppressWarnings("DuplicatedCode")
-    private static Class<?> loadClass(ClassLoader loader, String className, byte[] b) throws ClassNotFoundException, NoSuchMethodException, InvocationTargetException, IllegalAccessException, InaccessibleObjectException {
-        Class<?> clazz;
-        java.lang.reflect.Method method;
-        if (defineClassMethodRef.get() == null) {
-            var cls = Class.forName("java.lang.ClassLoader");
-            method = cls.getDeclaredMethod("defineClass", String.class, byte[].class, int.class, int.class);
-            defineClassMethodRef = new WeakReference<>(method);
-        } else {
-            method = defineClassMethodRef.get();
-        }
-        Objects.requireNonNull(method).setAccessible(true);
-        try {
-            var args = new Object[]{className, b, 0, b.length};
-            clazz = (Class<?>) method.invoke(loader, args);
-        } finally {
-            method.setAccessible(false);
-        }
-        return clazz;
     }
 
     public static String getLevelString(int level) {
@@ -482,7 +476,7 @@ public abstract class Enchantment implements Cloneable {
         return 0;
     }
 
-    public double getDamageBonus(Entity entity) {
+    public double getDamageBonus(Entity entity, Entity attacker) {
         return 0;
     }
 
@@ -508,6 +502,10 @@ public abstract class Enchantment implements Cloneable {
 
     public String getName() {
         return "%enchantment." + this.name;
+    }
+
+    public String getOriginalName() {
+        return this.name;
     }
 
     public boolean canEnchant(Item item) {

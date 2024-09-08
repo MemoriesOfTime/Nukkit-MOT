@@ -1,84 +1,69 @@
 package cn.nukkit.command.defaults;
 
-import cn.nukkit.Player;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Level;
 
+import java.util.Map;
+
 /**
- * @author Angelic47
- * Nukkit Project
+ * @author Angelic47 (Nukkit Project)
  */
 public class WeatherCommand extends VanillaCommand {
 
     public WeatherCommand(String name) {
-        super(name, "%nukkit.command.weather.description", "%commands.weather.usage");
+        super(name, "commands.weather.description", "commands.weather.usage");
         this.setPermission("nukkit.command.weather");
         this.commandParameters.clear();
         this.commandParameters.put("default", new CommandParameter[]{
-            CommandParameter.newEnum("type", new CommandEnum("WeatherType", "clear", "rain", "thunder")),
-            CommandParameter.newType("duration", true, CommandParamType.INT)
+                CommandParameter.newEnum("type", new CommandEnum("WeatherType", "clear", "rain", "thunder")),
+                CommandParameter.newType("duration", true, CommandParamType.INT)
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
-        }
-        if (args.length == 0 || args.length > 2) {
-            sender.sendMessage(new TranslationContainer("commands.weather.usage", this.usageMessage));
-            return false;
-        }
-
-        String weather = args[0];
-        Level level;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        String weather = list.getResult(0);
+        Level level = sender.getPosition().level;
         int seconds;
-        if (args.length > 1) {
-            try {
-                seconds = Integer.parseInt(args[1]);
-            } catch (Exception e) {
-                sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-                return true;
-            }
+        if (list.hasResult(1)) {
+            seconds = list.getResult(1);
         } else {
-            seconds = 12000;
+            seconds = 600 * 20;
         }
-
-        if (sender instanceof Player) {
-            level = ((Player) sender).getLevel();
-        } else {
-            level = sender.getServer().getDefaultLevel();
-        }
-
         switch (weather) {
-            case "clear":
+            case "clear" -> {
                 level.setRaining(false);
                 level.setThundering(false);
                 level.setRainTime(seconds * 20);
                 level.setThunderTime(seconds * 20);
-                broadcastCommandMessage(sender,
-                        new TranslationContainer("commands.weather.clear"));
-                return true;
-            case "rain":
+                log.addSuccess("commands.weather.clear").output(true);
+                return 1;
+            }
+            case "rain" -> {
                 level.setRaining(true);
                 level.setRainTime(seconds * 20);
-                broadcastCommandMessage(sender,
-                        new TranslationContainer("commands.weather.rain"));
-                return true;
-            case "thunder":
+                log.addSuccess("commands.weather.rain").output(true);
+                return 1;
+            }
+            case "thunder" -> {
                 level.setThundering(true);
                 level.setRainTime(seconds * 20);
                 level.setThunderTime(seconds * 20);
-                broadcastCommandMessage(sender,
-                        new TranslationContainer("commands.weather.thunder"));
-                return true;
-            default:
-                sender.sendMessage(new TranslationContainer("commands.weather.usage", this.usageMessage));
-                return false;
+                log.addSuccess("commands.weather.thunder").output(true);
+                return 1;
+            }
+            default -> {
+                sender.sendMessage(new TranslationContainer("commands.generic.usage", "\n" + this.getCommandFormatTips()));
+                return 0;
+            }
         }
     }
 }

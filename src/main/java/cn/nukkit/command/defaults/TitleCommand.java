@@ -1,124 +1,120 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
+import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
-import cn.nukkit.lang.TranslationContainer;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.PlayersNode;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.utils.TextFormat;
+
+import java.util.List;
+import java.util.Map;
 
 /**
  * @author Tee7even
  */
 public class TitleCommand extends VanillaCommand {
-
     public TitleCommand(String name) {
-        super(name, "%nukkit.command.title.description", "%nukkit.command.title.usage");
+        super(name, "commands.title.description");
         this.setPermission("nukkit.command.title");
 
         this.commandParameters.clear();
         this.commandParameters.put("clear", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("clear", new String[]{"clear"})
+                CommandParameter.newType("player", CommandParamType.TARGET, new PlayersNode()),
+                CommandParameter.newEnum("clear", new CommandEnum("TitleClear", "clear"))
         });
         this.commandParameters.put("reset", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("reset", new String[]{"reset"})
+                CommandParameter.newType("player", CommandParamType.TARGET, new PlayersNode()),
+                CommandParameter.newEnum("reset", new CommandEnum("TitleReset", "reset"))
         });
-        this.commandParameters.put("title", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("title", new String[]{"title"}),
-                new CommandParameter("titleText", CommandParamType.STRING, false)
-        });
-        this.commandParameters.put("subtitle", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("subtitle", new String[]{"subtitle"}),
-                new CommandParameter("titleText", CommandParamType.STRING, false)
-        });
-        this.commandParameters.put("actionbar", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("actionbar", new String[]{"actionbar"}),
-                new CommandParameter("titleText", CommandParamType.STRING, false)
+        this.commandParameters.put("set", new CommandParameter[]{
+                CommandParameter.newType("player", CommandParamType.TARGET, new PlayersNode()),
+                CommandParameter.newEnum("titleLocation", new CommandEnum("TitleSet", "title", "subtitle", "actionbar")),
+                CommandParameter.newType("titleText", CommandParamType.MESSAGE)
         });
         this.commandParameters.put("times", new CommandParameter[]{
-                new CommandParameter("player", CommandParamType.TARGET, false),
-                new CommandParameter("times", new String[]{"times"}),
-                new CommandParameter("fadeIn", CommandParamType.INT, false),
-                new CommandParameter("stay", CommandParamType.INT, false),
-                new CommandParameter("fadeOut", CommandParamType.INT, false)
+                CommandParameter.newType("player", CommandParamType.TARGET, new PlayersNode()),
+                CommandParameter.newEnum("times", new CommandEnum("TitleTimes", "times")),
+                CommandParameter.newType("fadeIn", CommandParamType.INT),
+                CommandParameter.newType("stay", CommandParamType.INT),
+                CommandParameter.newType("fadeOut", CommandParamType.INT)
         });
+        this.enableParamTree();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        List<Player> players = list.getResult(0);
+        if (players.isEmpty()) {
+            log.addNoTargetMatch().output();
+            return 0;
         }
-        if (args.length < 2) {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return false;
-        }
-
-        Player player = Server.getInstance().getPlayer(args[0]);
-        if (player == null) {
-            sender.sendMessage(new TranslationContainer(TextFormat.RED + "%commands.generic.player.notFound"));
-            return true;
-        }
-
-        if (args.length == 2) {
-            switch (args[1].toLowerCase()) {
-                case "clear":
+        switch (result.getKey()) {
+            case "clear" -> {
+                for (Player player : players) {
                     player.clearTitle();
-                    sender.sendMessage(new TranslationContainer("nukkit.command.title.clear", player.getName()));
-                    break;
-                case "reset":
-                    player.resetTitleSettings();
-                    sender.sendMessage(new TranslationContainer("nukkit.command.title.reset", player.getName()));
-                    break;
-                default:
-                    sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-                    return false;
-            }
-        } else if (args.length == 3) {
-            switch (args[1].toLowerCase()) {
-                case "title":
-                    player.sendTitle(args[2]);
-                    sender.sendMessage(new TranslationContainer("nukkit.command.title.title",
-                            TextFormat.clean(args[2]), player.getName()));
-                    break;
-                case "subtitle":
-                    player.setSubtitle(args[2]);
-                    sender.sendMessage(new TranslationContainer("nukkit.command.title.subtitle", TextFormat.clean(args[2]), player.getName()));
-                    break;
-                case "actionbar":
-                    player.sendActionBar(args[2]);
-                    sender.sendMessage(new TranslationContainer("nukkit.command.title.actionbar", TextFormat.clean(args[2]), player.getName()));
-                    break;
-                default:
-                    sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-                    return false;
-            }
-        } else if (args.length == 5) {
-            if (args[1].toLowerCase().equals("times")) {
-                try {
-                    /*player.setTitleAnimationTimes(Integer.valueOf(args[2]), //fadeIn
-                            Integer.valueOf(args[3]), //stay
-                            Integer.valueOf(args[4])); //fadeOut*/
-                    sender.sendMessage(new TranslationContainer("nukkit.command.title.times.success",
-                            args[2], args[3], args[4], player.getName()));
-                } catch (NumberFormatException exception) {
-                    sender.sendMessage(new TranslationContainer(TextFormat.RED + "%nukkit.command.title.times.fail"));
+                    log.addMessage(TextFormat.WHITE + "%nukkit.command.title.clear", player.getName());
                 }
-            } else {
-                sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-                return false;
+                log.output();
+                return 1;
             }
-        } else {
-            sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
-            return false;
+            case "reset" -> {
+                for (Player player : players) {
+                    player.resetTitleSettings();
+                    log.addMessage(TextFormat.WHITE + "%nukkit.command.title.reset", player.getName());
+                }
+                log.output();
+                return 1;
+            }
+            case "set" -> {
+                String titleLocation = list.getResult(1);
+                String titleText = list.getResult(2);
+                switch (titleLocation) {
+                    case "title" -> {
+                        for (Player player : players) {
+                            player.sendTitle(titleText);
+                            log.addMessage(TextFormat.WHITE + "%nukkit.command.title.title", TextFormat.clean(titleText), player.getName());
+                        }
+                        log.output();
+                    }
+                    case "subtitle" -> {
+                        for (Player player : players) {
+                            player.setSubtitle(titleText);
+                            log.addMessage(TextFormat.WHITE + "%nukkit.command.title.subtitle", TextFormat.clean(titleText), player.getName());
+                        }
+                        log.output();
+                    }
+                    case "actionbar" -> {
+                        for (Player player : players) {
+                            player.sendActionBar(titleText);
+                            log.addMessage(TextFormat.WHITE + "%nukkit.command.title.actionbar", TextFormat.clean(titleText), player.getName());
+                        }
+                        log.output();
+                    }
+                    default -> {
+                        log.addMessage("commands.generic.usage", "\n" + this.getCommandFormatTips());
+                        return 0;
+                    }
+                }
+                return 1;
+            }
+            case "times" -> {
+                int fadeIn = list.getResult(2);
+                int stay = list.getResult(3);
+                int fadeOut = list.getResult(4);
+                for (var player : players) {
+                    log.addMessage(TextFormat.WHITE + "%nukkit.command.title.times.success", String.valueOf(fadeIn), String.valueOf(stay), String.valueOf(fadeOut), player.getName());
+                }
+                log.output();
+                return 1;
+            }
+            default -> {
+                return 0;
+            }
         }
-
-        return true;
     }
 }

@@ -9,6 +9,7 @@ import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.DisconnectPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
@@ -29,6 +30,7 @@ import org.cloudburstmc.netty.handler.codec.raknet.common.RakSessionCodec;
 
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
@@ -148,11 +150,24 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             try {
                 this.server.getNetwork().processBatch(packetBuffer, this.inbound, compressionIn, this.channel.config().getProtocolVersion(), this.player);
             } catch (Exception e) {
+                Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> {
+                    try {
+                        InetAddress address = this.channel.remoteAddress().getAddress();
+                        this.channel.unsafe().close(this.channel.voidPromise());
+                        if (!address.isSiteLocalAddress()) {
+                            this.server.blockAddress(address, 60);
+                        }
+                    } catch (Throwable throwable) {
+                        if (Nukkit.DEBUG > 1) {
+                            log.info("Error while closing channel", throwable);
+                        }
+                    }
+                }, 10);
                 this.disconnect("Sent malformed packet");
                 log.error("[{}] Unable to process batch packet", (this.player == null ? this.channel.remoteAddress() : this.player.getName()), e);
             }
         } else if (Nukkit.DEBUG > 1) {
-            log.debug("Unknown EncapsulatedPacket: " + packetId);
+            log.info("Unknown EncapsulatedPacket: {}", packetId);
         }
     }
 

@@ -14,6 +14,7 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemMap;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.types.ContainerIds;
+import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
 
@@ -591,6 +592,7 @@ public class PlayerInventory extends BaseInventory {
         ContainerClosePacket pk = new ContainerClosePacket();
         pk.windowId = who.getWindowId(this);
         pk.wasServerInitiated = who.getClosingWindowId() != pk.windowId;
+        pk.type = ContainerType.from(this.type.getNetworkType());
         who.dataPacket(pk);
         // Player can never stop viewing their own inventory
         if (who != holder) {

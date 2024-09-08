@@ -24,8 +24,7 @@ public class FloatTag extends NumberTag<Float> {
     }
 
     public FloatTag(float data) {
-        super("");
-        this.data = data;
+        this("", data);
     }
 
     public FloatTag(String name, float data) {

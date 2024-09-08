@@ -1,5 +1,6 @@
 package cn.nukkit.inventory;
 
+import cn.nukkit.inventory.data.RecipeUnlockingRequirement;
 import cn.nukkit.item.Item;
 
 import java.util.List;
@@ -37,4 +38,6 @@ public interface CraftingRecipe extends Recipe {
     boolean matchItems(List<Item> inputList, List<Item> extraOutputList, int multiplier);
 
     List<Item> getIngredientsAggregate();
+
+    RecipeUnlockingRequirement getRequirement();
 }

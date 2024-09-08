@@ -32,7 +32,7 @@ public class CameraCommand extends VanillaCommand {
     public static final String[] EASE_TYPES = Arrays.stream(CameraEase.values()).map(CameraEase::getSerializeName).toArray(String[]::new);
 
     public CameraCommand(String name) {
-        super(name, "%nukkit.command.camera.description");
+        super(name, "commands.camera.description");
         this.setPermission("nukkit.command.camera");
         this.commandParameters.clear();
         this.commandParameters.put("clear", new CommandParameter[]{
@@ -141,6 +141,9 @@ public class CameraCommand extends VanillaCommand {
 
     @Override
     public boolean execute(CommandSender sender, String commandLabel, String[] args) {
+        if (!this.testPermission(sender)) {
+            return true;
+        }
         CameraInstructionPacket pk = new CameraInstructionPacket();
         Player player = Server.getInstance().getPlayer(args[0]);
         if (player == null) {

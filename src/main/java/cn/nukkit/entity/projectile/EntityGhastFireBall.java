@@ -17,7 +17,7 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
 
     private boolean canExplode;
 
-    private boolean directionChanged;
+    public Player directionChanged;
 
     @Override
     public int getNetworkId() {
@@ -36,7 +36,7 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
 
     @Override
     public float getGravity() {
-        return 0.005f;
+        return 0.001f;
     }
 
     @Override
@@ -91,9 +91,9 @@ public class EntityGhastFireBall extends EntityProjectile implements EntityExplo
 
     @Override
     public boolean attack(EntityDamageEvent source) {
-        if (!this.directionChanged && source instanceof EntityDamageByEntityEvent) {
-            if (((EntityDamageByEntityEvent) source).getDamager() instanceof Player) {
-                this.directionChanged = true;
+        if (this.directionChanged == null && source instanceof EntityDamageByEntityEvent) {
+            if (((EntityDamageByEntityEvent) source).getDamager() instanceof Player player) {
+                this.directionChanged = player;
                 this.setMotion(((EntityDamageByEntityEvent) source).getDamager().getLocation().getDirectionVector());
             }
         }

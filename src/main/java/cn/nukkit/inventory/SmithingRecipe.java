@@ -18,6 +18,7 @@
 
 package cn.nukkit.inventory;
 
+import cn.nukkit.inventory.data.RecipeUnlockingRequirement;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.ToString;
@@ -166,5 +167,10 @@ public class SmithingRecipe extends ShapelessRecipe {
         }
 
         return Recipe.matchItemList(haveInputs, needInputs);
+    }
+
+    @Override
+    public RecipeUnlockingRequirement getRequirement() {
+        return RecipeUnlockingRequirement.ALWAYS_UNLOCKED;
     }
 }
