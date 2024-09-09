@@ -487,6 +487,12 @@ public class LevelSoundEventPacket extends DataPacket {
     public static final int SOUND_DECORATED_POT_INSERT = 481;
     public static final int SOUND_DECORATED_POT_INSERT_FAILED = 482;
     public static final int SOUND_CRAFTER_DISABLE_SLOT = 483;
+    public static final int SOUND_TRIAL_SPAWNER_OPEN_SHUTTER = 484;
+    public static final int SOUND_TRIAL_SPAWNER_EJECT_ITEM = 485;
+    public static final int SOUND_TRIAL_SPAWNER_DETECT_PLAYER = 486;
+    public static final int SOUND_TRIAL_SPAWNER_SPAWN_MOB = 487;
+    public static final int SOUND_TRIAL_SPAWNER_CLOSE_SHUTTER = 488;
+    public static final int SOUND_TRIAL_SPAWNER_AMBIENT = 489;
     public static final int SOUND_COPPER_BULB_ON = 490;
     public static final int SOUND_COPPER_BULB_OFF = 491;
     public static final int SOUND_AMBIENT_IN_AIR = 492;

@@ -5,7 +5,6 @@ import cn.nukkit.event.Event;
 import cn.nukkit.event.EventPriority;
 import cn.nukkit.event.Listener;
 import cn.nukkit.utils.EventException;
-import co.aikar.timings.Timing;
 
 /**
  * @author MagicDroidX
@@ -29,11 +28,6 @@ public class RegisteredListener {
         this.plugin = plugin;
         this.executor = executor;
         this.ignoreCancelled = ignoreCancelled;
-    }
-
-    @Deprecated
-    public RegisteredListener(Listener listener, EventExecutor executor, EventPriority priority, Plugin plugin, boolean ignoreCancelled, Timing timing) {
-        this(listener, executor, priority, plugin, ignoreCancelled);
     }
 
     public Listener getListener() {
