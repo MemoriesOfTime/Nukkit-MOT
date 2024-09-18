@@ -188,6 +188,20 @@ public class AddEntityPacket extends DataPacket {
         } else {
             mapping.put(EntityCamel.NETWORK_ID, "minecraft:camel");
         }
+
+        //TODO 多版本
+        //1.20.0
+        mapping.put(139, "minecraft:sniffer");
+        //1.21.0
+        mapping.put(140, "minecraft:breeze");
+        //1.21.0
+        mapping.put(141, "minecraft:breeze_wind_charge_projectile");
+        //1.20.80
+        mapping.put(142, "minecraft:armadillo");
+        //1.21.0
+        mapping.put(143, "minecraft:wind_charge_projectile");
+        //1.21.0
+        mapping.put(144, "minecraft:bogged");
     }
 
     @Override

@@ -50,11 +50,9 @@ public class EffectCommand extends Command {
         }
         switch (result.getKey()) {
             case "default" -> {
-                Effect effect;
                 String str = list.getResult(1);
-                try {
-                    effect = Effect.getEffectByName(str);
-                } catch (RuntimeException e) {
+                Effect effect = Effect.getEffectByName(str);
+                if (effect == null) {
                     log.addError("commands.effect.notFound", str).output();
                     return 0;
                 }

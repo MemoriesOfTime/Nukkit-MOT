@@ -31,6 +31,10 @@ public class InventoryContentPacket extends DataPacket {
      * @since v712
      */
     public int dynamicContainerId;
+        /**
+     * @since v729
+     */
+    public int dynamicContainerSize;
 
     @Override
     public DataPacket clean() {
@@ -61,7 +65,11 @@ public class InventoryContentPacket extends DataPacket {
             this.putSlot(protocol, slot);
         }
         if (this.protocol >= ProtocolInfo.v1_21_20) {
-            this.putUnsignedVarInt(this.dynamicContainerId);
+            this.putUnsignedVarInt(/*this.dynamicContainerId*/ 0);  // fullContainerName.id
+            if (this.protocol >= ProtocolInfo.v1_21_30) {
+                this.putBoolean(false); // fullContainerName.optional.present
+                this.putUnsignedVarInt(0); // dynamicContainerSize
+            }
         }
     }
 
