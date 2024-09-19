@@ -288,7 +288,7 @@ public interface BlockID {
     int BLOCK_NETHER_WART_BLOCK = 214;
     int RED_NETHER_BRICK = 215;
     int BONE_BLOCK = 216;
-    // 217 not yet in Minecraft
+    int STRUCTURE_VOID = 217;
     int SHULKER_BOX = 218;
     int PURPLE_GLAZED_TERRACOTTA = 219;
     int WHITE_GLAZED_TERRACOTTA = 220;
