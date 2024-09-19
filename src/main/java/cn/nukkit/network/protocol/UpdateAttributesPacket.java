@@ -38,6 +38,10 @@ public class UpdateAttributesPacket extends DataPacket {
                 this.putLFloat(entry.getMinValue());
                 this.putLFloat(entry.getMaxValue());
                 this.putLFloat(entry.getValue());
+                if (protocol >= ProtocolInfo.v1_21_30) {
+                    this.putLFloat(entry.getMinValue()); // defaultMinValue
+                    this.putLFloat(entry.getMaxValue()); // defaultMaxValue
+                }
                 this.putLFloat(entry.getDefaultValue());
                 this.putString(entry.getName());
                 if (protocol >= ProtocolInfo.v1_19_20) {

@@ -40,9 +40,22 @@ public final class CameraPreset implements NamedDefinition {
     @Nullable
     private CameraAudioListener listener;
     private OptionalBoolean playEffect;
+    /**
+     * @since v729
+     */
+    private Float rotationSpeed;
+    /**
+     * @since v729
+     */
+    private OptionalBoolean snapToTarget = OptionalBoolean.empty();
+    /**
+     * @since v729
+     */
+    private Vector3f entityOffset;
 
     private int runtimeId;
 
+    @Deprecated
     public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, @Nullable CameraAudioListener listener, OptionalBoolean playEffect) {
         this.identifier = identifier;
         this.parentPreset = parentPreset;
@@ -53,6 +66,7 @@ public final class CameraPreset implements NamedDefinition {
         this.playEffect = playEffect;
     }
 
+    @Deprecated
     public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, @Nullable Vector2f viewOffset, @Nullable Float radius, @Nullable CameraAudioListener listener, OptionalBoolean playEffect) {
         this.identifier = identifier;
         this.parentPreset = parentPreset;
@@ -63,6 +77,21 @@ public final class CameraPreset implements NamedDefinition {
         this.radius = radius;
         this.listener = listener;
         this.playEffect = playEffect;
+    }
+
+    public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, @Nullable Vector2f viewOffset, @Nullable Float radius, @Nullable CameraAudioListener listener, OptionalBoolean playEffect, @Nullable Float rotationSpeed, OptionalBoolean snapToTarget, @Nullable Vector3f entityOffset) {
+        this.identifier = identifier;
+        this.parentPreset = parentPreset;
+        this.pos = pos;
+        this.yaw = yaw;
+        this.pitch = pitch;
+        this.viewOffset = viewOffset;
+        this.radius = radius;
+        this.listener = listener;
+        this.playEffect = playEffect;
+        this.rotationSpeed = rotationSpeed;
+        this.snapToTarget = snapToTarget;
+        this.entityOffset = entityOffset;
     }
 
     public String getParentPreset() {

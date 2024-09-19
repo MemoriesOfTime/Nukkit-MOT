@@ -1,6 +1,8 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import lombok.ToString;
 
 /**
@@ -30,7 +32,11 @@ public class InventoryContentPacket extends DataPacket {
     /**
      * @since v712
      */
-    public int dynamicContainerId;
+    public FullContainerName containerNameData = new FullContainerName(ContainerSlotType.ANVIL_INPUT, null);
+    /**
+     * @since v729
+     */
+    public int dynamicContainerSize;
 
     @Override
     public DataPacket clean() {
@@ -60,8 +66,12 @@ public class InventoryContentPacket extends DataPacket {
             }
             this.putSlot(protocol, slot);
         }
-        if (this.protocol >= ProtocolInfo.v1_21_20) {
-            this.putUnsignedVarInt(this.dynamicContainerId);
+        if (this.protocol >= ProtocolInfo.v1_21_30) {
+            this.putByte((byte) this.containerNameData.getContainer().getId());
+            this.putOptionalNull(this.containerNameData.getDynamicId(), this::putLInt);
+            this.putUnsignedVarInt(this.dynamicContainerSize);
+        } else if (this.protocol >= ProtocolInfo.v1_21_20) {
+            this.putUnsignedVarInt(this.containerNameData == null || this.containerNameData.getDynamicId() == null ? 0 : this.containerNameData.getDynamicId());
         }
     }
 

@@ -38,20 +38,22 @@ public class ResourcePacksInfoPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putBoolean(this.mustAccept);
-        if (protocol >= ProtocolInfo.v1_20_70) {
+        if (this.protocol >= ProtocolInfo.v1_20_70) {
             this.putBoolean(this.hasAddonPacks);
         }
-        if (protocol >= ProtocolInfo.v1_9_0) {
+        if (this.protocol >= ProtocolInfo.v1_9_0) {
             this.putBoolean(this.scripting);
-            if (protocol >= ProtocolInfo.v1_17_10) {
+            if (this.protocol >= ProtocolInfo.v1_17_10 && this.protocol < ProtocolInfo.v1_21_30) {
                 this.putBoolean(this.forceServerPacks);
             }
         }
 
-        this.encodeBehaviourPacks(this.behaviourPackEntries);
+        if (this.protocol < ProtocolInfo.v1_21_30) {
+            this.encodeBehaviourPacks(this.behaviourPackEntries);
+        }
         this.encodeResourcePacks(this.resourcePackEntries);
 
-        if (protocol >= ProtocolInfo.v1_20_30_24) {
+        if (this.protocol >= ProtocolInfo.v1_20_30_24) {
             this.putArray(this.CDNEntries, (entry) -> {
                 this.putString(entry.getPackId());
                 this.putString(entry.getRemoteUrl());

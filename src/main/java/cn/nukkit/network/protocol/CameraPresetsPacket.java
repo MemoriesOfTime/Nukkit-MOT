@@ -108,10 +108,17 @@ public class CameraPresetsPacket extends DataPacket {
         this.putOptionalNull(preset.getPitch(), this::putLFloat);
         this.putOptionalNull(preset.getYaw(), this::putLFloat);
         if (this.protocol >= ProtocolInfo.v1_21_20) {
+            if (this.protocol >= ProtocolInfo.v1_21_30) {
+                this.putOptionalNull(preset.getRotationSpeed(), this::putLFloat);
+                this.putOptionalNull(preset.getSnapToTarget(), (snapToTarget) -> this.putBoolean(snapToTarget.getAsBoolean()));
+            }
             this.putOptionalNull(preset.getViewOffset(), (viewOffset) -> {
                 this.putLFloat(viewOffset.getX());
                 this.putLFloat(viewOffset.getY());
             });
+            if (this.protocol >= ProtocolInfo.v1_21_30) {
+                this.putOptionalNull(preset.getEntityOffset(), this::putVector3f);
+            }
             this.putOptionalNull(preset.getRadius(), this::putLFloat);
         }
         this.putOptionalNull(preset.getListener(), (listener) -> this.putByte((byte) listener.ordinal()));
@@ -132,13 +139,23 @@ public class CameraPresetsPacket extends DataPacket {
 
         Vector2f viewOffset = null;
         Float radius = null;
+        Float rotationSpeed = null;
+        OptionalBoolean snapToTarget = OptionalBoolean.empty();
+        Vector3f entityOffset = null;
         if (this.protocol >= ProtocolInfo.v1_21_20) {
+            if (this.protocol >= ProtocolInfo.v1_21_30) {
+                rotationSpeed = this.getOptional(null, BinaryStream::getLFloat);
+                snapToTarget = this.getOptional(OptionalBoolean.empty(), binaryStream -> OptionalBoolean.of(binaryStream.getBoolean()));
+            }
             viewOffset = this.getOptional(null, binaryStream -> new Vector2f(binaryStream.getLFloat(), binaryStream.getLFloat()));
+            if (this.protocol >= ProtocolInfo.v1_21_30) {
+                entityOffset = this.getOptional(null, BinaryStream::getVector3f);
+            }
             radius = this.getOptional(null, BinaryStream::getLFloat);
         }
 
         CameraAudioListener listener = this.getOptional(null, binaryStream -> CameraAudioListener.values()[binaryStream.getByte()]);
         OptionalBoolean effects = this.getOptional(OptionalBoolean.empty(), binaryStream -> OptionalBoolean.of(binaryStream.getBoolean()));
-        return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, viewOffset, radius, listener, effects);
+        return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, viewOffset, radius, listener, effects, rotationSpeed, snapToTarget, entityOffset);
     }
 }

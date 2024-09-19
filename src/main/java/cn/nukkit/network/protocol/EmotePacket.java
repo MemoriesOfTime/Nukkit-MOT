@@ -21,6 +21,10 @@ public class EmotePacket extends DataPacket {
     public String platformId;
     public String emoteID;
     public byte flags;
+    /**
+     * @since v729
+     */
+    public long emoteDuration;
 
     @Override
     public byte pid() {
@@ -32,6 +36,9 @@ public class EmotePacket extends DataPacket {
         this.runtimeId = this.getEntityRuntimeId();
         this.emoteID = this.getString();
         if (this.protocol >= ProtocolInfo.v1_20_0_23) {
+            if (this.protocol >= ProtocolInfo.v1_21_30) {
+                this.emoteDuration = this.getUnsignedVarInt();
+            }
             this.xuid = this.getString();
             this.platformId = this.getString();
         }
@@ -44,6 +51,9 @@ public class EmotePacket extends DataPacket {
         this.putEntityRuntimeId(this.runtimeId);
         this.putString(this.emoteID);
         if (this.protocol >= ProtocolInfo.v1_20_0_23) {
+            if (this.protocol >= ProtocolInfo.v1_21_30) {
+                this.putUnsignedVarInt(this.emoteDuration);
+            }
             this.putString(this.xuid != null ? this.xuid : "");
             this.putString(this.platformId != null ? this.platformId : "");
         }
