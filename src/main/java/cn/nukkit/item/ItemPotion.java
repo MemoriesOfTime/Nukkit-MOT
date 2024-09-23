@@ -85,7 +85,7 @@ public class ItemPotion extends Item {
         }
 
         if (potion != null) {
-            potion.setSplash(true);
+            potion.setSplash(false);
             potion.applyPotion(player);
         }
         return true;
