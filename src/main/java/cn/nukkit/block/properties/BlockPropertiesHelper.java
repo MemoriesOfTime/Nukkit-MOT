@@ -1,6 +1,6 @@
 package cn.nukkit.block.properties;
 
-import cn.nukkit.block.customblock.container.BlockStorageContainer;
+import cn.nukkit.block.custom.container.BlockStorageContainer;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.network.protocol.ProtocolInfo;
 

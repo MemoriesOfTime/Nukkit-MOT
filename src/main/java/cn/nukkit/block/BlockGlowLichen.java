@@ -1,9 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Player;
-import cn.nukkit.block.properties.BlockProperties;
+import cn.nukkit.block.custom.properties.BlockProperties;
+import cn.nukkit.block.custom.properties.BooleanBlockProperty;
 import cn.nukkit.block.properties.BlockPropertiesHelper;
-import cn.nukkit.block.properties.BooleanBlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
@@ -164,7 +164,6 @@ public class BlockGlowLichen extends BlockTransparentMeta implements BlockProper
             case EAST:
                 this.setBooleanValue(CONNECTION_EAST, value);
                 break;
-
         }
     }
 
@@ -182,7 +181,6 @@ public class BlockGlowLichen extends BlockTransparentMeta implements BlockProper
                 return this.getBooleanValue(CONNECTION_WEST);
             case EAST:
                 return this.getBooleanValue(CONNECTION_EAST);
-
         }
         return false;
     }

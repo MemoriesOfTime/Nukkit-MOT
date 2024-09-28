@@ -517,16 +517,22 @@ public interface BlockID {
     int CRACKED_NETHER_BRICKS = 558;
     int QUARTZ_BRICKS = 559;
 
+    int POINTED_DRIPSTONE = 563;
+
     int COPPER_ORE = 566;
 
+    int DRIPSTONE_BLOCK = 572;
     int DIRT_WITH_ROOTS = 573;
 
     int MOSS_BLOCK = 575;
 
+    int BIG_DRIPLEAF = 578;
     int AZALEA_LEAVES = 579;
     int AZALEA_LEAVES_FLOWERED = 580;
 
     int AMETHYST_BLOCK = 582;
+
+    int SMALL_DRIPLEAF = 591;
 
     int GLOW_FRAME = 594;
 

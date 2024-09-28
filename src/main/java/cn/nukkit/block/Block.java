@@ -2,7 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.block.customblock.CustomBlockManager;
+import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.player.PlayerInteractEvent;
@@ -43,6 +43,7 @@ import static cn.nukkit.utils.Utils.dynamic;
  */
 @Log4j2
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
+
     public static final int MAX_BLOCK_ID = dynamic(1039);
     public static final int DATA_BITS = dynamic(6);
     public static final int ID_MASK = 0xfff; //max 4095
@@ -527,10 +528,16 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             list[CHISELED_NETHER_BRICKS] = BlockBricksNetherChiseled.class; //557
             list[CRACKED_NETHER_BRICKS] = BlockBricksNetherCracked.class; //558
             list[QUARTZ_BRICKS] = BlockBricksQuartz.class; //559
-            
+
+            list[POINTED_DRIPSTONE] = BlockPointedDripstone.class; // 563
+
             list[COPPER_ORE] = BlockOreCopper.class; //566
 
+            list[BIG_DRIPLEAF] = BlockDripleafBig.class; //578
+
             list[AMETHYST_BLOCK] = BlockAmethyst.class; //582
+
+            list[SMALL_DRIPLEAF] = BlockDripleafSmall.class; //591
 
             list[GLOW_FRAME] = BlockItemFrameGlow.class; //594
 
