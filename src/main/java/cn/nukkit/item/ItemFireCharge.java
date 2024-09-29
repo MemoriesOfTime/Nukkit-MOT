@@ -39,7 +39,8 @@ public class ItemFireCharge extends Item {
                 }
             }
 
-            BlockFire fire = (BlockFire) Block.get(BlockID.FIRE);
+            int did;
+            BlockFire fire = (BlockFire) Block.get(((did = block.down().getId()) == SOUL_SAND || did == SOUL_SOIL) ? BlockID.SOUL_FIRE : BlockID.FIRE);
             fire.x = block.x;
             fire.y = block.y;
             fire.z = block.z;

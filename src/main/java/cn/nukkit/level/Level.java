@@ -2496,7 +2496,8 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         Vector3 above = new Vector3(target.x, target.y + 1, target.z);
-        if (this.getBlockIdAt((int) above.x, (int) above.y, (int) above.z) == Item.FIRE) {
+        int bid = this.getBlockIdAt((int) above.x, (int) above.y, (int) above.z);
+        if (bid == Item.FIRE || bid == Item.SOUL_FIRE) {
             this.setBlock(above, Block.get(BlockID.AIR), true);
         }
 

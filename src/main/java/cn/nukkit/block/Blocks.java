@@ -371,13 +371,13 @@ public class Blocks {
         list[CRIMSON_FUNGUS] = BlockFungusCrimson.class; //483
         list[WARPED_FUNGUS] = BlockFungusWarped.class; //484
         list[SHROOMLIGHT] = BlockShroomlight.class; //485
-
+        list[WEEPING_VINES] = BlockWeepingVines.class; //486
         list[CRIMSON_NYLIUM] = BlockNyliumCrimson.class; //487
         list[WARPED_NYLIUM] = BlockNyliumWarped.class; //488
         list[BASALT] = BlockBasalt.class; //489
-
+        list[POLISHED_BASALT] = BlockPolishedBasalt.class; //490
         list[SOUL_SOIL] = BlockSoulSoil.class; //491
-
+        list[SOUL_FIRE] = BlockSoulFire.class; //492
         list[NETHER_SPROUTS_BLOCK] = BlockNetherSprouts.class; //493
         list[TARGET] = BlockTarget.class; //494
 

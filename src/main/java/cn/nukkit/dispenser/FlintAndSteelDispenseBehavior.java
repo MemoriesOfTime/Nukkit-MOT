@@ -13,9 +13,15 @@ public class FlintAndSteelDispenseBehavior extends DefaultDispenseBehavior {
         Block target = block.getSide(face);
 
         if (target.getId() == BlockID.AIR) {
-            block.level.setBlock(target, Block.get(BlockID.FIRE));
+            Block down = target.down();
+            if (down.getId() != BlockID.OBSIDIAN || !down.level.createPortal(down, false)) {
+                boolean soulFire = down.getId() == Block.SOUL_SAND || down.getId() == Block.SOUL_SOIL;
+                block.level.setBlock(target, Block.get(soulFire ? BlockID.SOUL_FIRE : BlockID.FIRE));
+            }
+            item.useOn(target);
         } else if (target.getId() == BlockID.TNT) {
             target.onActivate(item);
+            item.useOn(target);
         } else {
             this.success = false;
         }
