@@ -159,14 +159,9 @@ public class BlockDripleafSmall extends BlockFlowable implements BlockProperties
         return SMALL_DRIPLEAF;
     }
 
-    /*@Override
+    @Override
     public WaterloggingType getWaterloggingType() {
         return WaterloggingType.FLOW_INTO_BLOCK;
-    }*/
-
-    @Override
-    public int getWaterloggingLevel() {
-        return 1;
     }
 
     public void setHasHead(boolean value) {

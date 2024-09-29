@@ -216,14 +216,9 @@ public class BlockDripleafBig extends BlockSolidMeta implements BlockPropertiesH
         return BIG_DRIPLEAF;
     }
 
-    /*@Override
+    @Override
     public WaterloggingType getWaterloggingType() {
         return WaterloggingType.FLOW_INTO_BLOCK;
-    }*/
-
-    @Override
-    public int getWaterloggingLevel() {
-        return 1;
     }
 
     @Override

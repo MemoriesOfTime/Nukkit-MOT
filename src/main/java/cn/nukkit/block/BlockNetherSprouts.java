@@ -37,7 +37,7 @@ public class BlockNetherSprouts extends BlockRoots {
 
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        if (block.isLiquid() || !block.isAir() && block.getWaterloggingLevel() > 0 && level.getBlock(this, 1).isWater()) {
+        if (block.isLiquid() || !block.isAir() && block.getWaterloggingType() != WaterloggingType.NO_WATERLOGGING && level.getBlock(this, 1).isWater()) {
             return false;
         }
 

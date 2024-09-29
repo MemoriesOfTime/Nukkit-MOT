@@ -62,7 +62,7 @@ public class BlockSoulSand extends BlockSolid {
             if (up instanceof BlockWater && (up.getDamage() == 0 || up.getDamage() == 8)) {
                 BlockFormEvent event = new BlockFormEvent(up, new BlockBubbleColumn(0));
                 if (!event.isCancelled()) {
-                    if (event.getNewState().getWaterloggingLevel() > 0) {
+                    if (event.getNewState().getWaterloggingType() != WaterloggingType.NO_WATERLOGGING) {
                         this.getLevel().setBlock(up, 1, new BlockWater(), true, false);
                     }
                     this.getLevel().setBlock(up, 0, event.getNewState(), true, true);
