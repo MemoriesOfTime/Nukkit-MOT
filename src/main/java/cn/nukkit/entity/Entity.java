@@ -1896,7 +1896,7 @@ public abstract class Entity extends Location implements Metadatable {
         pk.yaw = yaw;
         pk.teleport = false;
         pk.onGround = this.onGround;
-        Server.broadcastPacket(hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_19_0).collect(Collectors.toList()), pk);
+        Server.broadcastPacket(hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_7_0).collect(Collectors.toList()), pk);
     }
 
     @Override

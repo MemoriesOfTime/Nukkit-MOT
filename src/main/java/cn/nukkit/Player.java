@@ -2025,13 +2025,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (!target.equals(event.getTo())) {
                         this.teleport(event.getTo(), null);
                     } else {
-                        //1.19.0-
+                        //1.7.0-
                         this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
                                 this.getViewers().values()
                                         .stream()
-                                        .filter(p -> p.protocol < ProtocolInfo.v1_19_0)
+                                        .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
                                         .collect(Collectors.toList()));
-                        //1.19.0+
+                        //1.7.0+
                         this.broadcastMovement();
                     }
                 } else {
