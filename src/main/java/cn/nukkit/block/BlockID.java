@@ -517,24 +517,34 @@ public interface BlockID {
     int CRACKED_NETHER_BRICKS = 558;
     int QUARTZ_BRICKS = 559;
 
+    int POWDER_SNOW = 561;
+    int SCULK_SENSOR = 562;
     int POINTED_DRIPSTONE = 563;
 
     int COPPER_ORE = 566;
+    int LIGHTNING_ROD = 567;
 
     int DRIPSTONE_BLOCK = 572;
     int DIRT_WITH_ROOTS = 573;
-
+    int ROOTED_DIRT = 573;
+    int HANGING_ROOTS = 574;
     int MOSS_BLOCK = 575;
-
+    int SPORE_BLOSSOM = 576;
+    int CAVE_VINES = 577;
     int BIG_DRIPLEAF = 578;
     int AZALEA_LEAVES = 579;
     int AZALEA_LEAVES_FLOWERED = 580;
 
     int AMETHYST_BLOCK = 582;
 
+    int MOSS_CARPET = 590;
     int SMALL_DRIPLEAF = 591;
-
+    int AZALEA = 592;
+    int FLOWERING_AZALEA = 593;
     int GLOW_FRAME = 594;
+
+    int CAVE_VINES_BODY_WITH_BERRIES = 630;
+    int CAVE_VINES_HEAD_WITH_BERRIES = 631;
 
     int DEEPSLATE = 633;
 
@@ -585,6 +595,8 @@ public interface BlockID {
     int VERDANT_FROGLIGHT = 725;
 
     int OCHRE_FROGLIGHT = 726;
+
+    int MUD = 728;
 
     int MANGROVE_PLANKS = 741;
 

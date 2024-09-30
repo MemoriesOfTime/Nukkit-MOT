@@ -446,17 +446,32 @@ public class Blocks {
         list[CRACKED_NETHER_BRICKS] = BlockBricksNetherCracked.class; //558
         list[QUARTZ_BRICKS] = BlockBricksQuartz.class; //559
 
+        list[POWDER_SNOW] = BlockPowderSnow.class; // 561
+        list[SCULK_SENSOR] = BlockSculkSensor.class; // 562
         list[POINTED_DRIPSTONE] = BlockPointedDripstone.class; // 563
 
         list[COPPER_ORE] = BlockOreCopper.class; //566
+        list[LIGHTNING_ROD] = BlockLightningRod.class; //567
 
+        list[DRIPSTONE_BLOCK] = BlockDripstone.class; //572
+        list[ROOTED_DIRT] = BlockDirtRooted.class; //573
+        list[HANGING_ROOTS] = BlockRootsHanging.class; //574
+        list[MOSS_BLOCK] = BlockMoss.class; //575
+        list[SPORE_BLOSSOM] = BlockSporeBlossom.class; //576
+        list[CAVE_VINES] = BlockCaveVines.class; //577
         list[BIG_DRIPLEAF] = BlockDripleafBig.class; //578
 
         list[AMETHYST_BLOCK] = BlockAmethyst.class; //582
 
+        list[MOSS_CARPET] = BlockMossCarpet.class; //590
         list[SMALL_DRIPLEAF] = BlockDripleafSmall.class; //591
+        list[AZALEA] = BlockAzalea.class; //592
+        list[FLOWERING_AZALEA] = BlockAzaleaFlowering.class; //593
 
         list[GLOW_FRAME] = BlockItemFrameGlow.class; //594
+
+        list[CAVE_VINES_BODY_WITH_BERRIES] = BlockCaveVinesBerriesBody.class; //630
+        list[CAVE_VINES_HEAD_WITH_BERRIES] = BlockCaveVinesBerriesHead.class; //631
 
         list[DEEPSLATE] = BlockDeepslate.class; // 633
 
