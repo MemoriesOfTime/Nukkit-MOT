@@ -161,7 +161,7 @@ public class ItemBucket extends Item {
 
                     return true;
                 } else {
-                    player.getInventory().sendContents(player);
+                    player.setNeedSendInventory(true);
                 }
             }
         } else if (targetBlock instanceof BlockLiquid) {
@@ -263,8 +263,8 @@ public class ItemBucket extends Item {
                 player.getLevel().addSound(new FizzSound(target, 2.6F + (ThreadLocalRandom.current().nextFloat() - ThreadLocalRandom.current().nextFloat()) * 0.8F));
                 player.getLevel().addParticle(new ExplodeParticle(target.add(0.5, 1, 0.5)));
             } else {
-                player.getLevel().sendBlocks(new Player[] {player}, new Block[] {block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
-                player.getInventory().sendContents(player);
+                player.getLevel().sendBlocks(new Player[]{player}, new Block[]{block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
+                player.setNeedSendInventory(true);
             }
         }
 
@@ -286,7 +286,7 @@ public class ItemBucket extends Item {
 
         player.getServer().getPluginManager().callEvent(consumeEvent);
         if (consumeEvent.isCancelled()) {
-            player.getInventory().sendContents(player);
+            player.setNeedSendInventory(true);
             return false;
         }
 

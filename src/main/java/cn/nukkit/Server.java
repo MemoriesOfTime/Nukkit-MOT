@@ -966,7 +966,7 @@ public class Server {
         }
 
         if (callBatchPkEv) {
-            BatchPacketsEvent ev = new BatchPacketsEvent(players, packets, forceSync);
+            BatchPacketsEvent ev = new BatchPacketsEvent(players, packets);
             pluginManager.callEvent(ev);
             if (ev.isCancelled()) {
                 return;
@@ -2722,7 +2722,7 @@ public class Server {
      * @return is operator
      */
     public boolean isOp(String name) {
-        return this.operators.exists(name, true);
+        return name != null && this.operators.exists(name, true);
     }
 
     /**
@@ -3067,7 +3067,7 @@ public class Server {
      */
     private void loadSettings() {
         this.forceLanguage = this.getPropertyBoolean("force-language", false);
-        this.networkCompressionLevel = Math.max(Math.min(this.getPropertyInt("compression-level", 4), 9), 0);
+        this.networkCompressionLevel = Math.max(Math.min(this.getPropertyInt("compression-level", 5), 9), 0);
         this.chunkCompressionLevel = Math.max(Math.min(this.getPropertyInt("chunk-compression-level", 7), 9), 1);
         this.autoTickRate = this.getPropertyBoolean("auto-tick-rate", true);
         this.autoTickRateLimit = this.getPropertyInt("auto-tick-rate-limit", 20);
@@ -3253,7 +3253,7 @@ public class Server {
             put("async-workers", "auto");
 
             put("zlib-provider", 2);
-            put("compression-level", 4);
+            put("compression-level", 5);
             put("compression-threshold", "256");
             put("use-snappy-compression", false);
             put("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
