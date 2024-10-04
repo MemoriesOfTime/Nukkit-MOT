@@ -21,6 +21,7 @@ import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.math.BigDecimal;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -327,13 +328,10 @@ public class Utils {
             return existing;
         }
         try {
-            U toPut = clazz.newInstance();
+            U toPut = clazz.getDeclaredConstructor().newInstance();
             existing = map.putIfAbsent(key, toPut);
-            if (existing == null) {
-                return toPut;
-            }
-            return existing;
-        } catch (InstantiationException | IllegalAccessException e) {
+            return Objects.requireNonNullElse(existing, toPut);
+        } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
             throw new RuntimeException(e);
         }
     }

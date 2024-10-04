@@ -43,6 +43,7 @@ public class ItemFlintSteel extends ItemTool {
         if ((block.getId() == AIR || block.getId() == FIRE || block.getId() == SOUL_FIRE) && (target instanceof BlockSolid || target instanceof BlockSolidMeta || target instanceof BlockLeaves)) {
             if (target.getId() == OBSIDIAN) {
                 if (level.createPortal(target, false)) {
+                    level.addLevelSoundEvent(target, LevelSoundEventPacket.SOUND_IGNITE);
                     return true;
                 }
             }

@@ -52,6 +52,7 @@ import cn.nukkit.lang.TextContainer;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.*;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.level.particle.PunchBlockParticle;
 import cn.nukkit.level.sound.ExperienceOrbSound;
@@ -334,10 +335,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int timeSinceRest;
     private boolean inSoulSand;
     private boolean dimensionChangeInProgress;
+    private int riptideTicks;
 
     private boolean needSendData;
     private boolean needSendAdventureSettings;
     private boolean needSendFoodLevel;
+    @Setter
     private boolean needSendInventory;
     private boolean needSendHeldItem;
     private boolean dimensionFix560;
@@ -1909,22 +1912,35 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        boolean invalidMotion = false;
-        Location revertPos = this.getLocation().clone();
         double distance = clientPos.distanceSquared(this);
 
-        if (!this.level.isChunkGenerated(clientPos.getChunkX(), clientPos.getChunkZ())) {
-            invalidMotion = true;
-            this.nextChunkOrderRun = 0;
-        } else if (distance > 128) {
-            invalidMotion = true;
-            getServer().getLogger().warning(String.format("%s moved too far (%.2f)", this.getName(), distance));
+        int maxDist = 9;
+        if (this.riptideTicks > 95 || clientPos.y - this.y < 2 || this.isOnLadder()) { // TODO: Remove ladder/vines check when block collisions are fixed
+            maxDist = 49;
         }
 
-        if (invalidMotion) {
-            this.revertClientMotion(revertPos);
+        if (distance > maxDist) {
+            this.revertClientMotion(this);
+            server.getLogger().debug(username + ": distanceSquared=" + distance +  " > maxDist=" + maxDist);
             return;
         }
+
+        if (this.chunk == null || !this.chunk.isGenerated()) {
+            BaseFullChunk chunk = this.level.getChunk(clientPos.getChunkX(), clientPos.getChunkZ(), false);
+            if (chunk == null || !chunk.isGenerated()) {
+                this.nextChunkOrderRun = 0;
+                this.revertClientMotion(this);
+                return;
+            } else {
+                if (this.chunk != null) {
+                    this.chunk.removeEntity(this);
+                }
+                this.chunk = chunk;
+            }
+        }
+
+        boolean invalidMotion = false;
+        Location revertPos = this.getLocation().clone();
 
         double diffX = clientPos.getX() - this.x;
         double diffY = clientPos.getY() - this.y;
@@ -2227,6 +2243,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastUpdate = currentTick;
 
         this.failedTransactions = 0;
+
+        if (this.riptideTicks > 0) {
+            this.riptideTicks -= tickDiff;
+        }
 
         if (this.fishing != null && this.age % 20 == 0) {
             if (this.distanceSquared(fishing) > 1089) { // 33 blocks
@@ -3433,7 +3453,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 Vector3 pos = this.temporalVector.setComponents(playerActionPacket.x, playerActionPacket.y, playerActionPacket.z);
                 BlockFace face = BlockFace.fromIndex(playerActionPacket.face);
 
-                actionswitch:
+                stopItemHold:
                 switch (playerActionPacket.action) {
                     case PlayerActionPacket.ACTION_START_BREAK:
                         if (this.isServerAuthoritativeBlockBreaking()) break;
@@ -3579,6 +3599,71 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             this.setSwimming(false);
                         }
                         break;
+                    case PlayerActionPacket.ACTION_START_SPIN_ATTACK:
+                        if (this.inventory == null) {
+                            break stopItemHold;
+                        }
+
+                        PlayerToggleSpinAttackEvent playerToggleSpinAttackEvent = new PlayerToggleSpinAttackEvent(this, true);
+
+                        int riptideLevel = 0;
+                        Item hand;
+                        if ((hand = this.inventory.getItemInHandFast()).getId() != ItemID.TRIDENT) {
+                            playerToggleSpinAttackEvent.setCancelled(true);
+                            this.getServer().getLogger().debug(username + ": got ACTION_START_SPIN_ATTACK but hand item is not a trident");
+                        } else {
+                            Enchantment riptide = hand.getEnchantment(Enchantment.ID_TRIDENT_RIPTIDE);
+                            if (riptide == null) {
+                                playerToggleSpinAttackEvent.setCancelled(true);
+                            } else {
+                                riptideLevel = riptide.getLevel();
+                                if (riptideLevel < 1) {
+                                    playerToggleSpinAttackEvent.setCancelled(true);
+                                } else {
+                                    boolean inWater = false;
+                                    for (Block block : this.getCollisionBlocks()) {
+                                        if (block instanceof BlockWater) {
+                                            inWater = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!(inWater || (this.getLevel().isRaining() && this.canSeeSky()))) {
+                                        playerToggleSpinAttackEvent.setCancelled(true);
+                                    }
+                                }
+                            }
+                        }
+
+                        this.server.getPluginManager().callEvent(playerToggleSpinAttackEvent);
+
+                        if (playerToggleSpinAttackEvent.isCancelled()) {
+                            this.needSendData = true;
+                        } else {
+                            this.setSpinAttack(true);
+                            this.resetFallDistance();
+
+                            this.riptideTicks = 50 + (riptideLevel << 5);
+
+                            int riptideSound;
+                            if (riptideLevel >= 3) {
+                                riptideSound = LevelSoundEventPacket.SOUND_ITEM_TRIDENT_RIPTIDE_3;
+                            } else if (riptideLevel == 2) {
+                                riptideSound = LevelSoundEventPacket.SOUND_ITEM_TRIDENT_RIPTIDE_2;
+                            } else {
+                                riptideSound = LevelSoundEventPacket.SOUND_ITEM_TRIDENT_RIPTIDE_1;
+                            }
+                            this.level.addLevelSoundEvent(this, riptideSound);
+                        }
+                        break stopItemHold;
+                    case PlayerActionPacket.ACTION_STOP_SPIN_ATTACK:
+                        playerToggleSpinAttackEvent = new PlayerToggleSpinAttackEvent(this, false);
+                        this.server.getPluginManager().callEvent(playerToggleSpinAttackEvent);
+                        if (playerToggleSpinAttackEvent.isCancelled()) {
+                            this.needSendData = true;
+                        } else {
+                            this.setSpinAttack(false);
+                        }
+                        return;
                     case PlayerActionPacket.ACTION_MISSED_SWING:
                         if (this.isMovementServerAuthoritative() || this.isLockMovementInput() || this.protocol < ProtocolInfo.v1_20_10_21) break;
                         PlayerMissedSwingEvent pmse = new PlayerMissedSwingEvent(this);
