@@ -2325,7 +2325,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     public boolean isInsideOfWater() {
         Block block = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
-        return block.isWater() || block.getWaterloggingLevel() > 0 && block.getLevelBlockAtLayer(1).isWater();
+        return block.isWater() || block.getWaterloggingType() != Block.WaterloggingType.NO_WATERLOGGING && block.getLevelBlockAtLayer(1).isWater();
     }
 
     public boolean isInsideOfSolid() {

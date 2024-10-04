@@ -78,8 +78,8 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable, Blo
     }
 
     @Override
-    public int getWaterloggingLevel() {
-        return 1;
+    public WaterloggingType getWaterloggingType() {
+        return WaterloggingType.WHEN_PLACED_IN_WATER;
     }
 
     protected int getPostId() {

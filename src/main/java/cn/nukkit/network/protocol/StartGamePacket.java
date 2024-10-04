@@ -1,8 +1,8 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
-import cn.nukkit.block.customblock.CustomBlockDefinition;
-import cn.nukkit.block.customblock.CustomBlockManager;
+import cn.nukkit.block.custom.CustomBlockDefinition;
+import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;

@@ -224,7 +224,7 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
                 if (layer0.getId() == 0) {
                     this.level.setBlock(this, 1, Block.get(Block.AIR), false, false);
                     this.level.setBlock(this, 0, this, false, false);
-                } else if (layer0.getWaterloggingLevel() <= 0 || layer0.getWaterloggingLevel() == 1 && getDamage() > 0) {
+                } else if (layer0.getWaterloggingType() == WaterloggingType.NO_WATERLOGGING || (layer0.getWaterloggingType() == WaterloggingType.WHEN_PLACED_IN_WATER && getDamage() > 0)) {
                     this.level.setBlock(this, 1, Block.get(Block.AIR), true, true);
                 }
             }
@@ -318,13 +318,13 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
     protected void flowIntoBlock(Block block, int newFlowDecay) {
         if (this.canFlowInto(block) && !(block instanceof BlockLiquid)) {
             if (this.usesWaterLogging()) {
-                Block layer1 = block.getLevelBlockAtLayer(1);
-                if (layer1 instanceof BlockLiquid) {
+                Block waterlogged = block.getLevelBlockAtLayer(1);
+                if (waterlogged instanceof BlockLiquid) {
                     return;
                 }
 
-                if (block.getWaterloggingLevel() > 1) {
-                    block = layer1;
+                if (block.getWaterloggingType() == WaterloggingType.FLOW_INTO_BLOCK) {
+                    block = waterlogged;
                 }
             }
 

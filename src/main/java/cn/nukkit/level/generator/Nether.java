@@ -30,36 +30,28 @@ import java.util.Map;
 public class Nether extends Generator {
     private static final double BIOME_AMPLIFICATION = 512;
 
-    private final double lavaHeight = 32;
+    private final int lavaHeight = 32;
     private final List<Populator> generationPopulators = ImmutableList.of(
         new PopulatorBedrock()
     );
     private final List<Populator> populators = ImmutableList.of(
-        new PopulatorOre(BlockID.NETHERRACK, new OreType[]{
-            new OreType(Block.get(BlockID.QUARTZ_ORE), 20, 16, 0, 128),
-            new OreType(Block.get(BlockID.SOUL_SAND), 5, 64, 0, 128),
-            new OreType(Block.get(BlockID.GRAVEL), 5, 64, 0, 128),
-            new OreType(Block.get(BlockID.LAVA), 1, 16, 0, (int) lavaHeight),
-        }),
-        new PopulatorGroundFire() {{
-            setBaseAmount(1);
-            setRandomAmount(1);
-        }},
         new PopulatorLava() {{
             setBaseAmount(1);
             setRandomAmount(2);
         }},
         new PopulatorGlowStone(),
         new PopulatorOre(BlockID.NETHERRACK, new OreType[]{
-            new OreType(Block.get(BlockID.QUARTZ_ORE), 20, 16, 0, 128, BlockID.NETHERRACK),
-            new OreType(Block.get(BlockID.SOUL_SAND), 1, 64, 30, 35, BlockID.NETHERRACK),
-            new OreType(Block.get(BlockID.LAVA), 32, 1, 0, 32, BlockID.NETHERRACK),
-            new OreType(Block.get(BlockID.MAGMA), 32, 16, 26, 37, BlockID.NETHERRACK),
+            new OreType(Block.get(BlockID.QUARTZ_ORE), 20, 16, 0, 117, BlockID.NETHERRACK),
+            new OreType(Block.get(BlockID.SOUL_SAND), 1, 64, 30, /*31*/ 105, BlockID.NETHERRACK),
+            new OreType(Block.get(BlockID.GRAVEL), 2, 64, 5, /*41*/ 105, BlockID.NETHERRACK),
+            new OreType(Block.get(BlockID.LAVA), 32, 1, 0, lavaHeight, BlockID.NETHERRACK),
+            new OreType(Block.get(BlockID.MAGMA), 32, 16, 26, lavaHeight + 1, BlockID.NETHERRACK),
             new OreType(Block.get(BlockID.NETHER_GOLD_ORE), 5, 16, 10, 117, BlockID.NETHERRACK),
             new OreType(Block.get(BlockID.ANCIENT_DEBRIS), 2, 2, 8, 119, BlockID.NETHERRACK),
             new OreType(Block.get(BlockID.ANCIENT_DEBRIS), 1, 3, 8, 22, BlockID.NETHERRACK),
         }),
-        new PopulatorNetherWart()
+        new PopulatorNetherWart(),
+        new PopulatorNetherFire(FIRE, NETHERRACK)
     );
     private final List<Populator> structurePopulators = ImmutableList.of(
         new PopulatorNetherFortress()

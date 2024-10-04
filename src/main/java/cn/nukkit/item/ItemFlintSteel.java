@@ -4,6 +4,8 @@ import cn.nukkit.Player;
 import cn.nukkit.block.*;
 import cn.nukkit.event.block.BlockIgniteEvent;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.Sound;
+import cn.nukkit.level.particle.ItemBreakParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Utils;
@@ -37,7 +39,8 @@ public class ItemFlintSteel extends ItemTool {
             return false;
         }
 
-        if (block.getId() == AIR && (target instanceof BlockSolid || target instanceof BlockSolidMeta || target instanceof BlockLeaves)) {
+        // 1.18 vanilla allows flint & steel to be used even if fire exists
+        if ((block.getId() == AIR || block.getId() == FIRE || block.getId() == SOUL_FIRE) && (target instanceof BlockSolid || target instanceof BlockSolidMeta || target instanceof BlockLeaves)) {
             if (target.getId() == OBSIDIAN) {
                 if (level.createPortal(target, false)) {
                     level.addLevelSoundEvent(target, LevelSoundEventPacket.SOUND_IGNITE);
@@ -45,7 +48,8 @@ public class ItemFlintSteel extends ItemTool {
                 }
             }
 
-            BlockFire fire = (BlockFire) Block.get(BlockID.FIRE);
+            int did;
+            BlockFire fire = (BlockFire) Block.get(((did = block.down().getId()) == SOUL_SAND || did == SOUL_SOIL) ? BlockID.SOUL_FIRE : BlockID.FIRE);
             fire.x = block.x;
             fire.y = block.y;
             fire.z = block.z;
@@ -64,6 +68,9 @@ public class ItemFlintSteel extends ItemTool {
                         this.useOn(block);
                         if (this.getDamage() >= DURABILITY_FLINT_STEEL) {
                             this.count = 0;
+
+                            player.level.addSoundToViewers(player, Sound.RANDOM_BREAK);
+                            player.level.addParticle(new ItemBreakParticle(player, this));
                         }
                         player.getInventory().setItemInHand(this);
                     }

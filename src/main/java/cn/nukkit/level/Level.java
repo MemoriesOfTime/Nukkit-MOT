@@ -167,6 +167,12 @@ public class Level implements ChunkManager, Metadatable {
         xrayableBlocks[Block.EMERALD_ORE] = true;
         xrayableBlocks[Block.ANCIENT_DEBRIS] = true;
         xrayableBlocks[Block.COPPER_ORE] = true;
+
+        randomTickBlocks[BlockID.CAVE_VINES] = true;
+        randomTickBlocks[BlockID.CAVE_VINES_BODY_WITH_BERRIES] = true;
+        randomTickBlocks[BlockID.CAVE_VINES_HEAD_WITH_BERRIES] = true;
+        randomTickBlocks[BlockID.AZALEA_LEAVES] = true;
+        randomTickBlocks[BlockID.AZALEA_LEAVES_FLOWERED] = true;
     }
 
     @NonComputationAtomic
@@ -2496,7 +2502,8 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         Vector3 above = new Vector3(target.x, target.y + 1, target.z);
-        if (this.getBlockIdAt((int) above.x, (int) above.y, (int) above.z) == Item.FIRE) {
+        int bid = this.getBlockIdAt((int) above.x, (int) above.y, (int) above.z);
+        if (bid == Item.FIRE || bid == Item.SOUL_FIRE) {
             this.setBlock(above, Block.get(BlockID.AIR), true);
         }
 
@@ -2825,7 +2832,7 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
-        if (hand.getWaterloggingLevel() == 0 && hand.canBeFlowedInto() && (block instanceof BlockLiquid || block.getLevelBlockAtLayer(1) instanceof BlockLiquid)) {
+        if (hand.getWaterloggingType() == Block.WaterloggingType.NO_WATERLOGGING && hand.canBeFlowedInto() && (block instanceof BlockLiquid || block.getLevelBlockAtLayer(1) instanceof BlockLiquid)) {
             return null;
         }
 

@@ -171,9 +171,9 @@ public class ItemBucket extends Item {
             if (usesWaterlogging) {
                 if (block.getId() == BlockID.BAMBOO) {
                     placementBlock = block;
-                } else if (target.getWaterloggingLevel() > 0) {
+                } else if (target.getWaterloggingType() != Block.WaterloggingType.NO_WATERLOGGING) {
                     placementBlock = target.getLevelBlockAtLayer(1);
-                } else if (block.getWaterloggingLevel() > 0) {
+                } else if (block.getWaterloggingType() != Block.WaterloggingType.NO_WATERLOGGING) {
                     placementBlock = block.getLevelBlockAtLayer(1);
                 } else {
                     placementBlock = block;
@@ -185,7 +185,7 @@ public class ItemBucket extends Item {
             PlayerBucketEmptyEvent ev = new PlayerBucketEmptyEvent(player, block, face, this, result, true);
             boolean canBeFlowedInto = placementBlock.canBeFlowedInto() || placementBlock.getId() == BlockID.BAMBOO;
             if (usesWaterlogging) {
-                ev.setCancelled(placementBlock.getWaterloggingLevel() <= 0 && !canBeFlowedInto);
+                ev.setCancelled(placementBlock.getWaterloggingType() == Block.WaterloggingType.NO_WATERLOGGING && !canBeFlowedInto);
             } else {
                 ev.setCancelled(!canBeFlowedInto);
             }
