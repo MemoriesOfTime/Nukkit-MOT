@@ -56,6 +56,11 @@ public class BlockPointedDripstone extends BlockSolidMeta implements BlockProper
     }
 
     @Override
+    public String getIdentifier() {
+        return "minecraft:pointed_dripstone";
+    }
+
+    @Override
     public BlockProperties getBlockProperties() {
         return PROPERTIES;
     }

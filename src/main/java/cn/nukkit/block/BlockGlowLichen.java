@@ -2,7 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.custom.properties.BlockProperties;
-import cn.nukkit.block.custom.properties.BooleanBlockProperty;
+import cn.nukkit.block.custom.properties.IntBlockProperty;
 import cn.nukkit.block.properties.BlockPropertiesHelper;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
@@ -17,14 +17,17 @@ import java.util.Set;
 public class BlockGlowLichen extends BlockTransparentMeta implements BlockPropertiesHelper {
 
     // Currently multi_face_direction_bits: 0x01 - down, 0x02 - up, 0x04 - north, 0x08 - south, 0x10 - west, 0x20 - east
-    private static final BooleanBlockProperty CONNECTION_DOWN = new BooleanBlockProperty("connection_down", false);
-    private static final BooleanBlockProperty CONNECTION_UP = new BooleanBlockProperty("connection_up", false);
-    private static final BooleanBlockProperty CONNECTION_NORTH = new BooleanBlockProperty("connection_north", false);
-    private static final BooleanBlockProperty CONNECTION_SOUTH = new BooleanBlockProperty("connection_south", false);
-    private static final BooleanBlockProperty CONNECTION_WEST = new BooleanBlockProperty("connection_west", false);
-    private static final BooleanBlockProperty CONNECTION_EAST = new BooleanBlockProperty("connection_east", false);
+    private static final IntBlockProperty MULTI_FACE_DIRECTION = new IntBlockProperty("multi_face_direction_bits", false,  63);
 
-    private static final BlockProperties PROPERTIES = new BlockProperties(CONNECTION_DOWN, CONNECTION_UP, CONNECTION_NORTH, CONNECTION_SOUTH, CONNECTION_WEST, CONNECTION_EAST);
+    //TODO check
+    public static final int DOWN_BIT = 0x01;
+    public static final int UP_BIT = 0x02;
+    public static final int NORTH_BIT = 0x10;
+    public static final int SOUTH_BIT = 0x04;
+    public static final int WEST_BIT = 0x08;
+    public static final int EAST_BIT = 0x20;
+
+    private static final BlockProperties PROPERTIES = new BlockProperties(MULTI_FACE_DIRECTION);
 
     public BlockGlowLichen() {
         this(0);
@@ -42,6 +45,11 @@ public class BlockGlowLichen extends BlockTransparentMeta implements BlockProper
     @Override
     public String getName() {
         return "Glow Lichen";
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:glow_lichen";
     }
 
     @Override
@@ -147,42 +155,35 @@ public class BlockGlowLichen extends BlockTransparentMeta implements BlockProper
     public void setBlockFace(BlockFace face, boolean value) {
         switch (face) {
             case UP:
-                this.setBooleanValue(CONNECTION_UP, value);
+                this.setIntValue(MULTI_FACE_DIRECTION, value ? this.getIntValue(MULTI_FACE_DIRECTION) | UP_BIT : this.getIntValue(MULTI_FACE_DIRECTION) & ~UP_BIT);
                 break;
             case DOWN:
-                this.setBooleanValue(CONNECTION_DOWN, value);
+                this.setIntValue(MULTI_FACE_DIRECTION, value ? this.getIntValue(MULTI_FACE_DIRECTION) | DOWN_BIT : this.getIntValue(MULTI_FACE_DIRECTION) & ~DOWN_BIT);
                 break;
             case NORTH:
-                this.setBooleanValue(CONNECTION_NORTH, value);
+                this.setIntValue(MULTI_FACE_DIRECTION, value ? this.getIntValue(MULTI_FACE_DIRECTION) | NORTH_BIT : this.getIntValue(MULTI_FACE_DIRECTION) & ~NORTH_BIT);
                 break;
             case SOUTH:
-                this.setBooleanValue(CONNECTION_SOUTH, value);
+                this.setIntValue(MULTI_FACE_DIRECTION, value ? this.getIntValue(MULTI_FACE_DIRECTION) | SOUTH_BIT : this.getIntValue(MULTI_FACE_DIRECTION) & ~SOUTH_BIT);
                 break;
             case WEST:
-                this.setBooleanValue(CONNECTION_WEST, value);
+                this.setIntValue(MULTI_FACE_DIRECTION, value ? this.getIntValue(MULTI_FACE_DIRECTION) | WEST_BIT : this.getIntValue(MULTI_FACE_DIRECTION) & ~WEST_BIT);
                 break;
             case EAST:
-                this.setBooleanValue(CONNECTION_EAST, value);
+                this.setIntValue(MULTI_FACE_DIRECTION, value ? this.getIntValue(MULTI_FACE_DIRECTION) | EAST_BIT : this.getIntValue(MULTI_FACE_DIRECTION) & ~EAST_BIT);
                 break;
         }
     }
 
     public boolean hasBlockFace(BlockFace face) {
-        switch (face) {
-            case UP:
-                return this.getBooleanValue(CONNECTION_UP);
-            case DOWN:
-                return this.getBooleanValue(CONNECTION_DOWN);
-            case NORTH:
-                return this.getBooleanValue(CONNECTION_NORTH);
-            case SOUTH:
-                return this.getBooleanValue(CONNECTION_SOUTH);
-            case WEST:
-                return this.getBooleanValue(CONNECTION_WEST);
-            case EAST:
-                return this.getBooleanValue(CONNECTION_EAST);
-        }
-        return false;
+        return switch (face) {
+            case UP -> (this.getIntValue(MULTI_FACE_DIRECTION) & UP_BIT) != 0;
+            case DOWN -> (this.getIntValue(MULTI_FACE_DIRECTION) & DOWN_BIT) != 0;
+            case NORTH -> (this.getIntValue(MULTI_FACE_DIRECTION) & NORTH_BIT) != 0;
+            case SOUTH -> (this.getIntValue(MULTI_FACE_DIRECTION) & SOUTH_BIT) != 0;
+            case WEST -> (this.getIntValue(MULTI_FACE_DIRECTION) & WEST_BIT) != 0;
+            case EAST -> (this.getIntValue(MULTI_FACE_DIRECTION) & EAST_BIT) != 0;
+        };
     }
 
     public Set<BlockFace> getSupportedFaces() {

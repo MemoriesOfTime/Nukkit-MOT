@@ -2,14 +2,17 @@ package cn.nukkit.level.format.leveldb.structure;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.custom.container.BlockStorageContainer;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
+import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
 import cn.nukkit.utils.Zlib;
 import lombok.extern.log4j.Log4j2;
+import org.cloudburstmc.nbt.NbtMap;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -272,6 +275,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Override
     public Block getAndSetBlock(int x, int y, int z, int layer, Block block) {
         int fullId;
+        NbtMap state = null;
         int previous;
         try {
             this.writeLock.lock();
@@ -287,10 +291,18 @@ public class LevelDBChunkSection implements ChunkSection {
 
                 storage = this.storages[layer];
 
+                if (block instanceof BlockStorageContainer container) {
+                    state = container.getStateNbt();
+                }
+
                 fullId = block.getFullId();
             } else {
                 storage = this.storages[layer];
                 previous = storage.get(x, y, z);
+
+                if (block instanceof BlockStorageContainer container) {
+                    state = container.getStateNbt();
+                }
 
                 fullId = block.getFullId();
 
@@ -299,7 +311,11 @@ public class LevelDBChunkSection implements ChunkSection {
                 }
             }
 
-            storage.set(x, y, z, fullId);
+            if (state != null) {
+                storage.set(x, y, z, BlockStateMapping.get().getState(state));
+            } else {
+                storage.set(x, y, z, fullId);
+            }
 
             dirty = true;
             parent.onSubChunkBlockChanged(this, x, y, z, layer, previous, fullId);

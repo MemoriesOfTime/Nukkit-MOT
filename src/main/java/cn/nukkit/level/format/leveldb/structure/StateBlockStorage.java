@@ -178,6 +178,14 @@ public class StateBlockStorage {
         }
     }
 
+    public BlockStateSnapshot getBlockState(int index) {
+        return this.palette.get(this.bitArray.get(index));
+    }
+
+    public BlockStateSnapshot getBlockState(int x, int y, int z) {
+        return this.getBlockState(elementIndex(x, y, z));
+    }
+
     public int get(int index) {
         BlockStateSnapshot snapshot = this.palette.get(this.bitArray.get(index));
         return snapshot.getLegacyId() << Block.DATA_BITS | snapshot.getLegacyData();
@@ -201,6 +209,10 @@ public class StateBlockStorage {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unable to set value: " + value + ", palette: " + palette, e);
         }
+    }
+
+    public void set(int x, int y, int z, BlockStateSnapshot value) {
+        this.set(elementIndex(x, y, z), value);
     }
 
     public void set(int x, int y, int z, int value) {

@@ -29,7 +29,7 @@ public class BlockDripleafBig extends BlockSolidMeta implements BlockPropertiesH
     public static final BlockProperty<DripleafTilt> TILT_PROPERTY = new EnumBlockProperty<>("big_dripleaf_tilt", false, DripleafTilt.class);
     public static final BlockProperty<Boolean> HEAD_PROPERTY = new BooleanBlockProperty("big_dripleaf_head", false);
 
-    private static final BlockProperties PROPERTIES = new BlockProperties(TILT_PROPERTY, HEAD_PROPERTY, VanillaProperties.DIRECTION);
+    private static final BlockProperties PROPERTIES = new BlockProperties(TILT_PROPERTY, HEAD_PROPERTY, VanillaProperties.CARDINAL_DIRECTION);
 
     public BlockDripleafBig() {
         this(0);
@@ -37,6 +37,11 @@ public class BlockDripleafBig extends BlockSolidMeta implements BlockPropertiesH
 
     public BlockDripleafBig(int meta) {
         super(meta);
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:big_dripleaf";
     }
 
     @Override
@@ -253,11 +258,11 @@ public class BlockDripleafBig extends BlockSolidMeta implements BlockPropertiesH
     }
 
     public void setDirection(BlockFace blockFace) {
-        this.setPropertyValue(VanillaProperties.DIRECTION, blockFace);
+        this.setPropertyValue(VanillaProperties.CARDINAL_DIRECTION, blockFace);
     }
 
     public BlockFace getDirection() {
-        return this.getPropertyValue(VanillaProperties.DIRECTION);
+        return this.getPropertyValue(VanillaProperties.CARDINAL_DIRECTION);
     }
 
     @Override

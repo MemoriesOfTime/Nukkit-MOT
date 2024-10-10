@@ -3,16 +3,23 @@ package cn.nukkit.block.custom.container;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.custom.properties.BlockProperties;
 import cn.nukkit.block.custom.properties.BlockProperty;
+import cn.nukkit.block.custom.properties.EnumBlockProperty;
+import cn.nukkit.block.custom.properties.RegisteredBlockProperty;
+import cn.nukkit.level.format.leveldb.LevelDBConstants;
+import org.cloudburstmc.nbt.NbtMap;
+import org.cloudburstmc.nbt.NbtMapBuilder;
 
 import java.io.Serializable;
 
 public interface BlockStorageContainer extends BlockContainer {
 
     int getStorage();
+
     void setStorage(int damage);
 
     BlockProperties getBlockProperties();
 
+    @Override
     default int getNukkitDamage() {
         return getStorage() & Block.DATA_MASK;
     }
@@ -33,6 +40,10 @@ public interface BlockStorageContainer extends BlockContainer {
         this.setPropertyValue(property.getName(), value);
     }
 
+    default void setIntValue(BlockProperty<Integer> property, int value) {
+        this.setIntValue(property.getName(), value);
+    }
+
     default void setIntValue(String propertyName, int value) {
         this.setStorage(this.getBlockProperties().setIntValue(this.getStorage(), propertyName, value));
     }
@@ -47,6 +58,10 @@ public interface BlockStorageContainer extends BlockContainer {
 
     default <T> T getCheckedPropertyValue(String propertyName, Class<T> tClass) {
         return tClass.cast(this.getPropertyValue(propertyName));
+    }
+
+    default int getIntValue(BlockProperty<Integer> property) {
+        return this.getIntValue(property.getName());
     }
 
     default int getIntValue(String propertyName) {
@@ -74,5 +89,21 @@ public interface BlockStorageContainer extends BlockContainer {
             damage = properties.setValue(damage, propertyName, itemProperties.getValue(itemMeta, propertyName));
         }
         this.setStorage(damage);
+    }
+
+    default NbtMap getStateNbt() {
+        NbtMapBuilder states = NbtMap.builder();
+        for (RegisteredBlockProperty property : this.getBlockProperties().getAllProperties()) {
+            if (property.getProperty() instanceof EnumBlockProperty<?>) {
+                states.put(property.getProperty().getName(), this.getPropertyValue(property.getProperty()).toString());
+            } else {
+                states.put(property.getProperty().getName(), this.getPropertyValue(property.getProperty()));
+            }
+        }
+        return NbtMap.builder()
+                .putString("name", this.getIdentifier())
+                .putCompound("states", states.build())
+                .putInt("version", LevelDBConstants.STATE_VERSION)
+                .build();
     }
 }

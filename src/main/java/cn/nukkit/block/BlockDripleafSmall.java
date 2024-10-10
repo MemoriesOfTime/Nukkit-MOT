@@ -17,7 +17,7 @@ import cn.nukkit.utils.Faceable;
 
 public class BlockDripleafSmall extends BlockFlowable implements BlockPropertiesHelper, Faceable {
 
-    private static final BlockProperties PROPERTIES = new BlockProperties(VanillaProperties.UPPER_BLOCK, VanillaProperties.DIRECTION);
+    private static final BlockProperties PROPERTIES = new BlockProperties(VanillaProperties.UPPER_BLOCK, VanillaProperties.CARDINAL_DIRECTION);
 
     public BlockDripleafSmall() {
         this(0);
@@ -25,6 +25,11 @@ public class BlockDripleafSmall extends BlockFlowable implements BlockProperties
 
     public BlockDripleafSmall(int meta) {
         super(meta);
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:small_dripleaf_block";
     }
 
     @Override
@@ -173,11 +178,11 @@ public class BlockDripleafSmall extends BlockFlowable implements BlockProperties
     }
 
     public void setDirection(BlockFace blockFace) {
-        this.setPropertyValue(VanillaProperties.DIRECTION, blockFace);
+        this.setPropertyValue(VanillaProperties.CARDINAL_DIRECTION, blockFace);
     }
 
     public BlockFace getDirection() {
-        return this.getPropertyValue(VanillaProperties.DIRECTION);
+        return this.getPropertyValue(VanillaProperties.CARDINAL_DIRECTION);
     }
 
     @Override
