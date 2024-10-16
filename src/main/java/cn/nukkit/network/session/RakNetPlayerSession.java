@@ -201,7 +201,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             log.warn("Wrong protocol used for {}! expected {} got{}", packet.getClass().getSimpleName(), this.player.protocol, packet.protocol);
         }
 
-        if (packet.packetId() != ProtocolInfo.toNewProtocolID(ProtocolInfo.BATCH_PACKET)) {
+        if (!(packet instanceof BatchPacket)) {
             packet.tryEncode();
         }
         this.outbound.offer(packet);

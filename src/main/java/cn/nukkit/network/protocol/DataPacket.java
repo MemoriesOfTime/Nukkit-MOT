@@ -27,9 +27,17 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
 
     public abstract void encode();
 
+    public final void tryEncode() {
+        if (!this.isEncoded) {
+            this.isEncoded = true;
+            this.encode();
+        }
+    }
+
     @Override
     public DataPacket reset() {
         super.reset();
+
         if (protocol <= 274) {
             if (protocol >= ProtocolInfo.v1_2_0) {
                 this.putByte(this.pid());
@@ -46,6 +54,7 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
         } else {
             this.putUnsignedVarInt(this.packetId());
         }
+
         return this;
     }
 
@@ -70,8 +79,7 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
     public DataPacket clone() {
         try {
             DataPacket packet = (DataPacket) super.clone();
-            // prevent reflecting same buffer instance
-            packet.setBuffer(this.count < 0 ? null : this.getBuffer());
+            packet.setBuffer(this.getBuffer()); // prevent reflecting same buffer instance
             packet.offset = this.offset;
             packet.count = this.count;
             return packet;
@@ -101,13 +109,6 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
             return batched;
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    public final void tryEncode() {
-        if (!this.isEncoded) {
-            this.isEncoded = true;
-            this.encode();
         }
     }
 }
