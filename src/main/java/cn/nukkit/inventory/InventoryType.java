@@ -25,6 +25,7 @@ public enum InventoryType {
     UI(1, "UI", -1), //1 CONTAINER
     SHULKER_BOX(27, "Shulker Box", 0), //27 CONTAINER
     BEACON(1, "Beacon", 13), //1 INPUT
+    LOOM(4, "Loom", 24), //4 CONTAINER
     CHEST_BOAT(27, "Chest Boat", 0),// 34 CONTAINER
     ENTITY_ARMOR(4, "Entity Armor", -1), //4 ARMOR
     ENTITY_EQUIPMENT(36, "Entity Equipment", -1), //36 CONTAINER

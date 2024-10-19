@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Server;
 import cn.nukkit.entity.data.Skin;
 import cn.nukkit.utils.PersonaPiece;
 import cn.nukkit.utils.PersonaPieceTint;
@@ -93,13 +94,12 @@ public class LoginPacket extends DataPacket {
     private void decodeSkinData() {
         int size = this.getLInt();
         if (size > 52428800) {
-            throw new IllegalArgumentException("The skin data is too big: " + size);
+            Server.getInstance().getLogger().warning(username + ": The skin data is too big: " + size);
+            return; // Get disconnected due to "invalid skin"
         }
 
-        String data = new String(this.get(size), StandardCharsets.UTF_8);
-        JsonObject skinToken = decodeToken(data);
-
-        if (skinToken == null) return;
+        JsonObject skinToken = decodeToken(new String(this.get(size), StandardCharsets.UTF_8));
+        if (skinToken == null) throw new RuntimeException("Invalid null skin token");
 
         // 将1.19.62按1.19.63版本处理 修复1.19.62皮肤修改问题
         if (this.protocol_ == ProtocolInfo.v1_19_60 &&

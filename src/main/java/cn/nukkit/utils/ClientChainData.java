@@ -218,7 +218,7 @@ public final class ClientChainData implements LoginChainData {
     private void decodeSkinData() {
         int size = bs.getLInt();
         if (size > 52428800) {
-            throw new IllegalArgumentException("The skin data is too big: " + size);
+            throw new TooBigSkinException("The skin data is too big: " + size);
         }
         JsonObject skinToken = decodeToken(new String(bs.get(size), StandardCharsets.UTF_8));
         if (skinToken == null) return;
@@ -293,5 +293,12 @@ public final class ClientChainData implements LoginChainData {
     }
 
     private static class MapTypeToken extends TypeToken<Map<String, List<String>>> {
+    }
+
+    public static class TooBigSkinException extends RuntimeException {
+
+        public TooBigSkinException(String s) {
+            super(s);
+        }
     }
 }

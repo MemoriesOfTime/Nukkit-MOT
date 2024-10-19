@@ -346,6 +346,7 @@ public class Blocks {
         list[FLETCHING_TABLE] = BlockFletchingTable.class; //456
         list[SMITHING_TABLE] = BlockSmithingTable.class; //457
         list[BARREL] = BlockBarrel.class; //458
+        list[LOOM] = BlockLoom.class; //459
 
         list[BELL] = BlockBell.class; //461
         list[SWEET_BERRY_BUSH] = BlockSweetBerryBush.class; //462
