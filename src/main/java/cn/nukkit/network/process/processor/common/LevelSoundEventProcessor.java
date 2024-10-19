@@ -36,4 +36,9 @@ public class LevelSoundEventProcessor extends DataPacketProcessor<LevelSoundEven
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.LEVEL_SOUND_EVENT_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

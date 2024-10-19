@@ -74,4 +74,9 @@ public class BookEditProcessor extends DataPacketProcessor<BookEditPacket> {
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.BOOK_EDIT_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

@@ -5,8 +5,10 @@ import cn.nukkit.network.process.processor.common.*;
 import cn.nukkit.network.process.processor.v113.ContainerSetSlotProcessor_v113;
 import cn.nukkit.network.process.processor.v113.DropItemProcessor_v113;
 import cn.nukkit.network.process.processor.v113.RemoveBlockProcessor_v113;
+import cn.nukkit.network.process.processor.v113.UseItemProcessor_v113;
 import cn.nukkit.network.process.processor.v282.SetLocalPlayerAsInitializedProcessor_v282;
 import cn.nukkit.network.process.processor.v340.LecternUpdateProcessor_v340;
+import cn.nukkit.network.process.processor.v422.FilterTextProcessor_v422;
 import cn.nukkit.network.process.processor.v527.RequestAbilityProcessor_v527;
 import cn.nukkit.network.process.processor.v554.RequestNetworkSettingsProcessor_v554;
 import cn.nukkit.network.protocol.DataPacket;
@@ -107,7 +109,6 @@ public final class DataPacketManager {
                 ClientToServerHandshakeProcessor.INSTANCE,
                 CommandRequestProcessor.INSTANCE,
                 EmotePacketProcessor.INSTANCE,
-                FilterTextProcessor.INSTANCE,
                 ItemFrameDropItemProcessor.INSTANCE,
                 LevelSoundEventProcessor.INSTANCE,
                 LevelSoundEventProcessorV1.INSTANCE,
@@ -134,7 +135,8 @@ public final class DataPacketManager {
                 ProtocolInfo.v1_1_0,
                 ContainerSetSlotProcessor_v113.INSTANCE,
                 DropItemProcessor_v113.INSTANCE,
-                RemoveBlockProcessor_v113.INSTANCE
+                RemoveBlockProcessor_v113.INSTANCE,
+                UseItemProcessor_v113.INSTANCE
         );
 
         registerProcessor(
@@ -145,6 +147,11 @@ public final class DataPacketManager {
         registerProcessor(
                 ProtocolInfo.v1_10_0,
                 LecternUpdateProcessor_v340.INSTANCE
+        );
+
+        registerProcessor(
+                ProtocolInfo.v1_16_200,
+                FilterTextProcessor_v422.INSTANCE
         );
 
         registerProcessor(

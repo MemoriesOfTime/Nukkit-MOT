@@ -49,4 +49,9 @@ public class PlayerSkinProcessor extends DataPacketProcessor<PlayerSkinPacket> {
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.PLAYER_SKIN_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

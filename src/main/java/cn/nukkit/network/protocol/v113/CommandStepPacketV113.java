@@ -10,7 +10,7 @@ import com.google.gson.Gson;
  */
 public class CommandStepPacketV113 extends DataPacket {
 
-    public static final byte NETWORK_ID = 0x4f;
+    public static final byte NETWORK_ID = ProtocolInfoV113.COMMAND_STEP_PACKET;
 
     /**
      * unknown (string)

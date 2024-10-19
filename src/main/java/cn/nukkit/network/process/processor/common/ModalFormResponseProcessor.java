@@ -62,5 +62,9 @@ public class ModalFormResponseProcessor extends DataPacketProcessor<ModalFormRes
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.MODAL_FORM_RESPONSE_PACKET);
     }
-    
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

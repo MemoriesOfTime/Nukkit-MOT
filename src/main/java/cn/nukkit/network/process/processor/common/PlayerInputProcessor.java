@@ -46,4 +46,9 @@ public class PlayerInputProcessor extends DataPacketProcessor<PlayerInputPacket>
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.PLAYER_INPUT_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

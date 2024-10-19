@@ -1,4 +1,4 @@
-package cn.nukkit.network.process.processor.common;
+package cn.nukkit.network.process.processor.v422;
 
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
@@ -14,9 +14,9 @@ import org.jetbrains.annotations.NotNull;
  * @date {2024/1/10} {12:30}
  */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class FilterTextProcessor extends DataPacketProcessor<FilterTextPacket> {
+public class FilterTextProcessor_v422 extends DataPacketProcessor<FilterTextPacket> {
 
-    public static final FilterTextProcessor INSTANCE = new FilterTextProcessor();
+    public static final FilterTextProcessor_v422 INSTANCE = new FilterTextProcessor_v422();
 
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull FilterTextPacket pk) {
@@ -34,5 +34,10 @@ public class FilterTextProcessor extends DataPacketProcessor<FilterTextPacket> {
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.FILTER_TEXT_PACKET);
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_16_200;
     }
 }

@@ -1456,14 +1456,16 @@ public class BinaryStream {
     }
 
     public void putEntityLink(int protocol, EntityLink link) {
-        putEntityUniqueId(link.fromEntityUniquieId);
-        putEntityUniqueId(link.toEntityUniquieId);
-        putByte(link.type);
-        putBoolean(link.immediate);
-        if (protocol >= 407) {
-            putBoolean(link.riderInitiated);
-            if (protocol >= ProtocolInfo.v1_21_20) {
-                putLFloat(link.vehicleAngularVelocity);
+        this.putEntityUniqueId(link.fromEntityUniquieId);
+        this.putEntityUniqueId(link.toEntityUniquieId);
+        this.putByte(link.type);
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            this.putBoolean(link.immediate);
+            if (protocol >= ProtocolInfo.v1_16_0) {
+                this.putBoolean(link.riderInitiated);
+                if (protocol >= ProtocolInfo.v1_21_20) {
+                    this.putLFloat(link.vehicleAngularVelocity);
+                }
             }
         }
     }

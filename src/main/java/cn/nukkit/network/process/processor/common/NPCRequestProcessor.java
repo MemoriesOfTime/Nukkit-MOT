@@ -72,4 +72,9 @@ public class NPCRequestProcessor extends DataPacketProcessor<NPCRequestPacket> {
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.NPC_REQUEST_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

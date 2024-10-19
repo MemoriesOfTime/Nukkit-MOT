@@ -533,8 +533,12 @@ public class AvailableCommandsPacket extends DataPacket {
                             type |= ARG_FLAG_ENUM | enums.indexOf(parameter.enumData);
                         } else {
                             CommandParam commandParam = COMMAND_PARAMS.getType(parameter.type.getId()); //正常来说应该传入最新版的数字id
-                            int id = getCommandParams(protocol).getId(commandParam);
-                            type |= id;
+                            try {
+                                int id = getCommandParams(protocol).getId(commandParam);
+                                type |= id;
+                            } catch (IllegalArgumentException e) {
+                                // 忽略不支持的id
+                            }
                         }
                     }
 

@@ -33,4 +33,9 @@ public class PlayerHotbarProcessor extends DataPacketProcessor<PlayerHotbarPacke
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.PLAYER_HOTBAR_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

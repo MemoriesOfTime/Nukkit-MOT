@@ -50,6 +50,6 @@ public class AdventureSettingsProcessor extends DataPacketProcessor<AdventureSet
 
     @Override
     public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_2_0 && protocol < ProtocolInfo.v1_19_30_23;
+        return protocol >= ProtocolInfo.v1_1_0 && protocol < ProtocolInfo.v1_19_30_23;
     }
 }

@@ -54,4 +54,9 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.MOB_EQUIPMENT_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

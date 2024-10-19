@@ -38,4 +38,9 @@ public class SetDifficultyProcessor extends DataPacketProcessor<SetDifficultyPac
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.SET_DIFFICULTY_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

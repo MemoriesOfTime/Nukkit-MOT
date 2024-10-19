@@ -39,4 +39,9 @@ public class CommandRequestProcessor extends DataPacketProcessor<CommandRequestP
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.COMMAND_REQUEST_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

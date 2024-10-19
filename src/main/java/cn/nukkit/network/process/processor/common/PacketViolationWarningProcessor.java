@@ -46,4 +46,9 @@ public class PacketViolationWarningProcessor extends DataPacketProcessor<PacketV
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.PACKET_VIOLATION_WARNING_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

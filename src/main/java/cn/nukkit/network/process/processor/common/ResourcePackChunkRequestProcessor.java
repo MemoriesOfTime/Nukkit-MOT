@@ -42,4 +42,9 @@ public class ResourcePackChunkRequestProcessor extends DataPacketProcessor<Resou
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.RESOURCE_PACK_CHUNK_REQUEST_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

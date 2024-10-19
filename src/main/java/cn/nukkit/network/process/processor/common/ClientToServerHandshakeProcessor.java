@@ -33,4 +33,9 @@ public class ClientToServerHandshakeProcessor extends DataPacketProcessor<Client
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

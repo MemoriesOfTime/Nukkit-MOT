@@ -31,6 +31,9 @@ public class SetEntityLinkPacket extends DataPacket {
         this.putEntityUniqueId(this.vehicleUniqueId);
         this.putEntityUniqueId(this.riderUniqueId);
         this.putByte(this.type);
+        if (protocol < ProtocolInfo.v1_2_0) {
+            return;
+        }
         this.putByte(this.immediate);
         if (protocol >= 407) {
             this.putBoolean(this.riderInitiated);

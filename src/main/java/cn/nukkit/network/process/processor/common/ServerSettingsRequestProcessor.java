@@ -42,4 +42,9 @@ public class ServerSettingsRequestProcessor extends DataPacketProcessor<ServerSe
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.SERVER_SETTINGS_REQUEST_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

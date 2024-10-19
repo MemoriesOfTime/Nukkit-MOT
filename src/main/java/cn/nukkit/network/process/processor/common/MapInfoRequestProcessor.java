@@ -79,4 +79,9 @@ public class MapInfoRequestProcessor extends DataPacketProcessor<MapInfoRequestP
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.MAP_INFO_REQUEST_PACKET);
     }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }
