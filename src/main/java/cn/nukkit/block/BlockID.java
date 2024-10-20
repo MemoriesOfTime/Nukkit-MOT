@@ -642,10 +642,9 @@ public interface BlockID {
     int WAXED_OXIDIZED_CUT_COPPER = 702;
 
     int RAW_IRON_BLOCK = 706;
-
     int RAW_COPPER_BLOCK = 707;
-
     int RAW_GOLD_BLOCK = 708;
+    int INFESTED_DEEPSLATE = 709;
 
     int PEARLESCENT_FROGLIGHT = 724;
 
@@ -658,6 +657,9 @@ public interface BlockID {
     int MUD_BRICKS = 730;
 
     int PACKED_MUD = 732;
+    int MUD_BRICK_SLAB = 733;
+    int MUD_BRICK_DOUBLE_SLAB = 734;
+    int MUD_BRICK_STAIRS = 735;
 
     int MANGROVE_PLANKS = 741;
 

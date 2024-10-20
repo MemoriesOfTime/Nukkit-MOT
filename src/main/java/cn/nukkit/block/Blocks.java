@@ -559,6 +559,7 @@ public class Blocks {
         list[RAW_IRON_BLOCK] = BlockRawIron.class; //706
         list[RAW_COPPER_BLOCK] = BlockRawCopper.class; //707
         list[RAW_GOLD_BLOCK] = BlockRawGold.class; //708
+        list[INFESTED_DEEPSLATE] = BlockInfestedDeepslate.class; //709
 
         list[PEARLESCENT_FROGLIGHT] = BlockFrogLightPearlescent.class; //724
         list[VERDANT_FROGLIGHT] = BlockFrogLightVerdant.class; //725
