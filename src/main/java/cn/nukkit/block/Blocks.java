@@ -480,6 +480,20 @@ public class Blocks {
         list[FLOWERING_AZALEA] = BlockAzaleaFlowering.class; //593
 
         list[GLOW_FRAME] = BlockItemFrameGlow.class; //594
+        list[COPPER_BLOCK] = BlockCopper.class; //595
+        list[EXPOSED_COPPER] = BlockCopperExposed.class; //596
+        list[WEATHERED_COPPER] = BlockCopperWeathered.class; //597
+        list[OXIDIZED_COPPER] = BlockCopperOxidized.class; //598
+        list[WAXED_COPPER] = BlockCopperWaxed.class; //599
+        list[WAXED_EXPOSED_COPPER] = BlockCopperExposedWaxed.class; //600
+        list[WAXED_WEATHERED_COPPER] = BlockCopperWeatheredWaxed.class; //601
+        list[CUT_COPPER] = BlockCopperCut.class; //602
+        list[EXPOSED_CUT_COPPER] = BlockCopperCutExposed.class; //603
+        list[WEATHERED_CUT_COPPER] = BlockCopperCutWeathered.class; //604
+        list[OXIDIZED_CUT_COPPER] = BlockCopperCutOxidized.class; //605
+        list[WAXED_CUT_COPPER] = BlockCopperCutWaxed.class; //606
+        list[WAXED_EXPOSED_CUT_COPPER] = BlockCopperCutExposedWaxed.class; //607
+        list[WAXED_WEATHERED_CUT_COPPER] = BlockCopperCutWeatheredWaxed.class; //608
 
         list[CAVE_VINES_BODY_WITH_BERRIES] = BlockCaveVinesBerriesBody.class; //630
         list[CAVE_VINES_HEAD_WITH_BERRIES] = BlockCaveVinesBerriesHead.class; //631
@@ -536,6 +550,8 @@ public class Blocks {
         list[GREEN_CANDLE_CAKE] = BlockCandleCakeGreen.class; //698
         list[RED_CANDLE_CAKE] = BlockCandleCakeRed.class; //699
         list[BLACK_CANDLE_CAKE] = BlockCandleCakeBlack.class; //700
+        list[WAXED_OXIDIZED_COPPER] = BlockCopperOxidizedWaxed.class; //701
+        list[WAXED_OXIDIZED_CUT_COPPER] = BlockCopperCutOxidizedWaxed.class; //702
 
         list[RAW_IRON_BLOCK] = BlockRawIron.class; //706
         list[RAW_COPPER_BLOCK] = BlockRawCopper.class; //707
