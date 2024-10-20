@@ -67,7 +67,11 @@ public class BlockOreRedstone extends BlockSolid {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_TOUCH) {
-            this.getLevel().setBlock(this, Block.get(GLOWING_REDSTONE_ORE), false, false);
+            Block block = Block.get(GLOWING_REDSTONE_ORE);
+            if(this instanceof BlockDeepslateRedstoneOre) {
+                block = Block.get(LIT_DEEPSLATE_REDSTONE_ORE);
+            }
+            this.getLevel().setBlock(this, block, false, false);
             this.getLevel().scheduleUpdate(this, 600);
 
             return Level.BLOCK_UPDATE_WEAK;
