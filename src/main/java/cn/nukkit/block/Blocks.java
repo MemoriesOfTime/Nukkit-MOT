@@ -462,8 +462,18 @@ public class Blocks {
         list[CAVE_VINES] = BlockCaveVines.class; //577
         list[BIG_DRIPLEAF] = BlockDripleafBig.class; //578
 
+        list[AZALEA_LEAVES] = BlockAzaleaLeaves.class; //589
+        list[AZALEA_LEAVES_FLOWERED] = BlockAzaleaLeavesFlowered.class; //580
+        list[CALCITE] = BlockCalcite.class; //581
         list[AMETHYST_BLOCK] = BlockAmethyst.class; //582
 
+        list[BUDDING_AMETHYST] = BlockBuddingAmethyst.class; //583
+        list[AMETHYST_CLUSTER] = BlockAmethystCluster.class; //584
+        list[LARGE_AMETHYST_BUD] = BlockAmethystBudLarge.class; //585
+        list[MEDIUM_AMETHYST_BUD] = BlockAmethystBudMedium.class; //586
+        list[SMALL_AMETHYST_BUD] = BlockAmethystBudSmall.class; //587
+        list[TUFF] = BlockTuff.class; //588
+        list[TINTED_GLASS] = BlockGlassTinted.class; //589
         list[MOSS_CARPET] = BlockMossCarpet.class; //590
         list[SMALL_DRIPLEAF] = BlockDripleafSmall.class; //591
         list[AZALEA] = BlockAzalea.class; //592
@@ -474,7 +484,9 @@ public class Blocks {
         list[CAVE_VINES_BODY_WITH_BERRIES] = BlockCaveVinesBerriesBody.class; //630
         list[CAVE_VINES_HEAD_WITH_BERRIES] = BlockCaveVinesBerriesHead.class; //631
 
+        list[SMOOTH_BASALT] = BlockBasaltSmooth.class; //632
         list[DEEPSLATE] = BlockDeepslate.class; // 633
+        list[COBBLED_DEEPSLATE] = BlockDeepslateCobbled.class; //634
 
         list[DEEPSLATE_LAPIS_ORE] = BlockDeepslateLapisOre.class; // 655
 
@@ -532,6 +544,12 @@ public class Blocks {
         list[PEARLESCENT_FROGLIGHT] = BlockFrogLightPearlescent.class; //724
         list[VERDANT_FROGLIGHT] = BlockFrogLightVerdant.class; //725
         list[OCHRE_FROGLIGHT] = BlockFrogLightOchre.class; //726
+
+        list[MUD] = BlockMud.class; //728
+
+        list[MUD_BRICKS] = BlockMudBricks.class; //730
+
+        list[PACKED_MUD] = BlockPackedMud.class; //732
 
         list[MANGROVE_PLANKS] = BlockPlanksMangrove.class; //741
 

@@ -534,9 +534,17 @@ public interface BlockID {
     int BIG_DRIPLEAF = 578;
     int AZALEA_LEAVES = 579;
     int AZALEA_LEAVES_FLOWERED = 580;
+    int CALCITE = 581;
 
     int AMETHYST_BLOCK = 582;
 
+    int BUDDING_AMETHYST = 583;
+    int AMETHYST_CLUSTER = 584;
+    int LARGE_AMETHYST_BUD = 585;
+    int MEDIUM_AMETHYST_BUD = 586;
+    int SMALL_AMETHYST_BUD = 587;
+    int TUFF = 588;
+    int TINTED_GLASS = 589;
     int MOSS_CARPET = 590;
     int SMALL_DRIPLEAF = 591;
     int AZALEA = 592;
@@ -546,7 +554,9 @@ public interface BlockID {
     int CAVE_VINES_BODY_WITH_BERRIES = 630;
     int CAVE_VINES_HEAD_WITH_BERRIES = 631;
 
+    int SMOOTH_BASALT = 632;
     int DEEPSLATE = 633;
+    int COBBLED_DEEPSLATE = 634;
 
     int DEEPSLATE_LAPIS_ORE = 656;
     int DEEPSLATE_GOLD_ORE = 657;
@@ -609,6 +619,10 @@ public interface BlockID {
     int OCHRE_FROGLIGHT = 726;
 
     int MUD = 728;
+
+    int MUD_BRICKS = 730;
+
+    int PACKED_MUD = 732;
 
     int MANGROVE_PLANKS = 741;
 
