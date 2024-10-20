@@ -8,6 +8,7 @@ import cn.nukkit.event.player.PlayerMapInfoRequestEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemMap;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.MapInfoRequestPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.plugin.InternalPlugin;
@@ -78,6 +79,11 @@ public class MapInfoRequestProcessor extends DataPacketProcessor<MapInfoRequestP
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.MAP_INFO_REQUEST_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return MapInfoRequestPacket.class;
     }
 
     @Override

@@ -1,15 +1,18 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.network.Network;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.SnappyCompression;
 import cn.nukkit.utils.Zlib;
+import lombok.extern.log4j.Log4j2;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
+@Log4j2
 public abstract class DataPacket extends BinaryStream implements Cloneable {
 
     public int protocol = Integer.MAX_VALUE;
@@ -48,6 +51,9 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
                     packetId = Server.getInstance().getNetwork().getPacketPool(protocol).getPacketId(this.getClass());
                 } catch (IllegalArgumentException e) {
                     packetId = 0x6a; //使用1.1不存在的id，所有不支持的数据包
+                    if (Nukkit.DEBUG > 1) {
+                        log.warn("Unknown packet {} for protocol {}", this.getClass().getName(), protocol);
+                    }
                 }
                 this.putByte((byte) (packetId & 0xff));
             }

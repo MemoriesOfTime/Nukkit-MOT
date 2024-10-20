@@ -5,6 +5,7 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.event.player.PlayerCommandPreprocessEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.CommandRequestPacket;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -37,5 +38,10 @@ public class CommandRequestProcessor_v137 extends DataPacketProcessor<CommandReq
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.COMMAND_REQUEST_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return CommandRequestPacket.class;
     }
 }

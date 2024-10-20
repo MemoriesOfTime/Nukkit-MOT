@@ -10,6 +10,7 @@ import cn.nukkit.item.ProjectileItem;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.UpdateBlockPacket;
 import cn.nukkit.network.protocol.v113.UseItemPacketV113;
@@ -122,6 +123,11 @@ public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacketV113
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(UseItemPacketV113.NETWORK_ID);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return UseItemPacketV113.class;
     }
 
     @Override

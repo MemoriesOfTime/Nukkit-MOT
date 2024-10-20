@@ -86,7 +86,11 @@ public class TextPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putByte(this.type);
+        if (this.protocol < ProtocolInfo.v1_2_0 && this.type > 4) {
+            this.putByte((byte) (this.type - 1));
+        } else {
+            this.putByte(this.type);
+        }
         if (protocol >= ProtocolInfo.v1_2_0) {
             this.putBoolean(this.isLocalized || type == TYPE_TRANSLATION);
         }

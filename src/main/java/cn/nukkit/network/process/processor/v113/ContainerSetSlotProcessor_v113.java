@@ -10,6 +10,7 @@ import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
@@ -44,7 +45,7 @@ public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<Containe
                 return;
             }
             if (player.isCreative()) {
-                if (Item.getCreativeItemIndex(pk.item) != -1) {
+                if (Item.getCreativeItemIndex(player.protocol, pk.item) != -1) {
                     inv.setItem(pk.slot, pk.item);
                     player.getInventory().setHotbarSlotIndex(pk.slot, pk.slot); //links hotbar[packet.slot] to slots[packet.slot]
                 }
@@ -60,7 +61,7 @@ public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<Containe
             inv = player.getWindowById(pk.windowid);
 
             if (!(inv instanceof AnvilInventory)) {
-                //player.craftingType = CRAFTING_SMALL;
+                player.craftingType = Player.CRAFTING_SMALL;
             }
 
             if (inv instanceof EnchantInventory && pk.item.hasEnchantments()) {
@@ -90,6 +91,14 @@ public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<Containe
 
 
         //TODO
+        if (transaction.isValid(player)) {
+            if (transaction.execute(player)) {
+                transaction.onExecuteSuccess(player);
+            } else {
+                transaction.onExecuteFail(player);
+            }
+        }
+
         /*if (player.currentTransaction == null || player.currentTransaction.getCreationTime() < (System.currentTimeMillis() - 8 * 1000)) {
             if (player.currentTransaction != null) {
                 for (Inventory inventory : player.currentTransaction.getInventories()) {
@@ -139,6 +148,11 @@ public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<Containe
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ContainerSetContentPacketV113.NETWORK_ID);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return ContainerSetSlotPacketV113.class;
     }
 
     @Override

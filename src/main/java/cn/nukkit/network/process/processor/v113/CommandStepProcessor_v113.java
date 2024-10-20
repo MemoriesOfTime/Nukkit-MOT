@@ -6,6 +6,7 @@ import cn.nukkit.command.Command;
 import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.event.player.PlayerCommandPreprocessEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.v113.CommandStepPacketV113;
 import com.google.gson.Gson;
@@ -77,6 +78,11 @@ public class CommandStepProcessor_v113 extends DataPacketProcessor<CommandStepPa
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(CommandStepPacketV113.NETWORK_ID);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return CommandStepPacketV113.class;
     }
 
     @Override

@@ -2925,7 +2925,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             log.trace("Inbound {}: {}", this.getName(), packet);
         }
 
-        if (DataPacketManager.canProcess(packet.protocol, packet.packetId())) {
+        if (DataPacketManager.canProcess(packet.protocol, packet.getClass())) {
             DataPacketManager.processPacket(this.playerHandle, packet);
             return;
         }

@@ -8,6 +8,7 @@ import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.v113.DropItemPacketV113;
 import lombok.AccessLevel;
@@ -52,6 +53,11 @@ public class DropItemProcessor_v113 extends DataPacketProcessor<DropItemPacketV1
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(DropItemPacketV113.NETWORK_ID);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return DropItemPacketV113.class;
     }
 
     @Override

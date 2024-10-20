@@ -3,6 +3,7 @@ package cn.nukkit.network.process.processor.v422;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.FilterTextPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.AccessLevel;
@@ -34,6 +35,11 @@ public class FilterTextProcessor_v422 extends DataPacketProcessor<FilterTextPack
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.FILTER_TEXT_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return FilterTextPacket.class;
     }
 
     @Override
