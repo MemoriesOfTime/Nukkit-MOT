@@ -1,13 +1,12 @@
 package cn.nukkit.network.protocol.v113;
 
 import cn.nukkit.item.Item;
-import cn.nukkit.network.protocol.DataPacket;
 
 /**
  * author: MagicDroidX
  * Nukkit Project
  */
-public class ContainerSetSlotPacketV113 extends DataPacket {
+public class ContainerSetSlotPacketV113 extends DataPacket_v113 {
     public static final byte NETWORK_ID = ProtocolInfoV113.CONTAINER_SET_SLOT_PACKET;
 
     @Override

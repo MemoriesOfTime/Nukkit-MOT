@@ -3,12 +3,11 @@ package cn.nukkit.network.protocol.v113;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.math.Vector3f;
-import cn.nukkit.network.protocol.DataPacket;
 
 /**
  * @author Nukkit Project Team
  */
-public class UseItemPacketV113 extends DataPacket {
+public class UseItemPacketV113 extends DataPacket_v113 {
 
     public static final byte NETWORK_ID = ProtocolInfoV113.USE_ITEM_PACKET;
 
@@ -54,7 +53,7 @@ public class UseItemPacketV113 extends DataPacket {
         this.posY = playerPos.y;
         this.posZ = playerPos.z;
         this.slot = this.getByte();
-        this.item = this.getSlot();
+        this.item = this.getSlot(this.protocol);
     }
 
     @Override

@@ -262,7 +262,7 @@ public class Network {
                     try {
                         if (raknetProtocol > 8) {
                             pk.decode();
-                        }else { // version < 1.6
+                        } else { // version < 1.6
                             pk.setBuffer(buf, pk.protocol < ProtocolInfo.v1_2_0 ? 1 : 3);
                             pk.decode();
                         }
@@ -384,6 +384,7 @@ public class Network {
                 .registerPacket(ProtocolInfoV113.DISCONNECT_PACKET, DisconnectPacket.class)
                 .registerPacket(ProtocolInfoV113.DROP_ITEM_PACKET, DropItemPacketV113.class)
                 .registerPacket(ProtocolInfoV113.ENTITY_EVENT_PACKET, EntityEventPacket.class)
+                .registerPacket(ProtocolInfoV113.UPDATE_ATTRIBUTES_PACKET, UpdateAttributesPacket.class)
                 .registerPacket(ProtocolInfoV113.ENTITY_FALL_PACKET, EntityFallPacket.class)
                 .registerPacket(ProtocolInfoV113.EXPLODE_PACKET, ExplodePacketV113.class)
                 .registerPacket(ProtocolInfoV113.FULL_CHUNK_DATA_PACKET, LevelChunkPacket.class)

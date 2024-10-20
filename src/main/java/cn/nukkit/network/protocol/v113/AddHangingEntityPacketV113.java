@@ -1,9 +1,8 @@
 package cn.nukkit.network.protocol.v113;
 
 import cn.nukkit.math.BlockVector3;
-import cn.nukkit.network.protocol.DataPacket;
 
-public class AddHangingEntityPacketV113 extends DataPacket {
+public class AddHangingEntityPacketV113 extends DataPacket_v113 {
     public static final byte NETWORK_ID = ProtocolInfoV113.ADD_HANGING_ENTITY_PACKET;
 
     @Override

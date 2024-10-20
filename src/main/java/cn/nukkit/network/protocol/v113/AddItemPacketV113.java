@@ -1,9 +1,8 @@
 package cn.nukkit.network.protocol.v113;
 
 import cn.nukkit.item.Item;
-import cn.nukkit.network.protocol.DataPacket;
 
-public class AddItemPacketV113 extends DataPacket {
+public class AddItemPacketV113 extends DataPacket_v113 {
     public static final byte NETWORK_ID = ProtocolInfoV113.ADD_ITEM_PACKET;
 
     @Override

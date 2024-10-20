@@ -754,7 +754,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void sendCommandData() {
-        AvailableCommandsPacket pk = new AvailableCommandsPacket();
         Map<String, CommandDataVersions> data = new HashMap<>();
 
         for (Command command : this.server.getCommandMap().getCommands().values()) {
@@ -772,6 +771,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (!data.isEmpty()) {
+            AvailableCommandsPacket pk = new AvailableCommandsPacket();
             pk.commands = data;
             this.dataPacket(pk);
         }

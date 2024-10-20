@@ -467,6 +467,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         clearCreativeItems();
     }
 
+    private static final List<Item> creative113 = new ObjectArrayList<>();
     private static final List<Item> creative137 = new ObjectArrayList<>();
     private static final List<Item> creative274 = new ObjectArrayList<>();
     private static final List<Item> creative291 = new ObjectArrayList<>();
@@ -507,6 +508,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         clearCreativeItems();
 
         // Creative inventory for oldest versions
+        registerCreativeItems(v1_1_0);
+        registerCreativeItems(v1_2_0);
         registerCreativeItems(v1_5_0);
         registerCreativeItems(v1_7_0);
         registerCreativeItems(v1_8_0);
@@ -582,6 +585,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public static void clearCreativeItems() {
+        Item.creative113.clear();
         Item.creative137.clear();
         Item.creative274.clear();
         Item.creative291.clear();
@@ -626,7 +630,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static ArrayList<Item> getCreativeItems(int protocol) {
         switch (protocol) {
-            case v1_1_0: //TODO check
+            case v1_1_0:
+                return new ArrayList<>(Item.creative113);
             case v1_2_0:
             case v1_2_5_11:
             case v1_2_5:
@@ -749,6 +754,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static void addCreativeItem(int protocol, Item item) {
         switch (protocol) { // NOTE: Not all versions are supposed to be here
+            case v1_1_0 -> Item.creative113.add(item.clone());
             case v1_2_0 -> Item.creative137.add(item.clone());
             case v1_5_0 -> Item.creative274.add(item.clone());
             case v1_7_0 -> Item.creative291.add(item.clone());
