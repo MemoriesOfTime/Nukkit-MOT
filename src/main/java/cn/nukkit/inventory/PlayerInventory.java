@@ -3,6 +3,7 @@ package cn.nukkit.inventory;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockAir;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.EntityHuman;
 import cn.nukkit.entity.EntityHumanType;
@@ -18,6 +19,7 @@ import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
 
+import java.util.Arrays;
 import java.util.Collection;
 
 /**
@@ -377,10 +379,18 @@ public class PlayerInventory extends BaseInventory {
 
         for (Player player : players) {
             if (player.equals(this.getHolder())) {
-                InventoryContentPacket pk2 = new InventoryContentPacket();
-                pk2.inventoryId = InventoryContentPacket.SPECIAL_ARMOR;
-                pk2.slots = armor;
-                player.dataPacket(pk2);
+                if (player.protocol >= ProtocolInfo.v1_2_0) {
+                    InventoryContentPacket pk2 = new InventoryContentPacket();
+                    pk2.inventoryId = InventoryContentPacket.SPECIAL_ARMOR;
+                    pk2.slots = armor;
+                    player.dataPacket(pk2);
+                } else {
+                    ContainerSetContentPacketV113 pk2 = new ContainerSetContentPacketV113();
+                    pk2.windowid = ContainerSetContentPacketV113.SPECIAL_ARMOR;
+                    pk2.eid = player.getId();
+                    pk2.slots = armor;
+                    player.dataPacket(pk2);
+                }
             } else {
                 player.dataPacket(pk);
             }
@@ -475,7 +485,38 @@ public class PlayerInventory extends BaseInventory {
             pk.slots[i] = this.getItem(i);
         }
 
+        if (Server.getInstance().minimumProtocol <= ProtocolInfo.v1_1_0) {
+            ContainerSetContentPacketV113 pk2 = new ContainerSetContentPacketV113();
+            pk2.slots = Arrays.copyOf(pk.slots.clone(), pk.slots.length + 9);
+            for(int i = this.getSize(); i < this.getSize() + 9; ++i){
+                pk2.slots[i] = new ItemBlock(new BlockAir());
+            }
+            for (Player player : players) {
+                if (player.protocol > ProtocolInfo.v1_1_0) {
+                    continue;
+                }
+                if (player.equals(this.getHolder())) {
+                    pk2.hotbar = new int[this.getHotbarSize()];
+                    for (int i = 0; i < this.getHotbarSize(); ++i) {
+                        int index = this.getHotbarSlotIndex(i);
+                        pk2.hotbar[i] = index <= -1 ? -1 : index + 9;
+                    }
+                }
+                int id = player.getWindowId(this);
+                if (id == -1 || !player.spawned) {
+                    this.close(player);
+                    continue;
+                }
+                pk2.eid = player.getId();
+                pk2.windowid = (byte) id;
+                player.dataPacket(pk2.clone());
+            }
+        }
+
         for (Player player : players) {
+            if (player.protocol < ProtocolInfo.v1_2_0) {
+                continue;
+            }
             int id = player.getWindowId(this);
             if (id == -1) {
                 if (this.getHolder() != player) this.close(player);

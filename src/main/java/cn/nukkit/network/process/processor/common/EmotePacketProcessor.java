@@ -38,6 +38,11 @@ public class EmotePacketProcessor extends DataPacketProcessor<EmotePacket> {
     }
 
     @Override
+    public Class<EmotePacket> getPacketClass() {
+        return EmotePacket.class;
+    }
+
+    @Override
     public boolean isSupported(int protocol) {
         return protocol >= ProtocolInfo.v1_1_0;
     }

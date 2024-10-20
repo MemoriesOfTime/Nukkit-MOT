@@ -3,6 +3,7 @@ package cn.nukkit.network.process.processor.common;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.AccessLevel;
@@ -13,7 +14,7 @@ import org.jetbrains.annotations.NotNull;
  * @author LT_Name
  */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class LevelSoundEventProcessor extends DataPacketProcessor<LevelSoundEventPacket> {
+public class LevelSoundEventProcessor<T extends LevelSoundEventPacket> extends DataPacketProcessor<LevelSoundEventPacket> {
 
     public static final LevelSoundEventProcessor INSTANCE = new LevelSoundEventProcessor();
 
@@ -35,6 +36,11 @@ public class LevelSoundEventProcessor extends DataPacketProcessor<LevelSoundEven
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.LEVEL_SOUND_EVENT_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return LevelSoundEventPacket.class;
     }
 
     @Override

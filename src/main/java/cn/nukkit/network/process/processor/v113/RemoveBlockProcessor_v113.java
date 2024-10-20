@@ -9,6 +9,7 @@ import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.UpdateBlockPacket;
 import cn.nukkit.network.protocol.v113.RemoveBlockPacketV113;
@@ -76,6 +77,11 @@ public class RemoveBlockProcessor_v113 extends DataPacketProcessor<RemoveBlockPa
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(RemoveBlockPacketV113.NETWORK_ID);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return RemoveBlockPacketV113.class;
     }
 
     @Override

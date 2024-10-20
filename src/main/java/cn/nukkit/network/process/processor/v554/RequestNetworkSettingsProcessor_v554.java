@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.NetworkSettingsPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.RequestNetworkSettingsPacket;
@@ -66,6 +67,11 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_NETWORK_SETTINGS_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return RequestNetworkSettingsPacket.class;
     }
 
     @Override

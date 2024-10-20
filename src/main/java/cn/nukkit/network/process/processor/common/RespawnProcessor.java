@@ -3,6 +3,7 @@ package cn.nukkit.network.process.processor.common;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.RespawnPacket;
 import lombok.AccessLevel;
@@ -38,6 +39,11 @@ public class RespawnProcessor extends DataPacketProcessor<RespawnPacket> {
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.RESPAWN_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return RespawnPacket.class;
     }
 
     @Override

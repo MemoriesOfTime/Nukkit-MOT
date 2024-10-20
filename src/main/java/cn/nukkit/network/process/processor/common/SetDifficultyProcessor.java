@@ -6,6 +6,7 @@ import cn.nukkit.Server;
 import cn.nukkit.command.Command;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.SetDifficultyPacket;
 import lombok.AccessLevel;
@@ -37,6 +38,11 @@ public class SetDifficultyProcessor extends DataPacketProcessor<SetDifficultyPac
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.SET_DIFFICULTY_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return SetDifficultyPacket.class;
     }
 
     @Override
