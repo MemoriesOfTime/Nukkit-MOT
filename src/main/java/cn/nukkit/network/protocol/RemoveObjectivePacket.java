@@ -8,7 +8,7 @@ public class RemoveObjectivePacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.REMOVE_OBJECTIVE_PACKET;
 
-    public String objectiveName;
+    public String objectiveId;
 
     @Override
     public byte pid() {
@@ -23,14 +23,14 @@ public class RemoveObjectivePacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putString(this.objectiveName);
+        this.putString(this.objectiveId);
     }
 
-    public void setObjectiveName(@NotNull String objectiveName) {
-        this.objectiveName = objectiveName;
+    public void setObjectiveId(@NotNull String objectiveName) {
+        this.objectiveId = objectiveName;
     }
 
-    public String getObjectiveName() {
-        return this.objectiveName;
+    public String getObjectiveId() {
+        return this.objectiveId;
     }
 }

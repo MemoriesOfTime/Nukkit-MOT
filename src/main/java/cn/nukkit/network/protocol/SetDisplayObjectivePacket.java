@@ -8,12 +8,9 @@ import lombok.ToString;
 public class SetDisplayObjectivePacket extends DataPacket {
 
     public DisplaySlot displaySlot;
-
-    public String
-            objectiveName,
-            displayName,
-            criteriaName;
-
+    public String objectiveId;
+    public String displayName;
+    public String criteria;
     public SortOrder sortOrder;
 
     @Override
@@ -30,9 +27,9 @@ public class SetDisplayObjectivePacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putString(this.displaySlot.getSlotName());
-        this.putString(this.objectiveName);
+        this.putString(this.objectiveId);
         this.putString(this.displayName);
-        this.putString(this.criteriaName);
+        this.putString(this.criteria);
         this.putVarInt(this.sortOrder.ordinal());
     }
 }

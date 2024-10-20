@@ -8,6 +8,7 @@ import java.util.List;
 
 @ToString
 public class SetScorePacket extends DataPacket {
+
     public Action action;
     public List<ScoreInfo> infos = new ArrayList<>();
 

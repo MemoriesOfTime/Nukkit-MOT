@@ -7169,9 +7169,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void display(IScoreboard scoreboard, DisplaySlot slot) {
         SetDisplayObjectivePacket pk = new SetDisplayObjectivePacket();
         pk.displaySlot = slot;
-        pk.objectiveName = scoreboard.getObjectiveName();
+        pk.objectiveId = scoreboard.getObjectiveName();
         pk.displayName = scoreboard.getDisplayName();
-        pk.criteriaName = scoreboard.getCriteriaName();
+        pk.criteria = scoreboard.getCriteriaName();
         pk.sortOrder = scoreboard.getSortOrder();
         this.dataPacket(pk);
 
@@ -7194,9 +7194,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void hide(DisplaySlot slot) {
         SetDisplayObjectivePacket pk = new SetDisplayObjectivePacket();
         pk.displaySlot = slot;
-        pk.objectiveName = "";
+        pk.objectiveId = "";
         pk.displayName = "";
-        pk.criteriaName = "";
+        pk.criteria = "";
         pk.sortOrder = SortOrder.ASCENDING;
         this.dataPacket(pk);
 
@@ -7209,7 +7209,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     @Override
     public void removeScoreboard(IScoreboard scoreboard) {
         RemoveObjectivePacket pk = new RemoveObjectivePacket();
-        pk.objectiveName = scoreboard.getObjectiveName();
+        pk.objectiveId = scoreboard.getObjectiveName();
 
         this.dataPacket(pk);
     }
