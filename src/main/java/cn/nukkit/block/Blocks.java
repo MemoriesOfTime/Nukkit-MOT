@@ -476,6 +476,19 @@ public class Blocks {
 
         list[DEEPSLATE] = BlockDeepslate.class; // 633
 
+        list[DEEPSLATE_LAPIS_ORE] = BlockDeepslateLapisOre.class; // 655
+
+        list[DEEPSLATE_GOLD_ORE] = BlockDeepslateGoldOre.class; // 657
+        list[DEEPSLATE_REDSTONE_ORE] = BlockDeepslateRedstoneOre.class; // 658
+        list[LIT_DEEPSLATE_REDSTONE_ORE] = BlockLitDeepslateRedstoneOre.class; // 659
+
+        list[DEEPSLATE_IRON_ORE] = BlockDeepslateIronOre.class; // 656
+
+        list[DEEPSLATE_DIAMOND_ORE] = BlockDeepslateDiamondOre.class; // 660
+        list[DEEPSLATE_COAL_ORE] = BlockDeepslateCoalOre.class; // 661
+        list[DEEPSLATE_EMERALD_ORE] = BlockDeepslateEmeraldOre.class; // 662
+        list[DEEPSLATE_COPPER_ORE] = BlockDeepslateCopperOre.class; // 663
+
         list[GLOW_LICHEN] = BlockGlowLichen.class; //666
         list[CANDLE] = BlockCandle.class; //667
         list[WHITE_CANDLE] = BlockCandleWhite.class; //668

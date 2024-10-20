@@ -28,13 +28,21 @@ public class BlockOreRedstoneGlowing extends BlockOreRedstone {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(REDSTONE_ORE));
+        return new ItemBlock(Block.get(getTypeId()));
+    }
+
+    private int getTypeId() {
+        int type = REDSTONE_ORE;
+        if(this instanceof BlockLitDeepslateRedstoneOre) {
+            type = DEEPSLATE_REDSTONE_ORE;
+        }
+        return type;
     }
 
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_SCHEDULED || type == Level.BLOCK_UPDATE_RANDOM) {
-            BlockFadeEvent event = new BlockFadeEvent(this, get(REDSTONE_ORE));
+            BlockFadeEvent event = new BlockFadeEvent(this, get(getTypeId()));
             level.getServer().getPluginManager().callEvent(event);
             if (!event.isCancelled()) {
                 level.setBlock(this, event.getNewState(), false, false);
