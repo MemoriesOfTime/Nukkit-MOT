@@ -107,8 +107,7 @@ public interface Oxidizable {
         if (player == null || !player.isCreative()) {
             item.useOn(this instanceof Block? (Block) this : location.getLevelBlock());
         }
-        // TODO: Fix particles
-        //location.getValidLevel().addParticle(new ScrapeParticle(location));
+        location.getValidLevel().addParticle(new ScrapeParticle(location));
         return true;
     }
 

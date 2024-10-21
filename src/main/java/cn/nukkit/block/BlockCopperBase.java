@@ -21,6 +21,7 @@ public abstract class BlockCopperBase extends BlockSolid implements Oxidizable, 
         return 6;
     }
 
+    @Override
     public boolean isWaxed() {
         return false;
     }
@@ -31,7 +32,7 @@ public abstract class BlockCopperBase extends BlockSolid implements Oxidizable, 
     }
 
     @Override
-    public boolean onActivate(Item item, Player player) {
+    public boolean onActivate(@NotNull Item item, Player player) {
         return Waxable.super.onActivate(item, player)
                 || Oxidizable.super.onActivate(item, player);
     }

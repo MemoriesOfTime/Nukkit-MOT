@@ -15,7 +15,6 @@ import javax.annotation.Nullable;
  * @author joserobjr & KoshakMineDev
  * @since 2021-06-14
  */
-
 public interface Waxable {
 
     @NotNull
@@ -40,8 +39,7 @@ public interface Waxable {
                 item.useOn(this instanceof Block? (Block) this : location.getLevelBlock());
             }
         }
-        // TODO: Fix particles
-        //location.getValidLevel().addParticle(waxed? new WaxOnParticle(location.add(0.5, 0.5, 0.5)) : new WaxOffParticle(location.add(0.5, 0.5, 0.5)));
+        location.getValidLevel().addParticle(waxed? new WaxOnParticle(location.add(0.5, 0.5, 0.5)) : new WaxOffParticle(location.add(0.5, 0.5, 0.5)));
         return true;
     }
 

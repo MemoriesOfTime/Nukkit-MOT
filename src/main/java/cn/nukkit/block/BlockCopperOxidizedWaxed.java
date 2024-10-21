@@ -25,7 +25,7 @@ public class BlockCopperOxidizedWaxed extends BlockCopperBase {
     }
 
     @Override
-    public boolean onActivate(Item item, Player player) {
+    public boolean onActivate(@NotNull Item item, Player player) {
         if (item.isAxe()) {
             this.getLevel().setBlock(this, Block.get(BlockID.OXIDIZED_COPPER), true, true);
             return true;

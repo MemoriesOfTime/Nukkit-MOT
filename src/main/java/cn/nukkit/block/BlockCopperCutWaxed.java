@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.block.properties.enums.OxidizationLevel;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author LoboMetalurgico
@@ -22,7 +23,7 @@ public class BlockCopperCutWaxed extends BlockCopperCut {
     }
 
     @Override
-    public OxidizationLevel getOxidizationLevel() {
+    public @NotNull OxidizationLevel getOxidizationLevel() {
         return OxidizationLevel.UNAFFECTED;
     }
 

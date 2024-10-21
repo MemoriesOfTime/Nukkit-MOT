@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.block.properties.enums.OxidizationLevel;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -23,7 +24,7 @@ public class BlockCopperCut extends BlockCopperBase {
     }
 
     @Override
-    public OxidizationLevel getOxidizationLevel() {
+    public @NotNull OxidizationLevel getOxidizationLevel() {
         return OxidizationLevel.UNAFFECTED;
     }
 
