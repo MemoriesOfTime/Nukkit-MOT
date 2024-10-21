@@ -8,9 +8,11 @@ public class BlockInfestedDeepslate extends BlockDeepslate {
     public BlockInfestedDeepslate() {
         this(0);
     }
+
     public BlockInfestedDeepslate(int meta) {
         super(meta);
     }
+
     @Override
     public int getId() {
         return INFESTED_DEEPSLATE;

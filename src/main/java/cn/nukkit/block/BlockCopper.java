@@ -16,6 +16,7 @@ public class BlockCopper extends BlockCopperBase {
     public String getName() {
         return "Block of Copper";
     }
+
     @Override
     public int getId() {
         return COPPER_BLOCK;

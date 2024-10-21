@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.item.Item;
 
 public class BlockAzaleaLeavesFlowered extends BlockAzaleaLeaves {
+
     @Override
     public int getId() {
         return AZALEA_LEAVES_FLOWERED;

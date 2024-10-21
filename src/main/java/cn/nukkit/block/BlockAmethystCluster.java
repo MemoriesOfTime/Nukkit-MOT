@@ -8,33 +8,41 @@ public class BlockAmethystCluster extends BlockAmethystBud {
     public BlockAmethystCluster() {
         this(0);
     }
+
     public BlockAmethystCluster(int meta) {
         super(meta);
     }
+
     @Override
     public int getId() {
         return AMETHYST_CLUSTER;
     }
+
     @Override
     protected int getCrystalHeight() {
         return 7;
     }
+
     @Override
     protected int getCrystalOffset() {
         return 7;
     }
+
     @Override
     protected String getSizeName() {
         return "Cluster";
     }
+
     @Override
     public String getName() {
         return "Amethyst Cluster";
     }
+
     @Override
     public int getLightLevel() {
         return 5;
     }
+
     @Override
     public Item[] getDrops(Item item) {
         if (!item.isPickaxe()) {

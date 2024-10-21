@@ -10,22 +10,27 @@ import java.util.concurrent.ThreadLocalRandom;
 public class BlockBuddingAmethyst extends BlockSolid {
     public BlockBuddingAmethyst() {
     }
+
     @Override
     public int getId() {
         return BUDDING_AMETHYST;
     }
+
     @Override
     public double getResistance() {
         return 1.5;
     }
+
     @Override
     public double getHardness() {
         return 1.5;
     }
+
     @Override
     public String getName() {
         return "Budding Amethyst";
     }
+
     @Override
     public int onUpdate(int type) {
         if (type != Level.BLOCK_UPDATE_RANDOM || ThreadLocalRandom.current().nextInt(4) != 0) {
@@ -53,6 +58,7 @@ public class BlockBuddingAmethyst extends BlockSolid {
         }
         return type;
     }
+
     @Override
     public boolean onBreak(Item item, Player player) {
         for (BlockFace face : BlockFace.values()) {
@@ -64,14 +70,17 @@ public class BlockBuddingAmethyst extends BlockSolid {
         }
         return super.onBreak(item, player);
     }
+
     @Override
     public boolean breaksWhenMoved() {
         return true;
     }
+
     @Override
     public boolean canSilkTouch() {
         return true;
     }
+
     @Override
     public BlockColor getColor() {
         return BlockColor.PURPLE_BLOCK_COLOR;

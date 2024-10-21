@@ -11,27 +11,34 @@ public abstract class BlockAmethystBud extends BlockTransparentMeta implements F
     public BlockAmethystBud() {
         this(0);
     }
+
     public BlockAmethystBud(int meta) {
         super(meta);
     }
+
     protected abstract String getSizeName();
+
     @Override
     public String getName() {
         return this.getSizeName() + " Amethyst Bud";
     }
+
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(face.getIndex());
         this.getLevel().setBlock(this, this, true, true);
         return true;
     }
+
     @Override
     public BlockFace getBlockFace() {
         return BlockFace.fromIndex(this.getDamage());
     }
+
     public void setBlockFace(BlockFace face) {
         this.setDamage(face.getIndex());
     }
+
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
         switch (this.getBlockFace()) {
@@ -56,35 +63,45 @@ public abstract class BlockAmethystBud extends BlockTransparentMeta implements F
         }
         return super.recalculateBoundingBox();
     }
+
     @Override
     public int getToolType() {
         return ItemTool.TYPE_PICKAXE;
     }
+
     @Override
     public double getHardness() {
         return 1.5;
     }
+
     @Override
     public double getResistance() {
         return 1.5;
     }
+
     @Override
     public boolean breaksWhenMoved() {
         return true;
     }
+
     protected abstract int getCrystalHeight();
+
     protected abstract int getCrystalOffset();
+
     @Override
     public Item toItem() {
         return new ItemBlock(Block.get(this.getId()), 0, 1);
     }
+
     protected static AxisAlignedBB boundingBox(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
         return new SimpleAxisAlignedBB(minX / 16.0D, minY / 16.0D, minZ / 16.0D, maxX / 16.0D, maxY / 16.0D, maxZ / 16.0D);
     }
+
     @Override
     public WaterloggingType getWaterloggingType() {
         return WaterloggingType.WHEN_PLACED_IN_WATER;
     }
+
     @Override
     public Item[] getDrops(Item item) {
         return new Item[0];
