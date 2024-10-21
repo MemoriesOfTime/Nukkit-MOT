@@ -1,7 +1,6 @@
 package cn.nukkit.block;
 
 public class BlockAzaleaFlowering extends BlockAzalea {
-
     public BlockAzaleaFlowering() {
     }
 
