@@ -25,15 +25,6 @@ public class BlockCopperOxidizedWaxed extends BlockCopperBase {
     }
 
     @Override
-    public boolean onActivate(@NotNull Item item, Player player) {
-        if (item.isAxe()) {
-            this.getLevel().setBlock(this, Block.get(BlockID.OXIDIZED_COPPER), true, true);
-            return true;
-        }
-        return false;
-    }
-
-    @Override
     public @NotNull OxidizationLevel getOxidizationLevel() {
         return OxidizationLevel.OXIDIZED;
     }

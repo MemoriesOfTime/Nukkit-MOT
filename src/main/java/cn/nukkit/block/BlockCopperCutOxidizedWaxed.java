@@ -9,7 +9,7 @@ import org.jetbrains.annotations.NotNull;
  * @author LoboMetalurgico
  * @since 11/06/2021
  */
-public class BlockCopperCutOxidizedWaxed extends BlockCopperWaxed {
+public class BlockCopperCutOxidizedWaxed extends BlockCopperCut {
     public BlockCopperCutOxidizedWaxed() {
         // Does nothing
     }
@@ -22,15 +22,6 @@ public class BlockCopperCutOxidizedWaxed extends BlockCopperWaxed {
     @Override
     public int getId() {
         return WAXED_OXIDIZED_CUT_COPPER;
-    }
-
-    @Override
-    public boolean onActivate(@NotNull Item item, Player player) {
-        if (item.isAxe()) {
-            this.getLevel().setBlock(this, Block.get(BlockID.OXIDIZED_CUT_COPPER), true, true);
-            return true;
-        }
-        return false;
     }
 
     @Override
