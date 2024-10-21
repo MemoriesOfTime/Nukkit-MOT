@@ -1,4 +1,5 @@
 package cn.nukkit.block;
+
 import cn.nukkit.block.properties.enums.OxidizationLevel;
 
 /**

@@ -1,4 +1,5 @@
 package cn.nukkit.block;
+
 import cn.nukkit.Player;
 import cn.nukkit.event.block.BlockSpreadEvent;
 import cn.nukkit.item.Item;
@@ -7,6 +8,7 @@ import cn.nukkit.level.particle.DestroyBlockParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import java.util.concurrent.ThreadLocalRandom;
+
 public class BlockBuddingAmethyst extends BlockSolid {
     public BlockBuddingAmethyst() {
     }

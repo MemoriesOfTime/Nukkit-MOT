@@ -1,4 +1,5 @@
 package cn.nukkit.block;
+
 public class BlockAmethystBudMedium extends BlockAmethystBud {
     public BlockAmethystBudMedium() {
         this(0);

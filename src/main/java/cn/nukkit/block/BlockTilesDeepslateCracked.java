@@ -1,4 +1,5 @@
 package cn.nukkit.block;
+
 /**
  * @author GoodLucky777
  */
