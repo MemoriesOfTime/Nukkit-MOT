@@ -675,6 +675,7 @@ public interface BlockID {
     int CHERRY_WOOD = 801;
     int CHERRY_SAPLING = 802;
     int CHERRY_LEAVES = 803;
+    int PINK_PETALS = 804;
 
     int DECORATED_POT = 806;
 
