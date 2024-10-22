@@ -40,7 +40,6 @@ public abstract class BlockCopperBulbBase extends BlockSolidMeta implements Oxid
 
             if ((this.level.isBlockPowered(this))) {
                 this.setLit(!(isLit()));
-
                 this.setPowered(true);
                 this.getLevel().setBlock(this, this, true, true);
                 return 1;
@@ -100,9 +99,7 @@ public abstract class BlockCopperBulbBase extends BlockSolidMeta implements Oxid
     @Override
     public Block getStateWithOxidizationLevel(@NotNull OxidizationLevel oxidizationLevel) {
         BlockCopperBulbBase bulb = (BlockCopperBulbBase) Block.get((getCopperId(isWaxed(), oxidizationLevel)));
-        bulb.setLit(this.isLit());
-        bulb.setPowered(this.isPowered());
-
+        bulb.setDamage(getDamage());
         return bulb;
     }
 
@@ -113,8 +110,7 @@ public abstract class BlockCopperBulbBase extends BlockSolidMeta implements Oxid
         }
 
         BlockCopperBulbBase bulb = (BlockCopperBulbBase) Block.get((getCopperId(isWaxed(), oxidizationLevel)));
-        bulb.setLit(this.isLit());
-        bulb.setPowered(this.isPowered());
+        bulb.setDamage(getDamage());
 
         return getValidLevel().setBlock(this, bulb);
     }
@@ -126,8 +122,7 @@ public abstract class BlockCopperBulbBase extends BlockSolidMeta implements Oxid
         }
 
         BlockCopperBulbBase bulb = (BlockCopperBulbBase) Block.get((getCopperId(waxed, getOxidizationLevel())));
-        bulb.setLit(this.isLit());
-        bulb.setPowered(this.isPowered());
+        bulb.setDamage(getDamage());
 
         return getValidLevel().setBlock(this, bulb);
     }
