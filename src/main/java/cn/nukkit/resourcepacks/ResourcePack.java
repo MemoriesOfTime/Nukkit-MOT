@@ -25,4 +25,11 @@ public interface ResourcePack {
     default boolean isAddonPack() {
         return false;
     }
+
+    /**
+     * @since v748 1.21.40
+     */
+    default String getCDNUrl() {
+        return "";
+    }
 }
