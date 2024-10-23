@@ -44,7 +44,9 @@ public class MobEffectPacket extends DataPacket {
         this.putVarInt(this.amplifier);
         this.putBoolean(this.particles);
         this.putVarInt(this.duration);
-        if (protocol >= ProtocolInfo.v1_20_70) {
+        if (this.protocol >= ProtocolInfo.v1_21_40) {
+            this.putUnsignedVarLong(this.tick);
+        } else if (this.protocol >= ProtocolInfo.v1_20_70) {
             this.putLLong(this.tick);
         }
     }

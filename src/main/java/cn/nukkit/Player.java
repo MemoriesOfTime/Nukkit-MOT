@@ -208,6 +208,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected CraftingTransaction craftingTransaction;
     protected EnchantTransaction enchantTransaction;
     protected RepairItemTransaction repairItemTransaction;
+    protected LoomTransaction loomTransaction;
     protected SmithingTransaction smithingTransaction;
     protected TradingTransaction tradingTransaction;
 
@@ -3352,6 +3353,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (protocol >= ProtocolInfo.v1_20_30_24) {
+                    if (this.protocol >= ProtocolInfo.v1_21_40) {
+                        if (authPacket.getInputData().contains(AuthInputAction.STOP_SPIN_ATTACK)) {
+                            PlayerToggleSpinAttackEvent playerToggleSpinAttackEvent = new PlayerToggleSpinAttackEvent(this, false);
+                            this.server.getPluginManager().callEvent(playerToggleSpinAttackEvent);
+                            if (playerToggleSpinAttackEvent.isCancelled()) {
+                                this.needSendData = true;
+                            } else {
+                                this.setSpinAttack(false);
+                            }
+                        }
+                    }
+
                     if (authPacket.getInputData().contains(AuthInputAction.START_FLYING)) {
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
                             this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
@@ -3615,6 +3628,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         break;
                     case PlayerActionPacket.ACTION_STOP_SPIN_ATTACK:
+                        if (this.isMovementServerAuthoritative() && protocol >= ProtocolInfo.v1_21_40) break;
                         PlayerToggleSpinAttackEvent playerToggleSpinAttackEvent = new PlayerToggleSpinAttackEvent(this, false);
                         playerToggleSpinAttackEvent.call();
                         if (playerToggleSpinAttackEvent.isCancelled()) {
@@ -4099,6 +4113,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (transactionPacket.isCraftingPart) {
+                    if (LoomTransaction.checkForItemPart(actions)) {
+                        if (this.loomTransaction == null) {
+                            this.loomTransaction = new LoomTransaction(this, actions);
+                        } else {
+                            for (InventoryAction action : actions) {
+                                this.loomTransaction.addAction(action);
+                            }
+                        }
+                        if (this.loomTransaction.canExecute()) {
+                            if (this.loomTransaction.execute()) {
+                                level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_LOOM_USE);
+                            }
+                        }
+                        this.loomTransaction = null;
+                        return;
+                    }
+
                     if (this.craftingTransaction == null) {
                         this.craftingTransaction = new CraftingTransaction(this, actions);
                     } else {

@@ -56,21 +56,7 @@ public class CameraInstructionPacket extends DataPacket {
     @Override
     public void decode() {
         if (this.protocol >= ProtocolInfo.v1_20_30_24) {
-            CameraSetInstruction set = this.getOptional(null, b -> {
-                int runtimeId = b.getLInt();
-                NamedDefinition definition = CameraPresetManager.getCameraPresetDefinitions().getDefinition(runtimeId);
-
-                CameraSetInstruction.EaseData ease = b.getOptional(null, b1 -> this.getEase());
-                Vector3f pos = b.getOptional(null, BinaryStream::getVector3f);
-                Vector2f rot = b.getOptional(null, BinaryStream::getVector2f);
-                Vector3f facing = b.getOptional(null, BinaryStream::getVector3f);
-                Vector2f viewOffset = null;
-                if (this.protocol >= ProtocolInfo.v1_21_20) {
-                    viewOffset = b.getOptional(null, BinaryStream::getVector2f);
-                }
-                OptionalBoolean defaultPreset = b.getOptional(OptionalBoolean.empty(), b1 -> OptionalBoolean.of(b1.getBoolean()));
-                return new CameraSetInstruction(definition, ease, pos, rot, facing, viewOffset, defaultPreset);
-            });
+            CameraSetInstruction set = this.getOptional(null, b -> this.readSetInstruction());
 
             this.setSetInstruction(set);
             this.setClear(this.getOptional(OptionalBoolean.empty(), buf -> OptionalBoolean.of(buf.getBoolean())));
@@ -166,20 +152,7 @@ public class CameraInstructionPacket extends DataPacket {
     public void encode() {
         this.reset();
         if (this.protocol >= ProtocolInfo.v1_20_30_24) {
-            this.putOptionalNull(this.getSetInstruction(), (b, set) -> {
-                DefinitionUtils.checkDefinition(CameraPresetManager.getCameraPresetDefinitions(), set.getPreset());
-                b.putLInt(set.getPreset().getRuntimeId());
-
-                b.putOptionalNull(set.getEase(), this::putEase);
-                b.putOptionalNull(set.getPos(), BinaryStream::putVector3f);
-                b.putOptionalNull(set.getRot(), BinaryStream::putVector2f);
-                b.putOptionalNull(set.getFacing(), BinaryStream::putVector3f);
-                if (this.protocol >= ProtocolInfo.v1_21_20) {
-                    b.putOptionalNull(set.getViewOffset(), BinaryStream::putVector2f);
-                }
-                b.putOptional(OptionalBoolean::isPresent, set.getDefaultPreset(),
-                        (b1, optional) -> b1.putBoolean(optional.getAsBoolean()));
-            });
+            this.putOptionalNull(this.getSetInstruction(), this::writeSetInstruction);
 
             this.putOptional(OptionalBoolean::isPresent, this.getClear(),
                     (b, optional) -> b.putBoolean(optional.getAsBoolean()));
@@ -268,6 +241,44 @@ public class CameraInstructionPacket extends DataPacket {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    protected void writeSetInstruction(CameraSetInstruction set) {
+        DefinitionUtils.checkDefinition(CameraPresetManager.getCameraPresetDefinitions(), set.getPreset());
+        this.putLInt(set.getPreset().getRuntimeId());
+
+        this.putOptionalNull(set.getEase(), this::putEase);
+        this.putOptionalNull(set.getPos(), this::putVector3f);
+        this.putOptionalNull(set.getRot(), vector2f -> this.putVector2f(vector2f));
+        this.putOptionalNull(set.getFacing(), this::putVector3f);
+        if (this.protocol >= ProtocolInfo.v1_21_20) {
+            this.putOptionalNull(set.getViewOffset(), vector2f -> this.putVector2f(vector2f));
+            if (this.protocol >= ProtocolInfo.v1_21_40) {
+                this.putOptionalNull(set.getEntityOffset(), this::putVector3f);
+            }
+        }
+        this.putOptional(OptionalBoolean::isPresent, set.getDefaultPreset(),
+                (b1, optional) -> b1.putBoolean(optional.getAsBoolean()));
+    }
+
+    protected CameraSetInstruction readSetInstruction() {
+        int runtimeId = this.getLInt();
+        NamedDefinition definition = CameraPresetManager.getCameraPresetDefinitions().getDefinition(runtimeId);
+
+        CameraSetInstruction.EaseData ease = this.getOptional(null, b1 -> this.getEase());
+        Vector3f pos = this.getOptional(null, BinaryStream::getVector3f);
+        Vector2f rot = this.getOptional(null, BinaryStream::getVector2f);
+        Vector3f facing = this.getOptional(null, BinaryStream::getVector3f);
+        Vector2f viewOffset = null;
+        Vector3f entityOffset = null;
+        if (this.protocol >= ProtocolInfo.v1_21_20) {
+            viewOffset = this.getOptional(null, BinaryStream::getVector2f);
+            if (this.protocol >= ProtocolInfo.v1_21_40) {
+                entityOffset = this.getOptional(null, BinaryStream::getVector3f);
+            }
+        }
+        OptionalBoolean defaultPreset = this.getOptional(OptionalBoolean.empty(), b1 -> OptionalBoolean.of(b1.getBoolean()));
+        return new CameraSetInstruction(definition, ease, pos, rot, facing, viewOffset, entityOffset, defaultPreset);
     }
 
     protected void putEase(CameraSetInstruction.EaseData ease) {

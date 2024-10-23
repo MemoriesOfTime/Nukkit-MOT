@@ -39,7 +39,7 @@ public final class CameraPreset implements NamedDefinition {
     private Float radius;
     @Nullable
     private CameraAudioListener listener;
-    private OptionalBoolean playEffect;
+    private OptionalBoolean playEffect = OptionalBoolean.empty();
     /**
      * @since v729
      */
@@ -52,6 +52,22 @@ public final class CameraPreset implements NamedDefinition {
      * @since v729
      */
     private Vector3f entityOffset;
+    /**
+     * @since v748
+     */
+    private Vector2f horizontalRotationLimit;
+    /**
+     * @since v748
+     */
+    private Vector2f verticalRotationLimit;
+    /**
+     * @since v748
+     */
+    private OptionalBoolean continueTargeting = OptionalBoolean.empty();
+    /**
+     * @since v748
+     */
+    private OptionalBoolean alignTargetAndCameraForward = OptionalBoolean.empty();
 
     private int runtimeId;
 
@@ -79,6 +95,7 @@ public final class CameraPreset implements NamedDefinition {
         this.playEffect = playEffect;
     }
 
+    @Deprecated
     public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, @Nullable Vector2f viewOffset, @Nullable Float radius, @Nullable CameraAudioListener listener, OptionalBoolean playEffect, @Nullable Float rotationSpeed, OptionalBoolean snapToTarget, @Nullable Vector3f entityOffset) {
         this.identifier = identifier;
         this.parentPreset = parentPreset;
@@ -92,6 +109,25 @@ public final class CameraPreset implements NamedDefinition {
         this.rotationSpeed = rotationSpeed;
         this.snapToTarget = snapToTarget;
         this.entityOffset = entityOffset;
+    }
+
+    public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, Vector2f viewOffset, Float radius, @Nullable CameraAudioListener listener, OptionalBoolean playEffect, Float rotationSpeed, OptionalBoolean snapToTarget, Vector3f entityOffset, Vector2f horizontalRotationLimit, Vector2f verticalRotationLimit, OptionalBoolean continueTargeting, OptionalBoolean alignTargetAndCameraForward) {
+        this.identifier = identifier;
+        this.parentPreset = parentPreset;
+        this.pos = pos;
+        this.yaw = yaw;
+        this.pitch = pitch;
+        this.viewOffset = viewOffset;
+        this.radius = radius;
+        this.listener = listener;
+        this.playEffect = playEffect;
+        this.rotationSpeed = rotationSpeed;
+        this.snapToTarget = snapToTarget;
+        this.entityOffset = entityOffset;
+        this.horizontalRotationLimit = horizontalRotationLimit;
+        this.verticalRotationLimit = verticalRotationLimit;
+        this.continueTargeting = continueTargeting;
+        this.alignTargetAndCameraForward = alignTargetAndCameraForward;
     }
 
     public String getParentPreset() {
