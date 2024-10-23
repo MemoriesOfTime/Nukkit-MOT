@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockStairsMudBrick extends BlockStairs {
     public BlockStairsMudBrick() {
@@ -44,5 +45,10 @@ public class BlockStairsMudBrick extends BlockStairs {
     @Override
     public boolean canHarvestWithHand() {
         return false;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.LIGHT_GRAY_TERRACOTA_BLOCK_COLOR;
     }
 }

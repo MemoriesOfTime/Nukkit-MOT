@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockStairsDeepslateTile extends BlockStairs {
     public BlockStairsDeepslateTile() {
@@ -44,5 +45,10 @@ public class BlockStairsDeepslateTile extends BlockStairs {
     @Override
     public int getToolType() {
         return ItemTool.TYPE_PICKAXE;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.DEEPSLATE_BLOCK_COLOR;
     }
 }

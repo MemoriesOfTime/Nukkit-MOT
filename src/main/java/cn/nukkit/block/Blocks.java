@@ -498,11 +498,11 @@ public class Blocks {
         list[DEEPSLATE] = BlockDeepslate.class; //633
         list[COBBLED_DEEPSLATE] = BlockDeepslateCobbled.class; //634
 
-        list[COBBLED_DEEPSLATE_STAIRS] = BlockStairsCobbledDeepslate.class; //636
+        list[COBBLED_DEEPSLATE_STAIRS] = BlockStairsDeepslateCobbled.class; //636
 
         list[POLISHED_DEEPSLATE] = BlockDeepslatePolished.class; //638
 
-        list[POLISHED_DEEPSLATE_STAIRS] = BlockStairsPolishedDeepslate.class; //640
+        list[POLISHED_DEEPSLATE_STAIRS] = BlockStairsDeepslatePolished.class; //640
 
         list[DEEPSLATE_TILES] = BlockTilesDeepslate.class; //642
 

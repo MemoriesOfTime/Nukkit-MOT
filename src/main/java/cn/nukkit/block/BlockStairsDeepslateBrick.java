@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockStairsDeepslateBrick extends BlockStairs {
     public BlockStairsDeepslateBrick() {
@@ -44,5 +45,10 @@ public class BlockStairsDeepslateBrick extends BlockStairs {
     @Override
     public boolean canHarvestWithHand() {
         return false;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.DEEPSLATE_BLOCK_COLOR;
     }
 }

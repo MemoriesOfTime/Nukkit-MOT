@@ -1,13 +1,14 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
-public class BlockStairsCobbledDeepslate extends BlockStairs {
-    public BlockStairsCobbledDeepslate() {
+public class BlockStairsDeepslateCobbled extends BlockStairs {
+    public BlockStairsDeepslateCobbled() {
         this(0);
     }
 
-    public BlockStairsCobbledDeepslate(int meta) {
+    public BlockStairsDeepslateCobbled(int meta) {
         super(meta);
     }
 
@@ -44,5 +45,10 @@ public class BlockStairsCobbledDeepslate extends BlockStairs {
     @Override
     public int getToolType() {
         return ItemTool.TYPE_PICKAXE;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.DEEPSLATE_BLOCK_COLOR;
     }
 }
