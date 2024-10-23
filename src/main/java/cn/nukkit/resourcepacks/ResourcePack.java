@@ -22,6 +22,14 @@ public interface ResourcePack {
         return "";
     }
 
+    default String getSubPackName() {
+        return "";
+    }
+
+    default boolean usesScripting() {
+        return false;
+    }
+
     default boolean isAddonPack() {
         return false;
     }

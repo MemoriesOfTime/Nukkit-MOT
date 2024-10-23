@@ -547,6 +547,10 @@ public class Server {
      * A number of datagram packets each address can send within one RakNet tick (10ms)
      */
     public int rakPacketLimit;
+    /**
+     * Temporary disable world saving to allow safe backup of leveldb worlds.
+     */
+    public boolean holdWorldSave;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -1066,6 +1070,10 @@ public class Server {
 
             ServerStopEvent serverStopEvent = new ServerStopEvent();
             pluginManager.callEvent(serverStopEvent);
+
+            if (this.holdWorldSave) {
+                this.getLogger().warning("World save hold was not released! Any backup currently being taken may be invalid");
+            }
 
             if (this.rcon != null) {
                 this.getLogger().debug("Closing RCON...");

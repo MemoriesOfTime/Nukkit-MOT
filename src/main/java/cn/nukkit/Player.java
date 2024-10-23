@@ -208,6 +208,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected CraftingTransaction craftingTransaction;
     protected EnchantTransaction enchantTransaction;
     protected RepairItemTransaction repairItemTransaction;
+    protected LoomTransaction loomTransaction;
     protected SmithingTransaction smithingTransaction;
     protected TradingTransaction tradingTransaction;
 
@@ -4112,6 +4113,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (transactionPacket.isCraftingPart) {
+                    if (LoomTransaction.checkForItemPart(actions)) {
+                        if (this.loomTransaction == null) {
+                            this.loomTransaction = new LoomTransaction(this, actions);
+                        } else {
+                            for (InventoryAction action : actions) {
+                                this.loomTransaction.addAction(action);
+                            }
+                        }
+                        if (this.loomTransaction.canExecute()) {
+                            if (this.loomTransaction.execute()) {
+                                level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_LOOM_USE);
+                            }
+                        }
+                        this.loomTransaction = null;
+                        return;
+                    }
+
                     if (this.craftingTransaction == null) {
                         this.craftingTransaction = new CraftingTransaction(this, actions);
                     } else {

@@ -52,6 +52,10 @@ public class RepairItemTransaction extends InventoryTransaction {
 
     @Override
     public boolean canExecute() {
+        if (!super.canExecute()) {
+            return false;
+        }
+
         Inventory inventory = getSource().getWindowById(Player.ANVIL_WINDOW_ID);
         if (inventory == null) {
             return false;

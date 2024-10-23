@@ -1446,7 +1446,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean save(boolean force) {
-        if (!this.autoSave && !force) {
+        if ((!this.autoSave || server.holdWorldSave) && !force) {
             return false;
         }
 
@@ -4142,6 +4142,10 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void unloadChunks(int maxUnload, boolean force) {
+        if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
+            return;
+        }
+
         if (!this.unloadQueue.isEmpty()) {
             long now = System.currentTimeMillis();
 
@@ -4190,6 +4194,10 @@ public class Level implements ChunkManager, Metadatable {
      * @return true if there is allocated time remaining
      */
     private boolean unloadChunks(long now, long allocatedTime, boolean force) {
+        if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
+            return false;
+        }
+
         if (!this.unloadQueue.isEmpty()) {
             boolean result = true;
             int maxIterations = this.unloadQueue.size();

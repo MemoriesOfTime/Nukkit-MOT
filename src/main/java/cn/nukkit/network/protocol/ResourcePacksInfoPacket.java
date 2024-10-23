@@ -68,10 +68,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
             this.putString(entry.getPackId().toString());
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
-            this.putString(entry.getEncryptionKey()); // encryption key
-            this.putString(""); // sub-pack name
+            this.putString(entry.getEncryptionKey());
+            this.putString(entry.getSubPackName());
             this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
-            this.putBoolean(false); // scripting
+            this.putBoolean(entry.usesScripting());
         }
     }
 
