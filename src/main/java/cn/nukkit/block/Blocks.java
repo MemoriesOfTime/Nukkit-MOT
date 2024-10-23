@@ -498,19 +498,19 @@ public class Blocks {
         list[DEEPSLATE] = BlockDeepslate.class; //633
         list[COBBLED_DEEPSLATE] = BlockDeepslateCobbled.class; //634
 
-        list[COBBLED_DEEPSLATE_STAIRS] = BlockCobbledDeepslateStairs.class; //636
+        list[COBBLED_DEEPSLATE_STAIRS] = BlockStairsCobbledDeepslate.class; //636
 
         list[POLISHED_DEEPSLATE] = BlockDeepslatePolished.class; //638
 
-        list[POLISHED_DEEPSLATE_STAIRS] = BlockPolishedDeepslateStairs.class; //640
+        list[POLISHED_DEEPSLATE_STAIRS] = BlockStairsPolishedDeepslate.class; //640
 
         list[DEEPSLATE_TILES] = BlockTilesDeepslate.class; //642
 
-        list[DEEPSLATE_TILE_STAIRS] = BlockDeepslateTileStairs.class; //644
+        list[DEEPSLATE_TILE_STAIRS] = BlockStairsDeepslateTile.class; //644
 
         list[DEEPSLATE_BRICKS] = BlockBricksDeepslate.class; //646
 
-        list[DEEPSLATE_BRICK_STAIRS] = BlockDeepslateBrickStairs.class; //648
+        list[DEEPSLATE_BRICK_STAIRS] = BlockStairsDeepslateBrick.class; //648
 
         list[CHISELED_DEEPSLATE] = BlockDeepslateChiseled.class; //650
         list[DEEPSLATE_LAPIS_ORE] = BlockDeepslateLapisOre.class; // 655
@@ -577,7 +577,7 @@ public class Blocks {
 
         list[PACKED_MUD] = BlockPackedMud.class; //732
 
-        list[MUD_BRICK_STAIRS] = BlockMudBrickStairs.class; //735
+        list[MUD_BRICK_STAIRS] = BlockStairsMudBrick.class; //735
 
         list[MANGROVE_PLANKS] = BlockPlanksMangrove.class; //741
 

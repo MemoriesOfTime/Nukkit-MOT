@@ -2,23 +2,23 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.ItemTool;
 
-public class BlockDeepslateBrickStairs extends BlockStairs {
-    public BlockDeepslateBrickStairs() {
+public class BlockStairsCobbledDeepslate extends BlockStairs {
+    public BlockStairsCobbledDeepslate() {
         this(0);
     }
 
-    public BlockDeepslateBrickStairs(int meta) {
+    public BlockStairsCobbledDeepslate(int meta) {
         super(meta);
     }
 
     @Override
-    public int getId() {
-        return DEEPSLATE_BRICK_STAIRS;
+    public String getName() {
+        return "Cobbled Deepslate Stairs";
     }
 
     @Override
-    public String getName() {
-        return "Deepslate Brick Stairs";
+    public int getId() {
+        return COBBLED_DEEPSLATE_STAIRS;
     }
 
     @Override
@@ -32,6 +32,11 @@ public class BlockDeepslateBrickStairs extends BlockStairs {
     }
 
     @Override
+    public boolean canHarvestWithHand() {
+        return false;
+    }
+
+    @Override
     public int getToolTier() {
         return ItemTool.TIER_WOODEN;
     }
@@ -39,10 +44,5 @@ public class BlockDeepslateBrickStairs extends BlockStairs {
     @Override
     public int getToolType() {
         return ItemTool.TYPE_PICKAXE;
-    }
-
-    @Override
-    public boolean canHarvestWithHand() {
-        return false;
     }
 }

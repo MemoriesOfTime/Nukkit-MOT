@@ -2,23 +2,23 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.ItemTool;
 
-public class BlockCobbledDeepslateStairs extends BlockStairs {
-    public BlockCobbledDeepslateStairs() {
+public class BlockStairsDeepslateTile extends BlockStairs {
+    public BlockStairsDeepslateTile() {
         this(0);
     }
 
-    public BlockCobbledDeepslateStairs(int meta) {
+    public BlockStairsDeepslateTile(int meta) {
         super(meta);
     }
 
     @Override
-    public String getName() {
-        return "Cobbled Deepslate Stairs";
+    public int getId() {
+        return DEEPSLATE_TILE_STAIRS;
     }
 
     @Override
-    public int getId() {
-        return COBBLED_DEEPSLATE_STAIRS;
+    public String getName() {
+        return "Deepslate Tile Stairs";
     }
 
     @Override
