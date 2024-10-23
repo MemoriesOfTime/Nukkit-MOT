@@ -24,6 +24,30 @@ public class SaveCommand extends VanillaCommand {
             return true;
         }
 
+        if (args.length > 0) {
+            switch (args[0].toLowerCase()) {
+                case "on":
+                    sender.getServer().setAutoSave(true);
+                    Command.broadcastCommandMessage(sender, new TranslationContainer("commands.save.enabled"));
+                    return true;
+                case "off":
+                    sender.getServer().setAutoSave(false);
+                    Command.broadcastCommandMessage(sender, new TranslationContainer("commands.save.disabled"));
+                    return true;
+                case "hold":
+                    sender.getServer().holdWorldSave = true;
+                    Command.broadcastCommandMessage(sender, new TranslationContainer("commands.save.hold-on"));
+                    return true;
+                case "resume":
+                    sender.getServer().holdWorldSave = false;
+                    Command.broadcastCommandMessage(sender, new TranslationContainer("commands.save.hold-off"));
+                    return true;
+                default:
+                    sender.sendMessage(new TranslationContainer("commands.generic.usage", this.usageMessage));
+                    return false;
+            }
+        }
+
         broadcastCommandMessage(sender, new TranslationContainer("commands.save.start"));
 
         for (Player player : sender.getServer().getOnlinePlayers().values()) {

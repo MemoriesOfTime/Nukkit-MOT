@@ -1370,7 +1370,7 @@ public class BinaryStream {
     }
 
     public Vector3f getVector3f() {
-        return new Vector3f(this.getLFloat(4), this.getLFloat(4), this.getLFloat(4));
+        return new Vector3f(this.getLFloat(), this.getLFloat(), this.getLFloat());
     }
 
     public void putVector3f(Vector3f v) {
@@ -1384,7 +1384,7 @@ public class BinaryStream {
     }
 
     public Vector2f getVector2f() {
-        return new Vector2f(this.getLFloat(4), this.getLFloat(4));
+        return new Vector2f(this.getLFloat(), this.getLFloat());
     }
 
     public void putVector2f(Vector2f v) {

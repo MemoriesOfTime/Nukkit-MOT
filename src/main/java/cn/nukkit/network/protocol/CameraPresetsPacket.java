@@ -111,6 +111,11 @@ public class CameraPresetsPacket extends DataPacket {
             if (this.protocol >= ProtocolInfo.v1_21_30) {
                 this.putOptionalNull(preset.getRotationSpeed(), this::putLFloat);
                 this.putOptionalNull(preset.getSnapToTarget(), (snapToTarget) -> this.putBoolean(snapToTarget.getAsBoolean()));
+                if (this.protocol >= ProtocolInfo.v1_21_40) {
+                    this.putOptionalNull(preset.getHorizontalRotationLimit(), vector2f -> this.putVector2f(vector2f));
+                    this.putOptionalNull(preset.getVerticalRotationLimit(), vector2f -> this.putVector2f(vector2f));
+                    this.putOptional(o -> o != null && o.isPresent(), preset.getContinueTargeting(), (optional) -> this.putBoolean(optional.getAsBoolean()));
+                }
             }
             this.putOptionalNull(preset.getViewOffset(), (viewOffset) -> {
                 this.putLFloat(viewOffset.getX());
@@ -123,6 +128,9 @@ public class CameraPresetsPacket extends DataPacket {
         }
         this.putOptionalNull(preset.getListener(), (listener) -> this.putByte((byte) listener.ordinal()));
         this.putOptional(o -> o != null && o.isPresent(), preset.getPlayEffect(), (optional) -> this.putBoolean(optional.getAsBoolean()));
+        if (this.protocol >= ProtocolInfo.v1_21_40) {
+            this.putOptional(o -> o != null && o.isPresent(), preset.getAlignTargetAndCameraForward(), (optional) -> this.putBoolean(optional.getAsBoolean()));
+        }
     }
 
     protected CameraPreset getPreset() {
@@ -141,21 +149,33 @@ public class CameraPresetsPacket extends DataPacket {
         Float radius = null;
         Float rotationSpeed = null;
         OptionalBoolean snapToTarget = OptionalBoolean.empty();
+        Vector2f horizontalRotationLimit = null;
+        Vector2f verticalRotationLimit = null;
+        OptionalBoolean continueTargeting = OptionalBoolean.empty();
         Vector3f entityOffset = null;
         if (this.protocol >= ProtocolInfo.v1_21_20) {
             if (this.protocol >= ProtocolInfo.v1_21_30) {
                 rotationSpeed = this.getOptional(null, BinaryStream::getLFloat);
-                snapToTarget = this.getOptional(OptionalBoolean.empty(), binaryStream -> OptionalBoolean.of(binaryStream.getBoolean()));
+                snapToTarget = this.getOptional(OptionalBoolean.empty(), b -> OptionalBoolean.of(b.getBoolean()));
+                if (this.protocol >= ProtocolInfo.v1_21_40) {
+                    horizontalRotationLimit = this.getOptional(null, b -> this.getVector2f());
+                    verticalRotationLimit = this.getOptional(null, b -> this.getVector2f());
+                    continueTargeting = this.getOptional(OptionalBoolean.empty(), b -> OptionalBoolean.of(b.getBoolean()));
+                }
             }
-            viewOffset = this.getOptional(null, binaryStream -> new Vector2f(binaryStream.getLFloat(), binaryStream.getLFloat()));
+            viewOffset = this.getOptional(null, b -> this.getVector2f());
             if (this.protocol >= ProtocolInfo.v1_21_30) {
                 entityOffset = this.getOptional(null, BinaryStream::getVector3f);
             }
             radius = this.getOptional(null, BinaryStream::getLFloat);
         }
 
-        CameraAudioListener listener = this.getOptional(null, binaryStream -> CameraAudioListener.values()[binaryStream.getByte()]);
-        OptionalBoolean effects = this.getOptional(OptionalBoolean.empty(), binaryStream -> OptionalBoolean.of(binaryStream.getBoolean()));
-        return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, viewOffset, radius, listener, effects, rotationSpeed, snapToTarget, entityOffset);
+        CameraAudioListener listener = this.getOptional(null, b -> CameraAudioListener.values()[b.getByte()]);
+        OptionalBoolean effects = this.getOptional(OptionalBoolean.empty(), b -> OptionalBoolean.of(b.getBoolean()));
+        OptionalBoolean alignTargetAndCameraForward = OptionalBoolean.empty();
+        if (this.protocol >= ProtocolInfo.v1_21_40) {
+            alignTargetAndCameraForward = this.getOptional(OptionalBoolean.empty(), b -> OptionalBoolean.of(b.getBoolean()));
+        }
+        return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, viewOffset, radius, listener, effects, rotationSpeed, snapToTarget, entityOffset, horizontalRotationLimit, verticalRotationLimit, continueTargeting, alignTargetAndCameraForward);
     }
 }

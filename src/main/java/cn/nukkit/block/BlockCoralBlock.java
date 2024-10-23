@@ -103,6 +103,7 @@ public class BlockCoralBlock extends BlockSolidMeta {
                     }
                 }
                 BlockFadeEvent event = new BlockFadeEvent(this, new BlockCoralBlock(this.getDamage() | 0x8));
+                event.call();
                 if (!event.isCancelled()) {
                     this.setDead(true);
                     this.getLevel().setBlock(this, event.getNewState(), true, true);
