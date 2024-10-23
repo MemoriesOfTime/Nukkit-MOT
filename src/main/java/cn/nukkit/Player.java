@@ -3352,6 +3352,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (protocol >= ProtocolInfo.v1_20_30_24) {
+                    if (this.protocol >= ProtocolInfo.v1_21_40) {
+                        if (authPacket.getInputData().contains(AuthInputAction.STOP_SPIN_ATTACK)) {
+                            PlayerToggleSpinAttackEvent playerToggleSpinAttackEvent = new PlayerToggleSpinAttackEvent(this, false);
+                            this.server.getPluginManager().callEvent(playerToggleSpinAttackEvent);
+                            if (playerToggleSpinAttackEvent.isCancelled()) {
+                                this.needSendData = true;
+                            } else {
+                                this.setSpinAttack(false);
+                            }
+                        }
+                    }
+
                     if (authPacket.getInputData().contains(AuthInputAction.START_FLYING)) {
                         if (!server.getAllowFlight() && !this.getAdventureSettings().get(Type.ALLOW_FLIGHT)) {
                             this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server");
@@ -3615,6 +3627,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         break;
                     case PlayerActionPacket.ACTION_STOP_SPIN_ATTACK:
+                        if (this.isMovementServerAuthoritative() && protocol >= ProtocolInfo.v1_21_40) break;
                         PlayerToggleSpinAttackEvent playerToggleSpinAttackEvent = new PlayerToggleSpinAttackEvent(this, false);
                         playerToggleSpinAttackEvent.call();
                         if (playerToggleSpinAttackEvent.isCancelled()) {
