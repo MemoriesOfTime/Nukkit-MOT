@@ -80,7 +80,25 @@ public class InventoryTransaction {
             Item sourceItem = slotChangeAction.getSourceItem();
             if (targetItem.getCount() > targetItem.getMaxStackSize() || sourceItem.getCount() > sourceItem.getMaxStackSize()) {
                 invalid = true;
+                Server.getInstance().getLogger().debug("Failed to add SlotChangeAction for " + source.getName() + ": illegal item stack size");
                 return;
+            }
+
+            if (!slotChangeAction.getInventory().allowedToAdd(targetItem)) {
+                invalid = true;
+                Server.getInstance().getLogger().debug("Failed to add SlotChangeAction for " + source.getName() + ": " + slotChangeAction.getInventory().getName() + " inventory doesn't allow item " + targetItem.getId());
+                return;
+            }
+
+            if (!source.isCreative()) {
+                int slot = slotChangeAction.getSlot();
+                if (slot == 36 || slot == 37 || slot == 38 || slot == 39) {
+                    if (sourceItem.hasEnchantment(Enchantment.ID_BINDING_CURSE)) {
+                        invalid = true;
+                        Server.getInstance().getLogger().debug("Failed to add SlotChangeAction for " + source.getName() + ": armor has binding curse");
+                        return;
+                    }
+                }
             }
 
             ListIterator<InventoryAction> iterator = this.actions.listIterator();

@@ -63,6 +63,7 @@ public class BlockSeaPickle extends BlockFlowable {
                 }
             } else if (!this.isDead()) {
                 BlockFadeEvent event = new BlockFadeEvent(this, new BlockSeaPickle(this.getDamage() ^ 0x4));
+                event.call();
                 if (!event.isCancelled()) {
                     this.getLevel().setBlock(this, event.getNewState(), true, true);
                 }

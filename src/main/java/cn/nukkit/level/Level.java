@@ -1446,7 +1446,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean save(boolean force) {
-        if (!this.autoSave && !force) {
+        if ((!this.autoSave || server.holdWorldSave) && !force) {
             return false;
         }
 
@@ -4142,6 +4142,10 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void unloadChunks(int maxUnload, boolean force) {
+        if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
+            return;
+        }
+
         if (!this.unloadQueue.isEmpty()) {
             long now = System.currentTimeMillis();
 
@@ -4190,6 +4194,10 @@ public class Level implements ChunkManager, Metadatable {
      * @return true if there is allocated time remaining
      */
     private boolean unloadChunks(long now, long allocatedTime, boolean force) {
+        if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
+            return false;
+        }
+
         if (!this.unloadQueue.isEmpty()) {
             boolean result = true;
             int maxIterations = this.unloadQueue.size();
@@ -5016,7 +5024,9 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_21_30) {
+        if (protocol >= ProtocolInfo.v1_21_40) {
+            return ProtocolInfo.v1_21_40;
+        } else if (protocol >= ProtocolInfo.v1_21_30) {
             return ProtocolInfo.v1_21_30;
         } else if (protocol >= ProtocolInfo.v1_21_20) {
             return ProtocolInfo.v1_21_20;
@@ -5132,7 +5142,8 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_21_0)
             if (player >= ProtocolInfo.v1_21_0) if (player < ProtocolInfo.v1_21_20) return true;
         if (chunk == ProtocolInfo.v1_21_20) if (player < ProtocolInfo.v1_21_30) return true;
-        if (chunk == ProtocolInfo.v1_21_30) if (player >= ProtocolInfo.v1_21_30) return true;
+        if (chunk == ProtocolInfo.v1_21_30) if (player < ProtocolInfo.v1_21_40) return true;
+        if (chunk == ProtocolInfo.v1_21_40) if (player >= ProtocolInfo.v1_21_40) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

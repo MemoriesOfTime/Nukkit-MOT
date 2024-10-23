@@ -47,7 +47,7 @@ public class SimpleCommandMap implements CommandMap {
         this.register("nukkit", new KickCommand("kick"));
         this.register("nukkit", new OpCommand("op"));
         this.register("nukkit", new DeopCommand("deop"));
-        this.register("nukkit", new SaveCommand("save-all"));
+        this.register("nukkit", new SaveCommand("save"));
         this.register("nukkit", new GiveCommand("give"));
         this.register("nukkit", new EffectCommand("effect"));
         this.register("nukkit", new EnchantCommand("enchant"));
@@ -70,8 +70,6 @@ public class SimpleCommandMap implements CommandMap {
         this.register("nukkit", new DefaultGamemodeCommand("defaultgamemode"));
         this.register("nukkit", new SayCommand("say"));
         this.register("nukkit", new MeCommand("me"));
-        this.register("nukkit", new SaveOnCommand("save-on"));
-        this.register("nukkit", new SaveOffCommand("save-off"));
         this.register("nukkit", new DifficultyCommand("difficulty"));
         this.register("nukkit", new ParticleCommand("particle"));
         this.register("nukkit", new SpawnpointCommand("spawnpoint"));
