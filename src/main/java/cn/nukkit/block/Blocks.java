@@ -1,9 +1,14 @@
 package cn.nukkit.block;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import static cn.nukkit.block.Block.list;
 import static cn.nukkit.block.BlockID.*;
 
 public class Blocks {
+
+    private static final Logger log = LogManager.getLogger(Blocks.class);
 
     static {
         list[AIR] = BlockAir.class; //0
@@ -593,6 +598,7 @@ public class Blocks {
         list[CHERRY_WOOD] = BlockWoodCherry.class; //801
         list[CHERRY_SAPLING] = BlockCherrySapling.class; //802
         list[CHERRY_LEAVES] = BlockCherryLeaves.class; //803
+        list[PINK_PETALS] = BlockPinkPetals.class; //804
 
         list[DECORATED_POT] = BlockDecoratedPot.class; //806
 
