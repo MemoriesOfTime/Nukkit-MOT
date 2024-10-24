@@ -346,6 +346,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     @Setter
     private boolean needSendInventory;
     private boolean needSendHeldItem;
+    private boolean needSendRotation;
     private boolean dimensionFix560;
     private boolean needSendUpdateClientInputLocksPacket;
 
@@ -1922,16 +1923,27 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        double distance = clientPos.distanceSquared(this);
+        double distanceSquared = clientPos.distanceSquared(this);
+        if (distanceSquared == 0) {
+            if (this.lastYaw != this.yaw || this.lastPitch != this.pitch) {
+                this.lastYaw = this.yaw;
+                this.lastPitch = this.pitch;
+                this.needSendRotation = true;
+            }
+
+            if (this.speed == null) speed = new Vector3(0, 0, 0);
+            else this.speed.setComponents(0, 0, 0);
+            return;
+        }
 
         int maxDist = 9;
         if (this.riptideTicks > 95 || clientPos.y - this.y < 2 || this.isOnLadder()) { // TODO: Remove ladder/vines check when block collisions are fixed
             maxDist = 49;
         }
 
-        if (distance > maxDist) {
+        if (distanceSquared > maxDist) {
             this.revertClientMotion(this);
-            server.getLogger().debug(username + ": distanceSquared=" + distance +  " > maxDist=" + maxDist);
+            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared +  " > maxDist=" + maxDist);
             return;
         }
 
@@ -1949,19 +1961,29 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
 
-        boolean invalidMotion = false;
-        Location revertPos = this.getLocation().clone();
+        double dx = clientPos.x - this.x;
+        double dy = clientPos.y - this.y;
+        double dz = clientPos.z - this.z;
 
-        double diffX = clientPos.getX() - this.x;
-        double diffY = clientPos.getY() - this.y;
-        double diffZ = clientPos.getZ() - this.z;
+        //the client likes to clip into blocks like stairs, but we do full server-side prediction of that without
+        //help from the client's position changes, so we deduct the expected clip height from the moved distance.
+        dy += this.ySize * (1 - STEP_CLIP_MULTIPLIER); // FIXME: ySize is always 0
 
-        // Client likes to clip into few blocks like stairs or slabs
-        // This should help reduce the server mis-prediction at least a bit
-        diffY += this.ySize * (1 - 0.4D);
+        if (this.checkMovement && this.riptideTicks <= 0 && this.riding == null && !this.isGliding() && !this.getAllowFlight()) {
+            double hSpeed = dx * dx + dz * dz;
+            if (hSpeed > MAXIMUM_SPEED) {
+                PlayerInvalidMoveEvent ev;
+                this.getServer().getPluginManager().callEvent(ev = new PlayerInvalidMoveEvent(this, true));
+                if (!ev.isCancelled()) {
+                    server.getLogger().debug(username + ": hSpeed=" + hSpeed + " > MAXIMUM_SPEED=" + MAXIMUM_SPEED);
+                    this.revertClientMotion(this);
+                    return;
+                }
+            }
+        }
 
         // Replacement for this.fastMove(dx, dy, dz) start
-        if (this.isSpectator() || !this.level.hasCollision(this, this.boundingBox.getOffsetBoundingBox(diffX, diffY, diffZ).shrink(0.1, this.getStepHeight(), 0.1), false)) {
+        if (this.isSpectator() || !this.level.hasCollision(this, this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, this.getStepHeight(), 0.1), false)) {
             this.x = clientPos.x;
             this.y = clientPos.y;
             this.z = clientPos.z;
@@ -1971,12 +1993,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.checkChunks();
 
-        if (!this.isSpectator() && (!this.onGround || diffY != 0)) {
+        if (!this.isSpectator() && (!this.onGround || dy != 0)) {
             AxisAlignedBB bb = this.boundingBox.clone();
             bb.setMinY(bb.getMinY() - 0.75);
 
             // Hack: fix fall damage from walls while falling
-            if (Math.abs(diffY) > 0.01) {
+            if (Math.abs(dy) > 0.01) {
                 bb.setMinX(bb.getMinX() + 0.1);
                 bb.setMaxX(bb.getMaxX() - 0.1);
                 bb.setMinZ(bb.getMinZ() + 0.1);
@@ -1999,162 +2021,150 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             corrY = 0;
         }
 
-        if (this.checkMovement && (Math.abs(corrX) > 0.5 || Math.abs(corrY) > 0.5 || Math.abs(corrZ) > 0.5) &&
-                this.riding == null && !this.hasEffect(Effect.LEVITATION) && !this.hasEffect(Effect.SLOW_FALLING)) {
-            double diff = corrX * corrX + corrZ * corrZ;
-            if (diff > 0.5) {
-                PlayerInvalidMoveEvent invalidMoveEvent = new PlayerInvalidMoveEvent(this, true);
-                this.getServer().getPluginManager().callEvent(invalidMoveEvent);
-                if (!invalidMoveEvent.isCancelled() && (invalidMotion = invalidMoveEvent.isRevert())) {
-                    this.server.getLogger().warning(this.getServer().getLanguage().translateString("nukkit.player.invalidMove", this.getName()));
-                }
-            }
+        // 瞬移检测
+        Location from = new Location(
+                this.lastX,
+                this.lastY,
+                this.lastZ,
+                this.lastYaw,
+                this.lastPitch,
+                this.level);
+        Location to = this.getLocation();
 
-            if (invalidMotion) {
-                this.setPositionAndRotation(revertPos.asVector3f().asVector3(), revertPos.getYaw(), revertPos.getPitch(), revertPos.getHeadYaw());
-                this.revertClientMotion(revertPos);
-                this.resetClientMovement();
+        if (!this.firstMove) {
+            PlayerMoveEvent moveEvent = new PlayerMoveEvent(this, from, to);
+            this.server.getPluginManager().callEvent(moveEvent);
+
+            if (moveEvent.isCancelled()) {
+                this.teleport(from, null);
                 return;
             }
+
+            this.lastX = to.x;
+            this.lastY = to.y;
+            this.lastZ = to.z;
+
+            this.lastYaw = to.yaw;
+            this.lastPitch = to.pitch;
+
+            this.blocksAround = null;
+            this.collisionBlocks = null;
+
+            if (!to.equals(moveEvent.getTo())) { // If plugins modify the destination
+                this.teleport(moveEvent.getTo(), null);
+            } else {
+                //1.7.0-
+                this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
+                        this.getViewers().values()
+                                .stream()
+                                .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
+                                .collect(Collectors.toList()));
+                //1.7.0+
+                this.broadcastMovement();
+            }
+        } else {
+            this.lastX = to.x;
+            this.lastY = to.y;
+            this.lastZ = to.z;
+
+            this.lastYaw = to.yaw;
+            this.lastPitch = to.pitch;
         }
 
-        // 瞬移检测
-        Location source = new Location(this.lastX, this.lastY, this.lastZ, this.lastYaw, this.lastHeadYaw, this.lastPitch, this.level);
-        Location target = this.getLocation();
-        double delta = Math.pow(this.lastX - target.getX(), 2) + Math.pow(this.lastY - target.getY(), 2) + Math.pow(this.lastZ - target.getZ(), 2);
-        double deltaAngle = Math.abs(this.lastYaw - target.getYaw()) + Math.abs(this.lastPitch - target.getPitch());
+        this.firstMove = false;
 
-        handleLogicInMove(invalidMotion,distance);
-        
-        if (delta > 0.0005 || deltaAngle > 1) {
-            boolean isFirst = this.firstMove;
-            this.firstMove = false;
+        if (this.speed == null) {
+            speed = new Vector3(from.x - to.x, from.y - to.y, from.z - to.z);
+        } else {
+            this.speed.setComponents(from.x - to.x, from.y - to.y, from.z - to.z);
+        }
 
-            this.setLastLocation(target);
-
-            if (!isFirst) {
-                List<Block> blocksAround = null;
-                if (this.blocksAround != null) {
-                    blocksAround = new ObjectArrayList<>(this.blocksAround);
+        if (this.riding == null && this.inventory != null) {
+            if (this.isFoodEnabled() && this.getServer().getDifficulty() > 0 && distanceSquared >= 0.05) {
+                double jump = 0;
+                double swimming = this.isInsideOfWater() ? 0.015 * distanceSquared : 0;
+                double distance2 = distanceSquared;
+                if (swimming != 0) {
+                    distance2 = 0;
                 }
-                List<Block> collidingBlocks = null;
-                if (this.collisionBlocks != null) {
-                    collidingBlocks = new ObjectArrayList<>(this.collisionBlocks);
-                }
-
-                PlayerMoveEvent event = new PlayerMoveEvent(this, source, target);
-                this.blocksAround = null;
-                this.collisionBlocks = null;
-                this.server.getPluginManager().callEvent(event);
-
-                if (!(invalidMotion = event.isCancelled())) {
-                    if (!target.equals(event.getTo())) {
-                        this.teleport(event.getTo(), null);
-                    } else {
-                        //1.7.0-
-                        this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
-                                this.getViewers().values()
-                                        .stream()
-                                        .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
-                                        .collect(Collectors.toList()));
-                        //1.7.0+
-                        this.broadcastMovement();
+                if (this.isSprinting()) {
+                    if (this.inAirTicks == 3 && swimming == 0) {
+                        jump = 0.2;
                     }
-                } else {
-                    this.blocksAround = blocksAround;
-                    this.collisionBlocks = collidingBlocks;
-                }
-            }
-
-            if (this.speed == null) {
-                this.speed = new Vector3(source.x - target.x, source.y - target.y, source.z - target.z);
-            } else {
-                this.speed.setComponents(source.x - target.x, source.y - target.y, source.z - target.z);
-            }
-        } else {
-            if (this.speed == null) {
-                speed = new Vector3(0, 0, 0);
-            } else {
-                this.speed.setComponents(0, 0, 0);
-            }
-        }
-
-        if (!invalidMotion && this.isFoodEnabled() && this.getServer().getDifficulty() > 0 && distance >= 0.05 && this.riding == null) {
-            double jump = 0;
-            double swimming = this.isInsideOfWater() ? 0.015 * distance : 0;
-            double distance2 = distance;
-            if (swimming != 0) {
-                distance2 = 0;
-            }
-            if (this.isSprinting()) {
-                if (this.inAirTicks == 3 && swimming == 0) {
-                    jump = 0.2;
-                }
-                this.getFoodData().updateFoodExpLevel(0.1 * distance2 + jump + swimming);
-            } else if (this.isSneaking() && this.inAirTicks == 3) {
-                jump = 0.05;
-                this.getFoodData().updateFoodExpLevel(jump);
-            } else {
-                if (this.inAirTicks == 3 && swimming == 0) {
+                    this.getFoodData().updateFoodExpLevel(0.1 * distance2 + jump + swimming);
+                } else if (this.isSneaking() && this.inAirTicks == 3) {
                     jump = 0.05;
+                    this.getFoodData().updateFoodExpLevel(jump);
+                } else {
+                    if (this.inAirTicks == 3 && swimming == 0) {
+                        jump = 0.05;
+                    }
+                    this.getFoodData().updateFoodExpLevel(jump + swimming);
                 }
-                this.getFoodData().updateFoodExpLevel(jump + swimming);
             }
+
+            this.handleEnchantmentInMove();
         }
 
-        // if plugin cancel move
-        if (invalidMotion) {
-            this.positionChanged = false;
-            this.setPositionAndRotation(revertPos.asVector3f().asVector3(), revertPos.getYaw(), revertPos.getPitch(), revertPos.getHeadYaw());
-            this.revertClientMotion(revertPos);
-            this.resetClientMovement();
-        } else {
-            this.forceMovement = null;
-            if (distance != 0) {
-                if (this.nextChunkOrderRun > 20) {
-                    this.nextChunkOrderRun = 20;
-                }
-                this.level.antiXrayOnBlockChange(this, this, 2);
+        this.forceMovement = null;
+        if (distanceSquared != 0) {
+            if (this.nextChunkOrderRun > 20) {
+                this.nextChunkOrderRun = 20;
             }
+            this.level.antiXrayOnBlockChange(this, this, 2);
         }
+        this.needSendRotation = false; // Sent with movement
+
+        this.resetClientMovement();
     }
 
-    protected void handleLogicInMove(boolean invalidMotion, double distance) {
-        if (!invalidMotion && (this.lastX != this.x) && (this.lastZ != this.z)) {
-            //Handle frost walker enchantment
-            Enchantment frostWalker = inventory.getBoots().getEnchantment(Enchantment.ID_FROST_WALKER);
-            if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
-                int radius = 2 + frostWalker.getLevel();
-                for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
-                    for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
-                        Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
-                        Block block = level.getBlock(coordX, this.getFloorY() - 1, coordZ);
-                        if (block instanceof BlockWater water && up.isAir()) {
-                            if (water.getFluidHeightPercent() < 0.15) {
-                                WaterFrostEvent ev = new WaterFrostEvent(block);
-                                server.getPluginManager().callEvent(ev);
-                                if (!ev.isCancelled()) {
-                                    level.setBlock(block, Block.get(Block.FROSTED_ICE), true, false);
-                                    level.scheduleUpdate(level.getBlock(block), ThreadLocalRandom.current().nextInt(20, 40));
-                                }
+    protected void handleEnchantmentInMove() {
+        Item boots = this.inventory.getBootsFast();
+
+        Enchantment frostWalker = boots.getEnchantment(Enchantment.ID_FROST_WALKER);
+        if (frostWalker != null && frostWalker.getLevel() > 0 && !this.isSpectator() && this.y >= this.level.getMinBlockY() && this.y <= this.level.getMaxBlockY()) {
+            int radius = 2 + frostWalker.getLevel();
+            for (int coordX = this.getFloorX() - radius; coordX < this.getFloorX() + radius + 1; coordX++) {
+                for (int coordZ = this.getFloorZ() - radius; coordZ < this.getFloorZ() + radius + 1; coordZ++) {
+                    Block up = level.getBlock(coordX, this.getFloorY(), coordZ);
+                    Block block = level.getBlock(coordX, this.getFloorY() - 1, coordZ);
+                    if (block instanceof BlockWater water && up.isAir()) {
+                        if (water.getFluidHeightPercent() < 0.15) {
+                            WaterFrostEvent ev = new WaterFrostEvent(block);
+                            server.getPluginManager().callEvent(ev);
+                            if (!ev.isCancelled()) {
+                                level.setBlock(block, Block.get(Block.FROSTED_ICE), true, false);
+                                level.scheduleUpdate(level.getBlock(block), ThreadLocalRandom.current().nextInt(20, 40));
                             }
                         }
                     }
                 }
             }
         }
+
+        Enchantment soulSpeedEnchantment = boots.getEnchantment(Enchantment.ID_SOUL_SPEED);
+        if (soulSpeedEnchantment != null && soulSpeedEnchantment.getLevel() > 0) {
+            int down = this.getLevel().getBlockIdAt(chunk, getFloorX(), getFloorY() - 1, getFloorZ());
+            if (this.inSoulSand && down != BlockID.SOUL_SAND) {
+                this.inSoulSand = false;
+                this.setMovementSpeed(DEFAULT_SPEED, true);
+            } else if (!this.inSoulSand && down == BlockID.SOUL_SAND) {
+                this.inSoulSand = true;
+                float soulSpeed = (soulSpeedEnchantment.getLevel() * 0.105f) + 1.3f;
+                this.setMovementSpeed(DEFAULT_SPEED * soulSpeed, true);
+            }
+        }
     }
 
     protected void resetClientMovement() {
         this.newPosition = null;
-        this.positionChanged = false;
-        this.clientMovements.clear();
     }
 
     protected void revertClientMotion(Location originalPos) {
         this.setLastLocation(originalPos);
 
         Vector3 syncPos = originalPos.add(0, 0.00001, 0);
+        this.needSendRotation = false;
         this.sendPosition(syncPos, originalPos.getYaw(), originalPos.getPitch(), MovePlayerPacket.MODE_RESET);
         this.forceMovement = syncPos;
 
@@ -2281,6 +2291,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             while (!this.clientMovements.isEmpty()) {
                 this.handleMovement(this.clientMovements.poll());
             }
+
+            if (this.needSendRotation) {
+                //1.7.0-
+                this.addMovement(this.x, this.y, this.z, this.yaw, this.pitch, this.headYaw,
+                        this.getViewers().values()
+                                .stream()
+                                .filter(p -> p.protocol < ProtocolInfo.v1_7_0)
+                                .collect(Collectors.toList()));
+                //1.7.0+
+                this.broadcastMovement();
+                this.needSendRotation = false;
+            }
+
             this.motionX = this.motionY = this.motionZ = 0; // HACK: fix player knockback being messed up
 
             if (!this.isSpectator() && this.isAlive()) {
