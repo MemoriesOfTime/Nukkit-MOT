@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.format.anvil.util.BlockStorage;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.util.BitArray;
@@ -26,13 +27,12 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
-import static cn.nukkit.level.format.anvil.util.BlockStorage.SECTION_SIZE;
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
 
 @Log4j2
 public class StateBlockStorage {
 
-    private static final int SIZE = 16 * 16 * 16;
+    private static final int SECTION_SIZE = 16 * 16 * 16;
 
     private List<BlockStateSnapshot> palette;
     private BitArray bitArray;
@@ -50,8 +50,8 @@ public class StateBlockStorage {
         this.palette = new ObjectArrayList<>(16);
         this.palette.add(BlockStateMapping.get().getState(0, 0));
 
-        this.blockIds = new byte[SIZE];
-        this.blockData = new NibbleArray(SECTION_SIZE);
+        this.blockIds = new byte[SECTION_SIZE];
+        this.blockData = new NibbleArray(BlockStorage.SECTION_SIZE);
     }
 
     protected StateBlockStorage(BitArray bitArray, List<BlockStateSnapshot> palette, byte[] blockIds, NibbleArray blockData) {
@@ -158,7 +158,7 @@ public class StateBlockStorage {
                     }
                     this.palette.add(blockState);
                 } catch (Exception e) {
-                    log.error("[" + chunkBuilder.debugString() + "] Unable to deserialize chunk block state", e);
+                    log.error("[{}] Unable to deserialize chunk block state", chunkBuilder.debugString(), e);
                 }
             }
 
@@ -176,6 +176,14 @@ public class StateBlockStorage {
                 log.error("Failed to close NBT stream", e);
             }
         }
+    }
+
+    public BlockStateSnapshot getBlockState(int index) {
+        return this.palette.get(this.bitArray.get(index));
+    }
+
+    public BlockStateSnapshot getBlockState(int x, int y, int z) {
+        return this.getBlockState(elementIndex(x, y, z));
     }
 
     public int get(int index) {
@@ -203,6 +211,10 @@ public class StateBlockStorage {
         }
     }
 
+    public void set(int x, int y, int z, BlockStateSnapshot value) {
+        this.set(elementIndex(x, y, z), value);
+    }
+
     public void set(int x, int y, int z, int value) {
         this.set(elementIndex(x, y, z), BlockStateMapping.get().getBlockStateFromFullId(value));
     }
@@ -211,21 +223,10 @@ public class StateBlockStorage {
         this.set(elementIndex(pos.x, pos.y, pos.z), BlockStateMapping.get().getBlockStateFromFullId(value));
     }
 
-    /**
-     * Fast check.
-     */
-    public boolean has(int id) {
-        return this.palette.contains(id);
-    }
-
-    public int indexOf(int id) {
-        return this.palette.indexOf(id);
-    }
-
     public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
-        for (int i = 0; i < SECTION_SIZE; i++) {
+        for (int i = 0; i < BlockStorage.SECTION_SIZE; i++) {
             int fullId = get(i);
             int id = fullId >> Block.DATA_BITS;
             int meta = fullId & Block.DATA_MASK;
@@ -240,8 +241,8 @@ public class StateBlockStorage {
     }
 
     private void grow(BitArrayVersion version) {
-        BitArray newBitArray = version.createPalette(SIZE);
-        for (int i = 0; i < SIZE; i++) {
+        BitArray newBitArray = version.createPalette(SECTION_SIZE);
+        for (int i = 0; i < SECTION_SIZE; i++) {
             newBitArray.set(i, this.bitArray.get(i));
         }
         this.bitArray = newBitArray;
@@ -276,10 +277,9 @@ public class StateBlockStorage {
         }
 
         for (int word : this.bitArray.getWords()) {
-            if (Integer.toUnsignedLong(word) == 0L) {
-                continue;
+            if (Integer.toUnsignedLong(word) != 0L) {
+                return false;
             }
-            return false;
         }
         return true;
     }
@@ -288,7 +288,7 @@ public class StateBlockStorage {
         if (!this.isEmpty()) {
             return Arrays.copyOf(blockIds, blockIds.length);
         } else {
-            return new byte[SECTION_SIZE];
+            return new byte[BlockStorage.SECTION_SIZE];
         }
     }
 
@@ -328,15 +328,15 @@ public class StateBlockStorage {
             this.palette.add(firstId);
 
 //            Arrays.fill(this.bitArray.getWords(), 0);
-            this.bitArray = BitArrayVersion.V1.createPalette(SIZE);
+            this.bitArray = BitArrayVersion.V1.createPalette(SECTION_SIZE);
             return true;
         }
 
         BitArrayVersion version = BitArrayVersion.V2;
-        BitArray newArray = version.createPalette(SIZE);
+        BitArray newArray = version.createPalette(SECTION_SIZE);
         List<BlockStateSnapshot> newPalette = new ObjectArrayList<>(count);
         newPalette.add(this.palette.get(0));
-        for (int i = 0; i < SIZE; i++) {
+        for (int i = 0; i < SECTION_SIZE; i++) {
             int paletteIndex = this.bitArray.get(i);
             BlockStateSnapshot snapshot = this.palette.get(paletteIndex);
             int newIndex = newPalette.indexOf(snapshot);
@@ -347,7 +347,7 @@ public class StateBlockStorage {
 
                 if (newIndex > version.getMaxEntryValue()) {
                     version = version.next();
-                    BitArray growArray = version.createPalette(SIZE);
+                    BitArray growArray = version.createPalette(SECTION_SIZE);
                     for (int j = 0; j < i; j++) {
                         growArray.set(j, newArray.get(j));
                     }

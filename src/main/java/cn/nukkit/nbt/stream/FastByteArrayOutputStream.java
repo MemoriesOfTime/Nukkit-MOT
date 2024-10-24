@@ -83,12 +83,10 @@ public class FastByteArrayOutputStream extends OutputStream {
     }
 
     @Override
-    public void write(final int b ) {
-        if ( position == length ) {
-            length++;
-            if ( position == array.length ) array = grow( array, length );
-        }
+    public void write( final int b ) {
+        if ( position >= array.length ) array = grow( array, position + 1, length );
         array[ position++ ] = (byte)b;
+        if ( length < position ) length = position;
     }
 
     public static void ensureOffsetLength( final int arrayLength, final int offset, final int length ) {
@@ -116,14 +114,14 @@ public class FastByteArrayOutputStream extends OutputStream {
     }
 
     @Override
-    public void write(final byte[] b, final int off, final int len ) throws IOException {
+    public void write( final byte[] b, final int off, final int len ) throws IOException {
         if ( position + len > array.length ) array = grow( array, position + len, position );
         System.arraycopy( b, off, array, position, len );
         if ( position + len > length ) length = position += len;
     }
 
     public void position( long newPosition ) {
-        if ( position > Integer.MAX_VALUE ) throw new IllegalArgumentException( "Position too large: " + newPosition );
+        if ( newPosition > Integer.MAX_VALUE ) throw new IllegalArgumentException( "Position too large: " + newPosition );
         position = (int)newPosition;
     }
 
@@ -136,7 +134,6 @@ public class FastByteArrayOutputStream extends OutputStream {
     }
 
     public byte[] toByteArray() {
-        if (position == array.length) return array;
         return Arrays.copyOfRange(array, 0, position);
     }
 }

@@ -2,14 +2,13 @@ package cn.nukkit.network.protocol.v113;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.DataPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * author: MagicDroidX
  * Nukkit Project
  */
-public class ContainerSetContentPacketV113 extends DataPacket {
-    public static final byte NETWORK_ID = ProtocolInfo.CRAFTING_DATA_PACKET;
+public class ContainerSetContentPacketV113 extends DataPacket_v113 {
+    public static final byte NETWORK_ID = ProtocolInfoV113.CONTAINER_SET_CONTENT_PACKET;
 
     @Override
     public byte pid() {

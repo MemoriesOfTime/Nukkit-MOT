@@ -1,14 +1,13 @@
 package cn.nukkit.network.protocol.v113;
 
 import cn.nukkit.math.BlockVector3;
-import cn.nukkit.network.protocol.DataPacket;
 
 /**
  * @author Nukkit Project Team
  */
-public class RemoveBlockPacketV113 extends DataPacket {
+public class RemoveBlockPacketV113 extends DataPacket_v113 {
 
-    public static final byte NETWORK_ID = /*ProtocolInfo.REMOVE_BLOCK_PACKET*/ 0x15;
+    public static final byte NETWORK_ID = ProtocolInfoV113.REMOVE_BLOCK_PACKET;
 
     public int x;
     public int y;

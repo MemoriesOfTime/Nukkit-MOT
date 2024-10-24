@@ -6,6 +6,7 @@ import cn.nukkit.Server;
 import cn.nukkit.entity.data.Skin;
 import cn.nukkit.event.player.PlayerChangeSkinEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.PlayerSkinPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.AccessLevel;
@@ -29,6 +30,7 @@ public class PlayerSkinProcessor extends DataPacketProcessor<PlayerSkinPacket> {
 
         if (!skin.isValid()) {
             player.getServer().getLogger().warning(playerHandle.getUsername() + ": PlayerSkinPacket with invalid skin");
+            player.close("", "disconnectionScreen.invalidSkin");
             return;
         }
 
@@ -47,5 +49,15 @@ public class PlayerSkinProcessor extends DataPacketProcessor<PlayerSkinPacket> {
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.PLAYER_SKIN_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return PlayerSkinPacket.class;
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
     }
 }

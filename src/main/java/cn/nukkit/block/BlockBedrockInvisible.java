@@ -19,13 +19,8 @@ public class BlockBedrockInvisible extends BlockSolid {
     }
 
     @Override
-    public int getWaterloggingLevel() {
-        return 2;
-    }
-
-    @Override
-    public boolean canBeFlowedInto() {
-        return false;
+    public WaterloggingType getWaterloggingType() {
+        return WaterloggingType.FLOW_INTO_BLOCK;
     }
 
     @Override

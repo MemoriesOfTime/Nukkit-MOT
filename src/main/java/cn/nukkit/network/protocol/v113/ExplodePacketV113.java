@@ -7,9 +7,9 @@ import cn.nukkit.network.protocol.DataPacket;
  * author: MagicDroidX
  * Nukkit Project
  */
-public class ExplodePacketV113 extends DataPacket {
+public class ExplodePacketV113 extends DataPacket_v113 {
 
-    public static final byte NETWORK_ID = 0x18;
+    public static final byte NETWORK_ID = ProtocolInfoV113.EXPLODE_PACKET;
 
     public float x;
     public float y;

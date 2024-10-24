@@ -111,7 +111,7 @@ public class BlockFire extends BlockFlowable {
             return Level.BLOCK_UPDATE_NORMAL;
         } else if (type == Level.BLOCK_UPDATE_SCHEDULED && this.level.gameRules.getBoolean(GameRule.DO_FIRE_TICK)) {
             Block down = this.down();
-            boolean forever = down.getId() == NETHERRACK || down.getId() == MAGMA || (down.getId() == BEDROCK && level.getDimension() == Level.DIMENSION_THE_END);
+            boolean forever = this.getId() == SOUL_FIRE || down.getId() == NETHERRACK || down.getId() == MAGMA || (down.getId() == BEDROCK && level.getDimension() == Level.DIMENSION_THE_END);
 
             boolean canBlockSeeSky = this.getLevel().canBlockSeeSky(this) ||
                     this.getLevel().canBlockSeeSky(this.east()) ||

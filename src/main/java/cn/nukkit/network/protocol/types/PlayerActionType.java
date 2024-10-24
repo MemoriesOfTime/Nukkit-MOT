@@ -25,6 +25,9 @@ public enum PlayerActionType {
     UPDATED_ENCHANTING_SEED,
     START_SWIMMING,
     STOP_SWIMMING,
+    /**
+     * @deprecated since v729
+     */
     START_SPIN_ATTACK,
     STOP_SPIN_ATTACK,
     INTERACT_WITH_BLOCK,
@@ -59,7 +62,12 @@ public enum PlayerActionType {
     /**
      * @since v622
      */
-    RECEIVED_SERVER_DATA;
+    RECEIVED_SERVER_DATA,
+    /**
+     * @since v748
+     */
+    START_USING_ITEM
+    ;
 
     private static final PlayerActionType[] VALUES = values();
 

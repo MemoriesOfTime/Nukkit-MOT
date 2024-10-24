@@ -22,11 +22,11 @@ import cn.nukkit.network.LittleEndianByteBufInputStream;
 import cn.nukkit.network.LittleEndianByteBufOutputStream;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.EntityLink;
-import cn.nukkit.network.protocol.types.itemstack.ContainerSlotType;
-import cn.nukkit.network.protocol.types.itemstack.request.ItemStackRequest;
-import cn.nukkit.network.protocol.types.itemstack.request.ItemStackRequestSlotData;
-import cn.nukkit.network.protocol.types.itemstack.request.TextProcessingEventOrigin;
-import cn.nukkit.network.protocol.types.itemstack.request.action.*;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequestSlotData;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessingEventOrigin;
+import cn.nukkit.network.protocol.types.inventory.itemstack.request.action.*;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.AbstractByteBufAllocator;
 import io.netty.buffer.ByteBuf;
@@ -719,10 +719,13 @@ public class BinaryStream {
         }
 
         int blockRuntimeId = this.getVarInt();// blockRuntimeId
-        if (id != null && id < 256 && id != 166) { // ItemBlock
-            int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, blockRuntimeId);
-            if (fullId != -1) {
-                damage = fullId & Block.DATA_MASK;
+        //TODO 在1.21.30会得到错误数据
+        if (protocolId < ProtocolInfo.v1_21_30) {
+            if (id != null && id < 256 && id != 166) { // ItemBlock
+                int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, blockRuntimeId);
+                if (fullId != -1) {
+                    damage = fullId & Block.DATA_MASK;
+                }
             }
         }
 
@@ -849,6 +852,11 @@ public class BinaryStream {
     public void putSlot(int protocolId, Item item, boolean crafting) {
         if (protocolId >= ProtocolInfo.v1_16_220) {
             this.putSlotNew(protocolId, item, crafting);
+            return;
+        }
+
+        if (protocolId < ProtocolInfo.v1_2_0) {
+            this.putSlotV113(item);
             return;
         }
 
@@ -1047,6 +1055,22 @@ public class BinaryStream {
         if (item.getId() == ItemID.SHIELD && protocolId >= ProtocolInfo.v1_11_0) {
             this.putVarLong(0); //"blocking tick" (ffs mojang)
         }
+    }
+
+    private void putSlotV113(Item item) {
+        if (item == null || item.getId() == Item.AIR) {
+            this.putVarInt(0);
+            return;
+        }
+
+        this.putVarInt(item.getId());
+        int auxValue = (((item.hasMeta() ? item.getDamage() : -1) & 0x7fff) << 8) | item.getCount();
+        this.putVarInt(auxValue);
+        byte[] nbt = item.getCompoundTag();
+        this.putLShort(nbt.length);
+        this.put(nbt);
+        this.putVarInt(0); //CanPlaceOn entry count
+        this.putVarInt(0); //CanDestroy entry count
     }
 
     private void putSlotNew(int protocolId, Item item, boolean instanceItem) {
@@ -1346,7 +1370,7 @@ public class BinaryStream {
     }
 
     public Vector3f getVector3f() {
-        return new Vector3f(this.getLFloat(4), this.getLFloat(4), this.getLFloat(4));
+        return new Vector3f(this.getLFloat(), this.getLFloat(), this.getLFloat());
     }
 
     public void putVector3f(Vector3f v) {
@@ -1360,7 +1384,7 @@ public class BinaryStream {
     }
 
     public Vector2f getVector2f() {
-        return new Vector2f(this.getLFloat(4), this.getLFloat(4));
+        return new Vector2f(this.getLFloat(), this.getLFloat());
     }
 
     public void putVector2f(Vector2f v) {
@@ -1453,14 +1477,16 @@ public class BinaryStream {
     }
 
     public void putEntityLink(int protocol, EntityLink link) {
-        putEntityUniqueId(link.fromEntityUniquieId);
-        putEntityUniqueId(link.toEntityUniquieId);
-        putByte(link.type);
-        putBoolean(link.immediate);
-        if (protocol >= 407) {
-            putBoolean(link.riderInitiated);
-            if (protocol >= ProtocolInfo.v1_21_20) {
-                putLFloat(link.vehicleAngularVelocity);
+        this.putEntityUniqueId(link.fromEntityUniquieId);
+        this.putEntityUniqueId(link.toEntityUniquieId);
+        this.putByte(link.type);
+        if (protocol >= ProtocolInfo.v1_2_0) {
+            this.putBoolean(link.immediate);
+            if (protocol >= ProtocolInfo.v1_16_0) {
+                this.putBoolean(link.riderInitiated);
+                if (protocol >= ProtocolInfo.v1_21_20) {
+                    this.putLFloat(link.vehicleAngularVelocity);
+                }
             }
         }
     }

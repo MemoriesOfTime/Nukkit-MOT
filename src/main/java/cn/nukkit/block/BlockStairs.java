@@ -43,8 +43,8 @@ public abstract class BlockStairs extends BlockSolidMeta implements Faceable {
     }
 
     @Override
-    public int getWaterloggingLevel() {
-        return 1;
+    public WaterloggingType getWaterloggingType() {
+        return WaterloggingType.WHEN_PLACED_IN_WATER;
     }
 
     @Override

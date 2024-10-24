@@ -1,6 +1,8 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import lombok.ToString;
 
 /**
@@ -24,7 +26,16 @@ public class InventorySlotPacket extends DataPacket {
     /**
      * @since v712
      */
-    public int dynamicContainerId;
+    public FullContainerName containerNameData = new FullContainerName(ContainerSlotType.ANVIL_INPUT, null);
+    /**
+     * @since v729
+     * @deprecated since v748. Use storageItem ItemData size instead.
+     */
+    public int dynamicContainerSize;
+    /**
+     * @since v748
+     */
+    private Item storageItem;
 
     @Override
     public void decode() {
@@ -38,8 +49,16 @@ public class InventorySlotPacket extends DataPacket {
         this.reset();
         this.putUnsignedVarInt(this.inventoryId);
         this.putUnsignedVarInt(this.slot);
-        if (this.protocol >= ProtocolInfo.v1_21_20) {
-            this.putUnsignedVarInt(this.dynamicContainerId);
+        if (this.protocol >= ProtocolInfo.v1_21_30) {
+            this.putByte((byte) this.containerNameData.getContainer().getId());
+            this.putOptionalNull(this.containerNameData.getDynamicId(), this::putLInt);
+            if (this.protocol >= ProtocolInfo.v1_21_40) {
+                this.putSlot(this.protocol, this.storageItem);
+            } else {
+                this.putUnsignedVarInt(this.dynamicContainerSize);
+            }
+        } else if (this.protocol >= ProtocolInfo.v1_21_20) {
+            this.putUnsignedVarInt(this.containerNameData == null || this.containerNameData.getDynamicId() == null ? 0 : this.containerNameData.getDynamicId());
         }
         if (protocol >= 407 && protocol < ProtocolInfo.v1_16_220) {
             this.putVarInt(networkId);

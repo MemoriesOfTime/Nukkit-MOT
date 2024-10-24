@@ -17,9 +17,7 @@ import cn.nukkit.level.biome.impl.mesa.*;
 import cn.nukkit.level.biome.impl.mushroom.MushroomIslandBiome;
 import cn.nukkit.level.biome.impl.mushroom.MushroomIslandShoreBiome;
 import cn.nukkit.level.biome.impl.nether.*;
-import cn.nukkit.level.biome.impl.ocean.DeepOceanBiome;
-import cn.nukkit.level.biome.impl.ocean.FrozenOceanBiome;
-import cn.nukkit.level.biome.impl.ocean.OceanBiome;
+import cn.nukkit.level.biome.impl.ocean.*;
 import cn.nukkit.level.biome.impl.plains.PlainsBiome;
 import cn.nukkit.level.biome.impl.plains.SunflowerPlainsBiome;
 import cn.nukkit.level.biome.impl.river.FrozenRiverBiome;
@@ -81,6 +79,14 @@ public enum EnumBiome {
     MESA(37, new MesaBiome()),
     MESA_PLATEAU_F(38, new MesaPlateauFBiome()),
     MESA_PLATEAU(39, new MesaPlateauBiome()),
+    WARM_OCEAN(40, new WarmOceanBiome()),
+    DEEP_WARM_OCEAN(41, new WarmDeepOceanBiome()),
+    LUKEWARM_OCEAN(42, new LukewarmOceanBiome()),
+    DEEP_LUKEWARM_OCEAN(43, new LukewarmDeepOceanBiome()),
+    COLD_OCEAN(44, new ColdOceanBiome()),
+    DEEP_COLD_OCEAN(45, new ColdDeepOceanBiome()),
+    NEW_FROZEN_OCEAN(46, new NewFrozenOceanBiome()),
+    DEEP_FROZEN_OCEAN(47, new FrozenDeepOceanBiome()),
     // All biomes below this comment are mutated variants of existing biomes
     @Deprecated
     JUNGLE_BAMBOO(48, new BambooJungleBiome()),
@@ -101,6 +107,7 @@ public enum EnumBiome {
     ROOFED_FOREST_M(157, new RoofedForestMBiome()),
     COLD_TAIGA_M(158, new ColdTaigaMBiome()),
     MEGA_SPRUCE_TAIGA(160, new MegaSpruceTaigaBiome()),
+    MEGA_SPRUCE_TAIGA_HILLS(161, new MegaSpruceTaigaHillsBiome()),
     EXTREME_HILLS_PLUS_M(162, new ExtremeHillsPlusMBiome()),
     SAVANNA_M(163, new SavannaMBiome()),
     SAVANNA_PLATEAU_M(164, new SavannaPlateauMBiome()),

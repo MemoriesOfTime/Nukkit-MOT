@@ -4,6 +4,7 @@ import cn.nukkit.command.data.*;
 import cn.nukkit.network.protocol.types.CommandParam;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.SequencedHashSet;
+import com.google.gson.Gson;
 import lombok.ToString;
 import org.cloudburstmc.protocol.common.util.TypeMap;
 
@@ -377,6 +378,12 @@ public class AvailableCommandsPacket extends DataPacket {
     public void encode() {
         this.reset();
 
+        if (this.protocol < ProtocolInfo.v1_2_0) {
+            this.putString(new Gson().toJson(this.commands));
+            this.putString("");
+            return;
+        }
+
         LinkedHashSet<String> enumValuesSet = new LinkedHashSet<>();
         SequencedHashSet<String> subCommandValues = new SequencedHashSet<>();
         LinkedHashSet<String> postFixesSet = new LinkedHashSet<>();
@@ -533,8 +540,12 @@ public class AvailableCommandsPacket extends DataPacket {
                             type |= ARG_FLAG_ENUM | enums.indexOf(parameter.enumData);
                         } else {
                             CommandParam commandParam = COMMAND_PARAMS.getType(parameter.type.getId()); //正常来说应该传入最新版的数字id
-                            int id = getCommandParams(protocol).getId(commandParam);
-                            type |= id;
+                            try {
+                                int id = getCommandParams(protocol).getId(commandParam);
+                                type |= id;
+                            } catch (IllegalArgumentException e) {
+                                type |= getCommandParams(protocol).getId(CommandParam.STRING);
+                            }
                         }
                     }
 

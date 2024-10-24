@@ -9,11 +9,18 @@ public class TransferPacket extends DataPacket {
 
     public String address;
     public int port = 19132;
+    /**
+     * @since v729
+     */
+    public boolean reloadWorld;
 
     @Override
     public void decode() {
         this.address = this.getString();
         this.port = (short) this.getLShort();
+        if (this.protocol >= ProtocolInfo.v1_21_30) {
+            this.reloadWorld = this.getBoolean();
+        }
     }
 
     @Override
@@ -21,6 +28,9 @@ public class TransferPacket extends DataPacket {
         this.reset();
         this.putString(address);
         this.putLShort(port);
+        if (this.protocol >= ProtocolInfo.v1_21_30) {
+            this.putBoolean(this.reloadWorld);
+        }
     }
 
     @Override

@@ -18,11 +18,11 @@ import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.DestroyBlockParticle;
-import cn.nukkit.level.sound.AnvilFallSound;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
+import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
@@ -178,6 +178,7 @@ public class EntityFallingBlock extends Entity {
 
             if (this.onGround) {
                 this.close();
+
                 Block block = this.level.getBlock(pos);
                 Block floorBlock = this.level.getBlock(pos);
                 if (this.getBlock() == Block.SNOW_LAYER && floorBlock.getId() == Block.SNOW_LAYER && (floorBlock.getDamage() & 0x7) != 0x7) {
@@ -187,7 +188,6 @@ public class EntityFallingBlock extends Entity {
                         this.server.getPluginManager().callEvent(event);
                         if (!event.isCancelled()) {
                             this.level.setBlock(pos, event.getTo(), true);
-
                             Vector3 abovePos = pos.up();
                             Block aboveBlock = this.level.getBlock(abovePos);
                             if (aboveBlock.getId() == Block.AIR) {
@@ -209,7 +209,7 @@ public class EntityFallingBlock extends Entity {
                     if (this.getBlock() != Block.SNOW_LAYER ? this.level.getGameRules().getBoolean(GameRule.DO_ENTITY_DROPS) : this.level.getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
                         this.level.dropItem(this, Block.get(this.getBlock(), this.getDamage()).toItem());
                     }
-                } else {
+                } else if (floorBlock.canBeReplaced()) {
                     EntityBlockChangeEvent event = new EntityBlockChangeEvent(this, block, Block.get(blockId, damage));
                     this.server.getPluginManager().callEvent(event);
                     if (!event.isCancelled()) {
@@ -229,8 +229,12 @@ public class EntityFallingBlock extends Entity {
                         }
                         //== 临时修复掉落方块问题
 
-                        if (event.getTo().getId() == Item.ANVIL) {
-                            this.level.addSound(new AnvilFallSound(pos));
+                        if (event.getTo().getId() == Item.ANVIL || blockId == Item.POINTED_DRIPSTONE) {
+                            if (blockId == Item.ANVIL) {
+                                this.getLevel().addLevelEvent(this, LevelEventPacket.EVENT_SOUND_ANVIL_FALL);
+                            } else {
+                                this.getLevel().dropItem(this, Block.get(blockId, event.getTo().getDamage()).toItem());
+                            }
 
                             Entity[] e = level.getCollidingEntities(this.getBoundingBox(), this);
                             for (Entity entity : e) {

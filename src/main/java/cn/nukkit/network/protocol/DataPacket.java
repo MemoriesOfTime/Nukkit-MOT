@@ -1,15 +1,18 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.network.Network;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.SnappyCompression;
 import cn.nukkit.utils.Zlib;
+import lombok.extern.log4j.Log4j2;
 
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
+@Log4j2
 public abstract class DataPacket extends BinaryStream implements Cloneable {
 
     public int protocol = Integer.MAX_VALUE;
@@ -27,9 +30,17 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
 
     public abstract void encode();
 
+    public final void tryEncode() {
+        if (!this.isEncoded) {
+            this.isEncoded = true;
+            this.encode();
+        }
+    }
+
     @Override
     public DataPacket reset() {
         super.reset();
+
         if (protocol <= 274) {
             if (protocol >= ProtocolInfo.v1_2_0) {
                 this.putByte(this.pid());
@@ -40,12 +51,16 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
                     packetId = Server.getInstance().getNetwork().getPacketPool(protocol).getPacketId(this.getClass());
                 } catch (IllegalArgumentException e) {
                     packetId = 0x6a; //使用1.1不存在的id，所有不支持的数据包
+                    if (Nukkit.DEBUG > 1) {
+                        log.warn("Unknown packet {} for protocol {}", this.getClass().getName(), protocol);
+                    }
                 }
                 this.putByte((byte) (packetId & 0xff));
             }
         } else {
             this.putUnsignedVarInt(this.packetId());
         }
+
         return this;
     }
 
@@ -70,8 +85,7 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
     public DataPacket clone() {
         try {
             DataPacket packet = (DataPacket) super.clone();
-            // prevent reflecting same buffer instance
-            packet.setBuffer(this.count < 0 ? null : this.getBuffer());
+            packet.setBuffer(this.getBuffer()); // prevent reflecting same buffer instance
             packet.offset = this.offset;
             packet.count = this.count;
             return packet;
@@ -101,13 +115,6 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
             return batched;
         } catch (Exception e) {
             throw new RuntimeException(e);
-        }
-    }
-
-    public final void tryEncode() {
-        if (!this.isEncoded) {
-            this.isEncoded = true;
-            this.encode();
         }
     }
 }

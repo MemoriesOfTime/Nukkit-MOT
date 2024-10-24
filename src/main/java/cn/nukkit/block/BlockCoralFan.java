@@ -51,8 +51,8 @@ public class BlockCoralFan extends BlockFlowable implements Faceable {
     }
 
     @Override
-    public int getWaterloggingLevel() {
-        return 2;
+    public WaterloggingType getWaterloggingType() {
+        return WaterloggingType.FLOW_INTO_BLOCK;
     }
     
     @Override
@@ -74,6 +74,7 @@ public class BlockCoralFan extends BlockFlowable implements Faceable {
 
             if (!this.isDead() && !(this.getLevelBlockAtLayer(1) instanceof BlockWater) && !(this.getLevelBlockAtLayer(1) instanceof BlockIceFrosted)) {
                 BlockFadeEvent event = new BlockFadeEvent(this, new BlockCoralFanDead(this.getDamage()));
+                event.call();
                 if (!event.isCancelled()) {
                     this.getLevel().setBlock(this, event.getNewState(), true, true);
                 }

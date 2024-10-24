@@ -8,6 +8,7 @@ import cn.nukkit.form.handler.FormDialogHandler;
 import cn.nukkit.form.response.FormResponseDialog;
 import cn.nukkit.form.window.FormWindowDialog;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.NPCDialoguePacket;
 import cn.nukkit.network.protocol.NPCRequestPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -71,5 +72,15 @@ public class NPCRequestProcessor extends DataPacketProcessor<NPCRequestPacket> {
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.NPC_REQUEST_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return NPCRequestPacket.class;
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
     }
 }

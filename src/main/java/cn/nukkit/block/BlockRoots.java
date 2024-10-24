@@ -12,6 +12,10 @@ public abstract class BlockRoots extends BlockFlowable {
         super(0);
     }
 
+    protected BlockRoots(int meta) {
+        super(meta);
+    }
+
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL && !isSupportValid()) {

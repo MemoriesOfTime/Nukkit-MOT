@@ -8,6 +8,7 @@ import cn.nukkit.blockentity.BlockEntityLectern;
 import cn.nukkit.event.block.LecternPageChangeEvent;
 import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.LecternUpdatePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.AccessLevel;
@@ -48,6 +49,11 @@ public class LecternUpdateProcessor_v340 extends DataPacketProcessor<LecternUpda
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.LECTERN_UPDATE_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return LecternUpdatePacket.class;
     }
 
     @Override

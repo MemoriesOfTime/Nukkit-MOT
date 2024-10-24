@@ -1,9 +1,11 @@
 package cn.nukkit.block;
 
 
+import cn.nukkit.block.properties.enums.OxidizationLevel;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockCopperBulb extends BlockCopperBulbBase {
 
@@ -40,5 +42,10 @@ public class BlockCopperBulb extends BlockCopperBulbBase {
     @Override
     public int getLightLevel() {
         return this.isLit() ? 15 : 0;
+    }
+
+    @Override
+    public @NotNull OxidizationLevel getOxidizationLevel() {
+        return OxidizationLevel.UNAFFECTED;
     }
 }

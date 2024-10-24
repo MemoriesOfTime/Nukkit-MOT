@@ -6,6 +6,7 @@ import cn.nukkit.PlayerHandle;
 import cn.nukkit.event.player.PlayerKickEvent;
 import cn.nukkit.event.player.PlayerToggleFlightEvent;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.RequestAbilityPacket;
 import cn.nukkit.network.protocol.types.PlayerAbility;
@@ -53,6 +54,11 @@ public class RequestAbilityProcessor_v527 extends DataPacketProcessor<RequestAbi
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.REQUEST_ABILITY_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return RequestAbilityPacket.class;
     }
 
     @Override

@@ -3,7 +3,11 @@ package cn.nukkit.level.format.anvil;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.generic.BaseRegionLoader;
-import cn.nukkit.utils.*;
+import cn.nukkit.utils.Binary;
+import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.ChunkException;
+import cn.nukkit.utils.Zlib;
+import lombok.extern.log4j.Log4j2;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -17,6 +21,7 @@ import java.util.TreeMap;
  * @author MagicDroidX
  * Nukkit Project
  */
+@Log4j2
 public class RegionLoader extends BaseRegionLoader {
 
     public RegionLoader(LevelProvider level, int regionX, int regionZ) throws IOException {
@@ -43,42 +48,42 @@ public class RegionLoader extends BaseRegionLoader {
         }
 
         try {
-        Integer[] table = this.locationTable.get(index);
-        RandomAccessFile raf = this.getRandomAccessFile();
-        raf.seek(table[0] << 12);
-        int length = raf.readInt();
-        byte compression = raf.readByte();
-        if (length <= 0 || length >= MAX_SECTOR_LENGTH) {
-            if (length >= MAX_SECTOR_LENGTH) {
-                table[0] = ++this.lastSector;
-                table[1] = 1;
-                this.locationTable.put(index, table);
-                MainLogger.getLogger().error("Corrupted chunk header detected");
+            Integer[] table = this.locationTable.get(index);
+            RandomAccessFile raf = this.getRandomAccessFile();
+            raf.seek(table[0] << 12);
+            int length = raf.readInt();
+            byte compression = raf.readByte();
+            if (length <= 0 || length >= MAX_SECTOR_LENGTH) {
+                if (length >= MAX_SECTOR_LENGTH) {
+                    table[0] = ++this.lastSector;
+                    table[1] = 1;
+                    this.locationTable.put(index, table);
+                    log.error("Corrupted chunk header detected: region {},{} pos {},{} in {}", this.x, this.z, x, z, levelProvider != null ? levelProvider.getPath() : "NULL");
+                }
+                return null;
             }
-            return null;
-        }
 
-        if (length > (table[1] << 12)) {
-            MainLogger.getLogger().error("Corrupted bigger chunk detected");
-            table[1] = length >> 12;
-            this.locationTable.put(index, table);
-            this.writeLocationIndex(index);
-        } else if (compression != COMPRESSION_ZLIB && compression != COMPRESSION_GZIP) {
-            MainLogger.getLogger().error("Invalid compression type");
-            return null;
-        }
+            if (length > (table[1] << 12)) {
+                log.error("Corrupted bigger chunk detected: region {},{} pos {},{} in {}", this.x, this.z, x, z, levelProvider != null ? levelProvider.getPath() : "NULL");
+                table[1] = length >> 12;
+                this.locationTable.put(index, table);
+                this.writeLocationIndex(index);
+            } else if (compression != COMPRESSION_ZLIB && compression != COMPRESSION_GZIP) {
+                log.error("Invalid compression type: region {},{} pos {},{} in {}", this.x, this.z, x, z, levelProvider != null ? levelProvider.getPath() : "NULL");
+                return null;
+            }
 
-        byte[] data = new byte[length - 1];
-        raf.readFully(data);
-        Chunk chunk = this.unserializeChunk(data);
-        if (chunk != null) {
-            return chunk;
-        } else {
-            MainLogger.getLogger().error("Corrupted chunk detected at (" + x + ", " + z + ") in " + levelProvider.getName());
-            return null;
-        }
+            byte[] data = new byte[length - 1];
+            raf.readFully(data);
+            Chunk chunk = this.unserializeChunk(data);
+            if (chunk != null) {
+                return chunk;
+            } else {
+                log.error("Corrupted chunk detected at region {},{} pos {},{} in {}", this.x, this.z, x, z, levelProvider != null ? levelProvider.getPath() : "NULL");
+                return null;
+            }
         } catch (EOFException e) {
-            MainLogger.getLogger().error("Your world is corrupted because some code is bad and corrupted it");
+            log.error("Your world is corrupt, because some code is bad and corrupted it. oops. region {},{} pos {},{} in {}", this.x, this.z, x, z, levelProvider != null ? levelProvider.getPath() : "NULL");
             return null;
         }
     }

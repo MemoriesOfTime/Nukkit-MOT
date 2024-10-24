@@ -167,6 +167,21 @@ public class Level implements ChunkManager, Metadatable {
         xrayableBlocks[Block.EMERALD_ORE] = true;
         xrayableBlocks[Block.ANCIENT_DEBRIS] = true;
         xrayableBlocks[Block.COPPER_ORE] = true;
+
+        randomTickBlocks[BlockID.CAVE_VINES] = true;
+        randomTickBlocks[BlockID.CAVE_VINES_BODY_WITH_BERRIES] = true;
+        randomTickBlocks[BlockID.CAVE_VINES_HEAD_WITH_BERRIES] = true;
+        randomTickBlocks[BlockID.AZALEA_LEAVES] = true;
+        randomTickBlocks[BlockID.AZALEA_LEAVES_FLOWERED] = true;
+        randomTickBlocks[Block.COPPER_BLOCK] = true;
+        randomTickBlocks[Block.CUT_COPPER] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER] = true;
+        randomTickBlocks[Block.EXPOSED_CUT_COPPER] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER] = true;
+        randomTickBlocks[Block.WEATHERED_CUT_COPPER] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER] = true;
+        randomTickBlocks[Block.OXIDIZED_CUT_COPPER] = true;
+        randomTickBlocks[BlockID.BUDDING_AMETHYST] = true;
     }
 
     @NonComputationAtomic
@@ -1431,7 +1446,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean save(boolean force) {
-        if (!this.autoSave && !force) {
+        if ((!this.autoSave || server.holdWorldSave) && !force) {
             return false;
         }
 
@@ -2496,7 +2511,8 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         Vector3 above = new Vector3(target.x, target.y + 1, target.z);
-        if (this.getBlockIdAt((int) above.x, (int) above.y, (int) above.z) == Item.FIRE) {
+        int bid = this.getBlockIdAt((int) above.x, (int) above.y, (int) above.z);
+        if (bid == Item.FIRE || bid == Item.SOUL_FIRE) {
             this.setBlock(above, Block.get(BlockID.AIR), true);
         }
 
@@ -2825,7 +2841,7 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
-        if (hand.getWaterloggingLevel() == 0 && hand.canBeFlowedInto() && (block instanceof BlockLiquid || block.getLevelBlockAtLayer(1) instanceof BlockLiquid)) {
+        if (hand.getWaterloggingType() == Block.WaterloggingType.NO_WATERLOGGING && hand.canBeFlowedInto() && (block instanceof BlockLiquid || block.getLevelBlockAtLayer(1) instanceof BlockLiquid)) {
             return null;
         }
 
@@ -4126,6 +4142,10 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void unloadChunks(int maxUnload, boolean force) {
+        if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
+            return;
+        }
+
         if (!this.unloadQueue.isEmpty()) {
             long now = System.currentTimeMillis();
 
@@ -4174,6 +4194,10 @@ public class Level implements ChunkManager, Metadatable {
      * @return true if there is allocated time remaining
      */
     private boolean unloadChunks(long now, long allocatedTime, boolean force) {
+        if (server.holdWorldSave && !force && this.saveOnUnloadEnabled) {
+            return false;
+        }
+
         if (!this.unloadQueue.isEmpty()) {
             boolean result = true;
             int maxIterations = this.unloadQueue.size();
@@ -5000,7 +5024,11 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_21_20) {
+        if (protocol >= ProtocolInfo.v1_21_40) {
+            return ProtocolInfo.v1_21_40;
+        } else if (protocol >= ProtocolInfo.v1_21_30) {
+            return ProtocolInfo.v1_21_30;
+        } else if (protocol >= ProtocolInfo.v1_21_20) {
             return ProtocolInfo.v1_21_20;
         } else if (protocol >= ProtocolInfo.v1_21_0) {
             return ProtocolInfo.v1_21_0;
@@ -5113,7 +5141,9 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_20_80) if (player == ProtocolInfo.v1_20_80) return true;
         if (chunk == ProtocolInfo.v1_21_0)
             if (player >= ProtocolInfo.v1_21_0) if (player < ProtocolInfo.v1_21_20) return true;
-        if (chunk == ProtocolInfo.v1_21_20) if (player >= ProtocolInfo.v1_21_20) return true;
+        if (chunk == ProtocolInfo.v1_21_20) if (player < ProtocolInfo.v1_21_30) return true;
+        if (chunk == ProtocolInfo.v1_21_30) if (player < ProtocolInfo.v1_21_40) return true;
+        if (chunk == ProtocolInfo.v1_21_40) if (player >= ProtocolInfo.v1_21_40) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

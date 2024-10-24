@@ -1,14 +1,13 @@
 package cn.nukkit.block.properties;
 
-import cn.nukkit.block.customblock.container.BlockStorageContainer;
-import cn.nukkit.item.RuntimeItems;
-import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.block.custom.container.BlockStorageContainer;
 
 public interface BlockPropertiesHelper extends BlockStorageContainer {
 
     int getId();
 
     int getDamage();
+
     void setDamage(int meta);
 
     @Override
@@ -26,7 +25,7 @@ public interface BlockPropertiesHelper extends BlockStorageContainer {
         return this.getId();
     }
 
-    default String getIdentifier() {
+    /*default String getIdentifier() {
         return RuntimeItems.getMapping(ProtocolInfo.CURRENT_PROTOCOL).getNamespacedIdByNetworkId(this.getRuntimeId());
-    }
+    }*/
 }

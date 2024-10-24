@@ -63,6 +63,7 @@ public class BlockSeaPickle extends BlockFlowable {
                 }
             } else if (!this.isDead()) {
                 BlockFadeEvent event = new BlockFadeEvent(this, new BlockSeaPickle(this.getDamage() ^ 0x4));
+                event.call();
                 if (!event.isCancelled()) {
                     this.getLevel().setBlock(this, event.getNewState(), true, true);
                 }
@@ -149,8 +150,8 @@ public class BlockSeaPickle extends BlockFlowable {
     }
 
     @Override
-    public int getWaterloggingLevel() {
-        return 1;
+    public WaterloggingType getWaterloggingType() {
+        return WaterloggingType.WHEN_PLACED_IN_WATER;
     }
 
     @Override

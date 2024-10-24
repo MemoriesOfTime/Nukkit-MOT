@@ -2,6 +2,7 @@ package cn.nukkit.network;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.event.server.BatchPacketsEvent;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -32,17 +33,20 @@ public class BatchingHelper {
         ThreadFactoryBuilder builder = new ThreadFactoryBuilder();
         builder.setNameFormat("Batching Executor");
         this.threadedExecutor = Executors.newSingleThreadExecutor(builder.build());
-        //this.threadedExecutor = new ThreadPoolExecutor(
-        //        1, 100, 100L, TimeUnit.MILLISECONDS,
-        //        new LinkedBlockingDeque<>(),
-        //        builder.build(),
-        //        new ThreadPoolExecutor.DiscardOldestPolicy());
     }
 
     public void batchPackets(Player[] players, DataPacket[] packets) {
-        if (players.length > 0 && packets.length > 0) {
-            this.threadedExecutor.execute(() -> this.batchAndSendPackets(players, packets));
+        if (players == null || packets == null || players.length == 0 || packets.length == 0) {
+            return;
         }
+
+        BatchPacketsEvent ev = new BatchPacketsEvent(players, packets);
+        ev.call();
+        if (ev.isCancelled()) {
+            return;
+        }
+
+        this.threadedExecutor.execute(() -> this.batchAndSendPackets(players, packets));
     }
 
     private void batchAndSendPackets(Player[] players, DataPacket[] packets) {

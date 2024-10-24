@@ -62,8 +62,8 @@ public class BlockEndRod extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public int getWaterloggingLevel() {
-        return 2;
+    public WaterloggingType getWaterloggingType() {
+        return WaterloggingType.FLOW_INTO_BLOCK;
     }
 
     @Override

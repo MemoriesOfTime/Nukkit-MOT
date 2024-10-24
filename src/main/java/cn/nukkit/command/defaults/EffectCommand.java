@@ -1,7 +1,6 @@
 
 package cn.nukkit.command.defaults;
 
-import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
@@ -20,7 +19,7 @@ import java.util.Map;
  * @author Snake1999 and Pub4Game
  * @since 2016/1/23
  */
-public class EffectCommand extends Command {
+public class EffectCommand extends VanillaCommand {
     public EffectCommand(String name) {
         super(name, "commands.effect.description", "nukkit.command.effect.usage");
         this.setPermission("nukkit.command.effect");
@@ -50,11 +49,9 @@ public class EffectCommand extends Command {
         }
         switch (result.getKey()) {
             case "default" -> {
-                Effect effect;
                 String str = list.getResult(1);
-                try {
-                    effect = Effect.getEffectByName(str);
-                } catch (RuntimeException e) {
+                Effect effect = Effect.getEffectByName(str);
+                if (effect == null) {
                     log.addError("commands.effect.notFound", str).output();
                     return 0;
                 }

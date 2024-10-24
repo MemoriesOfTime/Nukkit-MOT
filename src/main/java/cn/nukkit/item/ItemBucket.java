@@ -161,7 +161,7 @@ public class ItemBucket extends Item {
 
                     return true;
                 } else {
-                    player.getInventory().sendContents(player);
+                    player.setNeedSendInventory(true);
                 }
             }
         } else if (targetBlock instanceof BlockLiquid) {
@@ -171,9 +171,9 @@ public class ItemBucket extends Item {
             if (usesWaterlogging) {
                 if (block.getId() == BlockID.BAMBOO) {
                     placementBlock = block;
-                } else if (target.getWaterloggingLevel() > 0) {
+                } else if (target.getWaterloggingType() != Block.WaterloggingType.NO_WATERLOGGING) {
                     placementBlock = target.getLevelBlockAtLayer(1);
-                } else if (block.getWaterloggingLevel() > 0) {
+                } else if (block.getWaterloggingType() != Block.WaterloggingType.NO_WATERLOGGING) {
                     placementBlock = block.getLevelBlockAtLayer(1);
                 } else {
                     placementBlock = block;
@@ -185,7 +185,7 @@ public class ItemBucket extends Item {
             PlayerBucketEmptyEvent ev = new PlayerBucketEmptyEvent(player, block, face, this, result, true);
             boolean canBeFlowedInto = placementBlock.canBeFlowedInto() || placementBlock.getId() == BlockID.BAMBOO;
             if (usesWaterlogging) {
-                ev.setCancelled(placementBlock.getWaterloggingLevel() <= 0 && !canBeFlowedInto);
+                ev.setCancelled(placementBlock.getWaterloggingType() == Block.WaterloggingType.NO_WATERLOGGING && !canBeFlowedInto);
             } else {
                 ev.setCancelled(!canBeFlowedInto);
             }
@@ -263,8 +263,8 @@ public class ItemBucket extends Item {
                 player.getLevel().addSound(new FizzSound(target, 2.6F + (ThreadLocalRandom.current().nextFloat() - ThreadLocalRandom.current().nextFloat()) * 0.8F));
                 player.getLevel().addParticle(new ExplodeParticle(target.add(0.5, 1, 0.5)));
             } else {
-                player.getLevel().sendBlocks(new Player[] {player}, new Block[] {block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
-                player.getInventory().sendContents(player);
+                player.getLevel().sendBlocks(new Player[]{player}, new Block[]{block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
+                player.setNeedSendInventory(true);
             }
         }
 
@@ -286,7 +286,7 @@ public class ItemBucket extends Item {
 
         player.getServer().getPluginManager().callEvent(consumeEvent);
         if (consumeEvent.isCancelled()) {
-            player.getInventory().sendContents(player);
+            player.setNeedSendInventory(true);
             return false;
         }
 

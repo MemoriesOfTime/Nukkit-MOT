@@ -7,6 +7,7 @@ import cn.nukkit.command.Command;
 import cn.nukkit.event.player.PlayerKickEvent;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.SetPlayerGameTypePacket;
 import lombok.AccessLevel;
@@ -42,5 +43,15 @@ public class SetPlayerGameTypeProcessor extends DataPacketProcessor<SetPlayerGam
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.SET_PLAYER_GAME_TYPE_PACKET);
+    }
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return SetPlayerGameTypePacket.class;
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
     }
 }

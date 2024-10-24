@@ -1,16 +1,15 @@
 package cn.nukkit.network.protocol.v113;
 
 import cn.nukkit.command.data.CommandArgs;
-import cn.nukkit.network.protocol.DataPacket;
 import com.google.gson.Gson;
 
 /**
  * author: MagicDroidX
  * Nukkit Project
  */
-public class CommandStepPacketV113 extends DataPacket {
+public class CommandStepPacketV113 extends DataPacket_v113 {
 
-    public static final byte NETWORK_ID = 0x4f;
+    public static final byte NETWORK_ID = ProtocolInfoV113.COMMAND_STEP_PACKET;
 
     /**
      * unknown (string)

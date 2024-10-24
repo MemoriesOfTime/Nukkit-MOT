@@ -36,4 +36,14 @@ public class EmotePacketProcessor extends DataPacketProcessor<EmotePacket> {
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.EMOTE_PACKET);
     }
+
+    @Override
+    public Class<EmotePacket> getPacketClass() {
+        return EmotePacket.class;
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

@@ -22,7 +22,22 @@ public interface ResourcePack {
         return "";
     }
 
+    default String getSubPackName() {
+        return "";
+    }
+
+    default boolean usesScripting() {
+        return false;
+    }
+
     default boolean isAddonPack() {
         return false;
+    }
+
+    /**
+     * @since v748 1.21.40
+     */
+    default String getCDNUrl() {
+        return "";
     }
 }

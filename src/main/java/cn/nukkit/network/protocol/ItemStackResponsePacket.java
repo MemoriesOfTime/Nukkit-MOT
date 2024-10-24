@@ -1,7 +1,7 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.types.itemstack.response.ItemStackResponse;
-import cn.nukkit.network.protocol.types.itemstack.response.ItemStackResponseStatus;
+import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponse;
+import cn.nukkit.network.protocol.types.inventory.itemstack.response.ItemStackResponseStatus;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 

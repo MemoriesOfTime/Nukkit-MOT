@@ -37,4 +37,14 @@ public class ItemFrameDropItemProcessor extends DataPacketProcessor<ItemFrameDro
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.ITEM_FRAME_DROP_ITEM_PACKET);
     }
+
+    @Override
+    public Class<ItemFrameDropItemPacket> getPacketClass() {
+        return ItemFrameDropItemPacket.class;
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

@@ -105,15 +105,16 @@ public class ItemFirework extends Item {
             fds[i] = (byte) fades.get(i).getDyeData();
         }
 
-        ListTag<CompoundTag> explosions = this.getNamedTag().getCompound("Fireworks").getList("Explosions", CompoundTag.class);
+        CompoundTag namedTag = this.getNamedTag();
+        ListTag<CompoundTag> explosions = namedTag.getCompound("Fireworks").getList("Explosions", CompoundTag.class);
         CompoundTag tag = new CompoundTag()
                 .putByteArray("FireworkColor", clrs)
                 .putByteArray("FireworkFade", fds)
                 .putBoolean("FireworkFlicker", explosion.flicker)
                 .putBoolean("FireworkTrail", explosion.trail)
                 .putByte("FireworkType", explosion.type.ordinal());
-
         explosions.add(tag);
+        this.setNamedTag(namedTag);
     }
 
     public void clearExplosions() {

@@ -1398,7 +1398,7 @@ public abstract class Entity extends Location implements Metadatable {
 
         addEntity.links = new EntityLink[this.passengers.size()];
         for (int i = 0; i < addEntity.links.length; i++) {
-            addEntity.links[i] = new EntityLink(this.id, this.passengers.get(i).id, i == 0 ? EntityLink.TYPE_RIDER : TYPE_PASSENGER, false, false);
+            addEntity.links[i] = new EntityLink(this.id, this.passengers.get(i).id, i == 0 ? EntityLink.TYPE_RIDER : TYPE_PASSENGER, false, false, 0f);
         }
 
         return addEntity;
@@ -1896,7 +1896,7 @@ public abstract class Entity extends Location implements Metadatable {
         pk.yaw = yaw;
         pk.teleport = false;
         pk.onGround = this.onGround;
-        Server.broadcastPacket(hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_19_0).collect(Collectors.toList()), pk);
+        Server.broadcastPacket(hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_7_0).collect(Collectors.toList()), pk);
     }
 
     @Override
@@ -2325,7 +2325,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     public boolean isInsideOfWater() {
         Block block = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
-        return block.isWater() || block.getWaterloggingLevel() > 0 && block.getLevelBlockAtLayer(1).isWater();
+        return block.isWater() || block.getWaterloggingType() != Block.WaterloggingType.NO_WATERLOGGING && block.getLevelBlockAtLayer(1).isWater();
     }
 
     public boolean isInsideOfSolid() {

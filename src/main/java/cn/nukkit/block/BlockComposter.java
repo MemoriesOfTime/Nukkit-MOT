@@ -58,8 +58,8 @@ public class BlockComposter extends BlockSolidMeta implements ItemID {
     }
 
     @Override
-    public int getWaterloggingLevel() {
-        return 1;
+    public WaterloggingType getWaterloggingType() {
+        return WaterloggingType.WHEN_PLACED_IN_WATER;
     }
 
     @Override

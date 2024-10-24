@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.entity.item.EntityBoat;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.MoveEntityAbsolutePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.AccessLevel;
@@ -37,8 +38,13 @@ public class MoveEntityAbsoluteProcessor extends DataPacketProcessor<MoveEntityA
     }
 
     @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return MoveEntityAbsolutePacket.class;
+    }
+
+    @Override
     public boolean isSupported(int protocol) {
         //1.20.60开始使用AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE
-        return protocol >= ProtocolInfo.v1_2_0 && protocol < ProtocolInfo.v1_20_60;
+        return protocol >= ProtocolInfo.v1_1_0 && protocol < ProtocolInfo.v1_20_60;
     }
 }

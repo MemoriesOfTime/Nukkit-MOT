@@ -25,6 +25,7 @@ public class ResourcePacksInfoPacket extends DataPacket {
     public ResourcePack[] resourcePackEntries = ResourcePack.EMPTY_ARRAY;
     /**
      * @since v618
+     * @deprecated since v748 1.21.40
      */
     @Getter
     @Setter
@@ -38,20 +39,22 @@ public class ResourcePacksInfoPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putBoolean(this.mustAccept);
-        if (protocol >= ProtocolInfo.v1_20_70) {
+        if (this.protocol >= ProtocolInfo.v1_20_70) {
             this.putBoolean(this.hasAddonPacks);
         }
-        if (protocol >= ProtocolInfo.v1_9_0) {
+        if (this.protocol >= ProtocolInfo.v1_9_0) {
             this.putBoolean(this.scripting);
-            if (protocol >= ProtocolInfo.v1_17_10) {
+            if (this.protocol >= ProtocolInfo.v1_17_10 && this.protocol < ProtocolInfo.v1_21_30) {
                 this.putBoolean(this.forceServerPacks);
             }
         }
 
-        this.encodeBehaviourPacks(this.behaviourPackEntries);
+        if (this.protocol < ProtocolInfo.v1_21_30) {
+            this.encodeBehaviourPacks(this.behaviourPackEntries);
+        }
         this.encodeResourcePacks(this.resourcePackEntries);
 
-        if (protocol >= ProtocolInfo.v1_20_30_24) {
+        if (this.protocol >= ProtocolInfo.v1_20_30_24 && this.protocol < ProtocolInfo.v1_21_40) {
             this.putArray(this.CDNEntries, (entry) -> {
                 this.putString(entry.getPackId());
                 this.putString(entry.getRemoteUrl());
@@ -65,10 +68,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
             this.putString(entry.getPackId().toString());
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
-            this.putString(entry.getEncryptionKey()); // encryption key
-            this.putString(""); // sub-pack name
+            this.putString(entry.getEncryptionKey());
+            this.putString(entry.getSubPackName());
             this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
-            this.putBoolean(false); // scripting
+            this.putBoolean(entry.usesScripting());
         }
     }
 
@@ -91,6 +94,9 @@ public class ResourcePacksInfoPacket extends DataPacket {
                             this.putBoolean(entry.isAddonPack());
                         }
                         this.putBoolean(false); // raytracing capable
+                        if (protocol >= ProtocolInfo.v1_21_40) {
+                            this.putString(entry.getCDNUrl());
+                        }
                     }
                 }
             }

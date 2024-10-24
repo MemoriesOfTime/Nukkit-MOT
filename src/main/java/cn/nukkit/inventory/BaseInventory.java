@@ -13,6 +13,7 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.protocol.v113.ContainerSetContentPacketV113;
 import cn.nukkit.network.protocol.v113.ContainerSetSlotPacketV113;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -480,7 +481,28 @@ public abstract class BaseInventory implements Inventory {
             pk.slots[i] = this.getItem(i);
         }
 
+        if (Server.getInstance().minimumProtocol <= ProtocolInfo.v1_1_0) {
+            ContainerSetContentPacketV113 pk2 = new ContainerSetContentPacketV113();
+            pk2.slots = pk.slots.clone();
+            for (Player player : players) {
+                if (player.protocol > ProtocolInfo.v1_1_0) {
+                    continue;
+                }
+                pk2.eid = player.getId();
+                int id = player.getWindowId(this);
+                if (id == -1 || !player.spawned) {
+                    this.close(player);
+                    continue;
+                }
+                pk2.windowid = (byte) id;
+                player.dataPacket(pk2);
+            }
+        }
+
         for (Player player : players) {
+            if (player.protocol < ProtocolInfo.v1_2_0) {
+                continue;
+            }
             int id = player.getWindowId(this);
             if (id == -1) {
                 this.close(player);
@@ -550,16 +572,29 @@ public abstract class BaseInventory implements Inventory {
     }
 
     private void sendSlotTo(int index, Player player) {
-        InventorySlotPacket pk = new InventorySlotPacket();
-        pk.slot = index;
-        pk.item = this.getItem(index).clone();
-        int id = player.getWindowId(this);
-        if (id == -1) {
-            this.close(player);
-            return;
+        if (player.protocol >= ProtocolInfo.v1_2_0) {
+            InventorySlotPacket pk = new InventorySlotPacket();
+            pk.slot = index;
+            pk.item = this.getItem(index).clone();
+            int id = player.getWindowId(this);
+            if (id == -1) {
+                this.close(player);
+                return;
+            }
+            pk.inventoryId = id;
+            player.dataPacket(pk);
+        } else {
+            ContainerSetSlotPacketV113 pk = new ContainerSetSlotPacketV113();
+            pk.slot = index;
+            pk.item = this.getItem(index).clone();
+            int id = player.getWindowId(this);
+            if (id == -1) {
+                this.close(player);
+                return;
+            }
+            pk.windowid = (byte) id;
+            player.dataPacket(pk);
         }
-        pk.inventoryId = id;
-        player.dataPacket(pk);
     }
 
     @Override

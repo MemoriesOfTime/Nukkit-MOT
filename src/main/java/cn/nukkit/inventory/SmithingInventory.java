@@ -20,12 +20,11 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemArmor;
-import cn.nukkit.item.ItemTrimMaterial;
-import cn.nukkit.item.ItemTrimPattern;
+import cn.nukkit.item.*;
 import cn.nukkit.level.Position;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
@@ -46,6 +45,11 @@ public class SmithingInventory extends FakeBlockUIComponent {
 
     private Item currentResult = Item.get(0);
 
+    private static final IntSet ITEMS = new IntOpenHashSet(new int[]{
+            Item.AIR, ItemID.NETHERITE_INGOT, ItemID.DIAMOND_SWORD, ItemID.DIAMOND_SHOVEL, ItemID.DIAMOND_PICKAXE, ItemID.DIAMOND_AXE,
+            ItemID.DIAMOND_HOE, ItemID.DIAMOND_HELMET, ItemID.DIAMOND_CHESTPLATE, ItemID.DIAMOND_LEGGINGS, ItemID.DIAMOND_BOOTS,
+            ItemID.NETHERITE_SWORD, ItemID.NETHERITE_SHOVEL, ItemID.NETHERITE_PICKAXE, ItemID.NETHERITE_AXE, ItemID.NETHERITE_HOE,
+            ItemID.NETHERITE_HELMET, ItemID.NETHERITE_CHESTPLATE, ItemID.NETHERITE_LEGGINGS, ItemID.NETHERITE_BOOTS});
 
     public SmithingInventory(PlayerUIInventory playerUI, Position position) {
         super(playerUI, InventoryType.SMITHING_TABLE, 51, position);
@@ -143,5 +147,10 @@ public class SmithingInventory extends FakeBlockUIComponent {
             }
         }
         return Item.AIR_ITEM.clone();
+    }
+
+    @Override
+    public boolean allowedToAdd(Item item) {
+        return ITEMS.contains(item.getId());
     }
 }

@@ -4,7 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
-import cn.nukkit.block.customblock.CustomBlockManager;
+import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.inventory.Fuel;
 import cn.nukkit.inventory.ItemTag;
@@ -467,6 +467,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         clearCreativeItems();
     }
 
+    private static final List<Item> creative113 = new ObjectArrayList<>();
     private static final List<Item> creative137 = new ObjectArrayList<>();
     private static final List<Item> creative274 = new ObjectArrayList<>();
     private static final List<Item> creative291 = new ObjectArrayList<>();
@@ -500,12 +501,16 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     private static final List<Item> creative671 = new ObjectArrayList<>();
     private static final List<Item> creative685 = new ObjectArrayList<>();
     private static final List<Item> creative712 = new ObjectArrayList<>();
+    private static final List<Item> creative729 = new ObjectArrayList<>();
+    private static final List<Item> creative748 = new ObjectArrayList<>();
 
     public static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
         clearCreativeItems();
 
         // Creative inventory for oldest versions
+        registerCreativeItems(v1_1_0);
+        registerCreativeItems(v1_2_0);
         registerCreativeItems(v1_5_0);
         registerCreativeItems(v1_7_0);
         registerCreativeItems(v1_8_0);
@@ -540,6 +545,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCreativeItemsNew(ProtocolInfo.v1_20_80, ProtocolInfo.v1_20_80, creative671);
         registerCreativeItemsNew(ProtocolInfo.v1_21_0, ProtocolInfo.v1_21_0, creative685);
         registerCreativeItemsNew(ProtocolInfo.v1_21_20, ProtocolInfo.v1_21_20, creative712);
+        registerCreativeItemsNew(ProtocolInfo.v1_21_30, ProtocolInfo.v1_21_30, creative729);
+        registerCreativeItemsNew(ProtocolInfo.v1_21_40, ProtocolInfo.v1_21_40, creative748);
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -580,6 +587,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public static void clearCreativeItems() {
+        Item.creative113.clear();
         Item.creative137.clear();
         Item.creative274.clear();
         Item.creative291.clear();
@@ -613,6 +621,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         Item.creative671.clear();
         Item.creative685.clear();
         Item.creative712.clear();
+        Item.creative729.clear();
+        Item.creative748.clear();
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -623,7 +633,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static ArrayList<Item> getCreativeItems(int protocol) {
         switch (protocol) {
-            case v1_1_0: //TODO check
+            case v1_1_0:
+                return new ArrayList<>(Item.creative113);
             case v1_2_0:
             case v1_2_5_11:
             case v1_2_5:
@@ -731,6 +742,10 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
                 return new ArrayList<>(Item.creative685);
             case v1_21_20:
                 return new ArrayList<>(Item.creative712);
+            case v1_21_30:
+                return new ArrayList<>(Item.creative729);
+            case v1_21_40:
+                return new ArrayList<>(Item.creative748);
             // TODO Multiversion
             default:
                 throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
@@ -739,11 +754,12 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
 
     public static void addCreativeItem(Item item) {
         Server.mvw("Item#addCreativeItem(Item)");
-        addCreativeItem(v1_21_20, item);
+        addCreativeItem(v1_21_40, item);
     }
 
     public static void addCreativeItem(int protocol, Item item) {
         switch (protocol) { // NOTE: Not all versions are supposed to be here
+            case v1_1_0 -> Item.creative113.add(item.clone());
             case v1_2_0 -> Item.creative137.add(item.clone());
             case v1_5_0 -> Item.creative274.add(item.clone());
             case v1_7_0 -> Item.creative291.add(item.clone());
@@ -777,6 +793,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             case v1_20_80 -> Item.creative671.add(item.clone());
             case v1_21_0 -> Item.creative685.add(item.clone());
             case v1_21_20 -> Item.creative712.add(item.clone());
+            case v1_21_30 -> Item.creative729.add(item.clone());
+            case v1_21_40 -> Item.creative748.add(item.clone());
             // TODO Multiversion
             default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
@@ -949,6 +967,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCustomItem(customItem, v1_20_80, addCreativeItem, v1_20_80);
         registerCustomItem(customItem, v1_21_0, addCreativeItem, v1_21_0);
         registerCustomItem(customItem, v1_21_20, addCreativeItem, v1_21_20);
+        registerCustomItem(customItem, v1_21_30, addCreativeItem, v1_21_30);
         //TODO Multiversion 添加新版本支持时修改这里
 
         return new OK<Void>(true);
@@ -990,6 +1009,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             deleteCustomItem(customItem, v1_20_80, v1_20_80);
             deleteCustomItem(customItem, v1_21_0, v1_21_0);
             deleteCustomItem(customItem, v1_21_20, v1_21_20);
+            deleteCustomItem(customItem, v1_21_30, v1_21_30);
             //TODO Multiversion 添加新版本支持时修改这里
         }
     }
@@ -1714,7 +1734,26 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
     }
 
     public boolean isUnbreakable() {
-        return false;
+        if (!(this instanceof ItemDurable)) {
+            return false;
+        }
+
+        Tag tag = this.getNamedTagEntry("Unbreakable");
+        return tag instanceof ByteTag byteTag && byteTag.data > 0;
+    }
+
+    public Item setUnbreakable(boolean value) {
+        if (!(this instanceof ItemDurable)) {
+            return this;
+        }
+
+        CompoundTag tag = this.getOrCreateNamedTag();
+        this.setNamedTag(tag.putByte("Unbreakable", value ? 1 : 0));
+        return this;
+    }
+
+    public Item setUnbreakable() {
+        return this.setUnbreakable(true);
     }
 
     public boolean canBreakShield() {

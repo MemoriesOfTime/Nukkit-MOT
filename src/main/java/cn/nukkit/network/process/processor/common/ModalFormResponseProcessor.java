@@ -8,6 +8,7 @@ import cn.nukkit.form.handler.FormResponseHandler;
 import cn.nukkit.form.window.FormWindow;
 import cn.nukkit.form.window.FormWindowCustom;
 import cn.nukkit.network.process.DataPacketProcessor;
+import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ModalFormResponsePacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import lombok.AccessLevel;
@@ -62,5 +63,14 @@ public class ModalFormResponseProcessor extends DataPacketProcessor<ModalFormRes
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.MODAL_FORM_RESPONSE_PACKET);
     }
-    
+
+    @Override
+    public Class<? extends DataPacket> getPacketClass() {
+        return ModalFormResponsePacket.class;
+    }
+
+    @Override
+    public boolean isSupported(int protocol) {
+        return protocol >= ProtocolInfo.v1_1_0;
+    }
 }

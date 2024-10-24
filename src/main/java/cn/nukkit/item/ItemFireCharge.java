@@ -35,11 +35,13 @@ public class ItemFireCharge extends Item {
         if (block.getId() == AIR && (target instanceof BlockSolid || target instanceof BlockSolidMeta || target instanceof BlockLeaves)) {
             if (target.getId() == OBSIDIAN) {
                 if (level.createPortal(target, true)) {
+                    level.addSound(target, Sound.MOB_GHAST_FIREBALL);
                     return true;
                 }
             }
 
-            BlockFire fire = (BlockFire) Block.get(BlockID.FIRE);
+            int did;
+            BlockFire fire = (BlockFire) Block.get(((did = block.down().getId()) == SOUL_SAND || did == SOUL_SOIL) ? BlockID.SOUL_FIRE : BlockID.FIRE);
             fire.x = block.x;
             fire.y = block.y;
             fire.z = block.z;
