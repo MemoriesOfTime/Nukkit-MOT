@@ -109,4 +109,11 @@ public class BlockPinkPetals extends BlockFlowable implements Faceable, BlockPro
 
         return false;
     }
+
+    @Override
+    public Item[] getDrops(Item item) {
+        Item pink_petal = Block.get(PINK_PETALS).toItem();
+        pink_petal.setCount(this.getPropertyValue(GROWTH) + 1);
+        return new Item[]{pink_petal};
+    }
 }
