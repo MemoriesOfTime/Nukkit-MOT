@@ -1216,14 +1216,14 @@ public class BinaryStream {
     public void putRecipeIngredient(int protocolId, Item item) {
         if (item == null || item.getId() == 0) {
             if (protocolId >= ProtocolInfo.v1_19_30_23) {
-                this.putBoolean(false); // isValid? - false
+                this.putByte((byte) 0); //ItemDescriptorType.INVALID
             }
             this.putVarInt(0); // item == null ? 0 : item.getCount()
             return;
         }
 
         if (protocolId >= ProtocolInfo.v1_19_30_23) {
-            this.putBoolean(true); // isValid? - true
+            this.putByte((byte) 1); //ItemDescriptorType.DEFAULT
         }
 
         int runtimeId = item.getId();
