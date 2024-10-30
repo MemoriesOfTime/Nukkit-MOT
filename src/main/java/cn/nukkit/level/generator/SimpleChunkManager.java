@@ -22,9 +22,13 @@ public abstract class SimpleChunkManager implements ChunkManager {
 
     @Override
     public int getBlockIdAt(int x, int y, int z, int layer) {
+        if (y < this.getMinBlockY() || y > this.getMaxBlockY()) {
+            return 0;
+        }
+
         FullChunk chunk = this.getChunk(x >> 4, z >> 4);
         if (chunk != null) {
-            return chunk.getBlockId(x & 0xf, y & 0xff, z & 0xf, layer);
+            return chunk.getBlockId(x & 0xf, y, z & 0xf, layer);
         }
         return 0;
     }
@@ -37,9 +41,13 @@ public abstract class SimpleChunkManager implements ChunkManager {
 
     @Override
     public void setBlockIdAt(int x, int y, int z, int layer, int id) {
+        if (y < this.getMinBlockY() || y > this.getMaxBlockY()) {
+            return;
+        }
+
         FullChunk chunk = this.getChunk(x >> 4, z >> 4);
         if (chunk != null) {
-            chunk.setBlockId(x & 0xf, y & 0xff, z & 0xf, layer, id);
+            chunk.setBlockId(x & 0xf, y, z & 0xf, layer, id);
         }
     }
 
@@ -51,9 +59,13 @@ public abstract class SimpleChunkManager implements ChunkManager {
 
     @Override
     public boolean setBlockAtLayer(int x, int y, int z, int layer, int id, int data) {
+        if (y < this.getMinBlockY() || y > this.getMaxBlockY()) {
+            return false;
+        }
+
         FullChunk chunk = this.getChunk(x >> 4, z >> 4);
         if (chunk != null) {
-            return chunk.setBlock(x & 0xf, y & 0xff, z & 0xf, id, data);
+            return chunk.setBlock(x & 0xf, y, z & 0xf, id, data);
         }
         return false;
     }
@@ -65,9 +77,13 @@ public abstract class SimpleChunkManager implements ChunkManager {
 
     @Override
     public void setBlockFullIdAt(int x, int y, int z, int layer, int fullId) {
+        if (y < this.getMinBlockY() || y > this.getMaxBlockY()) {
+            return;
+        }
+
         FullChunk chunk = this.getChunk(x >> 4, z >> 4);
         if (chunk != null) {
-            chunk.setFullBlockId(x & 0xf, y & 0xff, z & 0xf, layer, fullId);
+            chunk.setFullBlockId(x & 0xf, y, z & 0xf, layer, fullId);
         }
     }
 
@@ -79,9 +95,13 @@ public abstract class SimpleChunkManager implements ChunkManager {
 
     @Override
     public int getBlockDataAt(int x, int y, int z, int layer) {
+        if (y < this.getMinBlockY() || y > this.getMaxBlockY()) {
+            return 0;
+        }
+
         FullChunk chunk = this.getChunk(x >> 4, z >> 4);
         if (chunk != null) {
-            return chunk.getBlockData(x & 0xf, y & 0xff, z & 0xf, layer);
+            return chunk.getBlockData(x & 0xf, y, z & 0xf, layer);
         }
         return 0;
     }
@@ -96,7 +116,7 @@ public abstract class SimpleChunkManager implements ChunkManager {
     public void setBlockDataAt(int x, int y, int z, int layer, int data) {
         FullChunk chunk = this.getChunk(x >> 4, z >> 4);
         if (chunk != null) {
-            chunk.setBlockData(x & 0xf, y & 0xff, z & 0xf, layer, data);
+            chunk.setBlockData(x & 0xf, y, z & 0xf, layer, data);
         }
     }
 
