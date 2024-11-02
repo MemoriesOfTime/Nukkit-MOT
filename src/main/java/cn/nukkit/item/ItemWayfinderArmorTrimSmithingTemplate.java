@@ -9,7 +9,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class ItemWayfinderArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemWayfinderArmorTrimSmithingTemplate() {
-        super("minecraft:wayfinder_armor_trim_smithing_template", "Wayfinder Armor Trim Smithing Template");
+        super(WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE, "Wayfinder Armor Trim Smithing Template");
     }
 
     @Override

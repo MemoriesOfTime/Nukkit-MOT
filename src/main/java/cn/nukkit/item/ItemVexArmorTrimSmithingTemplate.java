@@ -9,7 +9,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class ItemVexArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemVexArmorTrimSmithingTemplate() {
-        super("minecraft:vex_armor_trim_smithing_template", "Vex Armor Trim Smithing Template");
+        super(VEX_ARMOR_TRIM_SMITHING_TEMPLATE, "Vex Armor Trim Smithing Template");
     }
 
     @Override

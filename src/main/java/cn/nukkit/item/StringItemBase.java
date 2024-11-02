@@ -7,19 +7,20 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.Nullable;
 
 public abstract class StringItemBase extends Item implements StringItem {
-    private final String id;
 
-    public StringItemBase(@NotNull String id, @Nullable String name) {
+    private final String namespaceId;
+
+    public StringItemBase(@NotNull String namespaceId, @Nullable String name) {
         super(STRING_IDENTIFIED_ITEM, 0, 1, StringItem.notEmpty(name));
-        Preconditions.checkNotNull(id, "id can't be null");
-        Preconditions.checkArgument(id.contains(":"), "The ID must be a namespaced ID, like minecraft:stone");
-        this.id = id;
+        Preconditions.checkNotNull(namespaceId, "id can't be null");
+        Preconditions.checkArgument(namespaceId.contains(":"), "The ID must be a namespaced ID, like minecraft:stone");
+        this.namespaceId = namespaceId;
         clearNamedTag();
     }
 
     @Override
     public String getNamespaceId() {
-        return this.id;
+        return this.namespaceId;
     }
 
     @Override

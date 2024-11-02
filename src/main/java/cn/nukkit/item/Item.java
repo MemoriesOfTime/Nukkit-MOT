@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
  * Nukkit Project
  */
 @Log4j2
-public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
+public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, ProtocolInfo {
 
     public static final Item AIR_ITEM = new ItemBlock(Block.get(BlockID.AIR), null, 0);
 
@@ -398,6 +398,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             registerNamespacedIdItem(ItemRawGold.class);
             registerNamespacedIdItem(ItemRawCopper.class);
             registerNamespacedIdItem(ItemCopperIngot.class);
+            //TODO 修改类名格式为ItemSmithingTemplateXXX
             registerNamespacedIdItem(ItemNetheriteUpgradeSmithingTemplate.class);
             registerNamespacedIdItem(ItemSentryArmorTrimSmithingTemplate.class);
             registerNamespacedIdItem(ItemDuneArmorTrimSmithingTemplate.class);
@@ -442,6 +443,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             registerNamespacedIdItem(ItemBreezeRod.class);
             registerNamespacedIdItem(ItemWindCharge.class);
             registerNamespacedIdItem(ItemMace.class);
+            registerNamespacedIdItem(ItemSmithingTemplateArmorTrimFlow.class);
+            registerNamespacedIdItem(ItemSmithingTemplateArmorTrimBolt.class);
 
             // 添加原版物品到NAMESPACED_ID_ITEM
             // Add vanilla items to NAMESPACED_ID_ITEM

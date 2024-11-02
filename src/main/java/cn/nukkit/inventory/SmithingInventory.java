@@ -25,6 +25,8 @@ import cn.nukkit.level.Position;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 import javax.annotation.Nullable;
 import java.util.Arrays;
@@ -46,10 +48,29 @@ public class SmithingInventory extends FakeBlockUIComponent {
     private Item currentResult = Item.get(0);
 
     private static final IntSet ITEMS = new IntOpenHashSet(new int[]{
-            Item.AIR, ItemID.NETHERITE_INGOT, ItemID.DIAMOND_SWORD, ItemID.DIAMOND_SHOVEL, ItemID.DIAMOND_PICKAXE, ItemID.DIAMOND_AXE,
+            Item.AIR,
+            //材料 Material
+            Item.IRON_INGOT, Item.GOLD_INGOT, Item.EMERALD, Item.REDSTONE, Item.NETHER_QUARTZ,
+            ItemID.NETHERITE_INGOT, ItemID.AMETHYST_SHARD,
+            //工具与护甲 Tools and Armor
+            ItemID.DIAMOND_SWORD, ItemID.DIAMOND_SHOVEL, ItemID.DIAMOND_PICKAXE, ItemID.DIAMOND_AXE,
             ItemID.DIAMOND_HOE, ItemID.DIAMOND_HELMET, ItemID.DIAMOND_CHESTPLATE, ItemID.DIAMOND_LEGGINGS, ItemID.DIAMOND_BOOTS,
             ItemID.NETHERITE_SWORD, ItemID.NETHERITE_SHOVEL, ItemID.NETHERITE_PICKAXE, ItemID.NETHERITE_AXE, ItemID.NETHERITE_HOE,
-            ItemID.NETHERITE_HELMET, ItemID.NETHERITE_CHESTPLATE, ItemID.NETHERITE_LEGGINGS, ItemID.NETHERITE_BOOTS});
+            ItemID.NETHERITE_HELMET, ItemID.NETHERITE_CHESTPLATE, ItemID.NETHERITE_LEGGINGS, ItemID.NETHERITE_BOOTS
+    });
+
+    private static final ObjectSet<String> ITEMS_NAMESPACE = new ObjectOpenHashSet<>(new String[]{
+            //材料 Material
+            Item.COPPER_INGOT,
+            //模板 Template
+            Item.NETHERITE_UPGRADE_SMITHING_TEMPLATE, Item.SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE, Item.DUNE_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Item.COAST_ARMOR_TRIM_SMITHING_TEMPLATE, Item.WILD_ARMOR_TRIM_SMITHING_TEMPLATE, Item.WARD_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Item.EYE_ARMOR_TRIM_SMITHING_TEMPLATE, Item.VEX_ARMOR_TRIM_SMITHING_TEMPLATE, Item.TIDE_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Item.SNOUT_ARMOR_TRIM_SMITHING_TEMPLATE, Item.RIB_ARMOR_TRIM_SMITHING_TEMPLATE, Item.SPIRE_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Item.SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE, Item.WAYFINDER_ARMOR_TRIM_SMITHING_TEMPLATE, Item.RAISER_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Item.SHAPER_ARMOR_TRIM_SMITHING_TEMPLATE, Item.HOST_ARMOR_TRIM_SMITHING_TEMPLATE, Item.FLOW_ARMOR_TRIM_SMITHING_TEMPLATE,
+            Item.BOLT_ARMOR_TRIM_SMITHING_TEMPLATE
+    });
 
     public SmithingInventory(PlayerUIInventory playerUI, Position position) {
         super(playerUI, InventoryType.SMITHING_TABLE, 51, position);
@@ -151,6 +172,6 @@ public class SmithingInventory extends FakeBlockUIComponent {
 
     @Override
     public boolean allowedToAdd(Item item) {
-        return ITEMS.contains(item.getId());
+        return ITEMS.contains(item.getId()) || ITEMS_NAMESPACE.contains(item.getNamespaceId());
     }
 }

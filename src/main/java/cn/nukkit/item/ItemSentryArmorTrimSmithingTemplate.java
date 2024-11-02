@@ -9,7 +9,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class ItemSentryArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemSentryArmorTrimSmithingTemplate() {
-        super("minecraft:sentry_armor_trim_smithing_template", "Sentry Armor Trim Smithing Template");
+        super(SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE, "Sentry Armor Trim Smithing Template");
     }
 
     @Override
