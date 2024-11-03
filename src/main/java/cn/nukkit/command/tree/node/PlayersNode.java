@@ -33,7 +33,12 @@ public class PlayersNode extends TargetNode<Player> {
             result = entities.stream().filter(entity -> entity instanceof Player).map(entity -> (Player) entity).collect(Collectors.toList());
             this.value = result;
         } else {
-            this.value = Collections.singletonList(Server.getInstance().getPlayer(arg));
+            Player player = Server.getInstance().getPlayerExact(arg);
+            if (player != null) {
+                this.value = Collections.singletonList(player);
+            } else {
+                this.value = Collections.emptyList();
+            }
         }
     }
 }
