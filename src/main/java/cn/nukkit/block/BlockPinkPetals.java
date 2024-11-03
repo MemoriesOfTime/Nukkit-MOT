@@ -6,6 +6,7 @@ import cn.nukkit.block.custom.properties.IntBlockProperty;
 import cn.nukkit.block.properties.BlockPropertiesHelper;
 import cn.nukkit.block.properties.VanillaProperties;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.Faceable;
@@ -111,9 +112,7 @@ public class BlockPinkPetals extends BlockFlowable implements Faceable, BlockPro
     }
 
     @Override
-    public Item[] getDrops(Item item) {
-        Item pink_petal = Block.get(PINK_PETALS).toItem();
-        pink_petal.setCount(this.getPropertyValue(GROWTH) + 1);
-        return new Item[]{pink_petal};
+    public Item toItem() {
+        return new ItemBlock(this, 0, this.getPropertyValue(GROWTH) + 1);
     }
 }
