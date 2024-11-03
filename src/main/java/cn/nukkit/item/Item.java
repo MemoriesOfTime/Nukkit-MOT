@@ -47,7 +47,7 @@ import java.util.stream.Collectors;
  * Nukkit Project
  */
 @Log4j2
-public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
+public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, ProtocolInfo {
 
     public static final Item AIR_ITEM = new ItemBlock(Block.get(BlockID.AIR), null, 0);
 
@@ -398,6 +398,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             registerNamespacedIdItem(ItemRawGold.class);
             registerNamespacedIdItem(ItemRawCopper.class);
             registerNamespacedIdItem(ItemCopperIngot.class);
+            //TODO 修改类名格式为ItemSmithingTemplateXXX
             registerNamespacedIdItem(ItemNetheriteUpgradeSmithingTemplate.class);
             registerNamespacedIdItem(ItemSentryArmorTrimSmithingTemplate.class);
             registerNamespacedIdItem(ItemDuneArmorTrimSmithingTemplate.class);
@@ -442,6 +443,8 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             registerNamespacedIdItem(ItemBreezeRod.class);
             registerNamespacedIdItem(ItemWindCharge.class);
             registerNamespacedIdItem(ItemMace.class);
+            registerNamespacedIdItem(ItemSmithingTemplateArmorTrimFlow.class);
+            registerNamespacedIdItem(ItemSmithingTemplateArmorTrimBolt.class);
 
             // 添加原版物品到NAMESPACED_ID_ITEM
             // Add vanilla items to NAMESPACED_ID_ITEM
@@ -968,6 +971,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
         registerCustomItem(customItem, v1_21_0, addCreativeItem, v1_21_0);
         registerCustomItem(customItem, v1_21_20, addCreativeItem, v1_21_20);
         registerCustomItem(customItem, v1_21_30, addCreativeItem, v1_21_30);
+        registerCustomItem(customItem, v1_21_40, addCreativeItem, v1_21_40);
         //TODO Multiversion 添加新版本支持时修改这里
 
         return new OK<Void>(true);
@@ -1010,6 +1014,7 @@ public class Item implements Cloneable, BlockID, ItemID, ProtocolInfo {
             deleteCustomItem(customItem, v1_21_0, v1_21_0);
             deleteCustomItem(customItem, v1_21_20, v1_21_20);
             deleteCustomItem(customItem, v1_21_30, v1_21_30);
+            deleteCustomItem(customItem, v1_21_40, v1_21_40);
             //TODO Multiversion 添加新版本支持时修改这里
         }
     }

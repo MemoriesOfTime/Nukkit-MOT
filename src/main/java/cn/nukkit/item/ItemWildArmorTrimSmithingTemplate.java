@@ -9,7 +9,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class ItemWildArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemWildArmorTrimSmithingTemplate() {
-        super("minecraft:wild_armor_trim_smithing_template", "Wild Armor Trim Smithing Template");
+        super(WILD_ARMOR_TRIM_SMITHING_TEMPLATE, "Wild Armor Trim Smithing Template");
     }
 
     @Override

@@ -9,7 +9,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class ItemCoastArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemCoastArmorTrimSmithingTemplate() {
-        super("minecraft:coast_armor_trim_smithing_template", "Coast Armor Trim Smithing Template");
+        super(COAST_ARMOR_TRIM_SMITHING_TEMPLATE, "Coast Armor Trim Smithing Template");
     }
 
     @Override

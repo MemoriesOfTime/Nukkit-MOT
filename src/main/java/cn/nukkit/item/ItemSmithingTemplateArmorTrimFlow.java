@@ -6,10 +6,10 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 /**
  * @author Glorydark
  */
-public class ItemFlowArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
+public class ItemSmithingTemplateArmorTrimFlow extends StringItemBase implements ItemTrimPattern {
 
-    public ItemFlowArmorTrimSmithingTemplate() {
-        super("minecraft:flow_armor_trim_smithing_template", "Flow Armor Trim Smithing Template");
+    public ItemSmithingTemplateArmorTrimFlow() {
+        super(FLOW_ARMOR_TRIM_SMITHING_TEMPLATE, "Flow Armor Trim Smithing Template");
     }
 
     @Override

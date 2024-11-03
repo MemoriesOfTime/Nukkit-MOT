@@ -686,7 +686,7 @@ public class CraftingManager {
                 if (ingredient.getId() == Item.PLANKS) {
                     ingredient.setDamage(planksMeta);
                 }
-                ingredients.put(ingredientChar, ingredient);
+                ingredients.put(ingredientChar, Item.get(ingredient.getId(), ingredient.getDamage(), ingredient.getCount())); //使用Item.get()方法保证修改后的damage正常处理
             }
             Item result = Item.fromJson(first, true);
             if (result == null) {

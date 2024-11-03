@@ -9,7 +9,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class ItemSilenceArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemSilenceArmorTrimSmithingTemplate() {
-        super("minecraft:silence_armor_trim_smithing_template", "Silence Armor Trim Smithing Template");
+        super(SILENCE_ARMOR_TRIM_SMITHING_TEMPLATE, "Silence Armor Trim Smithing Template");
     }
 
     @Override

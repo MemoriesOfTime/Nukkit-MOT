@@ -9,7 +9,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class ItemEyeArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemEyeArmorTrimSmithingTemplate() {
-        super("minecraft:eye_armor_trim_smithing_template", "Eye Armor Trim Smithing Template");
+        super(EYE_ARMOR_TRIM_SMITHING_TEMPLATE, "Eye Armor Trim Smithing Template");
     }
 
     @Override

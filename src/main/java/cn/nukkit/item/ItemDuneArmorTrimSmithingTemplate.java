@@ -9,7 +9,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class ItemDuneArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemDuneArmorTrimSmithingTemplate() {
-        super("minecraft:dune_armor_trim_smithing_template", "Dune Armor Trim Smithing Template");
+        super(DUNE_ARMOR_TRIM_SMITHING_TEMPLATE, "Dune Armor Trim Smithing Template");
     }
 
     @Override

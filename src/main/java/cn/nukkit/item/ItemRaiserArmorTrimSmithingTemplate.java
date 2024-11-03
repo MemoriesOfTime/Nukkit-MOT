@@ -9,7 +9,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class ItemRaiserArmorTrimSmithingTemplate extends StringItemBase implements ItemTrimPattern {
 
     public ItemRaiserArmorTrimSmithingTemplate() {
-        super("minecraft:raiser_armor_trim_smithing_template", "Raiser Armor Trim Smithing Template");
+        super(RAISER_ARMOR_TRIM_SMITHING_TEMPLATE, "Raiser Armor Trim Smithing Template");
     }
 
     @Override
