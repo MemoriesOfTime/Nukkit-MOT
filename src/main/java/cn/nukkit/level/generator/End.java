@@ -8,10 +8,7 @@ import cn.nukkit.level.biome.EnumBiome;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.generator.noise.vanilla.d.NoiseGeneratorOctavesD;
 import cn.nukkit.level.generator.noise.vanilla.d.NoiseGeneratorSimplexD;
-import cn.nukkit.level.generator.populator.impl.PopulatorChorusTree;
-import cn.nukkit.level.generator.populator.impl.PopulatorEndGateway;
-import cn.nukkit.level.generator.populator.impl.PopulatorEndIsland;
-import cn.nukkit.level.generator.populator.impl.PopulatorEndObsidianPillar;
+import cn.nukkit.level.generator.populator.impl.*;
 import cn.nukkit.level.generator.populator.type.Populator;
 import cn.nukkit.math.MathHelper;
 import cn.nukkit.math.NukkitMath;
@@ -91,6 +88,7 @@ public class End extends Generator {
         this.detailNoiseOctaves = new NoiseGeneratorOctavesD(random, 8);
         this.islandNoise = new NoiseGeneratorSimplexD(random);
 
+        this.populators.add(new PopulatorEndPlatform());
         this.populators.add(new PopulatorEndIsland(this));
         this.populators.add(new PopulatorChorusTree(this));
         this.populators.add(new PopulatorEndGateway(this));

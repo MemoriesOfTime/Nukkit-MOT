@@ -2,6 +2,7 @@ package cn.nukkit.level;
 
 import cn.nukkit.Server;
 import cn.nukkit.level.generator.Generator;
+import cn.nukkit.math.Vector3;
 
 import java.util.StringTokenizer;
 
@@ -55,6 +56,7 @@ public enum EnumLevel {
             if (server.getLevelByName("the_end") == null) {
                 server.generateLevel("the_end", System.currentTimeMillis(), Generator.getGenerator(Generator.TYPE_THE_END));
                 server.loadLevel("the_end");
+                server.getLevelByName("the_end").setSpawnLocation(new Vector3(100.5, 49, 0.5));
             }
             THE_END.level = server.getLevelByName("the_end");
         }

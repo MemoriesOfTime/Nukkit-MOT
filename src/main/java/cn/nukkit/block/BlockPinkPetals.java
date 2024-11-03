@@ -6,6 +6,7 @@ import cn.nukkit.block.custom.properties.IntBlockProperty;
 import cn.nukkit.block.properties.BlockPropertiesHelper;
 import cn.nukkit.block.properties.VanillaProperties;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.Faceable;
@@ -108,5 +109,10 @@ public class BlockPinkPetals extends BlockFlowable implements Faceable, BlockPro
         }
 
         return false;
+    }
+
+    @Override
+    public Item toItem() {
+        return new ItemBlock(this, 0, this.getPropertyValue(GROWTH) + 1);
     }
 }
