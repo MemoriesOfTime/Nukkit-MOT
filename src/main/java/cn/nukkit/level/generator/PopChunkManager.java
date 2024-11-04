@@ -15,6 +15,11 @@ public class PopChunkManager extends SimpleChunkManager {
 
     private final Supplier<DimensionData> dimensionDataSupplier;
 
+    @Deprecated
+    public PopChunkManager(long seed) {
+        this(seed, () -> DimensionData.LEGACY_DIMENSION);
+    }
+
     public PopChunkManager(long seed, Supplier<DimensionData> dimensionDataSupplier) {
         super(seed);
         this.dimensionDataSupplier = dimensionDataSupplier;
