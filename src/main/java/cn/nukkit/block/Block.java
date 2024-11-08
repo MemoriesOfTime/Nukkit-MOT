@@ -44,7 +44,7 @@ import static cn.nukkit.utils.Utils.dynamic;
 @Log4j2
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
 
-    public static final int MAX_BLOCK_ID = dynamic(1039);
+    public static final int MAX_BLOCK_ID = dynamic(2048);
     public static final int DATA_BITS = dynamic(6);
     public static final int ID_MASK = 0xfff; //max 4095
     public static final int DATA_SIZE = dynamic(1 << DATA_BITS);
@@ -1238,7 +1238,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return false;
     }
 
-    protected static boolean canStayOnFullSolid(Block down) {
+    protected static boolean canConnectToFullSolid(Block down) {
         if (down.isTransparent()) {
             switch (down.getId()) {
                 case BEACON:
@@ -1247,17 +1247,37 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                 case STAINED_GLASS:
                 case HARD_GLASS:
                 case HARD_STAINED_GLASS:
-                case SCAFFOLDING:
                 case BARRIER:
                 case GLOWSTONE:
                 case SEA_LANTERN:
-                case HOPPER_BLOCK:
+                case MANGROVE_ROOTS:
+                case MUDDY_MANGROVE_ROOTS:
                     return true;
             }
             return false;
         }
         return true;
     }
+
+    protected static boolean canStayOnFullSolid(Block down) {
+        if (canConnectToFullSolid(down)) {
+            return true;
+        }
+        switch (down.getId()) {
+            case SCAFFOLDING:
+            case HOPPER_BLOCK:
+                return true;
+        }
+        if (down instanceof BlockSlab) {
+            return ((BlockSlab) down).hasTopBit();
+        }
+        return down instanceof BlockTrapdoor && ((BlockTrapdoor) down).isTop() && !((BlockTrapdoor) down).isOpen();
+    }
+
+    protected boolean isNarrowSurface() {
+        return this instanceof BlockGlassPane || this instanceof BlockFence || this instanceof BlockWall || this instanceof BlockChain || this instanceof BlockIronBars;
+    }
+
 
     /**
      * 被爆炸破坏时必定掉落<br>
@@ -1267,6 +1287,13 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
      */
     public boolean alwaysDropsOnExplosion() {
         return false;
+    }
+
+    /**
+     * Returns true for WATER and STILL_WATER, false for others
+     */
+    public static boolean isWater(int id) {
+        return id == WATER || id == STILL_WATER;
     }
 
     public boolean isSuspiciousBlock() {

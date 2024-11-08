@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
@@ -97,9 +98,21 @@ public abstract class BlockSlab extends BlockTransparentMeta {
         return true;
     }
 
+    public boolean hasTopBit() {
+        return (this.getDamage() & 0x08) > 0;
+    }
+
+    public void setTopBit(boolean topBit) {
+        if (topBit) {
+            this.setDamage(this.getDamage() | 0x08);
+        } else {
+            this.setDamage(this.getDamage() & 0x07);
+        }
+    }
+
     @Override
-    public boolean isTransparent() {
-        //HACK: Fix unable to place many blocks on slabs
-        return (this.getDamage() & SLAB_TOP_BIT) <= 0;
+    public Item toItem() {
+        int damage = this.getDamage() & 0x07;
+        return new ItemBlock(Block.get(this.getId(), damage), damage);
     }
 }

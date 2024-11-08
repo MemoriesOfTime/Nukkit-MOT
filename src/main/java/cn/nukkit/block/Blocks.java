@@ -572,17 +572,28 @@ public class Blocks {
         list[RAW_GOLD_BLOCK] = BlockRawGold.class; //708
         list[INFESTED_DEEPSLATE] = BlockInfestedDeepslate.class; //709
 
+        list[SCULK] = BlockSculk.class; //713
+        list[SCULK_VEIN] = BlockSculkVein.class; //714
+        list[SCULK_CATALYST] = BlockSculkCatalyst.class; //715
+        list[SCULK_SHRIEKER] = BlockSculkShrieker.class; //716
+
+        list[REINFORCED_DEEPSLATE] = BlockReinforcedDeeplsate.class; //721
+
+        list[FROG_SPAWN] = BlockFrogSpawn.class; //723
         list[PEARLESCENT_FROGLIGHT] = BlockFrogLightPearlescent.class; //724
         list[VERDANT_FROGLIGHT] = BlockFrogLightVerdant.class; //725
         list[OCHRE_FROGLIGHT] = BlockFrogLightOchre.class; //726
-
+        list[MANGROVE_LEAVES] = BlockLeaves.class; //727
         list[MUD] = BlockMud.class; //728
-
+        list[MANGROVE_PROPAGULE] = BlockMangrovePropagule.class; //729
         list[MUD_BRICKS] = BlockMudBricks.class; //730
 
         list[PACKED_MUD] = BlockPackedMud.class; //732
 
         list[MUD_BRICK_STAIRS] = BlockStairsMudBrick.class; //735
+
+        list[MANGROVE_ROOTS] = BlockMangroveRoots.class; //737
+        list[MUDDY_MANGROVE_ROOTS] = BlockMangroveRootsMuddy.class; //738
 
         list[MANGROVE_PLANKS] = BlockPlanksMangrove.class; //741
 

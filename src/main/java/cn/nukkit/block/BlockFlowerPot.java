@@ -72,8 +72,8 @@ public class BlockFlowerPot extends BlockFlowable implements BlockEntityHolder<B
         return BlockEntity.FLOWER_POT;
     }
 
-    private boolean isSupportValid(Block block) {
-        return block.isSolid() || block instanceof BlockFence || block instanceof BlockWall || block instanceof BlockHopper;
+    private static boolean isSupportValid(Block block) {
+        return block.isSolid() || block.isNarrowSurface() || Block.canStayOnFullSolid(block);
     }
 
     @Override

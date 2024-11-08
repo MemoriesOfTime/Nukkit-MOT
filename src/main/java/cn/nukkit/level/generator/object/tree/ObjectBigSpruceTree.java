@@ -19,22 +19,16 @@ public class ObjectBigSpruceTree extends ObjectSpruceTree {
     boolean fromSapling;
 
     public ObjectBigSpruceTree(float leafStartHeightMultiplier, int baseLeafRadius) {
-        this(leafStartHeightMultiplier, baseLeafRadius, false);
-    }
-
-    public ObjectBigSpruceTree(float leafStartHeightMultiplier, int baseLeafRadius, boolean fromSapling) {
         this.leafStartHeightMultiplier = leafStartHeightMultiplier;
         this.baseLeafRadius = baseLeafRadius;
-        this.fromSapling = fromSapling;
     }
 
     @Override
     public void placeObject(ChunkManager level, int x, int y, int z, NukkitRandom random) {
-        this.treeHeight = fromSapling ? Utils.rand(10, 15) : random.nextBoundedInt(15) + 20;
+        this.treeHeight = random.nextBoundedInt(15) + 15;
 
         int trunkHeight = this.getTreeHeight() - random.nextBoundedInt(3);
         int topSize = this.treeHeight - (int) (this.treeHeight * leafStartHeightMultiplier);
-        int lRadius = baseLeafRadius + random.nextBoundedInt(2);
 
         ArrayList<Vector3> list = new ArrayList<>();
         list.add(new Vector3(x, y, z));
@@ -54,7 +48,7 @@ public class ObjectBigSpruceTree extends ObjectSpruceTree {
 
         for (Vector3 pos : list) {
             this.placeTrunk(level, pos.getFloorX(), pos.getFloorY(), pos.getFloorZ(), random, trunkHeight);
-            this.placeLeaves(level, topSize, lRadius, pos.getFloorX(), pos.getFloorY(), pos.getFloorZ(), random);
+            this.placeLeaves(level, topSize, baseLeafRadius, x, y, z, random);
         }
     }
 

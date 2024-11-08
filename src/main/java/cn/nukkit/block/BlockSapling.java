@@ -61,6 +61,11 @@ public class BlockSapling extends BlockFlowable {
 
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+        if (!(this instanceof BlockMangrovePropagule) &&
+                (block instanceof BlockWater || block.level.isBlockWaterloggedAt(block.getChunk(), (int) block.x, (int) block.y, (int) block.z))) {
+            return false;
+        }
+
         if (!this.isSupportInvalid()) {
             this.getLevel().setBlock(block, this, true, true);
             return true;
@@ -72,7 +77,7 @@ public class BlockSapling extends BlockFlowable {
     protected boolean isSupportInvalid() {
         Block down = this.down();
         int id = down.getId();
-        return !(id == Block.GRASS || id == Block.DIRT || id == Block.FARMLAND || id == Block.PODZOL || id == MYCELIUM);
+        return !(id == Block.GRASS || id == Block.DIRT || id == Block.FARMLAND || id == Block.PODZOL || id == MYCELIUM || id == MUD);
     }
 
     @Override
@@ -146,7 +151,7 @@ public class BlockSapling extends BlockFlowable {
                 for (x = 0; x >= -1; --x) {
                     for (z = 0; z >= -1; --z) {
                         if (this.findSaplings(x, z, SPRUCE)) {
-                            new ObjectBigSpruceTree(0.5f, 5, true).placeObject(this.level, (int) this.x, (int) this.y, (int) this.z, new NukkitRandom());
+                            new ObjectBigSpruceTree(0.5f, 5).placeObject(this.level, (int) this.x, (int) this.y, (int) this.z, new NukkitRandom());
                             bigTree = true;
                             break loop;
                         }

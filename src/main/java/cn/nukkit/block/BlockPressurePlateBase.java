@@ -59,7 +59,7 @@ public abstract class BlockPressurePlateBase extends BlockFlowable {
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
             Block down = this.down();
-            if (down.isTransparent() && !(down instanceof BlockFence)) {
+            if (!isSupportValid(this.down())) {
                 this.level.useBreakOn(this, Item.get(Item.WOODEN_PICKAXE));
             }
         } else if (type == Level.BLOCK_UPDATE_SCHEDULED) {
@@ -76,12 +76,16 @@ public abstract class BlockPressurePlateBase extends BlockFlowable {
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = block.down();
-        if (down.isTransparent() && !(down instanceof BlockFence)) {
+        if (!isSupportValid(this.down())) {
             return false;
         }
 
         this.level.setBlock(block, this, true, true);
         return true;
+    }
+
+    private static boolean isSupportValid(Block block) {
+        return !block.isTransparent() || block.isNarrowSurface() || Block.canStayOnFullSolid(block);
     }
 
     @Override
@@ -178,6 +182,6 @@ public abstract class BlockPressurePlateBase extends BlockFlowable {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(this, 0, 1);
+        return new ItemBlock(Block.get(this.getId(), 0), 0);
     }
 }

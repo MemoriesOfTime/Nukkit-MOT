@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 
 public class BlockAzaleaLeaves extends BlockLeaves {
 
@@ -27,5 +28,10 @@ public class BlockAzaleaLeaves extends BlockLeaves {
     @Override
     protected boolean canDropApple() {
         return false;
+    }
+
+    @Override
+    public Item toItem() {
+        return new ItemBlock(Block.get(this.getId(), 0), 0);
     }
 }
