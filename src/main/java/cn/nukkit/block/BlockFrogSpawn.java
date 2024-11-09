@@ -1,8 +1,6 @@
 package cn.nukkit.block;
 
-import cn.nukkit.Player;
 import cn.nukkit.item.Item;
-import cn.nukkit.math.BlockFace;
 
 public class BlockFrogSpawn extends BlockFlowable {
     public BlockFrogSpawn() {
@@ -33,12 +31,12 @@ public class BlockFrogSpawn extends BlockFlowable {
         return 1;
     }
 
-    @Override
+    /*@Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        Block up;
-        if (!(block instanceof BlockWater) || !((up = block.up()) instanceof BlockAir)) {
+        if (!(block instanceof BlockWater) || !(block.up() instanceof BlockAir)) {
             return false;
         }
-        return this.getLevel().setBlock(up, this, true, true);
-    }
+        System.out.println(block.getClass().getName() + " " + block.up().getClass().getName());
+        return this.getLevel().setBlock(this, this, true, true);
+    }*/
 }

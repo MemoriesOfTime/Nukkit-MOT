@@ -583,7 +583,7 @@ public class Blocks {
         list[PEARLESCENT_FROGLIGHT] = BlockFrogLightPearlescent.class; //724
         list[VERDANT_FROGLIGHT] = BlockFrogLightVerdant.class; //725
         list[OCHRE_FROGLIGHT] = BlockFrogLightOchre.class; //726
-        list[MANGROVE_LEAVES] = BlockLeaves.class; //727
+        list[MANGROVE_LEAVES] = BlockLeavesMangrove.class; //727
         list[MUD] = BlockMud.class; //728
         list[MANGROVE_PROPAGULE] = BlockMangrovePropagule.class; //729
         list[MUD_BRICKS] = BlockMudBricks.class; //730

@@ -5,7 +5,7 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
 
-public class BlockSculkVein extends BlockTransparentMeta {
+public class BlockSculkVein extends BlockGlowLichen {
 
     public BlockSculkVein() {
         this(0);
