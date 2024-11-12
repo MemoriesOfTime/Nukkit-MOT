@@ -59,12 +59,8 @@ public class BlockTorch extends BlockFlowable implements Faceable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            Block below = this.down();
             int side = this.getDamage();
-            Block block = this.getSide(BlockFace.fromIndex(faces2[side]));
-            int id = block.getId();
-
-            if ((block.isTransparent() && !(side == 0 && (below instanceof BlockFence || below.getId() == COBBLE_WALL))) && id != GLASS && id != STAINED_GLASS && id != HARD_STAINED_GLASS) {
+            if ((side != 0 && !Block.canConnectToFullSolid(this.getSide(BlockFace.fromIndex(faces2[side])))) || (side == 0 && !isSupportValidBelow())) {
                 this.getLevel().useBreakOn(this);
                 return Level.BLOCK_UPDATE_NORMAL;
             }
@@ -73,23 +69,35 @@ public class BlockTorch extends BlockFlowable implements Faceable {
         return 0;
     }
 
+
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        int side = faces[face.getIndex()];
-        int bid = this.getSide(BlockFace.fromIndex(faces2[side])).getId();
-        if ((!target.isTransparent() || bid == GLASS || bid == STAINED_GLASS || bid == HARD_STAINED_GLASS) && face != BlockFace.DOWN) {
-            this.setDamage(side);
-            this.getLevel().setBlock(block, this, true, true);
-            return true;
+        if (block instanceof BlockWater || block.level.isBlockWaterloggedAt(block.getChunk(), (int) block.x, (int) block.y, (int) block.z)) {
+            return false;
         }
 
-        Block below = this.down();
-        if (!below.isTransparent() || below instanceof BlockFence || below.getId() == COBBLE_WALL || below.getId() == GLASS || below.getId() == STAINED_GLASS || below.getId() == HARD_STAINED_GLASS) {
+        int side = faces[face.getIndex()];
+        if (face != BlockFace.UP) {
+            if (Block.canConnectToFullSolid(this.getSide(BlockFace.fromIndex(faces[side])))) {
+                this.setDamage(side);
+                return this.getLevel().setBlock(this, this, true, true);
+            }
+            return false;
+        }
+
+        if (isSupportValidBelow()) {
             this.setDamage(0);
-            this.getLevel().setBlock(block, this, true, true);
-            return true;
+            return this.getLevel().setBlock(this, this, true, true);
         }
         return false;
+    }
+
+    private boolean isSupportValidBelow() {
+        Block block = this.down();
+        if (!block.isTransparent() || block.isNarrowSurface()) {
+            return true;
+        }
+        return Block.canStayOnFullSolid(block);
     }
 
     @Override

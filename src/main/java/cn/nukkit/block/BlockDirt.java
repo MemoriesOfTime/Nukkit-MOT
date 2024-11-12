@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.ItemPotion;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Sound;
 import cn.nukkit.utils.BlockColor;
@@ -74,6 +75,16 @@ public class BlockDirt extends BlockSolidMeta {
                 }
                 return true;
             }
+        } else if (player != null && item.getId() == Item.POTION && item.getDamage() == ItemPotion.NO_EFFECTS) {
+            item.count--;
+            Item emptyBottle = Item.get(Item.GLASS_BOTTLE);
+            if (player.getInventory().canAddItem(emptyBottle)) {
+                player.getInventory().addItem(emptyBottle);
+            } else {
+                player.getLevel().dropItem(player.add(0, 1.3, 0), emptyBottle, player.getDirectionVector().multiply(0.4));
+            }
+            this.getLevel().setBlock(this, get(MUD), true);
+            return true;
         }
 
         return false;

@@ -2683,16 +2683,20 @@ public class Level implements ChunkManager, Metadatable {
             return null;
         }
 
-        if (!(block.canBeReplaced()
-                || (hand instanceof BlockSlab && block instanceof BlockSlab)
-                || (block instanceof BlockCandle && hand.getId() == block.getId()))) {
+        if (!(block.canBeReplaced() || (hand instanceof BlockSlab && block instanceof BlockSlab && hand.getId() == block.getId()))) {
             return null;
         }
 
         if (target.canBeReplaced()) {
+            Block b = item.getBlockUnsafe();
+            if (b != null && target.getId() == b.getId() && target.getDamage() == b.getDamage()) {
+                return item; // No need to sync item
+            }
+
             block = target;
             hand.position(block);
         }
+
 
         if (!hand.canPassThrough() && hand.getBoundingBox() != null) {
             Entity[] entities = this.getCollidingEntities(hand.getBoundingBox());
@@ -4899,6 +4903,14 @@ public class Level implements ChunkManager, Metadatable {
             z = portal.getFloorZ() >> 3;
         }
         return new Position(x, y, z, this == nether ? Server.getInstance().getDefaultLevel() : nether);
+    }
+
+    public boolean isBlockWaterloggedAt(FullChunk chunk, int x, int y, int z) {
+        if (chunk == null || y < this.getMinBlockY() || y > this.getMaxBlockY()) {
+            return false;
+        }
+        int block = chunk.getBlockId(x & 0x0f, y, z & 0x0f, BlockLayer.WATERLOGGED.ordinal());
+        return Block.isWater(block);
     }
 
     public boolean isRayCollidingWithBlocks(double srcX, double srcY, double srcZ, double dstX, double dstY, double dstZ, double stepSize) {

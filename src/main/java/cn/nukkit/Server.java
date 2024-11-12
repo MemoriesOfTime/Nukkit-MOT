@@ -1119,6 +1119,11 @@ public class Server {
                 this.getLogger().debug("Closing name lookup DB...");
                 nameLookup.close();
             }
+
+            if (this.watchdog != null) {
+                this.getLogger().debug("Stopping Watchdog...");
+                this.watchdog.kill();
+            }
         } catch (Exception e) {
             log.fatal("Exception happened while shutting down, exiting the process", e);
             System.exit(1);

@@ -155,8 +155,10 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
     public boolean onActivate(Item item, Player player) {
         if (player != null) {
             Block top = this.up();
-            if (!top.isTransparent() && !(top instanceof BlockSlab && (top.getDamage() & 0x07) <= 0)) { // avoid issues with the slab hack
-                return true;
+            if (!(top instanceof BlockStairs)) { // Stairs don't block chest on vanilla
+                if (!top.isTransparent()) {
+                    return true;
+                }
             }
 
             BlockEntity t = this.getLevel().getBlockEntity(this);
