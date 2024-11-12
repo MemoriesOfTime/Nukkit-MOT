@@ -1,6 +1,7 @@
 package cn.nukkit.level.format.leveldb.structure;
 
 import cn.nukkit.Nukkit;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -12,6 +13,7 @@ import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -49,9 +51,13 @@ public class StateBlockStorage {
         this.bitArray = version.createPalette();
         this.palette = new ObjectArrayList<>(16);
         this.palette.add(BlockStateMapping.get().getState(0, 0));
-
-        this.blockIds = new byte[SECTION_SIZE];
-        this.blockData = new NibbleArray(BlockStorage.SECTION_SIZE);
+        if(Server.getInstance().minimumProtocol <= ProtocolInfo.v1_13_0) {
+            this.blockIds = new byte[SECTION_SIZE];
+            this.blockData = new NibbleArray(BlockStorage.SECTION_SIZE);
+        } else {
+            this.blockIds = null;
+            this.blockData = null;
+        }
     }
 
     protected StateBlockStorage(BitArray bitArray, List<BlockStateSnapshot> palette, byte[] blockIds, NibbleArray blockData) {
@@ -161,11 +167,12 @@ public class StateBlockStorage {
                     log.error("[{}] Unable to deserialize chunk block state", chunkBuilder.debugString(), e);
                 }
             }
-
-            for (int i = 0; i < this.bitArray.size(); i++) {
-                int fullId = this.get(i);
-                this.blockIds[i] = (byte) ((fullId >> Block.DATA_BITS) & 0xff);
-                this.blockData.set(i, (byte) (fullId & 0xf));
+            if(Server.getInstance().minimumProtocol <= ProtocolInfo.v1_13_0) {
+                for (int i = 0; i < this.bitArray.size(); i++) {
+                    int fullId = this.get(i);
+                    this.blockIds[i] = (byte) ((fullId >> Block.DATA_BITS) & 0xff);
+                    this.blockData.set(i, (byte) (fullId & 0xf));
+                }
             }
         } finally {
             try {
@@ -203,9 +210,10 @@ public class StateBlockStorage {
         try {
             int paletteIndex = this.getOrAdd(value);
             this.bitArray.set(index, paletteIndex);
-
-            this.blockIds[index] = (byte) (value.getLegacyId() & 0xff);
-            this.blockData.set(index, (byte) (value.getLegacyData() & 0xf));
+            if(Server.getInstance().minimumProtocol <= ProtocolInfo.v1_13_0) {
+                this.blockIds[index] = (byte) (value.getLegacyId() & 0xff);
+                this.blockData.set(index, (byte) (value.getLegacyData() & 0xf));
+            }
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unable to set value: " + value + ", palette: " + palette, e);
         }
@@ -363,11 +371,18 @@ public class StateBlockStorage {
     }
 
     public StateBlockStorage copy() {
-        return new StateBlockStorage(
-                this.bitArray.copy(),
-                new ObjectArrayList<>(this.palette),
-                blockIds.clone(),
-                this.blockData.copy());
+        if(Server.getInstance().minimumProtocol <= ProtocolInfo.v1_13_0) {
+            return new StateBlockStorage(
+                    this.bitArray.copy(),
+                    new ObjectArrayList<>(this.palette),
+                    blockIds.clone(),
+                    this.blockData.copy());
+        } else {
+            return new StateBlockStorage(
+                    this.bitArray.copy(),
+                    new ObjectArrayList<>(this.palette),
+                   null, null);
+        }
     }
 
     public static int elementIndex(int x, int y, int z) {
