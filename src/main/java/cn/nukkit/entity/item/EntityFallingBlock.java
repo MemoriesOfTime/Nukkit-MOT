@@ -224,7 +224,7 @@ public class EntityFallingBlock extends Entity {
                         Entity[] entities = level.getCollidingEntities(bb);
                         for (Entity entity : entities) {
                             if (entity instanceof EntityFallingBlock) {
-                                entity.teleport(entity.add(0, 1.1, 0));
+                                entity.teleport(entity.add(0, 1.1, 0), null);
                             }
                         }
                         //== 临时修复掉落方块问题

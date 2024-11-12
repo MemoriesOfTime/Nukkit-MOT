@@ -296,7 +296,7 @@ public class EntityWolf extends EntityTameableMob {
         if (!this.isSitting() && this.hasOwner() && this.distanceSquared(this.getOwner()) > 144) {
             this.setAngry(false);
             // TODO: Safe teleport (on ground)
-            this.teleport(this.getOwner());
+            this.teleport(this.getOwner(), null);
             this.move(0, 0.0001, 0); // To fix floating problem
             return;
         }

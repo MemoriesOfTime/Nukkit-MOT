@@ -6,6 +6,7 @@ import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.command.tree.ParamList;
 import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.event.player.PlayerTeleportEvent;
 import cn.nukkit.math.Vector3;
 
 import java.util.List;
@@ -57,7 +58,7 @@ public class SpreadPlayersCommand extends VanillaCommand {
         for (Entity target : targets) {
             Vector3 vec3 = this.nextXZ(x, z, (int) maxRange);
             vec3.y = target.getLevel().getHighestBlockAt(vec3.getFloorX(), vec3.getFloorZ()) + 1;
-            target.teleport(vec3);
+            target.teleport(vec3, PlayerTeleportEvent.TeleportCause.COMMAND);
         }
         log.addSuccess("commands.spreadplayers.success.players",
                 String.valueOf(targets.size()), String.valueOf(Math.floor(x)), String.valueOf(Math.floor(z))).output();

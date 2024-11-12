@@ -1880,9 +1880,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             getServer().getScheduler().scheduleTask(InternalPlugin.INSTANCE, () -> {
                                 if (foundPortal == null) {
                                     BlockNetherPortal.spawnPortal(portalPos);
-                                    teleport(portalPos.add(1.5, 1, 0.5));
+                                    teleport(portalPos.add(1.5, 1, 0.5), TeleportCause.NETHER_PORTAL);
                                 } else {
-                                    teleport(BlockNetherPortal.getSafePortal(foundPortal));
+                                    teleport(BlockNetherPortal.getSafePortal(foundPortal), TeleportCause.NETHER_PORTAL);
                                 }
                                 portalPos = null;
                             });
