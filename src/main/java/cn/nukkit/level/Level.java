@@ -2600,14 +2600,6 @@ public class Level implements ChunkManager, Metadatable {
         Block target = this.getBlock(vector);
         Block block = target.getSide(face);
 
-        //针对半砖特判
-        if (target instanceof BlockSlab
-                && (face == BlockFace.UP || face == BlockFace.DOWN)
-                && item.getId() == target.getId()
-                && (item.getDamage() & BlockSlab.SLAB_BLOCK_TYPE_BIT) == (target.getDamage() & BlockSlab.SLAB_BLOCK_TYPE_BIT)) {
-            block = target;
-        }
-
         if (!isYInRange(block.getFloorY())) {
             return null;
         }
