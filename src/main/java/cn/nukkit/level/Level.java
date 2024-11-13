@@ -209,9 +209,9 @@ public class Level implements ChunkManager, Metadatable {
      */
     public final ReentrantReadWriteLock providerLock = new ReentrantReadWriteLock();
 
-    private final Int2ObjectOpenHashMap<ChunkLoader> loaders = new Int2ObjectOpenHashMap<>();
+    private final ConcurrentHashMap<Integer, ChunkLoader> loaders = new ConcurrentHashMap<>();
 
-    private final Int2IntMap loaderCounter = new Int2IntOpenHashMap();
+    private final ConcurrentHashMap<Integer, Integer> loaderCounter = new ConcurrentHashMap<>();
 
     private final Map<Long, Map<Integer, ChunkLoader>> chunkLoaders = new ConcurrentHashMap<>();
 
