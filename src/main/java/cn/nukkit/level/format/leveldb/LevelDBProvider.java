@@ -996,7 +996,7 @@ public class LevelDBProvider implements LevelProvider {
                     NbtMap updatedState = BlockStateMapping.get().updateVanillaState(state);
                     blockState = BlockStateMapping.get().getUpdatedOrCustom(state, updatedState);
                 }
-                block = blockState.getBlock();
+                block = Block.get(blockState.getLegacyId(), blockState.getLegacyData());
             } else if (nbtMap.containsKey("tileID")) {
                 block = Block.get(nbtMap.getByte("tileID") & 0xff);
             }
