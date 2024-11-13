@@ -40,7 +40,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.ref.WeakReference;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -340,9 +339,7 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public Map<Long, BaseFullChunk> getLoadedChunks() {
-        synchronized (this.chunks) {
-            return ImmutableMap.copyOf(chunks);
-        }
+        return ImmutableMap.copyOf(chunks);
     }
 
     public Long2ObjectMap<? extends FullChunk> getLoadedChunksUnsafe() {
@@ -356,9 +353,7 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public boolean isChunkLoaded(long hash) {
-        synchronized (this.chunks) {
-            return this.chunks.containsKey(hash);
-        }
+        return this.chunks.containsKey(hash);
     }
 
     @Override
@@ -657,12 +652,10 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public void saveChunks() {
-        synchronized (this.chunks) {
-            for (BaseFullChunk chunk : this.chunks.values()) {
-                if (chunk.hasChanged()) {
-                    chunk.setChanged(false);
-                    this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
-                }
+        for (BaseFullChunk chunk : this.chunks.values()) {
+            if (chunk.hasChanged()) {
+                chunk.setChanged(false);
+                this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
             }
         }
     }
@@ -1078,23 +1071,16 @@ public class LevelDBProvider implements LevelProvider {
                 int chunkX = Binary.readLInt(key);
                 int chunkZ = Binary.readLInt(key, 4);
                 long index = Level.chunkHash(chunkX, chunkZ);
-                BaseFullChunk chunk;
-                synchronized (this.chunks) {
-                    chunk = this.chunks.get(index);
-                    if (chunk == null) {
-                        try {
-                            chunk = this.readChunk(chunkX, chunkZ);
-                        } catch (Exception e) {
-                            if (!skipCorrupted) {
-                                throw e;
-                            }
-                            log.error("Skipped corrupted chunk {} {}", chunkX, chunkZ, e);
-                            continue;
+                BaseFullChunk chunk = this.chunks.get(index);
+                if (chunk == null) {
+                    try {
+                        chunk = this.readChunk(chunkX, chunkZ);
+                    } catch (Exception e) {
+                        if (!skipCorrupted) {
+                            throw e;
                         }
-
-//                        if (chunk != null) {
-//                            this.chunks.put(index, chunk);
-//                        }
+                        log.error("Skipped corrupted chunk {} {}", chunkX, chunkZ, e);
+                        continue;
                     }
                 }
 
