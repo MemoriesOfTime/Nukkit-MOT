@@ -49,7 +49,7 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 
 ## Credits
 [<img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="18"/>]() [Nukkit](https://github.com/CloudburstMC/Nukkit)  
-[<img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="18"/>]()[NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
+[<img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="18"/>]() [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
 [<img src="https://www.powernukkitx.com/assets/image/PNX_LOGO_sm.png" width="18"/>]() [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 [<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" width="120"/>](https://jb.gg/OpenSourceSupport)  
