@@ -24,8 +24,6 @@ public class BlockStateSnapshot {
     @Builder.Default
     private int legacyData = -1;
 
-    private Block block;
-
     public int getLegacyId() {
         if (this.legacyId != -1) {
             return this.legacyId;
@@ -50,10 +48,8 @@ public class BlockStateSnapshot {
         return meta;
     }
 
+    @Deprecated
     public Block getBlock() {
-        if (this.block == null) {
-            this.block = Block.get(this.getLegacyId(), this.getLegacyData());
-        }
-        return this.block;
+        return Block.get(this.getLegacyId(), this.getLegacyData());
     }
 }

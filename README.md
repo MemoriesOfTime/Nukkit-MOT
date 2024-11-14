@@ -48,11 +48,17 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 ```
 
 ## Credits
-[Nukkit](https://github.com/CloudburstMC/Nukkit)  
-[NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
-[PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
+[<img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="18"/>]() [Nukkit](https://github.com/CloudburstMC/Nukkit)  
+[<img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="18"/>]() [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
+[<img src="https://www.powernukkitx.com/assets/image/PNX_LOGO_sm.png" width="18"/>]() [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
-This project is based on [Nukkit](https://github.com/CloudburstMC/Nukkit), so you should abide by [Nukkit](https://github.com/CloudburstMC/Nukkit)'s License
-
+[<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" width="120"/>](https://jb.gg/OpenSourceSupport)  
 Thanks to [jetbrains](https://jb.gg/OpenSourceSupport) for providing development tools for this project for free!  
-[<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" width="200"/>](https://jb.gg/OpenSourceSupport)
+
+![YourKit](https://www.yourkit.com/images/yklogo.png)  
+YourKit supports open source projects with innovative and intelligent tools
+for monitoring and profiling Java and .NET applications.
+YourKit is the creator of <a href="https://www.yourkit.com/java/profiler/">YourKit Java Profiler</a>,
+<a href="https://www.yourkit.com/dotnet-profiler/">YourKit .NET Profiler</a>,
+and <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>.
+
