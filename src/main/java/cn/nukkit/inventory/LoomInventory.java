@@ -49,7 +49,18 @@ public class LoomInventory extends FakeBlockUIComponent {
 
     @Override
     public boolean allowedToAdd(Item item) {
-        return ITEMS.contains(item.getId());
+        boolean allowed = ITEMS.contains(item.getId());
+        if(!allowed) {
+            switch (item.getNamespaceId()) {
+                case "minecraft:flow_banner_pattern":
+                    allowed = true;
+                    break;
+                case "minecraft:guster_banner_pattern":
+                    allowed = true;
+                    break;
+            }
+        }
+        return allowed;
     }
 
     @Deprecated

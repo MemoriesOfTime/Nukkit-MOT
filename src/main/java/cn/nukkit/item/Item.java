@@ -173,7 +173,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             list[CHAIN_BOOTS] = ItemBootsChain.class; //305
             list[IRON_HELMET] = ItemHelmetIron.class; //306
             list[IRON_CHESTPLATE] = ItemChestplateIron.class; //307
-            list[IRON_LEGGINGS] = ItemLeggingsIron.class; //308
+            list[IRON_LEGGINGS] = ItemLeggingsIron.class; //308     
             list[IRON_BOOTS] = ItemBootsIron.class; //309
             list[DIAMOND_HELMET] = ItemHelmetDiamond.class; //310
             list[DIAMOND_CHESTPLATE] = ItemChestplateDiamond.class; //311
@@ -398,6 +398,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemRawGold.class);
             registerNamespacedIdItem(ItemRawCopper.class);
             registerNamespacedIdItem(ItemCopperIngot.class);
+            registerNamespacedIdItem(ItemEchoShard.class);
             //TODO 修改类名格式为ItemSmithingTemplateXXX
             registerNamespacedIdItem(ItemNetheriteUpgradeSmithingTemplate.class);
             registerNamespacedIdItem(ItemSentryArmorTrimSmithingTemplate.class);
@@ -445,6 +446,16 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemMace.class);
             registerNamespacedIdItem(ItemSmithingTemplateArmorTrimFlow.class);
             registerNamespacedIdItem(ItemSmithingTemplateArmorTrimBolt.class);
+            registerNamespacedIdItem(ItemRecordCreator.class);
+            registerNamespacedIdItem(ItemRecordCreatorMusicBox.class);
+            registerNamespacedIdItem(ItemRecordPrecipice.class);
+            registerNamespacedIdItem(ItemFlowPotterySherd.class);
+            registerNamespacedIdItem(ItemGusterPotterySherd.class);
+            registerNamespacedIdItem(ItemScrapePotterySherd.class);
+            registerNamespacedIdItem(ItemBannerPatternFlow.class);
+            registerNamespacedIdItem(ItemBannerPatternGuster.class);
+            registerNamespacedIdItem(ItemOminousBottle.class);
+
 
             // 添加原版物品到NAMESPACED_ID_ITEM
             // Add vanilla items to NAMESPACED_ID_ITEM
