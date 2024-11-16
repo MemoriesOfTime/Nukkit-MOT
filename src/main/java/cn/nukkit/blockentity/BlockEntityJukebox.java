@@ -65,7 +65,7 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
                 case Item.RECORD_OTHERSIDE -> LevelSoundEventPacket.SOUND_RECORD_OTHERSIDE;
                 case Item.RECORD_5 -> LevelSoundEventPacket.SOUND_RECORD_5;
                 case Item.RECORD_RELIC -> LevelSoundEventPacket.SOUND_RECORD_RELIC;
-                case 255 -> {
+                case Item.STRING_IDENTIFIED_ITEM -> {
                     switch (this.recordItem.getNamespaceId()) {
                         case "minecraft:music_disc_creator":
                             yield LevelSoundEventPacket.SOUND_RECORD_CREATOR;
