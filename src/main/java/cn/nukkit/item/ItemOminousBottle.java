@@ -8,7 +8,7 @@ import cn.nukkit.potion.Effect;
 
 public class ItemOminousBottle extends StringItemBase {
     public ItemOminousBottle() {
-        super("minecraft:ominous_bottle", "Ominous Bottle");
+        super(OMINOUS_BOTTLE, "Ominous Bottle");
     }
 
     @Override

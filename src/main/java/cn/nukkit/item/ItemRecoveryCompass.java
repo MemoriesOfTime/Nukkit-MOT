@@ -4,7 +4,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemRecoveryCompass extends StringItemBase {
     public ItemRecoveryCompass() {
-        super("minecraft:recovery_compass", "Recovery Compass");
+        super(RECOVERY_COMPASS, "Recovery Compass");
     }
 
     @Override

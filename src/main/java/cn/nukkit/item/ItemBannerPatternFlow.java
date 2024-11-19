@@ -4,7 +4,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemBannerPatternFlow extends StringItemBase {
     public ItemBannerPatternFlow() {
-        super("minecraft:flow_banner_pattern", "Flow Banner Pattern");
+        super(FLOW_BANNER_PATTERN, "Flow Banner Pattern");
     }
 
     @Override

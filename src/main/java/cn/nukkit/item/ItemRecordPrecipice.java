@@ -19,7 +19,7 @@ public class ItemRecordPrecipice extends ItemRecord implements StringItem {
 
     @Override
     public String getNamespaceId(int protocolId) {
-        return "minecraft:music_disc_precipice";
+        return MUSIC_DISC_PRECIPICE;
     }
 
     @Override

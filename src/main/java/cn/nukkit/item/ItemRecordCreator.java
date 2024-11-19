@@ -19,7 +19,7 @@ public class ItemRecordCreator extends ItemRecord implements StringItem {
 
     @Override
     public String getNamespaceId(int protocolId) {
-        return "minecraft:music_disc_creator";
+        return MUSIC_DISC_CREATOR;
     }
 
     @Override

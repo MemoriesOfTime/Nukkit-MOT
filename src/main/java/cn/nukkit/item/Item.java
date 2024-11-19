@@ -173,7 +173,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             list[CHAIN_BOOTS] = ItemBootsChain.class; //305
             list[IRON_HELMET] = ItemHelmetIron.class; //306
             list[IRON_CHESTPLATE] = ItemChestplateIron.class; //307
-            list[IRON_LEGGINGS] = ItemLeggingsIron.class; //308     
+            list[IRON_LEGGINGS] = ItemLeggingsIron.class; //308
             list[IRON_BOOTS] = ItemBootsIron.class; //309
             list[DIAMOND_HELMET] = ItemHelmetDiamond.class; //310
             list[DIAMOND_CHESTPLATE] = ItemChestplateDiamond.class; //311

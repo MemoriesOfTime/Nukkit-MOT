@@ -4,7 +4,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemBannerPatternGuster extends StringItemBase {
     public ItemBannerPatternGuster() {
-        super("minecraft:guster_banner_pattern", "Guster Banner Pattern");
+        super(GUSTER_BANNER_PATTERN, "Guster Banner Pattern");
     }
 
     @Override
