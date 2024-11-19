@@ -407,7 +407,7 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public static long blockHash(int x, int y, int z) {
-        if (y < 0 || y >= 256) {
+        if (y < -64 || y >= 384) {
             throw new IllegalArgumentException("Y coordinate " + y + " is out of range!");
         }
         return (((long) x & (long) 0xFFFFFFF) << 36) | (((long) y & (long) 0xFF) << 28) | ((long) z & (long) 0xFFFFFFF);

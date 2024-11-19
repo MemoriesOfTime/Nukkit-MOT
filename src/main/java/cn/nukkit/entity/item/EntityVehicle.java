@@ -65,7 +65,7 @@ public abstract class EntityVehicle extends Entity implements EntityRideable, En
 
     @Override
     public boolean onUpdate(int currentTick) {
-        if (y < -16) {
+        if (y < -82) {
             this.close();
         }
 

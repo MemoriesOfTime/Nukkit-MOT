@@ -102,7 +102,8 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
                 continue;
             }
             Block c = this.getSide(BlockFace.fromIndex(side));
-            if (c instanceof BlockChest && c.getDamage() == this.getDamage()) {
+            int meta = (getDamage() == 2) ? 0 : getDamage(); //Temporary chest pairing fix
+            if (c instanceof BlockChest && c.getDamage() == meta) {
                 BlockEntity blockEntity = this.getLevel().getBlockEntity(c);
                 if (blockEntity instanceof BlockEntityChest && !((BlockEntityChest) blockEntity).isPaired()) {
                     chest = (BlockEntityChest) blockEntity;

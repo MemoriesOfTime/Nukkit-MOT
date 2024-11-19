@@ -282,7 +282,7 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
             }
             if (decay >= 0) {
                 int bottomY = (int) this.y - 1;
-                if (bottomY >= 0) {
+                if (bottomY >= -64) {
                     Block bottomBlock = this.level.getBlock((int) this.x, bottomY, (int) this.z);
                     this.flowIntoBlock(bottomBlock, decay | 0x08);
                     if (decay == 0 || !(usesWaterLogging() ? bottomBlock.canWaterloggingFlowInto() : bottomBlock.canBeFlowedInto())) {
