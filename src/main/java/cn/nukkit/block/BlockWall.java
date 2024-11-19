@@ -1,6 +1,10 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.custom.properties.BlockProperties;
+import cn.nukkit.block.properties.BlockPropertiesHelper;
+import cn.nukkit.block.properties.VanillaProperties;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
@@ -8,6 +12,7 @@ import cn.nukkit.utils.BlockColor;
 import lombok.Getter;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import static cn.nukkit.utils.BlockColor.*;
@@ -16,12 +21,14 @@ import static cn.nukkit.utils.BlockColor.*;
  * @author MagicDroidX
  * Nukkit Project
  */
-public class BlockWall extends BlockTransparentMeta {
+public class BlockWall extends BlockTransparentMeta implements BlockPropertiesHelper {
 
-    public static final int NONE_MOSSY_WALL = 0;
-    public static final int MOSSY_WALL = 1;
-
-    public static final int WALL_BLOCK_TYPE_BIT = 0b1111;
+    private static final BlockProperties PROPERTIES = new BlockProperties(VanillaProperties.WALL_TYPE,
+            VanillaProperties.WALL_CONNECTION_TYPE_EAST,
+            VanillaProperties.WALL_CONNECTION_TYPE_NORTH,
+            VanillaProperties.WALL_CONNECTION_TYPE_SOUTH,
+            VanillaProperties.WALL_CONNECTION_TYPE_WEST,
+            VanillaProperties.WALL_POST);
 
     public BlockWall() {
         this(0);
@@ -57,11 +64,11 @@ public class BlockWall extends BlockTransparentMeta {
     }
 
     public WallType getWallType() {
-        return WallType.values()[this.getDamage(WALL_BLOCK_TYPE_BIT)];
+        return this.getPropertyValue(VanillaProperties.WALL_TYPE);
     }
 
     public void setWallType(WallType wallType) {
-        this.setDamage(WALL_BLOCK_TYPE_BIT, wallType.ordinal());
+        this.setPropertyValue(VanillaProperties.WALL_TYPE, wallType);
     }
 
     @Override
@@ -119,6 +126,97 @@ public class BlockWall extends BlockTransparentMeta {
         return false;
     }
 
+    public void recalculateConnections() {
+        //TODO: post and short wall
+
+        if (canConnect(getSide(BlockFace.NORTH))) {
+            setNorthConnectionType(WallConnectionType.TALL);
+        } else {
+            setNorthConnectionType(WallConnectionType.NONE);
+        }
+        if (canConnect(getSide(BlockFace.SOUTH))) {
+            setSouthConnectionType(WallConnectionType.TALL);
+        } else {
+            setSouthConnectionType(WallConnectionType.NONE);
+        }
+        if (canConnect(getSide(BlockFace.WEST))) {
+            setWestConnectionType(WallConnectionType.TALL);
+        } else {
+            setWestConnectionType(WallConnectionType.NONE);
+        }
+        if (canConnect(getSide(BlockFace.EAST))) {
+            setEastConnectionType(WallConnectionType.TALL);
+        } else {
+            setEastConnectionType(WallConnectionType.NONE);
+        }
+    }
+
+    public boolean isPost() {
+        return this.getPropertyValue(VanillaProperties.WALL_POST);
+    }
+
+    public void setPost(boolean post) {
+        this.setPropertyValue(VanillaProperties.WALL_POST, post);
+    }
+
+    public WallConnectionType getNorthConnectionType() {
+        return this.getPropertyValue(VanillaProperties.WALL_CONNECTION_TYPE_NORTH);
+    }
+
+    public void setNorthConnectionType(WallConnectionType type) {
+        this.setPropertyValue(VanillaProperties.WALL_CONNECTION_TYPE_NORTH, type);
+    }
+
+    public WallConnectionType getEastConnectionType() {
+        return this.getPropertyValue(VanillaProperties.WALL_CONNECTION_TYPE_EAST);
+    }
+
+    public void setEastConnectionType(WallConnectionType type) {
+        this.setPropertyValue(VanillaProperties.WALL_CONNECTION_TYPE_EAST, type);
+    }
+
+    public WallConnectionType getSouthConnectionType() {
+        return this.getPropertyValue(VanillaProperties.WALL_CONNECTION_TYPE_SOUTH);
+    }
+
+    public void setSouthConnectionType(WallConnectionType type) {
+        this.setPropertyValue(VanillaProperties.WALL_CONNECTION_TYPE_SOUTH, type);
+    }
+
+    public WallConnectionType getWestConnectionType() {
+        return this.getPropertyValue(VanillaProperties.WALL_CONNECTION_TYPE_WEST);
+    }
+
+    public void setWestConnectionType(WallConnectionType type) {
+        this.setPropertyValue(VanillaProperties.WALL_CONNECTION_TYPE_WEST, type);
+    }
+
+    @Override
+    public int onUpdate(int type) {
+        if (type == Level.BLOCK_UPDATE_NORMAL) {
+            level.scheduleUpdate(this, 1);
+            return Level.BLOCK_UPDATE_NORMAL;
+        }
+
+        if (type == Level.BLOCK_UPDATE_SCHEDULED) {
+            int oldMeta = getDamage();
+
+            recalculateConnections();
+
+            if (oldMeta != getDamage()) {
+                level.setBlock(this, this, true);
+                return Level.BLOCK_UPDATE_NORMAL;
+            }
+        }
+
+        return 0;
+    }
+
+    @Override
+    public String getIdentifier() {
+        return this.getWallType().name().toLowerCase(Locale.ROOT) + "_wall";
+    }
+
     @Getter
     public enum WallType {
         COBBLESTONE,
@@ -151,5 +249,26 @@ public class BlockWall extends BlockTransparentMeta {
             this(STONE_BLOCK_COLOR);
         }
 
+    }
+
+    public enum WallConnectionType {
+        NONE("none"),
+        SHORT("short"),
+        TALL("tall");
+
+        private final String name;
+
+        WallConnectionType(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
+        }
+    }
+
+    @Override
+    public BlockProperties getBlockProperties() {
+        return PROPERTIES;
     }
 }
