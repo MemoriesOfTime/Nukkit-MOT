@@ -65,6 +65,17 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
                 case Item.RECORD_OTHERSIDE -> LevelSoundEventPacket.SOUND_RECORD_OTHERSIDE;
                 case Item.RECORD_5 -> LevelSoundEventPacket.SOUND_RECORD_5;
                 case Item.RECORD_RELIC -> LevelSoundEventPacket.SOUND_RECORD_RELIC;
+                case Item.STRING_IDENTIFIED_ITEM -> {
+                    switch (this.recordItem.getNamespaceId()) {
+                        case Item.MUSIC_DISC_CREATOR:
+                            yield LevelSoundEventPacket.SOUND_RECORD_CREATOR;
+                        case Item.MUSIC_DISC_CREATOR_BOX:
+                            yield LevelSoundEventPacket.SOUND_RECORD_CREATOR_MUSIC_BOX;
+                        case Item.MUSIC_DISC_PRECIPICE:
+                            yield LevelSoundEventPacket.SOUND_RECORD_PRECIPICE;
+                    }
+                    throw new IllegalStateException("Sound is not implemented for item: " + this.recordItem.getNamespaceId());
+                }
                 default ->
                     throw new IllegalStateException("Sound is not implemented for item: " + this.recordItem.getId());
             });

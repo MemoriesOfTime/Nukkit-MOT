@@ -5,7 +5,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 public class ItemFlowPotterySherd extends ItemPotterySherd {
 
     public ItemFlowPotterySherd() {
-        super("minecraft:flow_pottery_sherd", "Flow Pottery Sherd");
+        super(FLOW_POTTERY_SHERD, "Flow Pottery Sherd");
     }
 
     @Override

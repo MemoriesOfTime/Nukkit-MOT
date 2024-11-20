@@ -7,6 +7,9 @@ public interface ItemNamespaceId {
 
     String COPPER_INGOT = "minecraft:copper_ingot";
 
+    String ECHO_SHARD = "minecraft:echo_shard";
+    String RECOVERY_COMPASS = "minecraft:recovery_compass";
+
     String NETHERITE_UPGRADE_SMITHING_TEMPLATE = "minecraft:netherite_upgrade_smithing_template";
     String SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE = "minecraft:sentry_armor_trim_smithing_template";
     String DUNE_ARMOR_TRIM_SMITHING_TEMPLATE = "minecraft:dune_armor_trim_smithing_template";
@@ -28,5 +31,18 @@ public interface ItemNamespaceId {
 
     String FLOW_ARMOR_TRIM_SMITHING_TEMPLATE = "minecraft:flow_armor_trim_smithing_template";
     String BOLT_ARMOR_TRIM_SMITHING_TEMPLATE = "minecraft:bolt_armor_trim_smithing_template";
+
+    String MUSIC_DISC_CREATOR = "minecraft:music_disc_creator";
+    String MUSIC_DISC_CREATOR_BOX = "minecraft:music_disc_creator_music_box";
+    String MUSIC_DISC_PRECIPICE = "minecraft:music_disc_precipice";
+
+    String GUSTER_POTTERY_SHERD = "minecraft:guster_pottery_sherd";
+    String FLOW_POTTERY_SHERD = "minecraft:flow_pottery_sherd";
+    String SCRAPE_POTTERY_SHERD = "minecraft:scrape_pottery_sherd";
+
+    String FLOW_BANNER_PATTERN = "minecraft:flow_banner_pattern";
+    String GUSTER_BANNER_PATTERN = "minecraft:guster_banner_pattern";
+
+    String OMINOUS_BOTTLE = "minecraft:ominous_bottle";
 
 }
