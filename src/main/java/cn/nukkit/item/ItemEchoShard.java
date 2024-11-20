@@ -4,7 +4,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemEchoShard extends StringItemBase {
     public ItemEchoShard() {
-        super("minecraft:echo_shard", "Echo Shard");
+        super(ECHO_SHARD, "Echo Shard");
     }
 
     @Override
