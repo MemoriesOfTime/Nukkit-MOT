@@ -6,12 +6,16 @@ import cn.nukkit.item.ItemID;
 import cn.nukkit.level.Position;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 public class LoomInventory extends FakeBlockUIComponent {
 
     public static final int OFFSET = 9;
 
     private static final IntSet ITEMS = new IntOpenHashSet(new int[]{Item.AIR, ItemID.BANNER, ItemID.DYE, ItemID.BANNER_PATTERN});
+
+    private static final ObjectSet<String> ITEMS_NAMESPACE = new ObjectOpenHashSet<>(new String[]{Item.FLOW_BANNER_PATTERN, Item.GUSTER_BANNER_PATTERN});
 
     public LoomInventory(PlayerUIInventory playerUI, Position position) {
         super(playerUI, InventoryType.LOOM, OFFSET, position);
@@ -49,7 +53,7 @@ public class LoomInventory extends FakeBlockUIComponent {
 
     @Override
     public boolean allowedToAdd(Item item) {
-        return ITEMS.contains(item.getId());
+        return ITEMS.contains(item.getId()) || ITEMS_NAMESPACE.contains(item.getNamespaceId());
     }
 
     @Deprecated
