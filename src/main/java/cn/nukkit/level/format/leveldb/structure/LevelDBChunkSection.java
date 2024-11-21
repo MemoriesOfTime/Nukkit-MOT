@@ -12,7 +12,6 @@ import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
 import cn.nukkit.utils.Zlib;
 import lombok.extern.log4j.Log4j2;
-import org.cloudburstmc.nbt.NbtMap;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -276,7 +275,7 @@ public class LevelDBChunkSection implements ChunkSection {
     @Override
     public Block getAndSetBlock(int x, int y, int z, int layer, Block block) {
         int fullId;
-        NbtMap state = null;
+        BlockStateSnapshot state = null;
         int previous;
         try {
             this.writeLock.lock();
@@ -293,7 +292,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 storage = this.storages[layer];
 
                 if (block instanceof BlockStorageContainer container) {
-                    state = container.getStateNbt();
+                    state = BlockStateMapping.get().getStateUnsafe(container.getStateNbt());
                 }
 
                 fullId = block.getFullId();
@@ -302,7 +301,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 previous = storage.get(x, y, z);
 
                 if (block instanceof BlockStorageContainer container) {
-                    state = container.getStateNbt();
+                    state = BlockStateMapping.get().getStateUnsafe(container.getStateNbt());
                 }
 
                 fullId = block.getFullId();
@@ -313,7 +312,7 @@ public class LevelDBChunkSection implements ChunkSection {
             }
 
             if (state != null) {
-                storage.set(x, y, z, BlockStateMapping.get().getState(state));
+                storage.set(x, y, z, state);
             } else {
                 storage.set(x, y, z, fullId);
             }

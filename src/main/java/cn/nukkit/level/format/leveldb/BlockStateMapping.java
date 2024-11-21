@@ -172,7 +172,7 @@ public class BlockStateMapping {
     public BlockStateSnapshot getState(int runtimeId) {
         BlockStateSnapshot blockStateSnapshot = this.runtime2State.get(runtimeId);
         if (blockStateSnapshot == null) {
-            log.warn("Can not find state! No runtime2State mapping for " + runtimeId);
+            log.warn("Can not find state! No runtime2State mapping for {}", runtimeId);
             return this.getDefaultState();
         }
         return blockStateSnapshot;
@@ -203,7 +203,7 @@ public class BlockStateMapping {
     public int getRuntimeId(int legacyId, int data) {
         int runtimeId = this.legacyMapper.legacyToRuntime(legacyId, data);
         if (runtimeId == -1) {
-            log.warn("Can not find runtimeId! No legacy2runtime mapping for " + legacyId + ":" + data);
+            log.warn("Can not find runtimeId! No legacy2runtime mapping for {}:{}", legacyId, data);
             return this.getDefaultRuntimeId();
         }
         return runtimeId;
@@ -212,7 +212,7 @@ public class BlockStateMapping {
     public int getFullId(int runtimeId) {
         int fullId = this.legacyMapper.runtimeToFullId(runtimeId);
         if (fullId == -1) {
-            log.warn("Can not find legacyId! No runtime2FullId mapping for " + runtimeId);
+            log.warn("Can not find legacyId! No runtime2FullId mapping for {}", runtimeId);
             fullId = this.legacyMapper.runtimeToFullId(this.getDefaultRuntimeId());
             Preconditions.checkArgument(fullId != -1, "Can not find fullId for default runtimeId: " + this.getDefaultRuntimeId());
         }

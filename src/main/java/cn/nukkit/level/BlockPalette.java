@@ -13,6 +13,7 @@ import com.google.common.cache.CacheBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntMaps;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.BufferedInputStream;
@@ -61,17 +62,36 @@ public class BlockPalette {
     }
 
     private void loadBlockStates(ListTag<CompoundTag> blockStates) {
+        List<CompoundTag> stateOverloads = new ObjectArrayList<>();
         for (CompoundTag state : blockStates.getAll()) {
-            int id = state.getInt("id");
-            int data = state.getShort("data");
-            int runtimeId = state.getInt("runtimeId");
-            int legacyId = id << 6 | data;
-            legacyToRuntimeId.put(legacyId, runtimeId);
-            if (!runtimeIdToLegacy.containsKey(runtimeId)) {
-                runtimeIdToLegacy.put(runtimeId, legacyId);
+            if (!this.registerBlockState(state, false)) {
+                stateOverloads.add(state);
             }
-            stateToLegacy.put(state, legacyId);
         }
+
+        for (CompoundTag state : stateOverloads) {
+            log.info("[{}] Registering block palette overload: {}", this.getProtocol(), state.getString("name"));
+            this.registerBlockState(state, true);
+        }
+    }
+
+    private boolean registerBlockState(CompoundTag state, boolean force) {
+        int id = state.getInt("id");
+        int data = state.getShort("data");
+        int runtimeId = state.getInt("runtimeId");
+        boolean stateOverload = state.getBoolean("stateOverload");
+
+        if (stateOverload && !force) {
+            return false;
+        }
+
+        CompoundTag vanillaState = state
+                .remove("id")
+                .remove("data")
+                .remove("runtimeId")
+                .remove("stateOverload");
+        this.registerState(id, data, runtimeId, vanillaState);
+        return true;
     }
 
     /**
@@ -88,7 +108,7 @@ public class BlockPalette {
                 int id = Utils.toInt(map.get("id"));
                 int data = Utils.toInt(map.getOrDefault("data", 0));
                 int runtimeId = Utils.toInt(map.get("runtimeId"));
-                int legacyId = id << 6 | data;
+                int legacyId = id << Block.DATA_BITS | data;
                 legacyToRuntimeId.put(legacyId, runtimeId);
                 if (!runtimeIdToLegacy.containsKey(runtimeId)) {
                     runtimeIdToLegacy.put(runtimeId, legacyId);
@@ -153,16 +173,16 @@ public class BlockPalette {
     }
 
     public int getRuntimeId(int id, int meta) {
-        int legacyId = protocol >= 388 ? ((id << 6) | meta) : ((id << 4) | meta);
+        int legacyId = protocol >= 388 ? ((id << Block.DATA_BITS) | meta) : ((id << 4) | meta);
         int runtimeId;
         runtimeId = legacyToRuntimeId.get(legacyId);
         if (runtimeId == -1) {
-            runtimeId = legacyToRuntimeId.get(id << 6);
+            runtimeId = legacyToRuntimeId.get(id << Block.DATA_BITS);
             if (runtimeId == -1) {
                 Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyId);
                 if (cache == null) {
                     log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
-                    runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << 6);
+                    runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
                     legacyToRuntimeIdCache.put(legacyId, runtimeId);
                 } else {
                     runtimeId = cache;
