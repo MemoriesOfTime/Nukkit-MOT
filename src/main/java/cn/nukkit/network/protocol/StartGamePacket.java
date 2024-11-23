@@ -51,6 +51,13 @@ public class StartGamePacket extends DataPacket {
     public float pitch;
     public int seed;
     public byte dimension;
+    /**
+     * generator is the generator used for the world. It is a value from 0-4, with 0 being old limited worlds,
+     * 1 being infinite worlds, 2 being flat worlds, 3 being nether worlds and 4 being end worlds. A value of
+     * 0 will actually make the client stop rendering chunks you send beyond the world limit.
+     * <p>
+     * 防止主世界不渲染384高度，这里始终保持1
+     */
     public int generator = 1;
     public int worldGamemode;
     public int difficulty;

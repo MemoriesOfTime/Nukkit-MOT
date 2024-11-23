@@ -70,7 +70,7 @@ public class BlockPalette {
         }
 
         for (CompoundTag state : stateOverloads) {
-            log.info("[{}] Registering block palette overload: {}", this.getProtocol(), state.getString("name"));
+            log.debug("[{}] Registering block palette overload: {}", this.getProtocol(), state.getString("name"));
             this.registerBlockState(state, true);
         }
     }
