@@ -33,7 +33,6 @@ import net.daporkchop.ldbjni.DBProvider;
 import net.daporkchop.ldbjni.LevelDB;
 import net.daporkchop.lib.natives.FeatureBuilder;
 import org.cloudburstmc.nbt.*;
-import org.iq80.leveldb.*;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -1092,7 +1091,7 @@ public class LevelDBProvider implements LevelProvider {
                     break;
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException("iteration failed", e);
         }
     }

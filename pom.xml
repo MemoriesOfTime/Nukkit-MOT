@@ -235,7 +235,7 @@
         <dependency>
             <groupId>net.daporkchop</groupId>
             <artifactId>leveldb-mcpe-jni</artifactId>
-            <version>0.0.10-SNAPSHOT</version>
+            <version>0.0.10-MOT-Test-SNAPSHOT</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>

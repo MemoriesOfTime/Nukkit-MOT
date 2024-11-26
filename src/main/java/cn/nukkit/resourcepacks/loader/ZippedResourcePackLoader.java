@@ -5,11 +5,10 @@ import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.resourcepacks.ZippedResourcePack;
 import com.google.common.io.Files;
 import lombok.extern.log4j.Log4j2;
-import org.iq80.leveldb.util.FileUtils;
+import org.iq80.leveldb.fileenv.FileUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
