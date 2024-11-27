@@ -1092,7 +1092,7 @@ public class LevelDBProvider implements LevelProvider {
                     break;
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException("iteration failed", e);
         }
     }
