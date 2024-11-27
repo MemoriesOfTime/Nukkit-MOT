@@ -594,7 +594,8 @@ public class Blocks {
 
         list[MANGROVE_ROOTS] = BlockMangroveRoots.class; //737
         list[MUDDY_MANGROVE_ROOTS] = BlockMangroveRootsMuddy.class; //738
-
+        list[MANGROVE_LOG] = BlockLogMangrove.class; //739
+        list[STRIPPED_MANGROVE_LOG] = BlockLogStrippedMangrove.class; //740
         list[MANGROVE_PLANKS] = BlockPlanksMangrove.class; //741
 
         list[BAMBOO_PLANKS] = BlockPlanksBamboo.class; //765
