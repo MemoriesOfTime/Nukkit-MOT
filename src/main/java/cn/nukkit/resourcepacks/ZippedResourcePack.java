@@ -19,6 +19,7 @@ public class ZippedResourcePack extends AbstractResourcePack {
     private byte[] sha256;
 
     private String encryptionKey = "";
+    private String cdnUrl = "";
 
     public ZippedResourcePack(File file) {
         if (!file.exists()) {
@@ -107,5 +108,14 @@ public class ZippedResourcePack extends AbstractResourcePack {
     @Override
     public String getEncryptionKey() {
         return this.encryptionKey;
+    }
+
+    @Override
+    public String getCDNUrl() {
+        return this.cdnUrl;
+    }
+
+    public void setCdnUrl(String cdnUrl) {
+        this.cdnUrl = cdnUrl;
     }
 }
