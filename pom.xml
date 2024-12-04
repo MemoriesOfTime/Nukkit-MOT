@@ -92,6 +92,14 @@
                     <groupId>io.netty</groupId>
                     <artifactId>netty-buffer</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.cloudburstmc.fastutil.maps</groupId>
+                    <artifactId>int-object-maps</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.cloudburstmc.fastutil.maps</groupId>
+                    <artifactId>object-int-maps</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
         <dependency>
