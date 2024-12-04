@@ -2161,7 +2161,7 @@ public abstract class Entity extends Location implements Metadatable {
                 return; // TODO: Some waterlogged blocks prevent fall damage
             }
             if (!this.hasEffect(Effect.SLOW_FALLING)) {
-                Block down = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() - 1, this.getFloorZ(), true);
+                Block down = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() - 1, this.getFloorZ(), 0, true);
                 int floor = down.getId();
 
                 if (!this.noFallDamage) {
