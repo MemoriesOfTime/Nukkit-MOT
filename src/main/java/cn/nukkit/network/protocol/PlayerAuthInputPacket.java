@@ -5,6 +5,7 @@ import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
 import cn.nukkit.network.protocol.types.*;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 
 import java.util.EnumMap;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 
 @ToString
+@Setter
 @Getter
 public class PlayerAuthInputPacket extends DataPacket {
 
@@ -55,6 +57,10 @@ public class PlayerAuthInputPacket extends DataPacket {
      * @since v748
      */
     private Vector3f cameraOrientation;
+    /**
+     * @since v766
+     */
+    private Vector2f rawMoveVector;
 
     @Override
     public byte pid() {
@@ -131,6 +137,9 @@ public class PlayerAuthInputPacket extends DataPacket {
 
             if (protocol >= ProtocolInfo.v1_21_40) {
                 this.cameraOrientation = this.getVector3f();
+            }
+            if (protocol >= ProtocolInfo.v1_21_50) {
+                this.rawMoveVector = this.getVector2f();
             }
         }
     }

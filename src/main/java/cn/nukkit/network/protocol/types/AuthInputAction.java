@@ -121,7 +121,31 @@ public enum AuthInputAction {
     /**
      * @since v748
      */
-    STOP_SPIN_ATTACK
+    STOP_SPIN_ATTACK,
+    /**
+     * @since v766
+     */
+    JUMP_RELEASED_RAW,
+    /**
+     * @since v766
+     */
+    JUMP_PRESSED_RAW,
+    /**
+     * @since v766
+     */
+    JUMP_CURRENT_RAW,
+    /**
+     * @since v766
+     */
+    SNEAK_RELEASED_RAW,
+    /**
+     * @since v766
+     */
+    SNEAK_PRESSED_RAW,
+    /**
+     * @since v766
+     */
+    SNEAK_CURRENT_RAW
     ;
 
     private static final AuthInputAction[] VALUES = values();

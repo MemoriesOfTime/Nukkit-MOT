@@ -14,6 +14,7 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
@@ -861,6 +862,33 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         block.z = (int) z + face.getZOffset() * step;
         block.layer = layer;
         return block;
+    }
+
+    protected Block getSideIfLoaded(BlockFace face) {
+        if (this.isValid()) {
+            return this.level.getBlock(null,
+                    (int) this.x + face.getXOffset(), (int) this.y + face.getYOffset(), (int) this.z + face.getZOffset(),
+                    0, false);
+        }
+        return Block.get(AIR, 0, Position.fromObject(new Vector3(this.x, this.y, this.z).getSide(face, 1)), 0);
+    }
+
+    protected Block getSideIfLoadedOrNull(BlockFace face) {
+        if (this.isValid()) {
+            int cx = ((int) this.x + face.getXOffset()) >> 4;
+            int cz = ((int) this.z + face.getZOffset()) >> 4;
+
+            FullChunk chunk = this.level.getChunkIfLoaded(cx, cz);
+            if (chunk == null) {
+                return null;
+            }
+
+            return this.level.getBlock(chunk,
+                    (int) this.x + face.getXOffset(), (int) this.y + face.getYOffset(), (int) this.z + face.getZOffset(),
+                    0, false);
+        }
+
+        return Block.get(AIR, 0, Position.fromObject(new Vector3(this.x, this.y, this.z).getSide(face, 1)), 0);
     }
 
     @Override

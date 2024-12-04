@@ -8,6 +8,7 @@ import lombok.ToString;
 import lombok.Value;
 
 import java.util.List;
+import java.util.UUID;
 
 @ToString
 public class ResourcePacksInfoPacket extends DataPacket {
@@ -30,6 +31,14 @@ public class ResourcePacksInfoPacket extends DataPacket {
     @Getter
     @Setter
     private List<CDNEntry> CDNEntries = new ObjectArrayList<>();
+    /**
+     * @since v766
+     */
+    public UUID worldTemplateId = new UUID(0, 0);
+    /**
+     * @since v766
+     */
+    public String worldTemplateVersion = "";
 
     @Override
     public void decode() {
@@ -47,6 +56,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
             if (this.protocol >= ProtocolInfo.v1_17_10 && this.protocol < ProtocolInfo.v1_21_30) {
                 this.putBoolean(this.forceServerPacks);
             }
+        }
+        if (this.protocol >= ProtocolInfo.v1_21_50) {
+            this.putUUID(this.worldTemplateId);
+            this.putString(this.worldTemplateVersion);
         }
 
         if (this.protocol < ProtocolInfo.v1_21_30) {
@@ -78,7 +91,11 @@ public class ResourcePacksInfoPacket extends DataPacket {
     private void encodeResourcePacks(ResourcePack[] packs) {
         this.putLShort(packs.length);
         for (ResourcePack entry : packs) {
-            this.putString(entry.getPackId().toString());
+            if (this.protocol >= ProtocolInfo.v1_21_50) {
+                this.putUUID(entry.getPackId());
+            } else {
+                this.putString(entry.getPackId().toString());
+            }
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
             this.putString(entry.getEncryptionKey()); // encryption key

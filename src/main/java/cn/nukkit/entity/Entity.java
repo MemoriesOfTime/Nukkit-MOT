@@ -2,7 +2,10 @@ package cn.nukkit.entity;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.block.*;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockFire;
+import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockWater;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
 import cn.nukkit.entity.custom.CustomEntity;
 import cn.nukkit.entity.custom.EntityDefinition;
@@ -47,6 +50,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
@@ -2150,41 +2154,54 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void fall(float fallDistance) {
-        if (fallDistance > 0.75 && !this.hasEffect(Effect.SLOW_FALLING)) {
-            Block down = this.level.getBlock(this.floor().down());
-            if (!this.noFallDamage) {
-                float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));
+        if (fallDistance > 0.75) {
+            int block = this.level.getBlockIdAt(this.chunk, this.getFloorX(), this.getFloorY(), this.getFloorZ());
+            if (Block.isWater(block)) {
+                this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_SPLASH, ThreadLocalRandom.current().nextInt(600000, 800000), "minecraft:player", false, false);
+                return; // TODO: Some waterlogged blocks prevent fall damage
+            }
+            if (!this.hasEffect(Effect.SLOW_FALLING)) {
+                Block down = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() - 1, this.getFloorZ(), 0, true);
+                int floor = down.getId();
 
-                if (down.getId() == BlockID.HAY_BALE) {
-                    damage -= damage * 0.8f;
-                }
+                if (!this.noFallDamage) {
+                    float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));
 
-                if (isPlayer) {
-                    final int level = ((Player) this).getInventory().getBootsFast().getEnchantmentLevel(Enchantment.ID_PROTECTION_FALL);
-                    if (level != 0) {
-                        damage -= damage / 100 * (level * 12);
+                    if (floor == BlockID.HAY_BALE || block == BlockID.HAY_BALE) {
+                        damage -= (damage * 0.8f);
+                    } else if (floor == BlockID.BED_BLOCK || block == BlockID.BED_BLOCK) {
+                        damage -= (damage * 0.5f);
+                    } else if (floor == BlockID.SLIME_BLOCK || floor == BlockID.COBWEB || floor == BlockID.SCAFFOLDING || floor == BlockID.SWEET_BERRY_BUSH) {
+                        damage = 0;
+                    }
+
+                    if (isPlayer) {
+                        final int level = ((Player) this).getInventory().getBootsFast().getEnchantmentLevel(Enchantment.ID_PROTECTION_FALL);
+                        if (level != 0) {
+                            damage -= damage / 100 * (level * 12);
+                        }
+                    }
+
+                    if (damage > 0 && (!this.isPlayer || level.getGameRules().getBoolean(GameRule.FALL_DAMAGE))) {
+                        this.attack(new EntityDamageEvent(this, DamageCause.FALL, damage));
                     }
                 }
 
-                if (damage > 0 && (!this.isPlayer || level.getGameRules().getBoolean(GameRule.FALL_DAMAGE))) {
-                    this.attack(new EntityDamageEvent(this, DamageCause.FALL, damage));
-                }
-            }
+                if (down.getId() == BlockID.FARMLAND) {
+                    Event ev;
 
-            if (down.getId() == BlockID.FARMLAND) {
-                Event ev;
+                    if (this.isPlayer) {
+                        ev = new PlayerInteractEvent((Player) this, null, down, null, Action.PHYSICAL);
+                    } else {
+                        ev = new EntityInteractEvent(this, down);
+                    }
 
-                if (this.isPlayer) {
-                    ev = new PlayerInteractEvent((Player) this, null, down, null, Action.PHYSICAL);
-                } else {
-                    ev = new EntityInteractEvent(this, down);
+                    this.server.getPluginManager().callEvent(ev);
+                    if (ev.isCancelled()) {
+                        return;
+                    }
+                    this.level.setBlock(down, Block.get(BlockID.DIRT), true, true);
                 }
-
-                this.server.getPluginManager().callEvent(ev);
-                if (ev.isCancelled()) {
-                    return;
-                }
-                this.level.setBlock(down, Block.get(BlockID.DIRT), true, true);
             }
         }
     }
