@@ -32,13 +32,13 @@ public class ResourcePacksInfoPacket extends DataPacket {
     @Setter
     private List<CDNEntry> CDNEntries = new ObjectArrayList<>();
     /**
-     * @since v765
+     * @since v766
      */
-    public UUID worldTemplateId;
+    public UUID worldTemplateId = new UUID(0, 0);
     /**
-     * @since v765
+     * @since v766
      */
-    public String worldTemplateVersion;
+    public String worldTemplateVersion = "";
 
     @Override
     public void decode() {

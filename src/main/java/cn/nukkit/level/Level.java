@@ -3216,6 +3216,7 @@ public class Level implements ChunkManager, Metadatable {
         return chunk;
     }
 
+    @Nullable
     public BaseFullChunk getChunkIfLoaded(int chunkX, int chunkZ) {
         return this.requireProvider().getLoadedChunk(Level.chunkHash(chunkX, chunkZ));
     }

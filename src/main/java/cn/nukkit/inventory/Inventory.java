@@ -27,6 +27,10 @@ public interface Inventory {
 
     Item getItem(int index);
 
+    default Item getItemFast(int index) {
+        return getItem(index);
+    }
+
     default boolean setItem(int index, Item item) {
         return setItem(index, item, true);
     }

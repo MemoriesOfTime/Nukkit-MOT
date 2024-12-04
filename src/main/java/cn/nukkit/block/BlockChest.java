@@ -95,13 +95,13 @@ public class BlockChest extends BlockTransparentMeta implements Faceable, BlockE
         BlockEntityChest chest = null;
         this.setDamage(faces[player != null ? player.getDirection().getHorizontalIndex() : 0]);
 
-        for (int side = 2; side <= 5; ++side) {
-            if ((this.getDamage() == 4 || this.getDamage() == 5) && (side == 4 || side == 5)) {
+        for (BlockFace side : BlockFace.Plane.HORIZONTAL) {
+            if ((this.getDamage() == 4 || this.getDamage() == 5) && (side == BlockFace.WEST || side == BlockFace.EAST)) {
                 continue;
-            } else if ((this.getDamage() == 3 || this.getDamage() == 2) && (side == 2 || side == 3)) {
+            } else if ((this.getDamage() == 3 || this.getDamage() == 2) && (side == BlockFace.NORTH || side == BlockFace.SOUTH)) {
                 continue;
             }
-            Block c = this.getSide(BlockFace.fromIndex(side));
+            Block c = this.getSide(side);
             if (c instanceof BlockChest && c.getDamage() == this.getDamage()) {
                 BlockEntity blockEntity = this.getLevel().getBlockEntity(c);
                 if (blockEntity instanceof BlockEntityChest && !((BlockEntityChest) blockEntity).isPaired()) {

@@ -1149,18 +1149,21 @@ public class Server {
         this.forceShutdown();
     }
 
+    private static final byte[] QUERY_PREFIX = {(byte) 0xfe, (byte) 0xfd};
+
+    /**
+     * Internal: Handle query
+     * @param address sender address
+     * @param payload payload
+     */
     public void handlePacket(InetSocketAddress address, ByteBuf payload) {
         try {
-            if (!payload.isReadable(3)) {
+            if (this.queryHandler == null || !payload.isReadable(3)) {
                 return;
             }
             byte[] prefix = new byte[2];
             payload.readBytes(prefix);
-
-            if (!Arrays.equals(prefix, new byte[]{(byte) 0xfe, (byte) 0xfd})) {
-                return;
-            }
-            if (this.queryHandler != null) {
+            if (Arrays.equals(prefix, QUERY_PREFIX)) {
                 this.queryHandler.handle(address, payload);
             }
         } catch (Exception e) {
@@ -1172,6 +1175,9 @@ public class Server {
 
     private int lastLevelGC;
 
+    /**
+     * Internal: Tick the server
+     */
     public void tickProcessor() {
         this.nextTick = System.currentTimeMillis();
         try {

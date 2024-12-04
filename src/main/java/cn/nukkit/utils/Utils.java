@@ -502,7 +502,7 @@ public class Utils {
             case ProtocolInfo.v1_21_20 -> "1.21.20";
             case ProtocolInfo.v1_21_30 -> "1.21.30";
             case ProtocolInfo.v1_21_40 -> "1.21.40";
-            case ProtocolInfo.v1_21_50 -> "1.21.50";
+            case ProtocolInfo.v1_21_50_0, ProtocolInfo.v1_21_50 -> "1.21.50";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };

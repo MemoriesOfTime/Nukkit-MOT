@@ -1926,9 +1926,32 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double distanceSquared = clientPos.distanceSquared(this);
         if (distanceSquared == 0) {
             if (this.lastYaw != this.yaw || this.lastPitch != this.pitch) {
-                this.lastYaw = this.yaw;
-                this.lastPitch = this.pitch;
-                this.needSendRotation = true;
+                if (!this.firstMove) {
+                    Location from = new Location(this.x, this.y, this.z, this.lastYaw, this.lastPitch, this.level);
+                    Location to = this.getLocation();
+
+                    PlayerMoveEvent moveEvent = new PlayerMoveEvent(this, from, to);
+                    this.server.getPluginManager().callEvent(moveEvent);
+
+                    if (moveEvent.isCancelled()) {
+                        this.teleport(from, null);
+                        return;
+                    }
+
+                    this.lastYaw = to.yaw;
+                    this.lastPitch = to.pitch;
+
+                    if (!to.equals(moveEvent.getTo())) { // If plugins modify the destination
+                        this.teleport(moveEvent.getTo(), null);
+                    } else {
+                        this.needSendRotation = true;
+                    }
+                } else {
+                    this.lastYaw = this.yaw;
+                    this.lastPitch = this.pitch;
+                    this.needSendRotation = true;
+                    this.firstMove = false;
+                }
             }
 
             if (this.speed == null) speed = new Vector3(0, 0, 0);
@@ -2069,9 +2092,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.lastYaw = to.yaw;
             this.lastPitch = to.pitch;
-        }
 
-        this.firstMove = false;
+            this.firstMove = false;
+        }
 
         if (this.speed == null) {
             speed = new Vector3(from.x - to.x, from.y - to.y, from.z - to.z);

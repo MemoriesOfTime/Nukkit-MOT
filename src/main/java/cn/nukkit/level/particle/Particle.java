@@ -118,19 +118,19 @@ public abstract class Particle extends Vector3 {
      */
     public static final int TYPE_OMINOUS_ITEM_SPAWNER = dynamic(93);
     /**
-     * @since v765
+     * @since v766
      */
     public static final int TYPE_CREAKING_CRUMBLE = dynamic(94);
     /**
-     * @since v765
+     * @since v766
      */
     public static final int TYPE_PALE_OAK_LEAVES = dynamic(95);
     /**
-     * @since v765
+     * @since v766
      */
     public static final int TYPE_EYEBLOSSOM_OPEN = dynamic(96);
     /**
-     * @since v765
+     * @since v766
      */
     public static final int TYPE_EYEBLOSSOM_CLOSE = dynamic(97);
 
