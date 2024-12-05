@@ -439,10 +439,12 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             this.tileList = new Long2ObjectNonBlockingMap<>();
         }
         this.tiles.put(blockEntity.getId(), blockEntity);
-        int index = ((blockEntity.getFloorZ() & 0x0f) << 12) | ((blockEntity.getFloorX() & 0x0f) << 8) | (blockEntity.getFloorY() & 0xff);
+        int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
+        int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
         if (this.tileList.containsKey(index) && !this.tileList.get(index).equals(blockEntity)) {
             BlockEntity entity = this.tileList.get(index);
             this.tiles.remove(entity.getId());
+            entity.onReplacedWith(blockEntity);
             entity.close();
         }
         this.tileList.put(index, blockEntity);
@@ -455,7 +457,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     public void removeBlockEntity(BlockEntity blockEntity) {
         if (this.tiles != null) {
             this.tiles.remove(blockEntity.getId());
-            int index = ((blockEntity.getFloorZ() & 0x0f) << 12) | ((blockEntity.getFloorX() & 0x0f) << 8) | (blockEntity.getFloorY() & 0xff);
+            int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
+            int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
             this.tileList.remove(index);
 
             if (!(blockEntity instanceof PersistentDataContainerBlockEntity) && blockEntity.hasPersistentDataContainer()) {
@@ -494,8 +497,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         if (this.tileList == null || this.getProvider() == null)  {
             return null;
         }
-        int capY = y - this.getProvider().getLevel().getMinBlockY();
-        return this.tileList.get(((long) z << 16) | ((long) x << 12) | capY);
+        int capY = y - this.getProvider().getMinBlockY();
+        return this.tileList.get((z << 16) | (x << 12) | capY);
 
     }
 

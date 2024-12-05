@@ -3025,24 +3025,42 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public BlockEntity getBlockEntity(Vector3 pos) {
-        return this.getBlockEntity(pos.asBlockVector3());
+        return this.getBlockEntity(null, pos);
     }
 
     public BlockEntity getBlockEntity(BlockVector3 pos) {
-        FullChunk chunk = this.getChunk(pos.x >> 4, pos.z >> 4, false);
+        return this.getBlockEntity(null, pos.asVector3());
+    }
+
+    public BlockEntity getBlockEntity(FullChunk chunk, Vector3 pos) {
+        int by = pos.getFloorY();
+        if (!isYInRange(by)) {
+            return null;
+        }
+
+        int cx = (int) pos.x >> 4;
+        int cz = (int) pos.z >> 4;
+        if (chunk == null || cx != chunk.getX() || cz != chunk.getZ()) {
+            chunk = this.getChunk(cx, cz, false);
+        }
 
         if (chunk != null) {
-            return chunk.getTile(pos.x & 0x0f, pos.y & 0xff, pos.z & 0x0f);
+            return chunk.getTile((int) pos.x & 0x0f, by, (int) pos.z & 0x0f);
         }
 
         return null;
     }
 
     public BlockEntity getBlockEntityIfLoaded(Vector3 pos) {
+        int by = pos.getFloorY();
+        if (!isYInRange(by)) {
+            return null;
+        }
+
         FullChunk chunk = this.getChunkIfLoaded((int) pos.x >> 4, (int) pos.z >> 4);
 
         if (chunk != null) {
-            return chunk.getTile((int) pos.x & 0x0f, (int) pos.y & 0xff, (int) pos.z & 0x0f);
+            return chunk.getTile((int) pos.x & 0x0f, by, (int) pos.z & 0x0f);
         }
 
         return null;
