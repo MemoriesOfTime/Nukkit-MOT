@@ -7,6 +7,7 @@ import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityThreadTicker;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.item.EntityItem;
@@ -1068,18 +1069,21 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
-        if (!this.updateEntities.isEmpty()) {
-            for (long id : this.updateEntities.keySetLong()) {
-                Entity entity = this.updateEntities.get(id);
-                if (entity == null) {
-                    this.updateEntities.remove(id);
-                    continue;
-                }
-                if (entity.closed || !entity.onUpdate(currentTick)) {
-                    this.updateEntities.remove(id);
+        // Tick entities in other thread for better performance
+        EntityThreadTicker.getInstance().tickEntities(() -> {
+            if (!this.updateEntities.isEmpty()) {
+                for (long id : this.updateEntities.keySetLong()) {
+                    Entity entity = this.updateEntities.get(id);
+                    if (entity == null) {
+                        this.updateEntities.remove(id);
+                        continue;
+                    }
+                    if (entity.closed || !entity.onUpdate(currentTick)) {
+                        this.updateEntities.remove(id);
+                    }
                 }
             }
-        }
+        });
 
         this.updateBlockEntities.removeIf(blockEntity -> !blockEntity.isValid() || !blockEntity.onUpdate());
 
@@ -2954,18 +2958,18 @@ public class Level implements ChunkManager, Metadatable {
         return nearby.toArray(new Entity[0]);
     }
 
-    public Entity[] getNearbyEntities(AxisAlignedBB bb) {
+    public synchronized Entity[] getNearbyEntities(AxisAlignedBB bb) {
         return this.getNearbyEntities(bb, null);
     }
 
     private static final Entity[] EMPTY_ENTITY_ARR = new Entity[0];
     private static final Entity[] ENTITY_BUFFER = new Entity[512];
 
-    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity) {
+    public synchronized Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity) {
         return getNearbyEntities(bb, entity, false);
     }
 
-    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean loadChunks) {
+    public synchronized Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean loadChunks) {
         int index = 0;
 
         int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
