@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityChest;
 import cn.nukkit.blockentity.BlockEntityMovingBlock;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
 import cn.nukkit.event.block.BlockPistonEvent;
@@ -220,6 +221,9 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                 CompoundTag tag = null;
                 BlockEntity blockEntity = this.level.getBlockEntity(oldBlock);
                 if (blockEntity != null && !(blockEntity instanceof BlockEntityMovingBlock)) {
+                    if (blockEntity instanceof BlockEntityChest chest) {
+                        chest.unpair();
+                    }
                     blockEntity.saveNBT();
                     tag = new CompoundTag(blockEntity.namedTag.getTags());
                     blockEntity.close();
