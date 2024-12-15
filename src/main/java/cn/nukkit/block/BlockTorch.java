@@ -78,7 +78,7 @@ public class BlockTorch extends BlockFlowable implements Faceable {
 
         int side = faces[face.getIndex()];
         if (face != BlockFace.UP) {
-            if (Block.canConnectToFullSolid(this.getSide(BlockFace.fromIndex(faces[side])))) {
+            if (Block.canConnectToFullSolid(this.getSide(BlockFace.fromIndex(faces2[side])))) {
                 this.setDamage(side);
                 return this.getLevel().setBlock(this, this, true, true);
             }
