@@ -239,7 +239,7 @@ public class Level implements ChunkManager, Metadatable {
 
     private final BlockUpdateScheduler updateQueue;
     private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
-    private final Map<Long, Map<Integer, Object>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
+    private final Map<Long, Set<Integer>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
 
     private final Int2ObjectMap<ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<LongSet> chunkSendTasks = new Int2ObjectOpenHashMap<>();
@@ -416,27 +416,10 @@ public class Level implements ChunkManager, Metadatable {
         return (((long) x & (long) 0xFFFFFFF) << 36) | ((long) (capWorldY(y, dimensionData) - dimensionData.getMinHeight()) << 28) | ((long) z & (long) 0xFFFFFFF);
     }
 
-    @Deprecated
-    public static char localBlockHash(double x, double y, double z) {
-        byte hi = (byte) (((int) x & 15) + (((int) z & 15) << 4));
-        byte lo = (byte) y;
-        return (char) (((hi & 0xFF) << 8) | (lo & 0xFF));
-    }
-
     public static int localBlockHash(double x, double y, double z, DimensionData dimensionData) {
         byte hi = (byte) (((int) x & 15) + (((int) z & 15) << 4));
         short lo = (short) (capWorldY((int) y, dimensionData) - dimensionData.getMinHeight());
         return (hi & 0xFF) << 16 | lo;
-    }
-
-    @Deprecated
-    public static Vector3 getBlockXYZ(long chunkHash, char blockHash) {
-        int hi = (byte) (blockHash >>> 8);
-        int lo = (byte) blockHash;
-        int y = lo & 0xFF;
-        int x = (hi & 0xF) + (getHashX(chunkHash) << 4);
-        int z = ((hi >> 4) & 0xF) + (getHashZ(chunkHash) << 4);
-        return new Vector3(x, y, z);
     }
 
     public static Vector3 getBlockXYZ(long chunkHash, int blockHash, DimensionData dimensionData) {
@@ -1979,7 +1962,7 @@ public class Level implements ChunkManager, Metadatable {
     public void updateBlockSkyLight(int x, int y, int z) {
     }
 
-    public void updateBlockLight(Map<Long, Map<Integer, Object>> map) {
+    public void updateBlockLight(Map<Long, Set<Integer>> map) {
         int size = map.size();
         if (size == 0) {
             return;
@@ -1989,14 +1972,14 @@ public class Level implements ChunkManager, Metadatable {
         LongOpenHashSet visited = new LongOpenHashSet();
         LongOpenHashSet removalVisited = new LongOpenHashSet();
 
-        Iterator<Map.Entry<Long, Map<Integer, Object>>> iter = map.entrySet().iterator();
+        Iterator<Map.Entry<Long, Set<Integer>>> iter = map.entrySet().iterator();
         while (iter.hasNext() && size-- > 0) {
-            Map.Entry<Long, Map<Integer, Object>> entry = iter.next();
+            Map.Entry<Long, Set<Integer>> entry = iter.next();
             iter.remove();
             long index = entry.getKey();
-            Map<Integer, Object> blocks = entry.getValue();
+            Set<Integer> blocks = entry.getValue();
 
-            for (int blockHash : blocks.keySet()) {
+            for (int blockHash : blocks) {
                 Vector3 pos = getBlockXYZ(index, blockHash, this.getDimensionData());
                 BaseFullChunk chunk = getChunk(pos.getChunkX(), pos.getChunkZ(), false);
                 if (chunk != null) {
@@ -2097,12 +2080,8 @@ public class Level implements ChunkManager, Metadatable {
 
     public void addLightUpdate(int x, int y, int z) {
         long index = chunkHash(x >> 4, z >> 4);
-        Map<Integer, Object> currentMap = lightQueue.get(index);
-        if (currentMap == null) {
-            currentMap = new ConcurrentHashMap<>(8, 0.9f, 1);
-            this.lightQueue.put(index, currentMap);
-        }
-        currentMap.put(Level.localBlockHash(x, y, z, this.getDimensionData()), changeBlocksPresent);
+        Set<Integer> currentMap = this.lightQueue.computeIfAbsent(index, k -> ConcurrentHashMap.newKeySet(8));
+        currentMap.add(Level.localBlockHash(x, y, z, this.getDimensionData()));
     }
 
     @Override
