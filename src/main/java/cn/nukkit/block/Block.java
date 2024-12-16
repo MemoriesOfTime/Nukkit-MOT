@@ -791,7 +791,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             return 0; //用剑挖竹子时瞬间破坏
         }
 
-        if (correctTool0(getToolType(), item, getId())) {
+        if (correctTool0(this.getToolType(), item, blockId)) {
             speedMultiplier = toolBreakTimeBonus0(item);
 
             int efficiencyLevel = Optional.ofNullable(item.getEnchantment(Enchantment.ID_EFFICIENCY))
