@@ -1241,7 +1241,7 @@ public class CraftingManager {
             for (Item item : inputList) {
                 Item clone = item.clone();
                 clone.setCount(1);
-                if (item.isTool() && item.getDamage() > 0) {
+                if ((item.isTool() || item.isArmor()) && item.getDamage() > 0) {
                     clone.setDamage(0);
                 }
                 list.add(clone);
