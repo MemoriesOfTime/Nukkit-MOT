@@ -28,6 +28,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -199,7 +200,7 @@ public class Anvil2LevelDBConverter {
         newChunk.heightMap = Arrays.copyOf(oldChunk.getHeightMapArray(), oldChunk.getHeightMapArray().length);
         newChunk.tiles = new Long2ObjectNonBlockingMap<>();
         newChunk.tiles.putAll(oldChunk.getBlockEntities());
-        newChunk.entities = new Long2ObjectNonBlockingMap<>();
+        newChunk.entities = new ConcurrentHashMap<>();
         newChunk.entities.putAll(oldChunk.getEntities());
         newChunk.tileList = oldChunk.tileList;
 

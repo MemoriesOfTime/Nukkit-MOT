@@ -4,6 +4,7 @@ import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.entity.EntityThreadTicker;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.network.Network;
@@ -216,6 +217,8 @@ public class StatusCommand extends VanillaCommand {
             sender.sendMessage(TextFormat.GOLD + "Load: " + tpsColor + server.getTickUsage() + "%");
 
             sender.sendMessage(TextFormat.GOLD + "Thread count: " + TextFormat.GREEN + Thread.getAllStackTraces().size());
+
+            sender.sendMessage(TextFormat.GOLD + "Entity thread: " + TextFormat.RED + EntityThreadTicker.getExecutionTime() + TextFormat.GREEN + " mspt" + ", last call count: " + TextFormat.RED + EntityThreadTicker.getLastCallCount());
 
             Runtime runtime = Runtime.getRuntime();
             double totalMB = NukkitMath.round(((double) runtime.totalMemory()) / 1024 / 1024, 2);
