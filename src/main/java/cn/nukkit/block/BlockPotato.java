@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemPotato;
+import cn.nukkit.item.ItemPotatoPoisonous;
 import cn.nukkit.utils.Utils;
 
 /**
@@ -35,9 +36,9 @@ public class BlockPotato extends BlockCrops {
     @Override
     public Item[] getDrops(Item item) {
         if (getDamage() >= 0x07) {
-            return new Item[]{
-                    new ItemPotato(0, Utils.random.nextInt(3) + 2)
-            };
+            Item[] drops = new Item[]{new ItemPotato(0, Utils.random.nextInt(3) + 2), Item.AIR_ITEM};
+            if(Utils.random.nextDouble() < 0.02) drops[1] = new ItemPotatoPoisonous(0, 1);
+            return drops;
         } else {
             return new Item[]{
                     new ItemPotato()
