@@ -36,9 +36,16 @@ public class BlockPotato extends BlockCrops {
     @Override
     public Item[] getDrops(Item item) {
         if (getDamage() >= 0x07) {
-            Item[] drops = new Item[]{new ItemPotato(0, Utils.random.nextInt(3) + 2), Item.AIR_ITEM};
-            if(Utils.random.nextDouble() < 0.02) drops[1] = new ItemPotatoPoisonous(0, 1);
-            return drops;
+            if (Utils.random.nextDouble() < 0.02) {
+                return new Item[]{
+                        new ItemPotato(0, Utils.random.nextInt(3) + 2),
+                        new ItemPotatoPoisonous(0, 1)
+                };
+            } else {
+                return new Item[]{
+                        new ItemPotato(0, Utils.random.nextInt(3) + 2)
+                };
+            }
         } else {
             return new Item[]{
                     new ItemPotato()
