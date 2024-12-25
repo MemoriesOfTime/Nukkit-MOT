@@ -82,11 +82,19 @@ public class RuntimeItemMapping {
             if (mappings.containsKey(identifier)) {
                 MappingEntry mapping = mappings.get(identifier);
                 legacyId = RuntimeItems.getLegacyIdFromLegacyString(mapping.getLegacyName());
-                if (legacyId == -1) {
-                    throw new IllegalStateException("Unable to match  " + mapping + " with legacyId");
+                if(!(mapping.getProtocol() > protocolId)) {
+                    if (legacyId == -1) {
+                        throw new IllegalStateException("Unable to match  " + mapping + " with legacyId");
+                    }
+                    damage = mapping.getDamage();
+                    hasDamage = true;
+                } else {
+                    legacyId = RuntimeItems.getLegacyIdFromLegacyString(identifier);
+                    if (legacyId == -1) {
+                        log.trace("Unable to find legacyId for " + identifier);
+                        continue;
+                    }
                 }
-                damage = mapping.getDamage();
-                hasDamage = true;
             } else {
                 legacyId = RuntimeItems.getLegacyIdFromLegacyString(identifier);
                 if (legacyId == -1) {
