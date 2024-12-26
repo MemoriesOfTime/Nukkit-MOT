@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemPotato;
 import cn.nukkit.item.ItemPotatoPoisonous;
 import cn.nukkit.utils.Utils;
@@ -38,17 +39,17 @@ public class BlockPotato extends BlockCrops {
         if (getDamage() >= 0x07) {
             if (Utils.random.nextDouble() < 0.02) {
                 return new Item[]{
-                        new ItemPotato(0, Utils.random.nextInt(3) + 2),
-                        new ItemPotatoPoisonous(0, 1)
+                        Item.get(ItemID.POTATO, 0, Utils.random.nextInt(3) + 2),
+                        Item.get(ItemID.POISONOUS_POTATO,0, 1)
                 };
             } else {
                 return new Item[]{
-                        new ItemPotato(0, Utils.random.nextInt(3) + 2)
+                        Item.get(ItemID.POTATO,0, Utils.random.nextInt(3) + 2)
                 };
             }
         } else {
             return new Item[]{
-                    new ItemPotato()
+                    Item.get(ItemID.POTATO)
             };
         }
     }
