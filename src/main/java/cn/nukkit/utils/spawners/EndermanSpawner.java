@@ -27,7 +27,7 @@ public class EndermanSpawner extends AbstractEntitySpawner {
             return;
         }
 
-        if (level.getBlockLightAt((int) pos.x, (int) pos.y + 1, (int) pos.z) <= 7 || nether || end) {
+        if (level.getBlockLightAt((int) pos.x, (int) pos.y + 1, (int) pos.z) <= 0 || nether || end) {
             if (end) {
                 for (int i = 0; i < Utils.rand(1, 4); i++) {
                     this.spawnTask.createEntity("Enderman", pos.add(0.5, 1, 0.5));
