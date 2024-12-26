@@ -1,5 +1,6 @@
 package cn.nukkit.entity.item;
 
+import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
 import cn.nukkit.event.entity.EntityDamageEvent;
@@ -101,6 +102,13 @@ public class EntityEndCrystal extends Entity implements EntityExplosive {
             }
 
             Explosion explode = new Explosion(this.add(0, this.getHeight() / 2, 0), (float) ev.getForce(), this);
+
+            int floor = this.getFloorY();
+            int down = this.level.getBlockIdAt(this.chunk, this.getFloorX(), floor - 1, this.getFloorZ());
+            if (down == Block.BEDROCK || down == Block.OBSIDIAN) {
+                explode.setMinHeight(floor);
+            }
+
             if (ev.isBlockBreaking()) {
                 explode.explodeA();
             }

@@ -2915,6 +2915,10 @@ public abstract class Entity extends Location implements Metadatable {
         return true;
     }
 
+    protected boolean removeDataProperty(int id) {
+        return this.dataProperties.remove(id) != null;
+    }
+
     public boolean setDataPropertyAndSendOnlyToSelf(EntityData data) {
         if (!Objects.equals(data, this.dataProperties.get(data.getId()))) {
             this.dataProperties.put(data);

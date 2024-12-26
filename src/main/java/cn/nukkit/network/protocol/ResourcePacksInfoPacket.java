@@ -8,6 +8,7 @@ import lombok.ToString;
 import lombok.Value;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @ToString
@@ -68,7 +69,14 @@ public class ResourcePacksInfoPacket extends DataPacket {
         this.encodeResourcePacks(this.resourcePackEntries);
 
         if (this.protocol >= ProtocolInfo.v1_20_30_24 && this.protocol < ProtocolInfo.v1_21_40) {
-            this.putArray(this.CDNEntries, (entry) -> {
+            List<CDNEntry> cacheCDNEntries = new ObjectArrayList<>(this.CDNEntries);
+            for (ResourcePack entry : this.resourcePackEntries) {
+                CDNEntry cdnEntry = new CDNEntry(entry.getPackId().toString(), entry.getCDNUrl());
+                if (!"".equals(entry.getCDNUrl()) && !cacheCDNEntries.contains(cdnEntry)) {
+                    cacheCDNEntries.add(cdnEntry);
+                }
+            }
+            this.putArray(cacheCDNEntries, (entry) -> {
                 this.putString(entry.getPackId());
                 this.putString(entry.getRemoteUrl());
             });
@@ -129,5 +137,17 @@ public class ResourcePacksInfoPacket extends DataPacket {
     public static class CDNEntry {
         String packId;
         String remoteUrl;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof CDNEntry cdnEntry)) return false;
+            return Objects.equals(packId, cdnEntry.packId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(packId);
+        }
     }
 }
