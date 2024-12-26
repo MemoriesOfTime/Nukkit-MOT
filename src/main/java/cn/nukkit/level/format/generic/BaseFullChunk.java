@@ -10,10 +10,12 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.persistence.PersistentDataContainer;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.NumberTag;
+import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -163,8 +165,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                         this.setChanged();
                         continue;
                     }
-                    ListTag pos = nbt.getList("Pos");
-                    if ((((NumberTag) pos.get(0)).getData().intValue() >> 4) != this.x || ((((NumberTag) pos.get(2)).getData().intValue() >> 4) != this.z)) {
+                    ListTag<? extends Tag> pos = nbt.getList("Pos");
+                    if (NukkitMath.floorDouble(((NumberTag<?>) pos.get(0)).getData().doubleValue()) >> 4 != this.x || NukkitMath.floorDouble(((NumberTag<?>) pos.get(2)).getData().doubleValue()) >> 4 != this.z) {
                         changed = true;
                         continue;
                     }
@@ -438,10 +440,12 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             this.tileList = new Long2ObjectNonBlockingMap<>();
         }
         this.tiles.put(blockEntity.getId(), blockEntity);
-        int index = ((blockEntity.getFloorZ() & 0x0f) << 12) | ((blockEntity.getFloorX() & 0x0f) << 8) | (blockEntity.getFloorY() & 0xff);
+        int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
+        int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
         if (this.tileList.containsKey(index) && !this.tileList.get(index).equals(blockEntity)) {
             BlockEntity entity = this.tileList.get(index);
             this.tiles.remove(entity.getId());
+            entity.onReplacedWith(blockEntity);
             entity.close();
         }
         this.tileList.put(index, blockEntity);
@@ -454,7 +458,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     public void removeBlockEntity(BlockEntity blockEntity) {
         if (this.tiles != null) {
             this.tiles.remove(blockEntity.getId());
-            int index = ((blockEntity.getFloorZ() & 0x0f) << 12) | ((blockEntity.getFloorX() & 0x0f) << 8) | (blockEntity.getFloorY() & 0xff);
+            int y = blockEntity.getFloorY() - this.getProvider().getMinBlockY();
+            int index = ((blockEntity.getFloorZ() & 0x0f) << 16) | ((blockEntity.getFloorX() & 0x0f) << 12) | y;
             this.tileList.remove(index);
 
             if (!(blockEntity instanceof PersistentDataContainerBlockEntity) && blockEntity.hasPersistentDataContainer()) {
@@ -490,7 +495,12 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public BlockEntity getTile(int x, int y, int z) {
-        return this.tileList != null ? this.tileList.get((z << 12) | (x << 8) | y) : null;
+        if (this.tileList == null || this.getProvider() == null)  {
+            return null;
+        }
+        int capY = y - this.getProvider().getMinBlockY();
+        return this.tileList.get((z << 16) | (x << 12) | capY);
+
     }
 
     @Override

@@ -635,16 +635,12 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     private void saveChunkCallback(WriteBatch batch, LevelDBChunk chunk) {
-        if (this.closed) {
-            return;
-        }
-
         chunk.writeLock().lock();
         try {
             this.db.write(batch);
             batch.close();
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to close WriteBatch for " + this.getName(), e);
+        } catch (Exception e) {
+            log.error("Exception in saveChunkCallback for {}", this.getName(), e);
         } finally {
             chunk.writeLock().unlock();
         }
@@ -1092,7 +1088,7 @@ public class LevelDBProvider implements LevelProvider {
                     break;
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException("iteration failed", e);
         }
     }

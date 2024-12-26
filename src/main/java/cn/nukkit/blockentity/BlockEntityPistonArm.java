@@ -2,6 +2,7 @@ package cn.nukkit.blockentity;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockAir;
+import cn.nukkit.block.BlockChest;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityMoveByPistonEvent;
@@ -23,7 +24,7 @@ import java.util.List;
  */
 public class BlockEntityPistonArm extends BlockEntitySpawnable {
 
-    public static final float MOVE_STEP = Float.valueOf(0.5f);
+    public static final float MOVE_STEP = 0.5f;
 
     public float progress;
     public float lastProgress = 1;
@@ -69,13 +70,13 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
         attachedBlocks = new ArrayList<>();
 
         if (namedTag.contains("AttachedBlocks")) {
-            ListTag blocks = namedTag.getList("AttachedBlocks", IntTag.class);
-            if (blocks != null && blocks.size() > 0) {
+            ListTag<IntTag> blocks = namedTag.getList("AttachedBlocks", IntTag.class);
+            if (blocks != null && !blocks.isEmpty()) {
                 for (int i = 0; i < blocks.size(); i += 3) {
                     this.attachedBlocks.add(new BlockVector3(
-                            ((IntTag) blocks.get(i)).data,
-                            ((IntTag) blocks.get(i + 1)).data,
-                            ((IntTag) blocks.get(i + 1)).data
+                            blocks.get(i).data,
+                            blocks.get(i + 1).data,
+                            blocks.get(i + 1).data
                     ));
                 }
             }
@@ -161,16 +162,19 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
                     movingBlock.close();
                     Block moved = movingBlock.getBlock();
 
-                    CompoundTag blockEntity = ((BlockEntityMovingBlock) movingBlock).getBlockEntity();
-
-                    if (blockEntity != null) {
-                        blockEntity.putInt("x", movingBlock.getFloorX());
-                        blockEntity.putInt("y", movingBlock.getFloorY());
-                        blockEntity.putInt("z", movingBlock.getFloorZ());
-                        BlockEntity.createBlockEntity(blockEntity.getString("id"), this.level.getChunk(movingBlock.getChunkX(), movingBlock.getChunkZ()), blockEntity);
-                    }
-
                     this.level.setBlock(movingBlock, moved);
+
+                    CompoundTag blockEntityNbt = ((BlockEntityMovingBlock) movingBlock).getBlockEntity();
+
+                    if (blockEntityNbt != null) {
+                        blockEntityNbt.putInt("x", movingBlock.getFloorX());
+                        blockEntityNbt.putInt("y", movingBlock.getFloorY());
+                        blockEntityNbt.putInt("z", movingBlock.getFloorZ());
+                        BlockEntity blockEntity = BlockEntity.createBlockEntity(blockEntityNbt.getString("id"), this.level.getChunk(movingBlock.getChunkX(), movingBlock.getChunkZ()), blockEntityNbt);
+                        if (blockEntity != null && blockEntity.getBlock() instanceof BlockChest chest) {
+                            chest.tryPair();
+                        }
+                    }
                 }
             }
 

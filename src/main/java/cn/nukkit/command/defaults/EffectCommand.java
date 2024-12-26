@@ -9,6 +9,7 @@ import cn.nukkit.command.tree.ParamList;
 import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.item.EntityItem;
+import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.InstantEffect;
 
@@ -31,6 +32,13 @@ public class EffectCommand extends VanillaCommand {
                 CommandParameter.newType("amplifier", true, CommandParamType.INT),
                 CommandParameter.newEnum("hideParticle", true, CommandEnum.ENUM_BOOLEAN)
         });
+        this.commandParameters.put("default-number-effect", new CommandParameter[]{
+                CommandParameter.newType("player", CommandParamType.TARGET),
+                CommandParameter.newType("effect", CommandParamType.INT),
+                CommandParameter.newType("seconds", true, CommandParamType.INT),
+                CommandParameter.newType("amplifier", true, CommandParamType.INT),
+                CommandParameter.newEnum("hideParticle", true, CommandEnum.ENUM_BOOLEAN)
+        });
         this.commandParameters.put("clear", new CommandParameter[]{
                 CommandParameter.newType("player", CommandParamType.TARGET),
                 CommandParameter.newEnum("clear", new CommandEnum("ClearEffects", "clear"))
@@ -48,13 +56,20 @@ public class EffectCommand extends VanillaCommand {
             return 0;
         }
         switch (result.getKey()) {
-            case "default" -> {
-                String str = list.getResult(1);
-                Effect effect = Effect.getEffectByName(str);
+            case "default", "default-number-effect" -> {
+                Effect effect = null;
+                try {
+                    String str = list.getResult(1);
+                    effect = Effect.getEffectByName(str);
+                } catch (Exception e) {
+                    int id = list.getResult(1);
+                    effect = Effect.getEffect(id);
+                }
                 if (effect == null) {
-                    log.addError("commands.effect.notFound", str).output();
+                    log.addError("commands.effect.notFound", list.getResult(1)).output();
                     return 0;
                 }
+
                 int duration = 300;
                 int amplification = 0;
                 if (list.hasResult(2)) {
@@ -94,7 +109,7 @@ public class EffectCommand extends VanillaCommand {
                         log.addSuccess("commands.effect.success.removed", effect.getName(), entity.getName()).output();
                     } else {
                         effect.setDuration(duration).setAmplifier(amplification);
-                        entity.addEffect(effect.clone());
+                        entity.addEffect(effect.clone(), EntityPotionEffectEvent.Cause.COMMAND);
                         log.addSuccess("%commands.effect.success", effect.getName(), String.valueOf(effect.getAmplifier()), entity.getName(), String.valueOf(effect.getDuration() / 20))
                                 .output(true);
                     }
@@ -110,7 +125,7 @@ public class EffectCommand extends VanillaCommand {
                         continue;
                     }
                     for (Effect effect : entity.getEffects().values()) {
-                        entity.removeEffect(effect.getId());
+                        entity.removeEffect(effect.getId(), EntityPotionEffectEvent.Cause.COMMAND);
                     }
                     success++;
                     log.addSuccess("commands.effect.success.removed.all", entity.getName());

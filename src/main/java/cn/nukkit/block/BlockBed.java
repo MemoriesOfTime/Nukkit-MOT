@@ -5,20 +5,19 @@ import cn.nukkit.Server;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityBed;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.item.EntityPrimedTNT;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBed;
 import cn.nukkit.lang.TranslationContainer;
+import cn.nukkit.level.Explosion;
+import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.particle.DestroyBlockParticle;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.nbt.tag.DoubleTag;
-import cn.nukkit.nbt.tag.FloatTag;
-import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.*;
 import org.jetbrains.annotations.NotNull;
@@ -104,21 +103,16 @@ public class BlockBed extends BlockTransparentMeta implements Faceable, BlockEnt
     @Override
     public boolean onActivate(Item item, Player player) {
         if (this.level.getDimension() != Level.DIMENSION_OVERWORLD) {
-            this.level.useBreakOn(this);
-            CompoundTag nbt = new CompoundTag()
-                    .putList(new ListTag<DoubleTag>("Pos")
-                            .add(new DoubleTag("", x))
-                            .add(new DoubleTag("", y))
-                            .add(new DoubleTag("", z)))
-                    .putList(new ListTag<DoubleTag>("Motion")
-                            .add(new DoubleTag("", 0))
-                            .add(new DoubleTag("", 0))
-                            .add(new DoubleTag("", 0)))
-                    .putList(new ListTag<FloatTag>("Rotation")
-                            .add(new FloatTag("", 0))
-                            .add(new FloatTag("", 0)))
-                    .putShort("Fuse", 0); // create an instant explosion
-            new EntityPrimedTNT(this.level.getChunk(this.getFloorX() >> 4, this.getFloorZ() >> 4), nbt); // we don't even have to spawn the tnt entity for players
+            if (this.level.getGameRules().getBoolean(GameRule.RESPAWN_BLOCKS_EXPLODE)) {
+                if (this.getLevel().setBlock(this, Block.get(BlockID.AIR), true, true)) {
+                    this.level.addParticle(new DestroyBlockParticle(this.add(0.5, 0.5, 0.5), this));
+                }
+
+                Explosion explosion = new Explosion(this.add(0.5, 0, 0.5), 5, this);
+                explosion.setFireSpawnChance(0.3333);
+                explosion.explodeA();
+                explosion.explodeB();
+            }
             return true;
         }
 

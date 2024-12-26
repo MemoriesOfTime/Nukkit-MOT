@@ -268,6 +268,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected int inAirTicks = 0;
     protected int startAirTicks = 10;
+    protected int lastInAirTick = 0;
 
     protected AdventureSettings adventureSettings;
 
@@ -428,6 +429,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void onChorusFruitTeleport() {
         this.lastChorusFruitTeleport = this.server.getTick();
+    }
+
+    public int getLastInAirTick() {
+        return this.lastInAirTick;
     }
 
     /**
@@ -1481,7 +1486,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.server.getPluginManager().callEvent(new PlayerBedLeaveEvent(this, this.level.getBlock(this.sleeping)));
 
             this.sleeping = null;
-            this.setDataProperty(new IntPositionEntityData(DATA_PLAYER_BED_POSITION, 0, 0, 0));
+            this.removeDataProperty(DATA_PLAYER_BED_POSITION);
             this.setDataFlag(DATA_PLAYER_FLAGS, DATA_PLAYER_FLAG_SLEEP, false);
 
             this.level.sleepTicks = 0;
@@ -1926,9 +1931,32 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         double distanceSquared = clientPos.distanceSquared(this);
         if (distanceSquared == 0) {
             if (this.lastYaw != this.yaw || this.lastPitch != this.pitch) {
-                this.lastYaw = this.yaw;
-                this.lastPitch = this.pitch;
-                this.needSendRotation = true;
+                if (!this.firstMove) {
+                    Location from = new Location(this.x, this.y, this.z, this.lastYaw, this.lastPitch, this.level);
+                    Location to = this.getLocation();
+
+                    PlayerMoveEvent moveEvent = new PlayerMoveEvent(this, from, to);
+                    this.server.getPluginManager().callEvent(moveEvent);
+
+                    if (moveEvent.isCancelled()) {
+                        this.teleport(from, null);
+                        return;
+                    }
+
+                    this.lastYaw = to.yaw;
+                    this.lastPitch = to.pitch;
+
+                    if (!to.equals(moveEvent.getTo())) { // If plugins modify the destination
+                        this.teleport(moveEvent.getTo(), null);
+                    } else {
+                        this.needSendRotation = true;
+                    }
+                } else {
+                    this.lastYaw = this.yaw;
+                    this.lastPitch = this.pitch;
+                    this.needSendRotation = true;
+                    this.firstMove = false;
+                }
             }
 
             if (this.speed == null) speed = new Vector3(0, 0, 0);
@@ -2069,9 +2097,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             this.lastYaw = to.yaw;
             this.lastPitch = to.pitch;
-        }
 
-        this.firstMove = false;
+            this.firstMove = false;
+        }
 
         if (this.speed == null) {
             speed = new Vector3(from.x - to.x, from.y - to.y, from.z - to.z);
@@ -2337,6 +2365,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     this.resetFallDistance();
                 } else {
+                    this.lastInAirTick = server.getTick();
+
                     if (this.checkMovement && !this.isGliding() && !server.getAllowFlight() && this.inAirTicks > 20 && !this.getAllowFlight() && !this.isSleeping() && !this.isImmobile() && !this.isSwimming() && this.riding == null && !this.hasEffect(Effect.LEVITATION) && !this.hasEffect(Effect.SLOW_FALLING)) {
                         double expectedVelocity = (-this.getGravity()) / ((double) this.getDrag()) - ((-this.getGravity()) / ((double) this.getDrag())) * FastMath.exp(-((double) this.getDrag()) * ((double) (this.inAirTicks - this.startAirTicks)));
                         double diff = (this.speed.y - expectedVelocity) * (this.speed.y - expectedVelocity);

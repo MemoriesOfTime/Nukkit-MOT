@@ -68,6 +68,7 @@ public class CraftingManager {
     public static DataPacket packet712;
     public static DataPacket packet729;
     public static DataPacket packet748;
+    public static DataPacket packet766;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -735,6 +736,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet766 = packetFor(ProtocolInfo.v1_21_50).compress(Deflater.BEST_COMPRESSION);
         packet748 = packetFor(ProtocolInfo.v1_21_40).compress(Deflater.BEST_COMPRESSION);
         packet729 = packetFor(ProtocolInfo.v1_21_30).compress(Deflater.BEST_COMPRESSION);
         packet712 = packetFor(ProtocolInfo.v1_21_20).compress(Deflater.BEST_COMPRESSION);
@@ -1239,7 +1241,7 @@ public class CraftingManager {
             for (Item item : inputList) {
                 Item clone = item.clone();
                 clone.setCount(1);
-                if (item.isTool() && item.getDamage() > 0) {
+                if ((item.isTool() || item.isArmor()) && item.getDamage() > 0) {
                     clone.setDamage(0);
                 }
                 list.add(clone);

@@ -14,6 +14,7 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
 import cn.nukkit.level.Position;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.persistence.PersistentDataContainer;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
@@ -744,6 +745,19 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public double calculateBreakTime(@Nonnull Item item, Player player) {
+        double seconds = this.calculateBreakTimeNotInAir(item, player);
+
+        if (player != null) {
+            //玩家距离上次在空中过去5tick之后，才认为玩家是在地上挖掘。
+            //如果单纯用onGround检测，这个方法返回的时间将会不连续。
+            if (player.getServer().getTick() - player.getLastInAirTick() < 5) {
+                seconds *= 5;
+            }
+        }
+        return seconds;
+    }
+
+    public double calculateBreakTimeNotInAir(@NotNull Item item, @Nullable Player player) {
         Objects.requireNonNull(item, "Block#calculateBreakTime(): Item can not be null");
         double seconds = 0;
         double blockHardness = this.getHardness();
@@ -756,9 +770,14 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         double speedMultiplier = 1;
+        boolean hasConduitPower = false;
+        boolean hasAquaAffinity = false;
         int hasteEffectLevel = 0;
         int miningFatigueLevel = 0;
         if (player != null) {
+            hasConduitPower = player.hasEffect(Effect.CONDUIT_POWER);
+            hasAquaAffinity = Optional.ofNullable(player.getInventory().getHelmet().getEnchantment(Enchantment.ID_WATER_WORKER))
+                    .map(Enchantment::getLevel).map(l -> l >= 1).orElse(false);
             hasteEffectLevel = Optional.ofNullable(player.getEffect(Effect.HASTE))
                     .map(Effect::getAmplifier).orElse(0);
             miningFatigueLevel = Optional.ofNullable(player.getEffect(Effect.MINING_FATIGUE))
@@ -774,12 +793,15 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
         if (correctTool0(this.getToolType(), item, blockId)) {
             speedMultiplier = toolBreakTimeBonus0(item);
+
             int efficiencyLevel = Optional.ofNullable(item.getEnchantment(Enchantment.ID_EFFICIENCY))
                     .map(Enchantment::getLevel).orElse(0);
 
             if (canHarvest && efficiencyLevel > 0) {
                 speedMultiplier += efficiencyLevel ^ 2 + 1;
             }
+
+            if (hasConduitPower) hasteEffectLevel = Integer.max(hasteEffectLevel, 2);
 
             if (hasteEffectLevel > 0) {
                 speedMultiplier *= 1 + (0.2 * hasteEffectLevel);
@@ -792,8 +814,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
         seconds /= speedMultiplier;
 
-        if (player != null && !player.isOnGround()) {
-            seconds *= 5;
+        if (player != null) {
+            if (player.isInsideOfWater() && !hasAquaAffinity) {
+                seconds *= hasConduitPower && blockHardness >= 0.5 ? 2.5 : 5;
+            }
         }
         return seconds;
     }
@@ -861,6 +885,33 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         block.z = (int) z + face.getZOffset() * step;
         block.layer = layer;
         return block;
+    }
+
+    protected Block getSideIfLoaded(BlockFace face) {
+        if (this.isValid()) {
+            return this.level.getBlock(null,
+                    (int) this.x + face.getXOffset(), (int) this.y + face.getYOffset(), (int) this.z + face.getZOffset(),
+                    0, false);
+        }
+        return Block.get(AIR, 0, Position.fromObject(new Vector3(this.x, this.y, this.z).getSide(face, 1)), 0);
+    }
+
+    protected Block getSideIfLoadedOrNull(BlockFace face) {
+        if (this.isValid()) {
+            int cx = ((int) this.x + face.getXOffset()) >> 4;
+            int cz = ((int) this.z + face.getZOffset()) >> 4;
+
+            FullChunk chunk = this.level.getChunkIfLoaded(cx, cz);
+            if (chunk == null) {
+                return null;
+            }
+
+            return this.level.getBlock(chunk,
+                    (int) this.x + face.getXOffset(), (int) this.y + face.getYOffset(), (int) this.z + face.getZOffset(),
+                    0, false);
+        }
+
+        return Block.get(AIR, 0, Position.fromObject(new Vector3(this.x, this.y, this.z).getSide(face, 1)), 0);
     }
 
     @Override

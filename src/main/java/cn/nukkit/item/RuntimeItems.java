@@ -45,6 +45,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping712;
     private static RuntimeItemMapping mapping729;
     private static RuntimeItemMapping mapping748;
+    private static RuntimeItemMapping mapping766;
 
     public static RuntimeItemMapping[] VALUES;
 
@@ -76,13 +77,17 @@ public class RuntimeItems {
         Map<String, MappingEntry> mappingEntries630 = new HashMap<>();
         for (String legacyName : itemMapping.keySet()) {
             JsonObject convertData = itemMapping.getAsJsonObject(legacyName);
-            for (String damageStr : convertData.keySet()) {
-                if ("protocol".equalsIgnoreCase(damageStr)) {
+            for (String key : convertData.keySet()) {
+                if ("protocol".equalsIgnoreCase(key)) {
                     continue;
                 }
-                String identifier = convertData.get(damageStr).getAsString();
-                int damage = Integer.parseInt(damageStr);
-                MappingEntry value = new MappingEntry(legacyName, damage);
+                String identifier = convertData.get(key).getAsString();
+                int damage = Integer.parseInt(key);
+                int protocol = 0;
+                try {
+                    protocol = convertData.get("protocol").getAsInt();
+                } catch (Exception e) {}
+                MappingEntry value = new MappingEntry(legacyName, damage, protocol);
                 mappingEntries630.put(identifier, value);
                 if ("minecraft:stone".equals(legacyName)) {
                     continue; // Stone 在1.20.50及以后拆分，对于以前的版本，不需要重复注册
@@ -115,6 +120,7 @@ public class RuntimeItems {
         mapping712 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_20);
         mapping729 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_30);
         mapping748 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_40);
+        mapping766 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_50);
 
         VALUES = new RuntimeItemMapping[]{
                 mapping361,
@@ -140,12 +146,15 @@ public class RuntimeItems {
                 mapping685,
                 mapping712,
                 mapping729,
-                mapping748
+                mapping748,
+                mapping766
         };
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_21_40) {
+        if (protocolId >= ProtocolInfo.v1_21_50_26) {
+            return mapping766;
+        } else if (protocolId >= ProtocolInfo.v1_21_40) {
             return mapping748;
         } else if (protocolId >= ProtocolInfo.v1_21_30) {
             return mapping729;
@@ -203,6 +212,7 @@ public class RuntimeItems {
     public static class MappingEntry {
         private final String legacyName;
         private final int damage;
+        private final int protocol;
     }
 
     public static int getId(int fullId) {

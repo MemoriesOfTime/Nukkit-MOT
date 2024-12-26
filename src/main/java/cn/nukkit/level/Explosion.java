@@ -45,8 +45,8 @@ public class Explosion {
 
     private final Object what;
     private boolean doesDamage = true;
-
-    private double fireChance = 0.0; // 0.0 .. 1.0
+    private double minHeight = Integer.MIN_VALUE;
+    private double fireSpawnChance = 0.0; // 0.0 .. 1.0
 
     public Explosion(Position center, double size, Entity what) {
         this(center, size, (Object) what);
@@ -113,7 +113,7 @@ public class Explosion {
 
                             if (block.getId() != 0 && block.getId() != 7) {
                                 blastForce -= (block.getResistance() / 5 + 0.3d) * stepLen;
-                                if (blastForce > 0) {
+                                if (blastForce > 0 && block.y >= this.minHeight) {
                                     if (!this.affectedBlocks.contains(block)) {
                                         this.affectedBlocks.add(block);
                                     }
@@ -218,7 +218,7 @@ public class Explosion {
 
             this.level.setBlockAt((int) block.x, (int) block.y, (int) block.z, Block.AIR);
 
-            if (Math.random() < fireChance) {
+            if (Math.random() < fireSpawnChance) {
                 this.level.setBlockAt((int) block.x, (int) block.y, (int) block.z, BlockID.FIRE);
             }
 
@@ -244,7 +244,24 @@ public class Explosion {
         return true;
     }
 
+    /**
+     * Set minimum height at which the explosion can break blocks
+     * @param minHeight min y coordinate
+     */
+    public void setMinHeight(double minHeight) {
+        this.minHeight = minHeight;
+    }
+
+    /**
+     * Set chance for fire to be spawned
+     * @param fireSpawnChance 0.0 - 1.0
+     */
+    public void setFireSpawnChance(double fireSpawnChance) {
+        this.fireSpawnChance = fireSpawnChance;
+    }
+
+    @Deprecated
     public void setFireChance(double fireChance) {
-        this.fireChance = fireChance;
+        this.setFireSpawnChance(fireChance);
     }
 }
