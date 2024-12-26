@@ -1,8 +1,14 @@
 package cn.nukkit.block;
 
+import cn.nukkit.Player;
+import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityConduit;
+import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
-public class BlockConduit extends BlockSolidMeta {
+public class BlockConduit extends BlockSolidMeta implements BlockEntityHolder {
 
     public BlockConduit() {
         this(0);
@@ -55,5 +61,24 @@ public class BlockConduit extends BlockSolidMeta {
     @Override
     public boolean alwaysDropsOnExplosion() {
         return true;
+    }
+
+    @Override
+    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+        if (this.getLevel().setBlock(this, this, true, true)) {
+            BlockEntity.createBlockEntity(BlockEntity.CONDUIT, this.getChunk(), BlockEntity.getDefaultCompound(this, BlockEntity.CONDUIT));
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public @NotNull Class getBlockEntityClass() {
+        return BlockEntityConduit.class;
+    }
+
+    @Override
+    public @NotNull String getBlockEntityType() {
+        return BlockEntity.CONDUIT;
     }
 }
