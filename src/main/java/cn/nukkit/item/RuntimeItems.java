@@ -77,13 +77,17 @@ public class RuntimeItems {
         Map<String, MappingEntry> mappingEntries630 = new HashMap<>();
         for (String legacyName : itemMapping.keySet()) {
             JsonObject convertData = itemMapping.getAsJsonObject(legacyName);
-            for (String damageStr : convertData.keySet()) {
-                if ("protocol".equalsIgnoreCase(damageStr)) {
+            for (String key : convertData.keySet()) {
+                if ("protocol".equalsIgnoreCase(key)) {
                     continue;
                 }
-                String identifier = convertData.get(damageStr).getAsString();
-                int damage = Integer.parseInt(damageStr);
-                MappingEntry value = new MappingEntry(legacyName, damage);
+                String identifier = convertData.get(key).getAsString();
+                int damage = Integer.parseInt(key);
+                int protocol = 0;
+                try {
+                    protocol = convertData.get("protocol").getAsInt();
+                } catch (Exception e) {}
+                MappingEntry value = new MappingEntry(legacyName, damage, protocol);
                 mappingEntries630.put(identifier, value);
                 if ("minecraft:stone".equals(legacyName)) {
                     continue; // Stone 在1.20.50及以后拆分，对于以前的版本，不需要重复注册
@@ -208,6 +212,7 @@ public class RuntimeItems {
     public static class MappingEntry {
         private final String legacyName;
         private final int damage;
+        private final int protocol;
     }
 
     public static int getId(int fullId) {
