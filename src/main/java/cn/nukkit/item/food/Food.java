@@ -57,7 +57,7 @@ public abstract class Food {
     public static final Food potato_raw = registerDefaultFood(new FoodNormal(1, 0.6F).addRelative(Item.POTATO));
     public static final Food potato_baked = registerDefaultFood(new FoodNormal(5, 7.2F).addRelative(Item.BAKED_POTATO));
     public static final Food potato_poisonous = registerDefaultFood(new FoodEffective(2, 1.2F)
-            .addChanceEffect(0.6F, Effect.getEffect(Effect.POISON).setDuration(80))
+            .addChanceEffect(0.6F, Effect.getEffect(Effect.POISON).setDuration(100))
             .addRelative(Item.POISONOUS_POTATO));
     public static final Food pumpkin_pie = registerDefaultFood(new FoodNormal(8, 4.8F).addRelative(Item.PUMPKIN_PIE));
     public static final Food rabbit_cooked = registerDefaultFood(new FoodNormal(5, 6F).addRelative(Item.COOKED_RABBIT));
