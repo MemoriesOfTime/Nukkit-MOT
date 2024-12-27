@@ -178,7 +178,7 @@ public class BlockSweetBerryBush extends BlockFlowable {
 
     @Override
     public Item[] getDrops(Item item) {
-        int age = getDamage();
+        int age = MathHelper.clamp(this.getDamage(), 0, 3);
         int amount = 0;
         if(age > 1) {
             amount = age - 1 + ThreadLocalRandom.current().nextInt(2);
