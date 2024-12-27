@@ -345,6 +345,7 @@ public class Blocks {
         list[LECTERN] = BlockLectern.class; //449
         list[GRINDSTONE] = BlockGrindstone.class; //450
         list[BLAST_FURNACE] = BlockBlastFurnace.class; //451
+        list[STONECUTTER_BLOCK] = BlockStonecutterBlock.class; //452
         list[SMOKER] = BlockSmoker.class; //453
         list[LIT_SMOKER] = BlockSmokerLit.class; //454
         list[CARTOGRAPHY_TABLE] = BlockCartographyTable.class; //455
