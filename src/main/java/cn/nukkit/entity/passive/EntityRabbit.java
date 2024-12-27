@@ -29,26 +29,17 @@ public class EntityRabbit extends EntityJumpingAnimal {
 
     @Override
     public float getWidth() {
-        if (this.isBaby()) {
-            return 0.2f;
-        }
-        return 0.4f;
+        return this.isBaby() ? 0.268f : 0.402f;
     }
 
     @Override
     public float getLength() {
-        if (this.isBaby()) {
-            return 0.2f;
-        }
-        return 0.4f;
+        return this.isBaby() ? 0.268f : 0.402f;
     }
 
     @Override
     public float getHeight() {
-        if (this.isBaby()) {
-            return 0.25f;
-        }
-        return 0.5f;
+        return this.isBaby() ? 0.268f : 0.402f;
     }
 
     @Override
@@ -59,8 +50,8 @@ public class EntityRabbit extends EntityJumpingAnimal {
     @Override
     public void initEntity() {
         this.setMaxHealth(3);
-
         super.initEntity();
+        this.setScale(0.65f);
     }
 
     @Override
