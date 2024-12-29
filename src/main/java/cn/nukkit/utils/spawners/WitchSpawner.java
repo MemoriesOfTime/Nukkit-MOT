@@ -20,7 +20,7 @@ public class WitchSpawner extends AbstractEntitySpawner {
         if (Utils.rand(1, 5) == 1 && biomeId != 6 && biomeId != 134) {
             return;
         }
-        if (level.getBlockLightAt((int) pos.x, (int) pos.y + 1, (int) pos.z) <= 0) {
+        if (level.getBlockLightAt((int) pos.x, (int) pos.y + 1, (int) pos.z) == 0) {
             if (level.isMobSpawningAllowedByTime()) {
                 this.spawnTask.createEntity("Witch", pos.add(0.5, 1, 0.5));
             }
