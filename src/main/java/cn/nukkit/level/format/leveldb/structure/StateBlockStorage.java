@@ -221,12 +221,13 @@ public class StateBlockStorage {
     public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
-        for (int i = 0; i < BlockStorage.SECTION_SIZE; i++) {
+        for (int i = 0; i < SECTION_SIZE; i++) {
             int fullId = get(i);
             int id = fullId >> Block.DATA_BITS;
             int meta = fullId & Block.DATA_MASK;
             if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
-                fullId = Block.STONE << Block.DATA_BITS;
+                id = Block.STONE;
+                meta = 0;
             }
             int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, id, meta);
             palettedBlockStorage.setBlock(i, runtimeId);
