@@ -15,7 +15,7 @@ public class SkeletonSpawner extends AbstractEntitySpawner {
 
     @Override
     public void spawn(Player player, Position pos, Level level) {
-        if (level.getBlockLightAt((int) pos.x, (int) pos.y + 1, (int) pos.z) <= 7) {
+        if (level.getBlockLightAt((int) pos.x, (int) pos.y + 1, (int) pos.z) == 0) {
             if (level.isMobSpawningAllowedByTime()) {
                 this.spawnTask.createEntity("Skeleton", pos.add(0.5, 1, 0.5));
             }
