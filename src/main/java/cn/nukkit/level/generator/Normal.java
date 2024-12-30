@@ -11,10 +11,7 @@ import cn.nukkit.level.biome.EnumBiome;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.generator.noise.vanilla.f.NoiseGeneratorOctavesF;
 import cn.nukkit.level.generator.object.ore.OreType;
-import cn.nukkit.level.generator.populator.impl.PopulatorBedrock;
-import cn.nukkit.level.generator.populator.impl.PopulatorCaves;
-import cn.nukkit.level.generator.populator.impl.PopulatorGroundCover;
-import cn.nukkit.level.generator.populator.impl.PopulatorOre;
+import cn.nukkit.level.generator.populator.impl.*;
 import cn.nukkit.level.generator.populator.overworld.*;
 import cn.nukkit.level.generator.populator.type.Populator;
 import cn.nukkit.level.generator.task.ChunkPopulationTask;
@@ -48,25 +45,40 @@ public class Normal extends Generator {
         }
     }
 
+
+
     private List<Populator> generationPopulators = ImmutableList.of(
-        new PopulatorBedrock(),
-        new PopulatorGroundCover()
+            new PopulatorDeepslate(),
+            new PopulatorGroundCover()
     );
     private List<Populator> populators = ImmutableList.of(
-        new PopulatorOre(STONE, new OreType[]{
-            new OreType(Block.get(BlockID.COAL_ORE), 20, 17, 0, 128),
-            new OreType(Block.get(BlockID.IRON_ORE), 20, 9, 0, 64),
-            new OreType(Block.get(BlockID.REDSTONE_ORE), 8, 8, 0, 16),
-            new OreType(Block.get(BlockID.LAPIS_ORE), 1, 7, 0, 30),
-            new OreType(Block.get(BlockID.GOLD_ORE), 2, 9, 0, 32),
-            new OreType(Block.get(BlockID.DIAMOND_ORE), 1, 8, 0, 16),
-            new OreType(Block.get(BlockID.DIRT), 10, 33, 0, 128),
-            new OreType(Block.get(BlockID.GRAVEL), 8, 33, 0, 128),
-            new OreType(Block.get(BlockID.STONE, BlockStone.GRANITE), 10, 33, 0, 80),
-            new OreType(Block.get(BlockID.STONE, BlockStone.DIORITE), 10, 33, 0, 80),
-            new OreType(Block.get(BlockID.STONE, BlockStone.ANDESITE), 10, 33, 0, 80)
-        }),
-        new PopulatorCaves()
+            new PopulatorOre(STONE, new OreType[]{
+                    new OreType(Block.get(BlockID.COAL_ORE), 20, 17, 0, 128),
+                    new OreType(Block.get(BlockID.COPPER_ORE), 17, 9, 0, 64),
+                    new OreType(Block.get(BlockID.IRON_ORE), 20, 9, 0, 64),
+                    new OreType(Block.get(BlockID.REDSTONE_ORE), 8, 8, 0, 16),
+                    new OreType(Block.get(BlockID.LAPIS_ORE), 1, 7, 0, 30),
+                    new OreType(Block.get(BlockID.GOLD_ORE), 2, 9, 0, 32),
+                    new OreType(Block.get(BlockID.DIAMOND_ORE), 1, 8, 0, 16),
+                    new OreType(Block.get(BlockID.DIRT), 10, 33, 0, 128),
+                    new OreType(Block.get(BlockID.GRAVEL), 8, 33, 0, 128),
+                    new OreType(Block.get(BlockID.STONE, BlockStone.GRANITE), 10, 33, 0, 80),
+                    new OreType(Block.get(BlockID.STONE, BlockStone.DIORITE), 10, 33, 0, 80),
+                    new OreType(Block.get(BlockID.STONE, BlockStone.ANDESITE), 10, 33, 0, 80),
+                    new OreType(Block.get(BlockID.DEEPSLATE), 20, 33, 0, 16)
+            }),
+            new PopulatorOre(BlockID.DEEPSLATE, new OreType[]{
+                    new OreType(Block.get(BlockID.DEEPSLATE_COAL_ORE), 20, 17, 0, 16),
+                    new OreType(Block.get(BlockID.DEEPSLATE_COPPER_ORE), 20, 9, 0, 16),
+                    new OreType(Block.get(BlockID.DEEPSLATE_IRON_ORE), 20, 9, 0, 16),
+                    new OreType(Block.get(BlockID.DEEPSLATE_REDSTONE_ORE), 8, 8, 0, 16),
+                    new OreType(Block.get(BlockID.DEEPSLATE_LAPIS_ORE), 1, 7, 0, 16),
+                    new OreType(Block.get(BlockID.DEEPSLATE_GOLD_ORE), 2, 9, 0, 16),
+                    new OreType(Block.get(BlockID.DEEPSLATE_DIAMOND_ORE), 1, 8, 0, 16),
+                    new OreType(Block.get(BlockID.TUFF), 10, 20, 0, 16)
+            }),
+            new PopulatorCaves(),
+            new PopulatorBedrock()
     );
     private List<Populator> structurePopulators = ImmutableList.of(
         new PopulatorFossil(),
