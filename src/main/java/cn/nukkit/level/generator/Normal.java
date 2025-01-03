@@ -129,7 +129,7 @@ public class Normal extends Generator {
 
     @Override
     public String getName() {
-        return "newnormal";
+        return "normal";
     }
 
     @Override
