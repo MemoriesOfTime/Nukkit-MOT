@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
@@ -73,6 +74,34 @@ public class JavaPluginLoader implements PluginLoader {
     @Override
     public Plugin loadPlugin(String filename) throws Exception {
         return this.loadPlugin(new File(filename));
+    }
+
+    @Override
+    public void unloadPlugin(Plugin plugin) {
+        this.disablePlugin(plugin);
+
+        PluginClassLoader loader = this.classLoaders.remove(plugin.getDescription().getName());
+        if (loader == null) {
+            return;
+        }
+        Iterator<Map.Entry<String, Class>> iterator = this.classes.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, Class> entry = iterator.next();
+            try {
+                Class<?> aClass = loader.findClass(entry.getKey());
+                if (aClass == entry.getValue()) {
+                    iterator.remove();
+                }
+            } catch (ClassNotFoundException ignored) {
+
+            }
+        }
+
+        try {
+            loader.close();
+        } catch (Exception ignored) {
+
+        }
     }
 
     @Override

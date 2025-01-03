@@ -3,7 +3,7 @@ package cn.nukkit.level.generator.populator.impl;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.generator.Normal;
+import cn.nukkit.level.generator.OldNormal;
 import cn.nukkit.level.generator.populator.helper.PopulatorHelpers;
 import cn.nukkit.level.generator.populator.type.PopulatorCount;
 import cn.nukkit.math.NukkitRandom;
@@ -66,7 +66,7 @@ public class PopulatorUnderwaterFloor extends PopulatorCount {
         int y;
         x &= 0xF;
         z &= 0xF;
-        for (y = Normal.seaHeight - 1; y >= 0; --y) {
+        for (y = OldNormal.seaHeight - 1; y >= 0; --y) {
             if (!PopulatorHelpers.isNonOceanSolid(chunk.getBlockId(x, y, z))) {
                 break;
             }
