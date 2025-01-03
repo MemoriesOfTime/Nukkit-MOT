@@ -252,7 +252,11 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
         /**
          * Damage caused by standing on BlockMagma
          */
-        HOT_FLOOR
+        HOT_FLOOR,
+        /**
+         * Damage caused by temperature
+         */
+        FREEZING
     }
 
     private static class DamageModifierFloatEnumMap extends EnumMap<DamageModifier, Float> {
