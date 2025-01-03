@@ -17,6 +17,15 @@ import java.util.Random;
  * Nukkit Project
  */
 public class PopulatorCaves extends Populator {
+    private final int bedrockLayer;
+
+    public PopulatorCaves(int bedrockLayer) {
+        this.bedrockLayer = bedrockLayer;
+    }
+
+    public PopulatorCaves() {
+        this(0);
+    }
 
     protected int checkAreaSize = 8;
 
@@ -143,8 +152,8 @@ public class PopulatorCaves extends Populator {
             if (xTo > 16)
                 xTo = 16;
 
-            if (yFrom < 1)
-                yFrom = 1;
+            if (yFrom < bedrockLayer + 1)
+                yFrom = bedrockLayer + 1;
             if (yTo > this.worldHeightCap - 8) {
                 yTo = this.worldHeightCap - 8;
             }
@@ -158,7 +167,7 @@ public class PopulatorCaves extends Populator {
             for (int xx = xFrom; (!waterFound) && (xx < xTo); xx++) {
                 for (int zz = zFrom; (!waterFound) && (zz < zTo); zz++) {
                     for (int yy = yTo + 1; (!waterFound) && (yy >= yFrom - 1); yy--) {
-                        if (yy >= 0 && yy < this.worldHeightCap) {
+                        if (yy >= bedrockLayer && yy < this.worldHeightCap) {
                             int block = chunk.getBlockId(xx, yy, zz);
                             if (block == Block.WATER || block == Block.STILL_WATER) {
                                 waterFound = true;
@@ -197,7 +206,7 @@ public class PopulatorCaves extends Populator {
                                 //TODO: check this
 //                                if (this.isSuitableBlock(material, materialAbove, biome))
                                 {
-                                    if (yy - 1 < 10) {
+                                    if (yy - 1 < bedrockLayer + 10) {
                                         chunk.setBlock(xx, yy, zz, Block.LAVA);
                                     } else {
                                         chunk.setBlock(xx, yy, zz, Block.AIR);
@@ -234,9 +243,9 @@ public class PopulatorCaves extends Populator {
             double y;
 
             if (evenCaveDistribution)
-                y = numberInRange(random, caveMinAltitude, caveMaxAltitude);
+                y = numberInRange(random, bedrockLayer + caveMinAltitude, caveMaxAltitude);
             else
-                y = this.random.nextInt(this.random.nextInt(caveMaxAltitude - caveMinAltitude + 1) + 1) + caveMinAltitude;
+                y = this.random.nextInt(this.random.nextInt(caveMaxAltitude - (bedrockLayer + caveMinAltitude) + 1) + 1) + caveMinAltitude;
 
             double z = (chunkZ << 4) + this.random.nextInt(16);
 
