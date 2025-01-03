@@ -34,6 +34,7 @@ import java.util.SplittableRandom;
  * such as BukkitPE, ClearSky, Genisys, PocketMine-MP, or others
  */
 public class Normal extends Generator {
+    public static final int BEDROCK_LAYER = -64;
 
     private static final float[] biomeWeights = new float[25];
 
@@ -46,6 +47,7 @@ public class Normal extends Generator {
     }
 
     private List<Populator> generationPopulators = ImmutableList.of(
+            new PopulatorDeepslate(BEDROCK_LAYER),
             new PopulatorGroundCover()
     );
     private List<Populator> populators = ImmutableList.of(
@@ -62,24 +64,34 @@ public class Normal extends Generator {
                     new OreType(Block.get(BlockID.STONE, BlockStone.GRANITE), 10, 33, 0, 80),
                     new OreType(Block.get(BlockID.STONE, BlockStone.DIORITE), 10, 33, 0, 80),
                     new OreType(Block.get(BlockID.STONE, BlockStone.ANDESITE), 10, 33, 0, 80),
+                    new OreType(Block.get(BlockID.DEEPSLATE), 20, 33, 0, 8)
             }),
-            new PopulatorCaves(),
-            new PopulatorBedrock()
+            new PopulatorOre(BlockID.DEEPSLATE, new OreType[]{
+                    new OreType(Block.get(BlockID.DEEPSLATE_COAL_ORE), 20, 17, 0, 8),
+                    new OreType(Block.get(BlockID.DEEPSLATE_COPPER_ORE), 20, 9, -64, 8),
+                    new OreType(Block.get(BlockID.DEEPSLATE_IRON_ORE), 20, 9, -64, 8),
+                    new OreType(Block.get(BlockID.DEEPSLATE_REDSTONE_ORE), 8, 8, -64, 8),
+                    new OreType(Block.get(BlockID.DEEPSLATE_LAPIS_ORE), 1, 7, -64, 8),
+                    new OreType(Block.get(BlockID.DEEPSLATE_GOLD_ORE), 2, 9, -64, 8),
+                    new OreType(Block.get(BlockID.DEEPSLATE_DIAMOND_ORE), 1, 8, -64, 8)
+            }),
+            new PopulatorCaves(BEDROCK_LAYER),
+            new PopulatorBedrock(BEDROCK_LAYER)
     );
     private List<Populator> structurePopulators = ImmutableList.of(
-        new PopulatorFossil(),
-        new PopulatorShipwreck(),
-        new PopulatorSwampHut(),
-        new PopulatorDesertPyramid(),
-        new PopulatorJungleTemple(),
-        new PopulatorIgloo(),
-        new PopulatorPillagerOutpost(),
-        new PopulatorOceanRuin(),
-        new PopulatorVillage(),
-        new PopulatorStronghold(),
-        new PopulatorMineshaft(),
-        new PopulatorDesertWell(),
-        new PopulatorDungeon()
+            new PopulatorFossil(),
+            new PopulatorShipwreck(),
+            new PopulatorSwampHut(),
+            new PopulatorDesertPyramid(),
+            new PopulatorJungleTemple(),
+            new PopulatorIgloo(),
+            new PopulatorPillagerOutpost(),
+            new PopulatorOceanRuin(),
+            new PopulatorVillage(),
+            new PopulatorStronghold(),
+            new PopulatorMineshaft(),
+            new PopulatorDesertWell(),
+            new PopulatorDungeon()
     );
     public static final int seaHeight = 64; // should be 62
     public NoiseGeneratorOctavesF scaleNoise;
@@ -117,7 +129,7 @@ public class Normal extends Generator {
 
     @Override
     public String getName() {
-        return "normal";
+        return "newnormal";
     }
 
     @Override
