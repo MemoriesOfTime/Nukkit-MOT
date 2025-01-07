@@ -69,7 +69,7 @@ public class BlockCoralBlock extends BlockSolidMeta {
     
     @Override
     public double getHardness() {
-        return 7;
+        return 1.5;
     }
     
     @Override
