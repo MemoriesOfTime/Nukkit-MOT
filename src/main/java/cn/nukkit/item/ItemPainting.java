@@ -56,22 +56,12 @@ public class ItemPainting extends Item {
 
         List<EntityPainting.Motive> validMotives = new ArrayList<>();
         for (EntityPainting.Motive motive : EntityPainting.motives) {
-            boolean valid = true;
-            for (int x = 0; x < motive.width && valid; x++) {
-                for (int z = 0; z < motive.height && valid; z++) {
-                    if (target.getSide(BlockFace.fromIndex(RIGHT[face.getIndex() - 2]), x).isTransparent() ||
-                            target.up(z).isTransparent() ||
-                            block.getSide(BlockFace.fromIndex(RIGHT[face.getIndex() - 2]), x).isSolid() ||
-                            block.up(z).isSolid()) {
-                        valid = false;
-                    }
-                }
-            }
-
-            if (valid) {
+            if (motive.predicate.test(target.getLevel(), face, block, target)) {
                 validMotives.add(motive);
             }
         }
+        if(validMotives.isEmpty()) return false;
+
         int direction = DIRECTION[face.getIndex() - 2];
         EntityPainting.Motive motive = validMotives.get(Utils.random.nextInt(validMotives.size()));
 
@@ -124,6 +114,9 @@ public class ItemPainting extends Item {
     }
 
     private static double offset(int value) {
-        return value > 1 ? 0.5 : 0;
+        if(value > 1 && value != 3) {
+            return 0.5;
+        }
+        return 0;
     }
 }
