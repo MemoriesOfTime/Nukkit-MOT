@@ -42,11 +42,9 @@ public class BlockFrogSpawn extends BlockFlowable {
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
         if (target instanceof BlockWater) {
             Block up = target.up();
-            if(up instanceof BlockAir) {
-                if (up.getId() == Block.AIR) {
-                    this.getLevel().setBlock(up, this, true, true);
-                    return true;
-                }
+            if (up.getId() == Block.AIR) {
+                this.getLevel().setBlock(up, this, true, true);
+                return true;
             }
         }
 
