@@ -1,6 +1,8 @@
 package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
+import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityHanging;
@@ -8,6 +10,7 @@ import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.ItemPainting;
 import cn.nukkit.level.GameRule;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
@@ -15,9 +18,10 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddPaintingPacket;
 import cn.nukkit.network.protocol.DataPacket;
+import com.google.common.collect.Sets;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Function;
 
 /**
  * @author MagicDroidX
@@ -27,7 +31,50 @@ public class EntityPainting extends EntityHanging {
 
     public static final int NETWORK_ID = 83;
 
-    public final static Motive[] motives = Motive.values();
+    private static final Function<Integer, PaintingPlacePredicate> predicateFor4Width = (height) -> (level, face, block, target) -> {
+        for (int x = -1; x < 3; x++) {
+            for (int z = 0; z < height; z++) {
+                if (checkPlacePaint(x, z, level, face, block, target)) return false;
+            }
+        }
+        return true;
+    };
+
+    private static final PaintingPlacePredicate predicateFor4WidthHeight = (level, face, block, target) -> {
+        for (int x = -1; x < 3; x++) {
+            for (int z = -1; z < 3; z++) {
+                if (checkPlacePaint(x, z, level, face, block, target)) return false;
+            }
+        }
+        return true;
+    };
+
+    private static final PaintingPlacePredicate predicateFor3WidthHeight = (level, face, block, target) -> {
+        for (int x = -1; x < 2; x++) {
+            for (int z = -1; z < 2; z++) {
+                if (checkPlacePaint(x, z, level, face, block, target)) return false;
+            }
+        }
+        return true;
+    };
+
+    private static final Function<Integer, PaintingPlacePredicate> predicateFor3Width = (height) -> (level, face, block, target) -> {
+        for (int x = -1; x < 2; x++) {
+            for (int z = 0; z < height; z++) {
+                if (checkPlacePaint(x, z, level, face, block, target)) return false;
+            }
+        }
+        return true;
+    };
+
+    @FunctionalInterface
+    public interface PaintingPlacePredicate {
+        boolean test(Level level, BlockFace blockFace, Block block, Block target);
+    }
+
+    public final static Motive[] motives = Arrays.stream(Motive.values())
+            .filter(m -> ((m.newPainting && Server.getInstance().enableNewPaintings) || !m.newPainting))
+            .toArray(Motive[]::new);
 
     private Motive motive;
 
@@ -141,6 +188,34 @@ public class EntityPainting extends EntityHanging {
         this.close();
     }
 
+    private static boolean checkPlacePaint(int x, int z, Level level, BlockFace face, Block block, Block target) {
+        if (target.getSide(face.rotateYCCW(), x).isAir() ||
+                target.getSide(face.rotateYCCW(), x).up(z).isAir() ||
+                target.up(z).isAir()) {
+            return true;
+        } else {
+            Block side = block.getSide(face.rotateYCCW(), x);
+            Block up = block.getSide(face.rotateYCCW(), x).up(z).getLevelBlock();
+            Block up1 = block.up(z);
+            Set<FullChunk> chunks = Sets.newHashSet(side.getChunk(), up.getChunk(), up1.getChunk());
+            Collection<Entity> entities = chunks.stream().map(c -> c.getEntities().values()).reduce(new ArrayList<>(), (e1, e2) -> {
+                e1.addAll(e2);
+                return e1;
+            }, (entities1, entities2) -> {
+                entities1.addAll(entities2);
+                return entities1;
+            });
+            for (var e : entities) {
+                if (e instanceof EntityPainting painting) {
+                    if (painting.getBoundingBox().intersectsWith(side) || painting.getBoundingBox().intersectsWith(up) || painting.getBoundingBox().intersectsWith(up1)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     public Motive getArt() {
         return getMotive();
     }
@@ -157,8 +232,10 @@ public class EntityPainting extends EntityHanging {
         BOMB("Bomb", 1, 1),
         PLANT("Plant", 1, 1),
         WASTELAND("Wasteland", 1, 1),
+        MEDITATIVE("meditative", 1, 1, true),
         WANDERER("Wanderer", 1, 2),
         GRAHAM("Graham", 1, 2),
+        PRAIRIE_RIDE("prairie_ride", 1, 2, true),
         POOL("Pool", 2, 1),
         COURBET("Courbet", 2, 1),
         SUNSET("Sunset", 2, 1),
@@ -170,16 +247,30 @@ public class EntityPainting extends EntityHanging {
         VOID("Void", 2, 2),
         SKULL_AND_ROSES("SkullAndRoses", 2, 2),
         WITHER("Wither", 2, 2),
-        FIGHTERS("Fighters", 4, 2),
-        SKELETON("Skeleton", 4, 3),
-        DONKEY_KONG("DonkeyKong", 4, 3),
-        POINTER("Pointer", 4, 4),
-        PIG_SCENE("Pigscene", 4, 4),
-        BURNING_SKULL("BurningSkull", 4, 4);
-
-        public final String title;
-        public final int width;
-        public final int height;
+        BAROQUE("baroque", 2, 2, true),
+        HUMBLE("humble", 2, 2, true),
+        BOUQUET("bouquet", 3, 3, true, predicateFor3WidthHeight),
+        CAVEBIRD("cavebird", 3, 3, true, predicateFor3WidthHeight),
+        COTAN("cotan", 3, 3, true, predicateFor3WidthHeight),
+        ENDBOSS("endboss", 3, 3, true, predicateFor3WidthHeight),
+        FERN("fern", 3, 3, true, predicateFor3WidthHeight),
+        OWLEMONS("owlemons", 3, 3, true, predicateFor3WidthHeight),
+        SUNFLOWERS("sunflowers", 3, 3, true, predicateFor3WidthHeight),
+        TIDES("tides", 3, 3, true, predicateFor3WidthHeight),
+        BACKYARD("backyard", 3, 4, true, predicateFor3Width.apply(4)),
+        POND("pond", 3, 4, true, predicateFor3Width.apply(4)),
+        FIGHTERS("Fighters", 4, 2, predicateFor4Width.apply(2)),
+        CHANGING("changing", 4, 2, true, predicateFor4Width.apply(2)),
+        FINDING("finding", 4, 2, true, predicateFor4Width.apply(2)),
+        LOWMIST("lowmist", 4, 2, true, predicateFor4Width.apply(2)),
+        PASSAGE("passage", 4, 2, true, predicateFor4Width.apply(2)),
+        SKELETON("Skeleton", 4, 3, predicateFor4Width.apply(3)),
+        DONKEY_KONG("DonkeyKong", 4, 3, predicateFor4Width.apply(3)),
+        POINTER("Pointer", 4, 4, predicateFor4WidthHeight),
+        PIG_SCENE("Pigscene", 4, 4, predicateFor4WidthHeight),
+        BURNING_SKULL("BurningSkull", 4, 4, predicateFor4WidthHeight),
+        ORB("orb", 4, 4, true, predicateFor4WidthHeight),
+        UNPACKED("unpacked", 4, 4, true, predicateFor4WidthHeight);
 
         private static final Map<String, Motive> BY_NAME = new HashMap<>();
 
@@ -189,10 +280,41 @@ public class EntityPainting extends EntityHanging {
             }
         }
 
+        public final String title;
+        public final int width;
+        public final int height;
+        public final PaintingPlacePredicate predicate;
+        public final boolean newPainting;
+
         Motive(String title, int width, int height) {
+            this(title, width, height, false);
+        }
+
+        Motive(String title, int width, int height, boolean newPainting) {
             this.title = title;
             this.width = width;
             this.height = height;
+            this.newPainting = newPainting;
+            this.predicate = (level, face, block, target) -> {
+                for (int x = 0; x < width; x++) {
+                    for (int z = 0; z < height; z++) {
+                        if (checkPlacePaint(x, z, level, face, block, target)) return false;
+                    }
+                }
+                return true;
+            };
+        }
+
+        Motive(String title, int width, int height, PaintingPlacePredicate predicate) {
+            this(title, width, height, false, predicate);
+        }
+
+        Motive(String title, int width, int height, boolean newPainting, PaintingPlacePredicate predicate) {
+            this.title = title;
+            this.width = width;
+            this.height = height;
+            this.newPainting = newPainting;
+            this.predicate = predicate;
         }
     }
 }

@@ -544,6 +544,10 @@ public class Server {
      */
     public boolean enableRawOres;
     /**
+     * Enable 1.21 paintings
+     */
+    public boolean enableNewPaintings;
+    /**
      * A number of datagram packets each address can send within one RakNet tick (10ms)
      */
     public int rakPacketLimit;
@@ -3190,6 +3194,7 @@ public class Server {
         this.levelDbCache = this.getPropertyInt("leveldb-cache-mb", 80);
         this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
         this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
+        this.enableNewPaintings = this.getPropertyBoolean("enable-new-paintings", true);
         this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
     }
 
@@ -3338,6 +3343,7 @@ public class Server {
             put("leveldb-cache-mb", 80);
             put("use-native-leveldb", false);
             put("enable-raw-ores", true);
+            put("enable-new-paintings", true);
         }
     }
 
