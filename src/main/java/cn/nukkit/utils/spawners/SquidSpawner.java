@@ -24,16 +24,14 @@ public class SquidSpawner extends AbstractEntitySpawner {
         final int blockId = level.getBlockIdAt((int) pos.x, (int) pos.y, (int) pos.z);
         if (blockId == Block.WATER || blockId == Block.STILL_WATER) {
             final int biomeId = level.getBiomeId((int) pos.x, (int) pos.z);
-            if (biomeId == 0 || biomeId == 10 || biomeId == 24 || (biomeId >= 40 && biomeId <= 47)) {
-                if (level.isAnimalSpawningAllowedByTime()) {
-                    final int b = level.getBlockIdAt((int) pos.x, (int) (pos.y - 1), (int) pos.z);
-                    if (b == Block.WATER || b == Block.STILL_WATER) {
-                        for (int i = 0; i < Utils.rand(2, 4); i++) {
-                            BaseEntity entity = this.spawnTask.createEntity("Squid", pos.add(0, -1, 0));
-                            if (entity == null) return;
-                            if (Utils.rand(1, 20) == 1) {
-                                entity.setBaby(true);
-                            }
+            if (biomeId == 0 || biomeId == 7 || biomeId == 10 || biomeId == 24 || (biomeId >= 40 && biomeId <= 47)) {
+                final int b = level.getBlockIdAt((int) pos.x, (int) (pos.y - 1), (int) pos.z);
+                if (b == Block.WATER || b == Block.STILL_WATER) {
+                    for (int i = 0; i < Utils.rand(2, 4); i++) {
+                        BaseEntity entity = this.spawnTask.createEntity("Squid", pos.add(0, -1, 0));
+                        if (entity == null) return;
+                        if (Utils.rand(1, 20) == 1) {
+                            entity.setBaby(true);
                         }
                     }
                 }

@@ -67,15 +67,17 @@ public class Normal extends Generator {
                     new OreType(Block.get(BlockID.DEEPSLATE), 20, 33, 0, 8)
             }),
             new PopulatorOre(BlockID.DEEPSLATE, new OreType[]{
-                    new OreType(Block.get(BlockID.DEEPSLATE_COAL_ORE), 20, 17, 0, 8),
-                    new OreType(Block.get(BlockID.DEEPSLATE_COPPER_ORE), 20, 9, -64, 8),
-                    new OreType(Block.get(BlockID.DEEPSLATE_IRON_ORE), 20, 9, -64, 8),
-                    new OreType(Block.get(BlockID.DEEPSLATE_REDSTONE_ORE), 8, 8, -64, 8),
-                    new OreType(Block.get(BlockID.DEEPSLATE_LAPIS_ORE), 1, 7, -64, 8),
-                    new OreType(Block.get(BlockID.DEEPSLATE_GOLD_ORE), 2, 9, -64, 8),
-                    new OreType(Block.get(BlockID.DEEPSLATE_DIAMOND_ORE), 1, 8, -64, 8)
+                    new OreType(Block.get(BlockID.DEEPSLATE_COAL_ORE), 1, 13, -4, 8, BlockID.DEEPSLATE),
+                    new OreType(Block.get(BlockID.DEEPSLATE_COPPER_ORE), 5, 9, -64, 8, BlockID.DEEPSLATE),
+                    new OreType(Block.get(BlockID.DEEPSLATE_IRON_ORE), 5, 9, -64, 8, BlockID.DEEPSLATE),
+                    new OreType(Block.get(BlockID.DEEPSLATE_REDSTONE_ORE), 8, 8, -64, 8, BlockID.DEEPSLATE),
+                    new OreType(Block.get(BlockID.DEEPSLATE_LAPIS_ORE), 6, 6, -64, 8, BlockID.DEEPSLATE),
+                    new OreType(Block.get(BlockID.DEEPSLATE_GOLD_ORE), 2, 9, -64, 8, BlockID.DEEPSLATE),
+                    new OreType(Block.get(BlockID.DEEPSLATE_DIAMOND_ORE), 4, 5, -64, 8, BlockID.DEEPSLATE)
             }),
             new PopulatorCaves(BEDROCK_LAYER),
+            new PopulatorSpring(BlockID.WATER, BlockID.STONE, 15, 8, 255),
+            new PopulatorSpring(BlockID.LAVA, BlockID.STONE, 10, 16, 255),
             new PopulatorBedrock(BEDROCK_LAYER)
     );
     private List<Populator> structurePopulators = ImmutableList.of(
