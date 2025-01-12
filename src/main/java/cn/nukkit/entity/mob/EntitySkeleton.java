@@ -68,6 +68,12 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
         if (this.attackDelay > 23 && Utils.rand(1, 32) < 4 && this.distanceSquared(player) <= 55) {
             this.attackDelay = 0;
 
+            for (Block block : this.getLineOfSight(7, 7)) {
+                if (block.getId() != Block.AIR) {
+                    return;
+                }
+            }
+
             double f = 1.3;
             double yaw = this.yaw;
             double pitch = this.pitch;

@@ -31,10 +31,7 @@ import cn.nukkit.network.protocol.TextPacket;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockIterator;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * @author MagicDroidX
@@ -416,23 +413,27 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public Block[] getLineOfSight(int maxDistance, int maxLength) {
-        return this.getLineOfSight(maxDistance, maxLength, new Integer[]{});
+        return this.getLineOfSight(maxDistance, maxLength, (Set<Integer>) null);
     }
 
     public Block[] getLineOfSight(int maxDistance, int maxLength, Map<Integer, Object> transparent) {
-        return this.getLineOfSight(maxDistance, maxLength, transparent.keySet().toArray(new Integer[0]));
+        return this.getLineOfSight(maxDistance, maxLength, transparent.keySet());
     }
 
     public Block[] getLineOfSight(int maxDistance, int maxLength, Integer[] transparent) {
+        return this.getLineOfSight(maxDistance, maxLength, new HashSet<>(Arrays.asList(transparent)));
+    }
+
+    public Block[] getLineOfSight(int maxDistance, int maxLength, Set<Integer> transparent) {
         if (maxDistance > 120) {
             maxDistance = 120;
         }
 
-        if (transparent != null && transparent.length == 0) {
+        if (transparent != null && transparent.isEmpty()) {
             transparent = null;
         }
 
-        List<Block> blocks = new ArrayList<>();
+        LinkedList<Block> blocks = new LinkedList<>();
 
         BlockIterator itr = new BlockIterator(this.level, this.getPosition(), this.getDirectionVector(), this.getEyeHeight(), maxDistance);
 
@@ -441,7 +442,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             blocks.add(block);
 
             if (maxLength != 0 && blocks.size() > maxLength) {
-                blocks.remove(0);
+                blocks.pollFirst();
             }
 
             int id = block.getId();
@@ -451,7 +452,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                     break;
                 }
             } else {
-                if (Arrays.binarySearch(transparent, id) < 0) {
+                if (transparent.contains(id)) {
                     break;
                 }
             }
