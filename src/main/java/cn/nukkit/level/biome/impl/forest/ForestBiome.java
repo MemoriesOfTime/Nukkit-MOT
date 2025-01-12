@@ -32,7 +32,8 @@ public class ForestBiome extends GrassyBiome {
         if (type == TYPE_NORMAL) {
             // Normal forest biomes have both oak and birch trees
             trees = new PopulatorTree(BlockSapling.OAK);
-            trees.setBaseAmount(3);
+            trees.setRandomAmount(1);
+            trees.setBaseAmount(7);
             this.addPopulator(trees);
         }
 

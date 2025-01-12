@@ -11,6 +11,7 @@ import cn.nukkit.level.biome.impl.forest.FlowerForestBiome;
 import cn.nukkit.level.biome.impl.forest.ForestBiome;
 import cn.nukkit.level.biome.impl.forest.ForestHillsBiome;
 import cn.nukkit.level.biome.impl.iceplains.IcePlainsBiome;
+import cn.nukkit.level.biome.impl.iceplains.IcePlainsHillsBiome;
 import cn.nukkit.level.biome.impl.iceplains.IcePlainsSpikesBiome;
 import cn.nukkit.level.biome.impl.jungle.*;
 import cn.nukkit.level.biome.impl.mesa.*;
@@ -53,6 +54,7 @@ public enum EnumBiome {
     FROZEN_OCEAN(10, new FrozenOceanBiome()),
     FROZEN_RIVER(11, new FrozenRiverBiome()),
     ICE_PLAINS(12, new IcePlainsBiome()),
+    ICE_MOUNTAINS(13, new IcePlainsHillsBiome()),
     MUSHROOM_ISLAND(14, new MushroomIslandBiome()),
     MUSHROOM_ISLAND_SHORE(15, new MushroomIslandShoreBiome()),
     BEACH(16, new BeachBiome()),
