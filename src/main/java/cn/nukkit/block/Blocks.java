@@ -599,13 +599,19 @@ public class Blocks {
         list[STRIPPED_MANGROVE_LOG] = BlockLogStrippedMangrove.class; //740
         list[MANGROVE_PLANKS] = BlockPlanksMangrove.class; //741
 
+        list[MANGROVE_TRAPDOOR] = BlockTrapdoorMangrove.class; //751
+
         list[BAMBOO_PLANKS] = BlockPlanksBamboo.class; //765
+
+        list[BAMBOO_TRAPDOOR] = BlockTrapdoorBamboo.class; //775
 
         list[SUSPICIOUS_SAND] = BlockSuspiciousSand.class; // 784
 
         list[STRIPPED_CHERRY_LOG] = BlockLogStrippedCherry.class; //790
         list[CHERRY_LOG] = BlockCherryLog.class; //791
         list[CHERRY_PLANKS] = BlockPlanksCherry.class; //792
+
+        list[CHERRY_TRAPDOOR] = BlockTrapdoorCherry.class; //798
 
         list[STRIPPED_CHERRY_WOOD] = BlockWoodStrippedCherry.class; //800
         list[CHERRY_WOOD] = BlockWoodCherry.class; //801
