@@ -717,6 +717,9 @@ public interface BlockID {
     int BAMBOO_MOSAIC = 764;
 
     int BAMBOO_PLANKS = 765;
+
+    int BAMBOO_TRAPDOOR = 775;
+
     int SUSPICIOUS_SAND = 784;
     int CHERRY_BUTTON = 785;
     int CHERRY_DOOR = 786;
