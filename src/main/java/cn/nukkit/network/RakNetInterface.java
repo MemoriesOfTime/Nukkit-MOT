@@ -72,7 +72,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .option(RakChannelOption.RAK_GUID, this.serverId)
                 .option(RakChannelOption.RAK_SUPPORTED_PROTOCOLS, new int[]{8, 9, 10, 11})
                 .childOption(RakChannelOption.RAK_ORDERING_CHANNELS, 1)
-                .option(RakChannelOption.RAK_SEND_COOKIE, true)
+                .option(RakChannelOption.RAK_SEND_COOKIE, this.server.enableRakSendCookie)
                 .option(RakChannelOption.RAK_PACKET_LIMIT, this.server.rakPacketLimit)
                 .handler(new ChannelInitializer<>() {
                     @Override

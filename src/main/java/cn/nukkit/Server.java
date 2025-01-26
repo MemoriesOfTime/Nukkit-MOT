@@ -555,6 +555,10 @@ public class Server {
      * Temporary disable world saving to allow safe backup of leveldb worlds.
      */
     public boolean holdWorldSave;
+    /**
+     * Enable RakNet cookies for additional security
+     */
+    public boolean enableRakSendCookie;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -3196,6 +3200,7 @@ public class Server {
         this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
         this.enableNewPaintings = this.getPropertyBoolean("enable-new-paintings", true);
         this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
+        this.enableRakSendCookie = this.getPropertyBoolean("enable-rak-send-cookie", true);
     }
 
     /**
@@ -3277,6 +3282,7 @@ public class Server {
             put("compression-threshold", "256");
             put("use-snappy-compression", false);
             put("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
+            put("enable-rak-send-cookie", true);
             put("timeout-milliseconds", 25000);
 
             put("auto-tick-rate", true);
