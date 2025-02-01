@@ -4,6 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockWood;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.biome.Biome;
+import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.NukkitRandom;
 
 /**
@@ -40,7 +41,7 @@ public class ObjectSpruceTree extends ObjectTree {
         int topSize = this.treeHeight - (1 + random.nextBoundedInt(2));
         int lRadius = 2 + random.nextBoundedInt(2);
 
-        this.placeTrunk(level, x, y, z, random, this.treeHeight - random.nextBoundedInt(2));
+        this.placeTrunk(level, x, y, z, random, this.treeHeight);
 
         this.placeLeaves(level, topSize, lRadius, x, y, z, random);
     }
@@ -50,7 +51,11 @@ public class ObjectSpruceTree extends ObjectTree {
         int maxR = 1;
         int minR = 0;
 
-        boolean createSnow = this.canCreateSnow && Biome.getBiome(level.getChunk(x >> 4, z >> 4).getBiomeId(x & 0x0f, z & 0x0f)).isFreezing();
+        boolean createSnow = false;
+        if (this.canCreateSnow) {
+            FullChunk chunk = level.getChunk(x >> 4, z >> 4);
+            createSnow = chunk == null || Biome.getBiome(chunk.getBiomeId(x & 0x0f, z & 0x0f)).isFreezing();
+        }
 
         for (int yy = 0; yy <= topSize; ++yy) {
             int yyy = y + this.treeHeight - yy;
@@ -65,6 +70,7 @@ public class ObjectSpruceTree extends ObjectTree {
 
                     if (!Block.isBlockSolidById(level.getBlockIdAt(xx, yyy, zz))) {
                         level.setBlockAt(xx, yyy, zz, this.getLeafBlock(), this.getType());
+
                         if (createSnow) {
                             if (level.getBlockIdAt(xx, yyy + 1, zz) == Block.AIR && level.getBlockIdAt(xx, yyy + 2, zz) == Block.AIR) {
                                 level.setBlockAt(xx, yyy + 1, zz, Block.SNOW_LAYER, 0);

@@ -39,7 +39,7 @@ public class SpruceBigTreePopulator extends Populator {
             if (y == -1) {
                 continue;
             }
-            new ObjectBigSpruceTree(0.75f, 4).placeObject(this.level, (int) (v.x = x), (int) (v.y = y), (int) (v.z = z), random);
+            new ObjectBigSpruceTree(0.50f, 4).placeObject(this.level, (int) (v.x = x), (int) (v.y = y), (int) (v.z = z), random);
         }
     }
 
@@ -47,7 +47,7 @@ public class SpruceBigTreePopulator extends Populator {
         int y;
         for (y = 255; y > 0; --y) {
             int b = this.level.getBlockIdAt(x, y, z);
-            if (b == Block.DIRT || b == Block.GRASS) {
+            if (b == Block.DIRT || b == Block.GRASS || b == Block.PODZOL) {
                 break;
             } else if (b != Block.AIR && b != Block.SNOW_LAYER) {
                 return -1;

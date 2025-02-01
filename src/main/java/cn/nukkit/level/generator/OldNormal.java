@@ -12,6 +12,7 @@ import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.level.generator.noise.vanilla.f.NoiseGeneratorOctavesF;
 import cn.nukkit.level.generator.object.ore.OreType;
 import cn.nukkit.level.generator.populator.impl.*;
+import cn.nukkit.level.generator.populator.impl.PopulatorCaves;
 import cn.nukkit.level.generator.populator.overworld.*;
 import cn.nukkit.level.generator.populator.type.Populator;
 import cn.nukkit.level.generator.task.ChunkPopulationTask;

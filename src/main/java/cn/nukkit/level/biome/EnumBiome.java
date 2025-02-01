@@ -131,24 +131,6 @@ public enum EnumBiome {
     }
 
     /**
-     * Return the biome ID corresponding to the current enum instance.
-     *
-     * @return The biome ID.
-     */
-    public int getId() {
-        return this.id;
-    }
-
-    /**
-     * Return the biome corresponding to the current enum instance.
-     *
-     * @return The biome.
-     */
-    public Biome getBiome() {
-        return this.biome;
-    }
-
-    /**
      * You really shouldn't use this method if you can help it, reference the biomes directly!
      *
      * @param id biome id

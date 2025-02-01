@@ -1,14 +1,12 @@
 package cn.nukkit.level;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.LevelException;
 import org.jetbrains.annotations.NotNull;
 
-import javax.annotation.Nullable;
 import java.util.Set;
 
 /**
@@ -99,11 +97,6 @@ public class Position extends Vector3 {
     public Position setComponents(@NotNull Vector3 pos) {
         super.setComponents(pos);
         return this;
-    }
-
-    @Nullable
-    public BlockEntity getLevelBlockEntity() {
-        return this.getValidLevel().getBlockEntity(this);
     }
 
     public Block getLevelBlock() {

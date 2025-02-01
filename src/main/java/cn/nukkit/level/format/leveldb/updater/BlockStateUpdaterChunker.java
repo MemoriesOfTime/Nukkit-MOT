@@ -5,6 +5,8 @@ import lombok.NoArgsConstructor;
 import org.cloudburstmc.blockstateupdater.BlockStateUpdater;
 import org.cloudburstmc.blockstateupdater.util.tagupdater.CompoundTagUpdaterContext;
 
+import static cn.nukkit.level.format.leveldb.LevelDBConstants.*;
+
 /**
  * This is updater for worlds converted using chunker.app
  */
@@ -78,7 +80,7 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
     }
 
     private void addProperty(CompoundTagUpdaterContext ctx, String identifier, String propertyName, Object value) {
-        ctx.addUpdater(1, 21, 0, true)
+        ctx.addUpdater(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION, true)
                 .match("name", identifier)
                 .visit("states")
                 .tryAdd(propertyName, value);

@@ -49,7 +49,7 @@ public class SpruceMegaTreePopulator extends Populator {
         int y;
         for (y = 255; y > 0; --y) {
             int b = this.level.getBlockIdAt(x, y, z);
-            if (b == Block.DIRT || b == Block.GRASS) {
+            if (b == Block.DIRT || b == Block.GRASS || b == Block.PODZOL) {
                 break;
             } else if (b != Block.AIR && b != Block.SNOW_LAYER) {
                 return -1;
