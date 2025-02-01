@@ -600,29 +600,29 @@ public class LevelDBChunkSection implements ChunkSection {
             byte[] merged = new byte[ids.length + data.length];
             System.arraycopy(ids, 0, merged, 0, ids.length);
             System.arraycopy(data, 0, merged, ids.length, data.length);
-			if (protocolId < ProtocolInfo.v1_2_0) {
-				ByteBuffer buffer = ByteBuffer.allocate(10240);
-				byte[] skyLight = new byte[2048];
-				byte[] blockLight = new byte[2048];
-				for (int x = 0; x < 16; x++) {
-					for (int z = 0; z < 16; z++) {
-						int i = (x << 7) | (z << 3);
-						for (int y = 0; y < 16; y += 2) {
-							int b1 = this.getBlockSkyLight(x, y, z);
-							int b2 = this.getBlockSkyLight(x, y + 1, z);
-							skyLight[i | (y >> 1)] = (byte) ((b2 << 4) | b1);
-							b1 = this.getBlockLight(x, y, z);
-							b2 = this.getBlockLight(x, y + 1, z);
-							blockLight[i | (y >> 1)] = (byte) ((b2 << 4) | b1);
-						}
-					}
-				}
-				return buffer
-					.put(merged)
-					.put(skyLight)
-					.put(blockLight)
-					.array();
-			}
+            if (protocolId < ProtocolInfo.v1_2_0) {
+                ByteBuffer buffer = ByteBuffer.allocate(10240);
+                byte[] skyLight = new byte[2048];
+                byte[] blockLight = new byte[2048];
+                for (int x = 0; x < 16; x++) {
+                    for (int z = 0; z < 16; z++) {
+                        int i = (x << 7) | (z << 3);
+                        for (int y = 0; y < 16; y += 2) {
+                            int b1 = this.getBlockSkyLight(x, y, z);
+                            int b2 = this.getBlockSkyLight(x, y + 1, z);
+                            skyLight[i | (y >> 1)] = (byte) ((b2 << 4) | b1);
+                            b1 = this.getBlockLight(x, y, z);
+                            b2 = this.getBlockLight(x, y + 1, z);
+                            blockLight[i | (y >> 1)] = (byte) ((b2 << 4) | b1);
+                        }
+                    }
+                }
+                return buffer
+                        .put(merged)
+                        .put(skyLight)
+                        .put(blockLight)
+                        .array();
+            }
             return merged;
         } finally {
             this.readLock.unlock();
