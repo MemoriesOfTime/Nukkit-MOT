@@ -15,7 +15,7 @@ public class BlockMangroveSignPost extends BlockSignPost {
 
     @Override
     public int getId() {
-        return MANGROVE_WALL_SIGN;
+        return MANGROVE_STANDING_SIGN;
     }
 
     @Override
