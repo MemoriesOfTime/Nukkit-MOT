@@ -590,7 +590,8 @@ public class Blocks {
         list[MUD_BRICKS] = BlockMudBricks.class; //730
 
         list[PACKED_MUD] = BlockPackedMud.class; //732
-
+        list[MUD_BRICK_SLAB] = BlockSlabMudBrick.class; //733
+        list[MUD_BRICK_DOUBLE_SLAB] = BlockDoubleSlabMudBrick.class; //734
         list[MUD_BRICK_STAIRS] = BlockStairsMudBrick.class; //735
 
         list[MANGROVE_ROOTS] = BlockMangroveRoots.class; //737
