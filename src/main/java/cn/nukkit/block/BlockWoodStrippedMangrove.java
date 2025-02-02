@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockColor;
+
 public class BlockWoodStrippedMangrove extends BlockWoodStripped {
 
     public BlockWoodStrippedMangrove() {
@@ -23,5 +25,10 @@ public class BlockWoodStrippedMangrove extends BlockWoodStripped {
     @Override
     public int getBurnAbility() {
         return 5;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.RED_BLOCK_COLOR;
     }
 }

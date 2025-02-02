@@ -2,6 +2,7 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockWoodMangrove extends BlockWoodBark {
 
@@ -35,11 +36,16 @@ public class BlockWoodMangrove extends BlockWoodBark {
 
     @Override
     protected int getStrippedDamage() {
-        return this.getDamage() & ~0x3;
+        return this.getDamage() & ~0x7;
     }
 
     @Override
     public Item toItem() {
         return new ItemBlock(Block.get(MANGROVE_WOOD));
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.RED_BLOCK_COLOR;
     }
 }
