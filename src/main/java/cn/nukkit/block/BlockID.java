@@ -715,7 +715,6 @@ public interface BlockID {
     int WARPED_HANGING_SIGN = 762;
     int MANGROVE_HANGING_SIGN = 763;
     int BAMBOO_MOSAIC = 764;
-
     int BAMBOO_PLANKS = 765;
 
     int BAMBOO_TRAPDOOR = 775;
