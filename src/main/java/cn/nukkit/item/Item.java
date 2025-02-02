@@ -402,7 +402,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemCopperIngot.class);
             registerNamespacedIdItem(ItemEchoShard.class);
             registerNamespacedIdItem(ItemRecoveryCompass.class);
-            registerNamespacedIdItem(ItemDoorMangrove.class);
+            //registerNamespacedIdItem(ItemDoorMangrove.class); Turned off because door not working right at the moment
             //TODO 修改类名格式为ItemSmithingTemplateXXX
             registerNamespacedIdItem(ItemNetheriteUpgradeSmithingTemplate.class);
             registerNamespacedIdItem(ItemSentryArmorTrimSmithingTemplate.class);
