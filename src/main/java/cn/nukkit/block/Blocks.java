@@ -590,16 +590,28 @@ public class Blocks {
         list[MUD_BRICKS] = BlockMudBricks.class; //730
 
         list[PACKED_MUD] = BlockPackedMud.class; //732
-
+        list[MUD_BRICK_SLAB] = BlockSlabMudBrick.class; //733
+        list[MUD_BRICK_DOUBLE_SLAB] = BlockDoubleSlabMudBrick.class; //734
         list[MUD_BRICK_STAIRS] = BlockStairsMudBrick.class; //735
-
+        list[MUD_BRICK_WALL] = BlockWallMudBrick.class; //736
         list[MANGROVE_ROOTS] = BlockMangroveRoots.class; //737
         list[MUDDY_MANGROVE_ROOTS] = BlockMangroveRootsMuddy.class; //738
         list[MANGROVE_LOG] = BlockLogMangrove.class; //739
         list[STRIPPED_MANGROVE_LOG] = BlockLogStrippedMangrove.class; //740
         list[MANGROVE_PLANKS] = BlockPlanksMangrove.class; //741
-
+        list[MANGROVE_BUTTON] = BlockButtonMangrove.class; //742
+        list[MANGROVE_STAIRS] = BlockStairsMangrove.class; //743
+        list[MANGROVE_SLAB] = BlockSlabMangrove.class; //744
+        list[MANGROVE_PRESSURE_PLATE] = BlockPressurePlateMangrove.class; //745
+        list[MANGROVE_FENCE] = BlockFenceMangrove.class; //746
+        list[MANGROVE_FENCE_GATE] = BlockFenceGateMangrove.class; //747
+        list[MANGROVE_DOOR_BLOCK] = BlockDoorMangrove.class; //748
+        list[MANGROVE_STANDING_SIGN] = BlockMangroveSignPost.class; //749
+        list[MANGROVE_WALL_SIGN] = BlockMangroveWallSign.class; //750
         list[MANGROVE_TRAPDOOR] = BlockTrapdoorMangrove.class; //751
+        list[MANGROVE_WOOD] = BlockWoodMangrove.class; //752
+        list[STRIPPED_MANGROVE_WOOD] = BlockWoodStrippedMangrove.class; //753
+        list[MANGROVE_DOUBLE_SLAB] = BlockDoubleSlabMangrove.class; //754
 
         list[BAMBOO_PLANKS] = BlockPlanksBamboo.class; //765
 

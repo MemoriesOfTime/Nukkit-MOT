@@ -2,14 +2,15 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.utils.BlockColor;
 
-public class BlockWoodCherry extends BlockWoodBark {
+public class BlockWoodMangrove extends BlockWoodBark {
 
-    public BlockWoodCherry() {
+    public BlockWoodMangrove() {
         super(0);
     }
 
-    public BlockWoodCherry(int meta) {
+    public BlockWoodMangrove(int meta) {
         super(meta);
     }
 
@@ -20,17 +21,17 @@ public class BlockWoodCherry extends BlockWoodBark {
 
     @Override
     public int getId() {
-        return CHERRY_WOOD;
+        return MANGROVE_WOOD;
     }
 
     @Override
     public String getName() {
-        return "Cherry Wood";
+        return "Mangrove Wood";
     }
 
     @Override
     protected int getStrippedId() {
-        return STRIPPED_CHERRY_WOOD;
+        return STRIPPED_MANGROVE_WOOD;
     }
 
     @Override
@@ -40,6 +41,11 @@ public class BlockWoodCherry extends BlockWoodBark {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(CHERRY_WOOD));
+        return new ItemBlock(Block.get(MANGROVE_WOOD));
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.RED_BLOCK_COLOR;
     }
 }

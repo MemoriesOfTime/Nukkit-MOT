@@ -698,7 +698,7 @@ public interface BlockID {
     int MANGROVE_PRESSURE_PLATE = 745;
     int MANGROVE_FENCE = 746;
     int MANGROVE_FENCE_GATE = 747;
-    int MANGROVE_DOOR = 748;
+    int MANGROVE_DOOR_BLOCK = 748;
     int MANGROVE_STANDING_SIGN = 749;
     int MANGROVE_WALL_SIGN = 750;
     int MANGROVE_TRAPDOOR = 751;
@@ -715,7 +715,6 @@ public interface BlockID {
     int WARPED_HANGING_SIGN = 762;
     int MANGROVE_HANGING_SIGN = 763;
     int BAMBOO_MOSAIC = 764;
-
     int BAMBOO_PLANKS = 765;
 
     int BAMBOO_TRAPDOOR = 775;

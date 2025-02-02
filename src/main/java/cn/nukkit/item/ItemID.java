@@ -346,4 +346,6 @@ public interface ItemID {
     int SOUL_CAMPFIRE = 801;
 
     int GLOW_ITEM_FRAME = 850;
+
+    int MANGROVE_SIGN = 1005;
 }
