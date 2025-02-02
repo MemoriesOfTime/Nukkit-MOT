@@ -47,6 +47,22 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 </dependencies>
 ```
 
+## Gradle
+#### Repository:
+```kts
+repositories {
+    mavenCentral()
+    maven("https://repo.lanink.cn/repository/maven-public/")
+} 
+```
+
+#### Dependencies:
+```kts
+dependencies {
+    compileOnly("cn.nukkit:Nukkit:MOT-SNAPSHOT")
+}
+```
+
 ## Credits
 [<img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="18"/>]() [Nukkit](https://github.com/CloudburstMC/Nukkit)  
 [<img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="18"/>]() [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
