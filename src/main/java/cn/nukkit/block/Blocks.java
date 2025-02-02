@@ -598,7 +598,14 @@ public class Blocks {
         list[MANGROVE_LOG] = BlockLogMangrove.class; //739
         list[STRIPPED_MANGROVE_LOG] = BlockLogStrippedMangrove.class; //740
         list[MANGROVE_PLANKS] = BlockPlanksMangrove.class; //741
+        list[MANGROVE_BUTTON] = BlockButtonMangrove.class; //742
+        list[MANGROVE_STAIRS] = BlockStairsMangrove.class; //743
 
+        list[MANGROVE_PRESSURE_PLATE] = BlockPressurePlateMangrove.class; //745
+
+        list[MANGROVE_DOOR_BLOCK] = BlockDoorMangrove.class; //748
+        list[MANGROVE_STANDING_SIGN] = BlockMangroveSignPost.class; //749
+        list[MANGROVE_WALL_SIGN] = BlockMangroveWallSign.class; //750
         list[MANGROVE_TRAPDOOR] = BlockTrapdoorMangrove.class; //751
 
         list[BAMBOO_PLANKS] = BlockPlanksBamboo.class; //765
