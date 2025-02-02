@@ -20,9 +20,12 @@ import cn.nukkit.utils.Faceable;
  */
 public abstract class BlockDoor extends BlockTransparentMeta implements Faceable {
 
+    public static final int DOOR_DIRECTION_BIT = 0x03;
     public static final int DOOR_OPEN_BIT = 0x04;
     public static final int DOOR_TOP_BIT = 0x08;
-    public static final int DOOR_HINGE_BIT = 0x01;
+    public static final int DOOR_HINGE_BIT = 0x10;
+
+    @Deprecated
     public static final int DOOR_POWERED_BIT = 0x02;
 
     private static final int[] faces = {1, 2, 3, 0};
@@ -67,9 +70,7 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
             up = this.up().getDamage();
         }
 
-        boolean isRight = (up & DOOR_HINGE_BIT) > 0;
-
-        return down & 0x07 | (isTop() ? 0x08 : 0) | (isRight ? 0x10 : 0);
+        return down & DOOR_DIRECTION_BIT | (isTop() ? DOOR_TOP_BIT : 0) | (this.isRightHinged() ? DOOR_HINGE_BIT : 0);
     }
 
     @Override
@@ -87,9 +88,9 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
                 this.z + 1
         );
 
-        int j = damage & 0x03;
-        boolean isOpen = ((damage & 0x04) > 0);
-        boolean isRight = ((damage & 0x10) > 0);
+        int j = damage & DOOR_DIRECTION_BIT;
+        boolean isOpen = ((damage & DOOR_OPEN_BIT) > 0);
+        boolean isRight = this.isRightHinged();
 
         if (j == 0) {
             if (isOpen) {
@@ -273,7 +274,9 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
 
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        if (this.y > 254) return false;
+        if (this.y > block.getLevel().getMaxBlockY() - 1) {
+            return false;
+        }
         if (face == BlockFace.UP) {
             Block blockUp = this.up();
             Block blockDown = this.down();
@@ -418,6 +421,6 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
 
     @Override
     public BlockFace getBlockFace() {
-        return BlockFace.fromHorizontalIndex(this.getDamage() & 0x7);
+        return BlockFace.fromHorizontalIndex(this.getDamage() & DOOR_DIRECTION_BIT);
     }
 }
