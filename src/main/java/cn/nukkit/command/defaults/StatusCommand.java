@@ -232,15 +232,6 @@ public class StatusCommand extends VanillaCommand {
 
             sender.sendMessage(TextFormat.GOLD + "Total VM memory: " + TextFormat.RED + totalMB + " MB.");
 
-
-            TextFormat playerColor = TextFormat.GREEN;
-            if (((float) server.getOnlinePlayers().size() / (float) server.getMaxPlayers()) > 0.85) {
-                playerColor = TextFormat.GOLD;
-            }
-
-            sender.sendMessage(TextFormat.GOLD + "Players: " + playerColor + server.getOnlinePlayers().size() + TextFormat.GREEN + " online, " +
-                    TextFormat.RED + server.getMaxPlayers() + TextFormat.GREEN + " max. ");
-
             for (Level level : server.getLevels().values()) {
                 sender.sendMessage(
                         TextFormat.GOLD + "World \"" + level.getFolderName() + "\"" + (!Objects.equals(level.getFolderName(), level.getName()) ? " (" + level.getName() + ")" : "") + ": " +

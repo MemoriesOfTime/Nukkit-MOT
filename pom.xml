@@ -62,7 +62,7 @@
         <dependency>
             <groupId>org.cloudburstmc.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.0.0.CR3-SNAPSHOT</version>
+            <version>1.0.0.CR1-20240330.101522-15</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
