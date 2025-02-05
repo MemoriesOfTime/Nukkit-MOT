@@ -40,6 +40,7 @@ public class ItemComponentPacket extends DataPacket {
             if (this.protocol >= ProtocolInfo.v1_21_60) {
                 for (Entry entry : this.entries) {
                     this.putString(entry.getName());
+                    this.putLShort(entry.getRuntimeId());
                     this.putBoolean(entry.isComponentBased());
                     this.putVarInt(entry.getVersion());
                     this.put(NBTIO.write(entry.getData(), ByteOrder.LITTLE_ENDIAN, true));

@@ -43,6 +43,7 @@ import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
+import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.item.trim.TrimFactory;
@@ -2878,20 +2879,52 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                         }
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
-                        if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
+                        if (this.protocol >= ProtocolInfo.v1_21_60) {
                             Int2ObjectOpenHashMap<ItemComponentPacket.Entry> entries = new Int2ObjectOpenHashMap<>();
                             int i = 0;
-                            for (var entry : Item.getCustomItemDefinition().entrySet()) {
-                                try {
-                                    CompoundTag data = entry.getValue().getNbt(this.protocol);
-                                    data.putShort("minecraft:identifier", i);
-                                    entries.put(i, new ItemComponentPacket.Entry(entry.getKey(), data));
-                                    i++;
-                                } catch (Exception e) {
-                                    log.error("ItemComponentPacket encoding error", e);
+                            for (var entry : RuntimeItems.getMapping(this.protocol).getItemPaletteEntries()) {
+                                if (entry.isComponentBased()) {
+                                    try {
+                                        CustomItemDefinition definition = Item.getCustomItemDefinition().get(entry.getIdentifier());
+                                        CompoundTag data = definition.getNbt(this.protocol);
+                                        data.putShort("minecraft:identifier", i);
+                                        entries.put(i, new ItemComponentPacket.Entry(
+                                                entry.getIdentifier(),
+                                                entry.getRuntimeId(),
+                                                entry.getVersion(),
+                                                true,
+                                                data
+                                        ));
+                                    } catch (Exception e) {
+                                        log.error("ItemComponentPacket encoding error", e);
+                                    }
+                                } else {
+                                    entries.put(i, new ItemComponentPacket.Entry(
+                                            entry.getIdentifier(),
+                                            entry.getRuntimeId(),
+                                            entry.getVersion(),
+                                            false,
+                                            new CompoundTag()
+                                    ));
                                 }
                             }
                             itemComponentPacket.setEntries(entries.values().toArray(ItemComponentPacket.Entry.EMPTY_ARRAY));
+                        } else {
+                            if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
+                                Int2ObjectOpenHashMap<ItemComponentPacket.Entry> entries = new Int2ObjectOpenHashMap<>();
+                                int i = 0;
+                                for (var entry : Item.getCustomItemDefinition().entrySet()) {
+                                    try {
+                                        CompoundTag data = entry.getValue().getNbt(this.protocol);
+                                        data.putShort("minecraft:identifier", i);
+                                        entries.put(i, new ItemComponentPacket.Entry(entry.getKey(), data));
+                                        i++;
+                                    } catch (Exception e) {
+                                        log.error("ItemComponentPacket encoding error", e);
+                                    }
+                                }
+                                itemComponentPacket.setEntries(entries.values().toArray(ItemComponentPacket.Entry.EMPTY_ARRAY));
+                            }
                         }
                         this.dataPacket(itemComponentPacket);
                     }

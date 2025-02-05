@@ -76,6 +76,9 @@ public class BossEventPacket extends DataPacket {
                     break;
                 case TYPE_TITLE:
                     this.title = this.getString();
+                    if (this.protocol >= ProtocolInfo.v1_21_60) {
+                        this.filteredTitle = this.getString();
+                    }
                     break;
             }
         }
@@ -110,6 +113,9 @@ public class BossEventPacket extends DataPacket {
                     break;
                 case TYPE_TITLE:
                     this.putString(this.title);
+                    if (this.protocol >= ProtocolInfo.v1_21_60) {
+                        this.putString(this.filteredTitle);
+                    }
                     break;
             }
         }

@@ -60,6 +60,8 @@ public class RuntimeItemMapping {
             JsonObject entry = element.getAsJsonObject();
             String identifier = entry.get("name").getAsString();
             int runtimeId = entry.get("id").getAsInt();
+            int version = entry.has("version") ? entry.get("version").getAsInt() : 0;
+            boolean componentBased = entry.has("component_based") && entry.get("component_based").getAsBoolean();
 
             //高版本"minecraft:wool"的名称改为"minecraft:white_wool"
             //他们的legacyId均为35，这里避免冲突忽略"minecraft:wool"
@@ -103,7 +105,7 @@ public class RuntimeItemMapping {
                 }
             }
 
-            this.registerItem(identifier, runtimeId, legacyId, damage, hasDamage);
+            this.registerItem(identifier, runtimeId, version, componentBased, legacyId, damage, hasDamage);
         }
 
         this.generatePalette();
@@ -118,6 +120,10 @@ public class RuntimeItemMapping {
     }
 
     public void registerItem(String identifier, int runtimeId, int legacyId, int damage, boolean hasDamage) {
+        this.registerItem(identifier, runtimeId, 0, false, legacyId, damage, hasDamage);
+    }
+
+    public void registerItem(String identifier, int runtimeId, int version, boolean componentBased, int legacyId, int damage, boolean hasDamage) {
         int fullId = this.getFullId(legacyId, damage);
         LegacyEntry legacyEntry = new LegacyEntry(legacyId, hasDamage, damage);
 
@@ -135,7 +141,7 @@ public class RuntimeItemMapping {
         if (!hasDamage && this.legacy2Runtime.containsKey(fullId)) {
             log.debug("RuntimeItemMapping contains duplicated legacy item state runtimeId=" + runtimeId + " identifier=" + identifier);
         } else {
-            RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, runtimeId, hasDamage);
+            RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, runtimeId, hasDamage, version, componentBased);
             this.legacy2Runtime.put(fullId, runtimeEntry);
             this.itemPaletteEntries.add(runtimeEntry);
         }
@@ -361,6 +367,10 @@ public class RuntimeItemMapping {
         return this.itemPalette;
     }
 
+    public List<RuntimeEntry> getItemPaletteEntries() {
+        return itemPaletteEntries;
+    }
+
     public int getProtocolId() {
         return this.protocolId;
     }
@@ -381,7 +391,8 @@ public class RuntimeItemMapping {
         private final String identifier;
         private final int runtimeId;
         private final boolean hasDamage;
-        private final boolean isCustomItem;
+        private final int version;
+        private final boolean componentBased;
 
         public RuntimeEntry(String identifier, int runtimeId, boolean hasDamage) {
             this(identifier, runtimeId, hasDamage, false);
@@ -391,7 +402,21 @@ public class RuntimeItemMapping {
             this.identifier = identifier;
             this.runtimeId = runtimeId;
             this.hasDamage = hasDamage;
-            this.isCustomItem = isCustomItem;
+            this.version = 0;
+            this.componentBased = isCustomItem;
+        }
+
+        public RuntimeEntry(String identifier, int runtimeId, boolean hasDamage, int version, boolean componentBased) {
+            this.identifier = identifier;
+            this.runtimeId = runtimeId;
+            this.hasDamage = hasDamage;
+            this.version = version;
+            this.componentBased = componentBased;
+        }
+
+        @Deprecated
+        public boolean isCustomItem() {
+            return this.componentBased;
         }
     }
 }

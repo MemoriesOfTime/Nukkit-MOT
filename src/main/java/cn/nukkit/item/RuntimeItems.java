@@ -46,6 +46,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping729;
     private static RuntimeItemMapping mapping748;
     private static RuntimeItemMapping mapping766;
+    private static RuntimeItemMapping mapping776;
 
     public static RuntimeItemMapping[] VALUES;
 
@@ -121,6 +122,7 @@ public class RuntimeItems {
         mapping729 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_30);
         mapping748 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_40);
         mapping766 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_50);
+        mapping776 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_60);
 
         VALUES = new RuntimeItemMapping[]{
                 mapping361,
@@ -147,12 +149,15 @@ public class RuntimeItems {
                 mapping712,
                 mapping729,
                 mapping748,
-                mapping766
+                mapping766,
+                mapping776
         };
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_21_50_26) {
+        if (protocolId >= ProtocolInfo.v1_21_60) {
+            return mapping776;
+        } else if (protocolId >= ProtocolInfo.v1_21_50_26) {
             return mapping766;
         } else if (protocolId >= ProtocolInfo.v1_21_40) {
             return mapping748;
@@ -235,6 +240,7 @@ public class RuntimeItems {
         return (id & 0x1) != 0;
     }
 
+    @Deprecated
     @ToString
     @RequiredArgsConstructor
     static class Entry {
