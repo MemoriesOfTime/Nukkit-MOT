@@ -71,6 +71,9 @@ public class UpdateAbilitiesPacket extends DataPacket {
         buffer.putLInt(getAbilitiesNumber(abilityLayer.getAbilitiesSet()));
         buffer.putLInt(getAbilitiesNumber(abilityLayer.getAbilityValues()));
         buffer.putLFloat(abilityLayer.getFlySpeed());
+        if (this.protocol >= ProtocolInfo.v1_21_60) {
+            buffer.putLFloat(abilityLayer.getVerticalFlySpeed());
+        }
         buffer.putLFloat(abilityLayer.getWalkSpeed());
     }
 
