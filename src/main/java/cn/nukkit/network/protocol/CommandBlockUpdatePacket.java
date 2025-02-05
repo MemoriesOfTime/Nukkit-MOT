@@ -19,6 +19,10 @@ public class CommandBlockUpdatePacket extends DataPacket {
     public String command;
     public String lastOutput;
     public String name;
+    /**
+     * v776 1.21.60
+     */
+    private String filteredName;
     public boolean shouldTrackOutput;
     public int tickDelay;
     public boolean executingOnFirstTick;
@@ -45,6 +49,9 @@ public class CommandBlockUpdatePacket extends DataPacket {
         this.command = this.getString();
         this.lastOutput = this.getString();
         this.name = this.getString();
+        if (this.protocol >= ProtocolInfo.v1_21_60) {
+            this.filteredName = this.getString();
+        }
         this.shouldTrackOutput = this.getBoolean();
         if (this.protocol >= ProtocolInfo.v1_12_0) {
             this.tickDelay = this.getLInt();
@@ -67,6 +74,9 @@ public class CommandBlockUpdatePacket extends DataPacket {
         this.putString(this.command);
         this.putString(this.lastOutput);
         this.putString(this.name);
+        if (this.protocol >= ProtocolInfo.v1_21_60) {
+            this.putString(this.filteredName);
+        }
         this.putBoolean(this.shouldTrackOutput);
         if (this.protocol >= ProtocolInfo.v1_12_0) {
             this.putLInt(this.tickDelay);

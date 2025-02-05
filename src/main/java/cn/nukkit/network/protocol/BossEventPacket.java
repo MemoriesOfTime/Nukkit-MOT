@@ -35,6 +35,10 @@ public class BossEventPacket extends DataPacket {
     public long playerEid;
     public float healthPercent;
     public String title = "";
+    /**
+     * v776 1.21.60
+     */
+    public String filteredTitle = "";
     public short unknown;
     public int color;
     public int overlay;
@@ -57,6 +61,9 @@ public class BossEventPacket extends DataPacket {
                     break;
                 case TYPE_SHOW:
                     this.title = this.getString();
+                    if (this.protocol >= ProtocolInfo.v1_21_60) {
+                        this.filteredTitle = this.getString();
+                    }
                     this.healthPercent = this.getLFloat();
                 case TYPE_UPDATE_PROPERTIES:
                     this.unknown = (short) this.getShort();
@@ -88,6 +95,9 @@ public class BossEventPacket extends DataPacket {
                     break;
                 case TYPE_SHOW:
                     this.putString(this.title);
+                    if (this.protocol >= ProtocolInfo.v1_21_60) {
+                        this.putString(this.filteredTitle);
+                    }
                     this.putLFloat(this.healthPercent);
                 case TYPE_UPDATE_PROPERTIES:
                     this.putShort(this.unknown);
