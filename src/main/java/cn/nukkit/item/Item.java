@@ -1347,7 +1347,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             if (entry.getShort("id") == id) {
                 Enchantment e = Enchantment.getEnchantment(entry.getShort("id"));
                 if (e != null) {
-                    e.setLevel(entry.getShort("lvl"));
+                    e.setLevel(entry.getShort("lvl"), Server.getInstance().forcedSafetyEnchant);
                     return e;
                 }
             }
@@ -1409,7 +1409,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         for (CompoundTag entry : ench.getAll()) {
             Enchantment e = Enchantment.getEnchantment(entry.getShort("id"));
             if (e != null) {
-                e.setLevel(entry.getShort("lvl"));
+                e.setLevel(entry.getShort("lvl"), Server.getInstance().forcedSafetyEnchant);
                 enchantments.add(e);
             }
         }
