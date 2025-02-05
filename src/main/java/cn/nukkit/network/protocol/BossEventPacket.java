@@ -36,7 +36,7 @@ public class BossEventPacket extends DataPacket {
     public float healthPercent;
     public String title = "";
     /**
-     * v776 1.21.60
+     * @since v776 1.21.60
      */
     public String filteredTitle = "";
     public short unknown;

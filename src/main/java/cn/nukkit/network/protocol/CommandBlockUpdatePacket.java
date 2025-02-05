@@ -20,7 +20,7 @@ public class CommandBlockUpdatePacket extends DataPacket {
     public String lastOutput;
     public String name;
     /**
-     * v776 1.21.60
+     * @since v776 1.21.60
      */
     private String filteredName;
     public boolean shouldTrackOutput;

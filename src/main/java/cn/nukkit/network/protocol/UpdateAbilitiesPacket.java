@@ -36,7 +36,8 @@ public class UpdateAbilitiesPacket extends DataPacket {
             PlayerAbility.MUTED,
             PlayerAbility.WORLD_BUILDER,
             PlayerAbility.NO_CLIP,
-            PlayerAbility.PRIVILEGED_BUILDER
+            PlayerAbility.PRIVILEGED_BUILDER,
+            PlayerAbility.VERTICAL_FLY_SPEED,
     };
     private static final EnumMap<PlayerAbility, Integer> FLAGS_TO_BITS = new EnumMap<>(PlayerAbility.class);
 
