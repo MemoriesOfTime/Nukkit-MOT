@@ -3124,7 +3124,7 @@ public class Server {
         this.pvpEnabled = this.getPropertyBoolean("pvp", true);
         this.announceAchievements = this.getPropertyBoolean("announce-player-achievements", false);
         this.spawnEggsEnabled = this.getPropertyBoolean("spawn-eggs", true);
-        this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", false);
+        this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
         this.xpBottlesOnCreative = this.getPropertyBoolean("xp-bottles-on-creative", false);
         this.shouldSavePlayerData = this.getPropertyBoolean("save-player-data", true);
         this.mobsFromBlocks = this.getPropertyBoolean("block-listener", true);
@@ -3270,7 +3270,7 @@ public class Server {
             put("op-in-game", true);
             put("xp-bottles-on-creative", true);
             put("spawn-eggs", true);
-            put("forced-safety-enchant", false);
+            put("forced-safety-enchant", true);
             put("mob-ai", true);
             put("entity-auto-spawn-task", true);
             put("entity-despawn-task", true);
