@@ -1,5 +1,6 @@
 package cn.nukkit.item.enchantment;
 
+import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
@@ -428,7 +429,7 @@ public abstract class Enchantment implements Cloneable {
     }
 
     public Enchantment setLevel(int level, boolean safe) {
-        if (!safe) {
+        if (!safe && !Server.getInstance().forcedSafetyEnchant) {
             this.level = level;
             return this;
         }
