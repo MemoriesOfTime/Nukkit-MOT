@@ -594,7 +594,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(file)) {
             itemsArray = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("items");
         } catch (Exception e) {
-            throw new AssertionError("Error loading required block states!", e);
+            throw new AssertionError("Error while loading creative items for protocol " + protocol, e);
         }
 
         for (JsonElement element : itemsArray) {

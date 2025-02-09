@@ -157,7 +157,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void initChunk() {
         if (this.getProvider() != null && !this.isInit) {
-            boolean changed = false;
+            boolean changed = this.hasChanged();
             if (this.NBTentities != null) {
                 for (CompoundTag nbt : NBTentities) {
                     if (!nbt.contains("id")) {
