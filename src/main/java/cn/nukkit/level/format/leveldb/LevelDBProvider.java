@@ -469,80 +469,8 @@ public class LevelDBProvider implements LevelProvider {
 
         chunk.setChanged(false);
 
-        WriteBatch writeBatch = this.db.createWriteBatch();
-
-        if (chunk.isSubChunksDirty()) {
-            ChunkSerializers.serializeChunk(writeBatch, chunk, CURRENT_LEVEL_CHUNK_VERSION);
-        }
-
-        if (chunk.isHeightmapOrBiomesDirty()) {
-            if (chunk.has3dBiomes()) {
-                Data3dSerializer.serialize(writeBatch, chunk);
-            } else {
-                Data2dSerializer.serialize(writeBatch, chunk);
-            }
-        }
-
-        writeBatch.put(LevelDBKey.VERSION.getKey(chunkX, chunkZ, this.level.getDimension()), CHUNK_VERSION_SAVE_DATA);
-        writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()), Binary.writeLInt(chunk.getState().ordinal()));
-
-        BlockEntitySerializer.saveBlockEntities(writeBatch, chunk);
-        EntitySerializer.saveEntities(writeBatch, chunk);
-
-        Collection<BlockUpdateEntry> blockUpdateEntries = null;
-        // TODO randomBlockUpdate
-        //Collection<BlockUpdateEntry> randomBlockUpdateEntries = null;
-        long currentTick = 0;
-
-        LevelProvider provider;
-        if ((provider = chunk.getProvider()) != null) {
-            Level level = provider.getLevel();
-            currentTick = level.getCurrentTick();
-            //dirty?
-            blockUpdateEntries = level.getPendingBlockUpdates(chunk);
-            //randomBlockUpdateEntries = level.getPendingRandomBlockUpdates(chunk);
-        }
-
-        try {
-            byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension());
-            if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
-                NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
-                if (ticks != null) {
-                    ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
-                    NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
-                    outputStream.writeTag(ticks);
-                    writeBatch.put(pendingScheduledTicksKey, Utils.convertByteBuf2Array(byteBuf));
-                    byteBuf.release();
-                } else {
-                    writeBatch.delete(pendingScheduledTicksKey);
-                }
-            } else {
-                writeBatch.delete(pendingScheduledTicksKey);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-       /* byte[] pendingRandomTicksKey = PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ);
-        if (randomBlockUpdateEntries != null && !randomBlockUpdateEntries.isEmpty()) {
-            CompoundTag ticks = saveBlockTickingQueue(randomBlockUpdateEntries, currentTick);
-            if (ticks != null) {
-                try {
-                    writeBatch.put(pendingRandomTicksKey, NBTIO.write(ticks, ByteOrder.LITTLE_ENDIAN));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            } else {
-                writeBatch.delete(pendingRandomTicksKey);
-            }
-        } else {
-            writeBatch.delete(pendingRandomTicksKey);
-        }*/
-
-        writeBatch.delete(DATA_2D_LEGACY.getKey(chunkX, chunkZ, this.level.getDimension()));
-        writeBatch.delete(LEGACY_TERRAIN.getKey(chunkX, chunkZ, this.level.getDimension()));
-
-        return CompletableFuture.runAsync(() -> this.saveChunkCallback(writeBatch, chunk), this.executor);
+        WriteBatch batch = this.save0(chunkX, chunkZ, chunk);
+        return CompletableFuture.runAsync(() -> this.saveChunkCallback(batch, chunk), this.executor);
     }
 
     public void saveChunkSync(int chunkX, int chunkZ, FullChunk fullChunk) {
@@ -559,6 +487,11 @@ public class LevelDBProvider implements LevelProvider {
 
         chunk.setChanged(false);
 
+        WriteBatch batch = this.save0(chunkX, chunkZ, chunk);
+        this.saveChunkCallback(batch, chunk);
+    }
+
+    private WriteBatch save0(int chunkX, int chunkZ, LevelDBChunk chunk) {
         WriteBatch writeBatch = this.db.createWriteBatch();
 
         if (chunk.isSubChunksDirty()) {
@@ -593,23 +526,23 @@ public class LevelDBProvider implements LevelProvider {
             //randomBlockUpdateEntries = level.getPendingRandomBlockUpdates(chunk);
         }
 
-        try {
-            byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension());
-            if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
-                NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
-                if (ticks != null) {
-                    ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
-                    NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
+        byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension());
+        if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
+            NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
+            if (ticks != null) {
+                ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+                try (NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf))) {
                     outputStream.writeTag(ticks);
-                    writeBatch.put(pendingScheduledTicksKey, Utils.convertByteBuf2Array(byteBuf));
-                } else {
-                    writeBatch.delete(pendingScheduledTicksKey);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
+                writeBatch.put(pendingScheduledTicksKey, Utils.convertByteBuf2Array(byteBuf));
+                byteBuf.release();
             } else {
                 writeBatch.delete(pendingScheduledTicksKey);
             }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        } else {
+            writeBatch.delete(pendingScheduledTicksKey);
         }
 
        /* byte[] pendingRandomTicksKey = PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ);
@@ -631,7 +564,7 @@ public class LevelDBProvider implements LevelProvider {
         writeBatch.delete(DATA_2D_LEGACY.getKey(chunkX, chunkZ, this.level.getDimension()));
         writeBatch.delete(LEGACY_TERRAIN.getKey(chunkX, chunkZ, this.level.getDimension()));
 
-        this.saveChunkCallback(writeBatch, chunk);
+        return writeBatch;
     }
 
     private void saveChunkCallback(WriteBatch batch, LevelDBChunk chunk) {
