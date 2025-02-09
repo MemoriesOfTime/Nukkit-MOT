@@ -112,6 +112,7 @@ public class AdventureSettings implements Cloneable {
 
             layer.setWalkSpeed(Player.DEFAULT_SPEED);
             layer.setFlySpeed(Player.DEFAULT_FLY_SPEED);
+            layer.setVerticalFlySpeed(Player.DEFAULT_FLY_SPEED); // TODO check
             packet.getAbilityLayers().add(layer);
 
             if (this.get(Type.NO_CLIP)) {
@@ -181,6 +182,7 @@ public class AdventureSettings implements Cloneable {
         TELEPORT(AdventureSettingsPacket.TELEPORT, PlayerAbility.TELEPORT, false),
         BUILD(AdventureSettingsPacket.BUILD, PlayerAbility.BUILD, true),
         PRIVILEGED_BUILDER(0, PlayerAbility.PRIVILEGED_BUILDER, false, ProtocolInfo.v1_19_70),
+        VERTICAL_FLY_SPEED(0, PlayerAbility.VERTICAL_FLY_SPEED, false, ProtocolInfo.v1_21_60), //TODO check
 
         @Deprecated //1.19.30弃用
         DEFAULT_LEVEL_PERMISSIONS(AdventureSettingsPacket.DEFAULT_LEVEL_PERMISSIONS, null, false);
