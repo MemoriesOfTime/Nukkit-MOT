@@ -2,6 +2,7 @@ package cn.nukkit.network.protocol.types.camera;
 
 import cn.nukkit.math.Vector2f;
 import cn.nukkit.math.Vector3f;
+import cn.nukkit.network.protocol.types.camera.aimassist.CameraPresetAimAssist;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -75,7 +76,7 @@ public final class CameraPreset implements NamedDefinition {
     /**
      * @since v766
      */
-    private CameraAimAssistPreset aimAssistPreset;
+    private CameraPresetAimAssist aimAssistPreset;
 
     private int runtimeId;
 
@@ -99,7 +100,7 @@ public final class CameraPreset implements NamedDefinition {
         this.alignTargetAndCameraForward = alignTargetAndCameraForward;
     }
 
-    public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, Vector2f viewOffset, Float radius, @Nullable CameraAudioListener listener, OptionalBoolean playEffect, Float rotationSpeed, OptionalBoolean snapToTarget, Vector3f entityOffset, Vector2f horizontalRotationLimit, Vector2f verticalRotationLimit, OptionalBoolean continueTargeting, OptionalBoolean alignTargetAndCameraForward, Float blockListeningRadius, CameraAimAssistPreset aimAssistPreset) {
+    public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, Vector2f viewOffset, Float radius, @Nullable CameraAudioListener listener, OptionalBoolean playEffect, Float rotationSpeed, OptionalBoolean snapToTarget, Vector3f entityOffset, Vector2f horizontalRotationLimit, Vector2f verticalRotationLimit, OptionalBoolean continueTargeting, OptionalBoolean alignTargetAndCameraForward, Float blockListeningRadius, CameraPresetAimAssist aimAssistPreset) {
         this.identifier = identifier;
         this.parentPreset = parentPreset;
         this.pos = pos;

@@ -589,6 +589,10 @@ public class Network {
                 .registerPacket(ProtocolInfo.JIGSAW_STRUCTURE_DATA_PACKET, JigsawStructureDataPacket.class)
                 .registerPacket(ProtocolInfo.CURRENT_STRUCTURE_FEATURE_PACKET, CurrentStructureFeaturePacket.class)
                 .registerPacket(ProtocolInfo.SERVERBOUND_DIAGNOSTICS_PACKET, ServerboundDiagnosticsPacket.class)
+                .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PACKET, CameraAimAssistPacket.class)
+                .registerPacket(ProtocolInfo.CONTAINER_REGISTRY_CLEANUP_PACKET, ContainerRegistryCleanupPacket.class)
+                .registerPacket(ProtocolInfo.MOVEMENT_EFFECT_PACKET, MovementEffectPacket.class)
+                .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PRESETS_PACKET, CameraAimAssistPresetsPacket.class)
                 .build();
     }
 

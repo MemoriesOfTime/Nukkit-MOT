@@ -318,6 +318,13 @@ public interface ProtocolInfo {
     int CURRENT_STRUCTURE_FEATURE_PACKET = 314;
     int SERVERBOUND_DIAGNOSTICS_PACKET = 315;
 
+
+    int CAMERA_AIM_ASSIST_PACKET = 316;
+    int CONTAINER_REGISTRY_CLEANUP_PACKET = 317;
+    int MOVEMENT_EFFECT_PACKET = 318;
+    int SET_MOVEMENT_AUTHORITY_PACKET = 319; // 319 c
+    int CAMERA_AIM_ASSIST_PRESETS_PACKET = 320;
+
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;
     }
