@@ -322,7 +322,7 @@ public interface ProtocolInfo {
     int CAMERA_AIM_ASSIST_PACKET = 316;
     int CONTAINER_REGISTRY_CLEANUP_PACKET = 317;
     int MOVEMENT_EFFECT_PACKET = 318;
-    int SET_MOVEMENT_AUTHORITY_PACKET = 319; // 319 c
+    int SET_MOVEMENT_AUTHORITY_PACKET = 319;
     int CAMERA_AIM_ASSIST_PRESETS_PACKET = 320;
 
     static int toNewProtocolID(byte oldProtocolID) {
