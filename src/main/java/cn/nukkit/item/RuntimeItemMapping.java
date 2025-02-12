@@ -6,6 +6,9 @@ import cn.nukkit.item.RuntimeItems.MappingEntry;
 import cn.nukkit.item.customitem.CustomItem;
 import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ItemComponentPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
@@ -22,10 +25,13 @@ import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
+import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.zip.GZIPInputStream;
 
 @Log4j2
 public class RuntimeItemMapping {
@@ -35,6 +41,8 @@ public class RuntimeItemMapping {
     private final Int2ObjectMap<LegacyEntry> runtime2Legacy = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<RuntimeEntry> legacy2Runtime = new Int2ObjectOpenHashMap<>();
     private final Map<String, LegacyEntry> identifier2Legacy = new HashMap<>();
+
+    private final Map<String, ItemComponentPacket.Entry> vanillaItems = new HashMap<>();
 
     private final List<RuntimeEntry> itemPaletteEntries = new ArrayList<>();
     private final Int2ObjectMap<String> runtimeId2Name = new Int2ObjectOpenHashMap<>();
@@ -53,6 +61,15 @@ public class RuntimeItemMapping {
         }
         JsonArray json = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonArray();
 
+        CompoundTag itemComponents = null;
+        if (protocolId >= ProtocolInfo.v1_21_60) {
+            try (InputStream inputStream = RuntimeItemMapping.class.getClassLoader().getResourceAsStream("ItemComponents/item_components_" + protocolId + ".nbt")) {
+                itemComponents = NBTIO.read(new BufferedInputStream(new GZIPInputStream(inputStream)), ByteOrder.BIG_ENDIAN, false);
+            } catch (Exception e) {
+                throw new AssertionError("Error while loading item_components_" + protocolId + ".nbt", e);
+            }
+        }
+
         for (JsonElement element : json) {
             if (!element.isJsonObject()) {
                 throw new IllegalStateException("Invalid entry");
@@ -61,7 +78,20 @@ public class RuntimeItemMapping {
             String identifier = entry.get("name").getAsString();
             int runtimeId = entry.get("id").getAsInt();
             int version = entry.has("version") ? entry.get("version").getAsInt() : 0;
-            boolean componentBased = entry.has("component_based") && entry.get("component_based").getAsBoolean();
+            boolean componentBased = entry.has("componentBased") && entry.get("componentBased").getAsBoolean();
+            if (protocolId >= ProtocolInfo.v1_21_60) {
+                CompoundTag components = null;
+                if (componentBased) {
+                    components = new CompoundTag().putCompound("components", (CompoundTag) itemComponents.get(identifier));
+                }
+                this.vanillaItems.put(identifier, new ItemComponentPacket.Entry(
+                        identifier,
+                        runtimeId,
+                        componentBased,
+                        version,
+                        components
+                ));
+            }
 
             //高版本"minecraft:wool"的名称改为"minecraft:white_wool"
             //他们的legacyId均为35，这里避免冲突忽略"minecraft:wool"
@@ -368,7 +398,11 @@ public class RuntimeItemMapping {
     }
 
     public List<RuntimeEntry> getItemPaletteEntries() {
-        return itemPaletteEntries;
+        return this.itemPaletteEntries;
+    }
+
+    public Collection<ItemComponentPacket.Entry> getVanillaItemDefinitions() {
+        return this.vanillaItems.values();
     }
 
     public int getProtocolId() {

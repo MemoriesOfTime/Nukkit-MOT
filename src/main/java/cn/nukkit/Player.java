@@ -2881,35 +2881,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
                         if (this.protocol >= ProtocolInfo.v1_21_60) {
-                            Int2ObjectOpenHashMap<ItemComponentPacket.Entry> entries = new Int2ObjectOpenHashMap<>();
-                            int i = 0;
-                            for (var entry : RuntimeItems.getMapping(this.protocol).getItemPaletteEntries()) {
-                                if (entry.isComponentBased()) {
-                                    try {
-                                        CustomItemDefinition definition = Item.getCustomItemDefinition().get(entry.getIdentifier());
-                                        CompoundTag data = definition.getNbt(this.protocol);
-                                        data.putShort("minecraft:identifier", i);
-                                        entries.put(i, new ItemComponentPacket.Entry(
-                                                entry.getIdentifier(),
-                                                entry.getRuntimeId(),
-                                                entry.getVersion(),
-                                                true,
-                                                data
-                                        ));
-                                    } catch (Exception e) {
-                                        log.error("ItemComponentPacket encoding error", e);
-                                    }
-                                } else {
-                                    entries.put(i, new ItemComponentPacket.Entry(
-                                            entry.getIdentifier(),
-                                            entry.getRuntimeId(),
-                                            entry.getVersion(),
-                                            false,
-                                            new CompoundTag()
-                                    ));
+                            Collection<ItemComponentPacket.Entry> vanillaItems = RuntimeItems.getMapping(this.protocol).getVanillaItemDefinitions();
+                            Set<Map.Entry<String, CustomItemDefinition>> itemDefinitions = Item.getCustomItemDefinition().entrySet();
+                            List<ItemComponentPacket.Entry> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
+                            entries.addAll(vanillaItems);
+                            if (this.server.enableExperimentMode && !itemDefinitions.isEmpty()) {
+                                for (Map.Entry<String, CustomItemDefinition> entry : itemDefinitions) {
+                                    Item item = Item.fromString(entry.getKey());
+                                    CompoundTag data = entry.getValue().getNbt(this.protocol);
+                                    entries.add(new ItemComponentPacket.Entry(
+                                            entry.getKey(),
+                                            item.getNetworkId(this.protocol),
+                                            true,
+                                            1,
+                                            data));
                                 }
                             }
-                            itemComponentPacket.setEntries(entries.values().toArray(ItemComponentPacket.Entry.EMPTY_ARRAY));
+                            itemComponentPacket.setEntries(entries.toArray(ItemComponentPacket.Entry.EMPTY_ARRAY));
                         } else {
                             if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
                                 Int2ObjectOpenHashMap<ItemComponentPacket.Entry> entries = new Int2ObjectOpenHashMap<>();

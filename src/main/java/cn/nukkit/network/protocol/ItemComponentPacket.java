@@ -15,6 +15,16 @@ public class ItemComponentPacket extends DataPacket {
 
     public Entry[] entries = Entry.EMPTY_ARRAY;
 
+    private static final byte[] EMPTY_COMPOUND_TAG;
+
+    static {
+        try {
+            EMPTY_COMPOUND_TAG = NBTIO.writeNetwork(new CompoundTag(""));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public void setEntries(Entry[] entries) {
         this.entries = entries == null? null : entries.length == 0? Entry.EMPTY_ARRAY : entries.clone();
     }
@@ -43,7 +53,12 @@ public class ItemComponentPacket extends DataPacket {
                     this.putLShort(entry.getRuntimeId());
                     this.putBoolean(entry.isComponentBased());
                     this.putVarInt(entry.getVersion());
-                    this.put(NBTIO.write(entry.getData(), ByteOrder.LITTLE_ENDIAN, true));
+
+                    if (entry.isComponentBased()) {
+                        this.put(NBTIO.write(entry.getData(), ByteOrder.LITTLE_ENDIAN, true));
+                    } else {
+                        this.put(EMPTY_COMPOUND_TAG);
+                    }
                 }
             } else {
                 for (Entry entry : this.entries) {
@@ -63,8 +78,8 @@ public class ItemComponentPacket extends DataPacket {
 
         private final String name;
         private final int runtimeId;
-        private final int version;
         private final boolean componentBased;
+        private final int version;
         private final CompoundTag data;
 
         @Deprecated
@@ -73,15 +88,15 @@ public class ItemComponentPacket extends DataPacket {
             this.data = data;
 
             this.runtimeId = 0;
-            this.version = 0;
             this.componentBased = false;
+            this.version = 0;
         }
 
-        public Entry(String name, int runtimeId, int version, boolean componentBased, CompoundTag data) {
+        public Entry(String name, int runtimeId, boolean componentBased, int version, CompoundTag data) {
             this.name = name;
             this.runtimeId = runtimeId;
-            this.version = version;
             this.componentBased = componentBased;
+            this.version = version;
             this.data = data;
         }
 

@@ -620,7 +620,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             for (JsonElement obj : groupsArray.asList()) {
                 JsonObject groupRoot = obj.getAsJsonObject();
 
-                Item icon = mapping.parseCreativeItem(groupRoot.get("icon").getAsJsonObject(), true);
+                Item icon = mapping.parseCreativeItem(groupRoot.get("icon").getAsJsonObject(), true, blockPaletteProtocol);
                 if (icon == null) {
                     icon = Item.get(AIR);
                 }
@@ -643,7 +643,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 if (protocol >= ProtocolInfo.v1_21_60) {
                     creativeGroup = creativeItems.getGroups().get(creativeItem.get("groupId").getAsInt());
                 }
-                creativeItems.add(item.clone(), creativeGroup);
+                creativeItems.add(item, creativeGroup);
             }
         }
     }
@@ -895,10 +895,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static void removeCreativeItem(int protocol, Item item) {
-        int index = getCreativeItemIndex(protocol, item);
-        if (index != -1) {
-            Item.getCreativeItems(protocol).remove(index);
-        }
+        Item.getCreativeItemsAndGroups(protocol).getContents().remove(item);
     }
 
     public static boolean isCreativeItem(Item item) {
@@ -907,7 +904,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static boolean isCreativeItem(int protocol, Item item) {
-        for (Item aCreative : Item.getCreativeItems(protocol)) {
+        for (Item aCreative : Item.getCreativeItemsAndGroups(protocol).getItems()) {
             if (item.equals(aCreative, !item.isTool())) {
                 return true;
             }
@@ -921,7 +918,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static Item getCreativeItem(int protocol, int index) {
-        return (index >= 0 && index < Item.getCreativeItems(protocol).size()) ? Item.getCreativeItems(protocol).get(index) : null;
+        ArrayList<Item> items = Item.getCreativeItems(protocol);
+        return (index >= 0 && index < items.size()) ? items.get(index) : null;
     }
 
     public static int getCreativeItemIndex(Item item) {
@@ -930,8 +928,9 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static int getCreativeItemIndex(int protocol, Item item) {
-        for (int i = 0; i < Item.getCreativeItems(protocol).size(); i++) {
-            if (item.equals(Item.getCreativeItems(protocol).get(i), !item.isTool())) {
+        ArrayList<Item> items = Item.getCreativeItems(protocol);
+        for (int i = 0; i < items.size(); i++) {
+            if (item.equals(items.get(i), !item.isTool())) {
                 return i;
             }
         }
