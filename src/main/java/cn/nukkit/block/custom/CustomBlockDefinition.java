@@ -116,34 +116,34 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
         @Deprecated
         public Builder creativeGroupAndCategory(ItemCreativeGroup creativeGroup, ItemCreativeCategory creativeCategory) {
             this.nbt.getCompound("menu_category")
-                    .putString("category", creativeCategory.name().toLowerCase(Locale.ENGLISH))
+                    .putString("category", creativeCategory.name().toLowerCase(Locale.ROOT))
                     .putString("group", creativeGroup.getGroupName());
             return this;
         }
 
         public Builder creativeGroupAndCategory(CreativeItemGroup creativeGroup, CreativeItemCategory creativeCategory) {
             this.nbt.getCompound("menu_category")
-                    .putString("category", creativeCategory.name().toLowerCase(Locale.ENGLISH))
+                    .putString("category", creativeCategory.name().toLowerCase(Locale.ROOT))
                     .putString("group", creativeGroup.getName());
             return this;
         }
 
         public Builder creativeCategory(String creativeCategory) {
             this.nbt.getCompound("menu_category")
-                    .putString("category", creativeCategory.toLowerCase(Locale.ENGLISH));
+                    .putString("category", creativeCategory.toLowerCase(Locale.ROOT));
             return this;
         }
 
         @Deprecated
         public Builder creativeCategory(ItemCreativeCategory creativeCategory) {
             this.nbt.getCompound("menu_category")
-                    .putString("category", creativeCategory.name().toLowerCase(Locale.ENGLISH));
+                    .putString("category", creativeCategory.name().toLowerCase(Locale.ROOT));
             return this;
         }
 
         public Builder creativeCategory(CreativeItemCategory creativeCategory) {
             this.nbt.getCompound("menu_category")
-                    .putString("category", creativeCategory.name().toLowerCase(Locale.ENGLISH));
+                    .putString("category", creativeCategory.name().toLowerCase(Locale.ROOT));
             return this;
         }
 
@@ -175,7 +175,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
                 log.error("creativeGroup has an invalid value!");
                 return this;
             }
-            this.nbt.getCompound("components").getCompound("menu_category").putString("group", creativeGroup.toLowerCase(Locale.ENGLISH));
+            this.nbt.getCompound("components").getCompound("menu_category").putString("group", creativeGroup.toLowerCase(Locale.ROOT));
             return this;
         }
 
@@ -234,7 +234,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
             if (components.contains("minecraft:unit_cube")) components.remove("minecraft:unit_cube");
             //设置方块对应的几何模型
             components.putCompound("minecraft:geometry", new CompoundTag()
-                    .putString("identifier", geometry.toLowerCase(Locale.ENGLISH)));
+                    .putString("identifier", geometry.toLowerCase(Locale.ROOT)));
             return this;
         }
 

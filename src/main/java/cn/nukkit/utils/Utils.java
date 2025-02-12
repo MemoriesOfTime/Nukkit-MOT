@@ -75,7 +75,7 @@ public class Utils {
     }
 
     public static boolean hasItemOrBlock(String id) {
-        return Item.NAMESPACED_ID_ITEM.containsKey(id.toLowerCase(Locale.ENGLISH));
+        return Item.NAMESPACED_ID_ITEM.containsKey(id.toLowerCase(Locale.ROOT));
     }
 
     public static boolean hasItemOrBlock(int id) {

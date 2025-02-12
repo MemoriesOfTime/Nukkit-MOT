@@ -947,13 +947,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Constructor<? extends Item> constructor) {
         Preconditions.checkNotNull(namespacedId, "namespacedId is null");
         Preconditions.checkNotNull(constructor, "constructor is null");
-        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ENGLISH), itemSupplier(constructor));
+        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ROOT), itemSupplier(constructor));
     }
 
     public static void registerNamespacedIdItem(@NotNull String namespacedId, @NotNull Supplier<Item> constructor) {
         Preconditions.checkNotNull(namespacedId, "namespacedId is null");
         Preconditions.checkNotNull(constructor, "constructor is null");
-        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ENGLISH), constructor);
+        NAMESPACED_ID_ITEM.put(namespacedId.toLowerCase(Locale.ROOT), constructor);
     }
 
     @NotNull
@@ -1173,7 +1173,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static Item fromString(String str) {
-        String normalized = str.trim().replace(' ', '_').toLowerCase();
+        String normalized = str.trim().replace(' ', '_').toLowerCase(Locale.ROOT);
         Matcher matcher = ITEM_STRING_PATTERN.matcher(normalized);
         if (!matcher.matches()) {
             return AIR_ITEM.clone();
@@ -1239,13 +1239,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
         int id = 0;
         try {
-            id = BlockID.class.getField(name.toUpperCase()).getInt(null);
+            id = BlockID.class.getField(name.toUpperCase(Locale.ROOT)).getInt(null);
             if (id > 255) {
                 id = 255 - id;
             }
         } catch (Exception ignore) {
             try {
-                id = ItemID.class.getField(name.toUpperCase()).getInt(null);
+                id = ItemID.class.getField(name.toUpperCase(Locale.ROOT)).getInt(null);
             } catch (Exception ignore1) {
             }
         }

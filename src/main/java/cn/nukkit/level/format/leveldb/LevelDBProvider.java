@@ -112,9 +112,9 @@ public class LevelDBProvider implements LevelProvider {
         this.gcLock = new ReentrantLock();
 
         ThreadFactoryBuilder builder = new ThreadFactoryBuilder();
-        builder.setNameFormat("LevelDB Executor-" + this.getName() + " #%s");
+        builder.setNameFormat("LevelDB Executor for " + this.getName());
         builder.setUncaughtExceptionHandler((thread, ex) -> Server.getInstance().getLogger().error("Exception in " + thread.getName(), ex));
-        this.executor = Executors.newFixedThreadPool(3, builder.build());
+        this.executor = Executors.newSingleThreadExecutor(builder.build());
 
         if (level.isAutoCompaction()) {
             int delay = level.getServer().getAutoCompactionTicks();

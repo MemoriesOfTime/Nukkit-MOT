@@ -488,15 +488,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public boolean isWhitelisted() {
-        return this.server.isWhitelisted(this.username.toLowerCase());
+        return this.server.isWhitelisted(this.username.toLowerCase(Locale.ROOT));
     }
 
     @Override
     public void setWhitelisted(boolean value) {
         if (value) {
-            this.server.addWhitelist(this.username.toLowerCase());
+            this.server.addWhitelist(this.username.toLowerCase(Locale.ROOT));
         } else {
-            this.server.removeWhitelist(this.username.toLowerCase());
+            this.server.removeWhitelist(this.username.toLowerCase(Locale.ROOT));
         }
     }
 
@@ -2643,7 +2643,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     protected void processLogin() {
-        String lowerName = this.username.toLowerCase();
+        String lowerName = this.username.toLowerCase(Locale.ROOT);
         if (!this.server.isWhitelisted(lowerName)) {
             this.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, server.whitelistReason);
             return;
@@ -3103,7 +3103,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.username = this.unverifiedUsername;
                 this.unverifiedUsername = null;
                 this.displayName = this.username;
-                this.iusername = this.username.toLowerCase();
+                this.iusername = this.username.toLowerCase(Locale.ROOT);
                 this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
 
                 this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);

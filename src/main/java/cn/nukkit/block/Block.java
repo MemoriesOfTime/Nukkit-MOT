@@ -1303,6 +1303,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                 case SEA_LANTERN:
                 case MANGROVE_ROOTS:
                 case MUDDY_MANGROVE_ROOTS:
+                case MONSTER_SPAWNER:
                     return true;
             }
             return false;

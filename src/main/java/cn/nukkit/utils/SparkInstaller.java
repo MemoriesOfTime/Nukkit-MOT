@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URL;
 import java.nio.file.Files;
+import java.util.Locale;
 
 @Log4j2
 public class SparkInstaller {
@@ -111,7 +112,7 @@ public class SparkInstaller {
                 for (int i = 0; i < artifacts.size(); i++) {
                     JsonObject artifact = artifacts.get(i).getAsJsonObject();
                     String fileName = artifact.get("fileName").getAsString();
-                    if (fileName.toLowerCase().contains("nukkit")) {
+                    if (fileName.toLowerCase(Locale.ROOT).contains("nukkit")) {
                         return artifact;
                     }
                 }

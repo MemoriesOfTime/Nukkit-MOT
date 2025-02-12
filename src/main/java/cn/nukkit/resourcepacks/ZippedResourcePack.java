@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
+import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -33,7 +34,7 @@ public class ZippedResourcePack extends AbstractResourcePack {
             ZipEntry entry = zip.getEntry("manifest.json");
             if (entry == null) {
                 entry = zip.stream()
-                        .filter(e-> e.getName().toLowerCase().endsWith("manifest.json") && !e.isDirectory())
+                        .filter(e-> e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") && !e.isDirectory())
                         .filter(e-> {
                             File fe = new File(e.getName());
                             if (!fe.getName().equalsIgnoreCase("manifest.json")) {

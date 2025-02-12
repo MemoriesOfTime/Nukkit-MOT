@@ -20,6 +20,7 @@ import org.cloudburstmc.protocol.common.util.OptionalBoolean;
 
 import java.awt.*;
 import java.util.Arrays;
+import java.util.Locale;
 
 /**
  * @author daoge_cmd <br>
@@ -214,7 +215,7 @@ public class CameraCommand extends VanillaCommand {
                     return false;
                 }
                 float easeTime = Float.parseFloat(args[4]);
-                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase());
+                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase(Locale.ROOT));
                 pk.setSetInstruction(new CameraSetInstruction());
                 pk.getSetInstruction().setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
             }
@@ -225,7 +226,7 @@ public class CameraCommand extends VanillaCommand {
                     return false;
                 }
                 float easeTime = Float.parseFloat(args[4]);
-                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase());
+                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase(Locale.ROOT));
                 pk.setSetInstruction(new CameraSetInstruction());
                 pk.getSetInstruction().setPreset(preset);
                 pk.getSetInstruction().setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
@@ -238,7 +239,7 @@ public class CameraCommand extends VanillaCommand {
                     return false;
                 }
                 float easeTime = Float.parseFloat(args[4]);
-                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase());
+                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase(Locale.ROOT));
                 Vector3f position = new Vector3f(Float.parseFloat(args[6]), Float.parseFloat(args[7]), Float.parseFloat(args[8]));
                 pk.setSetInstruction(new CameraSetInstruction());
                 pk.getSetInstruction().setPreset(preset);
@@ -252,7 +253,7 @@ public class CameraCommand extends VanillaCommand {
                     return false;
                 }
                 float easeTime = Float.parseFloat(args[4]);
-                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase());
+                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase(Locale.ROOT));
                 Vector3f position = new Vector3f(Float.parseFloat(args[6]), Float.parseFloat(args[7]), Float.parseFloat(args[8]));
                 pk.setSetInstruction(new CameraSetInstruction());
                 pk.getSetInstruction().setPreset(preset);
