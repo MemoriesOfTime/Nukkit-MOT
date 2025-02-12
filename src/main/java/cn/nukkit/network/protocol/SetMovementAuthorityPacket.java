@@ -3,10 +3,6 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.network.protocol.types.ServerAuthMovementMode;
 import lombok.ToString;
 
-/**
- * @author glorydark
- */
-
 @ToString
 public class SetMovementAuthorityPacket extends DataPacket {
 
