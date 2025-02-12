@@ -23,7 +23,6 @@ import cn.nukkit.network.LittleEndianByteBufOutputStream;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.EntityLink;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
-import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequestSlotData;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessingEventOrigin;
@@ -1584,11 +1583,6 @@ public class BinaryStream {
 
     public <T> void putOptionalNull(T object, BiConsumer<BinaryStream, T> consumer) {
         this.putOptional(Objects::nonNull, object, consumer);
-    }
-
-    public void writeFullContainerName(FullContainerName fullContainerName) {
-        this.putByte((byte) fullContainerName.getContainer().getId());
-        this.putOptionalNull(fullContainerName.getDynamicId(), this::putLInt);
     }
 
     public boolean isReadable(int length) {

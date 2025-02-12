@@ -4,7 +4,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import lombok.ToString;
 
 /**
- * @since v712
+ * @author glorydark
  */
 @ToString
 public class JigsawStructureDataPacket extends DataPacket {
