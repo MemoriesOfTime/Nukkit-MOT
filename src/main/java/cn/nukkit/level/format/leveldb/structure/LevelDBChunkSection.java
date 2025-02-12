@@ -183,7 +183,12 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     @Override
-    public int getBlockData( int x, int y, int z, int layer) {
+    public int getBlockData(int x, int y, int z) {
+        return getBlockData(x, y, z, 0);
+    }
+
+    @Override
+    public int getBlockData(int x, int y, int z, int layer) {
         try {
             this.readLock.lock();
 
@@ -365,11 +370,6 @@ public class LevelDBChunkSection implements ChunkSection {
         } finally {
             this.writeLock.unlock();
         }
-    }
-
-    @Override
-    public int getBlockData(int x, int y, int z) {
-        return getBlockData(x, y, z, 0);
     }
 
     public boolean setBlock(int x, int y, int z, int layer, int blockId, int meta) {
