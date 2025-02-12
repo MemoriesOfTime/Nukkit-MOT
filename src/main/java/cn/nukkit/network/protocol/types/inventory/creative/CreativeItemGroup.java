@@ -5,7 +5,8 @@ import lombok.Data;
 
 @Data
 public class CreativeItemGroup {
-    private final CreativeItemCategory category;
-    private final String name;
-    private final Item icon;
+    public final int groupId;
+    public final CreativeItemCategory category;
+    public final String name;
+    public final Item icon;
 }

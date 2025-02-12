@@ -18,10 +18,14 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemData;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemGroup;
 import cn.nukkit.utils.*;
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -485,44 +489,44 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         clearCreativeItems();
     }
 
-    private static final List<Item> creative113 = new ObjectArrayList<>();
-    private static final List<Item> creative137 = new ObjectArrayList<>();
-    private static final List<Item> creative274 = new ObjectArrayList<>();
-    private static final List<Item> creative291 = new ObjectArrayList<>();
-    private static final List<Item> creative313 = new ObjectArrayList<>();
-    private static final List<Item> creative332 = new ObjectArrayList<>();
-    private static final List<Item> creative340 = new ObjectArrayList<>();
-    private static final List<Item> creative354 = new ObjectArrayList<>();
-    private static final List<Item> creative389 = new ObjectArrayList<>();
-    private static final List<Item> creative407 = new ObjectArrayList<>();
-    private static final List<Item> creative440 = new ObjectArrayList<>();
-    private static final List<Item> creative448 = new ObjectArrayList<>();
-    private static final List<Item> creative465 = new ObjectArrayList<>();
-    private static final List<Item> creative471 = new ObjectArrayList<>();
-    private static final List<Item> creative475 = new ObjectArrayList<>();
-    private static final List<Item> creative486 = new ObjectArrayList<>();
-    private static final List<Item> creative503 = new ObjectArrayList<>();
-    private static final List<Item> creative527 = new ObjectArrayList<>();
-    private static final List<Item> creative534 = new ObjectArrayList<>();
-    private static final List<Item> creative544 = new ObjectArrayList<>();
-    private static final List<Item> creative560 = new ObjectArrayList<>();
-    private static final List<Item> creative567 = new ObjectArrayList<>();
-    private static final List<Item> creative575 = new ObjectArrayList<>();
-    private static final List<Item> creative582 = new ObjectArrayList<>();
-    private static final List<Item> creative589 = new ObjectArrayList<>();
-    private static final List<Item> creative594 = new ObjectArrayList<>();
-    private static final List<Item> creative618 = new ObjectArrayList<>();
-    private static final List<Item> creative622 = new ObjectArrayList<>();
-    private static final List<Item> creative630 = new ObjectArrayList<>();
-    private static final List<Item> creative649 = new ObjectArrayList<>();
-    private static final List<Item> creative662 = new ObjectArrayList<>();
-    private static final List<Item> creative671 = new ObjectArrayList<>();
-    private static final List<Item> creative685 = new ObjectArrayList<>();
-    private static final List<Item> creative712 = new ObjectArrayList<>();
-    private static final List<Item> creative729 = new ObjectArrayList<>();
-    private static final List<Item> creative748 = new ObjectArrayList<>();
-    private static final List<Item> creative766 = new ObjectArrayList<>();
-    private static final List<Item> creative776 = new ObjectArrayList<>();
+    private static final CreativeItems creative113 = new CreativeItems();
+    private static final CreativeItems creative137 = new CreativeItems();
+    private static final CreativeItems creative274 = new CreativeItems();
+    private static final CreativeItems creative291 = new CreativeItems();
+    private static final CreativeItems creative313 = new CreativeItems();
+    private static final CreativeItems creative332 = new CreativeItems();
+    private static final CreativeItems creative340 = new CreativeItems();
+    private static final CreativeItems creative354 = new CreativeItems();
+    private static final CreativeItems creative389 = new CreativeItems();
+    private static final CreativeItems creative407 = new CreativeItems();
+    private static final CreativeItems creative440 = new CreativeItems();
+    private static final CreativeItems creative448 = new CreativeItems();
+    private static final CreativeItems creative465 = new CreativeItems();
+    private static final CreativeItems creative471 = new CreativeItems();
+    private static final CreativeItems creative475 = new CreativeItems();
+    private static final CreativeItems creative486 = new CreativeItems();
+    private static final CreativeItems creative503 = new CreativeItems();
+    private static final CreativeItems creative527 = new CreativeItems();
+    private static final CreativeItems creative534 = new CreativeItems();
+    private static final CreativeItems creative544 = new CreativeItems();
+    private static final CreativeItems creative560 = new CreativeItems();
+    private static final CreativeItems creative567 = new CreativeItems();
+    private static final CreativeItems creative575 = new CreativeItems();
+    private static final CreativeItems creative582 = new CreativeItems();
+    private static final CreativeItems creative589 = new CreativeItems();
+    private static final CreativeItems creative594 = new CreativeItems();
+    private static final CreativeItems creative618 = new CreativeItems();
+    private static final CreativeItems creative622 = new CreativeItems();
+    private static final CreativeItems creative630 = new CreativeItems();
+    private static final CreativeItems creative649 = new CreativeItems();
+    private static final CreativeItems creative662 = new CreativeItems();
+    private static final CreativeItems creative671 = new CreativeItems();
+    private static final CreativeItems creative685 = new CreativeItems();
+    private static final CreativeItems creative712 = new CreativeItems();
+    private static final CreativeItems creative729 = new CreativeItems();
+    private static final CreativeItems creative748 = new CreativeItems();
+    private static final CreativeItems creative766 = new CreativeItems();
+    private static final CreativeItems creative776 = new CreativeItems();
 
     public static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
@@ -585,7 +589,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
     }
 
-    private static void registerCreativeItemsNew(int protocol, int blockPaletteProtocol, List<Item> creativeItems) {
+    private static void registerCreativeItemsNew(int protocol, int blockPaletteProtocol, CreativeItems creativeItems) {
+        JsonObject root;
         JsonArray itemsArray;
         String file;
         if (protocol >= ProtocolInfo.v1_21_0) {
@@ -594,16 +599,51 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             file = "creativeitems" + protocol + ".json";
         }
         try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(file)) {
-            itemsArray = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("items");
+            root = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject();
+            itemsArray = root.getAsJsonArray("items");
+            if (itemsArray.isEmpty()) {
+                throw new IllegalStateException("Empty items");
+            }
         } catch (Exception e) {
             throw new AssertionError("Error while loading creative items for protocol " + protocol, e);
         }
 
+        RuntimeItemMapping mapping = RuntimeItems.getMapping(protocol);
+        if (protocol >= ProtocolInfo.v1_21_60) {
+            JsonArray groupsArray = root.getAsJsonArray("groups");
+            if (groupsArray.isEmpty()) {
+                throw new IllegalStateException("Empty groups");
+            }
+
+            int creativeGroupId = 0;
+
+            for (JsonElement obj : groupsArray.asList()) {
+                JsonObject groupRoot = obj.getAsJsonObject();
+
+                Item icon = mapping.parseCreativeItem(groupRoot.get("icon").getAsJsonObject(), true);
+                if (icon == null) {
+                    icon = Item.get(AIR);
+                }
+
+                CreativeItemGroup creativeGroup = new CreativeItemGroup(creativeGroupId++,
+                        CreativeItemCategory.valueOf(groupRoot.get("category").getAsString().toUpperCase(Locale.ROOT)),
+                        groupRoot.get("name").getAsString(),
+                        icon);
+
+                creativeItems.addGroup(creativeGroup);
+            }
+        }
+
         for (JsonElement element : itemsArray) {
-            Item item = RuntimeItems.getMapping(protocol).parseCreativeItem(element.getAsJsonObject(), true, blockPaletteProtocol);
+            JsonObject creativeItem = element.getAsJsonObject();
+            Item item = mapping.parseCreativeItem(creativeItem, true, blockPaletteProtocol);
             if (item != null && !item.getName().equals(UNKNOWN_STR)) {
                 // Add only implemented items
-                creativeItems.add(item.clone());
+                CreativeItemGroup creativeGroup = null;
+                if (protocol >= ProtocolInfo.v1_21_60) {
+                    creativeGroup = creativeItems.getGroups().get(creativeItem.get("groupId").getAsInt());
+                }
+                creativeItems.add(item.clone(), creativeGroup);
             }
         }
     }
@@ -656,9 +696,18 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static ArrayList<Item> getCreativeItems(int protocol) {
+        return new ArrayList<>(getCreativeItemsAndGroups(protocol).getItems());
+    }
+
+    public static CreativeItems getCreativeItemsAndGroups() {
+        Server.mvw("Item#getCreativeItemsAndGroups()");
+        return getCreativeItemsAndGroups(ProtocolInfo.CURRENT_PROTOCOL);
+    }
+
+    public static CreativeItems getCreativeItemsAndGroups(int protocol) {
         switch (protocol) {
             case v1_1_0:
-                return new ArrayList<>(Item.creative113);
+                return Item.creative113;
             case v1_2_0:
             case v1_2_5_11:
             case v1_2_5:
@@ -668,26 +717,26 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             case v1_2_13:
             case v1_2_13_11:
             case v1_4_0:
-                return new ArrayList<>(Item.creative137);
+                return Item.creative137;
             case v1_5_0:
-                return new ArrayList<>(Item.creative274);
+                return Item.creative274;
             case v1_6_0_5:
             case v1_6_0:
             case v1_7_0:
-                return new ArrayList<>(Item.creative291);
+                return Item.creative291;
             case v1_8_0:
-                return new ArrayList<>(Item.creative313);
+                return Item.creative313;
             case v1_9_0:
-                return new ArrayList<>(Item.creative332);
+                return Item.creative332;
             case v1_10_0:
-                return new ArrayList<>(Item.creative340);
+                return Item.creative340;
             case v1_11_0:
             case v1_12_0:
             case v1_13_0:
-                return new ArrayList<>(Item.creative354);
+                return Item.creative354;
             case v1_14_0:
             case v1_14_60:
-                return new ArrayList<>(Item.creative389);
+                return Item.creative389;
             case v1_16_0:
             case v1_16_20:
             case v1_16_100_0:
@@ -703,78 +752,78 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             case v1_16_230_50:
             case v1_16_230:
             case v1_16_230_54:
-                return new ArrayList<>(Item.creative407);
+                return Item.creative407;
             case v1_17_0:
-                return new ArrayList<>(Item.creative440);
+                return Item.creative440;
             case v1_17_10:
             case v1_17_20_20:
-                return new ArrayList<>(Item.creative448);
+                return Item.creative448;
             case v1_17_30:
-                return new ArrayList<>(Item.creative465);
+                return Item.creative465;
             case v1_17_40:
-                return new ArrayList<>(Item.creative471);
+                return Item.creative471;
             case v1_18_0:
-                return new ArrayList<>(Item.creative475);
+                return Item.creative475;
             case v1_18_10_26:
             case v1_18_10:
-                return new ArrayList<>(Item.creative486);
+                return Item.creative486;
             case v1_18_30:
-                return new ArrayList<>(Item.creative503);
+                return Item.creative503;
             case v1_19_0_29:
             case v1_19_0_31:
             case v1_19_0:
-                return new ArrayList<>(Item.creative527);
+                return Item.creative527;
             case v1_19_10:
-                return new ArrayList<>(Item.creative534);
+                return Item.creative534;
             case v1_19_20:
             case v1_19_21:
             case v1_19_30_23:
             case v1_19_30:
             case v1_19_40:
-                return new ArrayList<>(Item.creative544);
+                return Item.creative544;
             case v1_19_50:
-                return new ArrayList<>(Item.creative560);
+                return Item.creative560;
             case v1_19_60:
             case v1_19_63:
-                return new ArrayList<>(Item.creative567);
+                return Item.creative567;
             case v1_19_70_24:
             case v1_19_70:
-                return new ArrayList<>(Item.creative575);
+                return Item.creative575;
             case v1_19_80:
-                return new ArrayList<>(Item.creative582);
+                return Item.creative582;
             case v1_20_0_23:
             case v1_20_0:
-                return new ArrayList<>(Item.creative589);
+                return Item.creative589;
             case v1_20_10_21:
             case v1_20_10:
-                return new ArrayList<>(Item.creative594);
+                return Item.creative594;
             case v1_20_30_24:
             case v1_20_30:
-                return new ArrayList<>(Item.creative618);
+                return Item.creative618;
             case v1_20_40:
-                return new ArrayList<>(Item.creative622);
+                return Item.creative622;
             case v1_20_50:
-                return new ArrayList<>(Item.creative630);
+                return Item.creative630;
             case v1_20_60:
-                return new ArrayList<>(Item.creative649);
+                return Item.creative649;
             case v1_20_70:
-                return new ArrayList<>(Item.creative662);
+                return Item.creative662;
             case v1_20_80:
-                return new ArrayList<>(Item.creative671);
+                return Item.creative671;
             case v1_21_0:
             case v1_21_2:
-                return new ArrayList<>(Item.creative685);
+                return Item.creative685;
             case v1_21_20:
-                return new ArrayList<>(Item.creative712);
+                return Item.creative712;
             case v1_21_30:
-                return new ArrayList<>(Item.creative729);
+                return Item.creative729;
             case v1_21_40:
-                return new ArrayList<>(Item.creative748);
+                return Item.creative748;
             case v1_21_50_26:
             case v1_21_50:
-                return new ArrayList<>(Item.creative766);
+                return Item.creative766;
             case v1_21_60:
-                return new ArrayList<>(Item.creative776);
+                return Item.creative776;
             // TODO Multiversion
             default:
                 throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
@@ -786,46 +835,55 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         addCreativeItem(v1_21_60, item);
     }
 
+    public static void addCreativeItem(Item item, CreativeItemCategory category, String group) {
+        Server.mvw("Item#addCreativeItem(Item, CreativeItemCategory, String)");
+        addCreativeItem(v1_21_60, item, category, group);
+    }
+
     public static void addCreativeItem(int protocol, Item item) {
+        addCreativeItem(protocol, item, CreativeItemCategory.ALL, "");
+    }
+
+    public static void addCreativeItem(int protocol, Item item, CreativeItemCategory category, String group) {
         switch (protocol) { // NOTE: Not all versions are supposed to be here
-            case v1_1_0 -> Item.creative113.add(item.clone());
-            case v1_2_0 -> Item.creative137.add(item.clone());
-            case v1_5_0 -> Item.creative274.add(item.clone());
-            case v1_7_0 -> Item.creative291.add(item.clone());
-            case v1_8_0 -> Item.creative313.add(item.clone());
-            case v1_9_0 -> Item.creative332.add(item.clone());
-            case v1_10_0 -> Item.creative340.add(item.clone());
-            case v1_11_0 -> Item.creative354.add(item.clone());
-            case v1_14_0 -> Item.creative389.add(item.clone());
-            case v1_16_0 -> Item.creative407.add(item.clone());
-            case v1_17_0 -> Item.creative440.add(item.clone());
-            case v1_17_10 -> Item.creative448.add(item.clone());
-            case v1_17_30 -> Item.creative465.add(item.clone());
-            case v1_17_40 -> Item.creative471.add(item.clone());
-            case v1_18_10 -> Item.creative486.add(item.clone());
-            case v1_18_0 -> Item.creative475.add(item.clone());
-            case v1_18_30 -> Item.creative503.add(item.clone());
-            case v1_19_0 -> Item.creative527.add(item.clone());
-            case v1_19_10 -> Item.creative534.add(item.clone());
-            case v1_19_20 -> Item.creative544.add(item.clone());
-            case v1_19_50 -> Item.creative560.add(item.clone());
-            case v1_19_60 -> Item.creative567.add(item.clone());
-            case v1_19_70 -> Item.creative575.add(item.clone());
-            case v1_19_80 -> Item.creative582.add(item.clone());
-            case v1_20_0 -> Item.creative589.add(item.clone());
-            case v1_20_10 -> Item.creative594.add(item.clone());
-            case v1_20_30 -> Item.creative618.add(item.clone());
-            case v1_20_40 -> Item.creative622.add(item.clone());
-            case v1_20_50 -> Item.creative630.add(item.clone());
-            case v1_20_60 -> Item.creative649.add(item.clone());
-            case v1_20_70 -> Item.creative662.add(item.clone());
-            case v1_20_80 -> Item.creative671.add(item.clone());
-            case v1_21_0 -> Item.creative685.add(item.clone());
-            case v1_21_20 -> Item.creative712.add(item.clone());
-            case v1_21_30 -> Item.creative729.add(item.clone());
-            case v1_21_40 -> Item.creative748.add(item.clone());
-            case v1_21_50 -> Item.creative766.add(item.clone());
-            case v1_21_60 -> Item.creative776.add(item.clone());
+            case v1_1_0 -> Item.creative113.add(item.clone(), category, group);
+            case v1_2_0 -> Item.creative137.add(item.clone(), category, group);
+            case v1_5_0 -> Item.creative274.add(item.clone(), category, group);
+            case v1_7_0 -> Item.creative291.add(item.clone(), category, group);
+            case v1_8_0 -> Item.creative313.add(item.clone(), category, group);
+            case v1_9_0 -> Item.creative332.add(item.clone(), category, group);
+            case v1_10_0 -> Item.creative340.add(item.clone(), category, group);
+            case v1_11_0 -> Item.creative354.add(item.clone(), category, group);
+            case v1_14_0 -> Item.creative389.add(item.clone(), category, group);
+            case v1_16_0 -> Item.creative407.add(item.clone(), category, group);
+            case v1_17_0 -> Item.creative440.add(item.clone(), category, group);
+            case v1_17_10 -> Item.creative448.add(item.clone(), category, group);
+            case v1_17_30 -> Item.creative465.add(item.clone(), category, group);
+            case v1_17_40 -> Item.creative471.add(item.clone(), category, group);
+            case v1_18_10 -> Item.creative486.add(item.clone(), category, group);
+            case v1_18_0 -> Item.creative475.add(item.clone(), category, group);
+            case v1_18_30 -> Item.creative503.add(item.clone(), category, group);
+            case v1_19_0 -> Item.creative527.add(item.clone(), category, group);
+            case v1_19_10 -> Item.creative534.add(item.clone(), category, group);
+            case v1_19_20 -> Item.creative544.add(item.clone(), category, group);
+            case v1_19_50 -> Item.creative560.add(item.clone(), category, group);
+            case v1_19_60 -> Item.creative567.add(item.clone(), category, group);
+            case v1_19_70 -> Item.creative575.add(item.clone(), category, group);
+            case v1_19_80 -> Item.creative582.add(item.clone(), category, group);
+            case v1_20_0 -> Item.creative589.add(item.clone(), category, group);
+            case v1_20_10 -> Item.creative594.add(item.clone(), category, group);
+            case v1_20_30 -> Item.creative618.add(item.clone(), category, group);
+            case v1_20_40 -> Item.creative622.add(item.clone(), category, group);
+            case v1_20_50 -> Item.creative630.add(item.clone(), category, group);
+            case v1_20_60 -> Item.creative649.add(item.clone(), category, group);
+            case v1_20_70 -> Item.creative662.add(item.clone(), category, group);
+            case v1_20_80 -> Item.creative671.add(item.clone(), category, group);
+            case v1_21_0 -> Item.creative685.add(item.clone(), category, group);
+            case v1_21_20 -> Item.creative712.add(item.clone(), category, group);
+            case v1_21_30 -> Item.creative729.add(item.clone(), category, group);
+            case v1_21_40 -> Item.creative748.add(item.clone(), category, group);
+            case v1_21_50 -> Item.creative766.add(item.clone(), category, group);
+            case v1_21_60 -> Item.creative776.add(item.clone(), category, group);
             // TODO Multiversion
             default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
@@ -1010,7 +1068,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     private static void registerCustomItem(CustomItem item, int protocol,  boolean addCreativeItem, int... creativeProtocols) {
         if (RuntimeItems.getMapping(protocol).registerCustomItem(item) && addCreativeItem) {
             for (int creativeProtocol : creativeProtocols) {
-                addCreativeItem(creativeProtocol, (Item) item);
+                addCreativeItem(creativeProtocol, (Item) item, item.getDefinition().getCreativeCategory(), item.getDefinition().getCreativeGroup());
             }
         }
     }
@@ -2025,5 +2083,67 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         NONE,//only used in server
         LOCK_IN_SLOT,
         LOCK_IN_INVENTORY
+    }
+
+    public static class CreativeItems {
+
+        private final List<CreativeItemGroup> groups = new ArrayList<>();
+        private final Map<Item, CreativeItemGroup> contents = new HashMap<>();
+
+        public void clear() {
+            groups.clear();
+            contents.clear();
+        }
+
+        public void add(Item item) {
+            add(item, CreativeItemCategory.ALL, ""); // TODO: vanilla items back to correct groups
+        }
+
+        public void add(Item item, CreativeItemGroup group) {
+            contents.put(item, group);
+        }
+
+        public void add(Item item, CreativeItemCategory category, String group) {
+            CreativeItemGroup creativeGroup = null;
+
+            for (CreativeItemGroup existing : groups) {
+                if (existing.category == category && existing.name.equals(group) && existing.icon.equals(item)) {
+                    creativeGroup = existing;
+                    break;
+                }
+            }
+
+            if (creativeGroup == null) {
+                creativeGroup = new CreativeItemGroup(groups.size(), category, group, item);
+                groups.add(creativeGroup);
+            }
+
+            contents.put(item, creativeGroup);
+        }
+
+        public void addGroup(CreativeItemGroup creativeGroup) {
+            groups.add(creativeGroup);
+        }
+
+        public Collection<Item> getItems() {
+            return contents.keySet();
+        }
+
+        public List<CreativeItemGroup> getGroups() {
+            return groups;
+        }
+
+        public Map<Item, CreativeItemGroup> getContents() {
+            return contents;
+        }
+
+        public List<CreativeItemData> getCreativeItemDatas() {
+            int creativeNetId = 1; // 0 is not indexed by client
+            ObjectArrayList<CreativeItemData> list = new ObjectArrayList<>(this.getContents().size());
+            for (Map.Entry<Item, CreativeItemGroup> entry : this.getContents().entrySet()) {
+                list.add(new CreativeItemData(entry.getKey(), creativeNetId++, entry.getValue() != null ? entry.getValue().getGroupId() : 0));
+            }
+            return list;
+        }
     }
 }

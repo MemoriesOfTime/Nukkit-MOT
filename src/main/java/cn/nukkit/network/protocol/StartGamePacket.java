@@ -10,11 +10,11 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.network.protocol.types.NetworkPermissions;
+import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.log4j.Log4j2;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+@Log4j2
 @ToString
 public class StartGamePacket extends DataPacket {
 
@@ -32,7 +33,12 @@ public class StartGamePacket extends DataPacket {
     public static final int GAME_PUBLISH_SETTING_FRIENDS_ONLY = 2;
     public static final int GAME_PUBLISH_SETTING_FRIENDS_OF_FRIENDS = 3;
     public static final int GAME_PUBLISH_SETTING_PUBLIC = 4;
-    private static final Logger log = LoggerFactory.getLogger(StartGamePacket.class);
+
+    private static final byte[] EMPTY_UUID;
+
+    static {
+        EMPTY_UUID = Binary.writeUUID(new UUID(0, 0));
+    }
 
     @Override
     public byte pid() {
@@ -367,7 +373,8 @@ public class StartGamePacket extends DataPacket {
                         }
                         this.putLLong(0L); // BlockRegistryChecksum
                         if (protocol >= ProtocolInfo.v1_19_0_29) {
-                            this.putUUID(new UUID(0, 0)); // worldTemplateId
+                            //this.putUUID(new UUID(0, 0)); // worldTemplateId
+                            this.put(EMPTY_UUID); // worldTemplateId
                             if (protocol >= ProtocolInfo.v1_19_20) {
                                 this.putBoolean(this.clientSideGenerationEnabled);
                                 if (protocol >= ProtocolInfo.v1_19_80) {
