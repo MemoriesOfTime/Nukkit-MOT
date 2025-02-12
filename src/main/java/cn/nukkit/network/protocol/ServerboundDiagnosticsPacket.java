@@ -3,7 +3,7 @@ package cn.nukkit.network.protocol;
 import lombok.ToString;
 
 /**
- * @author glorydark
+ * @since v712
  */
 @ToString
 public class ServerboundDiagnosticsPacket extends DataPacket {
