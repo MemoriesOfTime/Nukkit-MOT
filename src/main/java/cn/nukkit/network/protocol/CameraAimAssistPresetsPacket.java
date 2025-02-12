@@ -1,9 +1,6 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.types.camera.aimassist.CameraAimAssistCategories;
-import cn.nukkit.network.protocol.types.camera.aimassist.CameraAimAssistCategory;
-import cn.nukkit.network.protocol.types.camera.aimassist.CameraAimAssistCategoryPriorities;
-import cn.nukkit.network.protocol.types.camera.aimassist.CameraAimAssistPreset;
+import cn.nukkit.network.protocol.types.camera.*;
 import cn.nukkit.utils.BinaryStream;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
@@ -29,12 +26,12 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
     }
 
     private final List<CameraAimAssistCategories> categories = new ObjectArrayList<>();
-    private final List<CameraAimAssistPreset> presets = new ObjectArrayList<>();
+    private final List<CameraAimAssistPresetDefinition> presets = new ObjectArrayList<>();
 
     @Override
     public void decode() {
         this.categories.addAll(List.of(this.getArray(CameraAimAssistCategories.class, binaryStream -> this.readCategories())));
-        this.presets.addAll(List.of(this.getArray(CameraAimAssistPreset.class, binaryStream -> this.readPreset())));
+        this.presets.addAll(List.of(this.getArray(CameraAimAssistPresetDefinition.class, binaryStream -> this.readPreset())));
     }
 
     @Override
@@ -50,32 +47,28 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
 
     private void writeCategory(CameraAimAssistCategory category) {
         this.putString(category.getName());
-        writePriorities(category.getPriorities());
+        this.putArray(category.getEntityPriorities(), this::writePriority);
+        this.putArray(category.getBlockPriorities(), this::writePriority);
     }
 
-    private void writePriorities(CameraAimAssistCategoryPriorities priorities) {
-        this.putArray(priorities.entities.entrySet(), this::writePriority);
-        this.putArray(priorities.blocks.entrySet(), this::writePriority);
+    private void writePriority(CameraAimAssistPriority priority) {
+        this.putString(priority.getName());
+        this.putInt(priority.getPriority());
     }
 
-    private void writePriority(Map.Entry<String, Integer> priority) {
-        this.putString(priority.getKey());
-        this.putInt(priority.getValue());
-    }
-
-    private void writeCameraAimAssist(CameraAimAssistPreset preset) {
+    private void writeCameraAimAssist(CameraAimAssistPresetDefinition preset) {
         this.putString(preset.getIdentifier());
-        this.putString(preset.getCategories());
+        this.putString(preset.getCategories()); // todo: multi-version support
         this.putArray(preset.getExclusionList(), this::putString);
         this.putArray(preset.getLiquidTargetingList(), this::putString);
-        this.putArray(preset.getItemSettings().entrySet(), this::writeItemSetting);
+        this.putArray(preset.getItemSettings(), this::writeItemSetting);
         this.putOptional(Objects::nonNull, preset.getDefaultItemSettings(), this::putString);
         this.putOptional(Objects::nonNull, preset.getHandSettings(), this::putString);
     }
 
-    private void writeItemSetting(Map.Entry<String, String> itemSetting) {
-        this.putString(itemSetting.getKey());
-        this.putString(itemSetting.getValue());
+    private void writeItemSetting(CameraAimAssistItemSettings cameraAimAssistItemSetting) {
+        this.putString(cameraAimAssistItemSetting.getItemId());
+        this.putString(cameraAimAssistItemSetting.getCategory());
     }
 
     // READ
@@ -92,31 +85,25 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
     public CameraAimAssistCategory readCategory() {
         CameraAimAssistCategory category = new CameraAimAssistCategory();
         category.setName(this.getString());
-        category.setPriorities(readPriorities());
-        return category;
-    }
-
-    public CameraAimAssistCategoryPriorities readPriorities() {
-        CameraAimAssistCategoryPriorities priorities = new CameraAimAssistCategoryPriorities();
         long entityPriorityLength = this.getUnsignedVarInt();
         for(int i = 0; i < entityPriorityLength; i++) {
             Map.Entry<String, Integer> entry = readPriority();
-            priorities.getEntities().put(entry.getKey(), entry.getValue());
+            category.getEntityPriorities().add(new CameraAimAssistPriority(entry.getKey(), entry.getValue()));
         }
         long blockPriorityLength = this.getUnsignedVarInt();
         for(int i = 0; i < blockPriorityLength; i++) {
             Map.Entry<String, Integer> entry = readPriority();
-            priorities.getBlocks().put(entry.getKey(), entry.getValue());
+            category.getBlockPriorities().add(new CameraAimAssistPriority(entry.getKey(), entry.getValue()));
         }
-        return priorities;
+        return category;
     }
 
     private Map.Entry<String, Integer> readPriority() {
         return Map.entry(this.getString(), this.getInt());
     }
 
-    private CameraAimAssistPreset readPreset() {
-        CameraAimAssistPreset preset = new CameraAimAssistPreset();
+    private CameraAimAssistPresetDefinition readPreset() {
+        CameraAimAssistPresetDefinition preset = new CameraAimAssistPresetDefinition();
         preset.setIdentifier(this.getString());
         preset.setCategories(this.getString());
         preset.getExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
@@ -124,7 +111,7 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
         long itemSettingsLength = this.getUnsignedVarInt();
         for(int i = 0; i < itemSettingsLength; i++) {
             Map.Entry<String, String> entry = readItemSetting();
-            preset.getItemSettings().put(entry.getKey(), entry.getValue());
+            preset.getItemSettings().add(new CameraAimAssistItemSettings(entry.getKey(), entry.getValue()));
         }
         preset.setDefaultItemSettings(this.getOptional(null, BinaryStream::getString));
         preset.setHandSettings(this.getOptional(null, BinaryStream::getString));

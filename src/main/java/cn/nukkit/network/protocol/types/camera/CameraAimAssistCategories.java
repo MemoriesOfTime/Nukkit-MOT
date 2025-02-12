@@ -1,8 +1,7 @@
-package cn.nukkit.network.protocol.types.camera.aimassist;
+package cn.nukkit.network.protocol.types.camera;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.Data;
-import lombok.Value;
 
 import java.util.List;
 
