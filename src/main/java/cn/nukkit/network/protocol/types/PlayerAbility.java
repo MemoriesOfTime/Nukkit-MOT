@@ -24,7 +24,7 @@ public enum PlayerAbility {
     NO_CLIP,
     PRIVILEGED_BUILDER,
     /**
-     * @since v776
+     * @since v776 1.21.60
      */
     VERTICAL_FLY_SPEED;
 

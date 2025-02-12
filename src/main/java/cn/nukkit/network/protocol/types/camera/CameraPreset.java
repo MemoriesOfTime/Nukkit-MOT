@@ -38,11 +38,11 @@ public final class CameraPreset implements NamedDefinition {
      */
     private Float radius;
     /**
-     * @since v776
+     * @since v776 1.21.60
      */
     private Float minYawLimit;
     /**
-     * @since v776
+     * @since v776 1.21.60
      */
     private Float maxYawLimit;
     @Nullable
