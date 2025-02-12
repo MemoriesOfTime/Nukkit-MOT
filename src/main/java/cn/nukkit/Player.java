@@ -2881,38 +2881,48 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
                         if (this.protocol >= ProtocolInfo.v1_21_60) {
-                            Collection<ItemComponentPacket.Entry> vanillaItems = RuntimeItems.getMapping(this.protocol).getVanillaItemDefinitions();
+                            Collection<ItemComponentPacket.ItemDefinition> vanillaItems = RuntimeItems.getMapping(this.protocol).getVanillaItemDefinitions();
                             Set<Map.Entry<String, CustomItemDefinition>> itemDefinitions = Item.getCustomItemDefinition().entrySet();
-                            List<ItemComponentPacket.Entry> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
+                            List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
                             entries.addAll(vanillaItems);
                             if (this.server.enableExperimentMode && !itemDefinitions.isEmpty()) {
                                 for (Map.Entry<String, CustomItemDefinition> entry : itemDefinitions) {
-                                    Item item = Item.fromString(entry.getKey());
-                                    CompoundTag data = entry.getValue().getNbt(this.protocol);
-                                    entries.add(new ItemComponentPacket.Entry(
-                                            entry.getKey(),
-                                            item.getNetworkId(this.protocol),
-                                            true,
-                                            1,
-                                            data));
+                                    try {
+                                        Item item = Item.fromString(entry.getKey());
+                                        entries.add(new ItemComponentPacket.ItemDefinition(
+                                                entry.getKey(),
+                                                item.getNetworkId(this.protocol),
+                                                true,
+                                                1,
+                                                entry.getValue().getNbt(this.protocol)
+                                        ));
+                                    } catch (Exception e) {
+                                        log.error("ItemComponentPacket encoding error", e);
+                                    }
                                 }
                             }
-                            itemComponentPacket.setEntries(entries.toArray(ItemComponentPacket.Entry.EMPTY_ARRAY));
+                            itemComponentPacket.setEntries(entries);
                         } else {
                             if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
-                                Int2ObjectOpenHashMap<ItemComponentPacket.Entry> entries = new Int2ObjectOpenHashMap<>();
+                                HashMap<String, CustomItemDefinition> itemDefinition = Item.getCustomItemDefinition();
+                                List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(itemDefinition.size());
                                 int i = 0;
-                                for (var entry : Item.getCustomItemDefinition().entrySet()) {
+                                for (var entry : itemDefinition.entrySet()) {
                                     try {
-                                        CompoundTag data = entry.getValue().getNbt(this.protocol);
-                                        data.putShort("minecraft:identifier", i);
-                                        entries.put(i, new ItemComponentPacket.Entry(entry.getKey(), data));
+                                        Item item = Item.fromString(entry.getKey());
+                                        entries.add(new ItemComponentPacket.ItemDefinition(
+                                                entry.getKey(),
+                                                item.getNetworkId(this.protocol),
+                                                true,
+                                                1,
+                                                entry.getValue().getNbt(this.protocol).putShort("minecraft:identifier", i)
+                                        ));
                                         i++;
                                     } catch (Exception e) {
                                         log.error("ItemComponentPacket encoding error", e);
                                     }
                                 }
-                                itemComponentPacket.setEntries(entries.values().toArray(ItemComponentPacket.Entry.EMPTY_ARRAY));
+                                itemComponentPacket.setEntries(entries);
                             }
                         }
                         this.dataPacket(itemComponentPacket);

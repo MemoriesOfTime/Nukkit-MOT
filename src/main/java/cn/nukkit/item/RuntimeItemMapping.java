@@ -42,7 +42,7 @@ public class RuntimeItemMapping {
     private final Int2ObjectMap<RuntimeEntry> legacy2Runtime = new Int2ObjectOpenHashMap<>();
     private final Map<String, LegacyEntry> identifier2Legacy = new HashMap<>();
 
-    private final Map<String, ItemComponentPacket.Entry> vanillaItems = new HashMap<>();
+    private final Map<String, ItemComponentPacket.ItemDefinition> vanillaItems = new HashMap<>();
 
     private final List<RuntimeEntry> itemPaletteEntries = new ArrayList<>();
     private final Int2ObjectMap<String> runtimeId2Name = new Int2ObjectOpenHashMap<>();
@@ -84,7 +84,7 @@ public class RuntimeItemMapping {
                 if (componentBased) {
                     components = new CompoundTag().putCompound("components", (CompoundTag) itemComponents.get(identifier));
                 }
-                this.vanillaItems.put(identifier, new ItemComponentPacket.Entry(
+                this.vanillaItems.put(identifier, new ItemComponentPacket.ItemDefinition(
                         identifier,
                         runtimeId,
                         componentBased,
@@ -401,7 +401,7 @@ public class RuntimeItemMapping {
         return this.itemPaletteEntries;
     }
 
-    public Collection<ItemComponentPacket.Entry> getVanillaItemDefinitions() {
+    public Collection<ItemComponentPacket.ItemDefinition> getVanillaItemDefinitions() {
         return this.vanillaItems.values();
     }
 
