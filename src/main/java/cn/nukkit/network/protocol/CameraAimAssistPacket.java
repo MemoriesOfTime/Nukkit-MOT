@@ -4,6 +4,9 @@ import cn.nukkit.math.Vector2f;
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * @since v729
+ */
 @Getter
 @Setter
 public class CameraAimAssistPacket extends DataPacket {

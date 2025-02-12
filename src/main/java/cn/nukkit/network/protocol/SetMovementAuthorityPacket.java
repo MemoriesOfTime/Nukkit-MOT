@@ -3,6 +3,9 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.network.protocol.types.ServerAuthMovementMode;
 import lombok.ToString;
 
+/**
+ * @since v748
+ */
 @ToString
 public class SetMovementAuthorityPacket extends DataPacket {
 

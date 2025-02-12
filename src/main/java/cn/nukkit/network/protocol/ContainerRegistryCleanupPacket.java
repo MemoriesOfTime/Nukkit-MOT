@@ -6,6 +6,9 @@ import lombok.Getter;
 
 import java.util.List;
 
+/**
+ * @since v729
+ */
 @Getter
 public class ContainerRegistryCleanupPacket extends DataPacket {
 
