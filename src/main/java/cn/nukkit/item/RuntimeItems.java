@@ -46,6 +46,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping729;
     private static RuntimeItemMapping mapping748;
     private static RuntimeItemMapping mapping766;
+    private static RuntimeItemMapping mapping776;
 
     public static RuntimeItemMapping[] VALUES;
 
@@ -74,25 +75,21 @@ public class RuntimeItems {
         JsonObject itemMapping = JsonParser.parseReader(new InputStreamReader(mappingStream)).getAsJsonObject();
 
         Map<String, MappingEntry> mappingEntries = new HashMap<>();
-        Map<String, MappingEntry> mappingEntries630 = new HashMap<>();
         for (String legacyName : itemMapping.keySet()) {
             JsonObject convertData = itemMapping.getAsJsonObject(legacyName);
+            int protocol = 0;
+            try {
+                protocol = convertData.get("protocol").getAsInt();
+            } catch (Exception ignored) {
+
+            }
             for (String key : convertData.keySet()) {
                 if ("protocol".equalsIgnoreCase(key)) {
                     continue;
                 }
                 String identifier = convertData.get(key).getAsString();
                 int damage = Integer.parseInt(key);
-                int protocol = 0;
-                try {
-                    protocol = convertData.get("protocol").getAsInt();
-                } catch (Exception e) {}
-                MappingEntry value = new MappingEntry(legacyName, damage, protocol);
-                mappingEntries630.put(identifier, value);
-                if ("minecraft:stone".equals(legacyName)) {
-                    continue; // Stone 在1.20.50及以后拆分，对于以前的版本，不需要重复注册
-                }
-                mappingEntries.put(identifier, value);
+                mappingEntries.put(identifier, new MappingEntry(legacyName, damage, protocol));
             }
         }
 
@@ -112,15 +109,16 @@ public class RuntimeItems {
         mapping589 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_0);
         mapping594 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_10);
         mapping618 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_30);
-        mapping630 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_50);
-        mapping649 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_60);
-        mapping662 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_70);
-        mapping671 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_80);
-        mapping685 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_0);
-        mapping712 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_20);
-        mapping729 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_30);
-        mapping748 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_40);
-        mapping766 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_50);
+        mapping630 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_50);
+        mapping649 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_60);
+        mapping662 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_70);
+        mapping671 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_80);
+        mapping685 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_21_0);
+        mapping712 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_21_20);
+        mapping729 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_21_30);
+        mapping748 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_21_40);
+        mapping766 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_21_50);
+        mapping776 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_21_60);
 
         VALUES = new RuntimeItemMapping[]{
                 mapping361,
@@ -147,12 +145,15 @@ public class RuntimeItems {
                 mapping712,
                 mapping729,
                 mapping748,
-                mapping766
+                mapping766,
+                mapping776
         };
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_21_50_26) {
+        if (protocolId >= ProtocolInfo.v1_21_60) {
+            return mapping776;
+        } else if (protocolId >= ProtocolInfo.v1_21_50_26) {
             return mapping766;
         } else if (protocolId >= ProtocolInfo.v1_21_40) {
             return mapping748;
@@ -235,6 +236,7 @@ public class RuntimeItems {
         return (id & 0x1) != 0;
     }
 
+    @Deprecated
     @ToString
     @RequiredArgsConstructor
     static class Entry {

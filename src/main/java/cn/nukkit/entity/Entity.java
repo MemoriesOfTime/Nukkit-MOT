@@ -220,6 +220,14 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v685
      */
     public static final int DATA_VISIBLE_MOB_EFFECTS = 131; //long
+    /**
+     * @since v776 1.21.60
+     */
+    public static final int DATA_FILTERED_NAME = 132; //string
+    /**
+     * @since v776 1.21.60
+     */
+    public static final int DATA_BED_ENTER_POSITION = 133; //vector3f
 
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
@@ -341,6 +349,10 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_TIMER_FLAG_2 = 116;
     public static final int DATA_TIMER_FLAG_3 = 117;
     public static final int DATA_FLAG_BODY_ROTATION_BLOCKED = 118;
+    /**
+     * @since v776 1.21.60
+     */
+    public static final int DATA_FLAG_RENDER_WHEN_INVISIBLE = 119;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;

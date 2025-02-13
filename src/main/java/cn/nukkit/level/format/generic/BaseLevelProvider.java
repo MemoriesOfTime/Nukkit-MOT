@@ -23,6 +23,7 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -93,7 +94,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
         }
 
         if (!this.levelData.contains("generatorName")) {
-            this.levelData.putString("generatorName", Generator.getGenerator("DEFAULT").getSimpleName().toLowerCase());
+            this.levelData.putString("generatorName", Generator.getGenerator("DEFAULT").getSimpleName().toLowerCase(Locale.ROOT));
         }
 
         if (!this.levelData.contains("generatorOptions")) {

@@ -36,7 +36,7 @@ public class BanListCommand extends VanillaCommand {
 
         if (paramList.hasResult(0)) {
             String type = paramList.getResult(0);
-            switch (type.toLowerCase(Locale.ENGLISH)) {
+            switch (type.toLowerCase(Locale.ROOT)) {
                 case "ips" -> {
                     list = sender.getServer().getIPBans();
                     ips = true;

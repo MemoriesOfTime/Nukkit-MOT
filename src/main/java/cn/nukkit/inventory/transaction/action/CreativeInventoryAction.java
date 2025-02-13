@@ -31,7 +31,7 @@ public class CreativeInventoryAction extends InventoryAction {
     @Override
     public boolean isValid(Player source) {
         return source.isCreative() &&
-                (this.actionType == TYPE_DELETE_ITEM || Item.getCreativeItemIndex(source.protocol, this.sourceItem) != -1);
+                (this.actionType == TYPE_DELETE_ITEM || Item.isCreativeItem(source.protocol, this.sourceItem));
     }
 
     /**

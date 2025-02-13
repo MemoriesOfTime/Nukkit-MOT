@@ -95,6 +95,9 @@ public class AddPlayerPacket extends DataPacket {
                 this.putLInt(63); // abilityValues - survival abilities
                 this.putLFloat(0.1f); // flySpeed
                 this.putLFloat(0.05f); // walkSpeed
+                if (this.protocol >= ProtocolInfo.v1_21_60) {
+                    this.putLFloat(1.0f); // getVerticalFlySpeed()
+                }
             }
             this.putUnsignedVarInt(0);
             this.putString(deviceId);

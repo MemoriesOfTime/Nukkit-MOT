@@ -9,12 +9,7 @@ import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.StringJoiner;
+import java.util.*;
 
 public class GameruleCommand extends VanillaCommand {
 
@@ -31,10 +26,10 @@ public class GameruleCommand extends VanillaCommand {
 
         rules.getGameRules().forEach((rule, value) -> {
             switch (value.getType()) {
-                case BOOLEAN -> boolGameRules.add(rule.getName().toLowerCase(Locale.ENGLISH));
-                case INTEGER -> intGameRules.add(rule.getName().toLowerCase(Locale.ENGLISH));
-                case FLOAT -> floatGameRules.add(rule.getName().toLowerCase(Locale.ENGLISH));
-                default -> unknownGameRules.add(rule.getName().toLowerCase(Locale.ENGLISH));
+                case BOOLEAN -> boolGameRules.add(rule.getName().toLowerCase(Locale.ROOT));
+                case INTEGER -> intGameRules.add(rule.getName().toLowerCase(Locale.ROOT));
+                case FLOAT -> floatGameRules.add(rule.getName().toLowerCase(Locale.ROOT));
+                default -> unknownGameRules.add(rule.getName().toLowerCase(Locale.ROOT));
             }
         });
         this.commandParameters.put("default", new CommandParameter[0]);
@@ -73,7 +68,7 @@ public class GameruleCommand extends VanillaCommand {
         if (result.getKey().equals("default")) {
             StringJoiner rulesJoiner = new StringJoiner(", ");
             for (GameRule rule : rules.getRules()) {
-                rulesJoiner.add(rule.getName().toLowerCase(Locale.ENGLISH));
+                rulesJoiner.add(rule.getName().toLowerCase(Locale.ROOT));
             }
             log.addSuccess(rulesJoiner.toString()).output();
             return 1;
@@ -83,7 +78,7 @@ public class GameruleCommand extends VanillaCommand {
                 log.addSyntaxErrors(0).output();
                 return 0;
             }
-            log.addSuccess(gameRule.get().getName().toLowerCase(Locale.ENGLISH) + " = " + rules.getString(gameRule.get())).output();
+            log.addSuccess(gameRule.get().getName().toLowerCase(Locale.ROOT) + " = " + rules.getString(gameRule.get())).output();
             return 1;
         }
 
@@ -111,7 +106,7 @@ public class GameruleCommand extends VanillaCommand {
             }
         }
         var str = list.getResult(1);
-        log.addSuccess("commands.gamerule.success", optionalRule.get().getName().toLowerCase(Locale.ENGLISH), str.toString()).output();
+        log.addSuccess("commands.gamerule.success", optionalRule.get().getName().toLowerCase(Locale.ROOT), str.toString()).output();
         return 1;
     }
 }

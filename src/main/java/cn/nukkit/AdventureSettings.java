@@ -102,6 +102,10 @@ public class AdventureSettings implements Cloneable {
             layer.getAbilityValues().add(PlayerAbility.WALK_SPEED);
             layer.getAbilityValues().add(PlayerAbility.FLY_SPEED);
 
+            if (player.protocol >= ProtocolInfo.v1_21_60) {
+                layer.getAbilitiesSet().add(PlayerAbility.VERTICAL_FLY_SPEED);
+            }
+
             if (player.isCreative()) { // Make sure player can interact with creative menu
                 layer.getAbilityValues().add(PlayerAbility.INSTABUILD);
             }
@@ -112,6 +116,7 @@ public class AdventureSettings implements Cloneable {
 
             layer.setWalkSpeed(Player.DEFAULT_SPEED);
             layer.setFlySpeed(Player.DEFAULT_FLY_SPEED);
+            layer.setVerticalFlySpeed(Player.DEFAULT_VERTICAL_FLY_SPEED);
             packet.getAbilityLayers().add(layer);
 
             if (this.get(Type.NO_CLIP)) {
@@ -121,6 +126,7 @@ public class AdventureSettings implements Cloneable {
                 layer2.getAbilitiesSet().addAll(PlayerAbility.VALUES);
                 layer2.getAbilitiesSet().remove(PlayerAbility.FLY_SPEED); //不要设置速度，这会导致视角出错
                 layer2.getAbilitiesSet().remove(PlayerAbility.WALK_SPEED);
+                layer2.getAbilitiesSet().remove(PlayerAbility.VERTICAL_FLY_SPEED);
 
                 layer2.getAbilityValues().add(PlayerAbility.FLYING);
                 layer2.getAbilityValues().add(PlayerAbility.NO_CLIP);
