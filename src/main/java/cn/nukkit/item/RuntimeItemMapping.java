@@ -132,7 +132,7 @@ public class RuntimeItemMapping {
                 }
             }
 
-            this.registerItem(identifier, runtimeId, version, componentBased, legacyId, damage, hasDamage);
+            this.registerItem(identifier, runtimeId, legacyId, damage, hasDamage);
         }
 
         this.generatePalette();
@@ -147,10 +147,6 @@ public class RuntimeItemMapping {
     }
 
     public void registerItem(String identifier, int runtimeId, int legacyId, int damage, boolean hasDamage) {
-        this.registerItem(identifier, runtimeId, 0, false, legacyId, damage, hasDamage);
-    }
-
-    public void registerItem(String identifier, int runtimeId, int version, boolean componentBased, int legacyId, int damage, boolean hasDamage) {
         int fullId = this.getFullId(legacyId, damage);
         LegacyEntry legacyEntry = new LegacyEntry(legacyId, hasDamage, damage);
 
@@ -168,7 +164,7 @@ public class RuntimeItemMapping {
         if (!hasDamage && this.legacy2Runtime.containsKey(fullId)) {
             log.debug("RuntimeItemMapping contains duplicated legacy item state runtimeId=" + runtimeId + " identifier=" + identifier);
         } else {
-            RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, runtimeId, hasDamage, version, componentBased);
+            RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, runtimeId, hasDamage);
             this.legacy2Runtime.put(fullId, runtimeEntry);
             this.itemPaletteEntries.add(runtimeEntry);
         }
@@ -422,8 +418,7 @@ public class RuntimeItemMapping {
         private final String identifier;
         private final int runtimeId;
         private final boolean hasDamage;
-        private final int version;
-        private final boolean componentBased;
+        private final boolean isCustomItem;
 
         public RuntimeEntry(String identifier, int runtimeId, boolean hasDamage) {
             this(identifier, runtimeId, hasDamage, false);
@@ -433,21 +428,7 @@ public class RuntimeItemMapping {
             this.identifier = identifier;
             this.runtimeId = runtimeId;
             this.hasDamage = hasDamage;
-            this.version = 0;
-            this.componentBased = isCustomItem;
-        }
-
-        public RuntimeEntry(String identifier, int runtimeId, boolean hasDamage, int version, boolean componentBased) {
-            this.identifier = identifier;
-            this.runtimeId = runtimeId;
-            this.hasDamage = hasDamage;
-            this.version = version;
-            this.componentBased = componentBased;
-        }
-
-        @Deprecated
-        public boolean isCustomItem() {
-            return this.componentBased;
+            this.isCustomItem = isCustomItem;
         }
     }
 }
