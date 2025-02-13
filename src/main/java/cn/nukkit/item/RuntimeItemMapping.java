@@ -2,6 +2,7 @@ package cn.nukkit.item;
 
 import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
+import cn.nukkit.block.Block;
 import cn.nukkit.item.RuntimeItems.MappingEntry;
 import cn.nukkit.item.customitem.CustomItem;
 import cn.nukkit.item.customitem.CustomItemDefinition;
@@ -312,16 +313,17 @@ public class RuntimeItemMapping {
             damage = legacyEntry.getDamage();
         } else if (json.has("blockRuntimeId")) {
             int runtimeId = json.get("blockRuntimeId").getAsInt();
-            int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, runtimeId);
-            if (fullId == -1) {
-                if (ignoreUnknown) {
-                    return null;
-                } else {
-                    throw new IllegalStateException("Can not find blockRuntimeId for " + runtimeId);
+            if (runtimeId != 0) {
+                int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, runtimeId);
+                if (fullId == -1) {
+                    if (ignoreUnknown) {
+                        return null;
+                    } else {
+                        throw new IllegalStateException("Can not find blockRuntimeId for " + identifier + " (" + runtimeId + ")");
+                    }
                 }
+                damage = fullId & Block.DATA_MASK;
             }
-
-            damage = fullId & 0xf;
         }
 
         int count = json.has("count") ? json.get("count").getAsInt() : 1;
