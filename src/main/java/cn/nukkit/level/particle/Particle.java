@@ -6,6 +6,7 @@ import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
 import java.lang.reflect.Field;
+import java.util.Locale;
 
 import static cn.nukkit.utils.Utils.dynamic;
 
@@ -183,7 +184,7 @@ public abstract class Particle extends Vector3 {
     public abstract DataPacket[] mvEncode(int protocol);
 
     public static Integer getParticleIdByName(String name) {
-        name = name.toUpperCase();
+        name = name.toUpperCase(Locale.ROOT);
 
         try {
             Field field = Particle.class.getField((name.startsWith("TYPE_") ? name : ("TYPE_" + name)));

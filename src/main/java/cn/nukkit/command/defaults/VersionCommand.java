@@ -16,6 +16,7 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -74,9 +75,9 @@ public class VersionCommand extends VanillaCommand {
         boolean found = false;
 
         if (exactPlugin == null) {
-            final String lowerName = pluginName.toLowerCase();
+            final String lowerName = pluginName.toLowerCase(Locale.ROOT);
             for (Plugin p : sender.getServer().getPluginManager().getPlugins().values()) {
-                if (p.getName().toLowerCase().contains(lowerName)) {
+                if (p.getName().toLowerCase(Locale.ROOT).contains(lowerName)) {
                     exactPlugin = p;
                     found = true;
                 }

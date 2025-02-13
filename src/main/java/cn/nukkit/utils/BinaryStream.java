@@ -1420,7 +1420,7 @@ public class BinaryStream {
         });
         this.putUnsignedVarInt(rulesToSend.size());
         rulesToSend.forEach((gameRule, value) -> {
-            putString(gameRule.getName().toLowerCase());
+            putString(gameRule.getName().toLowerCase(Locale.ROOT));
             value.write(protocol, this);
         });
     }
@@ -1434,7 +1434,7 @@ public class BinaryStream {
         });
         this.putUnsignedVarInt(rulesToSend.size());
         rulesToSend.forEach((gameRule, value) -> {
-            putString(gameRule.getName().toLowerCase());
+            putString(gameRule.getName().toLowerCase(Locale.ROOT));
             value.write(protocol, this);
         });
     }

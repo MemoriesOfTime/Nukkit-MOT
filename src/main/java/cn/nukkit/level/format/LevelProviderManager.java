@@ -4,6 +4,7 @@ import cn.nukkit.Server;
 import lombok.extern.log4j.Log4j2;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -37,6 +38,6 @@ public abstract class LevelProviderManager {
     }
 
     public static Class<? extends LevelProvider> getProviderByName(String name) {
-        return providers.getOrDefault(name.trim().toLowerCase(), null);
+        return providers.getOrDefault(name.trim().toLowerCase(Locale.ROOT), null);
     }
 }

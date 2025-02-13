@@ -8,6 +8,7 @@ import cn.nukkit.command.data.CommandParameter;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.utils.TextFormat;
 
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -93,7 +94,7 @@ public class HelpCommand extends VanillaCommand {
             return true;
         }
 
-        Command cmd = sender.getServer().getCommandMap().getCommand(command.toString().toLowerCase());
+        Command cmd = sender.getServer().getCommandMap().getCommand(command.toString().toLowerCase(Locale.ROOT));
         if (cmd != null && cmd.testPermissionSilent(sender)) {
             String message = TextFormat.YELLOW + "--------- " + TextFormat.WHITE + " Help: /" + cmd.getName() + TextFormat.YELLOW + " ---------\n";
             message += TextFormat.GOLD + "Description: " + TextFormat.WHITE + cmd.getDescription() + '\n';
@@ -109,7 +110,7 @@ public class HelpCommand extends VanillaCommand {
             return true;
         }
 
-        sender.sendMessage(TextFormat.RED + "No help for " + command.toString().toLowerCase());
+        sender.sendMessage(TextFormat.RED + "No help for " + command.toString().toLowerCase(Locale.ROOT));
         return true;
     }
 }

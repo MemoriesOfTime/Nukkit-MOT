@@ -12,8 +12,10 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.StringTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory;
 import cn.nukkit.utils.Identifier;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
@@ -38,6 +40,18 @@ public class CustomItemDefinition {
     private final CompoundTag nbt; //649
     private final CompoundTag nbt465;
     private final CompoundTag nbt419;
+
+    /**
+     * Creative inventory page where the item is put into
+     */
+    @Getter
+    private final CreativeItemCategory creativeCategory;
+
+    /**
+     * Group items in creative inventory
+     */
+    @Getter
+    private final String creativeGroup;
 
     private CustomItemDefinition(String identifier, CompoundTag nbt) {
         this.identifier = identifier;
@@ -64,6 +78,15 @@ public class CustomItemDefinition {
         this.nbt419 = this.nbt465.clone();
         this.nbt419.getCompound("components").getCompound("item_properties").remove("minecraft:icon");
         this.nbt419.getCompound("components").putCompound("minecraft:icon", new CompoundTag().putString("texture", this.getTexture()));
+
+
+        CompoundTag compound = this.nbt.getCompound("components").getCompound("item_properties");
+        if (compound.containsInt("creative_category")) {
+            this.creativeCategory = CreativeItemCategory.values()[compound.getInt("creative_category")];
+        } else {
+            this.creativeCategory = CreativeItemCategory.UNDEFINED;
+        }
+        this.creativeGroup = compound.getString("creative_group");
     }
 
     public String identifier() {
@@ -83,6 +106,11 @@ public class CustomItemDefinition {
         return this.nbt419;
     }
 
+    @Deprecated
+    public static CustomItemDefinition.SimpleBuilder customBuilder(CustomItem item, ItemCreativeCategory creativeCategory) {
+        return new CustomItemDefinition.SimpleBuilder(item, creativeCategory);
+    }
+
     /**
      * 自定义物品的定义构造器
      * <p>
@@ -92,7 +120,12 @@ public class CustomItemDefinition {
      * @param creativeCategory the creative category
      * @return the custom item definition . simple builder
      */
-    public static CustomItemDefinition.SimpleBuilder customBuilder(CustomItem item, ItemCreativeCategory creativeCategory) {
+    public static CustomItemDefinition.SimpleBuilder customBuilder(CustomItem item, CreativeItemCategory creativeCategory) {
+        return new CustomItemDefinition.SimpleBuilder(item, creativeCategory);
+    }
+
+    @Deprecated
+    public static CustomItemDefinition.SimpleBuilder simpleBuilder(ItemCustom item, ItemCreativeCategory creativeCategory) {
         return new CustomItemDefinition.SimpleBuilder(item, creativeCategory);
     }
 
@@ -104,8 +137,13 @@ public class CustomItemDefinition {
      * @param item             the item
      * @param creativeCategory the creative category
      */
-    public static CustomItemDefinition.SimpleBuilder simpleBuilder(ItemCustom item, ItemCreativeCategory creativeCategory) {
+    public static CustomItemDefinition.SimpleBuilder simpleBuilder(ItemCustom item, CreativeItemCategory creativeCategory) {
         return new CustomItemDefinition.SimpleBuilder(item, creativeCategory);
+    }
+
+    @Deprecated
+    public static CustomItemDefinition.ToolBuilder toolBuilder(ItemCustomTool item, ItemCreativeCategory creativeCategory) {
+        return new CustomItemDefinition.ToolBuilder(item, creativeCategory);
     }
 
     /**
@@ -116,8 +154,13 @@ public class CustomItemDefinition {
      * @param item             the item
      * @param creativeCategory the creative category
      */
-    public static CustomItemDefinition.ToolBuilder toolBuilder(ItemCustomTool item, ItemCreativeCategory creativeCategory) {
+    public static CustomItemDefinition.ToolBuilder toolBuilder(ItemCustomTool item, CreativeItemCategory creativeCategory) {
         return new CustomItemDefinition.ToolBuilder(item, creativeCategory);
+    }
+
+    @Deprecated
+    public static CustomItemDefinition.ArmorBuilder armorBuilder(ItemCustomArmor item, ItemCreativeCategory creativeCategory) {
+        return new CustomItemDefinition.ArmorBuilder(item, creativeCategory);
     }
 
     /**
@@ -128,8 +171,13 @@ public class CustomItemDefinition {
      * @param item             the item
      * @param creativeCategory the creative category
      */
-    public static CustomItemDefinition.ArmorBuilder armorBuilder(ItemCustomArmor item, ItemCreativeCategory creativeCategory) {
+    public static CustomItemDefinition.ArmorBuilder armorBuilder(ItemCustomArmor item, CreativeItemCategory creativeCategory) {
         return new CustomItemDefinition.ArmorBuilder(item, creativeCategory);
+    }
+
+    @Deprecated
+    public static CustomItemDefinition.EdibleBuilder edibleBuilder(ItemCustomEdible item, ItemCreativeCategory creativeCategory) {
+        return new CustomItemDefinition.EdibleBuilder(item, creativeCategory);
     }
 
     /**
@@ -140,7 +188,7 @@ public class CustomItemDefinition {
      * @param item             the item
      * @param creativeCategory the creative category
      */
-    public static CustomItemDefinition.EdibleBuilder edibleBuilder(ItemCustomEdible item, ItemCreativeCategory creativeCategory) {
+    public static CustomItemDefinition.EdibleBuilder edibleBuilder(ItemCustomEdible item, CreativeItemCategory creativeCategory) {
         return new CustomItemDefinition.EdibleBuilder(item, creativeCategory);
     }
 
@@ -174,13 +222,22 @@ public class CustomItemDefinition {
                                 .putCompound("minecraft:icon", new CompoundTag())));
         private final Item item;
 
+        @Deprecated
         protected SimpleBuilder(CustomItem customItem, ItemCreativeCategory creativeCategory) {
+            this(customItem,  CreativeItemCategory.valueOf(creativeCategory.name()), "");
+        }
+
+        protected SimpleBuilder(CustomItem customItem, CreativeItemCategory creativeCategory) {
+            this(customItem,  creativeCategory, "");
+        }
+
+        protected SimpleBuilder(CustomItem customItem, CreativeItemCategory creativeCategory, String creativeItemGroup) {
             this.item = (Item) customItem;
             this.identifier = customItem.getNamespaceId();
             //定义材质
-            this.nbt.getCompound("components")
-                    .getCompound("item_properties")
-                    .getCompound("minecraft:icon")
+            CompoundTag properties = this.nbt.getCompound("components")
+                    .getCompound("item_properties");
+            properties.getCompound("minecraft:icon")
                     .putCompound("textures", new CompoundTag().putString("default", customItem.getTextureName()));
 
             //定义显示名
@@ -190,14 +247,14 @@ public class CustomItemDefinition {
             }
 
             //定义最大堆叠数量
-            this.nbt.getCompound("components")
-                    .getCompound("item_properties")
-                    .putInt("max_stack_size", item.getMaxStackSize());
+            properties.putInt("max_stack_size", item.getMaxStackSize());
             //定义在创造栏的分类
-            this.nbt.getCompound("components")
-                    .getCompound("item_properties")//1 none
-                    .putInt("creative_category", creativeCategory.ordinal() + 1)
-                    .putString("creative_group", ItemCreativeGroup.NONE.getGroupName());
+            if (creativeCategory != null) {
+                properties.putInt("creative_category", creativeCategory.ordinal());
+                if (creativeCategory != CreativeItemCategory.UNDEFINED && creativeItemGroup != null) {
+                    properties.putString("creative_group", creativeItemGroup);
+                }
+            }
         }
 
         /**
@@ -259,6 +316,7 @@ public class CustomItemDefinition {
          *
          * @see <a href="https://wiki.bedrock.dev/documentation/creative-categories.html#list-of-creative-categories">bedrock wiki</a>
          */
+        @Deprecated
         public SimpleBuilder creativeGroup(ItemCreativeGroup creativeGroup) {
             this.nbt.getCompound("components")
                     .getCompound("item_properties")
@@ -436,7 +494,12 @@ public class CustomItemDefinition {
             toolBlocks.put(ItemTag.IS_SWORD, swordBlocks);
         }
 
+        @Deprecated
         private ToolBuilder(ItemCustomTool item, ItemCreativeCategory creativeCategory) {
+            this(item, CreativeItemCategory.valueOf(creativeCategory.name()));
+        }
+
+        private ToolBuilder(ItemCustomTool item, CreativeItemCategory creativeCategory) {
             super(item, creativeCategory);
             this.item = item;
             this.nbt.getCompound("components")
@@ -696,7 +759,12 @@ public class CustomItemDefinition {
     public static class ArmorBuilder extends SimpleBuilder {
         private final ItemCustomArmor item;
 
+        @Deprecated
         private ArmorBuilder(ItemCustomArmor item, ItemCreativeCategory creativeCategory) {
+            this(item, CreativeItemCategory.valueOf(creativeCategory.name()));
+        }
+
+        private ArmorBuilder(ItemCustomArmor item, CreativeItemCategory creativeCategory) {
             super(item, creativeCategory);
             this.item = item;
             this.nbt.getCompound("components")
@@ -762,7 +830,13 @@ public class CustomItemDefinition {
     }
 
     public static class EdibleBuilder extends SimpleBuilder {
+
+        @Deprecated
         private EdibleBuilder(ItemCustomEdible item, ItemCreativeCategory creativeCategory) {
+            this(item, CreativeItemCategory.valueOf(creativeCategory.name()));
+        }
+
+        private EdibleBuilder(ItemCustomEdible item, CreativeItemCategory creativeCategory) {
             super(item, creativeCategory);
             var food = Food.registerFood(item.getFood().getValue(), item.getFood().getKey());
             if (this.nbt.getCompound("components").contains("minecraft:food")) {

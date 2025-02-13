@@ -12,7 +12,7 @@ import lombok.ToString;
 @Getter
 @Setter
 public class RequestAbilityPacket extends DataPacket {
-    protected static final PlayerAbility[] ABILITIES = UpdateAbilitiesPacket.VALID_FLAGS;
+    protected static final PlayerAbility[] ABILITIES = PlayerAbility.values();
     protected static final AbilityType[] ABILITY_TYPES = AbilityType.values();
 
     public PlayerAbility ability;

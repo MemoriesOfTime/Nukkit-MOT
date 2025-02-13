@@ -8,6 +8,7 @@ import cn.nukkit.utils.BlockColor;
 import lombok.Getter;
 
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import static cn.nukkit.utils.BlockColor.*;
@@ -142,7 +143,7 @@ public class BlockWall extends BlockTransparentMeta {
         WallType(BlockColor color) {
             this.color = color;
             String name = Arrays.stream(name().split("_"))
-                    .map(part-> part.charAt(0) + part.substring(1).toLowerCase())
+                    .map(part-> part.charAt(0) + part.substring(1).toLowerCase(Locale.ROOT))
                     .collect(Collectors.joining(" "));
             typeName = name + " Wall";
         }

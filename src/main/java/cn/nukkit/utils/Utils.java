@@ -75,7 +75,7 @@ public class Utils {
     }
 
     public static boolean hasItemOrBlock(String id) {
-        return Item.NAMESPACED_ID_ITEM.containsKey(id.toLowerCase(Locale.ENGLISH));
+        return Item.NAMESPACED_ID_ITEM.containsKey(id.toLowerCase(Locale.ROOT));
     }
 
     public static boolean hasItemOrBlock(int id) {
@@ -503,6 +503,7 @@ public class Utils {
             case ProtocolInfo.v1_21_30 -> "1.21.30";
             case ProtocolInfo.v1_21_40 -> "1.21.40";
             case ProtocolInfo.v1_21_50_26, ProtocolInfo.v1_21_50 -> "1.21.50";
+            case ProtocolInfo.v1_21_60 -> "1.21.60";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };

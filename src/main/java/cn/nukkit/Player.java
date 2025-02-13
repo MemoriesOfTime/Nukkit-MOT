@@ -43,6 +43,7 @@ import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
+import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.item.trim.TrimFactory;
@@ -150,6 +151,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final float DEFAULT_SPEED = 0.1f;
     public static final float MAXIMUM_SPEED = 0.5f;
     public static final float DEFAULT_FLY_SPEED = 0.05f;
+    public static final float DEFAULT_VERTICAL_FLY_SPEED = 1.0f;
 
     public static final int PERMISSION_CUSTOM = 3;
     public static final int PERMISSION_OPERATOR = 2;
@@ -486,15 +488,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     public boolean isWhitelisted() {
-        return this.server.isWhitelisted(this.username.toLowerCase());
+        return this.server.isWhitelisted(this.username.toLowerCase(Locale.ROOT));
     }
 
     @Override
     public void setWhitelisted(boolean value) {
         if (value) {
-            this.server.addWhitelist(this.username.toLowerCase());
+            this.server.addWhitelist(this.username.toLowerCase(Locale.ROOT));
         } else {
-            this.server.removeWhitelist(this.username.toLowerCase());
+            this.server.removeWhitelist(this.username.toLowerCase(Locale.ROOT));
         }
     }
 
@@ -2641,7 +2643,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     protected void processLogin() {
-        String lowerName = this.username.toLowerCase();
+        String lowerName = this.username.toLowerCase(Locale.ROOT);
         if (!this.server.isWhitelisted(lowerName)) {
             this.kick(PlayerKickEvent.Reason.NOT_WHITELISTED, server.whitelistReason);
             return;
@@ -2878,20 +2880,50 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             }
                         }
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
-                        if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
-                            Int2ObjectOpenHashMap<ItemComponentPacket.Entry> entries = new Int2ObjectOpenHashMap<>();
-                            int i = 0;
-                            for (var entry : Item.getCustomItemDefinition().entrySet()) {
-                                try {
-                                    CompoundTag data = entry.getValue().getNbt(this.protocol);
-                                    data.putShort("minecraft:identifier", i);
-                                    entries.put(i, new ItemComponentPacket.Entry(entry.getKey(), data));
-                                    i++;
-                                } catch (Exception e) {
-                                    log.error("ItemComponentPacket encoding error", e);
+                        if (this.protocol >= ProtocolInfo.v1_21_60) {
+                            Collection<ItemComponentPacket.ItemDefinition> vanillaItems = RuntimeItems.getMapping(this.protocol).getVanillaItemDefinitions();
+                            Set<Map.Entry<String, CustomItemDefinition>> itemDefinitions = Item.getCustomItemDefinition().entrySet();
+                            List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
+                            entries.addAll(vanillaItems);
+                            if (this.server.enableExperimentMode && !itemDefinitions.isEmpty()) {
+                                for (Map.Entry<String, CustomItemDefinition> entry : itemDefinitions) {
+                                    try {
+                                        Item item = Item.fromString(entry.getKey());
+                                        entries.add(new ItemComponentPacket.ItemDefinition(
+                                                entry.getKey(),
+                                                item.getNetworkId(this.protocol),
+                                                true,
+                                                1,
+                                                entry.getValue().getNbt(this.protocol)
+                                        ));
+                                    } catch (Exception e) {
+                                        log.error("ItemComponentPacket encoding error", e);
+                                    }
                                 }
                             }
-                            itemComponentPacket.setEntries(entries.values().toArray(ItemComponentPacket.Entry.EMPTY_ARRAY));
+                            itemComponentPacket.setEntries(entries);
+                        } else {
+                            if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
+                                HashMap<String, CustomItemDefinition> itemDefinition = Item.getCustomItemDefinition();
+                                List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(itemDefinition.size());
+                                int i = 0;
+                                for (var entry : itemDefinition.entrySet()) {
+                                    try {
+                                        Item item = Item.fromString(entry.getKey());
+                                        entries.add(new ItemComponentPacket.ItemDefinition(
+                                                entry.getKey(),
+                                                item.getNetworkId(this.protocol),
+                                                true,
+                                                1,
+                                                entry.getValue().getNbt(this.protocol).putShort("minecraft:identifier", i)
+                                        ));
+                                        i++;
+                                    } catch (Exception e) {
+                                        log.error("ItemComponentPacket encoding error", e);
+                                    }
+                                }
+                                itemComponentPacket.setEntries(entries);
+                            }
                         }
                         this.dataPacket(itemComponentPacket);
                     }
@@ -3081,7 +3113,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.username = this.unverifiedUsername;
                 this.unverifiedUsername = null;
                 this.displayName = this.username;
-                this.iusername = this.username.toLowerCase();
+                this.iusername = this.username.toLowerCase(Locale.ROOT);
                 this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
 
                 this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);

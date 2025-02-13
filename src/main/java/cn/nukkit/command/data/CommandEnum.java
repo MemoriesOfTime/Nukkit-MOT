@@ -8,7 +8,6 @@ import cn.nukkit.utils.CameraPresetManager;
 import cn.nukkit.utils.Identifier;
 import com.google.common.collect.ImmutableList;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.function.Supplier;
@@ -36,7 +35,7 @@ public class CommandEnum {
     public static final CommandEnum ENUM_EFFECT = new CommandEnum("Effect", Arrays.stream(Effect.class.getDeclaredFields())
             .filter(field -> field.getType() == int.class)
             .filter(field -> (field.getModifiers() & (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL)) == (Modifier.PUBLIC | Modifier.STATIC | Modifier.FINAL))
-            .map(field -> field.getName().toLowerCase())
+            .map(field -> field.getName().toLowerCase(Locale.ROOT))
             .toList());
     public static final CommandEnum ENUM_ENCHANTMENT = new CommandEnum("enchantmentName", () -> Enchantment.getEnchantmentName2IDMap().keySet().stream()
             .map(name -> name.startsWith(Identifier.DEFAULT_NAMESPACE) ? name.substring(10) : name)

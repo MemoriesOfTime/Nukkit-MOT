@@ -254,7 +254,7 @@ public enum TextFormat {
         char[] b = textToTranslate.toCharArray();
         for (int i = 0; i < b.length - 1; i++) {
             int x = i + 1;
-            if (b[i] == altFormatChar && "0123456789AaBbCcDdEeFfGgKkLlMmNnOoRr".indexOf(b[x]) > -1) {
+            if (b[i] == altFormatChar && "0123456789AaBbCcDdEeFfGgKkLlMmNnOoRrSsTtUuVv".indexOf(b[x]) > -1) {
                 b[i] = TextFormat.ESCAPE;
                 b[x] = Character.toLowerCase(b[x]);
             }

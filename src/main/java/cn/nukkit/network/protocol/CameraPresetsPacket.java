@@ -130,6 +130,10 @@ public class CameraPresetsPacket extends DataPacket {
                 this.putOptionalNull(preset.getEntityOffset(), this::putVector3f);
             }
             this.putOptionalNull(preset.getRadius(), this::putLFloat);
+            if (this.protocol >= ProtocolInfo.v1_21_60) {
+                this.putOptionalNull(preset.getMinYawLimit(), this::putLFloat);
+                this.putOptionalNull(preset.getMaxYawLimit(), this::putLFloat);
+            }
         }
         this.putOptionalNull(preset.getListener(), (listener) -> this.putByte((byte) listener.ordinal()));
         this.putOptional(o -> o != null && o.isPresent(), preset.getPlayEffect(), (optional) -> this.putBoolean(optional.getAsBoolean()));
@@ -165,6 +169,8 @@ public class CameraPresetsPacket extends DataPacket {
         Float blockListeningRadius = null;
         Vector2f viewOffset = null;
         Float radius = null;
+        Float minYawLimit = null;
+        Float maxYawLimit = null;
         Float rotationSpeed = null;
         OptionalBoolean snapToTarget = OptionalBoolean.empty();
         Vector2f horizontalRotationLimit = null;
@@ -189,6 +195,10 @@ public class CameraPresetsPacket extends DataPacket {
                 entityOffset = this.getOptional(null, BinaryStream::getVector3f);
             }
             radius = this.getOptional(null, BinaryStream::getLFloat);
+            if (this.protocol >= ProtocolInfo.v1_21_60) {
+                minYawLimit = this.getOptional(null, BinaryStream::getLFloat);
+                maxYawLimit = this.getOptional(null, BinaryStream::getLFloat);
+            }
         }
 
         CameraAudioListener listener = this.getOptional(null, b -> CameraAudioListener.values()[b.getByte()]);
@@ -201,7 +211,10 @@ public class CameraPresetsPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_50) {
             aimAssist = this.getOptional(null, b -> this.getCameraAimAssist());
         }
-        return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, viewOffset, radius, listener, effects, rotationSpeed, snapToTarget, entityOffset, horizontalRotationLimit, verticalRotationLimit, continueTargeting, alignTargetAndCameraForward, blockListeningRadius, aimAssist);
+        return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, viewOffset, radius, minYawLimit, maxYawLimit,
+                listener, effects, rotationSpeed, snapToTarget, entityOffset, horizontalRotationLimit, verticalRotationLimit,
+                continueTargeting, alignTargetAndCameraForward, blockListeningRadius, aimAssist
+        );
     }
 
     protected CameraAimAssistPreset getCameraAimAssist() {

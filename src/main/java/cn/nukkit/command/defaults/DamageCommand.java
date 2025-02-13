@@ -11,11 +11,7 @@ import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.lang.TranslationContainer;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -30,12 +26,12 @@ public class DamageCommand extends VanillaCommand {
         this.addCommandParameters("default", new CommandParameter[]{
                 CommandParameter.newType("target", false, CommandParamType.TARGET),
                 CommandParameter.newType("amount", false, CommandParamType.INT),
-                CommandParameter.newEnum("cause", true, Arrays.stream(EntityDamageEvent.DamageCause.values()).map(e -> e.name().toLowerCase(Locale.ENGLISH)).toList().toArray(new String[0]))
+                CommandParameter.newEnum("cause", true, Arrays.stream(EntityDamageEvent.DamageCause.values()).map(e -> e.name().toLowerCase(Locale.ROOT)).toList().toArray(new String[0]))
         });
         this.addCommandParameters("damager", new CommandParameter[]{
                 CommandParameter.newType("target", false, CommandParamType.TARGET),
                 CommandParameter.newType("amount", false, CommandParamType.INT),
-                CommandParameter.newEnum("cause", false, Arrays.stream(EntityDamageEvent.DamageCause.values()).map(e -> e.name().toLowerCase(Locale.ENGLISH)).toList().toArray(new String[0])),
+                CommandParameter.newEnum("cause", false, Arrays.stream(EntityDamageEvent.DamageCause.values()).map(e -> e.name().toLowerCase(Locale.ROOT)).toList().toArray(new String[0])),
                 CommandParameter.newEnum("entity", false, new String[]{"entity"}),
                 CommandParameter.newType("damager", false, CommandParamType.TARGET)
         });
@@ -61,7 +57,7 @@ public class DamageCommand extends VanillaCommand {
                 EntityDamageEvent.DamageCause cause = EntityDamageEvent.DamageCause.VOID;
                 if (list.hasResult(2)) {
                     String str = list.getResult(2);
-                    cause = EntityDamageEvent.DamageCause.valueOf(str.toUpperCase(Locale.ENGLISH));
+                    cause = EntityDamageEvent.DamageCause.valueOf(str.toUpperCase(Locale.ROOT));
                 }
                 boolean all_success = true;
                 List<Entity> failed = new ArrayList<>();
@@ -84,7 +80,7 @@ public class DamageCommand extends VanillaCommand {
             }
             case "damager" -> {
                 String str = list.getResult(2);
-                EntityDamageEvent.DamageCause cause = EntityDamageEvent.DamageCause.valueOf(str.toUpperCase(Locale.ENGLISH));
+                EntityDamageEvent.DamageCause cause = EntityDamageEvent.DamageCause.valueOf(str.toUpperCase(Locale.ROOT));
                 List<Entity> damagers = list.getResult(4);
                 if (damagers.isEmpty()) {
                     log.addNoTargetMatch().output();
