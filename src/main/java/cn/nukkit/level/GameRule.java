@@ -1,5 +1,6 @@
 package cn.nukkit.level;
 
+import java.util.Locale;
 import java.util.Optional;
 
 public enum GameRule {
@@ -45,7 +46,7 @@ public enum GameRule {
 
     GameRule(String name) {
         this.name = name;
-        this.bedrockName = name.toLowerCase();
+        this.bedrockName = name.toLowerCase(Locale.ROOT);
     }
 
     public static Optional<GameRule> parseString(String gameRuleString) {
@@ -68,7 +69,7 @@ public enum GameRule {
     public static String[] getNamesLowerCase() {
         String[] stringValues = new String[values().length];
         for (int i = 0; i < values().length; i++) {
-            stringValues[i] = values()[i].name.toLowerCase();
+            stringValues[i] = values()[i].name.toLowerCase(Locale.ROOT);
         }
         return stringValues;
     }

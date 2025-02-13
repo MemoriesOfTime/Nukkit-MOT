@@ -202,6 +202,9 @@ public class AddEntityPacket extends DataPacket {
         mapping.put(143, "minecraft:wind_charge_projectile");
         //1.21.0
         mapping.put(144, "minecraft:bogged");
+        //1.21.60
+        mapping.put(145, "minecraft:ominous_item_spawner");
+        mapping.put(EntityCreaking.NETWORK_ID, "minecraft:creaking");
     }
 
     @Override

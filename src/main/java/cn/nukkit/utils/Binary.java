@@ -15,6 +15,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -510,7 +511,7 @@ public class Binary {
             }
             stringBuilder.append(hv);
         }
-        return stringBuilder.toString().toUpperCase();
+        return stringBuilder.toString().toUpperCase(Locale.ROOT);
     }
 
     public static byte[] hexStringToBytes(String hexString) {
@@ -518,7 +519,7 @@ public class Binary {
             return null;
         }
         String str = "0123456789ABCDEF";
-        hexString = hexString.toUpperCase().replace(" ", "");
+        hexString = hexString.toUpperCase(Locale.ROOT).replace(" ", "");
         int length = hexString.length() >> 1;
         char[] hexChars = hexString.toCharArray();
         byte[] d = new byte[length];

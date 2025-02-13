@@ -2,8 +2,8 @@ package cn.nukkit.item.customitem;
 
 import cn.nukkit.item.ItemBookEnchanted;
 import cn.nukkit.item.ItemID;
-import cn.nukkit.item.customitem.data.ItemCreativeCategory;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory;
 
 public abstract class ItemCustomBookEnchanted extends ItemBookEnchanted implements CustomItem {
     private final String id;
@@ -30,7 +30,7 @@ public abstract class ItemCustomBookEnchanted extends ItemBookEnchanted implemen
 
     @Override
     public CustomItemDefinition getDefinition() {
-        return CustomItemDefinition.customBuilder(this, ItemCreativeCategory.ITEMS)
+        return CustomItemDefinition.customBuilder(this, CreativeItemCategory.ITEMS)
                 .allowOffHand(false)
                 .creativeGroup("itemGroup.name.enchantedBook")
                 .foil(true)

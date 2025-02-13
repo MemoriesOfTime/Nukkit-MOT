@@ -2,10 +2,14 @@ package cn.nukkit.item;
 
 import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
+import cn.nukkit.block.Block;
 import cn.nukkit.item.RuntimeItems.MappingEntry;
 import cn.nukkit.item.customitem.CustomItem;
 import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.nbt.NBTIO;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.ItemComponentPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
@@ -22,10 +26,13 @@ import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
+import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.zip.GZIPInputStream;
 
 @Log4j2
 public class RuntimeItemMapping {
@@ -35,6 +42,8 @@ public class RuntimeItemMapping {
     private final Int2ObjectMap<LegacyEntry> runtime2Legacy = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<RuntimeEntry> legacy2Runtime = new Int2ObjectOpenHashMap<>();
     private final Map<String, LegacyEntry> identifier2Legacy = new HashMap<>();
+
+    private final Map<String, ItemComponentPacket.ItemDefinition> vanillaItems = new HashMap<>();
 
     private final List<RuntimeEntry> itemPaletteEntries = new ArrayList<>();
     private final Int2ObjectMap<String> runtimeId2Name = new Int2ObjectOpenHashMap<>();
@@ -53,6 +62,15 @@ public class RuntimeItemMapping {
         }
         JsonArray json = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonArray();
 
+        CompoundTag itemComponents = null;
+        if (protocolId >= ProtocolInfo.v1_21_60) {
+            try (InputStream inputStream = RuntimeItemMapping.class.getClassLoader().getResourceAsStream("ItemComponents/item_components_" + protocolId + ".nbt")) {
+                itemComponents = NBTIO.read(new BufferedInputStream(new GZIPInputStream(inputStream)), ByteOrder.BIG_ENDIAN, false);
+            } catch (Exception e) {
+                throw new AssertionError("Error while loading item_components_" + protocolId + ".nbt", e);
+            }
+        }
+
         for (JsonElement element : json) {
             if (!element.isJsonObject()) {
                 throw new IllegalStateException("Invalid entry");
@@ -60,6 +78,18 @@ public class RuntimeItemMapping {
             JsonObject entry = element.getAsJsonObject();
             String identifier = entry.get("name").getAsString();
             int runtimeId = entry.get("id").getAsInt();
+            int version = entry.has("version") ? entry.get("version").getAsInt() : 0;
+            boolean componentBased = entry.has("componentBased") && entry.get("componentBased").getAsBoolean();
+            if (protocolId >= ProtocolInfo.v1_21_60) {
+                CompoundTag components = (CompoundTag) itemComponents.get(identifier);
+                this.vanillaItems.put(identifier, new ItemComponentPacket.ItemDefinition(
+                        identifier,
+                        runtimeId,
+                        componentBased,
+                        version,
+                        components
+                ));
+            }
 
             //高版本"minecraft:wool"的名称改为"minecraft:white_wool"
             //他们的legacyId均为35，这里避免冲突忽略"minecraft:wool"
@@ -283,16 +313,17 @@ public class RuntimeItemMapping {
             damage = legacyEntry.getDamage();
         } else if (json.has("blockRuntimeId")) {
             int runtimeId = json.get("blockRuntimeId").getAsInt();
-            int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, runtimeId);
-            if (fullId == -1) {
-                if (ignoreUnknown) {
-                    return null;
-                } else {
-                    throw new IllegalStateException("Can not find blockRuntimeId for " + runtimeId);
+            if (runtimeId != 0) {
+                int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, runtimeId);
+                if (fullId == -1) {
+                    if (ignoreUnknown) {
+                        return null;
+                    } else {
+                        throw new IllegalStateException("Can not find blockRuntimeId for " + identifier + " (" + runtimeId + ")");
+                    }
                 }
+                damage = fullId & Block.DATA_MASK;
             }
-
-            damage = fullId & 0xf;
         }
 
         int count = json.has("count") ? json.get("count").getAsInt() : 1;
@@ -359,6 +390,14 @@ public class RuntimeItemMapping {
 
     public byte[] getItemPalette() {
         return this.itemPalette;
+    }
+
+    public List<RuntimeEntry> getItemPaletteEntries() {
+        return this.itemPaletteEntries;
+    }
+
+    public Collection<ItemComponentPacket.ItemDefinition> getVanillaItemDefinitions() {
+        return this.vanillaItems.values();
     }
 
     public int getProtocolId() {
