@@ -828,7 +828,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         seconds /= speedMultiplier;
 
         if (player != null) {
-            if (player.isInsideOfWater() && !hasAquaAffinity) {
+            if (player.isSubmerged() && !hasAquaAffinity) {
                 seconds *= hasConduitPower && blockHardness >= 0.5 ? 2.5 : 5;
             }
         }
