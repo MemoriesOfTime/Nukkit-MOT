@@ -312,12 +312,46 @@ public interface ProtocolInfo {
     int SET_PLAYER_INVENTORY_OPTIONS_PACKET = 307;
     int SET_HUD_PACKET = 308;
     int AWARD_ACHIEVEMENT_PACKET = 309;
+    /**
+     * @since v686
+     */
     int CLIENTBOUND_CLOSE_FORM_PACKET = 310;
-
+    /**
+     * @since v712
+     */
     int SERVERBOUND_LOADING_SCREEN_PACKET = 312;
+    /**
+     * @since v712
+     */
     int JIGSAW_STRUCTURE_DATA_PACKET = 313;
+    /**
+     * @since v712
+     */
     int CURRENT_STRUCTURE_FEATURE_PACKET = 314;
+    /**
+     * @since v712
+     */
     int SERVERBOUND_DIAGNOSTICS_PACKET = 315;
+    /**
+     * @since v729
+     */
+    int CAMERA_AIM_ASSIST_PACKET = 316;
+    /**
+     * @since v729
+     */
+    int CONTAINER_REGISTRY_CLEANUP_PACKET = 317;
+    /**
+     * @since v748
+     */
+    int MOVEMENT_EFFECT_PACKET = 318;
+    /**
+     * @since v748
+     */
+    int SET_MOVEMENT_AUTHORITY_PACKET = 319;
+    /**
+     * @since v766
+     */
+    int CAMERA_AIM_ASSIST_PRESETS_PACKET = 320;
 
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;

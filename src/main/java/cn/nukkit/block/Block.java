@@ -27,9 +27,8 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockColor;
 import lombok.extern.log4j.Log4j2;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.List;
 import java.util.Objects;
@@ -630,14 +629,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return this.getDrops(item);
     }
 
-    private double toolBreakTimeBonus0(Item item) {
-        if (item instanceof ItemCustomTool itemCustomTool && itemCustomTool.getSpeed() != null) {
-            return customToolBreakTimeBonus(customToolType(item), itemCustomTool.getSpeed());
-        }
-        return toolBreakTimeBonus0(toolType0(item, getId()), item.getTier(), this.getId() == BlockID.WOOL, this.getId() == BlockID.COBWEB);
-    }
-
-    private double customToolBreakTimeBonus(int toolType, @org.jetbrains.annotations.Nullable Integer speed) {
+    private double customToolBreakTimeBonus(int toolType, @Nullable Integer speed) {
         if (speed != null) return speed;
         else if (toolType == ItemTool.TYPE_SWORD) {
             if (this instanceof BlockCobweb) {
@@ -655,20 +647,25 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return 0;
     }
 
-    private int customToolType(Item item) {
-        if (this instanceof BlockLeaves && item.isHoe()) return ItemTool.TYPE_SHEARS;
-        if (item.isSword()) return ItemTool.TYPE_SWORD;
-        if (item.isShovel()) return ItemTool.TYPE_SHOVEL;
-        if (item.isPickaxe()) return ItemTool.TYPE_PICKAXE;
-        if (item.isAxe()) return ItemTool.TYPE_AXE;
-        if (item.isHoe()) return ItemTool.TYPE_HOE;
-        if (item.isShears()) return ItemTool.TYPE_SHEARS;
-        return ItemTool.TYPE_NONE;
+    private double toolBreakTimeBonus0(Item item) {
+        if (item instanceof ItemCustomTool itemCustomTool && itemCustomTool.getSpeed() != null) {
+            return customToolBreakTimeBonus(customToolType(item), itemCustomTool.getSpeed());
+        }
+        return toolBreakTimeBonus0(toolType0(item, getId()), item.getTier(), this.getId());
     }
 
-    private static double toolBreakTimeBonus0(int toolType, int toolTier, boolean isWoolBlock, boolean isCobweb) {
-        if (toolType == ItemTool.TYPE_SWORD) return isCobweb ? 15.0 : 1.0;
-        if (toolType == ItemTool.TYPE_SHEARS) return isWoolBlock ? 5.0 : 15.0;
+    private static double toolBreakTimeBonus0(int toolType, int toolTier, int blockId) {
+        if (toolType == ItemTool.TYPE_SWORD) return blockId == Block.COBWEB ? 15.0 : 1.0;
+        if (toolType == ItemTool.TYPE_SHEARS) {
+            boolean isLeaves = blockId == LEAVES || blockId == LEAVES2 || blockId == AZALEA_LEAVES
+                    || blockId == AZALEA_LEAVES_FLOWERED || blockId == MANGROVE_LEAVES || blockId == CHERRY_LEAVES;
+            if (blockId == Block.WOOL || isLeaves) {
+                return 5.0;
+            } else if (blockId == COBWEB) {
+                return 15.0;
+            }
+            return 1.0;
+        }
         if (toolType == ItemTool.TYPE_NONE) return 1.0;
         switch (toolTier) {
             case ItemTool.TIER_WOODEN:
@@ -697,8 +694,22 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return 1.0 + (0.2 * hasteLoreLevel);
     }
 
+    private int customToolType(Item item) {
+        return toolType0(item, this.getId());
+    }
+
     private static int toolType0(Item item, int blockId) {
-        if((blockId == LEAVES && item.isHoe()) || (blockId == LEAVES2 && item.isHoe())) return ItemTool.TYPE_SHEARS;
+        if (item.isHoe()) {
+            switch (blockId) {
+                case LEAVES:
+                case LEAVES2:
+                case AZALEA_LEAVES:
+                case AZALEA_LEAVES_FLOWERED:
+                case MANGROVE_LEAVES:
+                case CHERRY_LEAVES:
+                    return ItemTool.TYPE_SHEARS;
+            }
+        }
         if (item.isSword()) return ItemTool.TYPE_SWORD;
         if (item.isShovel()) return ItemTool.TYPE_SHOVEL;
         if (item.isPickaxe()) return ItemTool.TYPE_PICKAXE;
@@ -709,13 +720,15 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     private static boolean correctTool0(int blockToolType, Item item, int blockId) {
-        if (item.isShears() && (blockId == COBWEB || blockId == LEAVES || blockId == LEAVES2)){
+        boolean isLeaves = blockId == LEAVES || blockId == LEAVES2 || blockId == AZALEA_LEAVES
+                || blockId == AZALEA_LEAVES_FLOWERED || blockId == MANGROVE_LEAVES || blockId == CHERRY_LEAVES;
+
+        if (item.isShears() && (blockId == COBWEB || isLeaves)) {
             return true;
         }
 
-        if((blockId == LEAVES && item.isHoe()) ||
-                (blockId == LEAVES2 && item.isHoe())){
-            return (blockToolType == ItemTool.TYPE_SHEARS && item.isHoe());
+        if (isLeaves && item.isHoe()) {
+            return blockToolType == ItemTool.TYPE_SHEARS;
         }
 
         return (blockToolType == ItemTool.TYPE_SWORD && item.isSword()) ||
@@ -732,19 +745,19 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                                      boolean insideOfWaterWithoutAquaAffinity, boolean outOfWaterButNotOnGround) {
         double baseTime = ((correctTool || canHarvestWithHand) ? 1.5 : 5.0) * blockHardness;
         double speed = 1.0 / baseTime;
-        boolean isWoolBlock = blockId == Block.WOOL, isCobweb = blockId == Block.COBWEB;
-        if (correctTool) speed *= toolBreakTimeBonus0(toolType, toolTier, isWoolBlock, isCobweb);
+        if (correctTool) speed *= toolBreakTimeBonus0(toolType, toolTier, blockId);
         speed += correctTool ? speedBonusByEfficiencyLore0(efficiencyLoreLevel) : 0;
         speed *= speedRateByHasteLore0(hasteEffectLevel);
-        if (insideOfWaterWithoutAquaAffinity || outOfWaterButNotOnGround) speed *= 0.25;
+        if (insideOfWaterWithoutAquaAffinity) speed *= 0.2;
+        if (outOfWaterButNotOnGround) speed *= 0.2;
         return 1.0 / speed;
     }
 
-    public double calculateBreakTime(@Nonnull Item item) {
+    public double calculateBreakTime(@NotNull Item item) {
         return calculateBreakTime(item, null);
     }
 
-    public double calculateBreakTime(@Nonnull Item item, Player player) {
+    public double calculateBreakTime(@NotNull Item item, Player player) {
         double seconds = this.calculateBreakTimeNotInAir(item, player);
 
         if (player != null) {
@@ -822,7 +835,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return seconds;
     }
 
-    public double getBreakTime(@Nonnull Item item, Player player) {
+    public double getBreakTime(@NotNull Item item, Player player) {
         return calculateBreakTime(item, player);
         /*Objects.requireNonNull(item, "getBreakTime: Item can not be null");
         Objects.requireNonNull(player, "getBreakTime: Player can not be null");
@@ -833,7 +846,11 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         int blockId = getId();
-        boolean correctTool = correctTool0(getToolType(), item, blockId);
+        boolean correctTool = correctTool0(getToolType(), item, blockId)
+                || item.isShears() && (
+                        blockId == COBWEB || blockId == LEAVES || blockId == LEAVES2
+                                || blockId == AZALEA_LEAVES || blockId == AZALEA_LEAVES_FLOWERED
+                                || blockId == MANGROVE_LEAVES || blockId == CHERRY_LEAVES);
         boolean canHarvestWithHand = canHarvestWithHand();
         int itemToolType = toolType0(item, blockId);
         int itemTier = item.getTier();
@@ -841,11 +858,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                 .map(Enchantment::getLevel).orElse(0);
         int hasteEffectLevel = Optional.ofNullable(player.getEffect(Effect.HASTE))
                 .map(Effect::getAmplifier).orElse(0);
-        boolean submerged = player.isInsideOfWater();
-        boolean insideOfWaterWithoutAquaAffinity = submerged &&
+        boolean insideOfWaterWithoutAquaAffinity = player.isInsideOfWater() &&
                 Optional.ofNullable(player.getInventory().getHelmet().getEnchantment(Enchantment.ID_WATER_WORKER))
                         .map(Enchantment::getLevel).map(l -> l >= 1).orElse(false);
-        boolean outOfWaterButNotOnGround = !player.isOnGround() && !submerged;
+        boolean outOfWaterButNotOnGround = (!player.isInsideOfWater()) && (!player.isOnGround());
         return breakTime0(blockHardness, correctTool, canHarvestWithHand, blockId, itemToolType, itemTier,
                 efficiencyLoreLevel, hasteEffectLevel, insideOfWaterWithoutAquaAffinity, outOfWaterButNotOnGround);*/
     }
