@@ -218,6 +218,8 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
             List<CompoundTag> namedTags = new ArrayList<>();
             for (Block oldBlock : newBlocks){
+                if (this.level.getBlock(oldBlock.getLocation()).getId() != oldBlock.getId()) return false; // The delay between the calculation of blocks and move is small, but it is enough to cancel the action.
+
                 CompoundTag tag = null;
                 BlockEntity blockEntity = this.level.getBlockEntity(oldBlock);
                 if (blockEntity != null && !(blockEntity instanceof BlockEntityMovingBlock)) {

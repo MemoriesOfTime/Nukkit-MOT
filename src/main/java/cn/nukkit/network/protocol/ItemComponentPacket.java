@@ -9,6 +9,7 @@ import lombok.ToString;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
 import java.util.List;
 
 @ToString
@@ -16,7 +17,7 @@ public class ItemComponentPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.ITEM_COMPONENT_PACKET;
 
-    public List<ItemDefinition> entries;
+    public List<ItemDefinition> entries = new ArrayList<>();
 
     private static final byte[] EMPTY_COMPOUND_TAG;
 
