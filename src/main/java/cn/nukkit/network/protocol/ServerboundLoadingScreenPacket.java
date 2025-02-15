@@ -4,7 +4,7 @@ import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
 
 /**
- * @author glorydark
+ * @since v712
  */
 @ToString
 public class ServerboundLoadingScreenPacket extends DataPacket {
