@@ -136,7 +136,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 return BlockID.AIR;
             }
 
-            return (this.storages[layer].get(x, y, z)) >> Block.DATA_BITS;
+            return (this.storages[layer].getBlockState(x, y, z)).getLegacyId();
         } finally {
             this.readLock.unlock();
         }
@@ -196,7 +196,7 @@ public class LevelDBChunkSection implements ChunkSection {
                 return 0;
             }
 
-            return (this.storages[layer].get(x, y, z)) & Block.DATA_MASK;
+            return (this.storages[layer].getBlockState(x, y, z)).getLegacyData();
         } finally {
             this.readLock.unlock();
         }
@@ -255,8 +255,18 @@ public class LevelDBChunkSection implements ChunkSection {
 
     @Override
     public int[] getBlockState(int x, int y, int z, int layer) {
-        int full = this.getFullBlock(x, y, z, layer);
-        return new int[] { full >> Block.DATA_BITS, full & Block.DATA_MASK };
+        try {
+            this.readLock.lock();
+
+            if (!this.hasLayerUnsafe(layer)) {
+                return new int[] { BlockID.AIR, 0 };
+            }
+
+            BlockStateSnapshot blockState = this.storages[layer].getBlockState(x, y, z);
+            return new int[] { blockState.getLegacyId(), blockState.getLegacyData() };
+        } finally {
+            this.readLock.unlock();
+        }
     }
 
     @Override
