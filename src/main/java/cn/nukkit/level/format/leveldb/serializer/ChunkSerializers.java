@@ -54,6 +54,7 @@ public class ChunkSerializers {
         serializers.put(38, ChunkSerializerV3.INSTANCE);
         serializers.put(39, ChunkSerializerV3.INSTANCE);
         serializers.put(40, ChunkSerializerV3.INSTANCE);
+        serializers.put(41, ChunkSerializerV3.INSTANCE);
     }
 
     private static ChunkSerializer getChuckSerializer(int chunkVersion) {
