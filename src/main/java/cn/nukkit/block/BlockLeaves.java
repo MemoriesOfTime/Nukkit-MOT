@@ -210,7 +210,7 @@ public class BlockLeaves extends BlockTransparentMeta {
 
             for (BlockFace face : BlockFace.values()) {
                 Block nextBlock = currentBlock.getSideIfLoadedOrNull(face); // If side chunk not loaded, do not load or decay
-                if (nextBlock == null || isLog(nextBlock.getId())) {
+                if (nextBlock == null || isLog(nextBlock.getId(), nextBlock.getDamage())) {
                     return true;
                 }
 
@@ -232,9 +232,10 @@ public class BlockLeaves extends BlockTransparentMeta {
         };
     }
 
-    protected boolean isLog(int id) {
+    protected boolean isLog(int id, int damage) {
         return switch (id) {
-            case LOG, LOG2, MANGROVE_LOG, CHERRY_LOG -> true;
+            case LOG, LOG2, MANGROVE_LOG, CHERRY_LOG, MANGROVE_WOOD, CHERRY_WOOD -> true;
+            case WOOD_BARK -> (damage & BlockWoodBark.STRIPPED_BIT) == 0;
             default -> false;
         };
     }
