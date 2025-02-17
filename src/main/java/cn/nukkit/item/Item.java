@@ -632,14 +632,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
                 creativeItems.addGroup(creativeGroup);
             }
-
-            // 添加一个自定义的group用于添加插件的nbt物品
-            // Add custom group for adding NBT items to plugins.
-            CreativeItemGroup creativeGroup = new CreativeItemGroup(creativeGroupId++,
-                    CreativeItemCategory.ITEMS,
-                    "itemGroup.name.custom",
-                    Item.get(AIR));
-            creativeItems.addGroup(creativeGroup);
         }
 
         for (JsonElement element : itemsArray) {
@@ -843,17 +835,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         addCreativeItem(v1_21_60, item);
     }
 
-    public static void addCreativeItem(Item item, CreativeItemCategory category, String group) {
-        Server.mvw("Item#addCreativeItem(Item, CreativeItemCategory, String)");
-        addCreativeItem(v1_21_60, item, category, group);
-    }
-
     public static void addCreativeItem(int protocol, Item item) {
-        // 如果插件添加的物品不设置group会导致客户端无法进入服务器
-        // 我们这里将所有插件添加的物品放入一个自定义的group中
-        // If the items added by the plugin do not have a group set, it will cause the client to be unable to join the server.
-        // Here, we place all items added by plugins into a custom group.
-        addCreativeItem(protocol, item, CreativeItemCategory.ITEMS, "itemGroup.name.custom");
+        addCreativeItem(protocol, item, CreativeItemCategory.ITEMS, "");
     }
 
     public static void addCreativeItem(int protocol, Item item, CreativeItemCategory category, String group) {
@@ -2107,7 +2090,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         public void add(Item item) {
-            add(item, CreativeItemCategory.ITEMS, ""); // TODO: vanilla items back to correct groups
+            add(item, CreativeItemCategory.ITEMS, ""); // TODO: vanilla items back to correct categories & groups
         }
 
         public void add(Item item, CreativeItemGroup group) {
