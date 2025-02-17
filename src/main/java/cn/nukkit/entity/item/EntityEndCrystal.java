@@ -7,6 +7,7 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityExplosionPrimeEvent;
 import cn.nukkit.level.Explosion;
 import cn.nukkit.level.GameRule;
+import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 
@@ -92,7 +93,7 @@ public class EntityEndCrystal extends Entity implements EntityExplosive {
     @Override
     public void explode() {
         this.close();
-        if (!this.detonated && this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
+        if (!this.detonated) {
             this.detonated = true;
 
             EntityExplosionPrimeEvent ev = new EntityExplosionPrimeEvent(this, 6);
@@ -101,18 +102,17 @@ public class EntityEndCrystal extends Entity implements EntityExplosive {
                 return;
             }
 
-            Explosion explode = new Explosion(this.add(0, this.getHeight() / 2, 0), (float) ev.getForce(), this);
+            Position pos = this.getPosition();
+            Explosion explode = new Explosion(pos, 6, this);
 
-            int floor = this.getFloorY();
-            int down = this.level.getBlockIdAt(this.chunk, this.getFloorX(), floor - 1, this.getFloorZ());
-            if (down == Block.BEDROCK || down == Block.OBSIDIAN) {
-                explode.setMinHeight(floor);
-            }
+            this.close();
 
-            if (ev.isBlockBreaking()) {
+            if (this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
                 explode.explodeA();
+                explode.explodeB();
+            } else {
+                explode.explodeB();
             }
-            explode.explodeB();
         }
     }
 
