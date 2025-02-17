@@ -12,6 +12,7 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.event.entity.EntityRegainHealthEvent;
 import cn.nukkit.event.potion.PotionApplyEvent;
+import lombok.Getter;
 
 import java.util.Locale;
 
@@ -19,6 +20,7 @@ import java.util.Locale;
  * @author MagicDroidX
  * Nukkit Project
  */
+@Getter
 public class Potion implements Cloneable {
 
     public static final int NO_EFFECTS = 0;
@@ -144,9 +146,7 @@ public class Potion implements Cloneable {
     }
 
     protected final int id;
-
     protected final int level;
-
     protected boolean splash;
 
     public Potion(int id) {
@@ -165,18 +165,6 @@ public class Potion implements Cloneable {
 
     public Effect getEffect() {
         return getEffect(this.id, this.splash);
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public int getLevel() {
-        return level;
-    }
-
-    public boolean isSplash() {
-        return splash;
     }
 
     public Potion setSplash(boolean splash) {
@@ -228,7 +216,8 @@ public class Potion implements Cloneable {
                 if (entity instanceof EntitySmite) {
                     entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * (6 << (applyEffect.getAmplifier() + 1)))));
                 } else {
-                    entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
+                    System.out.println(applyEffect.getAmplifier());
+                    entity.heal(new EntityRegainHealthEvent(entity, (float) (applyEffect.getAmplifier() + 1) * 4, EntityRegainHealthEvent.CAUSE_MAGIC));
                 }
                 break;
             case HARMING:
@@ -269,12 +258,6 @@ public class Potion implements Cloneable {
     public static Effect getEffect(int potionType, boolean isSplash) {
         Effect effect;
         switch (potionType) {
-            case NO_EFFECTS:
-            case MUNDANE:
-            case MUNDANE_II:
-            case THICK:
-            case AWKWARD:
-                return null;
             case NIGHT_VISION:
             case NIGHT_VISION_LONG:
                 effect = Effect.getEffect(Effect.NIGHT_VISION);
@@ -309,10 +292,12 @@ public class Potion implements Cloneable {
                 break;
             case INSTANT_HEALTH:
             case INSTANT_HEALTH_II:
-                return Effect.getEffect(Effect.HEALING);
+                effect = Effect.getEffect(Effect.HEALING);
+                break;
             case HARMING:
             case HARMING_II:
-                return Effect.getEffect(Effect.HARMING);
+                effect = Effect.getEffect(Effect.HARMING);
+                break;
             case POISON:
             case POISON_LONG:
             case POISON_II:
@@ -351,6 +336,10 @@ public class Potion implements Cloneable {
                 return null;
         }
 
+        if (effect == null) {
+            return null;
+        }
+
         if (getLevel(potionType) > 1) {
             effect.setAmplifier(1);
         }
@@ -363,46 +352,25 @@ public class Potion implements Cloneable {
     }
 
     public static int getLevel(int potionType) {
-        switch (potionType) {
-            case SLOWNESS_IV:
-                return 4;
-            case MUNDANE_II:
-            case LEAPING_II:
-            case SPEED_II:
-            case INSTANT_HEALTH_II:
-            case HARMING_II:
-            case POISON_II:
-            case REGENERATION_II:
-            case STRENGTH_II:
-            case WITHER_II:
-            case TURTLE_MASTER_II:
-            case SLOWNESS_LONG_II:
-                return 2;
-            default:
-                return 1;
-        }
+        return switch (potionType) {
+            case SLOWNESS_IV -> 4;
+            case MUNDANE_II, LEAPING_II, SPEED_II, INSTANT_HEALTH_II,
+                 HARMING_II, POISON_II, REGENERATION_II, STRENGTH_II,
+                 WITHER_II, TURTLE_MASTER_II, SLOWNESS_LONG_II -> 2;
+            default -> 1;
+        };
     }
 
     public static boolean isInstant(int potionType) {
-        switch (potionType) {
-            case INSTANT_HEALTH:
-            case INSTANT_HEALTH_II:
-            case HARMING:
-            case HARMING_II:
-                return true;
-            default:
-                return false;
-        }
+        return switch (potionType) {
+            case INSTANT_HEALTH, INSTANT_HEALTH_II, HARMING, HARMING_II -> true;
+            default -> false;
+        };
     }
 
     public static int getApplySeconds(int potionType, boolean isSplash) {
         if (isSplash) {
             return switch (potionType) {
-                case NO_EFFECTS -> 0;
-                case MUNDANE -> 0;
-                case MUNDANE_II -> 0;
-                case THICK -> 0;
-                case AWKWARD -> 0;
                 case NIGHT_VISION -> 135;
                 case NIGHT_VISION_LONG -> 360;
                 case INVISIBLE -> 135;
@@ -419,10 +387,6 @@ public class Potion implements Cloneable {
                 case SLOWNESS_LONG -> 180;
                 case WATER_BREATHING -> 135;
                 case WATER_BREATHING_LONG -> 360;
-                case INSTANT_HEALTH -> 0;
-                case INSTANT_HEALTH_II -> 0;
-                case HARMING -> 0;
-                case HARMING_II -> 0;
                 case POISON -> 33;
                 case POISON_LONG -> 90;
                 case POISON_II -> 16;
@@ -440,11 +404,6 @@ public class Potion implements Cloneable {
             };
         } else {
             return switch (potionType) {
-                case NO_EFFECTS -> 0;
-                case MUNDANE -> 0;
-                case MUNDANE_II -> 0;
-                case THICK -> 0;
-                case AWKWARD -> 0;
                 case NIGHT_VISION -> 180;
                 case NIGHT_VISION_LONG -> 480;
                 case INVISIBLE -> 180;
@@ -461,10 +420,6 @@ public class Potion implements Cloneable {
                 case SLOWNESS_LONG -> 240;
                 case WATER_BREATHING -> 180;
                 case WATER_BREATHING_LONG -> 480;
-                case INSTANT_HEALTH -> 0;
-                case INSTANT_HEALTH_II -> 0;
-                case HARMING -> 0;
-                case HARMING_II -> 0;
                 case POISON -> 45;
                 case POISON_LONG -> 120;
                 case POISON_II -> 22;

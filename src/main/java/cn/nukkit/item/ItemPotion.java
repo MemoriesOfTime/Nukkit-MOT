@@ -3,6 +3,7 @@ package cn.nukkit.item;
 import cn.nukkit.Player;
 import cn.nukkit.event.player.PlayerItemConsumeEvent;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Potion;
 
 public class ItemPotion extends Item {
@@ -69,7 +70,7 @@ public class ItemPotion extends Item {
 
     @Override
     public boolean onUse(Player player, int ticksUsed) {
-        if (player.protocol < 388) return true;
+        if (player.protocol < ProtocolInfo.v1_13_0) return true;
         if (ticksUsed < 10) return false;
         PlayerItemConsumeEvent consumeEvent = new PlayerItemConsumeEvent(player, this);
         player.getServer().getPluginManager().callEvent(consumeEvent);
