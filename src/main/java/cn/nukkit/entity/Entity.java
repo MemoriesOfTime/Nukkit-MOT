@@ -1589,6 +1589,9 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void heal(EntityRegainHealthEvent source) {
+        if (this.isAlive()) {
+            return;
+        }
         this.server.getPluginManager().callEvent(source);
         if (source.isCancelled()) {
             return;
