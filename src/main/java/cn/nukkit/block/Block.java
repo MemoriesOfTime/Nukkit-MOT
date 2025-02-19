@@ -465,6 +465,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return true;
     }
 
+    public boolean isSolid(BlockFace side) {
+        return isSideFull(side);
+    }
+
     public boolean diffusesSkyLight() {
         return false;
     }
@@ -1159,6 +1163,47 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         return MovingObjectPosition.fromBlock((int) this.x, (int) this.y, (int) this.z, f, vector.add(this.x, this.y, this.z));
+    }
+
+    public boolean isSideFull(BlockFace face) {
+        AxisAlignedBB boundingBox = getBoundingBox();
+        if (boundingBox == null) {
+            return false;
+        }
+
+        if (face.getAxis().getPlane() == BlockFace.Plane.HORIZONTAL) {
+            if (boundingBox.getMinY() != getY() || boundingBox.getMaxY() != getY() + 1) {
+                return false;
+            }
+            int offset = face.getXOffset();
+            if (offset < 0) {
+                return boundingBox.getMinX() == getX()
+                        && boundingBox.getMinZ() == getZ() && boundingBox.getMaxZ() == getZ() + 1;
+            } else if (offset > 0) {
+                return boundingBox.getMaxX() == getX() + 1
+                        && boundingBox.getMaxZ() == getZ() + 1 && boundingBox.getMinZ() == getZ();
+            }
+
+            offset = face.getZOffset();
+            if (offset < 0) {
+                return boundingBox.getMinZ() == getZ()
+                        && boundingBox.getMinX() == getX() && boundingBox.getMaxX() == getX() + 1;
+            }
+
+            return boundingBox.getMaxZ() == getZ() + 1
+                    && boundingBox.getMaxX() == getX() + 1 && boundingBox.getMinX() == getX();
+        }
+
+        if (boundingBox.getMinX() != getX() || boundingBox.getMaxX() != getX() + 1 ||
+                boundingBox.getMinZ() != getZ() || boundingBox.getMaxZ() != getZ() + 1) {
+            return false;
+        }
+
+        if (face.getYOffset() < 0) {
+            return boundingBox.getMinY() == getY();
+        }
+
+        return boundingBox.getMaxY() == getY() + 1;
     }
 
     public String getSaveId() {
