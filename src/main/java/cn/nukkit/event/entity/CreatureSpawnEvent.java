@@ -1,10 +1,13 @@
 package cn.nukkit.event.entity;
 
+import cn.nukkit.entity.Entity;
 import cn.nukkit.event.Cancellable;
 import cn.nukkit.event.Event;
 import cn.nukkit.event.HandlerList;
 import cn.nukkit.level.Position;
 import cn.nukkit.nbt.tag.CompoundTag;
+import lombok.Getter;
+import org.jetbrains.annotations.Nullable;
 
 public class CreatureSpawnEvent extends Event implements Cancellable {
 
@@ -14,40 +17,48 @@ public class CreatureSpawnEvent extends Event implements Cancellable {
         return handlers;
     }
 
+    @Getter
     private final SpawnReason reason;
+    @Getter
     private final int entityNetworkId;
+    @Getter
     private final Position position;
+    @Getter
     private final CompoundTag compoundTag;
 
+    @Nullable
+    private final Entity owner;
+
     public CreatureSpawnEvent(int networkId, SpawnReason reason) {
-        this(networkId, new Position(), new CompoundTag(), reason);
+        this(networkId, new Position(), new CompoundTag(), reason, null);
+    }
+
+    public CreatureSpawnEvent(int networkId, SpawnReason reason, Entity owner) {
+        this(networkId, new Position(), new CompoundTag(), reason, owner);
     }
 
     public CreatureSpawnEvent(int networkId, Position position, SpawnReason reason) {
-        this(networkId, position, new CompoundTag(), reason);
+        this(networkId, position, new CompoundTag(), reason, null);
+    }
+
+    public CreatureSpawnEvent(int networkId, Position position, SpawnReason reason, Entity owner) {
+        this(networkId, position, new CompoundTag(), reason, owner);
     }
 
     public CreatureSpawnEvent(int networkId, Position position, CompoundTag nbt, SpawnReason reason) {
+        this(networkId, position, nbt, reason, null);
+    }
+
+    public CreatureSpawnEvent(int networkId, Position position, CompoundTag nbt, SpawnReason reason, @Nullable Entity owner) {
         this.reason = reason;
         this.entityNetworkId = networkId;
         this.position = position;
         this.compoundTag = nbt;
+        this.owner = owner;
     }
 
-    public SpawnReason getReason() {
-        return reason;
-    }
-
-    public int getEntityNetworkId() {
-        return entityNetworkId;
-    }
-
-    public CompoundTag getCompoundTag() {
-        return compoundTag;
-    }
-
-    public Position getPosition() {
-        return position;
+    public @Nullable Entity getOwner() {
+        return owner;
     }
 
     /**

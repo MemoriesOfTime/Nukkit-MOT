@@ -113,7 +113,7 @@ public class ItemSpawnEgg extends Item {
             nbt.putString("CustomName", this.getCustomName());
         }
 
-        CreatureSpawnEvent ev = new CreatureSpawnEvent(this.meta, block, nbt, CreatureSpawnEvent.SpawnReason.SPAWN_EGG);
+        CreatureSpawnEvent ev = new CreatureSpawnEvent(this.meta, block, nbt, CreatureSpawnEvent.SpawnReason.SPAWN_EGG, player);
         level.getServer().getPluginManager().callEvent(ev);
 
         if (ev.isCancelled()) {
