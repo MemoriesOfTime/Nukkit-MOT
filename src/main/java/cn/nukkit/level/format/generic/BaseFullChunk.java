@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author MagicDroidX
@@ -32,7 +33,7 @@ import java.util.Map;
  */
 public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
-    protected Long2ObjectNonBlockingMap<Entity> entities;
+    protected ConcurrentHashMap<Long, Entity> entities;
 
     protected Long2ObjectNonBlockingMap<BlockEntity> tiles;
 
@@ -414,7 +415,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     @Override
     public void addEntity(Entity entity) {
         if (this.entities == null) {
-            this.entities = new Long2ObjectNonBlockingMap<>();
+            this.entities = new ConcurrentHashMap<>();
         }
         this.entities.put(entity.getId(), entity);
         if (!(entity instanceof Player) && this.isInit) {
