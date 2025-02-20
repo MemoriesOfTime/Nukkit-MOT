@@ -607,6 +607,8 @@ public class PlayerInventory extends BaseInventory {
             CreativeContentPacket pk = new CreativeContentPacket();
             if (!p.isSpectator()) {
                 pk.creativeItems = Item.getCreativeItemsAndGroups(p.protocol);
+            } else if (p.protocol >= ProtocolInfo.v1_18_30) { //TODO check version
+                pk.creativeItems = Item.EMPTY_CREATIVE_ITEMS;
             }
             p.dataPacket(pk);
         }

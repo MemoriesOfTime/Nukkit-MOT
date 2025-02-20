@@ -489,6 +489,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         clearCreativeItems();
     }
 
+    public static final CreativeItems EMPTY_CREATIVE_ITEMS = new CreativeItems();
     private static final CreativeItems creative113 = new CreativeItems();
     private static final CreativeItems creative137 = new CreativeItems();
     private static final CreativeItems creative274 = new CreativeItems();
@@ -530,6 +531,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
+
+        EMPTY_CREATIVE_ITEMS.clear();
+        EMPTY_CREATIVE_ITEMS.add(get(AIR));
+
         clearCreativeItems();
 
         // Creative inventory for oldest versions
