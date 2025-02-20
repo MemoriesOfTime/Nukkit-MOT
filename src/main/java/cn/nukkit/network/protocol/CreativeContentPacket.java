@@ -35,8 +35,10 @@ public class CreativeContentPacket extends DataPacket {
                     this.creativeItems.add(item);
                 }
             } else { // Spectator
-                this.putUnsignedVarInt(0);
-                this.putUnsignedVarInt(0);
+                if (this.protocol >= ProtocolInfo.v1_21_60) {
+                    this.putUnsignedVarInt(0); // group count
+                }
+                this.putUnsignedVarInt(0); // item count
                 return;
             }
         }
