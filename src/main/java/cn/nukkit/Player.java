@@ -4672,13 +4672,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 Map<DamageModifier, Float> damage = new EnumMap<>(DamageModifier.class);
                                 damage.put(DamageModifier.BASE, itemDamage);
 
-                                float knockBack = 0.3f;
+                                float knockBackModifier = 0;
                                 Enchantment knockBackEnchantment = item.getEnchantment(Enchantment.ID_KNOCKBACK);
                                 if (knockBackEnchantment != null) {
-                                    knockBack += knockBackEnchantment.getLevel() * 0.1f;
+                                    knockBackModifier = knockBackEnchantment.getLevel();
                                 }
 
-                                EntityDamageByEntityEvent entityDamageByEntityEvent = new EntityDamageByEntityEvent(this, target, DamageCause.ENTITY_ATTACK, damage, knockBack, enchantments);
+                                EntityDamageByEntityEvent entityDamageByEntityEvent = new EntityDamageByEntityEvent(this, target, DamageCause.ENTITY_ATTACK, damage, 0.3F, enchantments, knockBackModifier);
                                 entityDamageByEntityEvent.setBreakShield(item.canBreakShield());
                                 if (this.isSpectator()) entityDamageByEntityEvent.setCancelled();
                                 if ((target instanceof Player) && !this.level.getGameRules().getBoolean(GameRule.PVP)) {
@@ -7149,6 +7149,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void setNoShieldTicks(int noShieldTicks) {
         this.noShieldTicks = noShieldTicks;
+    }
+
+    @Override
+    public void knockBack(Entity attacker, double damage, double deltaX, double deltaZ, double base, double r, double modifier) {
+        double resistance = 0;
+        for (Item armor : inventory.getArmorContents()) {
+            if (armor != null && armor.getTier() == ItemArmor.TIER_NETHERITE) {
+                resistance += 0.15;
+            }
+        }
+        super.knockBack(attacker, damage, deltaX, deltaZ, base, resistance, modifier);
     }
 
     @Override
