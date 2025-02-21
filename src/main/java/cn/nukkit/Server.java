@@ -58,6 +58,7 @@ import cn.nukkit.network.BatchingHelper;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.SourceInterface;
+import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.PlayerListPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -1333,78 +1334,10 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_21_60) {
-            player.dataPacket(CraftingManager.packet776);
-        } else if (player.protocol >= ProtocolInfo.v1_21_50_26) {
-            player.dataPacket(CraftingManager.packet766);
-        } else if (player.protocol >= ProtocolInfo.v1_21_40) {
-            player.dataPacket(CraftingManager.packet748);
-        } else if (player.protocol >= ProtocolInfo.v1_21_30) {
-            player.dataPacket(CraftingManager.packet729);
-        } else if (player.protocol >= ProtocolInfo.v1_21_20) {
-            player.dataPacket(CraftingManager.packet712);
-        } else if (player.protocol >= ProtocolInfo.v1_21_0) {
-            player.dataPacket(CraftingManager.packet685);
-        } else if (player.protocol >= ProtocolInfo.v1_20_80) {
-            player.dataPacket(CraftingManager.packet671);
-        } else if (player.protocol >= ProtocolInfo.v1_20_70) {
-            player.dataPacket(CraftingManager.packet662);
-        } else if (player.protocol >= ProtocolInfo.v1_20_60) {
-            player.dataPacket(CraftingManager.packet649);
-        } else if (player.protocol >= ProtocolInfo.v1_20_50) {
-            player.dataPacket(CraftingManager.packet630);
-        } else if (player.protocol >= ProtocolInfo.v1_20_40) {
-            player.dataPacket(CraftingManager.packet622);
-        } else if (player.protocol >= ProtocolInfo.v1_20_30_24) {
-            player.dataPacket(CraftingManager.packet618);
-        } else if (player.protocol >= ProtocolInfo.v1_20_10_21) {
-            player.dataPacket(CraftingManager.packet594);
-        } else if (player.protocol >= ProtocolInfo.v1_20_0_23) {
-            player.dataPacket(CraftingManager.packet589);
-        } else if (player.protocol >= ProtocolInfo.v1_19_80) {
-            player.dataPacket(CraftingManager.packet582);
-        } else if (player.protocol >= ProtocolInfo.v1_19_70_24) {
-            player.dataPacket(CraftingManager.packet575);
-        } else if (player.protocol >= ProtocolInfo.v1_19_60) {
-            player.dataPacket(CraftingManager.packet567);
-        } else if (player.protocol >= ProtocolInfo.v1_19_50_20) {
-            player.dataPacket(CraftingManager.packet560);
-        } else if (player.protocol >= ProtocolInfo.v1_19_30_23) {
-            player.dataPacket(CraftingManager.packet554);
-        } else if (player.protocol >= ProtocolInfo.v1_19_20) {
-            player.dataPacket(CraftingManager.packet544);
-        } else if (player.protocol >= ProtocolInfo.v1_19_0_29) {
-            player.dataPacket(CraftingManager.packet527);
-        } else if (player.protocol >= ProtocolInfo.v1_18_30) {
-            player.dataPacket(CraftingManager.packet503);
-        } else if (player.protocol >= ProtocolInfo.v1_18_10_26) {
-            player.dataPacket(CraftingManager.packet486);
-        } else if (player.protocol >= ProtocolInfo.v1_17_40) {
-            player.dataPacket(CraftingManager.packet471);
-        } else if (player.protocol >= ProtocolInfo.v1_17_30) {
-            player.dataPacket(CraftingManager.packet465);
-        } else if (player.protocol >= ProtocolInfo.v1_17_10) {
-            player.dataPacket(CraftingManager.packet448);
-        } else if (player.protocol >= ProtocolInfo.v1_17_0) {
-            player.dataPacket(CraftingManager.packet440);
-        } else if (player.protocol >= ProtocolInfo.v1_16_220) {
-            player.dataPacket(CraftingManager.packet431);
-        } else if (player.protocol >= ProtocolInfo.v1_16_100) {
-            player.dataPacket(CraftingManager.packet419);
-        } else if (player.protocol >= ProtocolInfo.v1_16_0) {
-            player.dataPacket(CraftingManager.packet407);
-        } else if (player.protocol >= ProtocolInfo.v1_13_0) {
-            player.dataPacket(CraftingManager.packet388);
-        } else if (player.protocol == ProtocolInfo.v1_12_0) {
-            player.dataPacket(CraftingManager.packet361);
-        } else if (player.protocol == ProtocolInfo.v1_11_0) {
-             player.dataPacket(CraftingManager.packet354);
-        } else if (player.protocol == ProtocolInfo.v1_10_0) {
-            player.dataPacket(CraftingManager.packet340);
-        } else if (player.protocol == ProtocolInfo.v1_9_0 || player.protocol == ProtocolInfo.v1_8_0 || player.protocol == ProtocolInfo.v1_7_0) { // these should work just fine
-            player.dataPacket(CraftingManager.packet313);
+        BatchPacket cachedPacket = this.craftingManager.getCachedPacket(player.protocol);
+        if (cachedPacket != null) { // Don't send recipes if they wouldn't work anyways
+            player.dataPacket(cachedPacket);
         }
-        // Don't send recipes if they wouldn't work anyways
     }
 
     private void checkTickUpdates(int currentTick) {
