@@ -348,4 +348,5 @@ public interface ItemID {
     int GLOW_ITEM_FRAME = 850;
 
     int MANGROVE_SIGN = 1005;
+    int BAMBOO_SIGN = 1006;
 }
