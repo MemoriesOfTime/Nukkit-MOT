@@ -1,7 +1,5 @@
 package cn.nukkit.block;
 
-import cn.nukkit.BlockWallDeepslateCobbled;
-
 public class BlockWallDeepslatePolished extends BlockWallDeepslateCobbled {
     public BlockWallDeepslatePolished() {
         this(0);

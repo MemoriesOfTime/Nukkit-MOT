@@ -1,6 +1,5 @@
 package cn.nukkit.block;
 
-import cn.nukkit.BlockWallDeepslateCobbled;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
