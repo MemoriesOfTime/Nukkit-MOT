@@ -25,40 +25,39 @@ public class CreatureSpawnEvent extends Event implements Cancellable {
     private final Position position;
     @Getter
     private final CompoundTag compoundTag;
-
     @Nullable
-    private final Entity owner;
+    @Getter
+    private final Entity creator;
 
+    @Deprecated
     public CreatureSpawnEvent(int networkId, SpawnReason reason) {
         this(networkId, new Position(), new CompoundTag(), reason, null);
     }
 
-    public CreatureSpawnEvent(int networkId, SpawnReason reason, Entity owner) {
-        this(networkId, new Position(), new CompoundTag(), reason, owner);
-    }
-
+    @Deprecated
     public CreatureSpawnEvent(int networkId, Position position, SpawnReason reason) {
         this(networkId, position, new CompoundTag(), reason, null);
     }
 
-    public CreatureSpawnEvent(int networkId, Position position, SpawnReason reason, Entity owner) {
-        this(networkId, position, new CompoundTag(), reason, owner);
-    }
-
+    @Deprecated
     public CreatureSpawnEvent(int networkId, Position position, CompoundTag nbt, SpawnReason reason) {
         this(networkId, position, nbt, reason, null);
     }
 
-    public CreatureSpawnEvent(int networkId, Position position, CompoundTag nbt, SpawnReason reason, @Nullable Entity owner) {
+    public CreatureSpawnEvent(int networkId, SpawnReason reason, Entity creator) {
+        this(networkId, new Position(), new CompoundTag(), reason, creator);
+    }
+
+    public CreatureSpawnEvent(int networkId, Position position, SpawnReason reason, Entity creator) {
+        this(networkId, position, new CompoundTag(), reason, creator);
+    }
+
+    public CreatureSpawnEvent(int networkId, Position position, CompoundTag nbt, SpawnReason reason, @Nullable Entity creator) {
         this.reason = reason;
         this.entityNetworkId = networkId;
         this.position = position;
         this.compoundTag = nbt;
-        this.owner = owner;
-    }
-
-    public @Nullable Entity getOwner() {
-        return owner;
+        this.creator = creator;
     }
 
     /**
