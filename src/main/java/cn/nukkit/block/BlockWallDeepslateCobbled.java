@@ -1,6 +1,5 @@
-package cn.nukkit;
+package cn.nukkit.block;
 
-import cn.nukkit.block.BlockWall;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
