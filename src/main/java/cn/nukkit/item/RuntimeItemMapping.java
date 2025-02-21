@@ -270,6 +270,14 @@ public class RuntimeItemMapping {
         return runtimeEntry;
     }
 
+    boolean isRegistered(int id, int meta) {
+        boolean containsKey = this.legacy2Runtime.containsKey(this.getFullId(id, meta));
+        if (!containsKey) {
+            containsKey = this.legacy2Runtime.containsKey(this.getFullId(id, 0));
+        }
+        return containsKey;
+    }
+
     public Item parseCreativeItem(JsonObject json, boolean ignoreUnknown) {
         return this.parseCreativeItem(json, ignoreUnknown, this.protocolId);
     }
