@@ -1148,6 +1148,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
             }
             itemComponentPacket.setEntries(entries);
+            this.dataPacket(itemComponentPacket);
         }
 
         this.noDamageTicks = 60;
