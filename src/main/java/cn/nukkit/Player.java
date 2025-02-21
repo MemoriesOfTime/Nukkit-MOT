@@ -1125,6 +1125,30 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.spawned) {
             return;
         }
+        if (this.protocol >= ProtocolInfo.v1_21_60) {
+            ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
+            Collection<ItemComponentPacket.ItemDefinition> vanillaItems = RuntimeItems.getMapping(this.protocol).getVanillaItemDefinitions();
+            Set<Map.Entry<String, CustomItemDefinition>> itemDefinitions = Item.getCustomItemDefinition().entrySet();
+            List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
+            entries.addAll(vanillaItems);
+            if (this.server.enableExperimentMode && !itemDefinitions.isEmpty()) {
+                for (Map.Entry<String, CustomItemDefinition> entry : itemDefinitions) {
+                    try {
+                        Item item = Item.fromString(entry.getKey());
+                        entries.add(new ItemComponentPacket.ItemDefinition(
+                                entry.getKey(),
+                                item.getNetworkId(this.protocol),
+                                true,
+                                1,
+                                entry.getValue().getNbt(this.protocol)
+                        ));
+                    } catch (Exception e) {
+                        log.error("ItemComponentPacket encoding error", e);
+                    }
+                }
+            }
+            itemComponentPacket.setEntries(entries);
+        }
 
         this.noDamageTicks = 60;
         this.setAirTicks(400);
@@ -2879,30 +2903,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 this.dataPacket(pk);
                             }
                         }
+                        // todo: HACK - Why we need to send an empty packet to fix missing recipes?
+                        // We add another packet sending to Player#doFirstSpawn(), while also adding these codes
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
-                        if (this.protocol >= ProtocolInfo.v1_21_60) {
-                            Collection<ItemComponentPacket.ItemDefinition> vanillaItems = RuntimeItems.getMapping(this.protocol).getVanillaItemDefinitions();
-                            Set<Map.Entry<String, CustomItemDefinition>> itemDefinitions = Item.getCustomItemDefinition().entrySet();
-                            List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
-                            entries.addAll(vanillaItems);
-                            if (this.server.enableExperimentMode && !itemDefinitions.isEmpty()) {
-                                for (Map.Entry<String, CustomItemDefinition> entry : itemDefinitions) {
-                                    try {
-                                        Item item = Item.fromString(entry.getKey());
-                                        entries.add(new ItemComponentPacket.ItemDefinition(
-                                                entry.getKey(),
-                                                item.getNetworkId(this.protocol),
-                                                true,
-                                                1,
-                                                entry.getValue().getNbt(this.protocol)
-                                        ));
-                                    } catch (Exception e) {
-                                        log.error("ItemComponentPacket encoding error", e);
-                                    }
-                                }
-                            }
-                            itemComponentPacket.setEntries(entries);
-                        } else {
+                        if (this.protocol < ProtocolInfo.v1_21_60) {
                             if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
                                 HashMap<String, CustomItemDefinition> itemDefinition = Item.getCustomItemDefinition();
                                 List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(itemDefinition.size());
