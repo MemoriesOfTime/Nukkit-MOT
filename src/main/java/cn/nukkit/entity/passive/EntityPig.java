@@ -245,7 +245,7 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
     public void onStruckByLightning(Entity entity) {
         Entity ent = Entity.createEntity("ZombiePigman", this);
         if (ent != null) {
-            CreatureSpawnEvent cse = new CreatureSpawnEvent(EntityZombiePigman.NETWORK_ID, this, ent.namedTag, CreatureSpawnEvent.SpawnReason.LIGHTNING);
+            CreatureSpawnEvent cse = new CreatureSpawnEvent(EntityZombiePigman.NETWORK_ID, this, ent.namedTag, CreatureSpawnEvent.SpawnReason.LIGHTNING, this);
             this.getServer().getPluginManager().callEvent(cse);
 
             if (cse.isCancelled()) {

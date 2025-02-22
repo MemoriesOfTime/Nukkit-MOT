@@ -2759,14 +2759,16 @@ public class Level implements ChunkManager, Metadatable {
                         block.getLevel().setBlock(target, Block.get(BlockID.AIR));
                         block.getLevel().setBlock(target.add(0, -1, 0), Block.get(BlockID.AIR));
 
-                        CreatureSpawnEvent ev = new CreatureSpawnEvent(EntitySnowGolem.NETWORK_ID, CreatureSpawnEvent.SpawnReason.BUILD_SNOWMAN);
+                        Position spawnPos = target.add(0.5, -1, 0.5);
+
+                        CreatureSpawnEvent ev = new CreatureSpawnEvent(EntitySnowGolem.NETWORK_ID, spawnPos, CreatureSpawnEvent.SpawnReason.BUILD_SNOWMAN, player);
                         server.getPluginManager().callEvent(ev);
 
                         if (ev.isCancelled()) {
                             return null;
                         }
 
-                        Entity.createEntity("SnowGolem", target.add(0.5, -1, 0.5)).spawnToAll();
+                        Entity.createEntity("SnowGolem", spawnPos).spawnToAll();
 
                         if (!player.isCreative()) {
                             item.setCount(item.getCount() - 1);
@@ -2788,14 +2790,16 @@ public class Level implements ChunkManager, Metadatable {
                             block.getLevel().setBlock(block, Block.get(BlockID.AIR));
                             block.getLevel().setBlock(block.add(0, -1, 0), Block.get(BlockID.AIR));
 
-                            CreatureSpawnEvent ev = new CreatureSpawnEvent(EntityIronGolem.NETWORK_ID, CreatureSpawnEvent.SpawnReason.BUILD_IRONGOLEM);
+                            Position spawnPos = block.add(0.5, -1, 0.5);
+
+                            CreatureSpawnEvent ev = new CreatureSpawnEvent(EntityIronGolem.NETWORK_ID, spawnPos, CreatureSpawnEvent.SpawnReason.BUILD_IRONGOLEM, player);
                             server.getPluginManager().callEvent(ev);
 
                             if (ev.isCancelled()) {
                                 return null;
                             }
 
-                            Entity.createEntity("IronGolem", block.add(0.5, -1, 0.5)).spawnToAll();
+                            Entity.createEntity("IronGolem", spawnPos).spawnToAll();
 
                             if (!player.isCreative()) {
                                 item.setCount(item.getCount() - 1);
@@ -2827,7 +2831,9 @@ public class Level implements ChunkManager, Metadatable {
                         block.getLevel().setBlock(block, Block.get(BlockID.AIR));
                         block.getLevel().setBlock(block.add(0, -1, 0), Block.get(BlockID.AIR));
 
-                        CreatureSpawnEvent ev = new CreatureSpawnEvent(EntityWither.NETWORK_ID, CreatureSpawnEvent.SpawnReason.BUILD_WITHER);
+                        Position spawnPos = block.add(0.5, -1, 0.5);
+
+                        CreatureSpawnEvent ev = new CreatureSpawnEvent(EntityWither.NETWORK_ID, spawnPos, CreatureSpawnEvent.SpawnReason.BUILD_WITHER, player);
                         server.getPluginManager().callEvent(ev);
 
                         if (ev.isCancelled()) {
@@ -2839,7 +2845,9 @@ public class Level implements ChunkManager, Metadatable {
                             player.getInventory().setItemInHand(item);
                         }
 
-                        EntityWither wither = (EntityWither) Entity.createEntity("Wither", block.add(0.5, -1, 0.5));
+                        player.awardAchievement("spawnWither");
+
+                        EntityWither wither = (EntityWither) Entity.createEntity("Wither", spawnPos);
                         wither.stayTime = 220;
                         wither.spawnToAll();
                         this.addSoundToViewers(wither, cn.nukkit.level.Sound.MOB_WITHER_SPAWN);
