@@ -1126,7 +1126,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        this.server.sendRecipeList(this);
+        if (this.protocol >= ProtocolInfo.v1_21_60) {
+            this.server.sendRecipeList(this);
+        }
 
         this.noDamageTicks = 60;
         this.setAirTicks(400);
@@ -2972,6 +2974,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 trimDataPacket.getMaterials().addAll(TrimFactory.trimMaterials);
                 trimDataPacket.getPatterns().addAll(TrimFactory.trimPatterns);
                 this.dataPacket(trimDataPacket);
+            }
+            if (this.protocol < ProtocolInfo.v1_21_60) {
+                this.server.sendRecipeList(this);
             }
 
             if (this.isEnableClientCommand()) {
