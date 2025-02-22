@@ -1731,7 +1731,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     final public Short getFuelTime() {
         if (!Fuel.duration.containsKey(id)) {
-            System.out.println(id + ":" + this.getName());
             return null;
         }
         if (this.id != BUCKET || this.meta == 10) {
