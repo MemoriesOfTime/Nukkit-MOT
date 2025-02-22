@@ -36,7 +36,7 @@ public class BlockDoubleSlabBamboo extends BlockSolidMeta {
 
     @Override
     public String getName() {
-        return "Banboo Slab";
+        return "Bamboo Slab";
     }
 
     @Override
