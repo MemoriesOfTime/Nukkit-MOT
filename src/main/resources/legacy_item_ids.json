@@ -1058,5 +1058,7 @@
   "minecraft:waxed_copper_bulb": -780,
   "minecraft:waxed_exposed_copper_bulb": -781,
   "minecraft:waxed_weathered_copper_bulb": -782,
-  "minecraft:waxed_oxidized_copper_bulb": -783
+  "minecraft:waxed_oxidized_copper_bulb": -783,
+  "minecraft:copper_ingot": 519,
+  "minecraft:raw_copper": 522
 }
