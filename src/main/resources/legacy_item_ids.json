@@ -12,6 +12,9 @@
   "minecraft:stripped_cherry_log": -535,
   "minecraft:suspicious_sand": -529,
   "minecraft:bamboo_trapdoor": -520,
+  "minecraft:bamboo_wall_sign": -519,
+  "minecraft:bamboo_standing_sign": -518,
+  "minecraft:bamboo_slab": -513,
   "minecraft:bamboo_planks": -510,
   "minecraft:mangrove_double_slab": -499,
   "minecraft:stripped_mangrove_wood": -498,
@@ -1013,6 +1016,7 @@
   "minecraft:glow_frame": 850,
   "minecraft:mangrove_door": 1004,
   "minecraft:mangrove_sign": 1005,
+  "minecraft:bamboo_sign": 1006,
   "minecraft:invisible_bedrock": 95,
   "minecraft:moving_block": 250,
   "minecraft:piston_arm_collision": 34,
@@ -1048,5 +1052,7 @@
   "minecraft:waxed_copper_bulb": -780,
   "minecraft:waxed_exposed_copper_bulb": -781,
   "minecraft:waxed_weathered_copper_bulb": -782,
-  "minecraft:waxed_oxidized_copper_bulb": -783
+  "minecraft:waxed_oxidized_copper_bulb": -783,
+  "minecraft:copper_ingot": 519,
+  "minecraft:raw_copper": 522
 }

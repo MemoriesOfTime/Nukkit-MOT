@@ -217,7 +217,7 @@ public class SpawnerTask implements Runnable {
         BaseEntity entity = (BaseEntity) Entity.createEntity((String) type, pos);
         if (entity != null) {
             if (!entity.isInsideOfSolid()) {
-                CreatureSpawnEvent ev = new CreatureSpawnEvent(entity.getNetworkId(), pos, entity.namedTag, CreatureSpawnEvent.SpawnReason.NATURAL);
+                CreatureSpawnEvent ev = new CreatureSpawnEvent(entity.getNetworkId(), pos, entity.namedTag, CreatureSpawnEvent.SpawnReason.NATURAL, null);
                 Server.getInstance().getPluginManager().callEvent(ev);
                 if (!ev.isCancelled()) {
                     entity.spawnToAll();

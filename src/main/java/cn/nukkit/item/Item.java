@@ -392,6 +392,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             list[GLOW_ITEM_FRAME] = ItemItemFrameGlow.class; //850
 
             list[MANGROVE_SIGN] = ItemMangroveSign.class; //1005
+            list[BAMBOO_SIGN] = ItemBambooSign.class; //1006
 
             for (int i = 0; i < 256; ++i) {
                 if (Block.list[i] != null) {

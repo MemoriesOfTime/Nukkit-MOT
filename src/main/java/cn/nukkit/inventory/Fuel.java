@@ -45,6 +45,19 @@ public abstract class Fuel {
         duration.put(Item.BOW, (short) 200);
         duration.put(Item.BOWL, (short) 200);
         duration.put(Item.WOOD2, (short) 300);
+
+        // stripped woods
+        duration.put(-10, (short) 300);
+        duration.put(-9, (short) 300);
+        duration.put(-8, (short) 300);
+        duration.put(-7, (short) 300);
+        duration.put(-6, (short) 300);
+        duration.put(-5, (short) 300);
+        duration.put(-545, (short) 300);
+        duration.put(-535, (short) 300);
+        duration.put(-498, (short) 300);
+        duration.put(-485, (short) 300);
+
         duration.put(Item.WOODEN_PRESSURE_PLATE, (short) 300);
         duration.put(Item.ACACIA_WOOD_STAIRS, (short) 300);
         duration.put(Item.DARK_OAK_WOOD_STAIRS, (short) 300);

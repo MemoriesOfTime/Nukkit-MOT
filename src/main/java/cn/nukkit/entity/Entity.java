@@ -1589,6 +1589,9 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void heal(EntityRegainHealthEvent source) {
+        if (!this.isAlive()) {
+            return;
+        }
         this.server.getPluginManager().callEvent(source);
         if (source.isCancelled()) {
             return;
@@ -2100,9 +2103,11 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setOnFire(int seconds) {
-        int ticks = seconds * 20;
-        if (ticks > this.fireTicks) {
-            this.fireTicks = ticks;
+        if (!hasEffect(Effect.FIRE_RESISTANCE)) {
+            int ticks = seconds * 20;
+            if (ticks > this.fireTicks) {
+                this.fireTicks = ticks;
+            }
         }
     }
 
