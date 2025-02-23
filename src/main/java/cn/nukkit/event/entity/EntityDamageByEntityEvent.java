@@ -3,6 +3,8 @@ package cn.nukkit.event.entity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.potion.Effect;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.Map;
 
@@ -11,10 +13,16 @@ import java.util.Map;
  * Nukkit Project
  */
 public class EntityDamageByEntityEvent extends EntityDamageEvent {
-
+    @Getter
     private final Entity damager;
 
+    @Setter
+    @Getter
     private float knockBack;
+
+    @Setter
+    @Getter
+    private float knockBackModifier;
 
     private Enchantment[] enchantments;
 
@@ -27,9 +35,14 @@ public class EntityDamageByEntityEvent extends EntityDamageEvent {
     }
 
     public EntityDamageByEntityEvent(Entity damager, Entity entity, DamageCause cause, float damage, float knockBack) {
+        this(damager, entity, cause, damage, knockBack, 0f);
+    }
+
+    public EntityDamageByEntityEvent(Entity damager, Entity entity, DamageCause cause, float damage, float knockBack, float knockBackModifier) {
         super(entity, cause, damage);
         this.damager = damager;
         this.knockBack = knockBack;
+        this.knockBackModifier = knockBackModifier;
         this.addAttackerModifiers(damager);
     }
 
@@ -38,10 +51,15 @@ public class EntityDamageByEntityEvent extends EntityDamageEvent {
     }
 
     public EntityDamageByEntityEvent(Entity damager, Entity entity, DamageCause cause, Map<DamageModifier, Float> modifiers, float knockBack, Enchantment[] enchantments) {
+        this(entity, damager, cause, modifiers, knockBack, enchantments, 0);
+    }
+
+    public EntityDamageByEntityEvent(Entity damager, Entity entity, DamageCause cause, Map<DamageModifier, Float> modifiers, float knockBack, Enchantment[] enchantments, float knockBackModifier) {
         super(entity, cause, modifiers);
         this.damager = damager;
         this.knockBack = knockBack;
         this.enchantments = enchantments;
+        this.knockBackModifier = knockBackModifier;
         this.addAttackerModifiers(damager);
     }
 
@@ -53,18 +71,6 @@ public class EntityDamageByEntityEvent extends EntityDamageEvent {
         if (damager.hasEffect(Effect.WEAKNESS)) {
             this.setDamage(-(float) (this.getDamage(DamageModifier.BASE) * 0.2 * (damager.getEffect(Effect.WEAKNESS).getAmplifier() + 1)), DamageModifier.WEAKNESS);
         }
-    }
-
-    public Entity getDamager() {
-        return damager;
-    }
-
-    public float getKnockBack() {
-        return knockBack;
-    }
-
-    public void setKnockBack(float knockBack) {
-        this.knockBack = knockBack;
     }
 
     public Enchantment[] getWeaponEnchantments() {
