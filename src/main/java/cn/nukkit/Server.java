@@ -565,6 +565,11 @@ public class Server {
      */
     public boolean forcedSafetyEnchant;
 
+    /**
+     * Enable distance check
+     */
+    public boolean enableMoveDistanceCheck;
+
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
         currentThread = Thread.currentThread(); // Saves the current thread instance as a reference, used in Server#isPrimaryThread()
@@ -3144,6 +3149,7 @@ public class Server {
         this.enableNewPaintings = this.getPropertyBoolean("enable-new-paintings", true);
         this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
         this.enableRakSendCookie = this.getPropertyBoolean("enable-rak-send-cookie", true);
+        this.enableMoveDistanceCheck = this.getPropertyBoolean("enable-move-distance-check", true);
     }
 
     /**

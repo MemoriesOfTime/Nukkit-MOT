@@ -276,6 +276,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected boolean checkMovement = true;
 
+    protected boolean checkMoveDistance = true;
+
     private PermissibleBase perm;
     /**
      * Option to hide admin permissions from player list tab in client.
@@ -1994,7 +1996,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (this.isCheckingMovement()) {
+        if (this.checkMoveDistance) {
             int maxDist = 9;
             if (this.riptideTicks > 95 || clientPos.y - this.y < 2 || this.isOnLadder()) { // TODO: Remove ladder/vines check when block collisions are fixed
                 maxDist = 49;
@@ -6794,6 +6796,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public boolean isCheckingMovement() {
         return this.checkMovement;
+    }
+
+    /**
+     * Enable or disable move distance check
+     *
+     * @param checkMoveDistance move distance check enabled
+     */
+    public void setCheckMoveDistance(boolean checkMoveDistance) {
+        this.checkMoveDistance = checkMoveDistance;
+    }
+
+    /**
+     * @return player move distance checks enabled
+     */
+    public boolean isCheckMoveDistance() {
+        return checkMoveDistance;
     }
 
     /**
