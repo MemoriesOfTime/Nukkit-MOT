@@ -1995,7 +1995,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (this.isCheckingMovement()) {
-
             int maxDist = 9;
             if (this.riptideTicks > 95 || clientPos.y - this.y < 2 || this.isOnLadder()) { // TODO: Remove ladder/vines check when block collisions are fixed
                 maxDist = 49;
