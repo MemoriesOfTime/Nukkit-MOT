@@ -1994,15 +1994,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        int maxDist = 9;
-        if (this.riptideTicks > 95 || clientPos.y - this.y < 2 || this.isOnLadder()) { // TODO: Remove ladder/vines check when block collisions are fixed
-            maxDist = 49;
-        }
+        if (this.isCheckingMovement()) {
 
-        if (distanceSquared > maxDist) {
-            this.revertClientMotion(this);
-            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared +  " > maxDist=" + maxDist);
-            return;
+            int maxDist = 9;
+            if (this.riptideTicks > 95 || clientPos.y - this.y < 2 || this.isOnLadder()) { // TODO: Remove ladder/vines check when block collisions are fixed
+                maxDist = 49;
+            }
+
+            if (distanceSquared > maxDist) {
+                this.revertClientMotion(this);
+                server.getLogger().debug(username + ": distanceSquared=" + distanceSquared +  " > maxDist=" + maxDist);
+                return;
+            }
         }
 
         if (this.chunk == null || !this.chunk.isGenerated()) {
