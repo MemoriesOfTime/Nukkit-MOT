@@ -120,7 +120,7 @@ public class ItemBucket extends Item {
                         }
                     }
 
-                    useBucket(player, ev.getItem(), ev);
+                    useBucket(player, ev.getItem());
 
                     if (target instanceof BlockLava) {
                         level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_BUCKET_FILL_LAVA);
