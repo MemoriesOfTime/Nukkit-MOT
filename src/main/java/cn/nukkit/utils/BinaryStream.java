@@ -7,6 +7,7 @@ import cn.nukkit.entity.data.Skin;
 import cn.nukkit.item.*;
 import cn.nukkit.item.RuntimeItemMapping.LegacyEntry;
 import cn.nukkit.item.RuntimeItemMapping.RuntimeEntry;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -578,7 +579,13 @@ public class BinaryStream {
                     if (tag.contains("__DamageConflict__")) {
                         tag.put("Damage", tag.removeAndGet("__DamageConflict__"));
                     }
-                    if (tag.getAllTags().size() > 0) {
+                    if (tag.containsList("ench")) {
+                        int enchCount = tag.getList("ench", CompoundTag.class).getAll().size();
+                        if (enchCount > Enchantment.getEnchantments().length * 1.5) {
+                            throw new RuntimeException("Too many enchantment: " + enchCount);
+                        }
+                    }
+                    if (!tag.getAllTags().isEmpty()) {
                         nbt = NBTIO.write(tag, ByteOrder.LITTLE_ENDIAN, false);
                     }
                 } catch (IOException e) {
@@ -588,12 +595,22 @@ public class BinaryStream {
             setOffset(offset + (int) stream.position());
         }
 
-        String[] canPlaceOn = new String[this.getVarInt()];
+        int canPlaceCount = this.getVarInt();
+        if (canPlaceCount > 4096) {
+            throw new RuntimeException("Too many CanPlaceOn blocks: " + canPlaceCount);
+        }
+
+        String[] canPlaceOn = new String[canPlaceCount];
         for (int i = 0; i < canPlaceOn.length; ++i) {
             canPlaceOn[i] = this.getString();
         }
 
-        String[] canDestroy = new String[this.getVarInt()];
+        int canBreakCount = this.getVarInt();
+        if (canBreakCount > 4096) {
+            throw new RuntimeException("Too many CanDestroy blocks: " + canBreakCount);
+        }
+
+        String[] canDestroy = new String[canBreakCount];
         for (int i = 0; i < canDestroy.length; ++i) {
             canDestroy[i] = this.getString();
         }
@@ -760,17 +777,33 @@ public class BinaryStream {
                 if (compoundTag.contains("__DamageConflict__")) {
                     compoundTag.put("Damage", compoundTag.removeAndGet("__DamageConflict__"));
                 }
+                if (compoundTag.containsList("ench")) {
+                    int enchCount = compoundTag.getList("ench", CompoundTag.class).getAll().size();
+                    if (enchCount > Enchantment.getEnchantments().length * 1.5) {
+                        throw new RuntimeException("Too many enchantment: " + enchCount);
+                    }
+                }
                 if (!compoundTag.isEmpty()) {
                     nbt = NBTIO.write(compoundTag, ByteOrder.LITTLE_ENDIAN);
                 }
             }
 
-            canPlace = new String[stream.readInt()];
+            int canPlaceCount = stream.readInt();
+            if (canPlaceCount > 4096) {
+                throw new RuntimeException("Too many CanPlaceOn blocks: " + canPlaceCount);
+            }
+
+            canPlace = new String[canPlaceCount];
             for (int i = 0; i < canPlace.length; i++) {
                 canPlace[i] = stream.readUTF();
             }
 
-            canBreak = new String[stream.readInt()];
+            int canBreakCount = stream.readInt();
+            if (canBreakCount > 4096) {
+                throw new RuntimeException("Too many CanDestroy blocks: " + canBreakCount);
+            }
+
+            canBreak = new String[canBreakCount];
             for (int i = 0; i < canBreak.length; i++) {
                 canBreak[i] = stream.readUTF();
             }

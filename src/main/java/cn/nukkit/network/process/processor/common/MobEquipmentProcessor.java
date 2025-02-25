@@ -20,6 +20,8 @@ import org.jetbrains.annotations.NotNull;
 public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacket> {
 
     public static final MobEquipmentProcessor INSTANCE = new MobEquipmentProcessor();
+
+    private static final int MAX_FAILED = 5;
     
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull MobEquipmentPacket pk) {
@@ -33,6 +35,10 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
 
         if (inv == null) {
             player.getServer().getLogger().debug(player.getName() + " has no open container with window ID " + pk.windowId);
+            playerHandle.setFailedMobEquipmentPacket(playerHandle.getFailedMobEquipmentPacket() + 1);
+            if (playerHandle.getFailedMobEquipmentPacket() > MAX_FAILED) {
+                player.close("", "Too many failed packets");
+            }
             return;
         }
 
@@ -40,6 +46,10 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
 
         if (!item.equals(pk.item)) {
             player.getServer().getLogger().debug(player.getName() + " tried to equip " + pk.item + " but have " + item + " in target slot");
+            playerHandle.setFailedMobEquipmentPacket(playerHandle.getFailedMobEquipmentPacket() + 1);
+            if (playerHandle.getFailedMobEquipmentPacket() > MAX_FAILED) {
+                player.close("", "Too many failed packets");
+            }
             inv.sendContents(player);
             return;
         }
