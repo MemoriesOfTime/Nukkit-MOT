@@ -225,7 +225,9 @@ public class ItemBucket extends Item {
                 }
 
                 return true;
-            } else checkNether(player, block, target, nether);
+            } else {
+                checkNether(player, block, target, nether);
+            }
         } else {
             if (block.getId() != 0 && !(block instanceof BlockLiquid) && !(block instanceof BlockSnowLayer)) {
                 return false;
@@ -279,20 +281,6 @@ public class ItemBucket extends Item {
         return false;
     }
 
-    private void checkNether(Player player, Block block, Block target, boolean nether) {
-        if (nether) {
-            if (!player.isCreative()) {
-                this.setDamage(0); // Empty bucket
-                player.getInventory().setItemInHand(this);
-            }
-            player.getLevel().addSound(new FizzSound(target, 2.6F + (ThreadLocalRandom.current().nextFloat() - ThreadLocalRandom.current().nextFloat()) * 0.8F));
-            player.getLevel().addParticle(new ExplodeParticle(target.add(0.5, 1, 0.5)));
-        } else {
-            player.getLevel().sendBlocks(new Player[]{player}, new Block[]{block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
-            player.setNeedSendInventory(true);
-        }
-    }
-
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
         return this.getDamage() == MILK_BUCKET;
@@ -323,5 +311,19 @@ public class ItemBucket extends Item {
     @Override
     public boolean canRelease() {
         return this.getDamage() == MILK_BUCKET;
+    }
+
+    private void checkNether(Player player, Block block, Block target, boolean nether) {
+        if (nether) {
+            if (!player.isCreative()) {
+                this.setDamage(0); // Empty bucket
+                player.getInventory().setItemInHand(this);
+            }
+            player.getLevel().addSound(new FizzSound(target, 2.6F + (ThreadLocalRandom.current().nextFloat() - ThreadLocalRandom.current().nextFloat()) * 0.8F));
+            player.getLevel().addParticle(new ExplodeParticle(target.add(0.5, 1, 0.5)));
+        } else {
+            player.getLevel().sendBlocks(new Player[]{player}, new Block[]{block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
+            player.setNeedSendInventory(true);
+        }
     }
 }
