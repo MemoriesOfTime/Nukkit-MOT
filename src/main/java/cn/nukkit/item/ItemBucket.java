@@ -51,47 +51,29 @@ public class ItemBucket extends Item {
     }
 
     protected static String getName(int meta) {
-        switch (meta) {
-            case 1:
-                return "Milk";
-            case 2:
-                return "Bucket of Cod";
-            case 3:
-                return "Bucket of Salmon";
-            case 4:
-                return "Bucket of Tropical Fish";
-            case 5:
-                return "Bucket of Pufferfish";
-            case 8:
-                return "Water Bucket";
-            case 10:
-                return "Lava Bucket";
-            case 12:
-                return "Bucket of Axolotl";
-            case 13:
-                return "Bucket of Tadpoles";
-            default:
-                return "Bucket";
-        }
+        return switch (meta) {
+            case MILK_BUCKET -> "Milk";
+            case COD_BUCKET -> "Bucket of Cod";
+            case SALMON_BUCKET -> "Bucket of Salmon";
+            case TROPICAL_FISH_BUCKET -> "Bucket of Tropical Fish";
+            case PUFFERFISH_BUCKET -> "Bucket of Pufferfish";
+            case WATER_BUCKET -> "Water Bucket";
+            case LAVA_BUCKET -> "Lava Bucket";
+            case POWDER_SNOW_BUCKET -> "Powder Snow Bucket";
+            case AXOLOTL_BUCKET -> "Bucket of Axolotl";
+            case TADPOLE_BUCKET -> "Bucket of Tadpoles";
+            default -> "Bucket";
+        };
     }
 
     public static int getDamageByTarget(int target) {
-        switch (target) {
-            case 2:
-            case 3:
-            case 4:
-            case 5:
-            case 8:
-            case 9:
-            case 12:
-            case 13:
-                return 8;
-            case 10:
-            case 11:
-                return 10;
-            default:
-                return 0;
-        }
+        return switch (target) {
+            case COD_BUCKET, SALMON_BUCKET, TROPICAL_FISH_BUCKET, PUFFERFISH_BUCKET,
+                 WATER_BUCKET, AXOLOTL_BUCKET, TADPOLE_BUCKET -> BlockID.WATER;
+            case POWDER_SNOW_BUCKET -> BlockID.POWDER_SNOW;
+            case LAVA_BUCKET -> BlockID.LAVA;
+            default -> 0;
+        };
     }
 
     @Override
@@ -226,49 +208,89 @@ public class ItemBucket extends Item {
                 }
 
                 if (Server.getInstance().mobsFromBlocks && ev.isMobSpawningAllowed()) {
-                    switch (this.getDamage()) {
-                        case 2:
-                            Entity e2 = Entity.createEntity("Cod", block.add(0.5, 0, 0.5));
-                            if (e2 != null) e2.spawnToAll();
-                            break;
-                        case 3:
-                            Entity e3 = Entity.createEntity("Salmon", block.add(0.5, 0, 0.5));
-                            if (e3 != null) e3.spawnToAll();
-                            break;
-                        case 4:
-                            Entity e4 = Entity.createEntity("TropicalFish", block.add(0.5, 0, 0.5));
-                            if (e4 != null) e4.spawnToAll();
-                            break;
-                        case 5:
-                            Entity e5 = Entity.createEntity("Pufferfish", block.add(0.5, 0, 0.5));
-                            if (e5 != null) e5.spawnToAll();
-                            break;
-                        case 12:
-                            Entity e12 = Entity.createEntity("Axolotl", block.add(0.5, 0, 0.5));
-                            if (e12 != null) e12.spawnToAll();
-                            break;
-                        case 13:
-                            Entity e13 = Entity.createEntity("Tadpole", block.add(0.5, 0, 0.5));
-                            if (e13 != null) e13.spawnToAll();
-                            break;
+                    String entityName = switch (this.getDamage()) {
+                        case COD_BUCKET -> "Cod";
+                        case SALMON_BUCKET -> "Salmon";
+                        case TROPICAL_FISH_BUCKET -> "TropicalFish";
+                        case PUFFERFISH_BUCKET -> "Pufferfish";
+                        case AXOLOTL_BUCKET -> "Axolotl";
+                        case TADPOLE_BUCKET -> "Tadpole";
+                        default -> null;
+                    };
+
+                    if (entityName != null) {
+                        Entity entity = Entity.createEntity(entityName, block.add(0.5, 0, 0.5));
+                        if (entity != null) entity.spawnToAll();
                     }
                 }
 
                 return true;
-            } else if (nether) {
-                if (!player.isCreative()) {
-                    this.setDamage(0); // Empty bucket
-                    player.getInventory().setItemInHand(this);
+            } else checkNether(player, block, target, nether);
+        } else {
+            if (block.getId() != 0 && !(block instanceof BlockLiquid) && !(block instanceof BlockSnowLayer)) {
+                return false;
+            }
+
+            if (target instanceof BlockSnowLayer) {
+                block.setY(block.getY() - 1);
+            }
+
+            Item result = Item.get(BUCKET, 0, 1);
+
+            PlayerBucketEmptyEvent ev = new PlayerBucketEmptyEvent(player, block, face, this, result, true);
+
+            boolean nether = false;
+            if (player.getLevel().getDimension() == Level.DIMENSION_NETHER && this.getDamage() != 10) {
+                ev.setCancelled(true);
+                nether = true;
+            }
+
+            player.getServer().getPluginManager().callEvent(ev);
+
+            if (!ev.isCancelled()) {
+                player.getLevel().setBlock(block, 0, targetBlock, true, true);
+                if (player.isSurvival()) {
+                    if (this.getCount() - 1 <= 0) {
+                        player.getInventory().setItemInHand(ev.getItem());
+                    } else {
+                        Item clone = this.clone();
+                        clone.setCount(this.getCount() - 1);
+                        player.getInventory().setItemInHand(clone);
+                        if (player.getInventory().canAddItem(ev.getItem())) {
+                            player.getInventory().addItem(ev.getItem());
+                        } else {
+                            player.dropItem(ev.getItem());
+                        }
+                    }
                 }
-                player.getLevel().addSound(new FizzSound(target, 2.6F + (ThreadLocalRandom.current().nextFloat() - ThreadLocalRandom.current().nextFloat()) * 0.8F));
-                player.getLevel().addParticle(new ExplodeParticle(target.add(0.5, 1, 0.5)));
+
+                if (this.getDamage() == 10) {
+                    level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_BUCKET_EMPTY_LAVA);
+                } else {
+                    level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_BUCKET_EMPTY_WATER);
+                }
+
+                return true;
             } else {
-                player.getLevel().sendBlocks(new Player[]{player}, new Block[]{block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
-                player.setNeedSendInventory(true);
+                checkNether(player, block, target, nether);
             }
         }
 
         return false;
+    }
+
+    private void checkNether(Player player, Block block, Block target, boolean nether) {
+        if (nether) {
+            if (!player.isCreative()) {
+                this.setDamage(0); // Empty bucket
+                player.getInventory().setItemInHand(this);
+            }
+            player.getLevel().addSound(new FizzSound(target, 2.6F + (ThreadLocalRandom.current().nextFloat() - ThreadLocalRandom.current().nextFloat()) * 0.8F));
+            player.getLevel().addParticle(new ExplodeParticle(target.add(0.5, 1, 0.5)));
+        } else {
+            player.getLevel().sendBlocks(new Player[]{player}, new Block[]{block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
+            player.setNeedSendInventory(true);
+        }
     }
 
     @Override
