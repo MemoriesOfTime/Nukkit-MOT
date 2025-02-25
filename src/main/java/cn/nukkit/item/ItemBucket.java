@@ -120,20 +120,7 @@ public class ItemBucket extends Item {
                         }
                     }
 
-                    if (player.isSurvival()) {
-                        if (this.getCount() - 1 <= 0) {
-                            player.getInventory().setItemInHand(ev.getItem());
-                        } else {
-                            Item clone = this.clone();
-                            clone.setCount(this.getCount() - 1);
-                            player.getInventory().setItemInHand(clone);
-                            if (player.getInventory().canAddItem(ev.getItem())) {
-                                player.getInventory().addItem(ev.getItem());
-                            } else {
-                                player.dropItem(ev.getItem());
-                            }
-                        }
-                    }
+                    useBucket(player, ev.getItem(), ev);
 
                     if (target instanceof BlockLava) {
                         level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_BUCKET_FILL_LAVA);
@@ -251,27 +238,8 @@ public class ItemBucket extends Item {
 
             if (!ev.isCancelled()) {
                 player.getLevel().setBlock(block, 0, targetBlock, true, true);
-                if (player.isSurvival()) {
-                    if (this.getCount() - 1 <= 0) {
-                        player.getInventory().setItemInHand(ev.getItem());
-                    } else {
-                        Item clone = this.clone();
-                        clone.setCount(this.getCount() - 1);
-                        player.getInventory().setItemInHand(clone);
-                        if (player.getInventory().canAddItem(ev.getItem())) {
-                            player.getInventory().addItem(ev.getItem());
-                        } else {
-                            player.dropItem(ev.getItem());
-                        }
-                    }
-                }
-
-                if (this.getDamage() == 10) {
-                    level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_BUCKET_EMPTY_LAVA);
-                } else {
-                    level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_BUCKET_EMPTY_WATER);
-                }
-
+                useBucket(player, ev.getItem());
+                level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_BUCKET_EMPTY_POWDER_SNOW);
                 return true;
             } else {
                 checkNether(player, block, target, nether);
@@ -324,6 +292,23 @@ public class ItemBucket extends Item {
         } else {
             player.getLevel().sendBlocks(new Player[]{player}, new Block[]{block.getLevelBlockAtLayer(1)}, UpdateBlockPacket.FLAG_ALL_PRIORITY, 1); //TODO: maybe not here
             player.setNeedSendInventory(true);
+        }
+    }
+
+    private void useBucket(Player player, Item item) {
+        if (player.isSurvival()) {
+            if (this.getCount() - 1 <= 0) {
+                player.getInventory().setItemInHand(item);
+            } else {
+                Item clone = this.clone();
+                clone.setCount(this.getCount() - 1);
+                player.getInventory().setItemInHand(clone);
+                if (player.getInventory().canAddItem(item)) {
+                    player.getInventory().addItem(item);
+                } else {
+                    player.dropItem(item);
+                }
+            }
         }
     }
 }
