@@ -623,21 +623,34 @@ public class Blocks {
         list[BAMBOO_SLAB] = BlockSlabBamboo.class; //768
         list[BAMBOO_PRESSURE_PLATE] = BlockPressurePlateBamboo.class; //769
 
+        list[BAMBOO_FENCE_GATE] = BlockFenceGateBamboo.class; //771
+
         list[BAMBOO_STANDING_SIGN] = BlockBambooSignPost.class; //773
         list[BAMBOO_WALL_SIGN] = BlockBambooWallSign.class; //774
         list[BAMBOO_TRAPDOOR] = BlockTrapdoorBamboo.class; //775
         list[BAMBOO_DOUBLE_SLAB] = BlockDoubleSlabBamboo.class; //776
 
+        list[BAMBOO_MOSAIC_STAIRS] = BlockStairsBambooMosaic.class; //778
+        list[BAMBOO_MOSAIC_SLAB] = BlockSlabBambooMosaic.class; //779
+        list[BAMBOO_MOSAIC_DOUBLE_SLAB] = BlockDoubleSlabBambooMosaic.class; //780
+
         list[BAMBOO_BLOCK] = BlockBambooBlock.class; //782
         list[STRIPPED_BAMBOO_BLOCK] = BlockStrippedBambooBlock.class; //783
-        list[SUSPICIOUS_SAND] = BlockSuspiciousSand.class; // 784
+        list[SUSPICIOUS_SAND] = BlockSuspiciousSand.class; //784
+        list[CHERRY_BUTTON] = BlockButtonCherry.class; //785
+
+        list[CHERRY_FENCE_GATE] = BlockFenceGateCherry.class; //788
 
         list[STRIPPED_CHERRY_LOG] = BlockLogStrippedCherry.class; //790
         list[CHERRY_LOG] = BlockCherryLog.class; //791
         list[CHERRY_PLANKS] = BlockPlanksCherry.class; //792
-
+        list[CHERRY_PRESSURE_PLATE] = BlockPressurePlateCherry.class; //793
+        list[CHERRY_SLAB] = BlockSlabCherry.class; //794
+        list[CHERRY_DOUBLE_SLAB] = BlockDoubleSlabCherry.class; //795
+        list[CHERRY_STAIRS] = BlockStairsCherry.class; //796
+        list[CHERRY_STANDING_SIGN] = BlockCherrySignPost.class; //797
         list[CHERRY_TRAPDOOR] = BlockTrapdoorCherry.class; //798
-
+        list[CHERRY_WALL_SIGN] = BlockCherryWallSign.class; //799
         list[STRIPPED_CHERRY_WOOD] = BlockWoodStrippedCherry.class; //800
         list[CHERRY_WOOD] = BlockWoodCherry.class; //801
         list[CHERRY_SAPLING] = BlockCherrySapling.class; //802
@@ -647,6 +660,8 @@ public class Blocks {
         list[DECORATED_POT] = BlockDecoratedPot.class; //806
 
         list[SUSPICIOUS_GRAVEL] = BlockSuspiciousGravel.class; //828
+
+        list[SNIFFER_EGG] = BlockSnifferEgg.class; //851
 
         list[COPPER_BULB] = BlockCopperBulb.class; //1031
         list[EXPOSED_COPPER_BULB] = BlockExposedCopperBulb.class; //1032

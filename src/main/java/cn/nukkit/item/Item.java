@@ -393,6 +393,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
             list[MANGROVE_SIGN] = ItemMangroveSign.class; //1005
             list[BAMBOO_SIGN] = ItemBambooSign.class; //1006
+            list[CHERRY_SIGN] = ItemCherrySign.class; //1007
 
             for (int i = 0; i < 256; ++i) {
                 if (Block.list[i] != null) {
