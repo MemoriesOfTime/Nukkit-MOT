@@ -66,13 +66,22 @@ public class ItemBucket extends Item {
         };
     }
 
-    public static int getDamageByTarget(int target) {
-        return switch (target) {
+    public static int getDamageByTarget(int block) {
+        return switch (block) {
+            case BlockID.WATER, BlockID.STILL_WATER -> WATER_BUCKET;
+            case BlockID.LAVA, BlockID.STILL_LAVA -> LAVA_BUCKET;
+            case BlockID.POWDER_SNOW -> POWDER_SNOW_BUCKET;
+            default -> EMPTY_BUCKET;
+        };
+    }
+
+    public static int getBlockByDamage(int meta) {
+        return switch (meta) {
             case COD_BUCKET, SALMON_BUCKET, TROPICAL_FISH_BUCKET, PUFFERFISH_BUCKET,
                  WATER_BUCKET, AXOLOTL_BUCKET, TADPOLE_BUCKET -> BlockID.WATER;
-            case POWDER_SNOW_BUCKET -> BlockID.POWDER_SNOW;
             case LAVA_BUCKET -> BlockID.LAVA;
-            default -> 0;
+            case POWDER_SNOW_BUCKET -> BlockID.POWDER_SNOW;
+            default -> BlockID.AIR;
         };
     }
 
@@ -92,9 +101,22 @@ public class ItemBucket extends Item {
             return false;
         }
 
-        Block targetBlock = Block.get(getDamageByTarget(this.meta));
+        Block targetBlock;
+        if (target instanceof BlockPowderSnow && this.getDamage() == 0) {
+            PlayerBucketFillEvent ev = new PlayerBucketFillEvent(player, block, face, this, Item.get(BUCKET, POWDER_SNOW_BUCKET, 1));
+            player.getServer().getPluginManager().callEvent(ev);
 
-        if (targetBlock instanceof BlockAir) {
+            if (!ev.isCancelled()) {
+                player.getLevel().setBlock(target, target.layer, Block.get(BlockID.AIR), true, true);
+
+                useBucket(player, ev.getItem());
+
+                level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_BUCKET_FILL_POWDER_SNOW);
+                return true;
+            } else {
+                player.setNeedSendInventory(true);
+            }
+        } else if ((targetBlock = Block.get(getBlockByDamage(this.meta))) instanceof BlockAir) {
             if (!(target instanceof BlockLiquid) || target.getDamage() != 0) {
                 target = target.getLevelBlockAtLayer(1);
             }
