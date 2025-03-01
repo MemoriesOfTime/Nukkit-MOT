@@ -1883,10 +1883,16 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    /**
+     * Returns a new item instance with count decreased by amount or air if new count is less or equal to 0
+     */
     public final Item decrement(int amount) {
         return increment(-amount);
     }
 
+    /**
+     * Returns a new item instance with count increased by amount or air if new count is less or equal to 0
+     */
     public final Item increment(int amount) {
         if (count + amount <= 0) {
             return get(0);
