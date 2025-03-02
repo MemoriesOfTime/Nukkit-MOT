@@ -122,6 +122,6 @@ public class EntityShulker extends EntityWalkingMob {
     }
 
     @Override
-    public void knockBack(Entity attacker, double damage, double x, double z, double base) {
+    public void knockBack(Entity attacker, double damage, double deltaX, double deltaZ, double base, double resistance, double modifier) {
     }
 }
