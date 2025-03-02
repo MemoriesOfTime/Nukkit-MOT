@@ -17,6 +17,7 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Potion;
 import cn.nukkit.utils.Utils;
 
@@ -263,5 +264,10 @@ public class ItemCrossbow extends ItemBow {
             }
         }
         return arrow;
+    }
+
+    @Override
+    public boolean isSupportedOn(int protocolId) {
+        return protocolId >= ProtocolInfo.v1_8_0;
     }
 }

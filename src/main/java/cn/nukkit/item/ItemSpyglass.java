@@ -2,6 +2,7 @@ package cn.nukkit.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * @author LT_Name
@@ -43,5 +44,10 @@ public class ItemSpyglass extends Item {
     @Override
     public boolean canRelease() {
         return true;
+    }
+
+    @Override
+    public boolean isSupportedOn(int protocolId) {
+        return protocolId >= ProtocolInfo.v1_17_0;
     }
 }

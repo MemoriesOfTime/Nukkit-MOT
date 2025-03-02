@@ -363,6 +363,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             list[SUSPICIOUS_STEW] = ItemSuspiciousStew.class; //734
             list[HONEYCOMB] = ItemHoneycomb.class; //736
             list[HONEY_BOTTLE] = ItemHoneyBottle.class; //737
+            list[LODESTONE_COMPASS] = ItemLodestoneCompass.class; //741
             list[NETHERITE_INGOT] = ItemIngotNetherite.class; //742
             list[NETHERITE_SWORD] = ItemSwordNetherite.class; //743
             list[NETHERITE_SHOVEL] = ItemShovelNetherite.class; //744
@@ -1884,10 +1885,16 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    /**
+     * Returns a new item instance with count decreased by amount or air if new count is less or equal to 0
+     */
     public final Item decrement(int amount) {
         return increment(-amount);
     }
 
+    /**
+     * Returns a new item instance with count increased by amount or air if new count is less or equal to 0
+     */
     public final Item increment(int amount) {
         if (count + amount <= 0) {
             return get(0);
@@ -2043,7 +2050,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
      * @return 是否支持 whether supported
      */
     public boolean isSupportedOn(int protocolId) {
-        return true;
+        int itemId = this.getId();
+
+        if (itemId >= 0 && itemId <= 255) {
+            return true;
+        }
+
+        return RuntimeItems.getMapping(protocolId).isRegistered(itemId, this.getDamage());
     }
 
     /**
