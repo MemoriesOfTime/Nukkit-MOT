@@ -4,19 +4,19 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 
-public class BlockDoubleSlabBamboo extends BlockSolidMeta {
+public class BlockDoubleSlabBambooMosaic extends BlockSolidMeta {
 
-    public BlockDoubleSlabBamboo() {
+    public BlockDoubleSlabBambooMosaic() {
         this(0);
     }
 
-    public BlockDoubleSlabBamboo(int meta) {
+    public BlockDoubleSlabBambooMosaic(int meta) {
         super(meta);
     }
 
     @Override
     public int getId() {
-        return BAMBOO_DOUBLE_SLAB;
+        return BAMBOO_MOSAIC_DOUBLE_SLAB;
     }
 
     @Override
@@ -41,13 +41,13 @@ public class BlockDoubleSlabBamboo extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(BAMBOO_SLAB));
+        return new ItemBlock(Block.get(BAMBOO_MOSAIC_SLAB));
     }
 
     @Override
     public Item[] getDrops(Item item) {
         return new Item[]{
-                Item.get(Item.BAMBOO_SLAB, 0, 2)
+                Item.get(Item.BAMBOO_MOSAIC_SLAB, 0, 2)
         };
     }
 }

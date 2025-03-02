@@ -3,23 +3,23 @@ package cn.nukkit.block;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockSlabBamboo extends BlockSlab {
-    public BlockSlabBamboo() {
+public class BlockSlabCherry  extends BlockSlab {
+    public BlockSlabCherry() {
         this(0);
     }
 
-    public BlockSlabBamboo(int meta) {
-        super(meta, BAMBOO_DOUBLE_SLAB);
+    public BlockSlabCherry(int meta) {
+        super(meta, CHERRY_DOUBLE_SLAB);
     }
 
     @Override
     public int getId() {
-        return BAMBOO_SLAB;
+        return CHERRY_SLAB;
     }
 
     @Override
     public String getName() {
-        return "Bamboo Slab";
+        return "Cherry Slab";
     }
 
     @Override
@@ -34,6 +34,6 @@ public class BlockSlabBamboo extends BlockSlab {
 
     @Override
     public BlockColor getColor() {
-        return BlockColor.BAMBOO_BLOCK_COLOR;
+        return BlockColor.CHERRY_BLOCK_COLOR;
     }
 }
