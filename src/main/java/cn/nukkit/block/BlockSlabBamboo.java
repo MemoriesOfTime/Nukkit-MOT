@@ -33,11 +33,6 @@ public class BlockSlabBamboo extends BlockSlab {
     }
 
     @Override
-    public double getHardness() {
-        return 3.5;
-    }
-
-    @Override
     public BlockColor getColor() {
         return BlockColor.BAMBOO_BLOCK_COLOR;
     }

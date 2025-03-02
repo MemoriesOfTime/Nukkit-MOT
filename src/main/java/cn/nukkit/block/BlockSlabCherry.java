@@ -33,11 +33,6 @@ public class BlockSlabCherry  extends BlockSlab {
     }
 
     @Override
-    public double getHardness() {
-        return 3.5;
-    }
-
-    @Override
     public BlockColor getColor() {
         return BlockColor.CHERRY_BLOCK_COLOR;
     }
