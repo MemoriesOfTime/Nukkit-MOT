@@ -156,6 +156,7 @@ public class ItemSpawnEgg extends Item {
             case 142 -> protocolId >= ProtocolInfo.v1_20_80;
             case 140, 144 -> protocolId >= ProtocolInfo.v1_21_0;
             case 141, 143, 145, 146 -> protocolId >= ProtocolInfo.v1_21_50;
+            default -> true;
         };
     }
 }

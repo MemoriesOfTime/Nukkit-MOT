@@ -92,6 +92,6 @@ public class ItemDye extends Item {
 
     @Override
     public boolean isSupportedOn(int protocolId) {
-        return this.meta < 20 || protocolId >= ProtocolInfo.v1_17_0;
+        return this.getDamage() < 20 || protocolId >= ProtocolInfo.v1_17_0;
     }
 }
