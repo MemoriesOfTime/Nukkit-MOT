@@ -213,12 +213,12 @@ public class BlockRedstoneWire extends BlockFlowable {
         return Level.BLOCK_UPDATE_REDSTONE;
     }
 
-    public boolean canBePlacedOn(Vector3 v) {
-        return this.canBePlacedOn(this.level.getBlock(v));
+    public boolean canBePlacedOn(Vector3 pos) {
+        return this.canBePlacedOn(this.level.getBlock(pos));
     }
 
-    private boolean canBePlacedOn(Block b) {
-        return (b.isSolid() && !b.isTransparent() && b.getId() != GLOWSTONE) || b.getId() == HOPPER_BLOCK;
+    public boolean canBePlacedOn(Block support) {
+        return support.isSolid(BlockFace.UP);
     }
 
     @Override

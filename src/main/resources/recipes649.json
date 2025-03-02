@@ -45017,6 +45017,17 @@
         "id": 463
       },
       "block": "campfire"
+    },
+    {
+      "type": 3,
+      "input": {
+        "id": "minecraft:raw_copper",
+        "damage": -1
+      },
+      "output": {
+        "id": "minecraft:copper_ingot"
+      },
+      "block": "furnace"
     }
   ],
   "potionMixes": [

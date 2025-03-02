@@ -8,6 +8,7 @@ import cn.nukkit.event.entity.CreatureSpawnEvent;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.player.PlayerTeleportEvent.TeleportCause;
+import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector3;
@@ -82,14 +83,16 @@ public class EntityEnderPearl extends EntityProjectile {
 
                 if (Server.getInstance().mobsFromBlocks) {
                     if (Utils.rand(1, 20) == 5) {
-                        CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, CreatureSpawnEvent.SpawnReason.ENDER_PEARL);
+                        Position spawnPos = add(0.5, 1, 0.5);
+
+                        CreatureSpawnEvent ev = new CreatureSpawnEvent(NETWORK_ID, spawnPos, CreatureSpawnEvent.SpawnReason.ENDER_PEARL, this.shootingEntity);
                         level.getServer().getPluginManager().callEvent(ev);
 
                         if (ev.isCancelled()) {
                             return false;
                         }
 
-                        Entity entity = Entity.createEntity("Endermite", this.add(0.5, 1, 0.5));
+                        Entity entity = Entity.createEntity("Endermite", spawnPos);
                         if (entity != null) {
                             entity.spawnToAll();
                         }

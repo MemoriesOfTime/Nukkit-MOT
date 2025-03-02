@@ -478,4 +478,12 @@ public final class PlayerHandle {
     public boolean isLoginPacketReceived() {
         return player.loginPacketReceived;
     }
+
+    public int getFailedMobEquipmentPacket() {
+        return player.failedMobEquipmentPacket;
+    }
+
+    public void setFailedMobEquipmentPacket(int failedCount) {
+        player.failedMobEquipmentPacket = failedCount;
+    }
 }

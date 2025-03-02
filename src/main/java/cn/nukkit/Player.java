@@ -337,6 +337,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public boolean locallyInitialized;
     private boolean foodEnabled = true;
     private int failedTransactions;
+    protected int failedMobEquipmentPacket;
     private int timeSinceRest;
     private boolean inSoulSand;
     private boolean dimensionChangeInProgress;
@@ -1124,6 +1125,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (this.spawned) {
             return;
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_21_60) {
+            this.server.sendRecipeList(this);
         }
 
         this.noDamageTicks = 60;
@@ -2317,6 +2322,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastUpdate = currentTick;
 
         this.failedTransactions = 0;
+        if (currentTick%20 == 0) {
+            this.failedMobEquipmentPacket = 0;
+        }
 
         if (this.riptideTicks > 0) {
             this.riptideTicks -= tickDiff;
@@ -2971,8 +2979,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 trimDataPacket.getPatterns().addAll(TrimFactory.trimPatterns);
                 this.dataPacket(trimDataPacket);
             }
-
-            this.server.sendRecipeList(this);
+            if (this.protocol < ProtocolInfo.v1_21_60) {
+                this.server.sendRecipeList(this);
+            }
 
             if (this.isEnableClientCommand()) {
                 this.sendCommandData();
@@ -6272,7 +6281,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @return form id to use in {@link PlayerFormRespondedEvent}
      */
     public int showFormWindow(FormWindow window, int id) {
-        if (formOpen) return 0;
+        if (formOpen) return -1;
         ModalFormRequestPacket packet = new ModalFormRequestPacket();
         packet.formId = id;
         packet.data = window.getJSONData();
@@ -7022,24 +7031,39 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 ArrayList<Integer> itemsWithMending = new ArrayList<>();
                 for (int i = 0; i < 4; i++) {
-                    if (inventory.getArmorItem(i).hasEnchantment(Enchantment.ID_MENDING)) {
+                    Item item = inventory.getArmorItem(i);
+                    if (item.getDamage() != 0 && item.hasEnchantment(Enchantment.ID_MENDING)) {
                         itemsWithMending.add(inventory.getSize() + i);
                     }
                 }
-                if (inventory.getItemInHandFast().hasEnchantment(Enchantment.ID_MENDING)) {
+
+                Item hand = inventory.getItemInHandFast();
+                if (hand.getDamage() != 0 && hand.hasEnchantment(Enchantment.ID_MENDING)) {
                     itemsWithMending.add(inventory.getHeldItemIndex());
                 }
+
+                Item offhand = this.getOffhandInventory().getItem(0);
+                if (offhand.getId() == Item.SHIELD && offhand.getDamage() != 0 && offhand.hasEnchantment(Enchantment.ID_MENDING)) {
+                    itemsWithMending.add(-1);
+                }
+
                 if (!itemsWithMending.isEmpty()) {
-                    int itemToRepair = itemsWithMending.get(Utils.random.nextInt(itemsWithMending.size()));
-                    Item toRepair = inventory.getItem(itemToRepair);
-                    if (toRepair instanceof ItemTool || toRepair instanceof ItemArmor) {
+                    int itemToRepair = itemsWithMending.get(ThreadLocalRandom.current().nextInt(itemsWithMending.size()));
+                    boolean isOffhand = itemToRepair == -1;
+
+                    Item toRepair = isOffhand ? offhand : this.inventory.getItem(itemToRepair);
+                    if (toRepair instanceof ItemDurable) {
                         if (toRepair.getDamage() > 0) {
-                            int dmg = toRepair.getDamage() - 2;
+                            int dmg = toRepair.getDamage() - (exp << 1); // repair 2 points per xp
                             if (dmg < 0) {
                                 dmg = 0;
                             }
                             toRepair.setDamage(dmg);
-                            inventory.setItem(itemToRepair, toRepair);
+                            if (isOffhand) {
+                                this.getOffhandInventory().setItem(0, toRepair);
+                            } else {
+                                this.inventory.setItem(itemToRepair, toRepair);
+                            }
                             return true;
                         }
                     }

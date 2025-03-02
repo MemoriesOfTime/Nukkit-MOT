@@ -503,22 +503,26 @@ public class Blocks {
         list[SMOOTH_BASALT] = BlockBasaltSmooth.class; //632
         list[DEEPSLATE] = BlockDeepslate.class; //633
         list[COBBLED_DEEPSLATE] = BlockDeepslateCobbled.class; //634
-
+        list[COBBLED_DEEPSLATE_SLAB] = BlockSlabDeepslateCobbled.class; //635
         list[COBBLED_DEEPSLATE_STAIRS] = BlockStairsDeepslateCobbled.class; //636
-
+        list[COBBLED_DEEPSLATE_WALL] = BlockWallDeepslateCobbled.class; //637
         list[POLISHED_DEEPSLATE] = BlockDeepslatePolished.class; //638
-
+        list[POLISHED_DEEPSLATE_SLAB] = BlockSlabDeepslatePolished.class; //639
         list[POLISHED_DEEPSLATE_STAIRS] = BlockStairsDeepslatePolished.class; //640
-
+        list[POLISHED_DEEPSLATE_WALL] = BlockWallDeepslatePolished.class; //641
         list[DEEPSLATE_TILES] = BlockTilesDeepslate.class; //642
-
+        list[DEEPSLATE_TILE_SLAB] = BlockSlabDeepslateTile.class; //643
         list[DEEPSLATE_TILE_STAIRS] = BlockStairsDeepslateTile.class; //644
-
+        list[DEEPSLATE_TILE_WALL] = BlockWallDeepslateTile.class; //645
         list[DEEPSLATE_BRICKS] = BlockBricksDeepslate.class; //646
-
+        list[DEEPSLATE_BRICK_SLAB] = BlockSlabDeepslateBrick.class; //647
         list[DEEPSLATE_BRICK_STAIRS] = BlockStairsDeepslateBrick.class; //648
-
+        list[DEEPSLATE_BRICK_WALL] = BlockWallDeepslateBrick.class; //649
         list[CHISELED_DEEPSLATE] = BlockDeepslateChiseled.class; //650
+        list[COBBLED_DEEPSLATE_DOUBLE_SLAB] = BlockDoubleSlabDeepslateCobbled.class; //651
+        list[POLISHED_DEEPSLATE_DOUBLE_SLAB] = BlockDoubleSlabDeepslatePolished.class; //652
+        list[DEEPSLATE_TILE_DOUBLE_SLAB] = BlockDoubleSlabDeepslateTile.class; //653
+        list[DEEPSLATE_BRICK_DOUBLE_SLAB] = BlockDoubleSlabDeepslateBrick.class; //654
         list[DEEPSLATE_LAPIS_ORE] = BlockDeepslateLapisOre.class; // 655
         list[DEEPSLATE_IRON_ORE] = BlockDeepslateIronOre.class; // 656
         list[DEEPSLATE_GOLD_ORE] = BlockDeepslateGoldOre.class; // 657
@@ -612,11 +616,20 @@ public class Blocks {
         list[MANGROVE_WOOD] = BlockWoodMangrove.class; //752
         list[STRIPPED_MANGROVE_WOOD] = BlockWoodStrippedMangrove.class; //753
         list[MANGROVE_DOUBLE_SLAB] = BlockDoubleSlabMangrove.class; //754
-
+        list[BAMBOO_MOSAIC] = BlockBambooMosaic.class; //764
         list[BAMBOO_PLANKS] = BlockPlanksBamboo.class; //765
+        list[BAMBOO_BUTTON] = BlockButtonBamboo.class; //766
+        list[BAMBOO_STAIRS] = BlockStairsBamboo.class; //777
+        list[BAMBOO_SLAB] = BlockSlabBamboo.class; //768
+        list[BAMBOO_PRESSURE_PLATE] = BlockPressurePlateBamboo.class; //769
 
+        list[BAMBOO_STANDING_SIGN] = BlockBambooSignPost.class; //773
+        list[BAMBOO_WALL_SIGN] = BlockBambooWallSign.class; //774
         list[BAMBOO_TRAPDOOR] = BlockTrapdoorBamboo.class; //775
+        list[BAMBOO_DOUBLE_SLAB] = BlockDoubleSlabBamboo.class; //776
 
+        list[BAMBOO_BLOCK] = BlockBambooBlock.class; //782
+        list[STRIPPED_BAMBOO_BLOCK] = BlockStrippedBambooBlock.class; //783
         list[SUSPICIOUS_SAND] = BlockSuspiciousSand.class; // 784
 
         list[STRIPPED_CHERRY_LOG] = BlockLogStrippedCherry.class; //790
