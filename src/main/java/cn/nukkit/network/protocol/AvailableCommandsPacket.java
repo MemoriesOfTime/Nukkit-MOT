@@ -561,7 +561,7 @@ public class AvailableCommandsPacket extends DataPacket {
                 for (CommandParameter parameter : overload.input.parameters) {
                     putString(parameter.name);
 
-                    putLInt(computeOffset(parameter, postFixes, softEnums, enums, name, protocol));
+                    putLInt(computeOverloadOffset(parameter, postFixes, softEnums, enums, name, protocol));
                     putBoolean(parameter.optional);
                     if (protocol >= 340) {
                         byte options = 0;
@@ -595,8 +595,8 @@ public class AvailableCommandsPacket extends DataPacket {
         }
     }
 
-    private Integer computeOffset(CommandParameter parameter, List<String> postFixes, List<CommandEnum> softEnums,
-            List<CommandEnum> enums, String name, int protocol) {
+    private Integer computeOverloadOffset(CommandParameter parameter, List<String> postFixes, List<CommandEnum> softEnums,
+                                          List<CommandEnum> enums, String name, int protocol) {
         int type = 0;
         if (parameter.postFix != null) {
             int i = postFixes.indexOf(parameter.postFix);
