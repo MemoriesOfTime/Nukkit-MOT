@@ -381,8 +381,8 @@ public class AvailableCommandsPacket extends DataPacket {
         this.reset();
 
         if (this.protocol < ProtocolInfo.v1_2_0) {
-            putString(new Gson().toJson(this.commands));
-            putString("");
+            this.putString(new Gson().toJson(this.commands));
+            this.putString("");
             return;
         }
 
@@ -430,6 +430,7 @@ public class AvailableCommandsPacket extends DataPacket {
             }
 
             for (CommandOverload overload : cmdData.overloads.values()) {
+
                 for (CommandParameter parameter : overload.input.parameters) {
                     if (parameter.enumData != null) {
                         if (parameter.enumData.isSoft()) {
@@ -454,17 +455,17 @@ public class AvailableCommandsPacket extends DataPacket {
 
         // refer: https://github.com/Sandertv/gophertunnel/blob/master/minecraft/protocol/packet/available_commands.go
         // EnumValues
-        putUnsignedVarInt(enumValues.size());
+        this.putUnsignedVarInt(enumValues.size());
         enumValues.forEach(this::putString);
 
         // ChainedSubcommandValues
         if (this.protocol >= ProtocolInfo.v1_20_10_21) {
-            putUnsignedVarInt(subCommandValues.size());
+            this.putUnsignedVarInt(subCommandValues.size());
             subCommandValues.forEach(this::putString);
         }
 
         // Suffixes
-        putUnsignedVarInt(postFixes.size());
+        this.putUnsignedVarInt(postFixes.size());
         postFixes.forEach(this::putString);
 
         ObjIntConsumer<BinaryStream> indexWriter;
@@ -477,12 +478,12 @@ public class AvailableCommandsPacket extends DataPacket {
         }
 
         // Enums
-        putUnsignedVarInt(enums.size());
+        this.putUnsignedVarInt(enums.size());
         enums.forEach((cmdEnum) -> {
-            putString(cmdEnum.getName());
+            this.putString(cmdEnum.getName());
 
             List<String> values = cmdEnum.getValues();
-            putUnsignedVarInt(values.size());
+            this.putUnsignedVarInt(values.size());
 
             for (String val : values) {
                 int i = enumValues.indexOf(val);
@@ -497,10 +498,10 @@ public class AvailableCommandsPacket extends DataPacket {
 
         // ChainedSubcommands
         if (this.protocol >= ProtocolInfo.v1_20_10_21) {
-            putUnsignedVarInt(subCommandData.size());
+            this.putUnsignedVarInt(subCommandData.size());
             for (ChainedSubCommandData chainedSubCommandData : subCommandData) {
-                putString(chainedSubCommandData.getName());
-                putUnsignedVarInt(chainedSubCommandData.getValues().size());
+                this.putString(chainedSubCommandData.getName());
+                this.putUnsignedVarInt(chainedSubCommandData.getValues().size());
                 for (ChainedSubCommandData.Value value : chainedSubCommandData.getValues()) {
                     int first = subCommandValues.indexOf(value.getFirst());
                     checkArgument(first > -1, "Invalid enum value detected: " + value.getFirst());
@@ -514,55 +515,55 @@ public class AvailableCommandsPacket extends DataPacket {
                         second = -1;
                     }
 
-                    putLShort(first);
-                    putLShort(second);
+                    this.putLShort(first);
+                    this.putLShort(second);
                 }
             }
         }
 
 
         // Commands
-        putUnsignedVarInt(commands.size());
+        this.putUnsignedVarInt(commands.size());
         commands.forEach((name, cmdData) -> {
             CommandData data = cmdData.versions.get(0);
 
-            putString(name);
-            putString(data.description);
+            this.putString(name);
+            this.putString(data.description);
             // Commands\Flags
             if (protocol >= ProtocolInfo.v1_17_10) {
-                putLShort(data.flags);
+                this.putLShort(data.flags);
             } else {
-                putByte((byte) data.flags);
+                this.putByte((byte) data.flags);
             }
             // Commands\PermissionLevel
-            putByte((byte) data.permission);
+            this.putByte((byte) data.permission);
 
             // Commands\AliasesOffset
-            putLInt(data.aliases == null ? -1 : enums.indexOf(data.aliases));
+            this.putLInt(data.aliases == null ? -1 : enums.indexOf(data.aliases));
 
             // Commands\ChainedSubcommandOffsets
             if (this.protocol >= ProtocolInfo.v1_20_10_21) {
-                putUnsignedVarInt(data.subcommands.size());
+                this.putUnsignedVarInt(data.subcommands.size());
                 for (ChainedSubCommandData subcommand : data.subcommands) {
                     int index = subCommandData.indexOf(subcommand);
                     checkArgument(index > -1, "Invalid subcommand index: " + subcommand);
-                    putLShort(index);
+                    this.putLShort(index);
                 }
             }
 
             // Commands\Overloads
-            putUnsignedVarInt(data.overloads.size());
+            this.putUnsignedVarInt(data.overloads.size());
             for (CommandOverload overload : data.overloads.values()) {
                 if (this.protocol >= ProtocolInfo.v1_20_10_21) {
-                    putBoolean(overload.chaining);
+                    this.putBoolean(overload.chaining);
                 }
-                putUnsignedVarInt(overload.input.parameters.length);
+                this.putUnsignedVarInt(overload.input.parameters.length);
 
                 for (CommandParameter parameter : overload.input.parameters) {
-                    putString(parameter.name);
+                    this.putString(parameter.name);
 
-                    putLInt(computeOverloadOffset(parameter, postFixes, softEnums, enums, name, protocol));
-                    putBoolean(parameter.optional);
+                    this.putLInt(computeOverloadOffset(parameter, postFixes, softEnums, enums, name, protocol));
+                    this.putBoolean(parameter.optional);
                     if (protocol >= 340) {
                         byte options = 0;
                         if (parameter.paramOptions != null) {
@@ -572,7 +573,7 @@ public class AvailableCommandsPacket extends DataPacket {
                         } else {
                             options = parameter.options;
                         }
-                        putByte(options);
+                        this.putByte(options);
                     }
                 }
             }
@@ -580,18 +581,18 @@ public class AvailableCommandsPacket extends DataPacket {
 
         // DynamicEnums
         if (protocol > 274) {
-            putUnsignedVarInt(softEnums.size());
+            this.putUnsignedVarInt(softEnums.size());
 
             softEnums.forEach((enumValue) -> {
-                putString(enumValue.getName());
-                putUnsignedVarInt(enumValue.getValues().size());
+                this.putString(enumValue.getName());
+                this.putUnsignedVarInt(enumValue.getValues().size());
                 enumValue.getValues().forEach(this::putString);
             });
         }
 
         // Constraints
         if (protocol >= 407) {
-            putUnsignedVarInt(0); //enumConstraints
+            this.putUnsignedVarInt(0); //enumConstraints
         }
     }
 
