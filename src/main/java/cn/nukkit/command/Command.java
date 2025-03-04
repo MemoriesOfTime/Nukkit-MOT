@@ -3,6 +3,7 @@ package cn.nukkit.command;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.command.data.*;
+import cn.nukkit.command.defaults.ExecuteCommand;
 import cn.nukkit.command.tree.ParamList;
 import cn.nukkit.command.tree.ParamTree;
 import cn.nukkit.command.utils.CommandLogger;
@@ -73,7 +74,9 @@ public abstract class Command {
         this.usageMessage = usageMessage == null ? "/" + name : usageMessage;
         this.aliases = aliases;
         this.activeAliases = aliases;
-        this.commandParameters.put("default", new CommandParameter[]{CommandParameter.newType("args", true, CommandParamType.RAWTEXT)});
+        this.commandParameters.put("default", new CommandParameter[]{
+                CommandParameter.newType("args", true, CommandParamType.RAWTEXT)
+        });
     }
 
     /**
@@ -140,6 +143,9 @@ public abstract class Command {
         this.commandParameters.forEach((key, params) -> {
             CommandOverload overload = new CommandOverload();
             overload.input.parameters = params;
+            if (this instanceof ExecuteCommand) {
+                overload.chaining = true;
+            }
             customData.overloads.put(key, overload);
         });
 

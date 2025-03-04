@@ -167,10 +167,10 @@ public class AvailableCommandsPacket extends DataPacket {
             .insert(36, CommandParam.PERMISSION_ELEMENTS)
             .build();
     private static final TypeMap<CommandParam> COMMAND_PARAMS_594 = COMMAND_PARAMS_582.toBuilder()
-            //TODO solve memory usage problem
-            //.insert(134217728, CommandParam.CHAINED_COMMAND)
+            .insert(134217728, CommandParam.CHAINED_COMMAND)
             .build();
     private static final TypeMap<CommandParam> COMMAND_PARAMS_662 = COMMAND_PARAMS_594.toBuilder()
+            .remove(134217728)//remove CommandParam.CHAINED_COMMAND
             .shift(24, 4)
             .insert(24, CommandParam.RATIONAL_RANGE_VAL)
             .insert(25, CommandParam.RATIONAL_RANGE_POST_VAL)
@@ -185,13 +185,15 @@ public class AvailableCommandsPacket extends DataPacket {
             .insert(53, CommandParam.HAS_PROPERTY_ELEMENT)
             .insert(54, CommandParam.HAS_PROPERTY_ELEMENTS)
             .insert(55, CommandParam.HAS_PROPERTY_SELECTOR)
+            .insert(134217728, CommandParam.CHAINED_COMMAND)//reinsert, avoid shift
             .build();
     private static final TypeMap<CommandParam> COMMAND_PARAMS_685 = COMMAND_PARAMS_662.toBuilder()
-            .shift(86, 4)
-            .insert(86, CommandParam.CODE_BUILDER_ARG)
-            .insert(87, CommandParam.CODE_BUILDER_ARGS)
-            .insert(88, CommandParam.CODE_BUILDER_SELECT_PARAM)
-            .insert(89, CommandParam.CODE_BUILDER_SELECTOR)
+            .remove(134217728)//remove CommandParam.CHAINED_COMMAND
+            .insert(88, CommandParam.CODE_BUILDER_ARG)
+            .insert(89, CommandParam.CODE_BUILDER_ARGS)
+            .insert(90, CommandParam.CODE_BUILDER_SELECT_PARAM)
+            .insert(91, CommandParam.CODE_BUILDER_SELECTOR)
+            .insert(134217728, CommandParam.CHAINED_COMMAND)//reinsert, avoid shift
             .build();
 
     //TODO Multiversion 保持最新版
@@ -220,7 +222,7 @@ public class AvailableCommandsPacket extends DataPacket {
     public static final int ARG_TYPE_COMMAND = COMMAND_PARAMS.getId(CommandParam.COMMAND);
 
     public Map<String, CommandDataVersions> commands;
-    public final Map<String, List<String>> softEnums = new HashMap<>();
+//    public final Map<String, List<String>> softEnums = new HashMap<>();
 
     public static TypeMap<CommandParam> getCommandParams(int protocol) {
         //TODO Multiversion
@@ -389,6 +391,7 @@ public class AvailableCommandsPacket extends DataPacket {
         LinkedHashSet<String> postFixesSet = new LinkedHashSet<>();
         SequencedHashSet<ChainedSubCommandData> subCommandData = new SequencedHashSet<>();
         LinkedHashSet<CommandEnum> enumsSet = new LinkedHashSet<>();
+        LinkedHashSet<CommandEnum> softEnumsSet = new LinkedHashSet<>();
 
         commands.forEach((name, data) -> {
             CommandData cmdData = data.versions.get(0);
@@ -398,6 +401,16 @@ public class AvailableCommandsPacket extends DataPacket {
 
                 enumValuesSet.addAll(cmdData.aliases.getValues());
             }
+            if ("execute".equals(name) && cmdData.subcommands.isEmpty()) {// Hook
+                String[] keywords = {
+                        "as", "at", "in", "positioned", "rotated", "facing", "align", "anchored", "if", "unless", "run"
+                };
+                ChainedSubCommandData chainedSubCommand = new ChainedSubCommandData("ExecuteChainedOption_0");
+                for (String keyword : keywords) {
+                    chainedSubCommand.getValues().add(new ChainedSubCommandData.Value(keyword, null));
+                }
+                cmdData.subcommands.add(chainedSubCommand);
+            }
 
             for (ChainedSubCommandData subcommand : cmdData.subcommands) {
                 if (subCommandData.contains(subcommand)) {
@@ -406,22 +419,26 @@ public class AvailableCommandsPacket extends DataPacket {
 
                 subCommandData.add(subcommand);
                 for (ChainedSubCommandData.Value value : subcommand.getValues()) {
-                    if (subCommandValues.contains(value.getFirst())) {
+                    if (value.getFirst() != null && !subCommandValues.contains(value.getFirst())) {
                         subCommandValues.add(value.getFirst());
                     }
 
-                    if (subCommandValues.contains(value.getSecond())) {
+                    if (value.getSecond() != null && !subCommandValues.contains(value.getSecond())) {
                         subCommandValues.add(value.getSecond());
                     }
                 }
             }
 
             for (CommandOverload overload : cmdData.overloads.values()) {
+
                 for (CommandParameter parameter : overload.input.parameters) {
                     if (parameter.enumData != null) {
-                        enumsSet.add(parameter.enumData);
-
-                        enumValuesSet.addAll(parameter.enumData.getValues());
+                        if (parameter.enumData.isSoft()) {
+                            softEnumsSet.add(parameter.enumData);
+                        } else {
+                            enumsSet.add(parameter.enumData);
+                            enumValuesSet.addAll(parameter.enumData.getValues());
+                        }
                     }
 
                     if (parameter.postFix != null) {
@@ -432,17 +449,22 @@ public class AvailableCommandsPacket extends DataPacket {
         });
 
         List<String> enumValues = new ArrayList<>(enumValuesSet);
-        List<CommandEnum> enums = new ArrayList<>(enumsSet);
         List<String> postFixes = new ArrayList<>(postFixesSet);
+        List<CommandEnum> enums = new ArrayList<>(enumsSet);
+        List<CommandEnum> softEnums = new ArrayList<>(softEnumsSet);
 
+        // refer: https://github.com/Sandertv/gophertunnel/blob/master/minecraft/protocol/packet/available_commands.go
+        // EnumValues
         this.putUnsignedVarInt(enumValues.size());
         enumValues.forEach(this::putString);
 
+        // ChainedSubcommandValues
         if (this.protocol >= ProtocolInfo.v1_20_10_21) {
             this.putUnsignedVarInt(subCommandValues.size());
             subCommandValues.forEach(this::putString);
         }
 
+        // Suffixes
         this.putUnsignedVarInt(postFixes.size());
         postFixes.forEach(this::putString);
 
@@ -455,12 +477,13 @@ public class AvailableCommandsPacket extends DataPacket {
             indexWriter = WRITE_INT;
         }
 
+        // Enums
         this.putUnsignedVarInt(enums.size());
         enums.forEach((cmdEnum) -> {
-            putString(cmdEnum.getName());
+            this.putString(cmdEnum.getName());
 
             List<String> values = cmdEnum.getValues();
-            putUnsignedVarInt(values.size());
+            this.putUnsignedVarInt(values.size());
 
             for (String val : values) {
                 int i = enumValues.indexOf(val);
@@ -473,6 +496,7 @@ public class AvailableCommandsPacket extends DataPacket {
             }
         });
 
+        // ChainedSubcommands
         if (this.protocol >= ProtocolInfo.v1_20_10_21) {
             this.putUnsignedVarInt(subCommandData.size());
             for (ChainedSubCommandData chainedSubCommandData : subCommandData) {
@@ -481,9 +505,15 @@ public class AvailableCommandsPacket extends DataPacket {
                 for (ChainedSubCommandData.Value value : chainedSubCommandData.getValues()) {
                     int first = subCommandValues.indexOf(value.getFirst());
                     checkArgument(first > -1, "Invalid enum value detected: " + value.getFirst());
+                    if (value.getFirst() == null) {
+                        first = -1;
+                    }
 
                     int second = subCommandValues.indexOf(value.getSecond());
                     checkArgument(second > -1, "Invalid enum value detected: " + value.getSecond());
+                    if (value.getSecond() == null) {
+                        second = -1;
+                    }
 
                     this.putLShort(first);
                     this.putLShort(second);
@@ -491,22 +521,27 @@ public class AvailableCommandsPacket extends DataPacket {
             }
         }
 
-        putUnsignedVarInt(commands.size());
 
+        // Commands
+        this.putUnsignedVarInt(commands.size());
         commands.forEach((name, cmdData) -> {
             CommandData data = cmdData.versions.get(0);
 
-            putString(name);
-            putString(data.description);
+            this.putString(name);
+            this.putString(data.description);
+            // Commands\Flags
             if (protocol >= ProtocolInfo.v1_17_10) {
-                putLShort(data.flags);
+                this.putLShort(data.flags);
             } else {
-                putByte((byte) data.flags);
+                this.putByte((byte) data.flags);
             }
-            putByte((byte) data.permission);
+            // Commands\PermissionLevel
+            this.putByte((byte) data.permission);
 
-            putLInt(data.aliases == null ? -1 : enums.indexOf(data.aliases));
+            // Commands\AliasesOffset
+            this.putLInt(data.aliases == null ? -1 : enums.indexOf(data.aliases));
 
+            // Commands\ChainedSubcommandOffsets
             if (this.protocol >= ProtocolInfo.v1_20_10_21) {
                 this.putUnsignedVarInt(data.subcommands.size());
                 for (ChainedSubCommandData subcommand : data.subcommands) {
@@ -516,41 +551,19 @@ public class AvailableCommandsPacket extends DataPacket {
                 }
             }
 
-            putUnsignedVarInt(data.overloads.size());
+            // Commands\Overloads
+            this.putUnsignedVarInt(data.overloads.size());
             for (CommandOverload overload : data.overloads.values()) {
                 if (this.protocol >= ProtocolInfo.v1_20_10_21) {
                     this.putBoolean(overload.chaining);
                 }
-                putUnsignedVarInt(overload.input.parameters.length);
+                this.putUnsignedVarInt(overload.input.parameters.length);
 
                 for (CommandParameter parameter : overload.input.parameters) {
-                    putString(parameter.name);
+                    this.putString(parameter.name);
 
-                    int type = 0;
-                    if (parameter.postFix != null) {
-                        int i = postFixes.indexOf(parameter.postFix);
-                        if (i < 0) {
-                            throw new IllegalStateException(
-                                    "Postfix '" + parameter.postFix + "' isn't in postfix array");
-                        }
-                        type = ARG_FLAG_POSTFIX | i;
-                    } else {
-                        type |= ARG_FLAG_VALID;
-                        if (parameter.enumData != null) {
-                            type |= ARG_FLAG_ENUM | enums.indexOf(parameter.enumData);
-                        } else {
-                            CommandParam commandParam = COMMAND_PARAMS.getType(parameter.type.getId()); //正常来说应该传入最新版的数字id
-                            try {
-                                int id = getCommandParams(protocol).getId(commandParam);
-                                type |= id;
-                            } catch (IllegalArgumentException e) {
-                                type |= getCommandParams(protocol).getId(CommandParam.STRING);
-                            }
-                        }
-                    }
-
-                    putLInt(type);
-                    putBoolean(parameter.optional);
+                    this.putLInt(computeOverloadOffset(parameter, postFixes, softEnums, enums, name, protocol));
+                    this.putBoolean(parameter.optional);
                     if (protocol >= 340) {
                         byte options = 0;
                         if (parameter.paramOptions != null) {
@@ -566,18 +579,58 @@ public class AvailableCommandsPacket extends DataPacket {
             }
         });
 
+        // DynamicEnums
         if (protocol > 274) {
             this.putUnsignedVarInt(softEnums.size());
 
-            softEnums.forEach((name, values) -> {
-                this.putString(name);
-                this.putUnsignedVarInt(values.size());
-                values.forEach(this::putString);
+            softEnums.forEach((enumValue) -> {
+                this.putString(enumValue.getName());
+                this.putUnsignedVarInt(enumValue.getValues().size());
+                enumValue.getValues().forEach(this::putString);
             });
         }
 
+        // Constraints
         if (protocol >= 407) {
             this.putUnsignedVarInt(0); //enumConstraints
         }
+    }
+
+    private Integer computeOverloadOffset(CommandParameter parameter, List<String> postFixes, List<CommandEnum> softEnums,
+                                          List<CommandEnum> enums, String name, int protocol) {
+        int type = 0;
+        if (parameter.postFix != null) {
+            int i = postFixes.indexOf(parameter.postFix);
+            if (i < 0) {
+                throw new IllegalStateException(
+                        "Postfix '" + parameter.postFix + "' isn't in postfix array");
+            }
+            type = ARG_FLAG_POSTFIX | i;
+        } else {
+            type |= ARG_FLAG_VALID;
+            if (parameter.enumData != null) {
+                if (parameter.enumData.isSoft()) {
+                    type = softEnums.indexOf(parameter.enumData) | ARG_FLAG_SOFT_ENUM | ARG_FLAG_VALID;
+                } else {
+                    type = enums.indexOf(parameter.enumData) | ARG_FLAG_ENUM | ARG_FLAG_VALID;
+                }
+            } else {
+                CommandParam commandParam = COMMAND_PARAMS.getType(parameter.type.getId()); //正常来说应该传入最新版的数字id
+
+                if ("execute".equals(name)) {// Hook
+                    if ("command".equals(parameter.name) && protocol >= 575) {
+                        commandParam = CommandParam.SLASH_COMMAND;
+                    }
+                }
+
+                try {
+                    int id = getCommandParams(protocol).getId(commandParam);
+                    type |= id;
+                } catch (IllegalArgumentException e) {
+                    type |= getCommandParams(protocol).getId(CommandParam.STRING);
+                }
+            }
+        }
+        return type;
     }
 }
