@@ -1223,9 +1223,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     String latest = "git-" + JsonParser.parseReader(content).getAsJsonObject().get("sha").getAsString().substring(0, 7);
                     content.close();
 
-                    if (Nukkit.getBranch().equals("master")) {
-                        if (!server.getNukkitVersion().equals(latest) && !server.getNukkitVersion().equals("git-null")) {
-                            this.sendMessage("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + server.getNukkitVersion() + " Latest: " + latest);
+                    if(Server.getInstance().enableUpdateNotification) {
+                        if (Nukkit.getBranch().equals("master")) {
+                            if (!server.getNukkitVersion().equals(latest) && !server.getNukkitVersion().equals("git-null")) {
+                                this.sendMessage("§c[Nukkit-MOT][Update] §eThere is a new build of §cNukkit§3-§dMOT §eavailable! Current: " + server.getNukkitVersion() + " Latest: " + latest);
+                            }
                         }
                     }
                 } catch (Exception ignore) {
