@@ -7,6 +7,7 @@ import com.google.common.base.Preconditions;
 import java.io.Serial;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.util.function.Consumer;
 
 public class BooleanBlockProperty extends BlockProperty<Boolean> {
     @Serial
@@ -145,5 +146,11 @@ public class BooleanBlockProperty extends BlockProperty<Boolean> {
     @Override
     public BooleanBlockProperty copy() {
         return new BooleanBlockProperty(this.getName(), this.isExportedToItem(), this.getPersistenceName());
+    }
+
+    @Override
+    public void forEach(Consumer<Serializable> func) {
+        func.accept(false);
+        func.accept(true);
     }
 }

@@ -131,6 +131,10 @@ public class BlockStateMapping {
         this.legacyMapper = legacyStateMapper;
     }
 
+    public boolean containsState(NbtMap state) {
+        return paletteMap.containsKey(state);
+    }
+
     public void registerState(int runtimeId, NbtMap state) {
         Preconditions.checkArgument(!this.runtime2State.containsKey(runtimeId),
                 "Mapping for runtimeId " + runtimeId + " is already created!");

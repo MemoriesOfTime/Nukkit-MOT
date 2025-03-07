@@ -10,7 +10,7 @@ public class HashedPaletteComparator implements Comparator<NbtMap> {
     public static final HashedPaletteComparator INSTANCE = new HashedPaletteComparator();
 
     private static final long FNV1_64_INIT = 0xcbf29ce484222325L;
-    private static final long FNV1_PRIME_64 = 1099511628211L;
+    private static final long FNV1_PRIME_64 = 0x100000001b3L;
 
     @Override
     public int compare(NbtMap o1, NbtMap o2) {

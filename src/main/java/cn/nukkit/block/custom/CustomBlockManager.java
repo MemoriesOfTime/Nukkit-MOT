@@ -30,17 +30,12 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.nbt.*;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.function.Supplier;
 
 @Log4j2
@@ -90,6 +85,36 @@ public class CustomBlockManager {
         this.registerCustomBlock(identifier, nukkitId, null, blockDefinition, meta -> factory.get());
     }
 
+    private static void variantGenerations(BlockProperties properties, String[] states, List<Map<String, Serializable>> variants, Map<String, Serializable> temp, int offset) {
+        if (states.length - offset >= 0) {
+            final String currentState = states[states.length - offset];
+
+            properties.getBlockProperty(currentState).forEach((value) -> {
+                temp.put(currentState, value);
+                if(!variants.contains(temp))
+                    variants.add(new HashMap<>(temp));
+                variantGenerations(properties, states, variants, temp, offset + 1);
+            });
+
+            temp.put(currentState, 0);//def value
+        }
+    }
+
+    private static List<Map<String, Serializable>> variantGenerations(BlockProperties properties, String[] states) {
+        final Map<String, Serializable> temp = new HashMap<>();
+        for(String state : states) {
+            temp.put(state, 0);//def value
+        }
+
+        final List<Map<String, Serializable>> variants = new ArrayList<>();
+        if(states.length == 0) {
+            variants.add(temp);
+        }
+
+        variantGenerations(properties, states, variants, temp, 1);
+        return variants;
+    }
+
     public void registerCustomBlock(String identifier, int nukkitId, BlockProperties properties, CustomBlockDefinition blockDefinition, BlockContainerFactory factory) {
         if (this.closed) {
             throw new IllegalStateException("Block registry was already closed");
@@ -121,16 +146,25 @@ public class CustomBlockManager {
         }
 
         if (properties != null) {
-            for (int meta = 1; meta < properties.getBitSize(); meta++) {
-                CustomBlockState state;
-                try {
-                    state = this.createBlockState(identifier, (nukkitId << Block.DATA_BITS) | meta, properties, factory);
-                } catch (InvalidBlockPropertyMetaException e) {
-                    log.error(e);
-                    break; // Nukkit has more states than our block
-                }
-                this.legacy2CustomState.put(state.getLegacyId(), state);
-            }
+            BlockProperties finalProperties = properties;
+            variantGenerations(properties, properties.getNames().toArray(new String[0]))
+                    .forEach(states -> {
+                        final int[] meta = {0};
+                        states.forEach((name, value) -> {
+                            meta[0] = finalProperties.setValue(meta[0], name, value);
+                        });
+
+                        if(meta[0] != 0) {
+                            CustomBlockState state;
+                            try {
+                                state = this.createBlockState(identifier, (nukkitId << Block.DATA_BITS) | meta[0], finalProperties, factory);
+                            } catch (InvalidBlockPropertyMetaException e) {
+                                log.error(e);
+                                return; // Nukkit has more states than our block
+                            }
+                            this.legacy2CustomState.put(state.getLegacyId(), state);
+                        }
+                    });
         }
     }
 
@@ -247,18 +281,20 @@ public class CustomBlockManager {
 
         for (int runtimeId = 0; runtimeId < vanillaPaletteList.size(); runtimeId++) {
             NbtMap state = vanillaPaletteList.get(runtimeId);
-            if (levelDb) {
-                BlockStateMapping.get().registerState(runtimeId, state);
-            }
+            if(!BlockStateMapping.get().containsState(state)) {
+                if (levelDb) {
+                    BlockStateMapping.get().registerState(runtimeId, state);
+                }
 
-            IntSet legacyIds = state2Legacy.get(state);
-            if (legacyIds == null) {
-                continue;
-            }
+                IntSet legacyIds = state2Legacy.get(state);
+                if (legacyIds == null) {
+                    continue;
+                }
 
-            CompoundTag nukkitState = convertNbtMap(state);
-            for (Integer fullId : legacyIds) {
-                palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
+                CompoundTag nukkitState = convertNbtMap(state);
+                for (Integer fullId : legacyIds) {
+                    palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
+                }
             }
         }
     }
