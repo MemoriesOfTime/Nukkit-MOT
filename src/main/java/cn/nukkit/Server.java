@@ -3296,6 +3296,7 @@ public class Server {
             put("use-native-leveldb", false);
             put("enable-raw-ores", true);
             put("enable-new-paintings", true);
+            put("enable-update-notification", true);
         }
     }
 
