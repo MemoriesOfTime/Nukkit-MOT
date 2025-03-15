@@ -3742,7 +3742,7 @@ public class Level implements ChunkManager, Metadatable {
 
         if (server.cacheChunks) {
             BatchPacket data = Player.getChunkCacheFromData(protocol, x, z, subChunkCount, payload, this.getDimension());
-            BaseFullChunk chunk = getChunk(x, z, false);
+            BaseFullChunk chunk = getChunkIfLoaded(x, z);
             if (chunk != null && chunk.getChanges() <= timestamp) {
                 chunk.setChunkPacket(protocol, data);
             }
