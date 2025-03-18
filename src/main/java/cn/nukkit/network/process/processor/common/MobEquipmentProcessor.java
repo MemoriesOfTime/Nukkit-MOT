@@ -22,11 +22,11 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
     public static final MobEquipmentProcessor INSTANCE = new MobEquipmentProcessor();
 
     private static final int MAX_FAILED = 5;
-    
+
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull MobEquipmentPacket pk) {
         Player player = playerHandle.player;
-        
+
         if (!player.spawned || !player.isAlive()) {
             return;
         }
@@ -44,14 +44,14 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
 
         Item item = inv.getItem(pk.hotbarSlot);
 
-        if (!item.equals(pk.item)) {
-            player.getServer().getLogger().debug(player.getName() + " tried to equip " + pk.item + " but have " + item + " in target slot");
-            playerHandle.setFailedMobEquipmentPacket(playerHandle.getFailedMobEquipmentPacket() + 1);
-            if (playerHandle.getFailedMobEquipmentPacket() > MAX_FAILED) {
-                player.close("", "Too many failed packets");
+        if (!item.equals(pk.item, false, true)) {
+            Item fixItem = Item.get(item.getId(), item.getDamage(), item.getCount(), item.getCompoundTag());
+            if (fixItem.equals(pk.item, false, true)) {
+                inv.setItem(pk.hotbarSlot, fixItem);
+            } else {
+                player.getServer().getLogger().debug("Tried to equip "+pk.item+" but have {} in target slot "+fixItem);
+                inv.sendContents(player);
             }
-            inv.sendContents(player);
-            return;
         }
 
         if (inv instanceof PlayerInventory) {
