@@ -32,7 +32,7 @@ public class QueryRegenerateEvent extends ServerEvent {
     private Plugin[] plugins;
     private Player[] players;
     private final String gameType;
-    private final String version;
+    private String version;
     private String map;
     private int numPlayers;
     private int maxPlayers;
@@ -98,6 +98,14 @@ public class QueryRegenerateEvent extends ServerEvent {
 
     public void setPlayerList(Player[] players) {
         this.players = players;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
     }
 
     public int getPlayerCount() {
