@@ -47,7 +47,7 @@ public class BlockStemPumpkin extends BlockCrops {
                     BlockGrowEvent ev = new BlockGrowEvent(this, block);
                     Server.getInstance().getPluginManager().callEvent(ev);
                     if (!ev.isCancelled()) {
-                        this.getLevel().setBlock(this, ev.getNewState(), true);
+                        this.getLevel().setBlock(this, ev.getNewState(), true, true);
                     }
                     return Level.BLOCK_UPDATE_RANDOM;
                 } else {
@@ -63,7 +63,7 @@ public class BlockStemPumpkin extends BlockCrops {
                         BlockGrowEvent ev = new BlockGrowEvent(side, Block.get(PUMPKIN));
                         Server.getInstance().getPluginManager().callEvent(ev);
                         if (!ev.isCancelled()) {
-                            this.getLevel().setBlock(side, ev.getNewState(), true);
+                            this.getLevel().setBlock(side, ev.getNewState(), true, true);
                         }
                     }
                 }
