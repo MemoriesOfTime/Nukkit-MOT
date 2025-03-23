@@ -109,6 +109,8 @@ public class GlobalBlockPalette {
         legacyToRuntimeId388.defaultReturnValue(-1);
         legacyToRuntimeId389.defaultReturnValue(-1);
         legacyToRuntimeId407.defaultReturnValue(-1);
+
+        getPaletteByProtocol(ProtocolInfo.CURRENT_PROTOCOL); // cache current block palette
     }
 
     public static void init() {
