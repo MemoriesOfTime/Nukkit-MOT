@@ -20,7 +20,7 @@ It is developed based on the last open source version of [NukkitPetteriM1Edition
 note: if you need higher version features, please use [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX).
 
 ### What's new in Nukkit-MOT?
-1. Support for 1.2 – 1.21.60 version (you can set the minimum protocol in the config)
+1. Support for 1.2 – 1.21.70 version (you can set the minimum protocol in the config)
 2. Supports most entities with AI
 3. Support for the nether world and The Еnd
 4. Generation of dungeons and caves
@@ -79,10 +79,7 @@ dependencies {
 ## Credits
 [<img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="18"/>]() [Nukkit](https://github.com/CloudburstMC/Nukkit)  
 [<img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="18"/>]() [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
-[<img src="https://www.powernukkitx.com/assets/image/PNX_LOGO_sm.png" width="18"/>]() [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
-
-[<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" width="120"/>](https://jb.gg/OpenSourceSupport)  
-Thanks to [jetbrains](https://jb.gg/OpenSourceSupport) for providing development tools for this project for free!  
+[<img src="https://www.powernukkitx.com/assets/image/PNX_LOGO_sm.png" width="18"/>]() [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)  
 
 ![YourKit](https://www.yourkit.com/images/yklogo.png)  
 YourKit supports open source projects with innovative and intelligent tools

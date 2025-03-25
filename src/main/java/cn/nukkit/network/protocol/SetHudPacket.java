@@ -36,13 +36,21 @@ public class SetHudPacket extends DataPacket {
     public void decode() {
         this.elements.clear();
         this.getArray(this.elements, value -> HudElement.values()[(int) this.getUnsignedVarInt()]);
-        this.visibility = HudVisibility.values()[this.getByte()];
+        if (this.protocol >= ProtocolInfo.v1_21_70) {
+            this.visibility = HudVisibility.values()[this.getInt()];
+        } else {
+            this.visibility = HudVisibility.values()[this.getByte()];
+        }
     }
 
     @Override
     public void encode() {
         this.reset();
         this.putArray(this.elements, (buf, element) -> this.putUnsignedVarInt(element.ordinal()));
-        this.putByte((byte) this.visibility.ordinal());
+        if (this.protocol >= ProtocolInfo.v1_21_70) {
+            this.putInt(this.visibility.ordinal());
+        } else {
+            this.putByte((byte) this.visibility.ordinal());
+        }
     }
 }
