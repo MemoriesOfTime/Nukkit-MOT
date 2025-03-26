@@ -28,6 +28,8 @@ public class ItemCrossbow extends ItemBow {
     private static final float ARROW_POWER = 3.15f;
     private static final float MULTISHOT_ANGLE_DELTA = 10;
 
+    private int launchCount = 0;
+
     private int loadTick = 0; //TODO Improve this
 
     public ItemCrossbow() {
@@ -101,9 +103,11 @@ public class ItemCrossbow extends ItemBow {
                 inventory.removeItem(chargedItem);
             }
 
+            this.launchCount = 0;
+
             boolean multishot = getEnchantmentLevel(Enchantment.ID_CROSSBOW_MULTISHOT) > 0;
             if (multishot) {
-                chargedItem.setCount(3);
+                this.launchCount = 3;
             }
 
             this.loadArrow(player, chargedItem);
@@ -150,15 +154,16 @@ public class ItemCrossbow extends ItemBow {
     public boolean launchArrow(Player player) {
         Vector3 pos = player.getEyePosition();
         Item chargedItem = getChargedItem();
+
         if (!chargedItem.isNull() && Server.getInstance().getTick() - this.loadTick > 10) {
             int penetrationLevel = getEnchantmentLevel(Enchantment.ID_CROSSBOW_PIERCING);
-            int count = Math.min(chargedItem.getCount(), 3);
             Vector3 aimDir = Vector3.directionFromRotation(player.pitch, player.yaw);
             ThreadLocalRandom random = ThreadLocalRandom.current();
+
             if (chargedItem.getId() == ARROW) {
                 CompoundTag itemTag = (CompoundTag) this.getNamedTagEntry("chargedItem");
-                for (int i = 0; i < count; i++) {
-                    float angleOffset = count == 1 ? 0 : i * MULTISHOT_ANGLE_DELTA - MULTISHOT_ANGLE_DELTA;
+                for (int i = 0; i < this.launchCount; i++) {
+                    float angleOffset = this.launchCount == 1 ? 0 : i * MULTISHOT_ANGLE_DELTA - MULTISHOT_ANGLE_DELTA;
                     Vector3 dir = aimDir.yRot(angleOffset * NukkitMath.DEG_TO_RAD)
                             .add(0.0075 * random.nextGaussian(), 0.0075 * random.nextGaussian(), 0.0075 * random.nextGaussian());
                     CompoundTag nbt = Entity.getDefaultNBT(pos, dir.multiply(ARROW_POWER), (float) dir.yRotFromDirection(), (float) dir.xRotFromDirection())
@@ -199,8 +204,8 @@ public class ItemCrossbow extends ItemBow {
                     }
                 }
             } else {
-                for (int i = 0; i < count; i++) {
-                    float angleOffset = count == 1 ? 0 : i * MULTISHOT_ANGLE_DELTA - MULTISHOT_ANGLE_DELTA;
+                for (int i = 0; i < this.launchCount; i++) {
+                    float angleOffset = this.launchCount == 1 ? 0 : i * MULTISHOT_ANGLE_DELTA - MULTISHOT_ANGLE_DELTA;
                     Vector3 dir = aimDir.yRot(angleOffset * NukkitMath.DEG_TO_RAD);
                     ((ItemFirework) chargedItem).spawnFirework(player.level, pos, dir);
                 }
