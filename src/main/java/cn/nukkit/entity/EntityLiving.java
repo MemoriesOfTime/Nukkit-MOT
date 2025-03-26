@@ -223,33 +223,61 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public void knockBack(Entity attacker, double damage, double deltaX, double deltaZ, double base, double resistance, double modifier) {
-        double d = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
-        if(d < 1e-4) {
-            return;
+        if (server.isOldKnockback()) {
+            double f = Math.sqrt(x * x + z * z);
+            if (f <= 0) {
+                return;
+            }
+
+            f = 1 / f;
+
+            Vector3 motion = new Vector3(this.motionX, this.motionY, this.motionZ);
+
+            motion.x /= 2d;
+            motion.y /= 2d;
+            motion.z /= 2d;
+            motion.x += x * f * base;
+            motion.y += base;
+            motion.z += z * f * base;
+
+            if (motion.y > base) {
+                motion.y = base;
+            }
+
+            this.resetFallDistance();
+
+            this.setMotion(motion);
+
+            this.knockBackTime = 10;
+        } else {
+            double d = Math.sqrt(deltaX * deltaX + deltaZ * deltaZ);
+            if (d < 1e-4) {
+                return;
+            }
+
+            double nx = deltaX / d;
+            double nz = deltaZ / d;
+
+            resistance = Math.min(resistance, 1.0);
+
+            double horizontalImpulse = base * (modifier + 1) * (1 - resistance);
+
+            Vector3 motion = new Vector3(this.motionX, this.motionY, this.motionZ);
+            motion.x *= 0.5;
+            motion.z *= 0.5;
+
+            motion.x += nx * horizontalImpulse;
+            motion.z += nz * horizontalImpulse;
+
+            if (isOnGround()) {
+                // no modifier (vanilla behaviour)
+                motion.y = base * 1.25 * (1 - resistance);
+            }
+
+            this.resetFallDistance();
+            this.setMotion(motion);
+            this.knockBackTime = 10;
         }
-
-        double nx = deltaX / d;
-        double nz = deltaZ / d;
-
-        resistance = Math.min(resistance, 1.0);
-
-        double horizontalImpulse = base * (modifier + 1) * (1 - resistance);
-
-        Vector3 motion = new Vector3(this.motionX, this.motionY, this.motionZ);
-        motion.x *= 0.5;
-        motion.z *= 0.5;
-
-        motion.x += nx * horizontalImpulse;
-        motion.z += nz * horizontalImpulse;
-
-        if (isOnGround()) {
-            // no modifier (vanilla behaviour)
-            motion.y = base * 1.25 * (1 - resistance);
-        }
-
-        this.resetFallDistance();
-        this.setMotion(motion);
-        this.knockBackTime = 10;
     }
 
     @Override

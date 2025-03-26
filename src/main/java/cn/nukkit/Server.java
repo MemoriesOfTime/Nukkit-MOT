@@ -92,6 +92,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.raknet.RakConstants;
 import org.iq80.leveldb.CompressionType;
@@ -137,7 +139,9 @@ public class Server {
     private final AtomicBoolean isRunning = new AtomicBoolean(true);
     private boolean hasStopped;
 
+    @Getter
     private final PluginManager pluginManager;
+    @Getter
     private final ServerScheduler scheduler;
 
     private int tickCounter;
@@ -150,36 +154,57 @@ public class Server {
     private final NukkitConsole console;
     private final ConsoleThread consoleThread;
 
+    @Getter
     private final SimpleCommandMap commandMap;
+    @Getter
     private final CraftingManager craftingManager;
+    @Getter
     private final ResourcePackManager resourcePackManager;
+    @Getter
     private final ConsoleCommandSender consoleSender;
+    @Getter
     private final IScoreboardManager scoreboardManager;
-
+    @Getter
     private final TickingAreaManager tickingAreaManager;
 
+    @Getter
+    @Setter
     private int maxPlayers;
     private boolean autoSave = true;
     /**
      * Automatic compression of the world
      */
     private boolean autoCompaction = true;
+    @Getter
     private int autoCompactionTicks = 60 * 30 * 20;
 
     private RCON rcon;
 
+    @Getter
     private final EntityMetadataStore entityMetadata;
+    @Getter
     private final PlayerMetadataStore playerMetadata;
+    @Getter
     private final LevelMetadataStore levelMetadata;
+    @Getter
     private final Network network;
 
+    @Getter
     private boolean autoTickRate;
+    @Getter
     private int autoTickRateLimit;
+    @Getter
     private boolean alwaysTickPlayers;
+    @Getter
+    @Setter
+    private boolean oldKnockback;
+    @Getter
     private int baseTickRate;
+    @Getter
     private int difficulty;
     private int defaultGameMode = Integer.MAX_VALUE;
-    int c_s_spawnThreshold;
+
+    protected int c_s_spawnThreshold;
 
     private int autoSaveTicker;
     private int autoSaveTicks;
@@ -187,19 +212,29 @@ public class Server {
     private final BaseLang baseLang;
     private boolean forceLanguage;
 
+    @Getter
     private final String filePath;
+    @Getter
     private final String dataPath;
+    @Getter
     private final String pluginPath;
 
+    @Getter
     private String ip;
+    @Getter
     private int port;
     private QueryHandler queryHandler;
     private QueryRegenerateEvent queryRegenerateEvent;
     private final UUID serverID;
+
+    /**
+     * Get server.properties
+     */
+    @Getter
     private final Config properties;
 
     private final Map<InetSocketAddress, Player> players = new HashMap<>();
-    final Map<UUID, Player> playerList = new HashMap<>();
+    protected final Map<UUID, Player> playerList = new HashMap<>();
 
     /**
      * Worlds where automatic mob spawning is disabled.
@@ -213,6 +248,9 @@ public class Server {
      * Worlds that have their own nether worlds.
      */
     public static final List<String> multiNetherWorlds = new ArrayList<>();
+    /**
+     * Worlds where anti xray is enabled
+     */
     public static final List<String> antiXrayWorlds = new ArrayList<>();
     /**
      * Worlds where random block ticking is disabled.
@@ -245,22 +283,33 @@ public class Server {
     };
 
     private Level[] levelArray = new Level[0];
-    private final ServiceManager serviceManager = new NKServiceManager();
     private Level defaultLevel;
-    private final Thread currentThread;
     private Watchdog watchdog;
+
+    private final ServiceManager serviceManager = new NKServiceManager();
+    private final Thread currentThread;
     private final DB nameLookup;
-    private PlayerDataSerializer playerDataSerializer;
-    private SpawnerTask spawnerTask;
     private final BatchingHelper batchingHelper;
 
     /**
+     * Player data serializer is used to save player data
+     */
+    @Getter
+    private PlayerDataSerializer playerDataSerializer;
+    /**
+     * Mob spawn task
+     */
+    @Getter
+    private SpawnerTask spawnerTask;
+    /**
      * The server's MOTD. Remember to call network.setName() when updated.
      */
+    @Getter
     public String motd;
     /**
      * Disconnection message shown to players who are not allowed to join due to whitelist.
      */
+    @Getter
     public String whitelistReason;
     /**
      * Mob AI enabled.
@@ -277,6 +326,7 @@ public class Server {
     /**
      * Hardcore mode enabled.
      */
+    @Getter
     public boolean isHardcore;
     /**
      * Force resource packs.
@@ -377,10 +427,12 @@ public class Server {
     /**
      * Maximum view distance.
      */
+    @Getter
     public int viewDistance;
     /**
      * Server's default gamemode.
      */
+    @Getter
     public int gamemode;
     /**
      * Minimum amount of time between player skin changes.
@@ -389,6 +441,7 @@ public class Server {
     /**
      * Spawn protection radius.
      */
+    @Getter
     public int spawnRadius;
     /**
      * Minimum allowed protocol version.
@@ -1014,14 +1067,6 @@ public class Server {
         return this.commandMap.dispatch(sender, commandLine);
     }
 
-    public ConsoleCommandSender getConsoleSender() {
-        return consoleSender;
-    }
-
-    public IScoreboardManager getScoreboardManager() {
-        return scoreboardManager;
-    }
-
     public void reload() {
         log.info("Reloading...");
 
@@ -1552,38 +1597,6 @@ public class Server {
         return Nukkit.API_VERSION;
     }
 
-    public String getFilePath() {
-        return filePath;
-    }
-
-    public String getDataPath() {
-        return dataPath;
-    }
-
-    public String getPluginPath() {
-        return pluginPath;
-    }
-
-    public int getMaxPlayers() {
-        return maxPlayers;
-    }
-
-    public void setMaxPlayers(int maxPlayers) {
-        this.maxPlayers = maxPlayers;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public int getViewDistance() {
-        return viewDistance;
-    }
-
-    public String getIp() {
-        return ip;
-    }
-
     public UUID getServerUniqueId() {
         return this.serverID;
     }
@@ -1608,16 +1621,8 @@ public class Server {
         this.autoCompactionTicks = ticks;
     }
 
-    public int getAutoCompactionTicks() {
-        return this.autoCompactionTicks;
-    }
-
     public String getLevelType() {
         return this.getPropertyString("level-type", "default");
-    }
-
-    public int getGamemode() {
-        return gamemode;
     }
 
     public boolean getForceGamemode() {
@@ -1629,18 +1634,14 @@ public class Server {
     }
 
     public static String getGamemodeString(int mode, boolean direct) {
-        switch (mode) {
-            case Player.SURVIVAL:
-                return direct ? "Survival" : "%gameMode.survival";
-            case Player.CREATIVE:
-                return direct ? "Creative" : "%gameMode.creative";
-            case Player.ADVENTURE:
-                return direct ? "Adventure" : "%gameMode.adventure";
-            case Player.SPECTATOR:
-                return direct ? "Spectator" : "%gameMode.spectator";
-        }
-        return "UNKNOWN";
-    }
+		return switch (mode) {
+			case Player.SURVIVAL -> direct ? "Survival" : "%gameMode.survival";
+			case Player.CREATIVE -> direct ? "Creative" : "%gameMode.creative";
+			case Player.ADVENTURE -> direct ? "Adventure" : "%gameMode.adventure";
+			case Player.SPECTATOR -> direct ? "Spectator" : "%gameMode.spectator";
+			default -> "UNKNOWN";
+		};
+	}
 
     public static int getGamemodeFromString(String str) {
         return switch (str.trim().toLowerCase(Locale.ROOT)) {
@@ -1662,10 +1663,6 @@ public class Server {
         };
     }
 
-    public int getDifficulty() {
-        return this.difficulty;
-    }
-
     public void setDifficulty(int difficulty) {
         int value = difficulty;
         if (value < 0) value = 0;
@@ -1678,16 +1675,8 @@ public class Server {
         return this.whitelistEnabled;
     }
 
-    public int getSpawnRadius() {
-        return spawnRadius;
-    }
-
     public boolean getAllowFlight() {
         return flyChecks;
-    }
-
-    public boolean isHardcore() {
-        return this.isHardcore;
     }
 
     public int getDefaultGamemode() {
@@ -1695,10 +1684,6 @@ public class Server {
             this.defaultGameMode = this.getGamemode();
         }
         return this.defaultGameMode;
-    }
-
-    public String getMotd() {
-        return motd;
     }
 
     public String getSubMotd() {
@@ -1717,34 +1702,6 @@ public class Server {
 
     public MainLogger getLogger() {
         return MainLogger.getLogger();
-    }
-
-    public EntityMetadataStore getEntityMetadata() {
-        return entityMetadata;
-    }
-
-    public PlayerMetadataStore getPlayerMetadata() {
-        return playerMetadata;
-    }
-
-    public LevelMetadataStore getLevelMetadata() {
-        return levelMetadata;
-    }
-
-    public PluginManager getPluginManager() {
-        return this.pluginManager;
-    }
-
-    public CraftingManager getCraftingManager() {
-        return craftingManager;
-    }
-
-    public ResourcePackManager getResourcePackManager() {
-        return resourcePackManager;
-    }
-
-    public ServerScheduler getScheduler() {
-        return scheduler;
     }
 
     /**
@@ -1789,10 +1746,6 @@ public class Server {
             sum += aUseAverage;
         }
         return ((float) Math.round(sum / this.useAverage.length * 100)) / 100;
-    }
-
-    public SimpleCommandMap getCommandMap() {
-        return commandMap;
     }
 
     public Map<UUID, Player> getOnlinePlayers() {
@@ -2434,24 +2387,6 @@ public class Server {
     }
 
     /**
-     * Get Network
-     *
-     * @return Network
-     */
-    public Network getNetwork() {
-        return network;
-    }
-
-    /**
-     * Get server.properties
-     *
-     * @return server.properties as a Config
-     */
-    public Config getProperties() {
-        return this.properties;
-    }
-
-    /**
      * Get a value from server.properties
      *
      * @param variable key
@@ -2558,15 +2493,11 @@ public class Server {
         if (value instanceof Boolean) {
             return (Boolean) value;
         }
-        switch (String.valueOf(value)) {
-            case "on":
-            case "true":
-            case "1":
-            case "yes":
-                return true;
-        }
-        return false;
-    }
+		return switch (String.valueOf(value)) {
+			case "on", "true", "1", "yes" -> true;
+			default -> false;
+		};
+	}
 
     /**
      * Set a boolean value in server.properties
@@ -2776,7 +2707,7 @@ public class Server {
 
     /**
      * Checks the current thread against the expected primary thread for the server.
-     *
+     * <p>
      * <b>Note:</b> this method should not be used to indicate the current synchronized state of the runtime. A current thread matching the main thread indicates that it is synchronized, but a mismatch does not preclude the same assumption.
      *
      * @return true if the current thread matches the expected primary thread, false otherwise
@@ -2988,25 +2919,12 @@ public class Server {
     }
 
     /**
-     * Get player data serializer that is used to save player data
-     *
-     * @return player data serializer
-     */
-    public PlayerDataSerializer getPlayerDataSerializer() {
-        return playerDataSerializer;
-    }
-
-    /**
      * Set player data serializer that is used to save player data
      *
      * @param playerDataSerializer player data serializer
      */
     public void setPlayerDataSerializer(PlayerDataSerializer playerDataSerializer) {
         this.playerDataSerializer = Preconditions.checkNotNull(playerDataSerializer, "playerDataSerializer");
-    }
-
-    public TickingAreaManager getTickingAreaManager() {
-        return tickingAreaManager;
     }
 
     /**
@@ -3016,15 +2934,6 @@ public class Server {
      */
     public static Server getInstance() {
         return instance;
-    }
-
-    /**
-     * Get the mob spawner task
-     *
-     * @return spawner task
-     */
-    public SpawnerTask getSpawnerTask() {
-        return this.spawnerTask;
     }
 
     /**
@@ -3060,6 +2969,7 @@ public class Server {
         this.achievementsEnabled = this.getPropertyBoolean("achievements", true);
         this.banXBAuthFailed = this.getPropertyBoolean("temp-ip-ban-failed-xbox-auth", false);
         this.pvpEnabled = this.getPropertyBoolean("pvp", true);
+        this.oldKnockback = this.getPropertyBoolean("old-knockback", false);
         this.announceAchievements = this.getPropertyBoolean("announce-player-achievements", false);
         this.spawnEggsEnabled = this.getPropertyBoolean("spawn-eggs", true);
         this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
@@ -3150,11 +3060,11 @@ public class Server {
      * Internal: Warn user about non multiversion compatible plugins.
      */
     public static void mvw(String action) {
-        if (getInstance().minimumProtocol != ProtocolInfo.CURRENT_PROTOCOL) {
+        if (instance.minimumProtocol != ProtocolInfo.CURRENT_PROTOCOL) {
             if (Nukkit.DEBUG > 1) {
-                getInstance().getLogger().logException(new PluginException("Default " + action + " used by a plugin. This can cause instability with the multiversion."));
+                instance.getLogger().logException(new PluginException("Default " + action + " used by a plugin. This can cause instability with the multiversion."));
             } else {
-                getInstance().getLogger().warning("Default " + action + " used by a plugin. This can cause instability with the multiversion.");
+                instance.getLogger().warning("Default " + action + " used by a plugin. This can cause instability with the multiversion.");
             }
         }
     }
@@ -3181,6 +3091,7 @@ public class Server {
             put("difficulty", 2);
             put("hardcore", false);
             put("pvp", true);
+            put("old-knockback", false);
 
             put("white-list", false);
             put("whitelist-reason", "§cServer is white-listed");

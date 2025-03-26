@@ -166,12 +166,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int SMITHING_WINDOW_ID = 6;
     /**
      * @since 649 1.20.60
-     * 自1.20.60开始，需要发送ContainerOpenPacket给玩家才能正常打开讲台上的书
-     * 在原版中id按顺序增加，但测试中采用固定id也可正常实现功能
+     * Starting from 1.20.60, you need to send ContainerOpenPacket to the player to open the book on the podium normally
+     * In the original version, the id increases in sequence, but in the test, the fixed id can also realize the function normally
      */
     public static final int LECTERN_WINDOW_ID = 7;
 
-    // 后续创建的窗口应该从此数值开始
+    /**
+     * Subsequent windows created should start with this value
+     */
     public static final int MINIMUM_OTHER_WINDOW_ID = Utils.dynamic(8);
 
     public static final int RESOURCE_PACK_CHUNK_SIZE = 8 * 1024; // 8KB
@@ -217,7 +219,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected long randomClientId;
 
     protected Vector3 forceMovement = null;
-
     protected Vector3 teleportPosition = null;
 
     protected int lastTeleportTick = -1;
