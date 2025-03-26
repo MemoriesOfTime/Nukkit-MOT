@@ -135,7 +135,7 @@ public class ItemCrossbow extends ItemBow {
         if (arrow == null) {
             return;
         }
-        this.setChargedItem(arrow, launchCount);
+        this.createNamedTag(arrow, launchCount);
         this.loadTick = Server.getInstance().getTick();
         player.getInventory().setItemInHand(this);
     }
@@ -230,10 +230,10 @@ public class ItemCrossbow extends ItemBow {
         return NBTIO.getItemHelper((CompoundTag) chargedItem);
     }
 
-    public void setChargedItem(Item item, int launchCount) {
+    public void createNamedTag(Item item, int launchCount) {
         this.setNamedTag(this.getOrCreateNamedTag()
                 .putBoolean("Charged", true)
-                        .putInt("launchCount", launchCount)
+                .putInt("launchCount", launchCount)
                 .putCompound("chargedItem", NBTIO.putItemHelper(item))
         );
     }
