@@ -1780,7 +1780,7 @@ public class Level implements ChunkManager, Metadatable {
 
         if (entities || solidEntities) {
             for (Entity ent : this.getCollidingEntities(bb.grow(0.25f, 0.25f, 0.25f), entity)) {
-                if (solidEntities && !ent.canPassThrough()) {
+                if (solidEntities || !ent.canPassThrough()) {
                     collides.add(ent.boundingBox.clone());
                 }
             }
@@ -1932,6 +1932,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public Block getBlock(int x, int y, int z, int layer, boolean load) {
         return this.getBlock(null, x, y, z, layer, load);
+    }
+
+    public Block getBlock(FullChunk chunk, int x, int y, int z, boolean load) {
+        return this.getBlock(chunk, x, y, z, BlockLayer.NORMAL.ordinal(), load);
     }
 
     public Block getBlock(FullChunk chunk, int x, int y, int z, int layer, boolean load) {
@@ -2520,12 +2524,6 @@ public class Level implements ChunkManager, Metadatable {
             drops = new Item[]{target.toItem()};
         } else {
             drops = target.getDrops(null, item);
-        }
-
-        Vector3 above = new Vector3(target.x, target.y + 1, target.z);
-        int bid = this.getBlockIdAt((int) above.x, (int) above.y, (int) above.z);
-        if (bid == Item.FIRE || bid == Item.SOUL_FIRE) {
-            this.setBlock(above, Block.get(BlockID.AIR), true);
         }
 
         if (createParticles) {

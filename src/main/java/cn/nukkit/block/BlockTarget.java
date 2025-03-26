@@ -4,6 +4,7 @@ import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityTarget;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.projectile.EntityArrow;
+import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntitySmallFireBall;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
 import cn.nukkit.item.Item;
@@ -15,6 +16,7 @@ import cn.nukkit.level.Position;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Axis;
 import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
@@ -93,8 +95,13 @@ public class BlockTarget extends BlockSolid implements BlockEntityHolder<BlockEn
 
     @Override
     public int getWeakPower(BlockFace face) {
-        BlockEntityTarget target = getBlockEntity();
-        return target == null? 0 : target.getActivePower();
+        for (Entity e : level.getCollidingEntities(new SimpleAxisAlignedBB(x - 0.000001, y - 0.000001, z - 0.000001, x + 1.000001, y + 1.000001, z + 1.000001))) {
+            if (e instanceof EntityProjectile && ((level.getServer().getTick() - ((EntityProjectile) e).getCollidedTick()) < ((e instanceof EntityArrow || e instanceof EntityThrownTrident) ? 10 : 4))) {
+                return 10;
+            }
+        }
+
+        return 0;
     }
 
     
@@ -151,9 +158,9 @@ public class BlockTarget extends BlockSolid implements BlockEntityHolder<BlockEn
 
     @Override
     public void onEntityCollide(@NotNull Entity entity) {
-        int ticks = 8;
+        int ticks = 4;
         if (entity instanceof EntityArrow || entity instanceof EntityThrownTrident || entity instanceof EntitySmallFireBall) {
-            ticks = 20;
+            ticks = 10;
         }
         Position position = entity.getPosition();
         Vector3 motion = position.add(new Vector3(entity.lastMotionX, entity.lastMotionY, entity.lastMotionZ));
