@@ -89,15 +89,10 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable, Bloc
     @Override
     public int getComparatorInputOverride() {
         int power = 0;
-        int page = 0;
-        int maxPage = 0;
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
-        if (!(blockEntity instanceof BlockEntityLectern lectern)) {
-            return power;
-        }
-        if (lectern.hasBook()) {
-            maxPage = lectern.getTotalPages();
-            page = lectern.getLeftPage() + 1;
+        if (blockEntity instanceof BlockEntityLectern lectern && lectern.hasBook()) {
+            int maxPage = lectern.getTotalPages();
+            int page = lectern.getLeftPage() + 1;
             power = (int) (((float) page / maxPage) * 16);
         }
         return power;

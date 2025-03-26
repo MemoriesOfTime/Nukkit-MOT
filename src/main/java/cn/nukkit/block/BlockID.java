@@ -681,7 +681,7 @@ public interface BlockID {
     int MUD = 728;
     int MANGROVE_PROPAGULE = 729;
     int MUD_BRICKS = 730;
-
+    int MANGROVE_PROPAGULE_HANGING = 731;
     int PACKED_MUD = 732;
     int MUD_BRICK_SLAB = 733;
     int MUD_BRICK_DOUBLE_SLAB = 734;
@@ -716,9 +716,24 @@ public interface BlockID {
     int MANGROVE_HANGING_SIGN = 763;
     int BAMBOO_MOSAIC = 764;
     int BAMBOO_PLANKS = 765;
-
+    int BAMBOO_BUTTON = 766;
+    int BAMBOO_STAIRS = 767;
+    int BAMBOO_SLAB = 768;
+    int BAMBOO_PRESSURE_PLATE = 769;
+    int BAMBOO_FENCE = 770;
+    int BAMBOO_FENCE_GATE = 771;
+    int BAMBOO_DOOR = 772;
+    int BAMBOO_STANDING_SIGN = 773;
+    int BAMBOO_WALL_SIGN = 774;
     int BAMBOO_TRAPDOOR = 775;
-
+    int BAMBOO_DOUBLE_SLAB = 776;
+    int BAMBOO_HANGING_SIGN = 777;
+    int BAMBOO_MOSAIC_STAIRS = 778;
+    int BAMBOO_MOSAIC_SLAB = 779;
+    int BAMBOO_MOSAIC_DOUBLE_SLAB = 780;
+    int CHISELED_BOOKSHELF = 781;
+    int BAMBOO_BLOCK = 782;
+    int STRIPPED_BAMBOO_BLOCK = 783;
     int SUSPICIOUS_SAND = 784;
     int CHERRY_BUTTON = 785;
     int CHERRY_DOOR = 786;

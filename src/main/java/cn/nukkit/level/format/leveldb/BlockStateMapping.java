@@ -107,6 +107,8 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_21_10.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_20.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_30.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_40.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_60.INSTANCE);
 
         blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
 
@@ -127,6 +129,10 @@ public class BlockStateMapping {
     public BlockStateMapping(int version, LegacyStateMapper legacyStateMapper) {
         this.version = version;
         this.legacyMapper = legacyStateMapper;
+    }
+
+    public boolean containsState(NbtMap state) {
+        return paletteMap.containsKey(state);
     }
 
     public void registerState(int runtimeId, NbtMap state) {

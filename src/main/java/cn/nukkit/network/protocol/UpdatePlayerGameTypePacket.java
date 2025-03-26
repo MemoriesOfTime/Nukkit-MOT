@@ -16,7 +16,7 @@ public class UpdatePlayerGameTypePacket extends DataPacket {
     /**
      * @since v671
      */
-    public int tick;
+    public long tick;
 
     @Override
     public byte pid() {
@@ -28,7 +28,7 @@ public class UpdatePlayerGameTypePacket extends DataPacket {
         this.gameType = GameType.from(this.getVarInt());
         this.entityId = this.getVarLong();
         if (this.protocol >= ProtocolInfo.v1_20_80) {
-            this.tick = (int) this.getUnsignedVarInt();
+            this.tick = (int) this.getUnsignedVarLong();
         }
     }
 
@@ -38,7 +38,7 @@ public class UpdatePlayerGameTypePacket extends DataPacket {
         this.putVarInt(this.gameType.ordinal());
         this.putVarLong(entityId);
         if (this.protocol >= ProtocolInfo.v1_20_80) {
-            this.putUnsignedVarInt(this.tick);
+            this.putUnsignedVarLong(this.tick);
         }
     }
 }

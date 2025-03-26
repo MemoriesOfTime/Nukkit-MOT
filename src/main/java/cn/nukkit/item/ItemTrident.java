@@ -16,6 +16,7 @@ import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * Created by PetteriM1
@@ -157,5 +158,10 @@ public class ItemTrident extends ItemTool {
         }
 
         return true;
+    }
+
+    @Override
+    public boolean isSupportedOn(int protocolId) {
+        return protocolId >= ProtocolInfo.v1_4_0;
     }
 }

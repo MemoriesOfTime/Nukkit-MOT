@@ -3,6 +3,7 @@ package cn.nukkit.entity.passive;
 import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntityBeehive;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityArthropod;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.mob.EntityFlyingMob;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
@@ -16,7 +17,7 @@ import cn.nukkit.utils.Utils;
 
 import java.util.HashMap;
 
-public class EntityBee extends EntityFlyingMob { // A mob because it needs to have an attack behavior
+public class EntityBee extends EntityFlyingMob implements EntityArthropod { // A mob because it needs to have an attack behavior
 
     public static final int NETWORK_ID = 122;
 

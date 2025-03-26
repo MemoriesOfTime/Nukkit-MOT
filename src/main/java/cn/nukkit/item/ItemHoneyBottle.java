@@ -3,6 +3,7 @@ package cn.nukkit.item;
 import cn.nukkit.Player;
 import cn.nukkit.event.entity.EntityPotionEffectEvent;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.potion.Effect;
 
 public class ItemHoneyBottle extends ItemEdible {
@@ -39,10 +40,14 @@ public class ItemHoneyBottle extends ItemEdible {
         }
 
         if (!player.isCreative()) {
-            this.count--;
             player.getInventory().setItemInHand(this);
             player.getInventory().addItem(Item.get(ItemID.BOTTLE, 0, 1));
         }
         return true;
+    }
+
+    @Override
+    public boolean isSupportedOn(int protocolId) {
+        return protocolId >= ProtocolInfo.v1_14_0;
     }
 }

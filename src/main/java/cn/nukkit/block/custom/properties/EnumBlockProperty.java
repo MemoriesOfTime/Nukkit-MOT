@@ -11,6 +11,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public class EnumBlockProperty<E extends Serializable> extends BlockProperty<E> {
     @Serial
@@ -203,5 +204,11 @@ public class EnumBlockProperty<E extends Serializable> extends BlockProperty<E> 
         Preconditions.checkNotNull(universe, "universe can't be null");
         Preconditions.checkArgument(universe.length > 0, "The universe can't be empty");
         return universe;
+    }
+
+    @Override
+    public void forEach(Consumer<Serializable> func) {
+        for(String name : getPersistenceNames())
+            func.accept(name);
     }
 }
