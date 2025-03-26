@@ -1653,12 +1653,30 @@ public abstract class Entity extends Location implements Metadatable {
         return lastDamageCause;
     }
 
+    /**
+     * 获取包含生命提升效果加成的最大生命值。
+     * Get maximum health including health from health boost effect.
+     *
+     * @return 当前的最大生命值。
+     *         current max health
+     */
     public int getMaxHealth() {
         return maxHealth + (this.hasEffect(Effect.HEALTH_BOOST) ? (this.getEffect(Effect.HEALTH_BOOST).getAmplifier() + 1) << 2 : 0);
     }
 
     public void setMaxHealth(int maxHealth) {
         this.maxHealth = maxHealth;
+    }
+
+    /**
+     * 获取不包含效果加成的正常最大生命值。
+     * Get normal maximum health excluding health from effects.
+     *
+     * @return 实际的最大生命值。
+     *         real max health
+     */
+    public int getRealMaxHealth() {
+        return maxHealth;
     }
 
     public boolean canCollideWith(Entity entity) {
@@ -1772,10 +1790,20 @@ public abstract class Entity extends Location implements Metadatable {
         return false;
     }
 
+    @Deprecated
     public boolean entityBaseTick() {
         return this.entityBaseTick(1);
     }
 
+    /**
+     * 实体基础 tick 方法，若实体存活，会在 `onUpdate` 方法中被调用。其返回结果会应用到 `onUpdate` 方法中，之后会自动调用 `updateMovement` 方法。
+     * Entity base tick, called from onUpdate if the entity is alive. Result is applied to onUpdate. updateMovement is called afterward automatically.
+     *
+     * @param tickDiff 间隔 tick
+     *                  Interval tick
+     * @return 是否继续 tick
+     *          Whether to continue tick
+     */
     public boolean entityBaseTick(int tickDiff) {
         if (!this.isPlayer) {
             //this.blocksAround = null; // Use only when entity moves for better performance
