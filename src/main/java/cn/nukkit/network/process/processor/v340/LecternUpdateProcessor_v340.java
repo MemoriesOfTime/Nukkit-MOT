@@ -23,6 +23,9 @@ public class LecternUpdateProcessor_v340 extends DataPacketProcessor<LecternUpda
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull LecternUpdatePacket pk) {
         BlockVector3 blockPosition = pk.blockPosition;
+        if (blockPosition.distanceSquared(this) > 4096) {
+            return;
+        }
         playerHandle.player.temporalVector.setComponents(blockPosition.x, blockPosition.y, blockPosition.z);
         if (pk.dropBook) {
             Block blockLectern = playerHandle.player.getLevel().getBlock(playerHandle.player.temporalVector);

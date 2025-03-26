@@ -4,6 +4,7 @@ import com.google.common.collect.Iterators;
 
 import java.util.Iterator;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Predicate;
 
 public enum BlockFace {
@@ -359,6 +360,10 @@ public enum BlockFace {
 
         public BlockFace random(NukkitRandom rand) {
             return faces[rand.nextBoundedInt(faces.length)];
+        }
+
+        public BlockFace random() {
+            return faces[ThreadLocalRandom.current().nextInt(faces.length)];
         }
 
         @Override
