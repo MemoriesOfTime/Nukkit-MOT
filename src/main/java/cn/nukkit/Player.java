@@ -6307,7 +6307,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (formOpen) return -1;
         ModalFormRequestPacket packet = new ModalFormRequestPacket();
         packet.formId = id;
-        packet.data = window.getJSONData();
+        packet.data = window.getJSONData(this.protocol);
         this.formWindows.put(packet.formId, window);
         this.dataPacket(packet);
         this.formOpen = true;
