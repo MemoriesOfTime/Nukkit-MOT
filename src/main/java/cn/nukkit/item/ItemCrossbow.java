@@ -101,7 +101,7 @@ public class ItemCrossbow extends ItemBow {
                 inventory.removeItem(chargedItem);
             }
 
-            launchCount = 1;
+            int launchCount = 1;
 
             boolean multishot = getEnchantmentLevel(Enchantment.ID_CROSSBOW_MULTISHOT) > 0;
             if (multishot) {
