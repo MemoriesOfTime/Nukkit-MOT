@@ -57,13 +57,18 @@ public class BlockStemMelon extends BlockCrops {
                             return Level.BLOCK_UPDATE_RANDOM;
                         }
                     }
-                    Block side = this.getSide(Plane.HORIZONTAL.random(Utils.nukkitRandom));
+
+                    BlockFace sideFace = Plane.HORIZONTAL.random(Utils.nukkitRandom);
+                    Block side = this.getSide(sideFace);
                     Block d = side.down();
-                    if (side.getId() == AIR && (d.getId() == FARMLAND || d.getId() == GRASS || d.getId() == DIRT)) {
+                    if (side.getId() == AIR && (d.getId() == FARMLAND && d.getId() == GRASS && d.getId() == DIRT)) {
                         BlockGrowEvent ev = new BlockGrowEvent(side, Block.get(MELON_BLOCK));
                         Server.getInstance().getPluginManager().callEvent(ev);
                         if (!ev.isCancelled()) {
                             this.getLevel().setBlock(side, ev.getNewState(), true, true);
+
+                            this.setDamage(0x08 + sideFace.getIndex()); // Attached Melon Stem
+                            this.getLevel().setBlock(this, this, true, true);
                         }
                     }
                 }
