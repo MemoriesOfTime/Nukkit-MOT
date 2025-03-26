@@ -28,7 +28,7 @@ public class ItemCrossbow extends ItemBow {
     private static final float ARROW_POWER = 3.15f;
     private static final float MULTISHOT_ANGLE_DELTA = 10;
 
-    private int launchCount = 0;
+    private int launchCount;
 
     private int loadTick = 0; //TODO Improve this
 
@@ -103,7 +103,7 @@ public class ItemCrossbow extends ItemBow {
                 inventory.removeItem(chargedItem);
             }
 
-            this.launchCount = 0;
+            this.launchCount = 1;
 
             boolean multishot = getEnchantmentLevel(Enchantment.ID_CROSSBOW_MULTISHOT) > 0;
             if (multishot) {
