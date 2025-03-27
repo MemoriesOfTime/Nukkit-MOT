@@ -39,11 +39,6 @@ public class LecternUpdateProcessor_v340 extends DataPacketProcessor<LecternUpda
                 playerHandle.player.getServer().getPluginManager().callEvent(lecternPageChangeEvent);
                 if (!lecternPageChangeEvent.isCancelled()) {
                     lectern.setRawPage(lecternPageChangeEvent.getNewRawPage());
-                    lectern.spawnToAll();
-                    Block blockLectern = lectern.getBlock();
-                    if (blockLectern instanceof BlockLectern) {
-                        ((BlockLectern) blockLectern).executeRedstonePulse();
-                    }
                 }
             }
         }
