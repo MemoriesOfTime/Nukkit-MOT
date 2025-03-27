@@ -24,9 +24,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.*;
-import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.*;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.nbt.*;
 
@@ -205,10 +203,20 @@ public class CustomBlockManager {
 
         BlockPalette storagePalette = GlobalBlockPalette.getPaletteByProtocol(LevelDBConstants.PALETTE_VERSION);
         boolean result = false;
-        for (BlockPalette palette : GlobalBlockPalette.NEW_PALETTES) {
+        ObjectSet<BlockPalette> set = new ObjectArraySet<>();
+        for (int protocol : ProtocolInfo.SUPPORTED_PROTOCOLS) {
+            if (protocol < ProtocolInfo.v1_16_100 || protocol < this.server.minimumProtocol) {
+                continue;
+            }
+
+            BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(protocol);
+            if (set.contains(palette)) {
+                continue;
+            }
+            set.add(palette);
+
             if (palette.getProtocol() == storagePalette.getProtocol()) {
                 this.recreateBlockPalette(palette, new ObjectArrayList<>(NukkitLegacyMapper.loadBlockPalette()));
-                result = true;
             } else {
                 Path path = this.getVanillaPalettePath(palette.getProtocol());
                 if (!Files.exists(path)) {
@@ -216,12 +224,12 @@ public class CustomBlockManager {
                     continue;
                 }
                 this.recreateBlockPalette(palette);
-                result = true;
             }
+            result = true;
         }
 
         log.info("Custom block registry closed in {}ms", (System.currentTimeMillis() - startTime));
-        return true;
+        return result;
     }
 
     private void recreateBlockPalette(BlockPalette palette) throws IOException {

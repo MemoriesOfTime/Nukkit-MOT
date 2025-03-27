@@ -530,6 +530,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     private static final CreativeItems creative748 = new CreativeItems();
     private static final CreativeItems creative766 = new CreativeItems();
     private static final CreativeItems creative776 = new CreativeItems();
+    private static final CreativeItems creative786 = new CreativeItems();
 
     public static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
@@ -576,6 +577,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCreativeItemsNew(ProtocolInfo.v1_21_40, ProtocolInfo.v1_21_40, creative748);
         registerCreativeItemsNew(ProtocolInfo.v1_21_50, ProtocolInfo.v1_21_50, creative766);
         registerCreativeItemsNew(ProtocolInfo.v1_21_60, ProtocolInfo.v1_21_60, creative776);
+        registerCreativeItemsNew(ProtocolInfo.v1_21_70, ProtocolInfo.v1_21_70, creative786);
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -690,6 +692,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Item.creative748.clear();
         Item.creative766.clear();
         Item.creative776.clear();
+        Item.creative786.clear();
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -827,6 +830,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 return Item.creative766;
             case v1_21_60:
                 return Item.creative776;
+            case v1_21_70:
+                return Item.creative786;
             // TODO Multiversion
             default:
                 throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
@@ -835,7 +840,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static void addCreativeItem(Item item) {
         Server.mvw("Item#addCreativeItem(Item)");
-        addCreativeItem(v1_21_60, item);
+        addCreativeItem(v1_21_70, item);
     }
 
     public static void addCreativeItem(int protocol, Item item) {
@@ -882,6 +887,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             case v1_21_40 -> Item.creative748.add(item.clone(), category, group);
             case v1_21_50 -> Item.creative766.add(item.clone(), category, group);
             case v1_21_60 -> Item.creative776.add(item.clone(), category, group);
+            case v1_21_70 -> Item.creative786.add(item.clone(), category, group);
             // TODO Multiversion
             default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
@@ -1057,6 +1063,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCustomItem(customItem, v1_21_40, addCreativeItem, v1_21_40);
         registerCustomItem(customItem, v1_21_50, addCreativeItem, v1_21_50);
         registerCustomItem(customItem, v1_21_60, addCreativeItem, v1_21_60);
+        registerCustomItem(customItem, v1_21_70, addCreativeItem, v1_21_70);
         //TODO Multiversion 添加新版本支持时修改这里
 
         return new OK<Void>(true);
@@ -1102,6 +1109,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             deleteCustomItem(customItem, v1_21_40, v1_21_40);
             deleteCustomItem(customItem, v1_21_50, v1_21_50);
             deleteCustomItem(customItem, v1_21_60, v1_21_60);
+            deleteCustomItem(customItem, v1_21_70, v1_21_70);
             //TODO Multiversion 添加新版本支持时修改这里
         }
     }

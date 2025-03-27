@@ -99,14 +99,7 @@ public class BlockComposter extends BlockSolidMeta implements ItemID {
         }
 
         if (this.isFull()) {
-            ComposterEmptyEvent event = new ComposterEmptyEvent(this, player, item, new ItemDye(DyeColor.WHITE), 0);
-            this.level.getServer().getPluginManager().callEvent(event);
-            if (!event.isCancelled()) {
-                this.setDamage(event.getNewLevel());
-                this.level.setBlock(this, this, true, true);
-                this.level.dropItem(this.add(0.5, 0.85, 0.5), event.getDrop(), event.getMotion(), false, 10);
-                this.level.addSound(this.add(0.5 , 0.5, 0.5), Sound.BLOCK_COMPOSTER_EMPTY);
-            }
+            empty(item, player);
             return true;
         }
 
@@ -138,6 +131,32 @@ public class BlockComposter extends BlockSolidMeta implements ItemID {
         }
 
         return true;
+    }
+
+    public Item empty() {
+        return empty(null, null);
+    }
+
+    public Item empty(Player player) {
+        return this.empty(null, player);
+    }
+
+    public Item empty(Item item, Player player) {
+        if (isEmpty()) {
+            return null;
+        }
+        ComposterEmptyEvent event = new ComposterEmptyEvent(this, player, item, new ItemDye(DyeColor.WHITE), 0);
+        this.level.getServer().getPluginManager().callEvent(event);
+        if (!event.isCancelled()) {
+            this.setDamage(event.getNewLevel());
+            this.level.setBlock(this, this, true, true);
+            if (item != null) {
+                this.level.dropItem(add(0.5, 0.85, 0.5), event.getDrop());
+            }
+            this.level.addSound(add(0.5 , 0.5, 0.5), Sound.BLOCK_COMPOSTER_EMPTY);
+            return event.getDrop();
+        }
+        return null;
     }
 
     public static void registerItem(int chance, int itemId) {

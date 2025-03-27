@@ -56,7 +56,7 @@ public class ItemSpawnEgg extends Item {
         }
 
         if (!Server.getInstance().spawnEggsEnabled) {
-            player.sendMessage("\u00A7cSpawn eggs are disabled on this server");
+            player.sendMessage("§cSpawn eggs are disabled on this server");
             return false;
         }
 

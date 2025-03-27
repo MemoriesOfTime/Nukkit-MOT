@@ -504,6 +504,7 @@ public class Utils {
             case ProtocolInfo.v1_21_40 -> "1.21.40";
             case ProtocolInfo.v1_21_50_26, ProtocolInfo.v1_21_50 -> "1.21.50";
             case ProtocolInfo.v1_21_60 -> "1.21.60";
+            case ProtocolInfo.v1_21_70 -> "1.21.70";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };
@@ -531,9 +532,9 @@ public class Utils {
             case 6:
                 return "HoloLens";
             case 7:
-                return "Windows 10";
-            case 8:
                 return "Windows";
+            case 8:
+                return "Windows x86";
             case 9:
                 return "Dedicated";
             case 10:

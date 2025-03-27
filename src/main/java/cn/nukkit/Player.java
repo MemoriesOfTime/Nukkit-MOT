@@ -166,12 +166,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int SMITHING_WINDOW_ID = 6;
     /**
      * @since 649 1.20.60
-     * 自1.20.60开始，需要发送ContainerOpenPacket给玩家才能正常打开讲台上的书
-     * 在原版中id按顺序增加，但测试中采用固定id也可正常实现功能
+     * Starting from 1.20.60, you need to send ContainerOpenPacket to the player to open the book on the podium normally
+     * In the original version, the id increases in sequence, but in the test, the fixed id can also realize the function normally
      */
     public static final int LECTERN_WINDOW_ID = 7;
 
-    // 后续创建的窗口应该从此数值开始
+    /**
+     * Subsequent windows created should start with this value
+     */
     public static final int MINIMUM_OTHER_WINDOW_ID = Utils.dynamic(8);
 
     public static final int RESOURCE_PACK_CHUNK_SIZE = 8 * 1024; // 8KB
@@ -217,7 +219,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected long randomClientId;
 
     protected Vector3 forceMovement = null;
-
     protected Vector3 teleportPosition = null;
 
     protected int lastTeleportTick = -1;
@@ -287,6 +288,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public boolean showToOthers = true;
 
+    /**
+     * Player's client-side walk speed. Remember to call getAdventureSettings().update() if changed.
+     */
+    @Getter
+    @Setter
+    private float walkSpeed = DEFAULT_SPEED;
+    /**
+     * Player's client-side fly speed. Remember to call getAdventureSettings().update() if changed.
+     */
+    @Getter
+    @Setter
+    private float flySpeed = DEFAULT_FLY_SPEED;
+    /**
+     * Player's client-side vertical fly speed. Remember to call getAdventureSettings().update() if changed.
+     */
+    @Getter
+    @Setter
+    private float verticalFlySpeed = DEFAULT_VERTICAL_FLY_SPEED;
+
     private int exp = 0;
     private int expLevel = 0;
 
@@ -331,7 +351,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int lastChorusFruitTeleport = 20;
     public long lastSkinChange = -1;
     private double lastRightClickTime = 0.0;
-    private Vector3 lastRightClickPos = null;
+    private BlockVector3 lastRightClickPos = null;
     public EntityFishingHook fishing = null;
     public boolean formOpen;
     public boolean locallyInitialized;
@@ -4425,13 +4445,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case InventoryTransactionPacket.TYPE_USE_ITEM:
                         UseItemData useItemData;
                         BlockVector3 blockVector;
-                        int type;
 
                         try {
                             useItemData = (UseItemData) transactionPacket.transactionData;
                             blockVector = useItemData.blockPos;
                             face = useItemData.face;
-                            type = useItemData.actionType;
                         } catch (Exception ignored) {
                             break packetswitch;
                         }
@@ -4440,14 +4458,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             inventory.equipItem(useItemData.hotbarSlot);
                         }
 
-                        switch (type) {
+                        switch (useItemData.actionType) {
                             case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_BLOCK:
                                 boolean spamming = !server.doNotLimitInteractions
                                         && lastRightClickPos != null
                                         && System.currentTimeMillis() - lastRightClickTime < 100.0
                                         && blockVector.distanceSquared(lastRightClickPos) < 0.00001;
 
-                                lastRightClickPos = blockVector.asVector3();
+                                lastRightClickPos = blockVector;
                                 lastRightClickTime = System.currentTimeMillis();
 
                                 // Hack: Fix client spamming right clicks
@@ -4611,8 +4629,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             return;
                         }
 
-                        type = useItemOnEntityData.actionType;
-
                         if (inventory.getHeldItemIndex() != useItemOnEntityData.hotbarSlot) {
                             inventory.equipItem(useItemOnEntityData.hotbarSlot);
                         }
@@ -4623,8 +4639,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                         item = this.inventory.getItemInHand();
 
-                        switch (type) {
+                        switch (useItemOnEntityData.actionType) {
                             case InventoryTransactionPacket.USE_ITEM_ON_ENTITY_ACTION_INTERACT:
+                                if (this.distanceSquared(target) > 256) { // TODO: Note entity scale
+                                    this.getServer().getLogger().debug(username + ": target entity is too far away");
+                                    return;
+                                }
+
+                                this.breakingBlock = null;
+
+                                this.setUsingItem(false);
+
                                 PlayerInteractEntityEvent playerInteractEntityEvent = new PlayerInteractEntityEvent(this, target, item, useItemOnEntityData.clickPos);
                                 if (this.isSpectator()) playerInteractEntityEvent.setCancelled();
                                 getServer().getPluginManager().callEvent(playerInteractEntityEvent);
@@ -4681,13 +4706,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 Map<DamageModifier, Float> damage = new EnumMap<>(DamageModifier.class);
                                 damage.put(DamageModifier.BASE, itemDamage);
 
-                                float knockBack = 0.3f;
+                                float knockBackModifier = 0;
                                 Enchantment knockBackEnchantment = item.getEnchantment(Enchantment.ID_KNOCKBACK);
                                 if (knockBackEnchantment != null) {
-                                    knockBack += knockBackEnchantment.getLevel() * 0.1f;
+                                    knockBackModifier = knockBackEnchantment.getLevel();
                                 }
 
-                                EntityDamageByEntityEvent entityDamageByEntityEvent = new EntityDamageByEntityEvent(this, target, DamageCause.ENTITY_ATTACK, damage, knockBack, enchantments);
+                                EntityDamageByEntityEvent entityDamageByEntityEvent = new EntityDamageByEntityEvent(this, target, DamageCause.ENTITY_ATTACK, damage, 0.3F, enchantments, knockBackModifier);
                                 entityDamageByEntityEvent.setBreakShield(item.canBreakShield());
                                 if (this.isSpectator()) entityDamageByEntityEvent.setCancelled();
                                 if ((target instanceof Player) && !this.level.getGameRules().getBoolean(GameRule.PVP)) {
@@ -4732,8 +4757,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         ReleaseItemData releaseItemData = (ReleaseItemData) transactionPacket.transactionData;
 
                         try {
-                            type = releaseItemData.actionType;
-                            switch (type) {
+                            switch (releaseItemData.actionType) {
                                 case InventoryTransactionPacket.RELEASE_ITEM_ACTION_RELEASE:
                                     if (this.isUsingItem()) {
                                         item = this.inventory.getItemInHand();
@@ -4782,6 +4806,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     }
                                     return;
                                 default:
+                                    this.getServer().getLogger().debug(username + ": unknown release item action type: " + releaseItemData.actionType);
                                     break;
                             }
                         } finally {
@@ -4922,11 +4947,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         inventory.sendContents(this);
         inventory.sendHeldItem(this);
 
-        if (blockPos.distanceSquared(this) < 100) {
-            Block target = this.level.getBlock(blockPos.asVector3());
-            this.level.sendBlocks(new Player[]{this}, new Block[]{target}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
-
-            BlockEntity blockEntity = this.level.getBlockEntity(blockPos.asVector3());
+        if (blockPos.distanceSquared(this) < 10000) {
+            Vector3 pos = blockPos.asVector3();
+            this.level.sendBlocks(this, new Block[]{this.level.getBlock(pos, false)}, UpdateBlockPacket.FLAG_ALL_PRIORITY);
+            BlockEntity blockEntity = this.level.getBlockEntityIfLoaded(this.chunk, pos);
             if (blockEntity instanceof BlockEntitySpawnable) {
                 ((BlockEntitySpawnable) blockEntity).spawnTo(this);
             }
@@ -6284,7 +6308,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (formOpen) return -1;
         ModalFormRequestPacket packet = new ModalFormRequestPacket();
         packet.formId = id;
-        packet.data = window.getJSONData();
+        packet.data = window.getJSONData(this.protocol);
         this.formWindows.put(packet.formId, window);
         this.dataPacket(packet);
         this.formOpen = true;
@@ -7174,6 +7198,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void setNoShieldTicks(int noShieldTicks) {
         this.noShieldTicks = noShieldTicks;
+    }
+
+    @Override
+    public void knockBack(Entity attacker, double damage, double deltaX, double deltaZ, double base, double r, double modifier) {
+        double resistance = 0;
+        for (Item armor : inventory.getArmorContents()) {
+            if (armor != null && armor.getTier() == ItemArmor.TIER_NETHERITE) {
+                resistance += 0.15;
+            }
+        }
+        super.knockBack(attacker, damage, deltaX, deltaZ, base, resistance, modifier);
     }
 
     @Override
