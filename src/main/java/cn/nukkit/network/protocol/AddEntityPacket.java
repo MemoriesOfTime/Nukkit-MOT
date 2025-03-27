@@ -11,6 +11,7 @@ import cn.nukkit.entity.passive.*;
 import cn.nukkit.entity.projectile.*;
 import cn.nukkit.entity.weather.EntityLightning;
 import cn.nukkit.network.protocol.types.EntityLink;
+import cn.nukkit.network.protocol.types.PropertySyncData;
 import cn.nukkit.utils.Binary;
 import lombok.ToString;
 
@@ -230,6 +231,10 @@ public class AddEntityPacket extends DataPacket {
     public EntityMetadata metadata = new EntityMetadata();
     public Attribute[] attributes = new Attribute[0];
     public EntityLink[] links = new EntityLink[0];
+    /**
+     * @since v557
+     */
+    public PropertySyncData properties = new PropertySyncData(new int[]{}, new float[]{});
 
     @Override
     public void decode() {
@@ -259,8 +264,18 @@ public class AddEntityPacket extends DataPacket {
         this.putAttributeList(this.attributes);
         this.put(Binary.writeMetadata(protocol, this.metadata));
         if (protocol >= ProtocolInfo.v1_19_40) {
-            this.putUnsignedVarInt(0); // Entity properties int
-            this.putUnsignedVarInt(0); // Entity properties float
+            int[] intProperties = this.properties.intProperties();
+            this.putUnsignedVarInt(intProperties.length);
+            for (int i = 0, len = intProperties.length; i < len; ++i) {
+                this.putUnsignedVarInt(i);
+                this.putVarInt(intProperties[i]);
+            }
+            float[] floats = this.properties.floatProperties();
+            this.putUnsignedVarInt(floats.length);
+            for (int i = 0, len = floats.length; i < len; ++i) {
+                this.putUnsignedVarInt(i);
+                this.putLFloat(floats[i]);
+            }
         }
         this.putUnsignedVarInt(this.links.length);
         for (EntityLink link : links) {

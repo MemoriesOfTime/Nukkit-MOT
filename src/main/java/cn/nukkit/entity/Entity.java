@@ -1434,6 +1434,8 @@ public abstract class Entity extends Location implements Metadatable {
             addEntity.links[i] = new EntityLink(this.id, this.passengers.get(i).id, i == 0 ? EntityLink.TYPE_RIDER : TYPE_PASSENGER, false, false, 0f);
         }
 
+        addEntity.properties = this.propertySyncData();
+
         return addEntity;
     }
 
