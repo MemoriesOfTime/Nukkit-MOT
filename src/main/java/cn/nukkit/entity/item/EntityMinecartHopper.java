@@ -129,14 +129,15 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
     }
 
     @Override
-    public boolean onUpdate(int currentTick) {
-        if (!super.onUpdate(currentTick)) {
-            return false;
-        }
+    public boolean entityBaseTick(int tickDiff) {
+        boolean hasUpdate = super.entityBaseTick(tickDiff);
 
-        this.transferCooldown--;
+        if (!this.closed && this.isAlive()) {
+            if (this.isOnTransferCooldown()) {
+                this.transferCooldown--;
+                return true;
+            }
 
-        if (!this.isOnTransferCooldown()) {
             boolean changed = pushItems();
 
             if (!changed) {
@@ -151,9 +152,11 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
             if (changed) {
                 this.setTransferCooldown(8);
             }
+
+            return true;
         }
 
-        return true;
+        return hasUpdate;
     }
 
     @Override

@@ -1780,7 +1780,7 @@ public class Level implements ChunkManager, Metadatable {
 
         if (entities || solidEntities) {
             for (Entity ent : this.getCollidingEntities(bb.grow(0.25f, 0.25f, 0.25f), entity)) {
-                if (solidEntities && !ent.canPassThrough()) {
+                if (solidEntities || !ent.canPassThrough()) {
                     collides.add(ent.boundingBox.clone());
                 }
             }
@@ -1932,6 +1932,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public Block getBlock(int x, int y, int z, int layer, boolean load) {
         return this.getBlock(null, x, y, z, layer, load);
+    }
+
+    public Block getBlock(FullChunk chunk, int x, int y, int z, boolean load) {
+        return this.getBlock(chunk, x, y, z, BlockLayer.NORMAL.ordinal(), load);
     }
 
     public Block getBlock(FullChunk chunk, int x, int y, int z, int layer, boolean load) {
@@ -2522,12 +2526,6 @@ public class Level implements ChunkManager, Metadatable {
             drops = target.getDrops(null, item);
         }
 
-        Vector3 above = new Vector3(target.x, target.y + 1, target.z);
-        int bid = this.getBlockIdAt((int) above.x, (int) above.y, (int) above.z);
-        if (bid == Item.FIRE || bid == Item.SOUL_FIRE) {
-            this.setBlock(above, Block.get(BlockID.AIR), true);
-        }
-
         if (createParticles) {
             Map<Integer, Player> players = this.getChunkPlayers((int) target.x >> 4, (int) target.z >> 4);
             this.addParticle(new DestroyBlockParticle(target.add(0.5), target), players.values());
@@ -3038,12 +3036,31 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public BlockEntity getBlockEntityIfLoaded(Vector3 pos) {
+        return this.getBlockEntityIfLoaded(null, pos);
+    }
+
+    /**
+     * 如果指定位置的区块已加载，则获取该位置的方块实体。
+     * If the chunk at the specified position is loaded, retrieve the block entity at that position.
+     *
+     * @param chunk 要检查的区块，如果为 null 则尝试从世界中获取。
+     *              The chunk to check. If it is null, attempt to retrieve it from the world.
+     * @param pos   方块实体所在的位置。
+     *              The position where the block entity is located.
+     * @return 如果区块已加载且存在方块实体，则返回该方块实体；否则返回 null。
+     *         If the chunk is loaded and there is a block entity, return the block entity; otherwise, return null.
+     */
+    public BlockEntity getBlockEntityIfLoaded(FullChunk chunk, Vector3 pos) {
         int by = pos.getFloorY();
         if (!isYInRange(by)) {
             return null;
         }
 
-        FullChunk chunk = this.getChunkIfLoaded((int) pos.x >> 4, (int) pos.z >> 4);
+        int cx = (int) pos.x >> 4;
+        int cz = (int) pos.z >> 4;
+        if (chunk == null || cx != chunk.getX() || cz != chunk.getZ()) {
+            chunk = this.getChunkIfLoaded(cx, cz);
+        }
 
         if (chunk != null) {
             return chunk.getTile((int) pos.x & 0x0f, by, (int) pos.z & 0x0f);
@@ -5067,7 +5084,9 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_21_60) {
+        if (protocol >= ProtocolInfo.v1_21_70) {
+            return ProtocolInfo.v1_21_70;
+        } else if (protocol >= ProtocolInfo.v1_21_60) {
             return ProtocolInfo.v1_21_60;
         } else if (protocol >= ProtocolInfo.v1_21_50_26) {
             return ProtocolInfo.v1_21_50;
@@ -5192,7 +5211,8 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_21_30) if (player < ProtocolInfo.v1_21_40) return true;
         if (chunk == ProtocolInfo.v1_21_40) if (player < ProtocolInfo.v1_21_50_26) return true;
         if (chunk == ProtocolInfo.v1_21_50) if (player < ProtocolInfo.v1_21_60) return true;
-        if (chunk == ProtocolInfo.v1_21_60) if (player >= ProtocolInfo.v1_21_60) return true;
+        if (chunk == ProtocolInfo.v1_21_60) if (player < ProtocolInfo.v1_21_70) return true;
+        if (chunk == ProtocolInfo.v1_21_70) if (player >= ProtocolInfo.v1_21_70) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 
