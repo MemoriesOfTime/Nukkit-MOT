@@ -2,6 +2,7 @@ package cn.nukkit.entity.projectile;
 
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityClimateVariant;
 import cn.nukkit.entity.passive.EntityChicken;
 import cn.nukkit.event.entity.CreatureSpawnEvent;
 import cn.nukkit.item.ItemEgg;
@@ -55,6 +56,14 @@ public class EntityEgg extends EntityProjectile {
 
     public EntityEgg(FullChunk chunk, CompoundTag nbt, Entity shootingEntity) {
         super(chunk, nbt, shootingEntity);
+    }
+
+    @Override
+    protected void initEntity() {
+        super.initEntity();
+        if(namedTag.containsString("variant")) {
+            EntityClimateVariant.setVariant(this, EntityClimateVariant.Variant.get(namedTag.getString("variant")));
+        } else EntityClimateVariant.setVariant(this, EntityClimateVariant.Variant.TEMPERATE);
     }
 
     @Override

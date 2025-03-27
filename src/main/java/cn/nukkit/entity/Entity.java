@@ -3348,6 +3348,19 @@ public abstract class Entity extends Location implements Metadatable {
         return false;
     }
 
+    public final String getEnumEntityProperty(String identifier) {
+        List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
+
+        for (EntityProperty property : entityPropertyList) {
+            if (!identifier.equals(property.getIdentifier()) ||
+                    !(property instanceof EnumEntityProperty enumProperty)) {
+                continue;
+            }
+            return enumProperty.getEnums()[intProperties.get(identifier)];
+        }
+        return null;
+    }
+
     private void initEntityProperties() {
         if(this.getIdentifier() != null) {
             initEntityProperties(this.getIdentifier().toString());
