@@ -35,7 +35,7 @@ public abstract class FormWindow {
         return FormWindow.GSON.toJson(this);
     }
 
-    public abstract void setResponse(String data);
+    public abstract void setResponse(int protocol, String data);
 
     public abstract FormResponse getResponse();
 
