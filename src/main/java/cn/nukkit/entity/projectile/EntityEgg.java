@@ -89,7 +89,12 @@ public class EntityEgg extends EntityProjectile {
                     }
 
                     EntityChicken entity = (EntityChicken) Entity.createEntity("Chicken", spawnPos);
+
                     if (entity != null) {
+                        if(namedTag.containsString("variant")) {
+                            EntityClimateVariant.setVariant(entity, EntityClimateVariant.Variant.get(namedTag.getString("variant")));
+                        } else EntityClimateVariant.setVariant(entity, EntityClimateVariant.Variant.TEMPERATE);
+
                         entity.spawnToAll();
                         entity.setBaby(true);
                     }

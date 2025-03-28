@@ -1,6 +1,7 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
+import cn.nukkit.entity.EntityClimateVariant;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.ItemBreakParticle;
@@ -44,8 +45,11 @@ public class EntityCow extends EntityWalkingAnimal {
     @Override
     public void initEntity() {
         this.setMaxHealth(10);
-
         super.initEntity();
+
+        if(namedTag.contains("variant")) {
+            EntityClimateVariant.setVariant(this, EntityClimateVariant.Variant.get(namedTag.getString("variant")));
+        } else EntityClimateVariant.setVariant(this, EntityClimateVariant.getBiomeVariant(getLevel().getBiomeId(getFloorX(), getFloorZ())));
     }
 
     @Override

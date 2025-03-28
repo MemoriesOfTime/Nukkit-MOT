@@ -2,10 +2,7 @@ package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.entity.Attribute;
-import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.EntityControllable;
-import cn.nukkit.entity.EntityRideable;
+import cn.nukkit.entity.*;
 import cn.nukkit.entity.data.FloatEntityData;
 import cn.nukkit.entity.data.Vector3fEntityData;
 import cn.nukkit.entity.mob.EntityZombiePigman;
@@ -62,8 +59,11 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
     @Override
     public void initEntity() {
         this.setMaxHealth(10);
-
         super.initEntity();
+
+        if(namedTag.contains("variant")) {
+            EntityClimateVariant.setVariant(this, EntityClimateVariant.Variant.get(namedTag.getString("variant")));
+        } else EntityClimateVariant.setVariant(this, EntityClimateVariant.getBiomeVariant(getLevel().getBiomeId(getFloorX(), getFloorZ())));
 
         if (this.namedTag.contains("Saddle")) {
             this.setSaddled(this.namedTag.getBoolean("Saddle"));

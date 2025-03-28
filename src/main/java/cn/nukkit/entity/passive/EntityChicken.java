@@ -1,6 +1,8 @@
 package cn.nukkit.entity.passive;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
+import cn.nukkit.entity.EntityClimateVariant;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
@@ -59,8 +61,11 @@ public class EntityChicken extends EntityWalkingAnimal {
     @Override
     public void initEntity() {
         this.setMaxHealth(4);
-
         super.initEntity();
+
+        if(namedTag.contains("variant")) {
+            EntityClimateVariant.setVariant(this, EntityClimateVariant.Variant.get(namedTag.getString("variant")));
+        } else EntityClimateVariant.setVariant(this, EntityClimateVariant.getBiomeVariant(getLevel().getBiomeId(getFloorX(), getFloorZ())));
 
         if (this.namedTag.contains("EggLayTime")) {
             this.eggLayTime = this.namedTag.getInt("EggLayTime");
@@ -84,13 +89,22 @@ public class EntityChicken extends EntityWalkingAnimal {
             if (this.eggLayTime > 0) {
                 eggLayTime -= tickDiff;
             } else {
-                this.level.dropItem(this, Item.get(Item.EGG, 0, 1));
+                this.level.dropItem(this, getEgg());
                 this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_PLOP);
                 this.eggLayTime = getRandomEggLayTime();
             }
         }
 
         return hasUpdate;
+    }
+
+    private Item getEgg() {
+        if(Server.getInstance().enableNewChickenEggsLaying) {
+            if(EntityClimateVariant.getVariant(this) == EntityClimateVariant.Variant.COLD) return Item.fromString(Item.BLUE_EGG);
+            if(EntityClimateVariant.getVariant(this) == EntityClimateVariant.Variant.WARM) return Item.fromString(Item.BROWN_EGG);
+        }
+
+        return Item.get(Item.EGG, 0, 1);
     }
 
     @Override
