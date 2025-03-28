@@ -39,7 +39,9 @@ public abstract class FormWindow {
         this.setResponse(ProtocolInfo.CURRENT_PROTOCOL, data);
     }
 
-    public abstract void setResponse(int protocol, String data);
+    public void setResponse(int protocol, String data) {
+        // no-op
+    }
 
     public abstract FormResponse getResponse();
 
