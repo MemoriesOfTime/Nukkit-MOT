@@ -10,8 +10,11 @@ import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.UpdateAttributesPacket;
 import cn.nukkit.utils.Utils;
 
@@ -152,5 +155,15 @@ public class EntityIronGolem extends EntityWalkingMob {
             pk.entityId = this.id;
             Server.broadcastPacket(this.getViewers().values(), pk);
         }
+    }
+
+    @Override
+    public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
+        if (item.getId() == ItemID.IRON_INGOT && this.health < this.getRealMaxHealth() && this.isAlive()) {
+            this.heal(25f);
+            this.level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_REPAIR_IRON_GOLEM);
+            return true; // onInteract: true = decrease count
+        }
+        return super.onInteract(player, item, clickedPos);
     }
 }

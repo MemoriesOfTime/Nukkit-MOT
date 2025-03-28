@@ -40,7 +40,6 @@ public class ItemHoneyBottle extends ItemEdible {
         }
 
         if (!player.isCreative()) {
-            this.count--;
             player.getInventory().setItemInHand(this);
             player.getInventory().addItem(Item.get(ItemID.BOTTLE, 0, 1));
         }

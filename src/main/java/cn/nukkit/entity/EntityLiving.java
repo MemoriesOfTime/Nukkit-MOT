@@ -278,11 +278,6 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     @Override
-    public boolean entityBaseTick() {
-        return this.entityBaseTick(1);
-    }
-
-    @Override
     public boolean entityBaseTick(int tickDiff) {
         boolean inWater = this.isSubmerged();
 

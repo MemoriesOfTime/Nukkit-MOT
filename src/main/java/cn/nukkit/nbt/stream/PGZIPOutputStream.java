@@ -2,6 +2,7 @@ package cn.nukkit.nbt.stream;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.FilterOutputStream;
 import java.io.IOException;
@@ -67,7 +68,7 @@ public class PGZIPOutputStream extends FilterOutputStream {
         super(out);
         this.executor = executor;
         this.nthreads = nthreads;
-        this.emitQueue = new ArrayBlockingQueue<Future<byte[]>>(nthreads);
+        this.emitQueue = new ArrayBlockingQueue<>(nthreads);
         writeHeader();
     }
 
@@ -119,13 +120,13 @@ public class PGZIPOutputStream extends FilterOutputStream {
 
     // Master thread only
     @Override
-    public void write(byte[] b) throws IOException {
+    public void write(byte @NotNull [] b) throws IOException {
         write(b, 0, b.length);
     }
 
     // Master thread only
     @Override
-    public void write(byte[] b, int off, int len) throws IOException {
+    public void write(byte @NotNull [] b, int off, int len) throws IOException {
         crc.update(b, off, len);
         bytesWritten += len;
         while (len > 0) {

@@ -18,6 +18,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Faceable;
@@ -213,7 +214,8 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                 return false;
             }
 
-            BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(this.getPosition().up());
+            Vector3 up = this.getPosition().up();
+            BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(up);
             if (blockEntity instanceof BlockEntityFurnace) {
                 FurnaceInventory inv = ((BlockEntityFurnace) blockEntity).getInventory();
                 Item item = inv.getResult();
@@ -273,6 +275,29 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                         inv.setItem(i, item);
                         return true;
                     }
+                }
+            } else {
+                Block block = this.getPosition().getLevel().getBlock(up);
+                if (block instanceof BlockComposter composter) {
+                    if (!composter.isFull()) {
+                        return false;
+                    }
+                    Item item = composter.empty();
+                    if (item == null || item.isNull()) {
+                        return false;
+                    }
+                    Item itemToAdd = item.clone();
+                    itemToAdd.setCount(1);
+                    if (!inventory.canAddItem(itemToAdd)) {
+                        return false;
+                    }
+                    InventoryMoveItemEvent ev = new InventoryMoveItemEvent(null, inventory, this, item, InventoryMoveItemEvent.Action.PICKUP);
+                    ev.call();
+                    if (ev.isCancelled()) {
+                        return false;
+                    }
+                    Item[] items = inventory.addItem(itemToAdd);
+                    return items.length < 1;
                 }
             }
             return false;

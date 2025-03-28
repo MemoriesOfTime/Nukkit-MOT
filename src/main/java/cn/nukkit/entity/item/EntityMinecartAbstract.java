@@ -118,129 +118,109 @@ public abstract class EntityMinecartAbstract extends EntityVehicle implements En
 
     @Override
     public void initEntity() {
+        this.setMaxHealth(40);
         super.initEntity();
 
+        this.setHealth(40);
         prepareDataProperty();
     }
 
     @Override
-    public boolean onUpdate(int currentTick) {
-        if (this.closed) {
-            return false;
+    public boolean entityBaseTick(int tickDiff) {
+        // The damage token
+        if (getHealth() < 20) {
+            setHealth(getHealth() + 1);
         }
 
-        if (!this.isAlive()) {
-            this.despawnFromAll();
-            this.close();
-            return false;
+        // Entity variables
+        lastX = x;
+        lastY = y;
+        lastZ = z;
+        motionY -= 0.03999999910593033D;
+        int dx = MathHelper.floor(x);
+        int dy = MathHelper.floor(y);
+        int dz = MathHelper.floor(z);
+
+        // Some hack to check rails
+        if (Rail.isRailBlock(level.getBlockIdAt(dx, dy - 1, dz))) {
+            --dy;
         }
 
-        int tickDiff = currentTick - this.lastUpdate;
+        Block block = level.getBlock(new Vector3(dx, dy, dz));
 
-        if (tickDiff <= 0) {
-            return false;
+        // Ensure that the block is a rail
+        if (Rail.isRailBlock(block)) {
+            processMovement(dx, dy, dz, (BlockRail) block);
+            // Activate the minecart/TNT
+            if (block instanceof BlockRailActivator && ((BlockRailActivator) block).isActive()) {
+                activate(dx, dy, dz, (block.getDamage() & 0x8) != 0);
+            }
+        } else {
+            setFalling();
+        }
+        checkBlockCollision();
+
+        // Minecart head
+        pitch = 0;
+        double diffX = this.lastX - this.x;
+        double diffZ = this.lastZ - this.z;
+        double yawToChange = yaw;
+        if (diffX * diffX + diffZ * diffZ > 0.001D) {
+            yawToChange = (FastMath.atan2(diffZ, diffX) * 180 / Math.PI);
         }
 
-        this.lastUpdate = currentTick;
+        // Reverse yaw if yaw is below 0
+        if (yawToChange < 0) {
+            // -90-(-90)-(-90) = 90
+            yawToChange -= yawToChange - yawToChange;
+        }
 
-        if (isAlive()) {
-            super.onUpdate(currentTick);
+        setRotation(yawToChange, pitch);
 
-            // The damage token
-            if (getHealth() < 20) {
-                setHealth(getHealth() + 1);
-            }
+        Location from = new Location(lastX, lastY, lastZ, lastYaw, lastPitch, level);
+        Location to = new Location(this.x, this.y, this.z, this.yaw, this.pitch, level);
 
-            // Entity variables
-            lastX = x;
-            lastY = y;
-            lastZ = z;
-            motionY -= 0.03999999910593033D;
-            int dx = MathHelper.floor(x);
-            int dy = MathHelper.floor(y);
-            int dz = MathHelper.floor(z);
+        this.getServer().getPluginManager().callEvent(new VehicleUpdateEvent(this));
 
-            // Some hack to check rails
-            if (Rail.isRailBlock(level.getBlockIdAt(dx, dy - 1, dz))) {
-                --dy;
-            }
+        if (!from.equals(to)) {
+            this.getServer().getPluginManager().callEvent(new VehicleMoveEvent(this, from, to));
+        }
 
-            Block block = level.getBlock(new Vector3(dx, dy, dz));
-
-            // Ensure that the block is a rail
-            if (Rail.isRailBlock(block)) {
-                processMovement(dx, dy, dz, (BlockRail) block);
-                // Activate the minecart/TNT
-                if (block instanceof BlockRailActivator && ((BlockRailActivator) block).isActive()) {
-                    activate(dx, dy, dz, (block.getDamage() & 0x8) != 0);
-                }
-            } else {
-                setFalling();
-            }
-            checkBlockCollision();
-
-            // Minecart head
-            pitch = 0;
-            double diffX = this.lastX - this.x;
-            double diffZ = this.lastZ - this.z;
-            double yawToChange = yaw;
-            if (diffX * diffX + diffZ * diffZ > 0.001D) {
-                yawToChange = (FastMath.atan2(diffZ, diffX) * 180 / Math.PI);
-            }
-
-            // Reverse yaw if yaw is below 0
-            if (yawToChange < 0) {
-                // -90-(-90)-(-90) = 90
-                yawToChange -= yawToChange - yawToChange;
-            }
-
-            setRotation(yawToChange, pitch);
-
-            Location from = new Location(lastX, lastY, lastZ, lastYaw, lastPitch, level);
-            Location to = new Location(this.x, this.y, this.z, this.yaw, this.pitch, level);
-
-            this.getServer().getPluginManager().callEvent(new VehicleUpdateEvent(this));
-
-            if (!from.equals(to)) {
-                this.getServer().getPluginManager().callEvent(new VehicleMoveEvent(this, from, to));
-            }
-
-            // Collisions
+        // Collisions
+        if (this instanceof InventoryHolder) {
             for (cn.nukkit.entity.Entity entity : level.getNearbyEntities(boundingBox.grow(0.2D, 0, 0.2D), this)) {
                 if (!passengers.contains(entity) && entity instanceof EntityMinecartAbstract) {
                     entity.applyEntityCollision(this);
                 }
             }
-
-            Iterator<cn.nukkit.entity.Entity> linkedIterator = this.passengers.iterator();
-
-            while (linkedIterator.hasNext()) {
-                cn.nukkit.entity.Entity linked = linkedIterator.next();
-
-                if (!linked.isAlive()) {
-                    if (linked.riding == this) {
-                        linked.riding = null;
-                    }
-
-                    linkedIterator.remove();
-                }
-            }
-
-            //使矿车通知漏斗更新而不是漏斗来检测矿车
-            //通常情况下，矿车的数量远远少于漏斗，所以说此举能大福提高性能
-            if (this instanceof InventoryHolder holder) {
-                checkPickupHopper(new SimpleAxisAlignedBB(this.x, this.y - 1, this.z, this.x, this.y, this.z), holder);
-                //漏斗矿车会自行拉取物品!
-                if (!(this instanceof EntityMinecartHopper)) {
-                    checkPushHopper(new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x, this.y + 2, this.z), holder);
-                }
-            }
-
-            // No need to onGround or Motion diff! This always have an update
-            return true;
         }
 
-        return false;
+        Iterator<cn.nukkit.entity.Entity> linkedIterator = this.passengers.iterator();
+
+        while (linkedIterator.hasNext()) {
+            cn.nukkit.entity.Entity linked = linkedIterator.next();
+
+            if (!linked.isAlive()) {
+                if (linked.riding == this) {
+                    linked.riding = null;
+                }
+
+                linkedIterator.remove();
+            }
+        }
+
+        //使矿车通知漏斗更新而不是漏斗来检测矿车
+        //通常情况下，矿车的数量远远少于漏斗，所以说此举能大福提高性能
+        if (this instanceof InventoryHolder holder) {
+            checkPickupHopper(new SimpleAxisAlignedBB(this.x, this.y - 1, this.z, this.x, this.y, this.z), holder);
+            //漏斗矿车会自行拉取物品!
+            if (!(this instanceof EntityMinecartHopper)) {
+                checkPushHopper(new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x, this.y + 2, this.z), holder);
+            }
+        }
+
+        // We call super here after movement code so block collision checks use up to date position
+        return super.entityBaseTick(tickDiff) || this.getRollingAmplitude() > 0 || !(this.motionX == 0 && this.motionY == 0 && this.motionZ == 0);
     }
 
     @Override
