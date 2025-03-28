@@ -7,12 +7,13 @@ import cn.nukkit.item.ItemSeedsMelon;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Plane;
+import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
 
 /**
  * Created by Pub4Game on 15.01.2016.
  */
-public class BlockStemMelon extends BlockCrops {
+public class BlockStemMelon extends BlockCrops implements Faceable {
 
     public BlockStemMelon() {
         this(0);
@@ -30,6 +31,15 @@ public class BlockStemMelon extends BlockCrops {
     @Override
     public String getName() {
         return "Melon Stem";
+    }
+
+    @Override
+    public BlockFace getBlockFace() {
+        return BlockFace.fromIndex(this.getDamage());
+    }
+
+    public void setBlockFace(BlockFace face) {
+        this.setDamage(0x08 + face.getIndex());
     }
 
     @Override
@@ -67,7 +77,7 @@ public class BlockStemMelon extends BlockCrops {
                         if (!ev.isCancelled()) {
                             this.getLevel().setBlock(side, ev.getNewState(), true, true);
 
-                            this.setDamage(0x08 + sideFace.getIndex()); // Attached Melon Stem
+                            this.setBlockFace(sideFace);
                             this.getLevel().setBlock(this, this, true, true);
                         }
                     }

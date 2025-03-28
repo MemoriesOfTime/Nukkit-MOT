@@ -7,12 +7,13 @@ import cn.nukkit.item.ItemSeedsPumpkin;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Plane;
+import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
 
 /**
  * Created by Pub4Game on 15.01.2016.
  */
-public class BlockStemPumpkin extends BlockCrops {
+public class BlockStemPumpkin extends BlockCrops implements Faceable {
 
     public BlockStemPumpkin() {
         this(0);
@@ -30,6 +31,15 @@ public class BlockStemPumpkin extends BlockCrops {
     @Override
     public String getName() {
         return "Pumpkin Stem";
+    }
+
+    @Override
+    public BlockFace getBlockFace() {
+        return BlockFace.fromIndex(this.getDamage());
+    }
+
+    public void setBlockFace(BlockFace face) {
+        this.setDamage(0x08 + face.getIndex());
     }
 
     @Override
@@ -67,7 +77,7 @@ public class BlockStemPumpkin extends BlockCrops {
                         if (!ev.isCancelled()) {
                             this.getLevel().setBlock(side, ev.getNewState(), true, true);
 
-                            this.setDamage(0x08 + sideFace.getIndex()); // Attached Pumpkin Stem
+                            this.setBlockFace(sideFace);
                             this.getLevel().setBlock(this, this, true, true);
                         }
                     }
