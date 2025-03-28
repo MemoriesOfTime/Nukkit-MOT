@@ -35,7 +35,7 @@ public class BlockStemPumpkin extends BlockCrops implements Faceable {
 
     @Override
     public BlockFace getBlockFace() {
-        return BlockFace.fromIndex(this.getDamage());
+        return BlockFace.fromIndex(this.getDamage() - 0x08);
     }
 
     public void setBlockFace(BlockFace face) {
