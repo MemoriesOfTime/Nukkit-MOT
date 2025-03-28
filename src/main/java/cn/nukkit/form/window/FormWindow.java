@@ -1,6 +1,5 @@
 package cn.nukkit.form.window;
 
-import cn.nukkit.form.element.ElementButton;
 import cn.nukkit.form.handler.FormResponseHandler;
 import cn.nukkit.form.response.FormResponse;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -54,8 +53,8 @@ public abstract class FormWindow {
     static class ExclusionStrategyFormWindowSimple implements ExclusionStrategy {
         @Override
         public boolean shouldSkipField(FieldAttributes fieldAttributes) {
-            return (fieldAttributes.getDeclaringClass() == FormWindowSimple.class && fieldAttributes.getName().equals("response"))
-                    || (fieldAttributes.getDeclaringClass() == ElementButton.class && fieldAttributes.getName().equals("image"));
+            return fieldAttributes.getDeclaringClass() == FormWindowSimple.class
+                    && fieldAttributes.getName().equals("elements");
         }
 
         @Override
