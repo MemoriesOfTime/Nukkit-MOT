@@ -35,6 +35,10 @@ public abstract class FormWindow {
         return FormWindow.GSON.toJson(this);
     }
 
+    public void setResponse(String data) {
+        this.setResponse(ProtocolInfo.CURRENT_PROTOCOL, data);
+    }
+
     public abstract void setResponse(int protocol, String data);
 
     public abstract FormResponse getResponse();
