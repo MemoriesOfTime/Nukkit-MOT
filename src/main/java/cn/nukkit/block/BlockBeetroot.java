@@ -34,7 +34,7 @@ public class BlockBeetroot extends BlockCrops {
 
     @Override
     public String getIdentifier() {
-        return "minecraft:beetroot_block";
+        return "minecraft:beetroot";
     }
 
     @Override

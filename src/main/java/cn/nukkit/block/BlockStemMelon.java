@@ -11,10 +11,18 @@ import cn.nukkit.math.BlockFace.Plane;
 import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
 
+import cn.nukkit.block.custom.properties.BlockProperties;
+import cn.nukkit.block.custom.properties.IntBlockProperty;
+import cn.nukkit.block.properties.BlockPropertiesHelper;
+
 /**
  * Created by Pub4Game on 15.01.2016.
  */
-public class BlockStemMelon extends BlockCrops implements Faceable {
+public class BlockStemMelon extends BlockCrops implements Faceable, BlockPropertiesHelper {
+
+    protected static final IntBlockProperty GROWTH = new IntBlockProperty("growth", false, 13, 0);
+
+    protected static final BlockProperties PROPERTIES = new BlockProperties(GROWTH);
 
     public BlockStemMelon() {
         this(0);
@@ -41,6 +49,11 @@ public class BlockStemMelon extends BlockCrops implements Faceable {
 
     public void setBlockFace(BlockFace face) {
         this.setDamage(8 + face.getIndex());
+    }
+
+    @Override
+    public BlockProperties getBlockProperties() {
+        return PROPERTIES;
     }
 
     @Override

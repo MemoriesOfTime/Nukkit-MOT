@@ -35,7 +35,7 @@ public class BlockPotato extends BlockCrops {
 
     @Override
     public String getIdentifier() {
-        return "minecraft:potato_block";
+        return "minecraft:potato";
     }
 
     @Override

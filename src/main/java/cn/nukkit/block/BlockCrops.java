@@ -20,7 +20,7 @@ import cn.nukkit.block.properties.BlockPropertiesHelper;
  */
 public abstract class BlockCrops extends BlockFlowable implements BlockPropertiesHelper {
 
-    protected static final IntBlockProperty GROWTH = new IntBlockProperty("growth", false, 13, 0);
+    protected static final IntBlockProperty GROWTH = new IntBlockProperty("growth", false, 7, 0);
 
     protected static final BlockProperties PROPERTIES = new BlockProperties(GROWTH);
 

@@ -36,7 +36,7 @@ public class BlockWheat extends BlockCrops {
 
     @Override
     public String getIdentifier() {
-        return "minecraft:wheat_block";
+        return "minecraft:wheat";
     }
 
     @Override

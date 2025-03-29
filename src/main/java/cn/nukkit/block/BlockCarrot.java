@@ -29,7 +29,7 @@ public class BlockCarrot extends BlockCrops {
 
     @Override
     public String getIdentifier() {
-        return "minecraft:carrot_block";
+        return "minecraft:carrot";
     }
 
     @Override

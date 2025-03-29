@@ -1,6 +1,9 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Server;
+import cn.nukkit.block.custom.properties.BlockProperties;
+import cn.nukkit.block.custom.properties.IntBlockProperty;
+import cn.nukkit.block.properties.BlockPropertiesHelper;
 import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemSeedsPumpkin;
@@ -13,7 +16,11 @@ import cn.nukkit.utils.Utils;
 /**
  * Created by Pub4Game on 15.01.2016.
  */
-public class BlockStemPumpkin extends BlockCrops implements Faceable {
+public class BlockStemPumpkin extends BlockCrops implements Faceable, BlockPropertiesHelper {
+
+    protected static final IntBlockProperty GROWTH = new IntBlockProperty("growth", false, 13, 0);
+
+    protected static final BlockProperties PROPERTIES = new BlockProperties(GROWTH);
 
     public BlockStemPumpkin() {
         this(0);
@@ -40,6 +47,11 @@ public class BlockStemPumpkin extends BlockCrops implements Faceable {
 
     public void setBlockFace(BlockFace face) {
         this.setDamage(8 + face.getIndex());
+    }
+
+    @Override
+    public BlockProperties getBlockProperties() {
+        return PROPERTIES;
     }
 
     @Override
