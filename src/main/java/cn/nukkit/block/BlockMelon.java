@@ -1,11 +1,18 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.custom.properties.IntBlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemMelon;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.level.Level;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+
+import cn.nukkit.block.custom.properties.BlockProperties;
+import cn.nukkit.block.custom.properties.EnumBlockProperty;
+import cn.nukkit.block.properties.BlockPropertiesHelper;
 
 /**
  * Created on 2015/12/11 by Pub4Game.
@@ -50,6 +57,21 @@ public class BlockMelon extends BlockSolid {
         return new Item[]{
                 new ItemMelon(0, Math.min(9, count))
         };
+    }
+
+    @Override
+    public boolean onBreak(Item item) {
+        for (BlockFace face : BlockFace.Plane.HORIZONTAL) {
+            Block block = this.getSide(face);
+            if (block instanceof BlockStemMelon stemMelon) {
+               if (stemMelon.getBlockFace() == face.getOpposite()) {
+                   stemMelon.setPropertyValue(BlockCrops.GROWTH, 7);
+                   this.getLevel().setBlock(stemMelon, stemMelon, true, true);
+               }
+            }
+        }
+
+        return super.onBreak(item);
     }
 
     @Override

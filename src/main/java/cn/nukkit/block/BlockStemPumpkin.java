@@ -77,9 +77,7 @@ public class BlockStemPumpkin extends BlockCrops implements Faceable {
                     Block side = this.getSide(sideFace);
                     Block d = side.down();
                     if (side.getId() == AIR && (d.getId() == FARMLAND || d.getId() == GRASS || d.getId() == DIRT)) {
-                        BlockPumpkin pumpkin = (BlockPumpkin) Block.get(PUMPKIN);
-
-                        BlockGrowEvent ev = new BlockGrowEvent(side, pumpkin);
+                        BlockGrowEvent ev = new BlockGrowEvent(side, Block.get(PUMPKIN));
                         Server.getInstance().getPluginManager().callEvent(ev);
                         if (!ev.isCancelled()) {
                             this.getLevel().setBlock(side, ev.getNewState(), true, true);

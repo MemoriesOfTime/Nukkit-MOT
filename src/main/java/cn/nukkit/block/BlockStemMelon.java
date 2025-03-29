@@ -11,10 +11,6 @@ import cn.nukkit.math.BlockFace.Plane;
 import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
 
-import cn.nukkit.block.custom.properties.BlockProperties;
-import cn.nukkit.block.custom.properties.EnumBlockProperty;
-import cn.nukkit.block.properties.BlockPropertiesHelper;
-
 /**
  * Created by Pub4Game on 15.01.2016.
  */
@@ -48,11 +44,6 @@ public class BlockStemMelon extends BlockCrops implements Faceable {
     }
 
     @Override
-    public BlockProperties getBlockProperties() {
-        return PROPERTIES;
-    }
-
-    @Override
     public String getIdentifier() {
         return "minecraft:melon_stem";
     }
@@ -80,8 +71,8 @@ public class BlockStemMelon extends BlockCrops implements Faceable {
                     return Level.BLOCK_UPDATE_RANDOM;
                 } else {
                     for (BlockFace face : Plane.HORIZONTAL) {
-                        Block b = this.getSide(face);
-                        if (b.getId() == MELON_BLOCK) {
+                        Block block = this.getSide(face);
+                        if (block.getId() == MELON_BLOCK) {
                             return Level.BLOCK_UPDATE_RANDOM;
                         }
                     }
@@ -90,9 +81,7 @@ public class BlockStemMelon extends BlockCrops implements Faceable {
                     Block side = this.getSide(sideFace);
                     Block d = side.down();
                     if (side.getId() == AIR && (d.getId() == FARMLAND || d.getId() == GRASS || d.getId() == DIRT)) {
-                        BlockMelon melonBlock = (BlockMelon) Block.get(MELON_BLOCK);
-
-                        BlockGrowEvent ev = new BlockGrowEvent(side, melonBlock);
+                        BlockGrowEvent ev = new BlockGrowEvent(side, Block.get(MELON_BLOCK));
                         Server.getInstance().getPluginManager().callEvent(ev);
                         if (!ev.isCancelled()) {
                             this.getLevel().setBlock(side, ev.getNewState(), false, true);
