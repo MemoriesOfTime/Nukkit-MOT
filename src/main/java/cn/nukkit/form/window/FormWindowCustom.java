@@ -97,7 +97,7 @@ public class FormWindowCustom extends FormWindow {
             if (e instanceof ElementLabel) {
                 labelResponses.put(i, ((ElementLabel) e).getText());
                 responses.put(i, ((ElementLabel) e).getText());
-                if (protocol < ProtocolInfo.v1_21_70_25) {
+                if (protocol < ProtocolInfo.v1_21_70_24) {
                     // to be compatible with the older response before 1.21.70
                     responseIndex++;
                 }

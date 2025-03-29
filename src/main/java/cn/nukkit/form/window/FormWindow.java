@@ -26,7 +26,7 @@ public abstract class FormWindow {
 
     public String getJSONData(int protocol) {
         if (this instanceof FormWindowSimple) {
-            if (protocol >= ProtocolInfo.v1_21_70_25) {
+            if (protocol >= ProtocolInfo.v1_21_70_24) {
                 return GSON_FORM_WINDOW_SIMPLE_785.toJson(this);
             }
             return GSON_FORM_WINDOW_SIMPLE.toJson(this);
