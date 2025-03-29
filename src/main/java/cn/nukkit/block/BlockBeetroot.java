@@ -8,6 +8,7 @@ import cn.nukkit.utils.Utils;
  * Package cn.nukkit.block in project Nukkit .
  */
 public class BlockBeetroot extends BlockCrops {
+
     public BlockBeetroot() {
         this(0);
     }
@@ -32,8 +33,13 @@ public class BlockBeetroot extends BlockCrops {
     }
 
     @Override
+    public String getIdentifier() {
+        return "minecraft:beetroot";
+    }
+
+    @Override
     public Item[] getDrops(Item item) {
-        if (this.getDamage() >= 0x07) {
+        if (this.getPropertyValue(GROWTH) >= 7) {
             return new Item[]{
                     Item.get(Item.BEETROOT, 0, 1),
                     Item.get(Item.BEETROOT_SEEDS, 0, Utils.random.nextInt(0, 4))
