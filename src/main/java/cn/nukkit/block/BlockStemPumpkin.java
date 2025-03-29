@@ -1,9 +1,6 @@
 package cn.nukkit.block;
 
 import cn.nukkit.Server;
-import cn.nukkit.block.custom.properties.BlockProperties;
-import cn.nukkit.block.custom.properties.IntBlockProperty;
-import cn.nukkit.block.properties.BlockPropertiesHelper;
 import cn.nukkit.event.block.BlockGrowEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemSeedsPumpkin;
@@ -12,6 +9,10 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Plane;
 import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
+
+import cn.nukkit.block.custom.properties.BlockProperties;
+import cn.nukkit.block.custom.properties.IntBlockProperty;
+import cn.nukkit.block.properties.BlockPropertiesHelper;
 
 /**
  * Created by Pub4Game on 15.01.2016.
