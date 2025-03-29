@@ -647,7 +647,7 @@ public class LevelSoundEventPacket extends DataPacket {
         this.entityIdentifier = this.getString();
         this.isBabyMob = this.getBoolean();
         this.isGlobal = this.getBoolean();
-        if (this.protocol >= ProtocolInfo.v1_21_70) {
+        if (this.protocol >= ProtocolInfo.v1_21_70_24) {
             this.entityUniqueId = this.getLLong();
         }
     }
@@ -661,7 +661,7 @@ public class LevelSoundEventPacket extends DataPacket {
         this.putString(this.entityIdentifier);
         this.putBoolean(this.isBabyMob);
         this.putBoolean(this.isGlobal);
-        if (this.protocol >= ProtocolInfo.v1_21_70) {
+        if (this.protocol >= ProtocolInfo.v1_21_70_24) {
             this.putLLong(this.entityUniqueId);
         }
     }
