@@ -38,9 +38,9 @@ public final class LevelDBConstants {
 
     public static final int STATE_MAYOR_VERSION = 1;
     public static final int STATE_MINOR_VERSION = 21;
-    public static final int STATE_PATCH_VERSION = 70;
+    public static final int STATE_PATCH_VERSION = 60;
 
-    public static final int STATE_VERSION = makeVersion(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION) + 3; //1 update
+    public static final int STATE_VERSION = makeVersion(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION) + 33; //33 update
     public static final List<IntTag> CURRENT_LEVEL_VERSION = Collections.unmodifiableList(ObjectArrayList.of(
             new IntTag("", STATE_MAYOR_VERSION), // major
             new IntTag("", STATE_MINOR_VERSION), // minor
