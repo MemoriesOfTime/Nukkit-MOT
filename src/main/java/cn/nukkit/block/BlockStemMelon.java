@@ -7,13 +7,20 @@ import cn.nukkit.item.ItemSeedsMelon;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Plane;
+
 import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
+
+import cn.nukkit.block.custom.properties.BlockProperties;
+import cn.nukkit.block.custom.properties.EnumBlockProperty;
+import cn.nukkit.block.properties.BlockPropertiesHelper;
 
 /**
  * Created by Pub4Game on 15.01.2016.
  */
-public class BlockStemMelon extends BlockCrops implements Faceable {
+public class BlockStemMelon extends BlockCrops implements Faceable, BlockPropertiesHelper {
+
+    private static final EnumBlockProperty<BlockFace> ATTACHED_SIDE = new EnumBlockProperty<>("attached_side", false, BlockFace.class);
 
     public BlockStemMelon() {
         this(0);
@@ -35,11 +42,21 @@ public class BlockStemMelon extends BlockCrops implements Faceable {
 
     @Override
     public BlockFace getBlockFace() {
-        return BlockFace.fromIndex(this.getDamage() - 0x08);
+        return BlockFace.fromIndex(this.getDamage() - 8);
     }
 
     public void setBlockFace(BlockFace face) {
-        this.setDamage(0x08 + face.getIndex());
+        this.setDamage(8 + face.getIndex());
+    }
+
+    @Override
+    public BlockProperties getBlockProperties() {
+        return PROPERTIES;
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:melon_stem";
     }
 
     @Override
@@ -51,11 +68,14 @@ public class BlockStemMelon extends BlockCrops implements Faceable {
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
             if (Utils.rand(1, 2) == 1) {
-                if (this.getDamage() < 0x07) {
+                if (this.getPropertyValue(GROWTH) < 7) {
+
+                    this.setPropertyValue(GROWTH, this.getPropertyValue(GROWTH) + 1);
+
                     Block block = this.clone();
-                    block.setDamage(block.getDamage() + 1);
                     BlockGrowEvent ev = new BlockGrowEvent(this, block);
                     Server.getInstance().getPluginManager().callEvent(ev);
+
                     if (!ev.isCancelled()) {
                         this.getLevel().setBlock(this, ev.getNewState(), true, true);
                     }
@@ -72,10 +92,12 @@ public class BlockStemMelon extends BlockCrops implements Faceable {
                     Block side = this.getSide(sideFace);
                     Block d = side.down();
                     if (side.getId() == AIR && (d.getId() == FARMLAND || d.getId() == GRASS || d.getId() == DIRT)) {
-                        BlockGrowEvent ev = new BlockGrowEvent(side, Block.get(MELON_BLOCK));
+                        BlockMelon melonBlock = (BlockMelon) Block.get(MELON_BLOCK);
+
+                        BlockGrowEvent ev = new BlockGrowEvent(side, melonBlock);
                         Server.getInstance().getPluginManager().callEvent(ev);
                         if (!ev.isCancelled()) {
-                            this.getLevel().setBlock(side, ev.getNewState(), true, true);
+                            this.getLevel().setBlock(side, ev.getNewState(), false, true);
 
                             this.setBlockFace(sideFace);
                             this.getLevel().setBlock(this, this, true, true);

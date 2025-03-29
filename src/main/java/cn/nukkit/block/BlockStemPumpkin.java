@@ -35,11 +35,16 @@ public class BlockStemPumpkin extends BlockCrops implements Faceable {
 
     @Override
     public BlockFace getBlockFace() {
-        return BlockFace.fromIndex(this.getDamage() - 0x08);
+        return BlockFace.fromIndex(this.getDamage() - 8);
     }
 
     public void setBlockFace(BlockFace face) {
-        this.setDamage(0x08 + face.getIndex());
+        this.setDamage(8 + face.getIndex());
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:pumpkin_stem";
     }
 
     @Override
@@ -72,7 +77,9 @@ public class BlockStemPumpkin extends BlockCrops implements Faceable {
                     Block side = this.getSide(sideFace);
                     Block d = side.down();
                     if (side.getId() == AIR && (d.getId() == FARMLAND || d.getId() == GRASS || d.getId() == DIRT)) {
-                        BlockGrowEvent ev = new BlockGrowEvent(side, Block.get(PUMPKIN));
+                        BlockPumpkin pumpkin = (BlockPumpkin) Block.get(PUMPKIN);
+
+                        BlockGrowEvent ev = new BlockGrowEvent(side, pumpkin);
                         Server.getInstance().getPluginManager().callEvent(ev);
                         if (!ev.isCancelled()) {
                             this.getLevel().setBlock(side, ev.getNewState(), true, true);

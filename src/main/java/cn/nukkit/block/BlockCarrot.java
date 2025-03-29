@@ -28,8 +28,13 @@ public class BlockCarrot extends BlockCrops {
     }
 
     @Override
+    public String getIdentifier() {
+        return "minecraft:carrot_block";
+    }
+
+    @Override
     public Item[] getDrops(Item item) {
-        if (getDamage() >= 0x07) {
+        if (this.getPropertyValue(GROWTH) >= 7) {
             return new Item[]{
                     new ItemCarrot(0, Utils.rand(1, 5))
             };
