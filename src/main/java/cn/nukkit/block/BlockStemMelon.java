@@ -18,9 +18,7 @@ import cn.nukkit.block.properties.BlockPropertiesHelper;
 /**
  * Created by Pub4Game on 15.01.2016.
  */
-public class BlockStemMelon extends BlockCrops implements Faceable, BlockPropertiesHelper {
-
-    private static final EnumBlockProperty<BlockFace> ATTACHED_SIDE = new EnumBlockProperty<>("attached_side", false, BlockFace.class);
+public class BlockStemMelon extends BlockCrops implements Faceable {
 
     public BlockStemMelon() {
         this(0);
