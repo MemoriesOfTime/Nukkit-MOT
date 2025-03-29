@@ -830,6 +830,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 return Item.creative766;
             case v1_21_60:
                 return Item.creative776;
+            case v1_21_70_24:
             case v1_21_70:
                 return Item.creative786;
             // TODO Multiversion
