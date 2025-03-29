@@ -94,9 +94,9 @@ public class EntityEgg extends EntityProjectile implements EntityClimateVariant 
 
                     if (entity != null) {
                         if (namedTag.containsString("variant")) {
-                            setVariant(EntityClimateVariant.Variant.get(namedTag.getString("variant")));
+                            entity.setVariant(EntityClimateVariant.Variant.get(namedTag.getString("variant")));
                         } else {
-                            setVariant(EntityClimateVariant.Variant.TEMPERATE);
+                            entity.setVariant(EntityClimateVariant.Variant.TEMPERATE);
                         }
 
                         entity.spawnToAll();
