@@ -25,7 +25,7 @@ import java.util.Objects;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
 
-public class EntityPig extends EntityWalkingAnimal implements EntityRideable, EntityControllable {
+public class EntityPig extends EntityWalkingAnimal implements EntityRideable, EntityControllable, EntityClimateVariant {
 
     public static final int NETWORK_ID = 12;
 
@@ -61,9 +61,11 @@ public class EntityPig extends EntityWalkingAnimal implements EntityRideable, En
         this.setMaxHealth(10);
         super.initEntity();
 
-        if(namedTag.contains("variant")) {
-            EntityClimateVariant.setVariant(this, EntityClimateVariant.Variant.get(namedTag.getString("variant")));
-        } else EntityClimateVariant.setVariant(this, EntityClimateVariant.getBiomeVariant(getLevel().getBiomeId(getFloorX(), getFloorZ())));
+        if (namedTag.contains("variant")) {
+            setVariant(Variant.get(namedTag.getString("variant")));
+        } else {
+            setVariant(getBiomeVariant(getLevel().getBiomeId(getFloorX(), getFloorZ())));
+        }
 
         if (this.namedTag.contains("Saddle")) {
             this.setSaddled(this.namedTag.getBoolean("Saddle"));

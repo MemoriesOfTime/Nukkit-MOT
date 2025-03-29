@@ -15,7 +15,7 @@ import cn.nukkit.utils.Utils;
 import java.util.ArrayList;
 import java.util.List;
 
-public class EntityChicken extends EntityWalkingAnimal {
+public class EntityChicken extends EntityWalkingAnimal implements EntityClimateVariant {
 
     public static final int NETWORK_ID = 10;
 
@@ -63,9 +63,11 @@ public class EntityChicken extends EntityWalkingAnimal {
         this.setMaxHealth(4);
         super.initEntity();
 
-        if(namedTag.contains("variant")) {
-            EntityClimateVariant.setVariant(this, EntityClimateVariant.Variant.get(namedTag.getString("variant")));
-        } else EntityClimateVariant.setVariant(this, EntityClimateVariant.getBiomeVariant(getLevel().getBiomeId(getFloorX(), getFloorZ())));
+        if (namedTag.contains("variant")) {
+            setVariant(Variant.get(namedTag.getString("variant")));
+        } else {
+            setVariant(getBiomeVariant(getLevel().getBiomeId(getFloorX(), getFloorZ())));
+        }
 
         if (this.namedTag.contains("EggLayTime")) {
             this.eggLayTime = this.namedTag.getInt("EggLayTime");
@@ -99,9 +101,9 @@ public class EntityChicken extends EntityWalkingAnimal {
     }
 
     private Item getEgg() {
-        if(Server.getInstance().enableNewChickenEggsLaying) {
-            if(EntityClimateVariant.getVariant(this) == EntityClimateVariant.Variant.COLD) return Item.fromString(Item.BLUE_EGG);
-            if(EntityClimateVariant.getVariant(this) == EntityClimateVariant.Variant.WARM) return Item.fromString(Item.BROWN_EGG);
+        if (Server.getInstance().enableNewChickenEggsLaying) {
+            if(getVariant() == EntityClimateVariant.Variant.COLD) return Item.fromString(Item.BLUE_EGG);
+            if(getVariant() == EntityClimateVariant.Variant.WARM) return Item.fromString(Item.BROWN_EGG);
         }
 
         return Item.get(Item.EGG, 0, 1);

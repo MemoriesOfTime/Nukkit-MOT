@@ -13,7 +13,7 @@ import cn.nukkit.utils.Utils;
 import java.util.ArrayList;
 import java.util.List;
 
-public class EntityCow extends EntityWalkingAnimal {
+public class EntityCow extends EntityWalkingAnimal implements EntityClimateVariant {
 
     public static final int NETWORK_ID = 11;
 
@@ -47,9 +47,11 @@ public class EntityCow extends EntityWalkingAnimal {
         this.setMaxHealth(10);
         super.initEntity();
 
-        if(namedTag.contains("variant")) {
-            EntityClimateVariant.setVariant(this, EntityClimateVariant.Variant.get(namedTag.getString("variant")));
-        } else EntityClimateVariant.setVariant(this, EntityClimateVariant.getBiomeVariant(getLevel().getBiomeId(getFloorX(), getFloorZ())));
+        if (namedTag.contains("variant")) {
+            setVariant(Variant.get(namedTag.getString("variant")));
+        } else {
+            setVariant(getBiomeVariant(getLevel().getBiomeId(getFloorX(), getFloorZ())));
+        }
     }
 
     @Override
