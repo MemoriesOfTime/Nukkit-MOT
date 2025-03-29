@@ -1,18 +1,12 @@
 package cn.nukkit.block;
 
-import cn.nukkit.block.custom.properties.IntBlockProperty;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemMelon;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
-import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
-
-import cn.nukkit.block.custom.properties.BlockProperties;
-import cn.nukkit.block.custom.properties.EnumBlockProperty;
-import cn.nukkit.block.properties.BlockPropertiesHelper;
 
 /**
  * Created on 2015/12/11 by Pub4Game.
