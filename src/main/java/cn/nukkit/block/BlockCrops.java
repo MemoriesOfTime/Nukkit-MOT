@@ -55,10 +55,12 @@ public abstract class BlockCrops extends BlockFlowable implements BlockPropertie
         if (item.getId() == Item.DYE && item.getDamage() == 0x0f) {
             if (this.getPropertyValue(GROWTH) < 7) {
                 BlockCrops block = (BlockCrops) this.clone();
+
                 block.setPropertyValue(GROWTH, block.getDamage() + Utils.random.nextInt(3) + 2);
-                if (block.getPropertyValue(GROWTH) < 7) {
+                if (block.getPropertyValue(GROWTH) > 7) {
                     block.setPropertyValue(GROWTH, 7);
                 }
+
                 BlockGrowEvent ev = new BlockGrowEvent(this, block);
                 Server.getInstance().getPluginManager().callEvent(ev);
 
