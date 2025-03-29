@@ -51,13 +51,13 @@ public abstract class Biome implements BlockID {
         }
 
         //TODO Multiversion
-        try (InputStream stream = Biome.class.getClassLoader().getResourceAsStream("biome_definitions_554.dat")) {
+        try (InputStream stream = Biome.class.getClassLoader().getResourceAsStream("biome_definitions_786.dat")) {
             if (stream == null) {
-                throw new AssertionError("Unable to locate block biome_definitions_554");
+                throw new AssertionError("Unable to locate block biome_definitions_786");
             }
             biomeDefinitions = (CompoundTag) NBTIO.readTag(new BufferedInputStream(stream), ByteOrder.BIG_ENDIAN, true);
         } catch (IOException e) {
-            throw new AssertionError("Unable to locate block biome_definitions_554", e);
+            throw new AssertionError("Unable to locate block biome_definitions_786", e);
         }
     }
 

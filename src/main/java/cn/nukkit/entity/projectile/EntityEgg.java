@@ -2,6 +2,7 @@ package cn.nukkit.entity.projectile;
 
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.EntityClimateVariant;
 import cn.nukkit.entity.passive.EntityChicken;
 import cn.nukkit.event.entity.CreatureSpawnEvent;
 import cn.nukkit.item.ItemEgg;
@@ -15,7 +16,7 @@ import cn.nukkit.utils.Utils;
  * @author MagicDroidX
  * Nukkit Project
  */
-public class EntityEgg extends EntityProjectile {
+public class EntityEgg extends EntityProjectile implements EntityClimateVariant {
 
     public static final int NETWORK_ID = 82;
 
@@ -58,6 +59,16 @@ public class EntityEgg extends EntityProjectile {
     }
 
     @Override
+    protected void initEntity() {
+        super.initEntity();
+        if (namedTag.containsString("variant")) {
+            setVariant(EntityClimateVariant.Variant.get(namedTag.getString("variant")));
+        } else {
+            setVariant(EntityClimateVariant.Variant.TEMPERATE);
+        }
+    }
+
+    @Override
     public boolean onUpdate(int currentTick) {
         if (this.closed) {
             return false;
@@ -80,7 +91,14 @@ public class EntityEgg extends EntityProjectile {
                     }
 
                     EntityChicken entity = (EntityChicken) Entity.createEntity("Chicken", spawnPos);
+
                     if (entity != null) {
+                        if (namedTag.containsString("variant")) {
+                            entity.setVariant(EntityClimateVariant.Variant.get(namedTag.getString("variant")));
+                        } else {
+                            entity.setVariant(EntityClimateVariant.Variant.TEMPERATE);
+                        }
+
                         entity.spawnToAll();
                         entity.setBaby(true);
                     }
