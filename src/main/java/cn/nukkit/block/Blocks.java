@@ -671,6 +671,15 @@ public class Blocks {
         list[WAXED_EXPOSED_COPPER_BULB] = BlockWaxedExposedCopperBulb.class; //1036
         list[WAXED_WEATHERED_COPPER_BULB] = BlockWaxedWeatheredCopperBulb.class; //1037
         list[WAXED_OXIDIZED_COPPER_BULB] = BlockWaxedOxidizedCopperBulb.class; //1038
+
+        list[BUSH] = BlockBush.class; //1278
+        list[WILDFLOWERS] = BlockWildflowers.class; //1279
+        list[FIREFLY_BUSH] = BlockFireflyBush.class; //1280
+        list[LEAF_LITTER] = BlockLeafLitter.class; //1281
+
+        list[SHORT_DRY_GRASS] = BlockShortDryGrass.class; //1283
+        list[TALL_DRY_GRASS] = BlockTallDryGrass.class; //1284
+        list[CACTUS_FLOWER] = BlockCactusFlower.class; //1285
     }
 
     static void init() {
