@@ -1,4 +1,11 @@
 {
+  "minecraft:cactus_flower": -1030,
+  "minecraft:tall_dry_grass": -1029,
+  "minecraft:short_dry_grass": -1028,
+  "minecraft:leaf_litter": -1026,
+  "minecraft:firefly_bush": -1025,
+  "minecraft:wildflowers": -1024,
+  "minecraft:bush": -1023,
   "minecraft:sniffer_egg": -596,
   "minecraft:suspicious_gravel": -573,
   "minecraft:decorated_pot": -551,
