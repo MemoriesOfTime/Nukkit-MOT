@@ -7,7 +7,6 @@ import cn.nukkit.item.ItemSeedsMelon;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Plane;
-
 import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
 
