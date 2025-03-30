@@ -1,6 +1,5 @@
 package cn.nukkit.form.window;
 
-import cn.nukkit.form.element.ElementButton;
 import cn.nukkit.form.handler.FormResponseHandler;
 import cn.nukkit.form.response.FormResponse;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -27,7 +26,7 @@ public abstract class FormWindow {
 
     public String getJSONData(int protocol) {
         if (this instanceof FormWindowSimple) {
-            if (protocol >= ProtocolInfo.v1_21_70_25) {
+            if (protocol >= ProtocolInfo.v1_21_70_24) {
                 return GSON_FORM_WINDOW_SIMPLE_785.toJson(this);
             }
             return GSON_FORM_WINDOW_SIMPLE.toJson(this);
@@ -35,7 +34,13 @@ public abstract class FormWindow {
         return FormWindow.GSON.toJson(this);
     }
 
-    public abstract void setResponse(String data);
+    public void setResponse(String data) {
+        this.setResponse(ProtocolInfo.CURRENT_PROTOCOL, data);
+    }
+
+    public void setResponse(int protocol, String data) {
+        // no-op
+    }
 
     public abstract FormResponse getResponse();
 
@@ -54,8 +59,8 @@ public abstract class FormWindow {
     static class ExclusionStrategyFormWindowSimple implements ExclusionStrategy {
         @Override
         public boolean shouldSkipField(FieldAttributes fieldAttributes) {
-            return (fieldAttributes.getDeclaringClass() == FormWindowSimple.class && fieldAttributes.getName().equals("response"))
-                    || (fieldAttributes.getDeclaringClass() == ElementButton.class && fieldAttributes.getName().equals("image"));
+            return fieldAttributes.getDeclaringClass() == FormWindowSimple.class
+                    && fieldAttributes.getName().equals("elements");
         }
 
         @Override

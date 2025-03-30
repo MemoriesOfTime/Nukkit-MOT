@@ -549,6 +549,10 @@ public class Server {
      */
     public boolean enableNewPaintings;
     /**
+     * Enable chicken egg laying from 1.21.70
+     */
+    public boolean enableNewChickenEggsLaying;
+    /**
      * A number of datagram packets each address can send within one RakNet tick (10ms)
      */
     public int rakPacketLimit;
@@ -825,6 +829,7 @@ public class Server {
             this.enablePlugins(PluginLoadOrder.POSTWORLD);
         }
 
+        EntityProperty.init();
         EntityProperty.buildPacket();
         EntityProperty.buildPlayerProperty();
 
@@ -3142,6 +3147,7 @@ public class Server {
         this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
         this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
         this.enableNewPaintings = this.getPropertyBoolean("enable-new-paintings", true);
+        this.enableNewChickenEggsLaying = this.getPropertyBoolean("enable-new-chicken-eggs-laying", true);
         this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
         this.enableRakSendCookie = this.getPropertyBoolean("enable-rak-send-cookie", true);
     }
@@ -3294,6 +3300,7 @@ public class Server {
             put("use-native-leveldb", false);
             put("enable-raw-ores", true);
             put("enable-new-paintings", true);
+            put("enable-new-chicken-eggs-laying", true);
         }
     }
 

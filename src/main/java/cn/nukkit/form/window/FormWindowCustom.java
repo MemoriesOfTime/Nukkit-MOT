@@ -3,6 +3,7 @@ package cn.nukkit.form.window;
 import cn.nukkit.form.element.*;
 import cn.nukkit.form.response.FormResponseCustom;
 import cn.nukkit.form.response.FormResponseData;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.gson.reflect.TypeToken;
 
 import java.util.ArrayList;
@@ -71,7 +72,7 @@ public class FormWindowCustom extends FormWindow {
     }
 
     @Override
-    public void setResponse(String data) {
+    public void setResponse(int protocol, String data) {
         if (data.equals("null")) {
             this.closed = true;
             return;
@@ -96,6 +97,10 @@ public class FormWindowCustom extends FormWindow {
             if (e instanceof ElementLabel) {
                 labelResponses.put(i, ((ElementLabel) e).getText());
                 responses.put(i, ((ElementLabel) e).getText());
+                if (protocol < ProtocolInfo.v1_21_70_24) {
+                    // to be compatible with the older response before 1.21.70
+                    responseIndex++;
+                }
             } else if (e instanceof ElementDropdown elementDropdown) {
                 int index = Integer.parseInt(elementData);
                 String answer = elementDropdown.getOptions().get(index);

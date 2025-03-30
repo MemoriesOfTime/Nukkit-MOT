@@ -466,6 +466,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemBannerPatternFlow.class);
             registerNamespacedIdItem(ItemBannerPatternGuster.class);
             registerNamespacedIdItem(ItemOminousBottle.class);
+            registerNamespacedIdItem(ItemBlueEgg.class);
+            registerNamespacedIdItem(ItemBrownEgg.class);
 
 
             // 添加原版物品到NAMESPACED_ID_ITEM
@@ -830,6 +832,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 return Item.creative766;
             case v1_21_60:
                 return Item.creative776;
+            case v1_21_70_24:
             case v1_21_70:
                 return Item.creative786;
             // TODO Multiversion

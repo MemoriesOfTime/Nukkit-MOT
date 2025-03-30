@@ -298,7 +298,7 @@ public class GlobalBlockPalette {
     }
 
     public static BlockPalette getPaletteByProtocol(int protocol) {
-        if (protocol >= ProtocolInfo.v1_21_70) {
+        if (protocol >= ProtocolInfo.v1_21_70_24) {
             if (blockPalette786 == null) {
                 blockPalette786 = new BlockPalette(ProtocolInfo.v1_21_70);
             }
