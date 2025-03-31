@@ -11,7 +11,7 @@ import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
 
 import cn.nukkit.block.custom.properties.BlockProperties;
-import cn.nukkit.block.custom.properties.IntBlockProperty;
+import cn.nukkit.block.properties.VanillaProperties;
 import cn.nukkit.block.properties.BlockPropertiesHelper;
 
 /**
@@ -19,9 +19,7 @@ import cn.nukkit.block.properties.BlockPropertiesHelper;
  */
 public class BlockStemPumpkin extends BlockCrops implements Faceable, BlockPropertiesHelper {
 
-    protected static final IntBlockProperty GROWTH = new IntBlockProperty("growth", false, 13, 0);
-
-    protected static final BlockProperties PROPERTIES = new BlockProperties(GROWTH);
+    protected static final BlockProperties PROPERTIES = new BlockProperties(GROWTH, VanillaProperties.FACING_DIRECTION);
 
     public BlockStemPumpkin() {
         this(0);
@@ -43,11 +41,12 @@ public class BlockStemPumpkin extends BlockCrops implements Faceable, BlockPrope
 
     @Override
     public BlockFace getBlockFace() {
-        return BlockFace.fromIndex(this.getDamage() - 8);
+        return this.getPropertyValue(VanillaProperties.FACING_DIRECTION);
     }
 
+    @Override
     public void setBlockFace(BlockFace face) {
-        this.setDamage(8 + face.getIndex());
+        this.setPropertyValue(VanillaProperties.FACING_DIRECTION, face);
     }
 
     @Override
@@ -69,11 +68,14 @@ public class BlockStemPumpkin extends BlockCrops implements Faceable, BlockPrope
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
             if (Utils.rand(1, 2) == 1) {
-                if (this.getDamage() < 0x07) {
+                if (this.getPropertyValue(GROWTH) < 7) {
+
+                    this.setPropertyValue(GROWTH, this.getPropertyValue(GROWTH) + 1);
+
                     Block block = this.clone();
-                    block.setDamage(block.getDamage() + 1);
                     BlockGrowEvent ev = new BlockGrowEvent(this, block);
                     Server.getInstance().getPluginManager().callEvent(ev);
+
                     if (!ev.isCancelled()) {
                         this.getLevel().setBlock(this, ev.getNewState(), true, true);
                     }

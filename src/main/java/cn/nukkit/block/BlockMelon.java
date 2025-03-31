@@ -58,10 +58,10 @@ public class BlockMelon extends BlockSolid {
         for (BlockFace face : BlockFace.Plane.HORIZONTAL) {
             Block block = this.getSide(face);
             if (block instanceof BlockStemMelon stemMelon) {
-               if (stemMelon.getBlockFace() == face.getOpposite()) {
-                   stemMelon.setPropertyValue(BlockCrops.GROWTH, 7);
-                   this.getLevel().setBlock(stemMelon, stemMelon, true, true);
-               }
+                if (stemMelon.getBlockFace() == face.getOpposite()) {
+                    stemMelon.setDamage(7);
+                    this.getLevel().setBlock(stemMelon, stemMelon, true, true);
+                }
             }
         }
 

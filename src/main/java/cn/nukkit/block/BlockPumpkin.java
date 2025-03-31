@@ -85,7 +85,7 @@ public class BlockPumpkin extends BlockSolidMeta implements Faceable {
             Block block = this.getSide(face);
             if (block instanceof BlockStemPumpkin stemPumpkin) {
                 if (stemPumpkin.getBlockFace() == face.getOpposite()) {
-                    stemPumpkin.setPropertyValue(BlockCrops.GROWTH, 7);
+                    stemPumpkin.setDamage(7);
                     this.getLevel().setBlock(stemPumpkin, stemPumpkin, true, true);
                 }
             }
