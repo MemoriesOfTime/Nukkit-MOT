@@ -9,6 +9,8 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
 
+import cn.nukkit.block.properties.VanillaProperties;
+
 /**
  * Created on 2015/12/8 by xtypr.
  * Package cn.nukkit.block in project Nukkit .
@@ -77,6 +79,21 @@ public class BlockPumpkin extends BlockSolidMeta implements Faceable {
         this.setBlockFace(player != null ? player.getDirection().getOpposite() : BlockFace.SOUTH);
         this.getLevel().setBlock(block, this, true, true);
         return true;
+    }
+
+    @Override
+    public boolean onBreak(Item item) {
+        for (BlockFace face : BlockFace.Plane.HORIZONTAL) {
+            Block block = this.getSide(face);
+            if (block instanceof BlockStemPumpkin stemPumpkin) {
+                if (stemPumpkin.getBlockFace() == face.getOpposite()) {
+                    stemPumpkin.setPropertyValue(VanillaProperties.FACING_DIRECTION, BlockFace.DOWN);
+                    this.getLevel().setBlock(stemPumpkin, stemPumpkin, true, true);
+                }
+            }
+        }
+
+        return super.onBreak(item);
     }
 
     @Override

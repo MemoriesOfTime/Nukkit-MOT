@@ -10,11 +10,19 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
 
+import cn.nukkit.block.custom.properties.BlockProperties;
+import cn.nukkit.block.custom.properties.IntBlockProperty;
+import cn.nukkit.block.properties.BlockPropertiesHelper;
+
 /**
  * @author MagicDroidX
  * Nukkit Project
  */
-public abstract class BlockCrops extends BlockFlowable {
+public abstract class BlockCrops extends BlockFlowable implements BlockPropertiesHelper {
+
+    protected static final IntBlockProperty GROWTH = new IntBlockProperty("growth", false, 7, 0);
+
+    protected static final BlockProperties PROPERTIES = new BlockProperties(GROWTH);
 
     public static final int MINIMUM_LIGHT_LEVEL = 9;
 
@@ -25,6 +33,11 @@ public abstract class BlockCrops extends BlockFlowable {
     @Override
     public boolean canBeActivated() {
         return true;
+    }
+
+    @Override
+    public BlockProperties getBlockProperties() {
+        return PROPERTIES;
     }
 
     @Override
@@ -40,12 +53,12 @@ public abstract class BlockCrops extends BlockFlowable {
     public boolean onActivate(Item item, Player player) {
         // Bone meal
         if (item.getId() == Item.DYE && item.getDamage() == 0x0f) {
-            if (this.getDamage() < 7) {
+            if (this.getPropertyValue(GROWTH) < 7) {
                 BlockCrops block = (BlockCrops) this.clone();
-                block.setDamage(block.getDamage() + Utils.random.nextInt(3) + 2);
-                if (block.getDamage() > 7) {
-                    block.setDamage(7);
-                }
+
+                int newGrowth = block.getPropertyValue(GROWTH) + Utils.random.nextInt(3) + 2;
+                block.setPropertyValue(GROWTH, Math.min(newGrowth, GROWTH.getMaxValue()));
+
                 BlockGrowEvent ev = new BlockGrowEvent(this, block);
                 Server.getInstance().getPluginManager().callEvent(ev);
 
@@ -77,9 +90,11 @@ public abstract class BlockCrops extends BlockFlowable {
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
             if (Utils.random.nextInt(2) == 1) {
-                if (this.getDamage() < 0x07) {
+                if (this.getPropertyValue(GROWTH) < 7) {
+
+                    this.setPropertyValue(GROWTH, this.getPropertyValue(GROWTH) + 1);
+
                     BlockCrops block = (BlockCrops) this.clone();
-                    block.setDamage(block.getDamage() + 1);
                     BlockGrowEvent ev = new BlockGrowEvent(this, block);
                     Server.getInstance().getPluginManager().callEvent(ev);
 
