@@ -61,7 +61,7 @@ public class BlockMelon extends BlockSolid {
             Block block = this.getSide(face);
             if (block instanceof BlockStemMelon stemMelon) {
                 if (stemMelon.getBlockFace() == face.getOpposite()) {
-                    stemPumpkin.setPropertyValue(VanillaProperties.FACING_DIRECTION, BlockFace.DOWN);
+                    stemMelon.setPropertyValue(VanillaProperties.FACING_DIRECTION, BlockFace.DOWN);
                     this.getLevel().setBlock(stemMelon, stemMelon, true, true);
                 }
             }
