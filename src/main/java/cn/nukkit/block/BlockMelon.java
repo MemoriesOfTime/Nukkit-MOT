@@ -8,6 +8,8 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
 
+import cn.nukkit.block.properties.VanillaProperties;
+
 /**
  * Created on 2015/12/11 by Pub4Game.
  * Package cn.nukkit.block in project Nukkit .
@@ -59,7 +61,7 @@ public class BlockMelon extends BlockSolid {
             Block block = this.getSide(face);
             if (block instanceof BlockStemMelon stemMelon) {
                 if (stemMelon.getBlockFace() == face.getOpposite()) {
-                    stemMelon.setDamage(7);
+                    stemPumpkin.setPropertyValue(VanillaProperties.FACING_DIRECTION, BlockFace.DOWN);
                     this.getLevel().setBlock(stemMelon, stemMelon, true, true);
                 }
             }
