@@ -1034,6 +1034,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             return new OK<>(false, e);
         }
 
+        if (customItem.getNamespaceId().startsWith("minecraft:")) {
+            return new OK<>(false, "The custom item \"" + customItem.getNamespaceId() + "\" cannot use \"minecraft\" as the namespace!");
+        }
+
         if (CUSTOM_ITEMS.containsKey(customItem.getNamespaceId())) {
             return new OK<>(false, "The custom item with the namespace ID \"" + customItem.getNamespaceId() + "\" is already registered!");
         }
