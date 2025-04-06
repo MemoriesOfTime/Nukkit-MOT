@@ -215,12 +215,6 @@ public class Server {
     public static final List<String> multiNetherWorlds = new ArrayList<>();
     public static final List<String> antiXrayWorlds = new ArrayList<>();
     /**
-     * Multi-version settings for resource packs.
-     * The resource pack will be sent only from the specified protocol.
-     * Format: protocol:UUIDv4
-     */
-    public static final HashMap<UUID, Integer> mvResourcePacks = new HashMap<>();
-    /**
      * Worlds where random block ticking is disabled.
      */
     public static final List<String> noTickingWorlds = new ArrayList<>();
@@ -3074,37 +3068,6 @@ public class Server {
             StringTokenizer tokenizer = new StringTokenizer(antiXrayWorldsString, ", ");
             while (tokenizer.hasMoreTokens()) {
                 antiXrayWorlds.add(tokenizer.nextToken());
-            }
-        }
-
-        mvResourcePacks.clear();
-        String mvResourcePacksString = this.getPropertyString("multi-version-packs");
-        if (mvResourcePacksString != null && !mvResourcePacksString.trim().isEmpty()) {
-            String[] pairs = mvResourcePacksString.split("\\s*,\\s*");
-            for (String pair : pairs) {
-                String[] parts = pair.split(":");
-                if (parts.length == 2) {
-                    try {
-                        int protocol = Integer.parseInt(parts[0].trim());
-                        boolean isSupported = false;
-                        for (int supported : ProtocolInfo.SUPPORTED_PROTOCOLS) {
-                            if (supported == protocol) {
-                                isSupported = true;
-                                break;
-                            }
-                        }
-                        if (isSupported) {
-                            try {
-                                UUID uuid = UUID.fromString(parts[1].trim());
-                                mvResourcePacks.put(uuid, protocol);
-                            } catch (IllegalArgumentException e) {
-                                this.getLogger().error("Invalid UUID for mvResourcePacks: " + parts[1]);
-                            }
-                        }
-                    } catch (NumberFormatException e) {
-                        this.getLogger().error("Invalid protocol for mvResourcePacks: " + parts[0]);
-                    }
-                }
             }
         }
 
