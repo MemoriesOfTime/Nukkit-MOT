@@ -10,8 +10,7 @@ public abstract class AbstractResourcePack implements ResourcePack {
 
     protected JsonObject manifest;
     private UUID id = null;
-
-    private Integer protocol = null;
+    private int protocol = 0;
 
     protected boolean verifyManifest() {
         if (this.manifest.has("format_version") && this.manifest.has("header") && this.manifest.has("modules")) {
@@ -41,8 +40,8 @@ public abstract class AbstractResourcePack implements ResourcePack {
     }
 
     @Override
-    public Integer getPackProtocol() {
-        if (protocol == null) {
+    public int getPackProtocol() {
+        if (protocol == 0) {
             var header = this.manifest.getAsJsonObject("header");
             protocol = header.has("protocol") ? header.get("protocol").getAsInt() : ProtocolInfo.SUPPORTED_PROTOCOLS.get(0);
         }
