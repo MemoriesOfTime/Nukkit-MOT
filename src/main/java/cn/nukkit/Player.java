@@ -2837,22 +2837,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         ResourcePacksInfoPacket infoPacket = new ResourcePacksInfoPacket();
         var mvResourcePacks = Server.mvResourcePacks;
 
-        infoPacket.resourcePackEntries = mvResourcePacks.isEmpty()
-                ? this.server.getResourcePackManager().getResourceStack()
-                : Arrays.stream(this.server.getResourcePackManager().getResourceStack())
-                .filter(pack -> mvResourcePacks.containsKey(pack.getPackId()))
-                .collect(Collectors.groupingBy(
-                        ResourcePack::getPackId,
-                        Collectors.maxBy(Comparator.comparingInt(
-                                pack -> protocol >= mvResourcePacks.get(pack.getPackId())
-                                        ? mvResourcePacks.get(pack.getPackId())
-                                        : Integer.MIN_VALUE
-                        ))
-                ))
-                .values().stream()
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .toArray(ResourcePack[]::new);
+        infoPacket.resourcePackEntries = mvResourcePacks.isEmpty() ? this.server.getResourcePackManager().getResourceStack() :
+            mvResourcePacks.entrySet().stream()
+        .filter(entry -> entry.getValue() <= protocol)
+        .max(Entry.comparingByValue())
+        .map(Entry::getKey)
+        .flatMap(id -> Arrays.stream(this.server.getResourcePackManager().getResourceStack())
+                .filter(pack -> id.equals(pack.getPackId()))
+                .findFirst()
+        )
+        .map(pack -> new ResourcePack[]{pack})
+        .orElse(ResourcePack.EMPTY_ARRAY);
 
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
