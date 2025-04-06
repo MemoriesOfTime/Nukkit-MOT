@@ -77,6 +77,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
+    private static final HashMap<String, CustomItem> CUSTOM_ITEM_NEED_ADD_CREATIVE = new HashMap<>();
 
     protected Block block = null;
     protected final int id;
@@ -653,6 +654,15 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 creativeItems.add(item, creativeGroup);
             }
         }
+
+        ArrayList<String> mappingCustomItems = mapping.getCustomItems();
+        for (CustomItem customItem : CUSTOM_ITEM_NEED_ADD_CREATIVE.values()) {
+            if (!mappingCustomItems.contains(customItem.getNamespaceId())) {
+                continue;
+            }
+            CustomItemDefinition definition = customItem.getDefinition();
+            creativeItems.add((Item) customItem, definition.getCreativeCategory(), definition.getCreativeGroup());
+        }
     }
 
     public static void clearCreativeItems() {
@@ -1069,6 +1079,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCustomItem(customItem, v1_21_70, addCreativeItem, v1_21_70);
         //TODO Multiversion 添加新版本支持时修改这里
 
+        if (addCreativeItem) {
+            CUSTOM_ITEM_NEED_ADD_CREATIVE.put(customItem.getNamespaceId(), customItem);
+        }
+
         return new OK<Void>(true);
     }
 
@@ -1085,6 +1099,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             Item customItem = fromString(namespaceId);
             CUSTOM_ITEMS.remove(namespaceId);
             CUSTOM_ITEM_DEFINITIONS.remove(namespaceId);
+            CUSTOM_ITEM_NEED_ADD_CREATIVE.remove(namespaceId);
 
             deleteCustomItem(customItem, v1_16_100, v1_16_0);
             deleteCustomItem(customItem, v1_17_0, v1_17_0);

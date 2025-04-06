@@ -101,7 +101,6 @@ public class AdventureSettings implements Cloneable {
             // Because we send speed
             layer.getAbilityValues().add(PlayerAbility.WALK_SPEED);
             layer.getAbilityValues().add(PlayerAbility.FLY_SPEED);
-
             if (player.protocol >= ProtocolInfo.v1_21_60) {
                 layer.getAbilitiesSet().add(PlayerAbility.VERTICAL_FLY_SPEED);
             }
@@ -119,18 +118,26 @@ public class AdventureSettings implements Cloneable {
             layer.setVerticalFlySpeed(player.getVerticalFlySpeed());
             packet.getAbilityLayers().add(layer);
 
-            if (this.get(Type.NO_CLIP)) {
-                AbilityLayer layer2 = new AbilityLayer();
-                layer2.setLayerType(AbilityLayer.Type.SPECTATOR);
+            if (player.protocol >= ProtocolInfo.v1_19_80 && player.isSpectator()) {
+                AbilityLayer spectator = new AbilityLayer();
+                spectator.setLayerType(AbilityLayer.Type.SPECTATOR);
 
-                layer2.getAbilitiesSet().addAll(PlayerAbility.VALUES);
-                layer2.getAbilitiesSet().remove(PlayerAbility.FLY_SPEED); //不要设置速度，这会导致视角出错
-                layer2.getAbilitiesSet().remove(PlayerAbility.WALK_SPEED);
-                layer2.getAbilitiesSet().remove(PlayerAbility.VERTICAL_FLY_SPEED);
+                spectator.getAbilitiesSet().addAll(PlayerAbility.VALUES);
+                spectator.getAbilitiesSet().remove(PlayerAbility.FLY_SPEED); //不要设置速度，这会导致视角出错
+                spectator.getAbilitiesSet().remove(PlayerAbility.WALK_SPEED);
+                spectator.getAbilitiesSet().remove(PlayerAbility.VERTICAL_FLY_SPEED);
 
-                layer2.getAbilityValues().add(PlayerAbility.FLYING);
-                layer2.getAbilityValues().add(PlayerAbility.NO_CLIP);
-                packet.getAbilityLayers().add(layer2);
+                for (Type type : Type.values()) {
+                    if (type.isAbility() && this.get(type) && player.protocol >= type.protocol) {
+                        spectator.getAbilityValues().add(type.getAbility());
+                    }
+                }
+
+                if (player.isOp()) {
+                    layer.getAbilityValues().add(PlayerAbility.OPERATOR_COMMANDS);
+                }
+
+                packet.getAbilityLayers().add(spectator);
             }
 
             UpdateAdventureSettingsPacket adventurePacket = new UpdateAdventureSettingsPacket();
@@ -142,7 +149,7 @@ public class AdventureSettings implements Cloneable {
 
             player.dataPacket(packet);
             player.dataPacket(adventurePacket);
-        }else {
+        } else {
             AdventureSettingsPacket pk = new AdventureSettingsPacket();
             for (Type t : Type.values()) {
                 if (t.getId() <= 0) {
