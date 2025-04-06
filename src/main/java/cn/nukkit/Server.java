@@ -215,6 +215,12 @@ public class Server {
     public static final List<String> multiNetherWorlds = new ArrayList<>();
     public static final List<String> antiXrayWorlds = new ArrayList<>();
     /**
+     * Multi-version settings for resource packs.
+     * The resource pack will be sent only from the specified protocol.
+     * Format: protocol:UUIDv4
+     */
+    public static final HashMap<UUID, Integer> mvResourcePacks = new HashMap<>();
+    /**
      * Worlds where random block ticking is disabled.
      */
     public static final List<String> noTickingWorlds = new ArrayList<>();
@@ -423,6 +429,13 @@ public class Server {
      */
     public boolean opInGame;
     /**
+     * Action mode if there is a space in the nickname.
+        0 - disabled (kick player on login)
+        1 - ignore [default]
+        2 - replace (replacing the space with an underscore)
+     */
+    public int spaceMode;
+    /**
      * Sky light updates enabled.
      */
     public boolean lightUpdates;
@@ -458,6 +471,10 @@ public class Server {
      * More vanilla like portal logics enabled.
      */
     public boolean vanillaPortals;
+    /**
+     * Ticks before activating the portal.
+     */
+    public int portalTicks;
     /**
      * Persona skins allowed.
      */
@@ -3060,6 +3077,37 @@ public class Server {
             }
         }
 
+        mvResourcePacks.clear();
+        String mvResourcePacksString = this.getPropertyString("multi-version-packs");
+        if (mvResourcePacksString != null && !mvResourcePacksString.trim().isEmpty()) {
+            String[] pairs = mvResourcePacksString.split("\\s*,\\s*");
+            for (String pair : pairs) {
+                String[] parts = pair.split(":");
+                if (parts.length == 2) {
+                    try {
+                        int protocol = Integer.parseInt(parts[0].trim());
+                        boolean isSupported = false;
+                        for (int supported : ProtocolInfo.SUPPORTED_PROTOCOLS) {
+                            if (supported == protocol) {
+                                isSupported = true;
+                                break;
+                            }
+                        }
+                        if (isSupported) {
+                            try {
+                                UUID uuid = UUID.fromString(parts[1].trim());
+                                mvResourcePacks.put(uuid, protocol);
+                            } catch (IllegalArgumentException e) {
+                                this.getLogger().error("Invalid UUID for mvResourcePacks: " + parts[1]);
+                            }
+                        }
+                    } catch (NumberFormatException e) {
+                        this.getLogger().error("Invalid protocol for mvResourcePacks: " + parts[0]);
+                    }
+                }
+            }
+        }
+
         this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
         this.bedSpawnpoints = this.getPropertyBoolean("bed-spawnpoints", true);
         this.achievementsEnabled = this.getPropertyBoolean("achievements", true);
@@ -3075,6 +3123,13 @@ public class Server {
         this.vanillaBossBar = this.getPropertyBoolean("vanilla-bossbars", false);
         this.stopInGame = this.getPropertyBoolean("stop-in-game", false);
         this.opInGame = this.getPropertyBoolean("op-in-game", false);
+
+        switch (this.getPropertyString("space-name-mode")) {
+            case "disabled" -> this.spaceMode = 0;
+            case "replacing" -> this.spaceMode = 2;
+            default -> this.spaceMode = 1;
+        }
+
         this.lightUpdates = this.getPropertyBoolean("light-updates", false);
         this.queryPlugins = this.getPropertyBoolean("query-plugins", false);
         this.flyChecks = this.getPropertyBoolean("allow-flight", false);
@@ -3103,7 +3158,10 @@ public class Server {
         this.chunksPerTick = this.getPropertyInt("chunk-sending-per-tick", 4);
         this.spawnThreshold = this.getPropertyInt("spawn-threshold", 56);
         this.savePlayerDataByUuid = this.getPropertyBoolean("save-player-data-by-uuid", true);
+
         this.vanillaPortals = this.getPropertyBoolean("vanilla-portals", true);
+        this.portalTicks = this.getPropertyInt("portal-ticks", 80);
+
         this.personaSkins = this.getPropertyBoolean("persona-skins", true);
         this.cacheChunks = this.getPropertyBoolean("cache-chunks", false);
         this.callEntityMotionEv = this.getPropertyBoolean("call-entity-motion-event", true);
@@ -3212,6 +3270,7 @@ public class Server {
             put("explosion-break-blocks", true);
             put("stop-in-game", false);
             put("op-in-game", true);
+            put("space-name-mode", "ignore");
             put("xp-bottles-on-creative", true);
             put("spawn-eggs", true);
             put("forced-safety-enchant", true);
@@ -3256,8 +3315,11 @@ public class Server {
             put("nether", true);
             put("end", true);
             put("vanilla-portals", true);
+            put("portal-ticks", 80);
             put("multi-nether-worlds", "");
             put("anti-xray-worlds", "");
+
+            put("multi-version-packs", "");
 
             put("do-not-tick-worlds", "");
             put("worlds-entity-spawning-disabled", "");
