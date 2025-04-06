@@ -1674,7 +1674,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.isSpectator()) {
             this.teleport(this, null);
 
-            this.setDataFlag(DATA_FLAGS, DATA_FLAG_SILENT, true);
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_SILENT, true, false);
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_HAS_COLLISION, false);
 
             if (this.protocol < ProtocolInfo.v1_16_0) {
@@ -1683,8 +1683,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.dataPacket(inventoryContentPacket);
             }
         } else {
-            this.setDataFlag(DATA_FLAGS, DATA_FLAG_SILENT, false);
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_SILENT, false, false);
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_HAS_COLLISION, true);
+
             if (this.protocol < ProtocolInfo.v1_16_0) {
                 InventoryContentPacket inventoryContentPacket = new InventoryContentPacket();
                 inventoryContentPacket.inventoryId = InventoryContentPacket.SPECIAL_CREATIVE;
