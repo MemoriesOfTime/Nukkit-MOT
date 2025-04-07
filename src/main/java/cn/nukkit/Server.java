@@ -423,10 +423,10 @@ public class Server {
      */
     public boolean opInGame;
     /**
-     * Action mode if there is a space in the nickname.
-        0 - disabled (kick player on login)
-        1 - ignore [default]
-        2 - replace (replacing the space with an underscore)
+     * Handling player names with spaces.
+        [0] "disabled" - Players with names containing spaces are prohibited from entering the server.
+        [1] "ignore" - Ignore names with spaces (default).
+        [2] "replacing" - Replace spaces in player names with "_".
      */
     public int spaceMode;
     /**
@@ -466,7 +466,7 @@ public class Server {
      */
     public boolean vanillaPortals;
     /**
-     * Ticks before activating the portal.
+     * Ticks required for the player to trigger the portal.
      */
     public int portalTicks;
     /**
