@@ -1,6 +1,7 @@
 package cn.nukkit.blockentity;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockSkull;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 
@@ -33,7 +34,7 @@ public class BlockEntitySkull extends BlockEntitySpawnable {
 
     @Override
     public boolean isBlockEntityValid() {
-        return getBlock().getId() == Block.SKULL_BLOCK;
+        return getBlock() instanceof BlockSkull;
     }
 
     @Override
