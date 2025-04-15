@@ -11,8 +11,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Field;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
-import java.util.stream.Stream;
 
 /**
  * @author LT_Name
@@ -22,14 +22,14 @@ public class PacketViolationWarningProcessor extends DataPacketProcessor<PacketV
 
     public static final PacketViolationWarningProcessor INSTANCE = new PacketViolationWarningProcessor();
 
-    private static Stream<Field> pkIDs;
+        private static List<Field> pkIDs;
 
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull PacketViolationWarningPacket pk) {
         if (pkIDs == null) {
-            pkIDs = Arrays.stream(ProtocolInfo.class.getDeclaredFields()).filter(field -> field.getName().endsWith("_PACKET"));
+            pkIDs = Arrays.stream(ProtocolInfo.class.getDeclaredFields()).filter(field -> field.getName().endsWith("_PACKET")).toList();
         }
-        Optional<String> PVWpkName = pkIDs
+        Optional<String> PVWpkName = pkIDs.stream()
                 .filter(field -> {
                     try {
                         if (pk.packetId >= 300) { //int id数据包从300开始

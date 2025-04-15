@@ -34,7 +34,7 @@ public final class LevelDBConstants {
     /**
      * This is protocol version if block palette used in storage
      */
-    public static final int PALETTE_VERSION = ProtocolInfo.v1_21_60;
+    public static final int PALETTE_VERSION = ProtocolInfo.v1_21_70;
 
     public static final int STATE_MAYOR_VERSION = 1;
     public static final int STATE_MINOR_VERSION = 21;

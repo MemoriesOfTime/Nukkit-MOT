@@ -36,14 +36,12 @@ import org.cloudburstmc.nbt.*;
 import org.iq80.leveldb.*;
 
 import javax.annotation.Nullable;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.CompletableFuture;
@@ -87,12 +85,41 @@ public class LevelDBProvider implements LevelProvider {
             throw new RuntimeException(e);
         }
 
-        try (InputStream stream = Files.newInputStream(dirPath.resolve("level.dat"))) {
+        Path levelDatFile = dirPath.resolve("level.dat");
+        try (InputStream stream = Files.newInputStream(levelDatFile)) {
             //noinspection ResultOfMethodCallIgnored
             stream.skip(8);
             this.levelData = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
         } catch (IOException e) {
-            throw new LevelException("Invalid level.dat", e);
+            log.fatal("Failed to load the level.dat file at {}, attempting to load level.dat.bak instead!", levelDatFile, e);
+            try {
+                Path bakPath = levelDatFile.resolveSibling("level.dat.bak");
+                if (!bakPath.toFile().isFile()) {
+                    log.fatal("The file {} does not exists!", bakPath);
+                    FileNotFoundException ex = new FileNotFoundException("The file " + bakPath + " does not exists!");
+                    ex.addSuppressed(e);
+                    throw ex;
+                }
+                try (InputStream stream = Files.newInputStream(bakPath)) {
+                    //noinspection ResultOfMethodCallIgnored
+                    stream.skip(8);
+                    this.levelData = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                } catch (Exception e2) {
+                    log.fatal("Failed to load the level.dat.bak file at {}", levelDatFile);
+                    e2.addSuppressed(e);
+                    throw e2;
+                }
+            } catch (Exception e2) {
+                LevelException ex = new LevelException("Could not load the level.dat and the level.dat.bak files. You might need to restore them from a backup!", e);
+                ex.addSuppressed(e2);
+                throw ex;
+            }
+        }
+
+        try {
+            Files.copy(levelDatFile, levelDatFile.resolveSibling("level.dat.bak"), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            log.warn("Failed to backup level.dat to level.dat.bak", e);
         }
 
         if (!this.levelData.contains("Generator")) {
