@@ -38,6 +38,9 @@ public abstract class EntityProjectile extends Entity {
     public boolean hadCollision = false;
     public int piercing;
 
+    @Getter
+    protected int collidedTick;
+
     public EntityProjectile(FullChunk chunk, CompoundTag nbt) {
         this(chunk, nbt, null);
     }
@@ -244,6 +247,7 @@ public abstract class EntityProjectile extends Entity {
     }
 
     protected void onHitGround(Vector3 vector3) {
+        this.collidedTick = this.level.getServer().getTick();
         Block block = this.level.getBlock(this.chunk, vector3.getFloorX(), vector3.getFloorY(), vector3.getFloorZ(), 0, false);
         if (block.hasEntityCollision()) {
             block.onEntityCollide(this);

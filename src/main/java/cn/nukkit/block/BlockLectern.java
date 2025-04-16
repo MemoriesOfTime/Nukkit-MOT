@@ -4,20 +4,18 @@ import cn.nukkit.Player;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityLectern;
 import cn.nukkit.event.block.BlockRedstoneEvent;
-import cn.nukkit.event.block.LecternDropBookEvent;
+import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.Sound;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.network.protocol.ContainerOpenPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
-
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class BlockLectern extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntityLectern> {
 
@@ -89,15 +87,10 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable, Bloc
     @Override
     public int getComparatorInputOverride() {
         int power = 0;
-        int page = 0;
-        int maxPage = 0;
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
-        if (!(blockEntity instanceof BlockEntityLectern lectern)) {
-            return power;
-        }
-        if (lectern.hasBook()) {
-            maxPage = lectern.getTotalPages();
-            page = lectern.getLeftPage() + 1;
+        if (blockEntity instanceof BlockEntityLectern lectern && lectern.hasBook()) {
+            int maxPage = lectern.getTotalPages();
+            int page = lectern.getLeftPage() + 1;
             power = (int) (((float) page / maxPage) * 16);
         }
         return power;
@@ -164,6 +157,17 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable, Bloc
     }
 
     @Override
+    public int onTouch(@Nullable Player player, PlayerInteractEvent.Action action) {
+        if (action == PlayerInteractEvent.Action.LEFT_CLICK_BLOCK) {
+            BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
+            if (blockEntity instanceof BlockEntityLectern lectern && lectern.dropBook(player)) {
+                return 1;
+            }
+        }
+        return 0;
+    }
+
+    @Override
     public boolean isPowerSource() {
         return true;
     }
@@ -180,22 +184,6 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable, Bloc
         }
     }
 
-    public void executeRedstonePulse() {
-        if (isActivated()) {
-            level.cancelSheduledUpdate(this, this);
-        } else {
-            this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 0, 15));
-        }
-
-        level.scheduleUpdate(this, this, 4);
-        setActivated(true);
-        level.setBlock(this, this, true, false);
-        level.addSound(this.add(0.5, 0.5, 0.5), Sound.ITEM_BOOK_PAGE_TURN);
-
-        level.updateAroundRedstone(this, null);
-        level.updateAroundRedstone(getSide(BlockFace.DOWN), BlockFace.UP);
-    }
-
     @Override
     public int getWeakPower(BlockFace face) {
         return isActivated() ? 15 : 0;
@@ -206,42 +194,30 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable, Bloc
         return face == BlockFace.DOWN ? this.getWeakPower(face) : 0;
     }
 
+    public void onPageChange(boolean active) {
+        if (isActivated() != active) {
+            setActivated(active);
+            this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 15, 0));
+            level.setBlock((int) this.x, (int) this.y, (int) this.z, 0, this, false, false); // No need to send this to client
+            level.updateAroundRedstone(this, null);
+            if (active) {
+                level.scheduleUpdate(this, 1);
+            }
+        }
+    }
+
     @Override
     public int onUpdate(int type) {
-        if (type == Level.BLOCK_UPDATE_SCHEDULED) {
-            if (isActivated()) {
-                this.level.getServer().getPluginManager().callEvent(new BlockRedstoneEvent(this, 15, 0));
-
-                setActivated(false);
-                level.setBlock(this, this, true, false);
-                level.updateAroundRedstone(this, null);
-                level.updateAroundRedstone(getSide(BlockFace.DOWN), BlockFace.UP);
-            }
-
-            return Level.BLOCK_UPDATE_SCHEDULED;
+        if (type == Level.BLOCK_UPDATE_SCHEDULED || type == Level.BLOCK_UPDATE_NORMAL) {
+            onPageChange(false);
         }
         return 0;
     }
 
     public void dropBook(Player player) {
         BlockEntity blockEntity = this.getLevel().getBlockEntity(this);
-        if (!(blockEntity instanceof BlockEntityLectern lectern)) {
-            return;
+        if (blockEntity instanceof BlockEntityLectern lectern) {
+            lectern.dropBook(player);
         }
-
-        Item book = lectern.getBook();
-        if (book.isNull()) {
-            return;
-        }
-
-        LecternDropBookEvent dropBookEvent = new LecternDropBookEvent(player, lectern, book);
-        this.getLevel().getServer().getPluginManager().callEvent(dropBookEvent);
-        if (dropBookEvent.isCancelled()) {
-            return;
-        }
-
-        lectern.setBook(Item.get(Item.AIR));
-        lectern.spawnToAll();
-        this.level.dropItem(lectern.add(0.5f, 0.6f, 0.5f), dropBookEvent.getBook());
     }
 }

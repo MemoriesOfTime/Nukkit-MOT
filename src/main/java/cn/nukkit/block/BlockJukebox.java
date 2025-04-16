@@ -124,4 +124,15 @@ public class BlockJukebox extends BlockSolid implements BlockEntityHolder<BlockE
     public BlockColor getColor() {
         return BlockColor.DIRT_BLOCK_COLOR;
     }
+
+    @Override
+    public boolean hasComparatorInputOverride() {
+        return true;
+    }
+
+    @Override
+    public int getComparatorInputOverride() {
+        BlockEntity blockEntity = this.getLevel().getBlockEntityIfLoaded(this);
+        return blockEntity instanceof BlockEntityJukebox ? ((BlockEntityJukebox) blockEntity).getComparatorSignal() : 0;
+    }
 }

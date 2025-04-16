@@ -353,6 +353,18 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v776 1.21.60
      */
     public static final int DATA_FLAG_RENDER_WHEN_INVISIBLE = 119;
+    /**
+     * @since v786 1.21.70
+     */
+    public static final int DATA_FLAG_BODY_ROTATION_AXIS_ALIGNED= 120;
+    /**
+     * @since v786 1.21.70
+     */
+    public static final int DATA_FLAG_COLLIDABLE = 121;
+    /**
+     * @since v786 1.21.70
+     */
+    public static final int DATA_FLAG_WASD_AIR_CONTROLLED = 122;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
@@ -1422,6 +1434,8 @@ public abstract class Entity extends Location implements Metadatable {
             addEntity.links[i] = new EntityLink(this.id, this.passengers.get(i).id, i == 0 ? EntityLink.TYPE_RIDER : TYPE_PASSENGER, false, false, 0f);
         }
 
+        addEntity.properties = this.propertySyncData();
+
         return addEntity;
     }
 
@@ -1641,12 +1655,30 @@ public abstract class Entity extends Location implements Metadatable {
         return lastDamageCause;
     }
 
+    /**
+     * 获取包含生命提升效果加成的最大生命值。
+     * Get maximum health including health from health boost effect.
+     *
+     * @return 当前的最大生命值。
+     *         current max health
+     */
     public int getMaxHealth() {
         return maxHealth + (this.hasEffect(Effect.HEALTH_BOOST) ? (this.getEffect(Effect.HEALTH_BOOST).getAmplifier() + 1) << 2 : 0);
     }
 
     public void setMaxHealth(int maxHealth) {
         this.maxHealth = maxHealth;
+    }
+
+    /**
+     * 获取不包含效果加成的正常最大生命值。
+     * Get normal maximum health excluding health from effects.
+     *
+     * @return 实际的最大生命值。
+     *         real max health
+     */
+    public int getRealMaxHealth() {
+        return maxHealth;
     }
 
     public boolean canCollideWith(Entity entity) {
@@ -1760,10 +1792,20 @@ public abstract class Entity extends Location implements Metadatable {
         return false;
     }
 
+    @Deprecated
     public boolean entityBaseTick() {
         return this.entityBaseTick(1);
     }
 
+    /**
+     * 实体基础 tick 方法，若实体存活，会在 `onUpdate` 方法中被调用。其返回结果会应用到 `onUpdate` 方法中，之后会自动调用 `updateMovement` 方法。
+     * Entity base tick, called from onUpdate if the entity is alive. Result is applied to onUpdate. updateMovement is called afterward automatically.
+     *
+     * @param tickDiff 间隔 tick
+     *                  Interval tick
+     * @return 是否继续 tick
+     *          Whether to continue tick
+     */
     public boolean entityBaseTick(int tickDiff) {
         if (!this.isPlayer) {
             //this.blocksAround = null; // Use only when entity moves for better performance
@@ -3295,7 +3337,7 @@ public abstract class Entity extends Location implements Metadatable {
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if(property.getIdentifier() == identifier && property instanceof EnumEntityProperty enumEntityProperty) {
+            if(Objects.equals(property.getIdentifier(), identifier) && property instanceof EnumEntityProperty enumEntityProperty) {
                 int index = enumEntityProperty.findIndex(value);
 
                 if(index >= 0) {
@@ -3306,6 +3348,19 @@ public abstract class Entity extends Location implements Metadatable {
             }
         }
         return false;
+    }
+
+    public final String getEnumEntityProperty(String identifier) {
+        List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
+
+        for (EntityProperty property : entityPropertyList) {
+            if (!identifier.equals(property.getIdentifier()) ||
+                    !(property instanceof EnumEntityProperty enumProperty)) {
+                continue;
+            }
+            return enumProperty.getEnums()[intProperties.get(identifier)];
+        }
+        return null;
     }
 
     private void initEntityProperties() {

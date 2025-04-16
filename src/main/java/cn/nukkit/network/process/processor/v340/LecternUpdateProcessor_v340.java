@@ -23,6 +23,9 @@ public class LecternUpdateProcessor_v340 extends DataPacketProcessor<LecternUpda
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull LecternUpdatePacket pk) {
         BlockVector3 blockPosition = pk.blockPosition;
+        if (blockPosition.distanceSquared(playerHandle.player) > 4096) {
+            return;
+        }
         playerHandle.player.temporalVector.setComponents(blockPosition.x, blockPosition.y, blockPosition.z);
         if (pk.dropBook) {
             Block blockLectern = playerHandle.player.getLevel().getBlock(playerHandle.player.temporalVector);
@@ -36,11 +39,6 @@ public class LecternUpdateProcessor_v340 extends DataPacketProcessor<LecternUpda
                 playerHandle.player.getServer().getPluginManager().callEvent(lecternPageChangeEvent);
                 if (!lecternPageChangeEvent.isCancelled()) {
                     lectern.setRawPage(lecternPageChangeEvent.getNewRawPage());
-                    lectern.spawnToAll();
-                    Block blockLectern = lectern.getBlock();
-                    if (blockLectern instanceof BlockLectern) {
-                        ((BlockLectern) blockLectern).executeRedstonePulse();
-                    }
                 }
             }
         }

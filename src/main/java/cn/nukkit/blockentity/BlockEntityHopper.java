@@ -245,9 +245,11 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             return false;
         }
 
-        BlockEntity be = this.level.getBlockEntity(this.getSide(BlockFace.fromIndex(this.level.getBlockDataAt(this.getFloorX(), this.getFloorY(), this.getFloorZ()))));
+        int blockData = this.level.getBlockDataAt(this.getFloorX(), this.getFloorY(), this.getFloorZ()) & 0x7;
 
-        if (be instanceof BlockEntityHopper && this.getBlock().getDamage() == 0 || !(be instanceof InventoryHolder)) {
+        BlockEntity be = this.level.getBlockEntity(this.getSide(BlockFace.fromIndex(blockData)));
+
+        if (be instanceof BlockEntityHopper && blockData == 0 || !(be instanceof InventoryHolder)) {
             return false;
         }
 
@@ -267,7 +269,7 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                     Item itemToAdd = item.clone();
                     itemToAdd.setCount(1);
 
-                    if (this.getBlock().getDamage() == 0) {
+                    if (blockData == 0) {
                         Item smelting = targetInv.getSmelting();
                         if (smelting.isNull()) {
                             event = new InventoryMoveItemEvent(this.inventory, targetInv, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);

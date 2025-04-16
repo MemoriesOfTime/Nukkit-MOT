@@ -1,7 +1,11 @@
 package cn.nukkit.blockentity;
 
+import cn.nukkit.Player;
+import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockAir;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockLectern;
+import cn.nukkit.event.block.LecternDropBookEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.format.FullChunk;
@@ -77,7 +81,7 @@ public class BlockEntityLectern extends BlockEntitySpawnable {
     }
 
     public void setBook(Item item) {
-        if (item.getId() == Item.WRITTEN_BOOK || item.getId() == Item.BOOK_AND_QUILL) {
+        if (item != null && (item.getId() == Item.WRITTEN_BOOK || item.getId() == Item.BOOK_AND_QUILL)) {
             this.namedTag.putCompound("book", NBTIO.putItemHelper(item));
             this.namedTag.putInt("page", 0);
         } else {
@@ -85,6 +89,7 @@ public class BlockEntityLectern extends BlockEntitySpawnable {
             this.namedTag.remove("page");
         }
         updateTotalPages();
+        setDirty();
     }
 
     public int getLeftPage() {
@@ -105,7 +110,12 @@ public class BlockEntityLectern extends BlockEntitySpawnable {
 
     public void setRawPage(int page) {
         this.namedTag.putInt("page", Math.min(page, totalPages));
-        this.getLevel().updateAround(this);
+        setDirty();
+
+        Block block = getLevelBlock();
+        if (block instanceof BlockLectern) {
+            ((BlockLectern) block).onPageChange(hasBook());
+        }
     }
 
     public int getRawPage() {
@@ -124,5 +134,32 @@ public class BlockEntityLectern extends BlockEntitySpawnable {
             totalPages = book.getNamedTag().getList("pages", CompoundTag.class).size();
         }
         level.updateAroundRedstone(this, null);
+    }
+
+    public boolean dropBook(Player player) {
+        Item item = this.getBook();
+        if (item != null && item.getId() != Item.AIR) {
+            LecternDropBookEvent dropBookEvent = new LecternDropBookEvent(player, this, item);
+            this.getLevel().getServer().getPluginManager().callEvent(dropBookEvent);
+            if (dropBookEvent.isCancelled()) {
+                return false;
+            }
+
+            this.setBook(null);
+            this.level.dropItem(this.add(0.5, 1, 0.5), item);
+
+            Block block = getLevelBlock();
+            if (block instanceof BlockLectern) {
+                ((BlockLectern) block).onPageChange(false);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public void setDirty() {
+        super.setDirty();
+        this.spawnToAll();
     }
 }
