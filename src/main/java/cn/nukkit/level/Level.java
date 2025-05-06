@@ -3247,34 +3247,42 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public final void generateChunkCallback(final int x, final int z, BaseFullChunk chunk, final boolean isPopulated) {
-        long index = Level.chunkHash(x, z);
-        LevelProvider levelProvider = this.requireProvider();
-        if (this.chunkPopulationQueue.containsKey(index)) {
-            FullChunk oldChunk = this.getChunk(x, z, false);
-            for (int xx = -1; xx <= 1; ++xx) {
-                for (int zz = -1; zz <= 1; ++zz) {
-                    this.chunkPopulationLock.remove(Level.chunkHash(x + xx, z + zz));
-                }
+        this.providerLock.readLock().lock();
+        try {
+            LevelProvider levelProvider = this.getProvider();
+            if (levelProvider == null) {
+                return;
             }
-            this.chunkPopulationQueue.remove(index);
-            chunk.setProvider(levelProvider);
-            this.setChunk(x, z, chunk, false);
-            chunk = this.getChunk(x, z, false);
-            if (chunk != null && (oldChunk == null || !isPopulated) && chunk.isPopulated() && chunk.getProvider() != null) {
-                this.server.getPluginManager().callEvent(new ChunkPopulateEvent(chunk));
+            long index = Level.chunkHash(x, z);
+            if (this.chunkPopulationQueue.containsKey(index)) {
+                FullChunk oldChunk = this.getChunk(x, z, false);
+                for (int xx = -1; xx <= 1; ++xx) {
+                    for (int zz = -1; zz <= 1; ++zz) {
+                        this.chunkPopulationLock.remove(Level.chunkHash(x + xx, z + zz));
+                    }
+                }
+                this.chunkPopulationQueue.remove(index);
+                chunk.setProvider(levelProvider);
+                this.setChunk(x, z, chunk, false);
+                chunk = this.getChunk(x, z, false);
+                if (chunk != null && (oldChunk == null || !isPopulated) && chunk.isPopulated() && chunk.getProvider() != null) {
+                    this.server.getPluginManager().callEvent(new ChunkPopulateEvent(chunk));
 
-                for (ChunkLoader loader : this.getChunkLoaders(x, z)) {
-                    loader.onChunkPopulated(chunk);
+                    for (ChunkLoader loader : this.getChunkLoaders(x, z)) {
+                        loader.onChunkPopulated(chunk);
+                    }
                 }
+            } else if (this.chunkGenerationQueue.containsKey(index) || this.chunkPopulationLock.containsKey(index)) {
+                this.chunkGenerationQueue.remove(index);
+                this.chunkPopulationLock.remove(index);
+                chunk.setProvider(levelProvider);
+                this.setChunk(x, z, chunk, false);
+            } else {
+                chunk.setProvider(levelProvider);
+                this.setChunk(x, z, chunk, false);
             }
-        } else if (this.chunkGenerationQueue.containsKey(index) || this.chunkPopulationLock.containsKey(index)) {
-            this.chunkGenerationQueue.remove(index);
-            this.chunkPopulationLock.remove(index);
-            chunk.setProvider(levelProvider);
-            this.setChunk(x, z, chunk, false);
-        } else {
-            chunk.setProvider(levelProvider);
-            this.setChunk(x, z, chunk, false);
+        } finally {
+            this.providerLock.readLock().unlock();
         }
     }
 
