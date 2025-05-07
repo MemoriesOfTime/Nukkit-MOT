@@ -1,6 +1,7 @@
 package cn.nukkit.utils;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.mob.*;
@@ -11,6 +12,8 @@ import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -650,5 +653,20 @@ public class Utils {
         }
 
         return blocks.toArray(new Block[0]);
+    }
+
+    public static JsonElement loadJsonResource(String file) {
+        try {
+            InputStream stream = Server.class.getClassLoader().getResourceAsStream(file);
+            if (stream == null) {
+                throw new AssertionError("Unable to load " + file);
+            }
+
+            JsonElement element = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+            stream.close();
+            return element;
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to load " + file, e);
+        }
     }
 }

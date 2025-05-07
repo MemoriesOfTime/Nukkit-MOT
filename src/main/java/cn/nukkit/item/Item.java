@@ -582,6 +582,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCreativeItemsNew(ProtocolInfo.v1_21_50, ProtocolInfo.v1_21_50, creative766);
         registerCreativeItemsNew(ProtocolInfo.v1_21_60, ProtocolInfo.v1_21_60, creative776);
         registerCreativeItemsNew(ProtocolInfo.v1_21_70, ProtocolInfo.v1_21_70, creative786);
+        registerCreativeItemsNew(ProtocolInfo.v1_21_80, ProtocolInfo.v1_21_80, creative800);
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -2141,9 +2142,9 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         public void add(Item item, CreativeItemGroup group) {
-            if (group == null) {
-                throw new IllegalArgumentException("group == null");
-            }
+//            if (group == null) {
+//                throw new IllegalArgumentException("group == null");
+//            }
 
             contents.put(item, group);
         }

@@ -2959,7 +2959,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         this.dataPacket(itemComponentPacket);
                     }
-                    this.dataPacket(new BiomeDefinitionListPacket());
+                    this.dataPacket(BiomeDefinitionListPacket.getCachedPacket(this.protocol));
                 }
                 this.dataPacket(new AvailableEntityIdentifiersPacket());
             }
