@@ -708,6 +708,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Item.creative766.clear();
         Item.creative776.clear();
         Item.creative786.clear();
+        Item.creative800.clear();
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
