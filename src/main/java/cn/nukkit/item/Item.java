@@ -357,6 +357,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
             list[BAMBOO_CHEST_RAFT] = ItemChestRaftBamboo.class; //648
             list[CHERRY_CHEST_BOAT] = ItemChestBoatCherry.class; //649
+            list[PALE_OAK_CHEST_BOAT] = ItemChestBoatPaleOak.class; //650
 
             list[GLOW_BERRIES] = ItemGlowBerries.class; //654
             list[RECORD_RELIC] = ItemRecordRelic.class; //701
