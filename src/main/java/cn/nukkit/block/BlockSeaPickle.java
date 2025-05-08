@@ -11,6 +11,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import cn.nukkit.utils.BlockColor;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -171,5 +172,10 @@ public class BlockSeaPickle extends BlockFlowable {
     @Override
     public Item[] getDrops(Item item) {
         return new Item[]{ new ItemBlock(new BlockSeaPickle(), 0, (this.getDamage() & 0x3) + 1) };
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.GREEN_BLOCK_COLOR;
     }
 }

@@ -6,6 +6,7 @@ import cn.nukkit.blockentity.BlockEntityConduit;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
 
 public class BlockConduit extends BlockSolidMeta implements BlockEntityHolder {
@@ -80,5 +81,10 @@ public class BlockConduit extends BlockSolidMeta implements BlockEntityHolder {
     @Override
     public @NotNull String getBlockEntityType() {
         return BlockEntity.CONDUIT;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.DIAMOND_BLOCK_COLOR;
     }
 }
