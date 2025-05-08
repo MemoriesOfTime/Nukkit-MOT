@@ -355,6 +355,10 @@ public interface ProtocolInfo {
      * @since v766
      */
     int CAMERA_AIM_ASSIST_PRESETS_PACKET = 320;
+    /**
+     * @since v800
+     */
+    int PLAYER_LOCATIONS_PACKET = 326;
 
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;

@@ -2,6 +2,9 @@ package cn.nukkit.network.protocol;
 
 import lombok.ToString;
 
+/**
+ * @deprecated Removed in 1.21.80 (800)
+ */
 @ToString
 public class RiderJumpPacket extends DataPacket {
 
