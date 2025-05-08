@@ -1711,6 +1711,10 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB bb) {
+        return hasCollisionBlocks(entity, bb, false);
+    }
+
+    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB bb, boolean checkCanPassThrough) {
         int minX = NukkitMath.floorDouble(bb.getMinX());
         int minY = NukkitMath.floorDouble(bb.getMinY());
         int minZ = NukkitMath.floorDouble(bb.getMinZ());
@@ -1722,7 +1726,7 @@ public class Level implements ChunkManager, Metadatable {
             for (int x = minX; x <= maxX; ++x) {
                 for (int y = minY; y <= maxY; ++y) {
                     Block block = this.getBlock(entity != null ? entity.chunk : null, x, y, z, 0, false);
-                    if (block != null && block.getId() != 0 && block.collidesWithBB(bb)) {
+                    if ((!checkCanPassThrough || !block.canPassThrough()) && block.collidesWithBB(bb)) {
                         return true;
                     }
                 }
@@ -1790,22 +1794,8 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public boolean hasCollision(Entity entity, AxisAlignedBB bb, boolean entities) {
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = NukkitMath.floorDouble(bb.getMinY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = NukkitMath.ceilDouble(bb.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
-
-        for (int z = minZ; z <= maxZ; ++z) {
-            for (int x = minX; x <= maxX; ++x) {
-                for (int y = minY; y <= maxY; ++y) {
-                    Block block = this.getBlock(x, y, z, false);
-                    if (!block.canPassThrough() && block.collidesWithBB(bb)) {
-                        return true;
-                    }
-                }
-            }
+        if (this.hasCollisionBlocks(entity, bb, true)) {
+            return true;
         }
 
         if (entities) {
@@ -1959,13 +1949,7 @@ public class Level implements ChunkManager, Metadatable {
             fullState = new int[]{0, 0};
         }
 
-        Block block = Block.get(fullState[0], fullState[1]);
-        block.x = x;
-        block.y = y;
-        block.z = z;
-        block.level = this;
-        block.layer = layer;
-        return block;
+        return Block.get(fullState[0], fullState[1], this, x, y, z, layer);
     }
 
     public synchronized void updateAllLight(Vector3 pos) {
