@@ -2468,7 +2468,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         Item chestplate = playerInventory.getChestplateFast();
                         if ((chestplate == null || chestplate.getId() != ItemID.ELYTRA)) {
                             this.setGliding(false);
-                        } else if (this.age % (20 * (chestplate.getEnchantmentLevel(Enchantment.ID_DURABILITY) + 1)) == 0) {
+                        } else if (!chestplate.isUnbreakable() && this.age % (20 * (chestplate.getEnchantmentLevel(Enchantment.ID_DURABILITY) + 1)) == 0) {
                             int newDamage = chestplate.getDamage() + 1;
                             if (newDamage < chestplate.getMaxDurability()) {
                                 chestplate.setDamage(newDamage);
