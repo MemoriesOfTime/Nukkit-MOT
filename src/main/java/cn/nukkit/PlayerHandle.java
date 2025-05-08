@@ -15,7 +15,7 @@ import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.LoginChainData;
 import com.google.common.cache.Cache;
 import com.google.common.collect.BiMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -83,7 +83,7 @@ public final class PlayerHandle {
         return player.permanentWindows;
     }
 
-    public Long2ObjectLinkedOpenHashMap<Boolean> getLoadQueue() {
+    public LongLinkedOpenHashSet getLoadQueue() {
         return player.loadQueue;
     }
 

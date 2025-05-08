@@ -623,8 +623,100 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v712
      */
     public static final int SOUND_VAULT_REJECT_REWARDED_PLAYER = 530;
+    /**
+     * @since v729
+     */
+    public static final int SOUND_IMITATE_DROWNED = 531;
+    /**
+     * @since v729
+     */
+    public static final int SOUND_BUNDLE_INSERT_FAILED = 533;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_IMITATE_CREAKING = 532;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_SPONGE_ABSORB = 534;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_BLOCK_CREAKING_HEART_TRAIL = 536;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_CREAKING_HEART_SPAWN = 537;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_ACTIVATE = 538;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_DEACTIVATE = 539;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_FREEZE = 540;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_UNFREEZE = 541;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_OPEN = 542;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_OPEN_LONG = 543;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_CLOSE = 544;
+    /**
+     * @since v766
+     */
+    public static final int SOUND_CLOSE_LONG = 545;
+    /**
+     * @since v800
+     */
+    public static final int SOUND_IMITATE_PHANTOM = 546;
+    /**
+     * @since v800
+     */
+    public static final int SOUND_IMITATE_ZOGLIN = 547;
+    /**
+     * @since v800
+     */
+    public static final int SOUND_IMITATE_GUARDIAN = 548;
+    /**
+     * @since v800
+     */
+    public static final int SOUND_IMITATE_RAVAGER = 549;
+    /**
+     * @since v800
+     */
+    public static final int SOUND_IMITATE_PILLAGER = 550;
+    /**
+     * @since v800
+     */
+    public static final int SOUND_PLACE_IN_WATER = 551;
+    /**
+     * @since v800
+     */
+    public static final int SOUND_STATE_CHANGE = 552;
+    /**
+     * @since v800
+     */
+    public static final int SOUND_IMITATE_HAPPY_GHAST = 553;
+    /**
+     * @since v800
+     */
+    public static final int SOUND_UNEQUIP_GENERIC = 554;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(531);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(555);
 
     public int sound;
     public float x;

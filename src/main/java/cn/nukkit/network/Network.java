@@ -44,6 +44,7 @@ public class Network {
     public static final byte CHANNEL_END = 31;
 
     private PacketPool packetPool113;
+    private PacketPool packetPool137;
     private PacketPool packetPoolCurrent;
 
     private final Server server;
@@ -314,15 +315,19 @@ public class Network {
     }
 
     public PacketPool getPacketPool(int protocol) {
-        if (protocol > ProtocolInfo.v1_1_0) {
+        if (protocol >= ProtocolInfo.v1_21_80) {
             return this.packetPoolCurrent;
+        } else if (protocol >= ProtocolInfo.v1_2_0) {
+            return this.packetPool137;
         }
         return this.packetPool113;
     }
 
     public void setPacketPool(int protocol, PacketPool packetPool) {
-        if (protocol > ProtocolInfo.v1_1_0) {
+        if (protocol >= ProtocolInfo.v1_21_80) {
             this.packetPoolCurrent = packetPool;
+        } else if (protocol >= ProtocolInfo.v1_2_0) {
+            this.packetPool137 = packetPool;
         } else {
             this.packetPool113 = packetPool;
         }
@@ -438,9 +443,9 @@ public class Network {
                 .registerPacket(ProtocolInfoV113.UPDATE_TRADE_PACKET, UpdateTradePacket.class)
                 .build();
 
-        this.packetPoolCurrent = PacketPool.builder()
-                .protocolVersion(ProtocolInfo.CURRENT_PROTOCOL)
-                .minecraftVersion(ProtocolInfo.MINECRAFT_VERSION)
+        this.packetPool137 = PacketPool.builder()
+                .protocolVersion(ProtocolInfo.v1_2_0)
+                .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v1_2_0))
                 .registerPacket(ProtocolInfo.SERVER_TO_CLIENT_HANDSHAKE_PACKET, ServerToClientHandshakePacket.class)
                 .registerPacket(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET, ClientToServerHandshakePacket.class)
                 .registerPacket(ProtocolInfo.ADD_ENTITY_PACKET, AddEntityPacket.class)
@@ -594,6 +599,14 @@ public class Network {
                 .registerPacket(ProtocolInfo.MOVEMENT_EFFECT_PACKET, MovementEffectPacket.class)
                 .registerPacket(ProtocolInfo.SET_MOVEMENT_AUTHORITY_PACKET, SetMovementAuthorityPacket.class)
                 .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PRESETS_PACKET, CameraAimAssistPresetsPacket.class)
+                .build();
+
+        this.packetPoolCurrent = this.packetPool137.toBuilder()
+                .protocolVersion(ProtocolInfo.CURRENT_PROTOCOL)
+                .minecraftVersion(ProtocolInfo.MINECRAFT_VERSION)
+                .deregisterPacket(ProtocolInfo.PLAYER_INPUT_PACKET)
+                .deregisterPacket(ProtocolInfo.RIDER_JUMP_PACKET)
+                .registerPacket(ProtocolInfo.PLAYER_LOCATIONS_PACKET, PlayerLocationPacket.class)
                 .build();
     }
 

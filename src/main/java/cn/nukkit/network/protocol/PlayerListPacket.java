@@ -3,6 +3,7 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.entity.data.Skin;
 import lombok.ToString;
 
+import java.awt.*;
 import java.util.UUID;
 
 /**
@@ -54,6 +55,9 @@ public class PlayerListPacket extends DataPacket {
                             this.putBoolean(entry.isHost);
                             if (protocol >= ProtocolInfo.v1_20_60) {
                                 this.putBoolean(entry.isSubClient);
+                                if (protocol >= ProtocolInfo.v1_21_80) {
+                                    this.putLInt(entry.color);
+                                }
                             }
                         }
                     }
@@ -89,6 +93,7 @@ public class PlayerListPacket extends DataPacket {
         public boolean isTeacher;
         public boolean isHost;
         public boolean isSubClient;
+        public int color = Color.BLACK.getRGB();
 
         public Entry(UUID uuid) {
             this.uuid = uuid;
