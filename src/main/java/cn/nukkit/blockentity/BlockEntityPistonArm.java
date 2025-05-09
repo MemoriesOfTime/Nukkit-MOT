@@ -42,6 +42,9 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
 
     @Override
     protected void initBlockEntity() {
+        this.state = this.namedTag.getByte("State");
+        this.newState = this.namedTag.getByte("NewState");
+
         if (namedTag.contains("Progress")) {
             this.progress = namedTag.getFloat("Progress");
         }
@@ -215,6 +218,8 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
         this.namedTag.putBoolean("powered", this.powered);
         this.namedTag.putList(getAttachedBlocks());
         this.namedTag.putInt("facing", this.facing.getIndex());
+        this.namedTag.putBoolean("Sticky", this.sticky);
+        this.namedTag.putBoolean("Extending", this.extending);
     }
 
     @Override

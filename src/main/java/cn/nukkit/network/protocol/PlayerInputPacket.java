@@ -3,6 +3,8 @@ package cn.nukkit.network.protocol;
 import lombok.ToString;
 
 /**
+ * @deprecated Removed as of v800 (1.21.80). Server authoritative input is handled by {@link PlayerAuthInputPacket}
+ *
  * @author Nukkit Project Team
  */
 @ToString

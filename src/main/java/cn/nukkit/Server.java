@@ -423,6 +423,13 @@ public class Server {
      */
     public boolean opInGame;
     /**
+     * Handling player names with spaces.
+        [0] "disabled" - Players with names containing spaces are prohibited from entering the server.
+        [1] "ignore" - Ignore names with spaces (default).
+        [2] "replacing" - Replace spaces in player names with "_".
+     */
+    public int spaceMode;
+    /**
      * Sky light updates enabled.
      */
     public boolean lightUpdates;
@@ -458,6 +465,10 @@ public class Server {
      * More vanilla like portal logics enabled.
      */
     public boolean vanillaPortals;
+    /**
+     * Ticks required for the player to trigger the portal.
+     */
+    public int portalTicks;
     /**
      * Persona skins allowed.
      */
@@ -2527,7 +2538,18 @@ public class Server {
      * @return value
      */
     public int getPropertyInt(String variable, Integer defaultValue) {
-        return this.properties.exists(variable) ? (!this.properties.get(variable).equals("") ? Integer.parseInt(String.valueOf(this.properties.get(variable))) : defaultValue) : defaultValue;
+        Object value = this.properties.get(variable);
+        if (value == null) {
+            value = defaultValue;
+        }
+        if (value instanceof Integer) {
+            return (Integer) value;
+        }
+        String trimmed = String.valueOf(value).trim();
+        if (trimmed.isEmpty()) {
+            return defaultValue;
+        }
+        return Integer.parseInt(trimmed);
     }
 
     /**
@@ -2563,14 +2585,10 @@ public class Server {
         if (value instanceof Boolean) {
             return (Boolean) value;
         }
-        switch (String.valueOf(value)) {
-            case "on":
-            case "true":
-            case "1":
-            case "yes":
-                return true;
-        }
-        return false;
+        return switch (String.valueOf(value).trim().toLowerCase(Locale.ROOT)) {
+            case "on", "true", "1", "yes" -> true;
+            default -> false;
+        };
     }
 
     /**
@@ -2580,7 +2598,7 @@ public class Server {
      * @param value value
      */
     public void setPropertyBoolean(String variable, boolean value) {
-        this.properties.set(variable, value ? "1" : "0");
+        this.properties.set(variable, value);
         this.properties.save();
     }
 
@@ -3075,6 +3093,13 @@ public class Server {
         this.vanillaBossBar = this.getPropertyBoolean("vanilla-bossbars", false);
         this.stopInGame = this.getPropertyBoolean("stop-in-game", false);
         this.opInGame = this.getPropertyBoolean("op-in-game", false);
+
+        switch (this.getPropertyString("space-name-mode")) {
+            case "disabled" -> this.spaceMode = 0;
+            case "replacing" -> this.spaceMode = 2;
+            default -> this.spaceMode = 1;
+        }
+
         this.lightUpdates = this.getPropertyBoolean("light-updates", false);
         this.queryPlugins = this.getPropertyBoolean("query-plugins", false);
         this.flyChecks = this.getPropertyBoolean("allow-flight", false);
@@ -3103,7 +3128,10 @@ public class Server {
         this.chunksPerTick = this.getPropertyInt("chunk-sending-per-tick", 4);
         this.spawnThreshold = this.getPropertyInt("spawn-threshold", 56);
         this.savePlayerDataByUuid = this.getPropertyBoolean("save-player-data-by-uuid", true);
+
         this.vanillaPortals = this.getPropertyBoolean("vanilla-portals", true);
+        this.portalTicks = this.getPropertyInt("portal-ticks", 80);
+
         this.personaSkins = this.getPropertyBoolean("persona-skins", true);
         this.cacheChunks = this.getPropertyBoolean("cache-chunks", false);
         this.callEntityMotionEv = this.getPropertyBoolean("call-entity-motion-event", true);
@@ -3212,6 +3240,7 @@ public class Server {
             put("explosion-break-blocks", true);
             put("stop-in-game", false);
             put("op-in-game", true);
+            put("space-name-mode", "ignore");
             put("xp-bottles-on-creative", true);
             put("spawn-eggs", true);
             put("forced-safety-enchant", true);
@@ -3256,6 +3285,7 @@ public class Server {
             put("nether", true);
             put("end", true);
             put("vanilla-portals", true);
+            put("portal-ticks", 80);
             put("multi-nether-worlds", "");
             put("anti-xray-worlds", "");
 

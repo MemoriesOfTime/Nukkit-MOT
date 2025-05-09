@@ -738,7 +738,7 @@ public class BinaryStream {
 
         int blockRuntimeId = this.getVarInt();// blockRuntimeId
         //TODO 在1.21.30会得到错误数据
-        if (protocolId < ProtocolInfo.v1_21_30) {
+        if (protocolId < ProtocolInfo.v1_19_0_31) {
             if (id != null && id < 256 && id != 166) { // ItemBlock
                 int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, blockRuntimeId);
                 if (fullId != -1) {

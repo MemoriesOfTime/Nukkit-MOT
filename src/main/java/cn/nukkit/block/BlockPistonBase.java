@@ -53,12 +53,12 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
     @Override
     public double getResistance() {
-        return 2.5;
+        return 1.5;
     }
 
     @Override
     public double getHardness() {
-        return 0.5;
+        return 1.5;
     }
 
     @Override
@@ -127,8 +127,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         }
 
         BlockEntity blockEntity = this.level.getBlockEntity(this);
-        if (blockEntity instanceof BlockEntityPistonArm) {
-            BlockEntityPistonArm arm = (BlockEntityPistonArm) blockEntity;
+        if (blockEntity instanceof BlockEntityPistonArm arm) {
             boolean powered = this.isPowered();
 
             if (arm.state % 2 == 0 && arm.powered != powered && this.checkState(powered)) {

@@ -94,6 +94,10 @@ public class PacketPool {
             return this;
         }
 
+        public Builder deregisterPacket(byte id) {
+            return this.deregisterPacket(ProtocolInfo.toNewProtocolID(id));
+        }
+
         public Builder deregisterPacket(int id) {
             packets.remove(id);
             return this;

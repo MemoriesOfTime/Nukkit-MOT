@@ -6,10 +6,7 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.protocol.types.camera.AimAssistAction;
-import cn.nukkit.network.protocol.types.camera.CameraAudioListener;
-import cn.nukkit.network.protocol.types.camera.CameraPreset;
-import cn.nukkit.network.protocol.types.camera.CameraAimAssistPreset;
+import cn.nukkit.network.protocol.types.camera.*;
 import cn.nukkit.utils.BinaryStream;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.Getter;
@@ -145,6 +142,9 @@ public class CameraPresetsPacket extends DataPacket {
                 this.putCameraAimAssist(cameraAimAssistPreset);
             });
         }
+        if (this.protocol >= ProtocolInfo.v1_21_80) {
+            this.putOptionalNull(preset.getControlScheme(), (controlScheme) -> this.putByte((byte) controlScheme.ordinal()));
+        }
     }
 
     protected void putCameraAimAssist(CameraAimAssistPreset aimAssist) {
@@ -211,9 +211,14 @@ public class CameraPresetsPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_50) {
             aimAssist = this.getOptional(null, b -> this.getCameraAimAssist());
         }
+        ControlScheme controlScheme = null;
+        if (this.protocol >= ProtocolInfo.v1_21_80) {
+            controlScheme = this.getOptional(null, b -> ControlScheme.values()[b.getByte()]);
+        }
+
         return new CameraPreset(identifier, parentPreset, pos, yaw, pitch, viewOffset, radius, minYawLimit, maxYawLimit,
                 listener, effects, rotationSpeed, snapToTarget, entityOffset, horizontalRotationLimit, verticalRotationLimit,
-                continueTargeting, alignTargetAndCameraForward, blockListeningRadius, aimAssist
+                continueTargeting, alignTargetAndCameraForward, blockListeningRadius, aimAssist, controlScheme
         );
     }
 

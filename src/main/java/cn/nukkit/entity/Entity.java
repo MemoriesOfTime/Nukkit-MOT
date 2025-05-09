@@ -228,6 +228,14 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v776 1.21.60
      */
     public static final int DATA_BED_ENTER_POSITION = 133; //vector3f
+    /**
+     * @since v800
+     */
+    public static final int DATA_SEAT_THIRD_PERSON_CAMERA_RADIUS = 134; //float
+    /**
+     * @since v800
+     */
+    public static final int DATA_SEAT_CAMERA_RELAX_DISTANCE_SMOOTHING = 135; //float
 
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
@@ -365,6 +373,10 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v786 1.21.70
      */
     public static final int DATA_FLAG_WASD_AIR_CONTROLLED = 122;
+    /**
+     * @since v800 1.21.80
+     */
+    public static final int DATA_FLAG_DOES_SERVER_AUTH_ONLY_DISMOUNT = 123;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
