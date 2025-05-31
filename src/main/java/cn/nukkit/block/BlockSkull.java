@@ -13,12 +13,19 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+
 import org.jetbrains.annotations.NotNull;
+
+import cn.nukkit.block.custom.properties.BlockProperties;
+import cn.nukkit.block.properties.BlockPropertiesHelper;
+import cn.nukkit.block.properties.VanillaProperties;
 
 /**
  * @author Justin
  */
-public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntitySkull> {
+public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockPropertiesHelper, BlockEntityHolder<BlockEntitySkull> {
+
+    protected static final BlockProperties PROPERTIES = new BlockProperties(VanillaProperties.FACING_DIRECTION);
 
     public BlockSkull() {
         this(0);
@@ -81,6 +88,26 @@ public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockE
     }
 
     @Override
+    public BlockFace getBlockFace() {
+        return getPropertyValue(VanillaProperties.FACING_DIRECTION);
+    }
+
+    @Override
+    public void setBlockFace(BlockFace face) {
+        setPropertyValue(VanillaProperties.FACING_DIRECTION, face);
+    }
+
+    @Override
+    public BlockProperties getBlockProperties() {
+        return PROPERTIES;
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:skull";
+    }
+
+    @Override
     public String getName() {
         int itemMeta = 0;
 
@@ -94,18 +121,12 @@ public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockE
 
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        switch (face) {
-            case NORTH:
-            case SOUTH:
-            case EAST:
-            case WEST:
-            case UP:
-                this.setDamage(face.getIndex());
-                break;
-            case DOWN:
-            default:
-                return false;
+        if (face == BlockFace.DOWN) {
+            return false;
         }
+
+        setBlockFace(face);
+
         this.getLevel().setBlock(block, this, true, true);
 
         CompoundTag nbt = new CompoundTag()
@@ -155,11 +176,6 @@ public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockE
     @Override
     public BlockColor getColor() {
         return BlockColor.AIR_BLOCK_COLOR;
-    }
-
-    @Override
-    public BlockFace getBlockFace() {
-        return BlockFace.fromIndex(this.getDamage() & 0x7);
     }
 
     @Override
