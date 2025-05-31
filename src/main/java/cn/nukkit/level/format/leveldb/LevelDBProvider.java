@@ -44,10 +44,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -722,14 +719,20 @@ public class LevelDBProvider implements LevelProvider {
         if (this.closed) {
             return;
         }
-        this.closed = true;
 
         try {
             gcLock.lock();
 
             this.unloadChunksUnsafe(true);
+            this.closed = true;
             this.level = null;
             this.executor.shutdown();
+            try {
+                this.executor.awaitTermination(1, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                Server.getInstance().getLogger().error("Stopping LevelDB Executor interrupted", e);
+            }
+
             try {
                 this.db.close();
             } catch (IOException e) {
