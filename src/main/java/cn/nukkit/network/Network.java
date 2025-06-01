@@ -177,6 +177,7 @@ public class Network {
 
     @Deprecated
     public void registerPacket(byte id, Class<? extends DataPacket> clazz) {
+        this.registerPacket(ProtocolInfo.v1_2_0, id, clazz);
         this.registerPacket(ProtocolInfo.CURRENT_PROTOCOL, id, clazz);
     }
 
@@ -192,6 +193,7 @@ public class Network {
 
     @Deprecated
     public void registerPacketNew(@Nonnegative int id, @NotNull Class<? extends DataPacket> clazz) {
+        this.registerPacketNew(ProtocolInfo.v1_2_0, id, clazz);
         this.registerPacketNew(ProtocolInfo.CURRENT_PROTOCOL, id, clazz);
     }
 

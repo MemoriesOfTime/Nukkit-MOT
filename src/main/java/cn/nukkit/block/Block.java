@@ -313,7 +313,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         block.y = y;
         block.z = z;
         block.level = level;
-        //block.layer = layer;
+        block.layer = layer;
         return block;
     }
 
