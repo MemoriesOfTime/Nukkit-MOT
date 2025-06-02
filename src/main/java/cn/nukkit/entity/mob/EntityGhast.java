@@ -88,8 +88,15 @@ public class EntityGhast extends EntityFlyingMob {
                 Location pos = new Location(this.x - Math.sin(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, this.y + this.getEyeHeight(),
                         this.z + Math.cos(FastMath.toRadians(yaw)) * Math.cos(FastMath.toRadians(pitch)) * 0.5, yaw, pitch, this.level);
 
-                if (this.getLevel().getBlockIdAt((int) pos.getX(), (int) pos.getY(), (int) pos.getZ()) != Block.AIR) {
+                if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) != Block.AIR) {
                     return;
+                }
+
+                // 暂时不要遍历64格，以免卡顿
+                for (Block block : this.getLineOfSight(28, 28)) {
+                    if (!block.canPassThrough()) {
+                        return;
+                    }
                 }
 
                 EntityGhastFireBall fireball = (EntityGhastFireBall) Entity.createEntity("GhastFireBall", pos, this);
