@@ -2,6 +2,9 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
+import cn.nukkit.inventory.special.BookCloningRecipe;
+import cn.nukkit.inventory.special.MapCloningRecipe;
+import cn.nukkit.inventory.special.UncheckedMultiRecipe;
 import cn.nukkit.inventory.special.RepairItemRecipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
@@ -130,6 +133,8 @@ public class CraftingManager {
     public CraftingManager() {
         MainLogger.getLogger().debug("Loading recipes...");
         this.registerMultiRecipe(new RepairItemRecipe());
+        this.registerMultiRecipe(new BookCloningRecipe());
+        this.registerMultiRecipe(new MapCloningRecipe());
 
         ConfigSection recipes_649_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes649.json")).getRootSection();
         ConfigSection recipes_419_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes419.json")).getRootSection();
@@ -291,9 +296,12 @@ public class CraftingManager {
                                 break;
                         }
                         break;
-                    /*case 4:
-                        this.registerRecipe(new MultiRecipe(UUID.fromString((String) recipe.get("uuid"))));
-                        break;*/
+                    case 4:
+                        String uuid = (String) recipe.get("uuid");
+                        if (MultiRecipe.unsupportedRecipes.contains(uuid)) {
+                            this.registerRecipe(new UncheckedMultiRecipe(uuid));
+                        }
+                        break;
                     default:
                         break;
                 }
