@@ -19,7 +19,6 @@ public class UncheckedMultiRecipe extends MultiRecipe {
 
     @Override
     public boolean canExecute(Player player, Item outputItem, List<Item> inputs) {
-        // Processing the checks about the inputs and outputItem
         return true;
     }
 }
