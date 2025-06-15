@@ -69,7 +69,7 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
             this.attackDelay = 0;
 
             for (Block block : this.getLineOfSight(7, 7)) {
-                if (block.getId() != Block.AIR) {
+                if (!block.canPassThrough()) {
                     return;
                 }
             }

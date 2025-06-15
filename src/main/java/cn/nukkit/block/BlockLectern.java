@@ -6,6 +6,7 @@ import cn.nukkit.blockentity.BlockEntityLectern;
 import cn.nukkit.event.block.BlockRedstoneEvent;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
@@ -212,6 +213,11 @@ public class BlockLectern extends BlockTransparentMeta implements Faceable, Bloc
             onPageChange(false);
         }
         return 0;
+    }
+
+    @Override
+    public Item toItem() {
+        return new ItemBlock(this);
     }
 
     public void dropBook(Player player) {

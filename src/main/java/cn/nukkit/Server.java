@@ -2538,7 +2538,18 @@ public class Server {
      * @return value
      */
     public int getPropertyInt(String variable, Integer defaultValue) {
-        return this.properties.exists(variable) ? (!this.properties.get(variable).equals("") ? Integer.parseInt(String.valueOf(this.properties.get(variable))) : defaultValue) : defaultValue;
+        Object value = this.properties.get(variable);
+        if (value == null) {
+            value = defaultValue;
+        }
+        if (value instanceof Integer) {
+            return (Integer) value;
+        }
+        String trimmed = String.valueOf(value).trim();
+        if (trimmed.isEmpty()) {
+            return defaultValue;
+        }
+        return Integer.parseInt(trimmed);
     }
 
     /**
@@ -2574,14 +2585,10 @@ public class Server {
         if (value instanceof Boolean) {
             return (Boolean) value;
         }
-        switch (String.valueOf(value)) {
-            case "on":
-            case "true":
-            case "1":
-            case "yes":
-                return true;
-        }
-        return false;
+        return switch (String.valueOf(value).trim().toLowerCase(Locale.ROOT)) {
+            case "on", "true", "1", "yes" -> true;
+            default -> false;
+        };
     }
 
     /**
@@ -2591,7 +2598,7 @@ public class Server {
      * @param value value
      */
     public void setPropertyBoolean(String variable, boolean value) {
-        this.properties.set(variable, value ? "1" : "0");
+        this.properties.set(variable, value);
         this.properties.save();
     }
 

@@ -93,6 +93,15 @@ public class Anvil extends BaseLevelProvider {
     }
 
     @Override
+    public String getGenerator() {
+        String generator = super.getGenerator();
+        if ("normal".equalsIgnoreCase(generator)) { // anvil 不支持384世界高度，强制使用旧的生成器
+            generator = "oldnormal";
+        }
+        return generator;
+    }
+
+    @Override
     public Chunk getEmptyChunk(int chunkX, int chunkZ) {
         return Chunk.getEmptyChunk(chunkX, chunkZ, this);
     }

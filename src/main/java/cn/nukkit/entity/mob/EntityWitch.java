@@ -64,7 +64,7 @@ public class EntityWitch extends EntityWalkingMob {
             this.attackDelay = 0;
             if (player.isAlive() && !player.closed) {
                 for (Block block : this.getLineOfSight(7, 7)) {
-                    if (block.getId() != Block.AIR) {
+                    if (!block.canPassThrough()) {
                         return;
                     }
                 }

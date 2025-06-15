@@ -32,10 +32,12 @@ public class PacketViolationWarningProcessor extends DataPacketProcessor<PacketV
         Optional<String> PVWpkName = pkIDs.stream()
                 .filter(field -> {
                     try {
-                        if (pk.packetId >= 300) { //int id数据包从300开始
+                        if (field.getType() == int.class) {
                             return field.getInt(null) == pk.packetId;
+                        } else if (field.getType() == byte.class) {
+                            return field.getByte(null) == pk.packetId;
                         }
-                        return field.getByte(null) == pk.packetId;
+                        return false;
                     } catch (IllegalAccessException e) {
                         return false;
                     }

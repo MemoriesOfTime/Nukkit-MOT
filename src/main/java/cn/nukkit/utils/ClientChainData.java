@@ -4,6 +4,7 @@ import cn.nukkit.Server;
 import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.LoginPacket;
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import org.jetbrains.annotations.Nullable;
@@ -131,6 +132,11 @@ public final class ClientChainData implements LoginChainData {
     }
 
     @Override
+    public String getTitleId() {
+        return titleId;
+    }
+
+    @Override
     @Nullable
     public String getWaterdogXUID() {
         return waterdogXUID;
@@ -195,10 +201,9 @@ public final class ClientChainData implements LoginChainData {
     private int defaultInputMode;
     private String waterdogIP;
     private String waterdogXUID;
-
     private int UIProfile;
-
     private String capeData;
+    private String titleId;
 
     private JsonObject rawData;
 
@@ -254,7 +259,7 @@ public final class ClientChainData implements LoginChainData {
         if (size > 52428800) {
             throw new IllegalArgumentException("The chain data is too big: " + size);
         }
-        Map<String, List<String>> map = GSON.fromJson(new String(bs.get(size), StandardCharsets.UTF_8), new MapTypeToken().getType());
+        Map<String, List<String>> map = GSON.fromJson(new String(bs.get(size), StandardCharsets.UTF_8), new MapTypeToken());
         if (map.isEmpty() || !map.containsKey("chain") || map.get("chain").isEmpty()) return;
         List<String> chains = map.get("chain");
 
@@ -273,7 +278,13 @@ public final class ClientChainData implements LoginChainData {
                 if (extra.has("displayName")) this.username = extra.get("displayName").getAsString();
                 if (extra.has("identity")) this.clientUUID = UUID.fromString(extra.get("identity").getAsString());
                 if (extra.has("XUID")) this.xuid = extra.get("XUID").getAsString();
+
+                JsonElement titleIdElement = extra.get("titleId");
+                if (titleIdElement != null && !titleIdElement.isJsonNull()) {
+                    this.titleId = titleIdElement.getAsString();
+                }
             }
+
             if (chainMap.has("identityPublicKey")) {
                 this.identityPublicKey = chainMap.get("identityPublicKey").getAsString();
             }
