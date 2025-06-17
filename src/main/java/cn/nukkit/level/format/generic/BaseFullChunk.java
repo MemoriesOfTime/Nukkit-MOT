@@ -725,7 +725,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public BaseFullChunk getChunk(int chunkX, int chunkZ) {
-        if (chunkX == this.x && chunkZ == this.x) return this;
+        if (chunkX == this.x && chunkZ == this.z) return this;
         return null;
     }
 
