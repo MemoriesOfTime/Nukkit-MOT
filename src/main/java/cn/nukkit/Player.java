@@ -6673,30 +6673,54 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void resetCraftingGridType() {
-        if (this.craftingGrid != null) {
-            Item[] drops = this.inventory.addItem(this.craftingGrid.getContents().values().toArray(Item.EMPTY_ARRAY));
+        if (this.playerUIInventory != null) {
+            Item[] drops;
 
-            if (drops.length > 0) {
+            if (this.craftingGrid != null) {
+                drops = this.inventory.addItem(this.craftingGrid.getContents().values().toArray(Item.EMPTY_ARRAY));
+                this.craftingGrid.clearAll();
+
                 for (Item drop : drops) {
-                    this.dropItem(drop);
+                    this.level.dropItem(this, drop);
                 }
             }
 
             drops = this.inventory.addItem(this.getCursorInventory().getItem(0));
-            if (drops.length > 0) {
-                for (Item drop : drops) {
-                    this.dropItem(drop);
-                }
+            this.playerUIInventory.getCursorInventory().clear(0);
+
+            for (Item drop : drops) {
+                this.level.dropItem(this, drop);
             }
+
+            // Don't trust the client to handle this
+            this.moveBlockUIContents(Player.ANVIL_WINDOW_ID); // LOOM_WINDOW_ID is the same as ANVIL_WINDOW_ID?
+            this.moveBlockUIContents(Player.ENCHANT_WINDOW_ID);
+            this.moveBlockUIContents(Player.BEACON_WINDOW_ID);
+            this.moveBlockUIContents(Player.SMITHING_WINDOW_ID);
 
             this.playerUIInventory.clearAll();
 
-            if (this.craftingGrid instanceof BigCraftingGrid) {
+            if (this.craftingGrid instanceof BigCraftingGrid && this.connected) {
                 this.craftingGrid = this.playerUIInventory.getCraftingGrid();
                 this.addWindow(this.craftingGrid, ContainerIds.NONE);
             }
 
-            this.craftingType = CRAFTING_SMALL;
+        }
+        this.craftingType = CRAFTING_SMALL;
+    }
+
+    /**
+     * Move all block UI contents back to player inventory or drop them
+     * @param window window id
+     */
+    private void moveBlockUIContents(int window) {
+        Inventory inventory = this.getWindowById(window);
+        if (inventory instanceof FakeBlockUIComponent) {
+            Item[] drops = this.inventory.addItem(inventory.getContents().values().toArray(Item.EMPTY_ARRAY));
+            inventory.clearAll();
+            for (Item drop : drops) {
+                this.level.dropItem(this, drop);
+            }
         }
     }
 
