@@ -7,6 +7,9 @@ import cn.nukkit.item.Item;
 import java.util.List;
 import java.util.UUID;
 
+/*
+   TODO: when cartography is supported, this should be disused.
+ */
 public class UncheckedMultiRecipe extends MultiRecipe {
 
     public UncheckedMultiRecipe(String id){
