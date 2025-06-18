@@ -8,10 +8,6 @@ import cn.nukkit.item.Item;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * @author glorydark
- * @date {2024/1/8} {16:04}
- */
 public class BookCloningRecipe extends MultiRecipe {
 
     public BookCloningRecipe(){

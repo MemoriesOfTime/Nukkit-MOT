@@ -31,13 +31,6 @@ public class MultiRecipe implements Recipe {
 
     public static final List<String> unsupportedRecipes = new ArrayList<>() {
         {
-            this.add(TYPE_MAP_EXTENDING);
-            this.add(TYPE_MAP_CLONING);
-            this.add(TYPE_MAP_UPGRADING);
-            this.add(TYPE_DECORATED_POT_RECIPE);
-            this.add(TYPE_BANNER_DUPLICATE);
-            this.add(TYPE_BANNER_ADD_PATTERN);
-            this.add(TYPE_FIREWORKS);
             this.add(TYPE_MAP_EXTENDING_CARTOGRAPHY);
             this.add(TYPE_MAP_UPGRADING_CARTOGRAPHY);
             this.add(TYPE_MAP_CLONING_CARTOGRAPHY);

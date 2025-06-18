@@ -142,9 +142,4 @@ public class ItemMap extends Item {
     public boolean canBeActivated() {
         return true;
     }
-
-    @Override
-    public int getMaxStackSize() {
-        return 1;
-    }
 }

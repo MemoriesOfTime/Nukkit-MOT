@@ -2,10 +2,7 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.inventory.special.BookCloningRecipe;
-import cn.nukkit.inventory.special.MapCloningRecipe;
-import cn.nukkit.inventory.special.UncheckedMultiRecipe;
-import cn.nukkit.inventory.special.RepairItemRecipe;
+import cn.nukkit.inventory.special.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
 import cn.nukkit.item.ItemID;
@@ -135,6 +132,12 @@ public class CraftingManager {
         this.registerMultiRecipe(new RepairItemRecipe());
         this.registerMultiRecipe(new BookCloningRecipe());
         this.registerMultiRecipe(new MapCloningRecipe());
+        this.registerMultiRecipe(new MapUpgradingRecipe());
+        this.registerMultiRecipe(new MapExtendingRecipe());
+        this.registerMultiRecipe(new BannerAddPatternRecipe());
+        this.registerMultiRecipe(new BannerDuplicateRecipe());
+        this.registerMultiRecipe(new FireworkRecipe());
+        this.registerMultiRecipe(new DecoratedPotRecipe());
 
         ConfigSection recipes_649_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes649.json")).getRootSection();
         ConfigSection recipes_419_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes419.json")).getRootSection();
