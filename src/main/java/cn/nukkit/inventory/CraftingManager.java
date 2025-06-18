@@ -301,6 +301,7 @@ public class CraftingManager {
                         break;
                     case 4:
                         String uuid = (String) recipe.get("uuid");
+                        // TODO: when cartography is supported, this should be removed and add relevant checks like MapCloningRecipe.class.
                         if (MultiRecipe.unsupportedRecipes.contains(uuid)) {
                             this.registerRecipe(new UncheckedMultiRecipe(uuid));
                         }

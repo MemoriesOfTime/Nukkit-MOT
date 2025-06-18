@@ -29,6 +29,7 @@ public class MultiRecipe implements Recipe {
     public static final String TYPE_MAP_CLONING_CARTOGRAPHY = "442D85ED-8272-4543-A6F1-418F90DED05D";
     public static final String TYPE_MAP_LOCKING_CARTOGRAPHY = "602234E4-CAC1-4353-8BB7-B1EBFF70024B";
 
+    // TODO: when cartography is supported, this should be removed and add relevant checks like MapCloningRecipe.class.
     public static final List<String> unsupportedRecipes = new ArrayList<>() {
         {
             this.add(TYPE_MAP_EXTENDING_CARTOGRAPHY);
