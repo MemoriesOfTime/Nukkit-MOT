@@ -249,7 +249,7 @@ public final class ClientChainData implements LoginChainData {
     }
 
     public static JsonObject decodeToken(String token) {
-        String[] base = token.split("\\.", 100);
+        String[] base = token.split("\\.", 5);
         if (base.length < 2) return null;
         return GSON.fromJson(new String(Base64.getDecoder().decode(base[1]), StandardCharsets.UTF_8), JsonObject.class);
     }
@@ -259,9 +259,18 @@ public final class ClientChainData implements LoginChainData {
         if (size > 52428800) {
             throw new IllegalArgumentException("The chain data is too big: " + size);
         }
-        Map<String, List<String>> map = GSON.fromJson(new String(bs.get(size), StandardCharsets.UTF_8), new MapTypeToken());
-        if (map.isEmpty() || !map.containsKey("chain") || map.get("chain").isEmpty()) return;
-        List<String> chains = map.get("chain");
+
+        Map<String, Object> map = GSON.fromJson(new String(bs.get(size), StandardCharsets.UTF_8), new MapTypeToken());
+
+        String certificate = (String) map.get("Certificate");
+        if (certificate != null) {
+            map = GSON.fromJson(certificate, new MapTypeToken());
+        }
+
+        List<String> chains = (List<String>) map.get("chain");
+        if (chains == null || chains.isEmpty()) {
+            return;
+        }
 
         // Validate keys
         try {
@@ -303,7 +312,7 @@ public final class ClientChainData implements LoginChainData {
         }
     }
 
-    private static class MapTypeToken extends TypeToken<Map<String, List<String>>> {
+    private static class MapTypeToken extends TypeToken<Map<String, Object>> {
     }
 
     public static class TooBigSkinException extends RuntimeException {

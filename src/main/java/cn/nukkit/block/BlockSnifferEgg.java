@@ -56,7 +56,7 @@ public class BlockSnifferEgg extends BlockTransparentMeta implements BlockProper
 
     @Override
     public double getResistance() {
-        return 0.5;
+        return 2.5;
     }
 
     @Override
@@ -69,4 +69,8 @@ public class BlockSnifferEgg extends BlockTransparentMeta implements BlockProper
         return new ItemBlock(Block.get(this.getId()), 0, 1);
     }
 
+    @Override
+    public WaterloggingType getWaterloggingType() {
+        return WaterloggingType.WHEN_PLACED_IN_WATER;
+    }
 }

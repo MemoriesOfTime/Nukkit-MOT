@@ -661,6 +661,8 @@ public class Blocks {
 
         list[SUSPICIOUS_GRAVEL] = BlockSuspiciousGravel.class; //828
 
+        list[CALIBRATED_SCULK_SENSOR] = BlockCalibratedSculkSensor.class; //835
+
         list[SNIFFER_EGG] = BlockSnifferEgg.class; //851
 
         list[COPPER_BULB] = BlockCopperBulb.class; //1031

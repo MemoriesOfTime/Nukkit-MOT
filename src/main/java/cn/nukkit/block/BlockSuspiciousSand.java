@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockSuspiciousSand extends BlockFallableMeta {
 
@@ -33,6 +35,11 @@ public class BlockSuspiciousSand extends BlockFallableMeta {
     }
 
     @Override
+    public int getToolType() {
+        return ItemTool.TYPE_SHOVEL;
+    }
+
+    @Override
     public Item[] getDrops(Item item) {
         return new Item[]{Item.AIR_ITEM};
     }
@@ -40,5 +47,10 @@ public class BlockSuspiciousSand extends BlockFallableMeta {
     @Override
     public boolean isSuspiciousBlock() {
         return true;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.SAND_BLOCK_COLOR;
     }
 }

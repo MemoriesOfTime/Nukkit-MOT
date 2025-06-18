@@ -13,10 +13,22 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockComposter extends BlockSolidMeta implements ItemID {
 
-    private static Int2IntOpenHashMap compostableItems = new Int2IntOpenHashMap();
+    private static final Int2IntOpenHashMap ITEMS = new Int2IntOpenHashMap();
 
     static {
-        registerDefaults();
+        registerItems(30, BEETROOT_SEEDS, DRIED_KELP, GLOW_BERRIES, KELP, MELON_SEEDS, PUMPKIN_SEEDS, SWEET_BERRIES, WHEAT_SEEDS);
+        registerItems(50, MELON_SLICE, NETHER_SPROUTS, SUGAR_CANE);
+        registerItems(65, APPLE, BEETROOT, CARROT, COCOA, POTATO, NETHER_WART, WHEAT);
+        registerItems(85, BAKED_POTATOES, BREAD, COOKIE);
+        registerItems(100, CAKE, PUMPKIN_PIE);
+        registerBlocks(30, GRASS, LEAVES, LEAVES2, SAPLINGS, SEAGRASS, SMALL_DRIPLEAF, MANGROVE_PROPAGULE, MANGROVE_ROOTS);
+        registerBlocks(50, CACTUS, DRIED_KELP_BLOCK, AZALEA_LEAVES_FLOWERED, GLOW_LICHEN, TWISTING_VINES, VINES, WEEPING_VINES);
+        registerBlocks(65, AZALEA, BIG_DRIPLEAF, DOUBLE_PLANT, DANDELION, RED_FLOWER, WITHER_ROSE, CRIMSON_FUNGUS, WARPED_FUNGUS, LILY_PAD, MELON_BLOCK, MOSS_BLOCK, BROWN_MUSHROOM, RED_MUSHROOM, PUMPKIN, CARVED_PUMPKIN, CRIMSON_ROOTS, WARPED_ROOTS, SEA_PICKLE, SHROOMLIGHT);
+        registerBlocks(85, FLOWERING_AZALEA, HAY_BALE, BROWN_MUSHROOM_BLOCK, RED_MUSHROOM_BLOCK, BLOCK_NETHER_WART_BLOCK, PITCHER_PLANT, TORCHFLOWER, WARPED_WART_BLOCK);
+        registerBlock(50, TALL_GRASS, 0);
+        registerBlock(50, TALL_GRASS, 1);
+        registerBlock(65, TALL_GRASS, 2);
+        registerBlock(65, TALL_GRASS, 3);
     }
 
     public BlockComposter() {
@@ -164,7 +176,7 @@ public class BlockComposter extends BlockSolidMeta implements ItemID {
     }
 
     public static void registerItem(int chance, int itemId, int meta) {
-        compostableItems.put(itemId << 6 | meta & 0x3F, chance);
+        ITEMS.put(itemId << 6 | meta & 0x3F, chance);
     }
 
     public static void registerItems(int chance, int... itemIds) {
@@ -195,30 +207,10 @@ public class BlockComposter extends BlockSolidMeta implements ItemID {
     }
 
     public static int getChance(Item item) {
-        int chance = compostableItems.get(item.getId() << 6 | item.getDamage());
+        int chance = ITEMS.get(item.getId() << 6 | item.getDamage());
         if (chance == 0) {
-            chance = compostableItems.get(item.getId() << 6);
+            chance = ITEMS.get(item.getId() << 6);
         }
         return chance;
-    }
-
-    private static void registerDefaults() {
-        registerItems(30, KELP, BEETROOT_SEEDS, DRIED_KELP, MELON_SEEDS, PUMPKIN_SEEDS, SWEET_BERRIES, SWEET_BERRIES, WHEAT_SEEDS);
-        registerItems(50, MELON_SLICE, SUGAR_CANE);
-        registerItems(65, APPLE, BEETROOT, CARROT, COCOA, POTATO, WHEAT);
-        registerItems(85, BAKED_POTATOES, BREAD, COOKIE);
-        registerItems(100, CAKE, PUMPKIN_PIE);
-
-        registerBlocks(30, BLOCK_KELP, LEAVES, LEAVES2, SAPLINGS, SEAGRASS, SWEET_BERRY_BUSH);
-        registerBlocks(50, GRASS, CACTUS, DRIED_KELP_BLOCK, VINES);
-        registerBlocks(65, DANDELION, RED_FLOWER, DOUBLE_PLANT, LILY_PAD, MELON_BLOCK,
-                                  PUMPKIN, CARVED_PUMPKIN, SEA_PICKLE, BROWN_MUSHROOM, RED_MUSHROOM); //TODO: pumpkin
-        registerBlocks(85, HAY_BALE, BROWN_MUSHROOM_BLOCK, RED_MUSHROOM_BLOCK, MUSHROOM_STEW);
-        registerBlocks(100, CAKE_BLOCK);
-
-        registerBlock(50, TALL_GRASS, 0);
-        registerBlock(50, TALL_GRASS, 1);
-        registerBlock(65, TALL_GRASS, 2);
-        registerBlock(65, TALL_GRASS, 3);
     }
 }

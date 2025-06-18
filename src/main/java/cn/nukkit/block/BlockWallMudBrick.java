@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
@@ -46,6 +47,17 @@ public class BlockWallMudBrick extends BlockWall {
     @Override
     public int getToolTier() {
         return ItemTool.TIER_WOODEN;
+    }
+
+    @Override
+    public Item[] getDrops(Item item) {
+        if (item.isPickaxe()) {
+            return new Item[]{
+                    toItem()
+            };
+        } else {
+            return Item.EMPTY_ARRAY;
+        }
     }
 
     @Override

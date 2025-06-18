@@ -1,6 +1,6 @@
 package cn.nukkit.block;
 
-import cn.nukkit.item.Item;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockStrippedBambooBlock extends BlockWoodStripped {
     public BlockStrippedBambooBlock() {
@@ -43,5 +43,10 @@ public class BlockStrippedBambooBlock extends BlockWoodStripped {
     @Override
     protected int getStrippedId() {
         return STRIPPED_BAMBOO_BLOCK;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.YELLOW_BLOCK_COLOR;
     }
 }

@@ -715,8 +715,32 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v800
      */
     public static final int SOUND_UNEQUIP_GENERIC = 554;
+    /**
+     * @since v818
+     */
+    public static final int SOUND_RECORD_TEARS = 555;
+    /**
+     * @since v818
+     */
+    public static final int SOUND_THE_END_LIGHT_FLASH = 556;
+    /**
+     * @since v818
+     */
+    public static final int SOUND_LEAD_LEASH = 557;
+    /**
+     * @since v818
+     */
+    public static final int SOUND_LEAD_UNLEASH = 558;
+    /**
+     * @since v818
+     */
+    public static final int SOUND_LEAD_BREAK = 559;
+    /**
+     * @since v818
+     */
+    public static final int SOUND_UNSADDLE = 560;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(555);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(561);
 
     public int sound;
     public float x;

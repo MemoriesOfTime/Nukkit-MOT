@@ -377,6 +377,10 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v800 1.21.80
      */
     public static final int DATA_FLAG_DOES_SERVER_AUTH_ONLY_DISMOUNT = 123;
+    /**
+     * @since v818 1.21.90
+     */
+    public static final int DATA_FLAG_BODY_ROTATION_ALWAYS_FOLLOWS_HEAD = 124;
 
     public static final double STEP_CLIP_MULTIPLIER = 0.4;
     public static final int ENTITY_COORDINATES_MAX_VALUE = 2100000000;
