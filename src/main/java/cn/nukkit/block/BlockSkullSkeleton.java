@@ -18,13 +18,13 @@ import org.jetbrains.annotations.NotNull;
 /**
  * @author Justin
  */
-public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntitySkull> {
+public class BlockSkullSkeleton extends BlockTransparentMeta implements Faceable, BlockEntityHolder<BlockEntitySkull> {
 
-    public BlockSkull() {
+    public BlockSkullSkeleton() {
         this(0);
     }
 
-    public BlockSkull(int meta) {
+    public BlockSkullSkeleton(int meta) {
         super(meta);
     }
 
@@ -131,11 +131,8 @@ public class BlockSkull extends BlockTransparentMeta implements Faceable, BlockE
 
     @Override
     public Item[] getDrops(Item item) {
-        BlockEntity blockEntity = getLevel().getBlockEntity(this);
-        int dropMeta = 0;
-        if (blockEntity != null) dropMeta = blockEntity.namedTag.getByte("SkullType");
         return new Item[]{
-                new ItemSkull(dropMeta)
+                this.toItem()
         };
     }
 
