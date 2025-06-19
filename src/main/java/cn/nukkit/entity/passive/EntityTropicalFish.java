@@ -57,7 +57,7 @@ public class EntityTropicalFish extends EntityFish {
     }
 
     @Override
-    int getBucketMeta() {
+    protected int getBucketMeta() {
         return 4;
     }
 

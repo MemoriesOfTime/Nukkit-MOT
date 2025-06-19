@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockColor;
+
 public class BlockWoodStrippedCherry extends BlockWoodStripped {
 
     public BlockWoodStrippedCherry() {
@@ -23,5 +25,10 @@ public class BlockWoodStrippedCherry extends BlockWoodStripped {
     @Override
     public int getBurnAbility() {
         return 5;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.WHITE_TERRACOTA_BLOCK_COLOR;
     }
 }

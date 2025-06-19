@@ -134,7 +134,7 @@ public class CameraPresetsPacket extends DataPacket {
         }
         this.putOptionalNull(preset.getListener(), (listener) -> this.putByte((byte) listener.ordinal()));
         this.putOptional(o -> o != null && o.isPresent(), preset.getPlayEffect(), (optional) -> this.putBoolean(optional.getAsBoolean()));
-        if (this.protocol >= ProtocolInfo.v1_21_40) {
+        if (this.protocol >= ProtocolInfo.v1_21_40 && this.protocol < ProtocolInfo.v1_21_90) {
             this.putOptional(o -> o != null && o.isPresent(), preset.getAlignTargetAndCameraForward(), (optional) -> this.putBoolean(optional.getAsBoolean()));
         }
         if (this.protocol >= ProtocolInfo.v1_21_50) {
@@ -204,7 +204,7 @@ public class CameraPresetsPacket extends DataPacket {
         CameraAudioListener listener = this.getOptional(null, b -> CameraAudioListener.values()[b.getByte()]);
         OptionalBoolean effects = this.getOptional(OptionalBoolean.empty(), b -> OptionalBoolean.of(b.getBoolean()));
         OptionalBoolean alignTargetAndCameraForward = OptionalBoolean.empty();
-        if (this.protocol >= ProtocolInfo.v1_21_40) {
+        if (this.protocol >= ProtocolInfo.v1_21_40 && this.protocol < ProtocolInfo.v1_21_90) {
             alignTargetAndCameraForward = this.getOptional(OptionalBoolean.empty(), b -> OptionalBoolean.of(b.getBoolean()));
         }
         CameraAimAssistPreset aimAssist = null;

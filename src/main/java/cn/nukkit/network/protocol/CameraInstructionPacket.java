@@ -259,6 +259,9 @@ public class CameraInstructionPacket extends DataPacket {
         }
         this.putOptional(OptionalBoolean::isPresent, set.getDefaultPreset(),
                 (b1, optional) -> b1.putBoolean(optional.getAsBoolean()));
+        if (this.protocol >= ProtocolInfo.v1_21_90) {
+            this.putBoolean(set.isRemoveIgnoreStartingValues());
+        }
     }
 
     protected CameraSetInstruction readSetInstruction() {
@@ -278,7 +281,11 @@ public class CameraInstructionPacket extends DataPacket {
             }
         }
         OptionalBoolean defaultPreset = this.getOptional(OptionalBoolean.empty(), b1 -> OptionalBoolean.of(b1.getBoolean()));
-        return new CameraSetInstruction(definition, ease, pos, rot, facing, viewOffset, entityOffset, defaultPreset);
+        boolean removeIgnoreStartingValues = false;
+        if (this.protocol >= ProtocolInfo.v1_21_90) {
+            removeIgnoreStartingValues = this.getBoolean();
+        }
+        return new CameraSetInstruction(definition, ease, pos, rot, facing, viewOffset, entityOffset, defaultPreset, removeIgnoreStartingValues);
     }
 
     protected void putEase(CameraSetInstruction.EaseData ease) {

@@ -50,6 +50,11 @@ public class BlockDoubleSlabMudBrick extends BlockSolidMeta {
     }
 
     @Override
+    public boolean canHarvestWithHand() {
+        return false;
+    }
+
+    @Override
     public Item[] getDrops(Item item) {
         return new Item[]{
                 Item.get(Item.MUD_BRICK_SLAB, 0, 2)

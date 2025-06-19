@@ -308,6 +308,9 @@ public class StartGamePacket extends DataPacket {
                         this.putString(this.serverId);
                         this.putString(this.worldId);
                         this.putString(this.scenarioId);
+                        if (protocol >= ProtocolInfo.v1_21_90) {
+                            this.putString(""); // OwnerId
+                        }
                     }
                 }
             }
@@ -321,7 +324,9 @@ public class StartGamePacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_13_0) {
             if (protocol >= ProtocolInfo.v1_16_100) {
                 if (protocol >= ProtocolInfo.v1_16_210) {
-                    this.putVarInt(this.isMovementServerAuthoritative ? 1 : 0); // 2 - rewind
+                    if (protocol < ProtocolInfo.v1_21_90) {
+                        this.putVarInt(this.isMovementServerAuthoritative ? 1 : 0); // 2 - rewind
+                    }
                     this.putVarInt(0); // RewindHistorySize
                     this.putBoolean(this.isServerAuthoritativeBlockBreaking); // isServerAuthoritativeBlockBreaking
                 } else {

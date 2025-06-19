@@ -67,6 +67,8 @@ public class LevelDBProvider implements LevelProvider {
     protected final String path;
 
     protected CompoundTag levelData;
+    private Vector3 spawn;
+    private Long cachedSeed;
 
     protected volatile boolean closed;
     protected final Lock gcLock;
@@ -829,17 +831,24 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public long getSeed() {
-        return this.levelData.getLong("RandomSeed");
+        if (this.cachedSeed == null) {
+            this.cachedSeed = this.levelData.getLong("RandomSeed");
+        }
+        return this.cachedSeed;
     }
 
     @Override
     public void setSeed(long value) {
+        this.cachedSeed = null;
         this.levelData.putLong("RandomSeed", value);
     }
 
     @Override
     public Vector3 getSpawn() {
-        return new Vector3(this.levelData.getInt("SpawnX"), this.levelData.getInt("SpawnY"), this.levelData.getInt("SpawnZ"));
+        if (this.spawn == null) {
+            this.spawn = new Vector3(this.levelData.getInt("SpawnX"), this.levelData.getInt("SpawnY"), this.levelData.getInt("SpawnZ"));
+        }
+        return this.spawn;
     }
 
     @Override
@@ -847,6 +856,7 @@ public class LevelDBProvider implements LevelProvider {
         this.levelData.putInt("SpawnX", (int) pos.x);
         this.levelData.putInt("SpawnY", (int) pos.y);
         this.levelData.putInt("SpawnZ", (int) pos.z);
+        this.spawn = pos;
     }
 
     @Override
