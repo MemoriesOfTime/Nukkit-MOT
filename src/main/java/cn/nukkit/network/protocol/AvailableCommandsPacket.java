@@ -508,15 +508,9 @@ public class AvailableCommandsPacket extends DataPacket {
                 for (ChainedSubCommandData.Value value : chainedSubCommandData.getValues()) {
                     int first = subCommandValues.indexOf(value.getFirst());
                     checkArgument(first > -1, "Invalid enum value detected: " + value.getFirst());
-                    if (value.getFirst() == null) {
-                        first = -1;
-                    }
 
                     int second = subCommandValues.indexOf(value.getSecond());
                     checkArgument(second > -1, "Invalid enum value detected: " + value.getSecond());
-                    if (value.getSecond() == null) {
-                        second = -1;
-                    }
 
                     this.putLShort(first);
                     this.putLShort(second);
