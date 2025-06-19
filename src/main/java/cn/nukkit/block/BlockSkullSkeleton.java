@@ -110,7 +110,7 @@ public class BlockSkullSkeleton extends BlockTransparentMeta implements Faceable
 
         CompoundTag nbt = new CompoundTag()
                 .putString("id", BlockEntity.SKULL)
-                .putByte("SkullType", item.getDamage())
+                .putByte("SkullType", this.getSkullType() == SkullType.DEFAULT? item.getDamage(): this.getSkullType().ordinal())
                 .putInt("x", block.getFloorX())
                 .putInt("y", block.getFloorY())
                 .putInt("z", block.getFloorZ())
@@ -129,10 +129,17 @@ public class BlockSkullSkeleton extends BlockTransparentMeta implements Faceable
         return true;
     }
 
+    public SkullType getSkullType() {
+        return SkullType.DEFAULT;
+    }
+
     @Override
     public Item[] getDrops(Item item) {
+        BlockEntity blockEntity = getLevel().getBlockEntity(this);
+        int dropMeta = 0;
+        if (blockEntity != null) dropMeta = blockEntity.namedTag.getByte("SkullType");
         return new Item[]{
-                this.toItem()
+                new ItemSkull(dropMeta)
         };
     }
 
@@ -178,5 +185,15 @@ public class BlockSkullSkeleton extends BlockTransparentMeta implements Faceable
     @Override
     public boolean alwaysDropsOnExplosion() {
         return true;
+    }
+
+    public enum SkullType {
+        DEFAULT,
+        WITHER_SKELETON,
+        ZOMBIE,
+        PLAYER,
+        CREEPER,
+        DRAGON,
+        PIGLIN
     }
 }

@@ -30,4 +30,9 @@ public class BlockHeadDragon extends BlockSkullSkeleton {
     public Item toItem() {
         return Item.get(Item.SKULL, 5);
     }
+
+    @Override
+    public SkullType getSkullType() {
+        return SkullType.DRAGON;
+    }
 }

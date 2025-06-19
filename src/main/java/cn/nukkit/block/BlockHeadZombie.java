@@ -30,4 +30,9 @@ public class BlockHeadZombie extends BlockSkullSkeleton {
     public Item toItem() {
         return Item.get(Item.SKULL, 2);
     }
+
+    @Override
+    public SkullType getSkullType() {
+        return SkullType.ZOMBIE;
+    }
 }

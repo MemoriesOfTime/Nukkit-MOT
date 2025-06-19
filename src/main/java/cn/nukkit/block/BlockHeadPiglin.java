@@ -30,4 +30,9 @@ public class BlockHeadPiglin extends BlockSkullSkeleton {
     public Item toItem() {
         return Item.get(Item.SKULL, 6);
     }
+
+    @Override
+    public SkullType getSkullType() {
+        return SkullType.PIGLIN;
+    }
 }
