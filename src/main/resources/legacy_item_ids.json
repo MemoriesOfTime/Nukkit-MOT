@@ -1081,5 +1081,11 @@
   "minecraft:waxed_weathered_copper_bulb": -782,
   "minecraft:waxed_oxidized_copper_bulb": -783,
   "minecraft:copper_ingot": 519,
-  "minecraft:raw_copper": 522
+  "minecraft:raw_copper": 522,
+  "minecraft:wither_skeleton_skull": 1220,
+  "minecraft:zombie_head": 1221,
+  "minecraft:player_head": 1222,
+  "minecraft:creeper_head": 1223,
+  "minecraft:dragon_head": 1224,
+  "minecraft:piglin_head": 1225
 }
