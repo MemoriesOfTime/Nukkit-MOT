@@ -12,6 +12,10 @@ public class ElementSlider extends Element {
     private int step;
     @SerializedName("default")
     private float defaultValue;
+    /**
+     * This option will show an exclamation icon that will display a tooltip if it is hovered.
+     */
+    private String tooltip = "";
 
     public ElementSlider(String text, float min, float max) {
         this(text, min, max, -1);
@@ -67,5 +71,13 @@ public class ElementSlider extends Element {
 
     public void setDefaultValue(float defaultValue) {
         this.defaultValue = defaultValue;
+    }
+
+    public String getTooltip() {
+        return tooltip;
+    }
+
+    public void setTooltip(String tooltip) {
+        this.tooltip = tooltip;
     }
 }
