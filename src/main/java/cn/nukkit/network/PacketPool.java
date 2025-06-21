@@ -38,7 +38,7 @@ public class PacketPool {
     }
 
     public DataPacket getPacket(int id) {
-        if (id >= packetsById.length) {
+        if (id < 0 || id >= packetsById.length) {
             Server.getInstance().getLogger().debug("Packet exceeds limits, id: " + id);
             return null;
         }

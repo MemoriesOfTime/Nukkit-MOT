@@ -1,6 +1,8 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemTool;
+import cn.nukkit.utils.BlockColor;
 
 public class BlockSuspiciousGravel extends BlockFallableMeta {
 
@@ -29,7 +31,12 @@ public class BlockSuspiciousGravel extends BlockFallableMeta {
 
     @Override
     public double getResistance() {
-        return 1.25;
+        return 2.5;
+    }
+
+    @Override
+    public int getToolType() {
+        return ItemTool.TYPE_SHOVEL;
     }
 
     @Override
@@ -40,5 +47,10 @@ public class BlockSuspiciousGravel extends BlockFallableMeta {
     @Override
     public boolean isSuspiciousBlock() {
         return true;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.GRAY_BLOCK_COLOR;
     }
 }

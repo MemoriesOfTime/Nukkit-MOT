@@ -2,7 +2,7 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.inventory.special.RepairItemRecipe;
+import cn.nukkit.inventory.special.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
 import cn.nukkit.item.ItemID;
@@ -70,6 +70,7 @@ public class CraftingManager {
     private static BatchPacket packet766;
     private static BatchPacket packet776;
     private static BatchPacket packet800;
+    private static BatchPacket packet818;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -130,6 +131,14 @@ public class CraftingManager {
     public CraftingManager() {
         MainLogger.getLogger().debug("Loading recipes...");
         this.registerMultiRecipe(new RepairItemRecipe());
+        this.registerMultiRecipe(new BookCloningRecipe());
+        this.registerMultiRecipe(new MapCloningRecipe());
+        this.registerMultiRecipe(new MapUpgradingRecipe());
+        this.registerMultiRecipe(new MapExtendingRecipe());
+        this.registerMultiRecipe(new BannerAddPatternRecipe());
+        this.registerMultiRecipe(new BannerDuplicateRecipe());
+        this.registerMultiRecipe(new FireworkRecipe());
+        this.registerMultiRecipe(new DecoratedPotRecipe());
 
         ConfigSection recipes_649_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes649.json")).getRootSection();
         ConfigSection recipes_419_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes419.json")).getRootSection();
@@ -291,9 +300,13 @@ public class CraftingManager {
                                 break;
                         }
                         break;
-                    /*case 4:
-                        this.registerRecipe(new MultiRecipe(UUID.fromString((String) recipe.get("uuid"))));
-                        break;*/
+                    case 4:
+                        String uuid = (String) recipe.get("uuid");
+                        // TODO: when cartography is supported, this should be removed and add relevant checks like MapCloningRecipe.class.
+                        if (MultiRecipe.unsupportedRecipes.contains(uuid)) {
+                            this.registerRecipe(new UncheckedMultiRecipe(uuid));
+                        }
+                        break;
                     default:
                         break;
                 }
@@ -737,6 +750,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet818 = null;
         packet800 = null;
         packet776 = null;
         packet766 = null;
@@ -790,7 +804,12 @@ public class CraftingManager {
      */
     public BatchPacket getCachedPacket(int protocol) {
         //TODO Multiversion 添加新版本支持时修改这里
-        if (protocol >= ProtocolInfo.v1_21_80) {
+        if (protocol >= ProtocolInfo.v1_21_90) {
+            if (packet818 == null) {
+                packet818 = packetFor(ProtocolInfo.v1_21_90);
+            }
+            return packet818;
+        } else if (protocol >= ProtocolInfo.v1_21_80) {
             if (packet800 == null) {
                 packet800 = packetFor(ProtocolInfo.v1_21_80);
             }

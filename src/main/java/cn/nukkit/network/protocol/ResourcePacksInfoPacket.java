@@ -21,6 +21,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
      * @since v662 1.20.70
      */
     public boolean hasAddonPacks;
+    /**
+     * @since v818 1.21.90
+     */
+    public boolean forceDisableVibrantVisuals;
     public boolean scripting;
     public boolean forceServerPacks;
     public ResourcePack[] behaviourPackEntries = ResourcePack.EMPTY_ARRAY;
@@ -54,6 +58,9 @@ public class ResourcePacksInfoPacket extends DataPacket {
         }
         if (this.protocol >= ProtocolInfo.v1_9_0) {
             this.putBoolean(this.scripting);
+            if (this.protocol >= ProtocolInfo.v1_21_90) {
+                this.putBoolean(this.forceDisableVibrantVisuals);
+            }
             if (this.protocol >= ProtocolInfo.v1_17_10 && this.protocol < ProtocolInfo.v1_21_30) {
                 this.putBoolean(this.forceServerPacks);
             }

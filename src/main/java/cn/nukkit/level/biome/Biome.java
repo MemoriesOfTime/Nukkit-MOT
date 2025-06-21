@@ -70,10 +70,10 @@ public abstract class Biome implements BlockID {
     }
 
     public static int getBiomeIdOrCorrect(int protocol, int biomeId) {
-        if (runtimeId2Identifier.get(biomeId) == null) {
-            return EnumBiome.OCEAN.id;
+        if (runtimeId2Identifier.containsKey(biomeId)) {
+            return biomeId;
         }
-        return biomeId;
+        return EnumBiome.OCEAN.id;
     }
 
     public static CompoundTag getBiomeDefinitions(int biomeId) {

@@ -32,7 +32,7 @@ public class BlockSculkVein extends BlockGlowLichen {
 
     @Override
     public double getHardness() {
-        return 0.2;
+        return 0;
     }
 
     @Override
@@ -52,7 +52,7 @@ public class BlockSculkVein extends BlockGlowLichen {
                     this.toItem()
             };
         }
-        return new Item[0];
+        return Item.EMPTY_ARRAY;
     }
 
     @Override

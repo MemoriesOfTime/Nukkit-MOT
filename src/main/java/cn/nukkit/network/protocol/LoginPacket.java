@@ -2,10 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
 import cn.nukkit.entity.data.Skin;
-import cn.nukkit.utils.PersonaPiece;
-import cn.nukkit.utils.PersonaPieceTint;
-import cn.nukkit.utils.SerializedImage;
-import cn.nukkit.utils.SkinAnimation;
+import cn.nukkit.utils.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -14,8 +11,6 @@ import lombok.ToString;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-
-import static cn.nukkit.utils.ClientChainData.decodeToken;
 
 @ToString
 public class LoginPacket extends DataPacket {
@@ -72,16 +67,26 @@ public class LoginPacket extends DataPacket {
 
     private void decodeChainData() {
         int size = this.getLInt();
-        if (size > 52428800) {
+        if (size > 3145728) {
             throw new IllegalArgumentException("The chain data is too big: " + size);
         }
 
         String data = new String(this.get(size), StandardCharsets.UTF_8);
 
-        Map<String, List<String>> map = GSON.fromJson(data, new MapTypeToken());
-        if (map.isEmpty() || !map.containsKey("chain") || map.get("chain").isEmpty()) return;
-        for (String c : map.get("chain")) {
-            JsonObject chainMap = decodeToken(c);
+        Map<String, Object> map = GSON.fromJson(data, new MapTypeToken());
+
+        String certificate = (String) map.get("Certificate");
+        if (certificate != null) {
+            map = GSON.fromJson(certificate, new MapTypeToken());
+        }
+
+        List<String> chains = (List<String>) map.get("chain");
+        if (chains == null || chains.isEmpty()) {
+            return;
+        }
+
+        for (String c : chains) {
+            JsonObject chainMap = ClientChainData.decodeToken(c);
             if (chainMap == null) continue;
             if (chainMap.has("extraData")) {
                 JsonObject extra = chainMap.get("extraData").getAsJsonObject();
@@ -98,7 +103,7 @@ public class LoginPacket extends DataPacket {
             return; // Get disconnected due to "invalid skin"
         }
 
-        JsonObject skinToken = decodeToken(new String(this.get(size), StandardCharsets.UTF_8));
+        JsonObject skinToken = ClientChainData.decodeToken(new String(this.get(size), StandardCharsets.UTF_8));
         if (skinToken == null) throw new RuntimeException("Invalid null skin token");
 
         // 将1.19.62按1.19.63版本处理 修复1.19.62皮肤修改问题
@@ -256,6 +261,6 @@ public class LoginPacket extends DataPacket {
         return new PersonaPieceTint(pieceType, colors);
     }
 
-    private static class MapTypeToken extends TypeToken<Map<String, List<String>>> {
+    private static class MapTypeToken extends TypeToken<Map<String, Object>> {
     }
 }

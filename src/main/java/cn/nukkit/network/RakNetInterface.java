@@ -30,6 +30,7 @@ import org.cloudburstmc.netty.handler.codec.raknet.server.RakServerRateLimiter;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -99,6 +100,14 @@ public class RakNetInterface implements AdvancedSourceInterface {
         String address = Strings.isNullOrEmpty(this.server.getIp()) ? "0.0.0.0" : this.server.getIp();
 
         this.channel = bootstrap.bind(address, this.server.getPort()).awaitUninterruptibly().channel();
+
+        try {
+            RakServerRateLimiter rakServerRateLimiter = this.channel.pipeline().get(RakServerRateLimiter.class);
+            rakServerRateLimiter.addException(InetAddress.getLocalHost());
+            rakServerRateLimiter.addException(InetAddress.getByName("127.0.0.1"));
+        } catch (UnknownHostException e) {
+            log.error("Failed to add localhost to exception list", e);
+        }
     }
 
     @Override

@@ -154,7 +154,7 @@ public class Blocks {
         list[CARROT_BLOCK] = BlockCarrot.class; //141
         list[POTATO_BLOCK] = BlockPotato.class; //142
         list[WOODEN_BUTTON] = BlockButtonWooden.class; //143
-        list[SKULL_BLOCK] = BlockSkull.class; //144
+        list[SKULL_BLOCK] = BlockSkullSkeleton.class; //144
         list[ANVIL] = BlockAnvil.class; //145
         list[TRAPPED_CHEST] = BlockTrappedChest.class; //146
         list[LIGHT_WEIGHTED_PRESSURE_PLATE] = BlockWeightedPressurePlateLight.class; //147
@@ -661,6 +661,8 @@ public class Blocks {
 
         list[SUSPICIOUS_GRAVEL] = BlockSuspiciousGravel.class; //828
 
+        list[CALIBRATED_SCULK_SENSOR] = BlockCalibratedSculkSensor.class; //835
+
         list[SNIFFER_EGG] = BlockSnifferEgg.class; //851
 
         list[COPPER_BULB] = BlockCopperBulb.class; //1031
@@ -671,6 +673,13 @@ public class Blocks {
         list[WAXED_EXPOSED_COPPER_BULB] = BlockWaxedExposedCopperBulb.class; //1036
         list[WAXED_WEATHERED_COPPER_BULB] = BlockWaxedWeatheredCopperBulb.class; //1037
         list[WAXED_OXIDIZED_COPPER_BULB] = BlockWaxedOxidizedCopperBulb.class; //1038
+
+        list[WITHER_SKELETON_SKULL] = BlockSkullWitherSkeleton.class; //1220
+        list[ZOMBIE_HEAD] = BlockHeadZombie.class; //1221
+        list[PLAYER_HEAD] = BlockHeadPlayer.class; //1222
+        list[CREEPER_HEAD] = BlockHeadCreeper.class; //1223
+        list[DRAGON_HEAD] = BlockHeadDragon.class; //1224
+        list[PIGLIN_HEAD] = BlockHeadPiglin.class; //1225
 
         list[BUSH] = BlockBush.class; //1278
         list[WILDFLOWERS] = BlockWildflowers.class; //1279

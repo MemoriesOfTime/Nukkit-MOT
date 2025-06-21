@@ -74,6 +74,7 @@ public final class CameraPreset implements NamedDefinition {
     private OptionalBoolean continueTargeting = OptionalBoolean.empty();
     /**
      * @since v748
+     * @deprecated v818
      */
     private OptionalBoolean alignTargetAndCameraForward = OptionalBoolean.empty();
     /**

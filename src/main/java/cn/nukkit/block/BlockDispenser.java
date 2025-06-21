@@ -175,14 +175,14 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
         Random rand = ThreadLocalRandom.current();
         int r = 1;
         int slot = -1;
-        Item target = null;
+        Item original = null;
 
         Inventory inv = ((BlockEntityDispenser) blockEntity).getInventory();
         for (Entry<Integer, Item> entry : inv.getContents().entrySet()) {
             Item item = entry.getValue();
 
             if (!item.isNull() && rand.nextInt(r++) == 0) {
-                target = item;
+                original = item;
                 slot = entry.getKey();
             }
         }
@@ -195,7 +195,7 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
         pk.y = 0.5f + facing.getYOffset() * 0.7f;
         pk.z = 0.5f + facing.getZOffset() * 0.7f;
 
-        if (target == null) {
+        if (original == null) {
             pk.evid = LevelEventPacket.EVENT_SOUND_CLICK_FAIL;
             pk.data = 1200;
 
@@ -212,16 +212,16 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
         pk.data = 7;
         level.addChunkPacket(getChunkX(), getChunkZ(), pk);
 
-        Item origin = target;
-        target = target.clone();
+        Item origin = original;
+        original = original.clone();
 
-        DispenseBehavior behavior = DispenseBehaviorRegister.getBehavior(target.getId());
-        Item result = behavior.dispense(this, facing, target);
+        DispenseBehavior behavior = DispenseBehaviorRegister.getBehavior(original.getId());
+        Item result = behavior.dispense(this, facing, original);
 
         pk.evid = LevelEventPacket.EVENT_SOUND_CLICK;
 
-        target.count--;
-        inv.setItem(slot, target);
+        original.count--;
+        inv.setItem(slot, original);
 
         if (result != null) {
             if (result.getId() != origin.getId() || result.getDamage() != origin.getDamage()) {
@@ -232,6 +232,14 @@ public class BlockDispenser extends BlockSolidMeta implements Faceable, BlockEnt
                 }
             } else {
                 inv.setItem(slot, result);
+
+                // TODO: Better solution. Give back empty buckets if a stack was in original slot.
+                if (result.getId() == Item.HONEY_BOTTLE || result.getId() == Item.GLASS_BOTTLE || (result.getId() == Item.BUCKET && result.getDamage() > 0)) {
+                    Item[] invFull = inv.addItem(original.decrement(result.count));
+                    for (Item drop : invFull) {
+                        DispenseBehaviorRegister.getBehavior(-1).dispense(this, getBlockFace(), drop);
+                    }
+                }
             }
         }
     }

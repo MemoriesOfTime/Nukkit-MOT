@@ -7,6 +7,7 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.CameraPresetManager;
 import cn.nukkit.utils.Identifier;
 import com.google.common.collect.ImmutableList;
+import lombok.EqualsAndHashCode;
 
 import java.lang.reflect.Modifier;
 import java.util.*;
@@ -15,6 +16,7 @@ import java.util.function.Supplier;
 /**
  * @author CreeperFace
  */
+@EqualsAndHashCode
 public class CommandEnum {
 
     public static final CommandEnum ENUM_BOOLEAN = new CommandEnum("Boolean", ImmutableList.of("true", "false"));
@@ -113,18 +115,5 @@ public class CommandEnum {
             return;
         }
         this.updateSoftEnum(UpdateSoftEnumPacket.Type.SET, this.getValues().toArray(new String[0]));
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        CommandEnum that = (CommandEnum) o;
-        return name.equals(that.name);
-    }
-
-    @Override
-    public int hashCode() {
-        return name.hashCode();
     }
 }

@@ -30,6 +30,7 @@ public abstract class FormWindow {
                 return GSON_FORM_WINDOW_SIMPLE_785.toJson(this);
             }
             return GSON_FORM_WINDOW_SIMPLE.toJson(this);
+
         }
         return FormWindow.GSON.toJson(this);
     }
