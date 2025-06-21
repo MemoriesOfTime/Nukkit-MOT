@@ -10,6 +10,10 @@ public class ElementInput extends Element {
     private String placeholder = "";
     @SerializedName("default")
     private String defaultText = "";
+    /**
+     * This option will show an exclamation icon that will display a tooltip if it is hovered.
+     */
+    private String tooltip = "";
 
     public ElementInput(String text) {
         this(text, "");
@@ -47,5 +51,13 @@ public class ElementInput extends Element {
 
     public void setDefaultText(String defaultText) {
         this.defaultText = defaultText;
+    }
+
+    public String getTooltip() {
+        return tooltip;
+    }
+
+    public void setTooltip(String tooltip) {
+        this.tooltip = tooltip;
     }
 }
