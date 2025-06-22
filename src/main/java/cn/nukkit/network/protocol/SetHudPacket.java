@@ -36,8 +36,8 @@ public class SetHudPacket extends DataPacket {
     public void decode() {
         this.elements.clear();
         if (this.protocol >= ProtocolInfo.v1_21_70_24) {
-            this.getArray(this.elements, value -> HudElement.values()[(int) this.getVarInt()]);
-            this.visibility = HudVisibility.values()[this.getInt()];
+            this.getArray(this.elements, value -> HudElement.values()[this.getVarInt()]);
+            this.visibility = HudVisibility.values()[this.getVarInt()];
         } else {
             this.getArray(this.elements, value -> HudElement.values()[(int) this.getUnsignedVarInt()]);
             this.visibility = HudVisibility.values()[this.getByte()];
@@ -49,7 +49,7 @@ public class SetHudPacket extends DataPacket {
         this.reset();
         if (this.protocol >= ProtocolInfo.v1_21_70_24) {
             this.putArray(this.elements, (buf, element) -> this.putVarInt(element.ordinal()));
-            this.putInt(this.visibility.ordinal());
+            this.putVarInt(this.visibility.ordinal());
         } else {
             this.putArray(this.elements, (buf, element) -> this.putUnsignedVarInt(element.ordinal()));
             this.putByte((byte) this.visibility.ordinal());
