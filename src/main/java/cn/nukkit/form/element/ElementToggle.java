@@ -9,6 +9,10 @@ public class ElementToggle extends Element {
     private String text;
     @SerializedName("default")
     private boolean defaultValue;
+    /**
+     * This option will show an exclamation icon that will display a tooltip if it is hovered.
+     */
+    private String tooltip = "";
 
     public ElementToggle(String text) {
         this(text, false);
@@ -33,5 +37,13 @@ public class ElementToggle extends Element {
 
     public void setDefaultValue(boolean defaultValue) {
         this.defaultValue = defaultValue;
+    }
+
+    public String getTooltip() {
+        return tooltip;
+    }
+
+    public void setTooltip(String tooltip) {
+        this.tooltip = tooltip;
     }
 }
