@@ -13,6 +13,10 @@ public class ElementStepSlider extends Element {
     private List<String> steps;
     @SerializedName("default")
     private int defaultStepIndex = 0;
+    /**
+     * This option will show an exclamation icon that will display a tooltip if it is hovered.
+     */
+    private String tooltip = "";
 
     public ElementStepSlider(String text) {
         this(text, new ArrayList<>());
@@ -56,5 +60,13 @@ public class ElementStepSlider extends Element {
     public void addStep(String step, boolean isDefault) {
         steps.add(step);
         if (isDefault) this.defaultStepIndex = steps.size() - 1;
+    }
+
+    public String getTooltip() {
+        return tooltip;
+    }
+
+    public void setTooltip(String tooltip) {
+        this.tooltip = tooltip;
     }
 }
