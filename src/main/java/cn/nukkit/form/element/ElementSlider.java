@@ -2,6 +2,8 @@ package cn.nukkit.form.element;
 
 import com.google.gson.annotations.SerializedName;
 
+import org.jetbrains.annotations.Nullable;
+
 public class ElementSlider extends Element {
 
     @SuppressWarnings("unused")
@@ -14,8 +16,10 @@ public class ElementSlider extends Element {
     private float defaultValue;
     /**
      * This option will show an exclamation icon that will display a tooltip if it is hovered.
+     * @since 1.21.80
      */
-    private String tooltip = "";
+    @Nullable
+    private String tooltip;
 
     public ElementSlider(String text, float min, float max) {
         this(text, min, max, -1);
@@ -73,6 +77,7 @@ public class ElementSlider extends Element {
         this.defaultValue = defaultValue;
     }
 
+    @Nullable
     public String getTooltip() {
         return tooltip;
     }
