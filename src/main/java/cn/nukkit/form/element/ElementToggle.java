@@ -2,7 +2,7 @@ package cn.nukkit.form.element;
 
 import com.google.gson.annotations.SerializedName;
 
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.Nullable;
 
 public class ElementToggle extends Element {
 
@@ -43,6 +43,7 @@ public class ElementToggle extends Element {
         this.defaultValue = defaultValue;
     }
 
+    @Nullable
     public String getTooltip() {
         return tooltip;
     }
