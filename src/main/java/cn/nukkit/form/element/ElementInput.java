@@ -2,6 +2,8 @@ package cn.nukkit.form.element;
 
 import com.google.gson.annotations.SerializedName;
 
+import javax.annotation.Nullable;
+
 public class ElementInput extends Element {
 
     @SuppressWarnings("unused")
@@ -12,8 +14,10 @@ public class ElementInput extends Element {
     private String defaultText = "";
     /**
      * This option will show an exclamation icon that will display a tooltip if it is hovered.
+     * @since 1.21.80
      */
-    private String tooltip = "";
+    @Nullable
+    private String tooltip;
 
     public ElementInput(String text) {
         this(text, "");
