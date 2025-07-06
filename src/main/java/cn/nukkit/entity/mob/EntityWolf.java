@@ -114,7 +114,7 @@ public class EntityWolf extends EntityTameableMob {
                 return true;
             }
 
-            if (this.hasOwner() && creature.equals(this.getOwner())) {
+            if (this.isOwner(creature)) {
                 if (distance <= 4) {
                     return false;
                 }
@@ -156,7 +156,9 @@ public class EntityWolf extends EntityTameableMob {
 
     public void setAngry(boolean angry) {
         this.angry = angry;
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ANGRY, angry);
+        if (!this.hasOwner()) {
+            this.setDataFlag(DATA_FLAGS, DATA_FLAG_ANGRY, angry);
+        }
         this.angryDuration = angry ? 500 : 0;
         this.setFriendly(!angry);
     }
