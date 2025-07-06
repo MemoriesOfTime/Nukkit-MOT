@@ -2,6 +2,7 @@ package cn.nukkit.network.process.processor.common;
 
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
+import cn.nukkit.event.player.PlayerKickEvent;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
@@ -40,13 +41,13 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
             playerHandle.setFailedMobEquipmentPacket(playerHandle.getFailedMobEquipmentPacket() + 1);
             if (playerHandle.getFailedMobEquipmentPacket() > MAX_FAILED) {
                 log.warn("{} Too many failed MobEquipmentPacket", player.getName());
-                player.close("", "Too many failed packets");
+                player.kick(PlayerKickEvent.Reason.INVALID_PACKET, "Too many failed packets", true, "type=MobEquipmentPacket");
             }
             return;
         }
 
         Item item = inv.getItem(pk.hotbarSlot);
-
+        
         if (!item.equals(pk.item, false, true)) {
             Item fixItem = Item.get(item.getId(), item.getDamage(), item.getCount(), item.getCompoundTag());
             if (fixItem.equals(pk.item, false, true)) {

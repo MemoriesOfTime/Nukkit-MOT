@@ -23,4 +23,8 @@ public interface EntityTameable {
     boolean isSitting();
 
     void setSitting(boolean sitting);
+
+    default boolean isOwner(Entity entity) {
+        return entity instanceof Player && entity.getUniqueId().toString().equals(this.getOwnerUUID());
+    }
 }

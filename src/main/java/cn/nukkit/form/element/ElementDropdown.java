@@ -2,6 +2,7 @@ package cn.nukkit.form.element;
 
 import com.google.gson.annotations.SerializedName;
 
+import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,8 +16,10 @@ public class ElementDropdown extends Element {
     private int defaultOptionIndex = 0;
     /**
      * This option will show an exclamation icon that will display a tooltip if it is hovered.
+     * @since 1.21.80
      */
-    private String tooltip = "";
+    @Nullable
+    private String tooltip;
 
     public ElementDropdown(String text) {
         this(text, new ArrayList<>());
@@ -62,6 +65,7 @@ public class ElementDropdown extends Element {
         if (isDefault) this.defaultOptionIndex = options.size() - 1;
     }
 
+    @Nullable
     public String getTooltip() {
         return tooltip;
     }
