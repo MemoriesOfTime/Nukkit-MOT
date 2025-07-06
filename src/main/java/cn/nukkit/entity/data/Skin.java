@@ -59,7 +59,7 @@ public class Skin {
     private final List<PersonaPiece> personaPieces = new ArrayList<>();
     private final List<PersonaPieceTint> tintColors = new ArrayList<>();
     private SerializedImage capeData;
-    private String geometryData;
+    private String geometryData = STEVE_GEOMETRY; //Compatible plugin
     private String animationData;
     private boolean premium;
     private boolean persona;
@@ -86,15 +86,18 @@ public class Skin {
     }
 
     private boolean isValidSkin(boolean doNotLimitSkinGeometry) {
-        return skinId != null && !skinId.trim().isEmpty() && skinId.length() < 100 &&
+        return skinId != null && !skinId.trim().isEmpty() && skinId.length() < 100 && //skinId
                 skinData != null && skinData.width >= 64 && skinData.height >= 32 &&
-                skinData.data.length >= SINGLE_SKIN_SIZE &&
-                (playFabId == null || playFabId.length() < 100) &&
-                (capeId == null || capeId.length() < 100) &&
-                (skinColor == null || skinColor.length() < 100) &&
-                (armSize == null || armSize.length() < 100) &&
-                (geometryDataEngineVersion == null || geometryDataEngineVersion.length() < 100) &&
-                (doNotLimitSkinGeometry || skinData.data.length <= MAX_DATA_SIZE);
+                skinData.data.length >= SINGLE_SKIN_SIZE && skinData.data.length <= MAX_DATA_SIZE && //skinData
+                ((geometryData != null && !geometryData.isEmpty()) &&
+                        (doNotLimitSkinGeometry || geometryData.getBytes(StandardCharsets.UTF_8).length <= MAX_DATA_SIZE)) && //geometryData
+                (capeData == null || capeData.data.length <= MAX_DATA_SIZE) && //capeData
+                (animationData == null || animationData.getBytes(StandardCharsets.UTF_8).length <= MAX_DATA_SIZE) && //animationData
+                (playFabId == null || playFabId.length() < 100) && //playFabId
+                (capeId == null || capeId.length() < 100) && //capeId
+                (skinColor == null || skinColor.length() < 100) && //skinColor
+                (armSize == null || armSize.length() < 100) && //armSize
+                (geometryDataEngineVersion == null || geometryDataEngineVersion.length() < 100); //geometryDataEngineVersion
     }
 
     private boolean isValidResourcePatch() {
