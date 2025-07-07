@@ -74,7 +74,7 @@ public abstract class FormWindow {
         @Override
         public boolean shouldSkipField(FieldAttributes fieldAttributes) {
             return fieldAttributes.getDeclaringClass() == FormWindowSimple.class
-                    && fieldAttributes.getName().equals("response");
+                    && fieldAttributes.getName().equals("buttons");
         }
 
         @Override
