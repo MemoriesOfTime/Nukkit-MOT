@@ -739,8 +739,10 @@ public class CraftingManager {
                 pk.addContainerRecipe(recipe);
             }
             if (protocol >= ProtocolInfo.v1_16_0) {
-                for (MultiRecipe recipe : this.getMultiRecipes(protocol).values()) {
-                    pk.addMultiRecipe(recipe);
+                for (MultiRecipe recipe : this.getMultiRecipes().values()) {
+                    if (recipe.isSupportedOn(protocol)) {
+                        pk.addMultiRecipe(recipe);
+                    }
                 }
             }
         }
@@ -1081,11 +1083,16 @@ public class CraftingManager {
         return this.brewingRecipesOld;
     }
 
+    @Deprecated
     public Map<UUID, MultiRecipe> getMultiRecipes(int protocol) {
         if (protocol >= ProtocolInfo.v1_16_0) {
             return this.multiRecipes;
         }
         throw new IllegalArgumentException("Multi recipes are not supported for protocol " + protocol + " (< 407)");
+    }
+
+    public Map<UUID, MultiRecipe> getMultiRecipes() {
+        return this.multiRecipes;
     }
 
     public MultiRecipe getMultiRecipe(Player player, Item outputItem, List<Item> inputs) {
