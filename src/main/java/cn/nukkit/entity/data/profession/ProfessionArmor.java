@@ -15,141 +15,158 @@ public class ProfessionArmor extends Profession {
         super(8, BlockID.BLAST_FURNACE, "entity.villager.armor");
     }
 
+    // Вспомогательный метод для создания предмета по namespace ID
+    private Item createItem(String namespaceId, int count) {
+        Item item = Item.fromString(namespaceId);
+        if (item != null) {
+            item.setCount(count);
+        }
+        return item;
+    }
+
+    // Вспомогательный метод для создания зачарованного предмета
+    private Item createEnchantedItem(String namespaceId, int[] possibleEnchantments, Random random) {
+        Item item = Item.fromString(namespaceId);
+        if (item != null) {
+            int enchantId = possibleEnchantments[random.nextInt(possibleEnchantments.length)];
+            Enchantment enchantment = Enchantment.getEnchantment(enchantId);
+            enchantment.setLevel(1 + random.nextInt(enchantment.getMaxLevel()));
+            item.addEnchantment(enchantment);
+        }
+        return item;
+    }
+
     @Override
     public ListTag<Tag> buildTrades(int seed) {
         ListTag<Tag> recipes = new ListTag<>("Recipes");
         Random random = new Random(seed);
 
-        int[] enchantments = new int[]{Enchantment.ID_DURABILITY, Enchantment.ID_THORNS, Enchantment.ID_PROTECTION_ALL, Enchantment.ID_PROTECTION_EXPLOSION, Enchantment.ID_PROTECTION_PROJECTILE, Enchantment.ID_PROTECTION_FIRE, Enchantment.ID_VANISHING_CURSE};
-        Item diamondLeggings = Item.get(Item.DIAMOND_LEGGINGS);
-        Enchantment diamondLeggingsEnchantment = Enchantment.getEnchantment(enchantments[random.nextInt(enchantments.length)]);
-        diamondLeggingsEnchantment.setLevel(1 + random.nextInt(diamondLeggingsEnchantment.getMaxLevel()));
-        diamondLeggings.addEnchantment(diamondLeggingsEnchantment);
+        int[] enchantments = new int[]{
+                Enchantment.ID_DURABILITY,
+                Enchantment.ID_THORNS,
+                Enchantment.ID_PROTECTION_ALL,
+                Enchantment.ID_PROTECTION_EXPLOSION,
+                Enchantment.ID_PROTECTION_PROJECTILE,
+                Enchantment.ID_PROTECTION_FIRE,
+                Enchantment.ID_VANISHING_CURSE
+        };
 
-        Item diamondChestplate = Item.get(Item.DIAMOND_CHESTPLATE);
-        Enchantment diamondChestplateEnchantment = Enchantment.getEnchantment(enchantments[random.nextInt(enchantments.length)]);
-        diamondChestplateEnchantment.setLevel(1 + random.nextInt(diamondChestplateEnchantment.getMaxLevel()));
-        diamondChestplate.addEnchantment(diamondChestplateEnchantment);
+        // Создаем зачарованные предметы
+        Item mithrilLeggings = createEnchantedItem("fireshaldrpg:mithril_platelegs", enchantments, random);
+        Item mithrilChestplate = createEnchantedItem("fireshaldrpg:mithril_platebody", enchantments, random);
+        Item mithrilHelmet = createEnchantedItem("fireshaldrpg:mithril_helm", enchantments, random);
+        Item mithrilBoots = createEnchantedItem("fireshaldrpg:mithril_boots", enchantments, random);
 
-        Item diamondHelmet = Item.get(Item.DIAMOND_HELMET);
-        Enchantment diamondHelmetEnchantment = Enchantment.getEnchantment(enchantments[random.nextInt(enchantments.length)]);
-        diamondHelmetEnchantment.setLevel(1 + random.nextInt(diamondHelmetEnchantment.getMaxLevel()));
-        diamondHelmet.addEnchantment(diamondHelmetEnchantment);
-
-        Item diamondBoots = Item.get(Item.DIAMOND_BOOTS);
-        Enchantment diamondBootsEnchantment = Enchantment.getEnchantment(enchantments[random.nextInt(enchantments.length)]);
-        diamondBootsEnchantment.setLevel(1 + random.nextInt(diamondBootsEnchantment.getMaxLevel()));
-        diamondBoots.addEnchantment(diamondBootsEnchantment);
-
-        recipes.add(RecipeBuildUtils.of(Item.get(Item.COAL, 0, 15), Item.get(Item.EMERALD, 0, 1))
+        // Добавляем рецепты
+        recipes.add(RecipeBuildUtils.of(createItem("minecraft:coal", 15), createItem("minecraft:emerald", 1))
                         .setMaxUses(16)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(2)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 4), Item.get(Item.IRON_BOOTS, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 4), createItem("fireshaldrpg:iron_boots", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(1)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 7), Item.get(Item.IRON_LEGGINGS, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 7), createItem("fireshaldrpg:iron_platelegs", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 5), Item.get(Item.IRON_HELMET, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 5), createItem("fireshaldrpg:iron_helm", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 9), Item.get(Item.IRON_CHESTPLATE, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 9), createItem("fireshaldrpg:iron_platebody", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.IRON_INGOT, 0, 4), Item.get(Item.EMERALD, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:iron_ingot", 4), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(10)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 36), Item.get(Item.BELL, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 36), createItem("minecraft:bell", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(5)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 3), Item.get(Item.CHAIN_LEGGINGS, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 3), createItem("fireshaldrpg:steel_platelegs", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 1), Item.get(Item.CHAIN_BOOTS, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 1), createItem("fireshaldrpg:steel_boots", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.BUCKET, 10), Item.get(Item.EMERALD, 0, 1))
+                .add(RecipeBuildUtils.of(Item.get(Item.BUCKET), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(20)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.DIAMOND, 0, 1), Item.get(Item.EMERALD, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:diamond", 1), createItem("minecraft:emerald", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 4), Item.get(Item.CHAIN_CHESTPLATE, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 4), createItem("fireshaldrpg:steel_platebody", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(10)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 1), Item.get(Item.CHAIN_HELMET, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 1), createItem("fireshaldrpg:steel_helm", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 5), Item.get(Item.SHIELD, 0, 1))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 5), createItem("minecraft:shield", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 19 + random.nextInt(34 - 19)), diamondLeggings)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 19 + random.nextInt(15)), mithrilLeggings)
                         .setMaxUses(3)
                         .setRewardExp((byte) 1)
                         .setTier(4)
                         .setTraderExp(15)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 13 + random.nextInt(28 - 13)), diamondBoots)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 13 + random.nextInt(15)), mithrilBoots)
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(4)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 21 + random.nextInt(36 - 21)), diamondChestplate)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 21 + random.nextInt(15)), mithrilChestplate)
                         .setMaxUses(3)
                         .setRewardExp((byte) 1)
                         .setTier(5)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 13 + random.nextInt(28 - 13)), diamondHelmet)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 13 + random.nextInt(15)), mithrilHelmet)
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(5)
                         .setTraderExp(0)
                         .build());
+
         return recipes;
     }
-
 }

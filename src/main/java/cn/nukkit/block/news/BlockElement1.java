@@ -1,23 +1,22 @@
-package cn.nukkit.block;
+package cn.nukkit.block.news;
 
+import cn.nukkit.block.BlockSolid;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
 
-/**
- * Created by PetteriM1
- */
-public class BlockInfoUpdate extends BlockSolid {
+public class BlockElement1 extends BlockElement {
 
     @Override
     public int getId() {
-        return INFO_UPDATE;
+        return ELEMENT_16;
     }
 
     @Override
     public String getName() {
-        return "Update Game Block";
+        return "Element 16";
     }
+
     @Override
     public double getHardness() {
         return 1.5;

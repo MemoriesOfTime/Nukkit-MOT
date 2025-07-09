@@ -98,7 +98,17 @@ public class IcePlainsSpikesBiome extends IcePlainsBiome {
         }
 
         public int getHighestWorkableBlock(int x, int z, FullChunk chunk) {
-            return chunk.getHighestBlockAt(x & 0xF, z & 0xF) - 5;
+            int y;
+            // Начинаем проверку с верха чанка вниз
+            for (y = 255; y >= 0; y--) {
+                // Получаем ID блока на координатах x, y, z
+                int id = chunk.getBlockId(x & 0xF, y, z & 0xF);
+                // Если блок не воздух и не снег/лед, значит мы нашли поверхность
+                if (id != Block.AIR && id != Block.SNOW_LAYER && id != Block.ICE && id != Block.PACKED_ICE) {
+                    break;
+                }
+            }
+            return y + 1; // Возвращаем позицию над последним не-воздушным блоком
         }
     }
 }

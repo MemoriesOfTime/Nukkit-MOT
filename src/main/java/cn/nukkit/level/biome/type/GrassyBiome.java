@@ -13,11 +13,11 @@ public abstract class GrassyBiome extends CoveredBiome {
 
     public GrassyBiome() {
         PopulatorGrass grass = new PopulatorGrass();
-        grass.setBaseAmount(30);
+        grass.setBaseAmount(40);
         this.addPopulator(grass);
 
         PopulatorDoublePlant tallGrass = new PopulatorDoublePlant(BlockDoublePlant.TALL_GRASS);
-        tallGrass.setBaseAmount(5);
+        tallGrass.setBaseAmount(20);
         this.addPopulator(tallGrass);
     }
 

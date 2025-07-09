@@ -55,7 +55,7 @@ public abstract class ObjectTree {
                 tree = new ObjectSpruceTree();
                 break;
             case BlockSapling.SPRUCE + SNOWY_TREE:
-                tree = new ObjectSpruceTree(true);
+                tree = new ObjectSpruceTree();
                 break;
             case BlockSapling.BIRCH:
                 tree = new ObjectBirchTree();

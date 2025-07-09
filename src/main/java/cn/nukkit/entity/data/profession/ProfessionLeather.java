@@ -1,7 +1,8 @@
 package cn.nukkit.entity.data.profession;
 
 import cn.nukkit.block.BlockID;
-import cn.nukkit.item.*;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemColorArmor;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.DyeColor;
@@ -13,83 +14,107 @@ public class ProfessionLeather extends Profession {
         super(12, BlockID.CAULDRON_BLOCK, "entity.villager.leather");
     }
 
+    // Вспомогательный метод для создания предмета по namespace ID
+    private Item createItem(String namespaceId, int count) {
+        Item item = Item.fromString(namespaceId);
+        if (item != null) {
+            item.setCount(count);
+        }
+        return item;
+    }
+
+    // Вспомогательный метод для создания окрашенной кожаной брони
+    private Item createDyedLeatherArmor(String namespaceId, DyeColor color) {
+        Item armor = Item.fromString(namespaceId);
+        if (armor instanceof ItemColorArmor) {
+            ((ItemColorArmor) armor).setColor(color);
+        }
+        return armor;
+    }
+
     @Override
     public ListTag<Tag> buildTrades(int seed) {
         ListTag<Tag> recipes = new ListTag<>("Recipes");
 
-        recipes.add(RecipeBuildUtils.of(Item.get(Item.LEATHER, 0, 6), Item.get(Item.EMERALD))
+        recipes.add(RecipeBuildUtils.of(createItem("minecraft:leather", 6), createItem("minecraft:emerald", 1))
                         .setMaxUses(16)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(2)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 7), ((ItemChestplateLeather) Item.get(Item.LEATHER_TUNIC)).setColor(DyeColor.RED))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 7),
+                                createDyedLeatherArmor("fireshaldrpg:leather_platebody", DyeColor.RED))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(1)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 3), ((ItemLeggingsLeather) Item.get(Item.LEATHER_PANTS)).setColor(DyeColor.RED))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 3),
+                                createDyedLeatherArmor("fireshaldrpg:leather_platelegs", DyeColor.RED))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.FLINT, 0, 26), Item.get(Item.EMERALD))
+                .add(RecipeBuildUtils.of(createItem("minecraft:flint", 26), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(10)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 5), ((ItemHelmetLeather) Item.get(Item.LEATHER_CAP)).setColor(DyeColor.RED))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 5),
+                                createDyedLeatherArmor("fireshaldrpg:leather_helm", DyeColor.RED))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(5)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 4), ((ItemBootsLeather) Item.get(Item.LEATHER_BOOTS)).setColor(DyeColor.RED))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 4),
+                                createDyedLeatherArmor("fireshaldrpg:leather_boots", DyeColor.RED))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.RABBIT_HIDE, 0, 9), Item.get(Item.EMERALD))
+                .add(RecipeBuildUtils.of(createItem("minecraft:rabbit_hide", 9), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(20)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 7), ((ItemChestplateLeather) Item.get(Item.LEATHER_TUNIC)).setColor(DyeColor.RED))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 7),
+                                createDyedLeatherArmor("fireshaldrpg:leather_platebody", DyeColor.RED))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(10)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.TURTLE_SHELL, 0, 4), Item.get(Item.EMERALD))
+                .add(RecipeBuildUtils.of(createItem("minecraft:turtle_shell", 4), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(4)
                         .setTraderExp(30)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 6), Item.get(Item.LEATHER_HORSE_ARMOR))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 6), createItem("fireshaldrpg:leather_horse_armor", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(4)
                         .setTraderExp(15)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 6), Item.get(Item.SADDLE))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 6), createItem("fireshaldrpg:saddle", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(5)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 5), ((ItemHelmetLeather) Item.get(Item.LEATHER_CAP)).setColor(DyeColor.RED))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 5),
+                                createDyedLeatherArmor("fireshaldrpg:leather_helm", DyeColor.RED))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(5)
                         .setTraderExp(0)
                         .build());
+
         return recipes;
     }
-
 }

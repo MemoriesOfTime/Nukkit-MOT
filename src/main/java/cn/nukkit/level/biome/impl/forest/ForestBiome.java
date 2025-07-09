@@ -25,19 +25,20 @@ public class ForestBiome extends GrassyBiome {
 
     public ForestBiome(int type) {
         super();
-
         this.type = type;
 
-        PopulatorTree trees = new PopulatorTree(type == TYPE_BIRCH_TALL ? BlockSapling.BIRCH_TALL : BlockSapling.BIRCH);
-        trees.setBaseAmount(type == TYPE_NORMAL ? 3 : 6);
-        this.addPopulator(trees);
-
         if (type == TYPE_NORMAL) {
-            // Normal forest biomes have both oak and birch trees
-            trees = new PopulatorTree(BlockSapling.OAK);
-            trees.setRandomAmount(1);
-            trees.setBaseAmount(7);
-            this.addPopulator(trees);
+            PopulatorTree oakTrees = new PopulatorTree(BlockSapling.OAK);
+            oakTrees.setBaseAmount(14);
+            this.addPopulator(oakTrees);
+        }
+
+        if (type == TYPE_BIRCH || type == TYPE_BIRCH_TALL) {
+            PopulatorTree birchTrees = new PopulatorTree(
+                    type == TYPE_BIRCH_TALL ? BlockSapling.BIRCH_TALL : BlockSapling.BIRCH
+            );
+            birchTrees.setBaseAmount(10);
+            this.addPopulator(birchTrees);
         }
 
         PopulatorFallenTree fallenTree = new PopulatorFallenTree();

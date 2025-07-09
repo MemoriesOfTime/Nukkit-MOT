@@ -42,7 +42,7 @@ public class SwampTreePopulator extends Populator {
             if (y == -1) {
                 continue;
             }
-            new ObjectSwampTree().generate(level, random, v.setComponents(x, y, z));
+            new ObjectSwampTree().placeObject(level, x, y, z, random);
         }
     }
 

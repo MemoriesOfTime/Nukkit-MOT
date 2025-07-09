@@ -15,130 +15,147 @@ public class ProfessionTool extends Profession {
         super(10, BlockID.SMITHING_TABLE, "entity.villager.tool");
     }
 
+    // Вспомогательный метод для создания предмета по namespace ID
+    private Item createItem(String namespaceId, int count) {
+        Item item = Item.fromString(namespaceId);
+        if (item != null) {
+            item.setCount(count);
+        }
+        return item;
+    }
+
+    // Вспомогательный метод для создания зачарованного предмета
+    private Item createEnchantedItem(String namespaceId, int[] possibleEnchantments, Random random) {
+        Item item = Item.fromString(namespaceId);
+        if (item != null) {
+            int enchantId = possibleEnchantments[random.nextInt(possibleEnchantments.length)];
+            Enchantment enchantment = Enchantment.getEnchantment(enchantId);
+            enchantment.setLevel(1 + random.nextInt(enchantment.getMaxLevel()));
+            item.addEnchantment(enchantment);
+        }
+        return item;
+    }
+
     @Override
     public ListTag<Tag> buildTrades(int seed) {
         ListTag<Tag> recipes = new ListTag<>("Recipes");
         Random random = new Random(seed);
 
-        int[] ench = new int[]{Enchantment.ID_DURABILITY, Enchantment.ID_EFFICIENCY, Enchantment.ID_FORTUNE_DIGGING, Enchantment.ID_SILK_TOUCH};
+        int[] ench = new int[]{
+                Enchantment.ID_DURABILITY,
+                Enchantment.ID_EFFICIENCY,
+                Enchantment.ID_FORTUNE_DIGGING,
+                Enchantment.ID_SILK_TOUCH
+        };
 
-        Item iaxe = Item.get(Item.IRON_AXE);
-        Enchantment iaxee = Enchantment.getEnchantment(ench[random.nextInt(ench.length)]);
-        iaxee.setLevel(1 + random.nextInt(iaxee.getMaxLevel()));
-        iaxe.addEnchantment(iaxee);
-        Item ishovel = Item.get(Item.IRON_SHOVEL);
-        Enchantment ishovele = Enchantment.getEnchantment(ench[random.nextInt(ench.length)]);
-        ishovele.setLevel(1 + random.nextInt(ishovele.getMaxLevel()));
-        ishovel.addEnchantment(ishovele);
-        Item ipickaxe = Item.get(Item.IRON_PICKAXE);
-        Enchantment ipickaxee = Enchantment.getEnchantment(ench[random.nextInt(ench.length)]);
-        ipickaxee.setLevel(1 + random.nextInt(ipickaxee.getMaxLevel()));
-        ipickaxe.addEnchantment(ipickaxee);
+        // Железные инструменты
+        Item ironAxe = createEnchantedItem("fireshaldrpg:iron_axe", ench, random);
+        Item ironShovel = createEnchantedItem("fireshaldrpg:iron_shovel", ench, random);
+        Item ironPickaxe = createEnchantedItem("fireshaldrpg:iron_pickaxe", ench, random);
+        Item ironHoe = createEnchantedItem("fireshaldrpg:iron_hoe", ench, random);
 
-        Item daxe = Item.get(Item.DIAMOND_AXE);
-        Enchantment daxee = Enchantment.getEnchantment(ench[random.nextInt(ench.length)]);
-        daxee.setLevel(1 + random.nextInt(daxee.getMaxLevel()));
-        daxe.addEnchantment(daxee);
-        Item dshovel = Item.get(Item.DIAMOND_SHOVEL);
-        Enchantment dshovele = Enchantment.getEnchantment(ench[random.nextInt(ench.length)]);
-        dshovele.setLevel(1 + random.nextInt(dshovele.getMaxLevel()));
-        dshovel.addEnchantment(dshovele);
-        Item dpickaxe = Item.get(Item.DIAMOND_PICKAXE);
-        Enchantment dpickaxee = Enchantment.getEnchantment(ench[random.nextInt(ench.length)]);
-        dpickaxee.setLevel(1 + random.nextInt(dpickaxee.getMaxLevel()));
-        dpickaxe.addEnchantment(dpickaxee);
+        // Стальные инструменты
+        Item steelAxe = createEnchantedItem("fireshaldrpg:steel_axe", ench, random);
+        Item steelShovel = createEnchantedItem("fireshaldrpg:steel_shovel", ench, random);
+        Item steelPickaxe = createEnchantedItem("fireshaldrpg:steel_pickaxe", ench, random);
+        Item steelHoe = createEnchantedItem("fireshaldrpg:steel_hoe", ench, random);
 
-        recipes.add(RecipeBuildUtils.of(Item.get(Item.COAL, 0, 15), Item.get(Item.EMERALD))
+        // Мифриловые инструменты
+        Item mithrilAxe = createEnchantedItem("fireshaldrpg:mithril_axe", ench, random);
+        Item mithrilShovel = createEnchantedItem("fireshaldrpg:mithril_shovel", ench, random);
+        Item mithrilPickaxe = createEnchantedItem("fireshaldrpg:mithril_pickaxe", ench, random);
+
+        recipes.add(RecipeBuildUtils.of(createItem("minecraft:coal", 15), createItem("minecraft:emerald", 1))
                         .setMaxUses(16)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(2)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 1), Item.get(Item.STONE_AXE))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 1), createItem("fireshaldrpg:bronze_axe", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(1)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 1), Item.get(Item.STONE_SHOVEL))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 1), createItem("fireshaldrpg:bronze_shovel", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 1), Item.get(Item.STONE_PICKAXE))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 1), createItem("fireshaldrpg:bronze_pickaxe", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 1), Item.get(Item.STONE_HOE))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 1), createItem("fireshaldrpg:bronze_hoe", 1))
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.IRON_INGOT, 0, 4), Item.get(Item.EMERALD))
+                .add(RecipeBuildUtils.of(createItem("minecraft:iron_ingot", 4), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(10)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 36), Item.get(Item.BELL))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 36), createItem("minecraft:bell", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(5)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.FLINT, 0, 24), Item.get(Item.EMERALD))
+                .add(RecipeBuildUtils.of(createItem("minecraft:flint", 24), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(20)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 6 + random.nextInt(21 - 6)), iaxe)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 6 + random.nextInt(15)), steelAxe)
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(10)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 7 + random.nextInt(22 - 7)), ishovel)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 7 + random.nextInt(15)), steelShovel)
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 8 + random.nextInt(23 - 8)), ipickaxe)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 8 + random.nextInt(15)), steelPickaxe)
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 4), Item.get(Item.DIAMOND_HOE))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 4), steelHoe)
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.DIAMOND, 0, 1), Item.get(Item.EMERALD))
+                .add(RecipeBuildUtils.of(createItem("minecraft:diamond", 1), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(4)
                         .setTraderExp(30)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 17 + random.nextInt(32 - 17)), daxe)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 17 + random.nextInt(15)), mithrilAxe)
                         .setMaxUses(3)
                         .setRewardExp((byte) 1)
                         .setTier(4)
                         .setTraderExp(15)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 10 + random.nextInt(25 - 10)), dshovel)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 10 + random.nextInt(15)), mithrilShovel)
                         .setMaxUses(99)
                         .setRewardExp((byte) 1)
                         .setTier(4)
                         .setTraderExp(0)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 18 + random.nextInt(33 - 18)), dpickaxe)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 18 + random.nextInt(15)), mithrilPickaxe)
                         .setMaxUses(3)
                         .setRewardExp((byte) 1)
                         .setTier(5)
@@ -146,5 +163,4 @@ public class ProfessionTool extends Profession {
                         .build());
         return recipes;
     }
-
 }

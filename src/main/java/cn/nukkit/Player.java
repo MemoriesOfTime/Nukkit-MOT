@@ -3022,7 +3022,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
             this.sendData(this, this.dataProperties.clone());
 
-            if (!this.server.checkOpMovement && this.isOp()) {
+
+            // TODO: Better MaXoN3RYT
+            if (!this.server.checkOpMovement && this.isPlayer) {
                 this.setCheckMovement(false);
             }
 

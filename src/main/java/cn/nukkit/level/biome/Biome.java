@@ -84,7 +84,7 @@ public abstract class Biome implements BlockID {
         return biomeDefinitions.getCompound(biomeName);
     }
 
-    protected static void register(int id, Biome biome) {
+    public static void register(int id, Biome biome) {
         biome.setId(id);
         biomes[id] = biome;
         unorderedBiomes.add(biome);

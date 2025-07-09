@@ -1,41 +1,25 @@
-package cn.nukkit.block;
+package cn.nukkit.block.news;
 
+
+import cn.nukkit.block.BlockSolid;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.utils.BlockColor;
 
-/**
- * Created by PetteriM1
- */
-public class BlockInfoUpdate extends BlockSolid {
+public abstract class BlockElement extends BlockSolid {
 
-    @Override
-    public int getId() {
-        return INFO_UPDATE;
+    protected BlockElement() {
+        // meta has been removed in the latest version
     }
 
-    @Override
-    public String getName() {
-        return "Update Game Block";
-    }
     @Override
     public double getHardness() {
-        return 1.5;
+        return 2;
     }
 
     @Override
     public double getResistance() {
-        return 30;
-    }
-
-    @Override
-    public int getToolType() {
-        return ItemTool.TYPE_PICKAXE;
-    }
-
-    @Override
-    public int getToolTier() {
-        return ItemTool.TIER_WOODEN;
+        return 2;
     }
 
     @Override
@@ -53,12 +37,9 @@ public class BlockInfoUpdate extends BlockSolid {
     }
 
     @Override
-    public boolean canHarvestWithHand() {
-        return false;
+    public BlockColor getColor() {
+        return BlockColor.BLACK_BLOCK_COLOR; //TODO: check ElementBlock::getMapColor -- 07/30/2022
     }
 
-    @Override
-    public boolean canSilkTouch() {
-        return true;
-    }
+
 }

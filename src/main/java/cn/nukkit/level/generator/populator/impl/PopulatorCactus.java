@@ -17,15 +17,15 @@ public class PopulatorCactus extends PopulatorSurfaceBlock {
     @Override
     protected void populateCount(ChunkManager level, int chunkX, int chunkZ, NukkitRandom random, FullChunk chunk) {
         //不生成在边界，防止和其他区块上的方块相邻
-        int x = random.nextBoundedInt(14) + 1;
-        int z = random.nextBoundedInt(14) + 1;
+        int x = random.nextBoundedInt(10) + 1;
+        int z = random.nextBoundedInt(10) + 1;
         int y = getHighestWorkableBlock(level, x, z, chunk);
-        int height = 1;
-        int range = random.nextBoundedInt(18);
+        int height = 2;
+        int range = random.nextBoundedInt(13);
         if (range >= 16) {
-            height = 3;
+            height = 5;
         }else if (range >= 11) {
-            height = 2;
+            height = 3;
         }
         if (y > 0) {
             for (int i = 0; i < height; i++) {

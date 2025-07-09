@@ -340,6 +340,8 @@ public interface BlockID {
     int STRIPPED_OAK_LOG = 265;
     int BLUE_ICE = 266;
 
+    int ELEMENT_16 =267;
+
     int SEAGRASS = 385;
     int CORAL = 386;
     int CORAL_BLOCK = 387;

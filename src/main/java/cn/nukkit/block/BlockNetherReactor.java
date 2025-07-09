@@ -4,6 +4,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemDiamond;
 import cn.nukkit.item.ItemIngotIron;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.item.enchantment.Enchantment;
 
 public class BlockNetherReactor extends BlockSolid {
 
@@ -19,12 +20,12 @@ public class BlockNetherReactor extends BlockSolid {
 
     @Override
     public double getHardness() {
-        return 3;
+        return 1.5;
     }
 
     @Override
     public double getResistance() {
-        return 15;
+        return 30;
     }
 
     @Override
@@ -39,13 +40,25 @@ public class BlockNetherReactor extends BlockSolid {
 
     @Override
     public Item[] getDrops(Item item) {
-        if (item.isPickaxe() && item.getTier() >= ItemTool.TIER_WOODEN) {
-            return new Item[]{new ItemDiamond(0, 3), new ItemIngotIron(0, 6)};
-        } else return Item.EMPTY_ARRAY;
+        if (item.isPickaxe() && item.getTier() >= this.getToolTier()) {
+            if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
+                return new Item[]{this.toItem()};
+            }
+            return new Item[]{
+                    Item.get(this.getDamage() == 0 ? Item.COBBLESTONE : Item.STONE, this.getDamage(), 1)
+            };
+        } else {
+            return Item.EMPTY_ARRAY;
+        }
     }
 
     @Override
     public boolean canHarvestWithHand() {
         return false;
+    }
+
+    @Override
+    public boolean canSilkTouch() {
+        return true;
     }
 }

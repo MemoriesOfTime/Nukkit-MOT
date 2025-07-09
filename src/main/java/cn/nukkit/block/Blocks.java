@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.block.news.BlockElement1;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -277,6 +278,14 @@ public class Blocks {
         list[STRIPPED_DARK_OAK_LOG] = BlockWoodStrippedDarkOak.class; //264
         list[STRIPPED_OAK_LOG] = BlockWoodStrippedOak.class; //265
         list[BLUE_ICE] = BlockBlueIce.class; //266
+
+
+
+        //Кастом Блоки
+        list[ELEMENT_16] = BlockElement1.class; //267
+
+
+
 
         list[SEAGRASS] = BlockSeagrass.class; //385
         list[CORAL] = BlockCoral.class; //386

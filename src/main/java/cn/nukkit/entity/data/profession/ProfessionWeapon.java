@@ -15,77 +15,105 @@ public class ProfessionWeapon extends Profession {
         super(9, BlockID.GRINDSTONE, "entity.villager.weapon");
     }
 
+    // Вспомогательный метод для создания предмета по namespace ID
+    private Item createItem(String namespaceId, int count) {
+        Item item = Item.fromString(namespaceId);
+        if (item != null) {
+            item.setCount(count);
+        }
+        return item;
+    }
+
+    // Вспомогательный метод для создания зачарованного предмета
+    private Item createEnchantedItem(String namespaceId, int[] possibleEnchantments, Random random) {
+        Item item = Item.fromString(namespaceId);
+        if (item != null) {
+            int enchantId = possibleEnchantments[random.nextInt(possibleEnchantments.length)];
+            Enchantment enchantment = Enchantment.getEnchantment(enchantId);
+            enchantment.setLevel(1 + random.nextInt(enchantment.getMaxLevel()));
+            item.addEnchantment(enchantment);
+        }
+        return item;
+    }
+
     @Override
     public ListTag<Tag> buildTrades(int seed) {
         ListTag<Tag> recipes = new ListTag<>("Recipes");
         Random random = new Random(seed);
 
-        int[] enchantments = new int[]{Enchantment.ID_DURABILITY, Enchantment.ID_DAMAGE_ALL, Enchantment.ID_VANISHING_CURSE, Enchantment.ID_DAMAGE_SMITE, Enchantment.ID_DAMAGE_ARTHROPODS, Enchantment.ID_LOOTING, Enchantment.ID_FIRE_ASPECT};
+        int[] enchantments = new int[]{
+                Enchantment.ID_DURABILITY,
+                Enchantment.ID_DAMAGE_ALL,
+                Enchantment.ID_VANISHING_CURSE,
+                Enchantment.ID_DAMAGE_SMITE,
+                Enchantment.ID_DAMAGE_ARTHROPODS,
+                Enchantment.ID_LOOTING,
+                Enchantment.ID_FIRE_ASPECT
+        };
 
-        Item ironsword = Item.get(Item.IRON_SWORD);
-        Enchantment ironswordEnchantment = Enchantment.getEnchantment(enchantments[random.nextInt(enchantments.length)]);
-        ironswordEnchantment.setLevel(1 + random.nextInt(ironswordEnchantment.getMaxLevel()));
-        ironsword.addEnchantment(ironswordEnchantment);
+        // Создаем зачарованные кастомные мечи
+        Item ironSword = createEnchantedItem("fireshaldrpg:iron_sword", enchantments, random);
+        Item steelSword = createEnchantedItem("fireshaldrpg:steel_sword", enchantments, random);
+        Item mithrilSword = createEnchantedItem("fireshaldrpg:mithril_sword", enchantments, random);
 
-        Item diamondAxe = Item.get(Item.DIAMOND_AXE);
-        Enchantment diamondAxeEnchantment = Enchantment.getEnchantment(enchantments[random.nextInt(enchantments.length)]);
-        diamondAxeEnchantment.setLevel(1 + random.nextInt(diamondAxeEnchantment.getMaxLevel()));
-        diamondAxe.addEnchantment(diamondAxeEnchantment);
+        // Создаем зачарованные топоры
+        Item diamondAxe = createEnchantedItem("minecraft:diamond_axe", enchantments, random);
 
-        Item diamondsword = Item.get(Item.DIAMOND_SWORD);
-        Enchantment diamondswordEnchantment = Enchantment.getEnchantment(enchantments[random.nextInt(enchantments.length)]);
-        diamondswordEnchantment.setLevel(1 + random.nextInt(diamondswordEnchantment.getMaxLevel()));
-        diamondsword.addEnchantment(diamondswordEnchantment);
-
-        recipes.add(RecipeBuildUtils.of(Item.get(Item.COAL, 0, 15), Item.get(Item.EMERALD))
+        recipes.add(RecipeBuildUtils.of(createItem("minecraft:coal", 15), createItem("minecraft:emerald", 1))
                         .setMaxUses(16)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(2)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 3), Item.get(Item.IRON_AXE))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 3), createItem("fireshaldrpg:iron_axe", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(1)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 7 + random.nextInt(22 - 7)), ironsword)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 7 + random.nextInt(15)), ironSword)
                         .setMaxUses(3)
                         .setRewardExp((byte) 1)
                         .setTier(1)
                         .setTraderExp(1)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.IRON_INGOT, 0, 4), Item.get(Item.EMERALD))
+                .add(RecipeBuildUtils.of(createItem("minecraft:iron_ingot", 4), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(10)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 36), Item.get(Item.BELL))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 36), createItem("minecraft:bell", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(2)
                         .setTraderExp(5)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.FLINT, 0, 24), Item.get(Item.EMERALD))
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 5), steelSword)
+                        .setMaxUses(12)
+                        .setRewardExp((byte) 1)
+                        .setTier(2)
+                        .setTraderExp(5)
+                        .build())
+                .add(RecipeBuildUtils.of(createItem("minecraft:flint", 24), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(3)
                         .setTraderExp(20)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.DIAMOND, 0, 1), Item.get(Item.EMERALD))
+                .add(RecipeBuildUtils.of(createItem("minecraft:diamond", 1), createItem("minecraft:emerald", 1))
                         .setMaxUses(12)
                         .setRewardExp((byte) 1)
                         .setTier(4)
                         .setTraderExp(30)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 17 + random.nextInt(32 - 17)), diamondAxe)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 17 + random.nextInt(15)), diamondAxe)
                         .setMaxUses(3)
                         .setRewardExp((byte) 1)
                         .setTier(4)
                         .setTraderExp(15)
                         .build())
-                .add(RecipeBuildUtils.of(Item.get(Item.EMERALD, 0, 13 + random.nextInt(27 - 13)), diamondsword)
+                .add(RecipeBuildUtils.of(createItem("minecraft:emerald", 25 + random.nextInt(15)), mithrilSword)
                         .setMaxUses(3)
                         .setRewardExp((byte) 1)
                         .setTier(5)
@@ -93,5 +121,4 @@ public class ProfessionWeapon extends Profession {
                         .build());
         return recipes;
     }
-
 }
