@@ -150,7 +150,7 @@ public interface CompressionProvider {
         if (algorithm == null) {
             return NONE;
         } else if (algorithm == PacketCompressionAlgorithm.ZLIB) {
-            if (Server.getInstance().netEaseMod) {
+            if (raknetProtocol == 8 && Server.getInstance().netEaseMod) {
                 return ZLIB_RAW;
             }
             return raknetProtocol < 10 ? ZLIB : ZLIB_RAW;
@@ -163,7 +163,8 @@ public interface CompressionProvider {
     static CompressionProvider byPrefix(byte prefix, int raknetProtocol) {
         switch (prefix) {
             case 0x00 -> {
-                if (raknetProtocol >= 10) {
+                if (raknetProtocol >= 10
+                        || (raknetProtocol == 8 && Server.getInstance().netEaseMod)) {
                     return ZLIB_RAW;
                 } else {
                     return ZLIB;
