@@ -41,7 +41,7 @@ public class GameRules {
         gameRules.gameRules.put(FREEZE_DAMAGE, new Value<>(Type.BOOLEAN, true, 440));
         gameRules.gameRules.put(FUNCTION_COMMAND_LIMIT, new Value<>(Type.INTEGER, 10000, 332));
         gameRules.gameRules.put(KEEP_INVENTORY, new Value<>(Type.BOOLEAN, false));
-        gameRules.gameRules.put(LOCATOR_BAR, new Value<>(Type.BOOLEAN, true));
+        gameRules.gameRules.put(LOCATOR_BAR, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_21_90));
         gameRules.gameRules.put(MAX_COMMAND_CHAIN_LENGTH, new Value<>(Type.INTEGER, 65536));
         gameRules.gameRules.put(MOB_GRIEFING, new Value<>(Type.BOOLEAN, true));
         gameRules.gameRules.put(NATURAL_REGENERATION, new Value<>(Type.BOOLEAN, true));
@@ -58,7 +58,7 @@ public class GameRules {
         gameRules.gameRules.put(RECIPES_UNLOCK, new Value<>(Type.BOOLEAN, false, ProtocolInfo.v1_18_0));
         gameRules.gameRules.put(RESPAWN_BLOCKS_EXPLODE, new Value<>(Type.BOOLEAN, true, 618));
         gameRules.gameRules.put(DO_LIMITED_CRAFTING, new Value<>(Type.BOOLEAN, false, 618));
-        gameRules.gameRules.put(SHOW_RECIPE_MESSAGE, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_20_50));
+        gameRules.gameRules.put(SHOW_RECIPE_MESSAGES, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_20_50));
         gameRules.gameRules.put(PROJECTILES_CAN_BREAK_BLOCKS, new Value<>(Type.BOOLEAN, true, ProtocolInfo.v1_20_50));
 
         return gameRules;
