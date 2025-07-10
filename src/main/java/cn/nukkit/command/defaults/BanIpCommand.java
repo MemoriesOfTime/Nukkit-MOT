@@ -1,6 +1,7 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
@@ -36,10 +37,12 @@ public class BanIpCommand extends VanillaCommand {
                 CommandParameter.newType("player", CommandParamType.STRING),
                 CommandParameter.newType("reason", true, CommandParamType.STRING)
         });
-        this.commandParameters.put("byIp", new CommandParameter[]{
-                CommandParameter.newType("ip", CommandParamType.STRING, new IPStringNode()),
-                CommandParameter.newType("reason", true, CommandParamType.STRING)
-        });
+        if (!Server.getInstance().netEaseMod) { // make client assertion happy
+            this.commandParameters.put("byIp", new CommandParameter[]{
+                    CommandParameter.newType("ip", CommandParamType.STRING, new IPStringNode()),
+                    CommandParameter.newType("reason", true, CommandParamType.STRING)
+            });
+        }
         this.enableParamTree();
     }
 
