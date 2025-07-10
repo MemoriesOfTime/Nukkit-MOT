@@ -55,6 +55,7 @@ public class BatchingHelper {
         if (players.length == 1) {
             for (DataPacket packet : packets) {
                 packet.protocol = players[0].protocol;
+                packet.isNetEase = players[0].isNetEase;
                 players[0].getNetworkSession().sendPacket(packet);
            }
            return;
@@ -81,6 +82,8 @@ public class BatchingHelper {
                 if (!encodedPacket.containsKey(encodingProtocol)) {
                     DataPacket pk = packet.clone();
                     pk.protocol = encodingProtocol;
+                    //TODO
+                    //pk.isNetEase =
                     pk.tryEncode();
                     encodedPacket.put(encodingProtocol, pk);
                 }

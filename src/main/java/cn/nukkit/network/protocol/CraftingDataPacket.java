@@ -3,6 +3,8 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.data.RecipeUnlockingRequirement;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.RuntimeItemMapping;
+import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
 
@@ -174,9 +176,19 @@ public class CraftingDataPacket extends DataPacket {
                     case FURNACE_DATA:
                         FurnaceRecipe furnace = (FurnaceRecipe) recipe;
                         Item input = furnace.getInput();
-                        this.putVarInt(input.getId());
+                        int runtimeId;
+                        int damage;
+                        if (!input.hasMeta()) {
+                            runtimeId = RuntimeItems.getMapping(protocol).toRuntime(input.getId(), 0).getRuntimeId();
+                            damage = 0x7fff;
+                        } else {
+                            RuntimeItemMapping.RuntimeEntry runtimeEntry = RuntimeItems.getMapping(protocol).toRuntime(input.getId(), input.getDamage());
+                            runtimeId = runtimeEntry.getRuntimeId();
+                            damage = runtimeEntry.isHasDamage() ? 0 : input.getDamage();
+                        }
+                        this.putVarInt(runtimeId);
                         if (recipe.getType() == RecipeType.FURNACE_DATA) {
-                            this.putVarInt(input.getDamage());
+                            this.putVarInt(damage);
                         }
                         this.putSlot(protocol, furnace.getResult(), protocol >= ProtocolInfo.v1_16_100);
                         if (protocol >= 354) {

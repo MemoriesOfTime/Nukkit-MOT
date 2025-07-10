@@ -80,9 +80,14 @@ public class PlayerAuthInputPacket extends DataPacket {
         this.headYaw = this.getLFloat();
 
         long inputData = this.getUnsignedVarLong();
+        int inClientPredictedInVehicleOrdinal = AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE.ordinal();
         for (int i = 0; i < AuthInputAction.size(); i++) {
+            int offset = 0;
+            if (isNetEase && protocol == ProtocolInfo.v1_21_2 && i >= inClientPredictedInVehicleOrdinal) {
+                offset = -1;
+            }
             if ((inputData & (1L << i)) != 0) {
-                this.inputData.add(AuthInputAction.from(i));
+                this.inputData.add(AuthInputAction.from(i + offset));
             }
         }
 

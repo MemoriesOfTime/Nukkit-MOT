@@ -265,6 +265,7 @@ public class Network {
 
                 if (pk != null) {
                     pk.protocol = player == null ? Integer.MAX_VALUE : player.protocol;
+                    pk.isNetEase = player != null && player.isNetEase;
                     pk.setBuffer(buf, buf.length - bais.available());
                     try {
                         if (raknetProtocol > 8) {
