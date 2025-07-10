@@ -240,6 +240,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public int raknetProtocol;
     /**
+     * 网易客户端
+     */
+    public boolean isNetEase;
+    /**
      * Client version string
      */
     protected String version;
@@ -1355,6 +1359,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         packet = packet.clone();
         packet.protocol = this.protocol;
+        packet.isNetEase = this.isNetEase;
 
         if (server.callDataPkSendEv) {
             DataPacketSendEvent ev = new DataPacketSendEvent(this, packet);
@@ -1398,6 +1403,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void forceDataPacket(DataPacket packet, Runnable callback) {
         packet.protocol = this.protocol;
+        packet.isNetEase = this.isNetEase;
         this.networkSession.sendImmediatePacket(packet, (callback == null ? () -> {
         } : callback));
     }
@@ -2898,7 +2904,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
                 String.valueOf(this.getPort()),
-                this.protocol + " (" + Utils.getVersionByProtocol(this.protocol) + ")"));
+                this.protocol + " (" + Utils.getVersionByProtocol(this.protocol) + (isNetEase ? "_NetEase" : "") + ")"));
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
@@ -3058,6 +3064,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (packet.protocol == Integer.MAX_VALUE) {
             packet.protocol = this.protocol;
+            packet.isNetEase = this.isNetEase;
         }
 
         DataPacketReceiveEvent ev = new DataPacketReceiveEvent(this, packet);
@@ -3181,7 +3188,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 boolean valid = true;
                 int len = loginPacket.username.length();
-                if (len > 16 || len < 3 || loginPacket.username.trim().isEmpty()) {
+                if (((len > 16 || len < 3) && !Server.getInstance().netEaseMod)
+                        || loginPacket.username.trim().isEmpty()) {
                     valid = false;
                 }
 

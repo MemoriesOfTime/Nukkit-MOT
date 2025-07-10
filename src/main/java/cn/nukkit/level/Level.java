@@ -5076,6 +5076,12 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private int getChunkProtocol(int protocol) {
+        if (Server.getInstance().netEaseMod) {
+            if (protocol == ProtocolInfo.v1_21_2) {
+                return ProtocolInfo.v1_21_2;
+            }
+        }
+
         if (protocol >= ProtocolInfo.v1_21_90) {
             return ProtocolInfo.v1_21_90;
         } else if (protocol >= ProtocolInfo.v1_21_80) {
@@ -5157,6 +5163,10 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private static boolean matchMVChunkProtocol(int chunk, int player) {
+        if (Server.getInstance().netEaseMod) {
+            if (chunk == ProtocolInfo.v1_21_2) if (player == ProtocolInfo.v1_21_2) return true;
+        }
+
         if (chunk == 0) if (player < ProtocolInfo.v1_2_0) return true;
         if (chunk == ProtocolInfo.v1_2_0)
             if (player >= ProtocolInfo.v1_2_0) if (player < ProtocolInfo.v1_12_0) return true;

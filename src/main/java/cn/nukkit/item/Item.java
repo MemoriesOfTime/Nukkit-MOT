@@ -539,6 +539,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     private static final CreativeItems creative818 = new CreativeItems();
     private static final CreativeItems creative819 = new CreativeItems();
 
+    private static final CreativeItems creative_netease_686 = new CreativeItems();
+
     public static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
         clearCreativeItems();
@@ -588,6 +590,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCreativeItemsNew(ProtocolInfo.v1_21_80, ProtocolInfo.v1_21_80, creative800);
         registerCreativeItemsNew(ProtocolInfo.v1_21_90, ProtocolInfo.v1_21_90, creative818);
         registerCreativeItemsNew(ProtocolInfo.v1_21_93, ProtocolInfo.v1_21_93, creative819);
+
+        if (Server.getInstance().netEaseMod) {
+            registerCreativeItemsNew(ProtocolInfo.v1_21_2, ProtocolInfo.v1_21_2, creative_netease_686, true);
+        }
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -605,10 +611,16 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     private static void registerCreativeItemsNew(int protocol, int blockPaletteProtocol, CreativeItems creativeItems) {
+        registerCreativeItemsNew(protocol, blockPaletteProtocol, creativeItems, false);
+    }
+
+    private static void registerCreativeItemsNew(int protocol, int blockPaletteProtocol, CreativeItems creativeItems, boolean isNetEase) {
         JsonObject root;
         JsonArray itemsArray;
         String file;
-        if (protocol >= ProtocolInfo.v1_21_0) {
+        if (isNetEase) {
+            file = "CreativeItems/creative_items_netease_" + protocol + ".json";
+        } else if (protocol >= ProtocolInfo.v1_21_0) {
             file = "CreativeItems/creative_items_" + protocol + ".json";
         } else {
             file = "creativeitems" + protocol + ".json";
@@ -715,6 +727,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Item.creative800.clear();
         Item.creative818.clear();
         Item.creative819.clear();
+
+        Item.creative_netease_686.clear();
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -733,6 +747,12 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static CreativeItems getCreativeItemsAndGroups(int protocol) {
+        if (Server.getInstance().netEaseMod) {
+            if (protocol == ProtocolInfo.v1_21_2) {
+                return Item.creative_netease_686;
+            }
+        }
+
         switch (protocol) {
             case v1_1_0:
                 return Item.creative113;
@@ -877,6 +897,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static void addCreativeItem(int protocol, Item item, CreativeItemCategory category, String group) {
+        if (Server.getInstance().netEaseMod) {
+            if (protocol == ProtocolInfo.v1_21_2) {
+                Item.creative_netease_686.add(item, category, group);
+                return;
+            }
+        }
+
         switch (protocol) { // NOTE: Not all versions are supposed to be here
             case v1_1_0 -> Item.creative113.add(item.clone(), category, group);
             case v1_2_0 -> Item.creative137.add(item.clone(), category, group);
@@ -1098,6 +1125,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCustomItem(customItem, v1_21_70, addCreativeItem, v1_21_70);
         registerCustomItem(customItem, v1_21_80, addCreativeItem, v1_21_80);
         registerCustomItem(customItem, v1_21_90, addCreativeItem, v1_21_90, v1_21_93);
+
+        if (Server.getInstance().netEaseMod) {
+            registerCustomItem(customItem, v1_21_2, addCreativeItem, v1_21_2);
+        }
+
         //TODO Multiversion 添加新版本支持时修改这里
 
         if (addCreativeItem) {
@@ -1151,6 +1183,11 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             deleteCustomItem(customItem, v1_21_70, v1_21_70);
             deleteCustomItem(customItem, v1_21_80, v1_21_80);
             deleteCustomItem(customItem, v1_21_90, v1_21_90, v1_21_93);
+
+            if (Server.getInstance().netEaseMod) {
+                deleteCustomItem(customItem, v1_21_2, v1_21_2);
+            }
+
             //TODO Multiversion 添加新版本支持时修改这里
         }
     }

@@ -16,6 +16,7 @@ import lombok.extern.log4j.Log4j2;
 public abstract class DataPacket extends BinaryStream implements Cloneable {
 
     public int protocol = Integer.MAX_VALUE;
+    public boolean isNetEase = false;
 
     public volatile boolean isEncoded = false;
     private int channel = Network.CHANNEL_NONE;

@@ -51,6 +51,8 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping800;
     private static RuntimeItemMapping mapping818;
 
+    private static RuntimeItemMapping mapping_netease_686;
+
     public static RuntimeItemMapping[] VALUES;
 
     private static boolean initialized;
@@ -126,6 +128,8 @@ public class RuntimeItems {
         mapping800 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_21_80);
         mapping818 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_21_90);
 
+        mapping_netease_686 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_21_2, true);
+
         VALUES = new RuntimeItemMapping[]{
                 mapping361,
                 mapping419,
@@ -160,6 +164,12 @@ public class RuntimeItems {
     }
 
     public static RuntimeItemMapping getMapping(int protocolId) {
+        if (Server.getInstance().netEaseMod) {
+            if (protocolId == ProtocolInfo.v1_21_2) {
+                return mapping_netease_686;
+            }
+        }
+
         if (protocolId >= ProtocolInfo.v1_21_90) {
             return mapping818;
         } else if (protocolId >= ProtocolInfo.v1_21_80) {

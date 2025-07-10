@@ -2,6 +2,7 @@ package cn.nukkit.network.process.processor.v554;
 
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
+import cn.nukkit.Server;
 import cn.nukkit.network.CompressionProvider;
 import cn.nukkit.network.process.DataPacketProcessor;
 import cn.nukkit.network.protocol.DataPacket;
@@ -27,7 +28,8 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull RequestNetworkSettingsPacket pk) {
         Player player = playerHandle.player;
 
-        if (player.raknetProtocol < 11) {
+        if (player.raknetProtocol < 11
+                && (player.raknetProtocol != 8 && !Server.getInstance().netEaseMod)) {
             return;
         }
         if (playerHandle.isLoginPacketReceived()) {
@@ -36,6 +38,12 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
         }
 
         player.protocol = pk.protocolVersion;
+        if (player.raknetProtocol == 8
+                && Server.getInstance().netEaseMod
+                && player.protocol == ProtocolInfo.v1_21_2) {
+            player.isNetEase = true;
+            playerHandle.getNetworkSession().setCompressionOut(CompressionProvider.NONE);
+        }
 
         NetworkSettingsPacket settingsPacket = new NetworkSettingsPacket();
         PacketCompressionAlgorithm algorithm;

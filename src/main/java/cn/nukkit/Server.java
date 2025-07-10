@@ -579,6 +579,10 @@ public class Server {
      * Enable forced safety enchantments (up max lvl)
      */
     public boolean forcedSafetyEnchant;
+    /**
+     * Enable NetEase Client Support
+     */
+    public boolean netEaseMod = true;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");

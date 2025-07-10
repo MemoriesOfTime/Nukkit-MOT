@@ -73,7 +73,11 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
 
         int protocolVersion = channel.config().getProtocolVersion();
-        this.compressionIn = protocolVersion >= 11 ? CompressionProvider.NONE : (protocolVersion < 10 ? CompressionProvider.ZLIB : CompressionProvider.ZLIB_RAW);
+        if (protocolVersion == 8 && Server.getInstance().netEaseMod) {
+            this.compressionIn = CompressionProvider.NETEASE_UNKNOWN;
+        } else {
+            this.compressionIn = protocolVersion >= 11 ? CompressionProvider.NONE : (protocolVersion < 10 ? CompressionProvider.ZLIB : CompressionProvider.ZLIB_RAW);
+        }
         this.compressionOut = this.compressionIn;
     }
 
@@ -346,6 +350,13 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
         this.compressionIn = compression;
         this.compressionOut = compression;
         this.compressionInitialized = true;
+    }
+
+    @Override
+    public void setCompressionOut(CompressionProvider compression) {
+        Preconditions.checkArgument(!this.compressionInitialized, "compressionOut cannot be set after compression has been initialized");
+        Preconditions.checkNotNull(compression, "compression");
+        this.compressionOut = compression;
     }
 
     @Override

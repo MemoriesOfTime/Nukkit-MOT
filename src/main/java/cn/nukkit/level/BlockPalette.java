@@ -30,6 +30,7 @@ import java.util.zip.GZIPInputStream;
 public class BlockPalette {
 
     private final int protocol;
+    private final boolean isNetEase;
     private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
     private final Map<CompoundTag, Integer> stateToLegacy = new HashMap<>();
@@ -39,7 +40,13 @@ public class BlockPalette {
     private volatile boolean locked;
 
     public BlockPalette(int protocol) {
+        this(protocol, false);
+    }
+
+    public BlockPalette(int protocol, boolean isNetEase) {
         this.protocol = protocol;
+        this.isNetEase = isNetEase;
+
         legacyToRuntimeId.defaultReturnValue(-1);
         runtimeIdToLegacy.defaultReturnValue(-1);
 
@@ -49,7 +56,11 @@ public class BlockPalette {
 
     private ListTag<CompoundTag> paletteFor(int protocol) {
         ListTag<CompoundTag> tag;
-        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream("runtime_block_states_" + protocol + ".dat")) {
+        String name = "runtime_block_states_" + protocol + ".dat";
+        if (isNetEase) {
+            name = "runtime_block_states_netease_" + protocol + ".dat";
+        }
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(name)) {
             if (stream == null) {
                 throw new AssertionError("Unable to locate block state nbt " + protocol);
             }

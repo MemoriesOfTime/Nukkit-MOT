@@ -240,6 +240,10 @@ public class Network {
 
                 ByteArrayInputStream bais = new ByteArrayInputStream(buf);
 
+                if (raknetProtocol == 8 && Server.getInstance().netEaseMod) {
+                    raknetProtocol = 9;
+                }
+
                 int packetId;
                 switch (raknetProtocol) {
                     case 7:

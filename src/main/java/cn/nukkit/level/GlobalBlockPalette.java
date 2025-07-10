@@ -86,6 +86,8 @@ public class GlobalBlockPalette {
     private static BlockPalette blockPalette800;
     private static BlockPalette blockPalette818;
 
+    private static BlockPalette blockPalette_netease_686;
+
     private static byte[] compiledTable282;
     private static byte[] compiledTable291;
     private static byte[] compiledTable313;
@@ -300,6 +302,15 @@ public class GlobalBlockPalette {
     }
 
     public static BlockPalette getPaletteByProtocol(int protocol) {
+        if (Server.getInstance().netEaseMod) {
+            if (protocol == ProtocolInfo.v1_21_2) {
+                if (blockPalette_netease_686 == null) {
+                    blockPalette_netease_686 = new BlockPalette(ProtocolInfo.v1_21_2, true);
+                }
+                return blockPalette_netease_686;
+            }
+        }
+
         if (protocol >= ProtocolInfo.v1_21_90) {
             if (blockPalette818 == null) {
                 blockPalette818 = new BlockPalette(ProtocolInfo.v1_21_90);

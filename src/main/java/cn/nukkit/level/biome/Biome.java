@@ -1,5 +1,6 @@
 package cn.nukkit.level.biome;
 
+import cn.nukkit.Server;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.level.ChunkManager;
 import cn.nukkit.level.format.FullChunk;
@@ -40,7 +41,11 @@ public abstract class Biome implements BlockID {
     private float heightVariation = 0.3f;
 
     static {
-        try (InputStream stream = Biome.class.getClassLoader().getResourceAsStream("biome_id_map.json")) {
+        String name = "biome_id_map.json";
+        if (Server.getInstance().netEaseMod) {
+            name = "biome_id_map_netease.json";
+        }
+        try (InputStream stream = Biome.class.getClassLoader().getResourceAsStream(name)) {
             JsonObject json = JsonParser.parseReader(new InputStreamReader(stream)).getAsJsonObject();
             for (String identifier : json.keySet()) {
                 int biomeId = json.get(identifier).getAsInt();

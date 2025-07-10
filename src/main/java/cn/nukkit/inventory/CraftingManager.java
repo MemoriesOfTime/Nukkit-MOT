@@ -72,6 +72,8 @@ public class CraftingManager {
     private static BatchPacket packet800;
     private static BatchPacket packet818;
 
+    private static BatchPacket packet_netease_686;
+
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes388 = new Int2ObjectOpenHashMap<>();
@@ -713,8 +715,13 @@ public class CraftingManager {
     }
 
     private BatchPacket packetFor(int protocol) {
+        return packetFor(protocol, false);
+    }
+
+    private BatchPacket packetFor(int protocol, boolean isNetEase) {
         CraftingDataPacket pk = new CraftingDataPacket();
         pk.protocol = protocol;
+        pk.isNetEase = isNetEase;
         for (Recipe recipe : this.getRecipes(protocol)) {
             if (recipe instanceof ShapedRecipe) {
                 pk.addShapedRecipe((ShapedRecipe) recipe);
@@ -752,6 +759,10 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        if (Server.getInstance().netEaseMod) {
+            packet_netease_686 = null;
+        }
+
         packet818 = null;
         packet800 = null;
         packet776 = null;
@@ -806,6 +817,16 @@ public class CraftingManager {
      */
     public BatchPacket getCachedPacket(int protocol) {
         //TODO Multiversion 添加新版本支持时修改这里
+
+        if (Server.getInstance().netEaseMod) {
+            if (protocol == ProtocolInfo.v1_21_2) {
+                if (packet_netease_686 == null) {
+                    packet_netease_686 = this.packetFor(ProtocolInfo.v1_21_2, true);
+                }
+                return packet_netease_686;
+            }
+        }
+
         if (protocol >= ProtocolInfo.v1_21_90) {
             if (packet818 == null) {
                 packet818 = packetFor(ProtocolInfo.v1_21_90);
