@@ -1,0 +1,88 @@
+[versions]
+log4j = "2.17.1"
+jline = "3.21.0"
+leveldb_java = "1.0.1"
+leveldb_jni = "0.0.10"
+block_state_updater = "1.21.60-SNAPSHOT"
+netty_epoll = "4.1.101.Final"
+caffeine = "3.1.8"
+guava = "33.1.0-jre"
+gson = "2.10.1"
+fastutil = "8.5.15"
+snakeyaml = "2.0"
+snakeyaml_engine = "2.7"
+nimbus_jose = "9.37.2"
+asm = "9.7"
+lombok = "1.18.36"
+terminalconsoleappender = "1.3.0"
+jsr305 = "3.0.2"
+snappy = "0.5"
+daporkchop_natives = "0.5.8-SNAPSHOT"
+sentry = "6.25.0"
+commons_math3 = "3.6.1"
+snappy_java = "1.1.10.5"
+oshi = "5.8.7"
+annotations = "24.1.0"
+jose4j = "0.9.6"
+junit = "5.10.2"
+nukkitx_natives = "1.0.3"
+raknet = "1.0.0.CR3-SNAPSHOT"
+cloudburst_common = "3.0.0.Beta3-SNAPSHOT"
+
+[libraries]
+raknet = { module = "org.cloudburstmc.netty:netty-transport-raknet", version.ref = "raknet" }
+netty-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "netty_epoll" }
+nukkitx-natives = { module = "com.nukkitx:natives", version.ref = "nukkitx_natives" }
+cloudburst-common = { module = "org.cloudburstmc.protocol:common", version.ref = "cloudburst_common" }
+fastutil = { module = "it.unimi.dsi:fastutil", version.ref = "fastutil" }
+guava = { module = "com.google.guava:guava", version.ref = "guava" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
+
+snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
+snakeyaml-engine = { module = "org.snakeyaml:snakeyaml-engine", version.ref = "snakeyaml_engine" }
+
+nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus_jose" }
+asm = { module = "org.ow2.asm:asm", version.ref = "asm" }
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+
+jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "jsr305" }
+
+snappy = { module = "org.iq80.snappy:snappy", version.ref = "snappy" }
+
+daporkchop-natives = { module = "net.daporkchop.lib:natives", version.ref = "daporkchop_natives" }
+
+sentry = { module = "io.sentry:sentry", version.ref = "sentry" }
+commons-math3 = { module = "org.apache.commons:commons-math3", version.ref = "commons_math3" }
+snappy-java = { module = "org.xerial.snappy:snappy-java", version.ref = "snappy_java" }
+oshi-core = { module = "com.github.oshi:oshi-core", version.ref = "oshi" }
+annotations = { module = "org.jetbrains:annotations", version.ref = "annotations" }
+jose4j = { module = "org.bitbucket.b_c:jose4j", version.ref = "jose4j" }
+
+block-state-updater = { module = "org.cloudburstmc:block-state-updater", version.ref = "block_state_updater" }
+
+leveldb = { module = "com.hivemc.leveldb:leveldb", version.ref = "leveldb_java" }
+leveldb-api = { module = "com.hivemc.leveldb:leveldb-api", version.ref = "leveldb_java" }
+leveldb-jni = { module = "cn.lanink.leveldb:leveldb-mcpe-jni", version.ref = "leveldb_jni" }
+
+log4j-api = { module = "org.apache.logging.log4j:log4j-api", version.ref = "log4j" }
+log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+log4j-slf4j = { module = "org.apache.logging.log4j:log4j-slf4j-impl", version.ref = "log4j" }
+
+jline-terminal-jna = { module = "org.jline:jline-terminal-jna", version.ref = "jline" }
+jline-reader = { module = "org.jline:jline-reader", version.ref = "jline" }
+terminal-console = { module = "net.minecrell:terminalconsoleappender", version.ref = "terminalconsoleappender" }
+
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+
+[bundles]
+snakeyaml = [ "snakeyaml", "snakeyaml-engine" ]
+leveldb = [ "leveldb", "leveldb-api", "leveldb-jni" ]
+log4j = [ "log4j-api", "log4j-core", "log4j-slf4j" ]
+terminal = [ "jline-terminal-jna", "jline-reader", "terminal-console" ]
+junit = [ "junit-jupiter", "junit-engine" ]
+
+[plugins]
+shadow = { id = "com.github.johnrengelman.shadow", version = "8.0.0" }
+git = { id = "com.gorylenko.gradle-git-properties", version = "2.4.1" }
