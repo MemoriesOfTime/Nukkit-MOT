@@ -15,7 +15,7 @@ public class DropItemPacketV113 extends DataPacket_v113 {
     @Override
     public void decode() {
         this.type = this.getByte();
-        this.item = this.getSlot(protocol);
+        this.item = this.getSlot(gameVersion);
     }
 
     @Override
