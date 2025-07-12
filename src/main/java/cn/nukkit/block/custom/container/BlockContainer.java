@@ -1,5 +1,7 @@
 package cn.nukkit.block.custom.container;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.Server;
 import cn.nukkit.level.GlobalBlockPalette;
 
 public interface BlockContainer {
@@ -13,6 +15,11 @@ public interface BlockContainer {
     }
 
     default int getRuntimeId() {
-        return GlobalBlockPalette.getOrCreateRuntimeId(this.getNukkitId(), this.getNukkitDamage());
+        Server.mvw("BlockContainer#getRuntimeId()");
+        return getRuntimeId(GameVersion.getLastVersion());
+    }
+
+    default int getRuntimeId(GameVersion version) {
+        return GlobalBlockPalette.getOrCreateRuntimeId(version, this.getNukkitId(), this.getNukkitDamage());
     }
 }

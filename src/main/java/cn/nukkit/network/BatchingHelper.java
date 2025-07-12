@@ -55,7 +55,7 @@ public class BatchingHelper {
         if (players.length == 1) {
             for (DataPacket packet : packets) {
                 packet.protocol = players[0].protocol;
-                packet.isNetEase = players[0].isNetEase;
+                packet.gameVersion = players[0].getGameVersion();
                 players[0].getNetworkSession().sendPacket(packet);
            }
            return;

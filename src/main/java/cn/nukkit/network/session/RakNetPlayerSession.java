@@ -73,7 +73,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
 
         int protocolVersion = channel.config().getProtocolVersion();
-        if (protocolVersion == 8 && Server.getInstance().netEaseMod) {
+        if (protocolVersion == 8 && Server.getInstance().netEaseMode) {
             this.compressionIn = CompressionProvider.NETEASE_UNKNOWN;
         } else {
             this.compressionIn = protocolVersion >= 11 ? CompressionProvider.NONE : (protocolVersion < 10 ? CompressionProvider.ZLIB : CompressionProvider.ZLIB_RAW);

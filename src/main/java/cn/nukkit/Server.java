@@ -90,6 +90,8 @@ import io.netty.buffer.ByteBuf;
 import io.sentry.Sentry;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import lombok.extern.log4j.Log4j2;
@@ -579,10 +581,15 @@ public class Server {
      * Enable forced safety enchantments (up max lvl)
      */
     public boolean forcedSafetyEnchant;
+
     /**
      * Enable NetEase Client Support
      */
-    public boolean netEaseMod = true;
+    public boolean netEaseMode = true;
+    /**
+     * Only allow NetEase clients to join the server
+     */
+    public boolean onlyNetEaseMode = false;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -721,7 +728,7 @@ public class Server {
         Attribute.init();
         DispenseBehaviorRegister.init();
         CustomBlockManager.init(this);
-        GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, 0, 0);
+        GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getLastVersion(), 0, 0);
 
         // Convert legacy data before plugins get the chance to mess with it
         try {
@@ -1354,7 +1361,7 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        BatchPacket cachedPacket = this.craftingManager.getCachedPacket(player.protocol);
+        BatchPacket cachedPacket = this.craftingManager.getCachedPacket(player.getGameVersion());
         if (cachedPacket != null) { // Don't send recipes if they wouldn't work anyways
             player.dataPacket(cachedPacket);
         }
@@ -2779,6 +2786,7 @@ public class Server {
      * @param players players
      * @return players sorted by protocol
      */
+    @Deprecated
     public static Int2ObjectMap<ObjectList<Player>> sortPlayers(Player[] players) {
         Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
         for (Player player : players) {
@@ -2793,10 +2801,39 @@ public class Server {
      * @param players players
      * @return players sorted by protocol
      */
+    @Deprecated
     public static Int2ObjectMap<ObjectList<Player>> sortPlayers(Collection<Player> players) {
         Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
         for (Player player : players) {
             targets.computeIfAbsent(player.protocol, i -> new ObjectArrayList<>()).add(player);
+        }
+        return targets;
+    }
+
+    /**
+     * Group players by game version
+     *
+     * @param players players
+     * @return players grouped by game version
+     */
+    public static Object2ObjectMap<GameVersion, ObjectList<Player>> groupPlayersByGameVersion(Player[] players) {
+        Object2ObjectMap<GameVersion, ObjectList<Player>> targets = new Object2ObjectOpenHashMap<>();
+        for (Player player : players) {
+            targets.computeIfAbsent(player.getGameVersion(), i -> new ObjectArrayList<>()).add(player);
+        }
+        return targets;
+    }
+
+    /**
+     * Group players by game version
+     *
+     * @param players players
+     * @return players grouped by game version
+     */
+    public static Object2ObjectMap<GameVersion, ObjectList<Player>> groupPlayersByGameVersion(Collection<Player> players) {
+        Object2ObjectMap<GameVersion, ObjectList<Player>> targets = new Object2ObjectOpenHashMap<>();
+        for (Player player : players) {
+            targets.computeIfAbsent(player.getGameVersion(), i -> new ObjectArrayList<>()).add(player);
         }
         return targets;
     }

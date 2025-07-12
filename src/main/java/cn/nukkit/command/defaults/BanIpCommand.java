@@ -37,7 +37,7 @@ public class BanIpCommand extends VanillaCommand {
                 CommandParameter.newType("player", CommandParamType.STRING),
                 CommandParameter.newType("reason", true, CommandParamType.STRING)
         });
-        if (!Server.getInstance().netEaseMod) { // make client assertion happy
+        if (!Server.getInstance().netEaseMode) { // make client assertion happy
             this.commandParameters.put("byIp", new CommandParameter[]{
                     CommandParameter.newType("ip", CommandParamType.STRING, new IPStringNode()),
                     CommandParameter.newType("reason", true, CommandParamType.STRING)

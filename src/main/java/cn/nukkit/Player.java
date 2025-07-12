@@ -243,6 +243,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * 网易客户端
      */
     public boolean isNetEase;
+    @Getter
+    private GameVersion gameVersion;
     /**
      * Client version string
      */
@@ -425,6 +427,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private boolean lockCameraInput;
 
     private boolean lockMovementInput;
+
+    public void setGameVersion(GameVersion gameVersion) {
+        this.gameVersion = gameVersion;
+        this.protocol = gameVersion.getProtocol();
+        this.isNetEase = gameVersion.isNetEase();
+    }
 
     public int getStartActionTick() {
         return startAction;
@@ -1359,7 +1367,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         packet = packet.clone();
         packet.protocol = this.protocol;
-        packet.isNetEase = this.isNetEase;
+        packet.gameVersion = this.gameVersion;
 
         if (server.callDataPkSendEv) {
             DataPacketSendEvent ev = new DataPacketSendEvent(this, packet);
@@ -1403,7 +1411,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void forceDataPacket(DataPacket packet, Runnable callback) {
         packet.protocol = this.protocol;
-        packet.isNetEase = this.isNetEase;
+        packet.gameVersion = this.gameVersion;
         this.networkSession.sendImmediatePacket(packet, (callback == null ? () -> {
         } : callback));
     }
@@ -2922,7 +2930,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
                         if (this.protocol >= ProtocolInfo.v1_21_60) {
-                            Collection<ItemComponentPacket.ItemDefinition> vanillaItems = RuntimeItems.getMapping(this.protocol).getVanillaItemDefinitions();
+                            Collection<ItemComponentPacket.ItemDefinition> vanillaItems = RuntimeItems.getMapping(this.gameVersion).getVanillaItemDefinitions();
                             Set<Entry<String, CustomItemDefinition>> itemDefinitions = Item.getCustomItemDefinition().entrySet();
                             List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
                             entries.addAll(vanillaItems);
@@ -3064,7 +3072,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (packet.protocol == Integer.MAX_VALUE) {
             packet.protocol = this.protocol;
-            packet.isNetEase = this.isNetEase;
+            packet.gameVersion = this.gameVersion;
         }
 
         DataPacketReceiveEvent ev = new DataPacketReceiveEvent(this, packet);
@@ -3188,7 +3196,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 boolean valid = true;
                 int len = loginPacket.username.length();
-                if (((len > 16 || len < 3) && !Server.getInstance().netEaseMod)
+                if (((len > 16 || len < 3) && !Server.getInstance().netEaseMode)
                         || loginPacket.username.trim().isEmpty()) {
                     valid = false;
                 }
@@ -6815,17 +6823,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return getChunkCacheFromData(protocol, chunkX, chunkZ, subChunkCount, payload, 0);
     }
 
+    @Deprecated
+    public static BatchPacket getChunkCacheFromData(int protocol, int chunkX, int chunkZ, int subChunkCount, byte[] payload, int dimension) {
+        return getChunkCacheFromData(GameVersion.byProtocol(protocol, false), chunkX, chunkZ, subChunkCount, payload, dimension);
+    }
+
     /**
      * Get chunk cache from data
      *
-     * @param protocol      protocol version
+     * @param gameVersion      protocol version
      * @param chunkX        chunk x
      * @param chunkZ        chunk z
      * @param subChunkCount sub chunk count
      * @param payload       data
      * @return BatchPacket
      */
-    public static BatchPacket getChunkCacheFromData(int protocol, int chunkX, int chunkZ, int subChunkCount, byte[] payload, int dimension) {
+    public static BatchPacket getChunkCacheFromData(GameVersion gameVersion, int chunkX, int chunkZ, int subChunkCount, byte[] payload, int dimension) {
+        int protocol = gameVersion.getProtocol();
+
         LevelChunkPacket pk = new LevelChunkPacket();
         pk.chunkX = chunkX;
         pk.chunkZ = chunkZ;
@@ -6833,6 +6848,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.subChunkCount = subChunkCount;
         pk.data = payload;
         pk.protocol = protocol;
+        pk.gameVersion = gameVersion;
         pk.tryEncode();
 
         byte[] buf = pk.getBuffer();

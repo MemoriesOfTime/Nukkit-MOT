@@ -83,7 +83,7 @@ public class PlayerAuthInputPacket extends DataPacket {
         int inClientPredictedInVehicleOrdinal = AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE.ordinal();
         for (int i = 0; i < AuthInputAction.size(); i++) {
             int offset = 0;
-            if (isNetEase && protocol == ProtocolInfo.v1_21_2 && i >= inClientPredictedInVehicleOrdinal) {
+            if (gameVersion.isNetEase() && protocol == ProtocolInfo.v1_21_2 && i >= inClientPredictedInVehicleOrdinal) {
                 offset = -1;
             }
             if ((inputData & (1L << i)) != 0) {
@@ -108,7 +108,7 @@ public class PlayerAuthInputPacket extends DataPacket {
         this.tick = this.getUnsignedVarLong();
         this.delta = this.getVector3f();
 
-        if (isNetEase && protocol == ProtocolInfo.v1_21_2) {
+        if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_16_200) {
             this.cameraDeparted = this.getBoolean();
         }
 
