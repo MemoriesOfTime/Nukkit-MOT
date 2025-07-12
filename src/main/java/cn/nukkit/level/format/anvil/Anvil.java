@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.anvil;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.format.generic.BaseFullChunk;
@@ -10,7 +11,7 @@ import cn.nukkit.level.generator.Generator;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.ChunkException;
-import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -107,7 +108,7 @@ public class Anvil extends BaseLevelProvider {
     }
 
     @Override
-    public void requestChunkTask(IntSet protocols, int x, int z) throws ChunkException {
+    public void requestChunkTask(ObjectSet<GameVersion> protocols, int x, int z) throws ChunkException {
         Chunk chunk = (Chunk) this.getChunk(x, z, false);
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk Set");
@@ -119,7 +120,7 @@ public class Anvil extends BaseLevelProvider {
             final Chunk chunkClone = chunk.cloneForChunkSending();
             this.level.getAsyncChuckExecutor().execute(() -> {
                 NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
-                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
                             timestamp,
                             x,
                             z,
@@ -130,7 +131,7 @@ public class Anvil extends BaseLevelProvider {
             });
         }else {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
                         timestamp,
                         x,
                         z,
