@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "cn.nukkit"
-version = "MOT-SNAPSHOT"
+version = "MOT-NetEase-SNAPSHOT"
 
 java {
     toolchain {
