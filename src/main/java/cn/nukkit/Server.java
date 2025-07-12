@@ -579,6 +579,15 @@ public class Server {
      * Enable forced safety enchantments (up max lvl)
      */
     public boolean forcedSafetyEnchant;
+    /**
+     * Enable vibrant visuals
+     * @since 1.21.80
+     */
+    public boolean enableVibrantVisuals;
+    /**
+     * Enable raytracing
+     */
+    public boolean enableRaytracing;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -3008,6 +3017,25 @@ public class Server {
         return this.netherEnabled;
     }
 
+
+    /**
+     * Is vibrant visuals enabled on this server
+     *
+     * @return vibrant visuals enabled
+     */
+    public boolean isVibrantVisualsEnabled() {
+        return this.enableVibrantVisuals;
+    }
+
+    /**
+     * Is ray tracing enabled on this server
+     *
+     * @return ray tracing enabled
+     */
+    public boolean isRaytracingEnabled() {
+        return this.enableRaytracing;
+    }
+
     public boolean isWaterdogCapable() {
         return this.useWaterdog;
     }
@@ -3087,7 +3115,6 @@ public class Server {
         this.pvpEnabled = this.getPropertyBoolean("pvp", true);
         this.announceAchievements = this.getPropertyBoolean("announce-player-achievements", false);
         this.spawnEggsEnabled = this.getPropertyBoolean("spawn-eggs", true);
-        this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
         this.xpBottlesOnCreative = this.getPropertyBoolean("xp-bottles-on-creative", false);
         this.shouldSavePlayerData = this.getPropertyBoolean("save-player-data", true);
         this.mobsFromBlocks = this.getPropertyBoolean("block-listener", true);
@@ -3180,6 +3207,9 @@ public class Server {
         this.enableNewChickenEggsLaying = this.getPropertyBoolean("enable-new-chicken-eggs-laying", true);
         this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
         this.enableRakSendCookie = this.getPropertyBoolean("enable-rak-send-cookie", true);
+        this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
+        this.enableVibrantVisuals = this.getPropertyBoolean("enable-vibrant-visuals", true);
+        this.enableRaytracing = this.getPropertyBoolean("enable-raytracing", true);
     }
 
     /**
@@ -3333,6 +3363,7 @@ public class Server {
             put("enable-raw-ores", true);
             put("enable-new-paintings", true);
             put("enable-new-chicken-eggs-laying", true);
+            put("enable-vibrant-visuals", true);
         }
     }
 
