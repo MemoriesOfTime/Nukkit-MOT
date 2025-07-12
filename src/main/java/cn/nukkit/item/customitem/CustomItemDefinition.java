@@ -1,5 +1,6 @@
 package cn.nukkit.item.customitem;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.inventory.ItemTag;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItems;
@@ -390,7 +391,7 @@ public class CustomItemDefinition {
         protected CustomItemDefinition calculateID() {
             var result = new CustomItemDefinition(identifier, nbt);
             if (!INTERNAL_ALLOCATION_ID_MAP.containsKey(result.identifier())) {
-                while (RuntimeItems.getMapping(ProtocolInfo.CURRENT_PROTOCOL).getNamespacedIdByNetworkId(nextRuntimeId.incrementAndGet()) != null)
+                while (RuntimeItems.getMapping(GameVersion.getLastVersion()).getNamespacedIdByNetworkId(nextRuntimeId.incrementAndGet()) != null)
                     ;
                 INTERNAL_ALLOCATION_ID_MAP.put(result.identifier(), nextRuntimeId.get());
                 result.nbt.putString("name", result.identifier());

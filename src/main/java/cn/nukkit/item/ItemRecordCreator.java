@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
 public class ItemRecordCreator extends ItemRecord implements StringItem {
@@ -18,7 +19,7 @@ public class ItemRecordCreator extends ItemRecord implements StringItem {
     }
 
     @Override
-    public String getNamespaceId(int protocolId) {
+    public String getNamespaceId(GameVersion protocolId) {
         return MUSIC_DISC_CREATOR;
     }
 

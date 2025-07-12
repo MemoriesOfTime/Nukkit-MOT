@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -38,6 +39,7 @@ import java.util.zip.GZIPInputStream;
 public class RuntimeItemMapping {
 
     private final int protocolId;
+    private final GameVersion gameVersion;
 
     private final Int2ObjectMap<LegacyEntry> runtime2Legacy = new Int2ObjectOpenHashMap<>();
     private final Int2ObjectMap<RuntimeEntry> legacy2Runtime = new Int2ObjectOpenHashMap<>();
@@ -53,14 +55,16 @@ public class RuntimeItemMapping {
 
     private byte[] itemPalette;
 
+    @Deprecated
     public RuntimeItemMapping(Map<String, MappingEntry> mappings, int protocolId) {
-        this(mappings, protocolId, false);
+        this(mappings, GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
     }
 
-    public RuntimeItemMapping(Map<String, MappingEntry> mappings, int protocolId, boolean isNetEase) {
-        this.protocolId = protocolId;
+    public RuntimeItemMapping(Map<String, MappingEntry> mappings, GameVersion gameVersion) {
+        this.protocolId = gameVersion.getProtocol();
+        this.gameVersion = gameVersion;
         String itemStatesFile = "runtime_item_states_" + protocolId + ".json";
-        if (isNetEase) {
+        if (gameVersion.isNetEase()) {
             itemStatesFile = "runtime_item_states_netease_" + protocolId + ".json";
         }
         InputStream stream = Server.class.getClassLoader().getResourceAsStream(itemStatesFile);
@@ -286,17 +290,20 @@ public class RuntimeItemMapping {
     }
 
     public Item parseCreativeItem(JsonObject json, boolean ignoreUnknown) {
-        return this.parseCreativeItem(json, ignoreUnknown, this.protocolId);
+        return this.parseCreativeItem(json, ignoreUnknown, this.gameVersion);
     }
 
+    @Deprecated
     public Item parseCreativeItem(JsonObject json, boolean ignoreUnknown, int protocolId) {
+        return this.parseCreativeItem(json, ignoreUnknown, GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public Item parseCreativeItem(JsonObject json, boolean ignoreUnknown, GameVersion gameVersion) {
+        int protocolId = gameVersion.getProtocol();
         String identifier = json.get("id").getAsString();
         LegacyEntry legacyEntry = this.fromIdentifier(identifier);
         if (legacyEntry == null || !Utils.hasItemOrBlock(legacyEntry.getLegacyId())) {
             OptionalInt networkId = this.getNetworkIdByNamespaceId(identifier);
-            if ("minecraft:raw_iron".equalsIgnoreCase(identifier)) {
-                int test = 1;
-            }
             if (networkId.isEmpty() || !Item.NAMESPACED_ID_ITEM.containsKey(identifier)) {
                 if (!ignoreUnknown) {
                     throw new IllegalStateException("Can not find legacyEntry for " + identifier);
@@ -329,7 +336,7 @@ public class RuntimeItemMapping {
         } else if (json.has("blockRuntimeId")) {
             int runtimeId = json.get("blockRuntimeId").getAsInt();
             if (runtimeId != 0) {
-                int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, runtimeId);
+                int fullId = GlobalBlockPalette.getLegacyFullId(gameVersion, runtimeId);
                 if (fullId == -1) {
                     if (ignoreUnknown) {
                         return null;
