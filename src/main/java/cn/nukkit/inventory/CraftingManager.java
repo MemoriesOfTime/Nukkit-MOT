@@ -292,7 +292,7 @@ public class CraftingManager {
                             case "furnace":
                                 FurnaceRecipe furnaceRecipe = new FurnaceRecipe(resultItem, inputItem);
                                 this.registerRecipe(388, furnaceRecipe);
-                                String runtimeId = RuntimeItems.getMapping(388).toRuntime(inputItem.getId(), inputItem.getDamage()).getIdentifier();
+                                String runtimeId = RuntimeItems.getMapping(GameVersion.V1_13_0).toRuntime(inputItem.getId(), inputItem.getDamage()).getIdentifier();
                                 double xp = furnaceXpConfig.getDouble(runtimeId + ":" + inputItem.getDamage(), 0d);
                                 if (xp != 0) {
                                     this.setRecipeXp(furnaceRecipe, xp);
