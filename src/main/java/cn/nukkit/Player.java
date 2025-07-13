@@ -3132,19 +3132,31 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                 }
 
+                if (Server.getInstance().netEaseMode) {
+                    if (Server.getInstance().onlyNetEaseMode && !this.gameVersion.isNetEase()) {
+                        this.close("", "You are running unsupported Minecraft version");
+                        this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (Reason:SupportedProtocols) " + this.gameVersion);
+                        break;
+                    }
+                } else if (this.gameVersion.isNetEase()) {
+                    this.close("", "You are running unsupported Minecraft version");
+                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (Reason:SupportedProtocols) " + this.gameVersion);
+                    break;
+                }
+
                 if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
                     this.close("", "You are running unsupported Minecraft version");
-                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (SupportedProtocols) " + this.protocol);
+                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (Reason:SupportedProtocols) " + this.gameVersion);
                     break;
                 }
 
                 if (this.protocol < server.minimumProtocol) {
                     this.close("", "Multiversion support for this Minecraft version is disabled");
-                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (minimumProtocol) " + this.protocol);
+                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (Reason:minimumProtocol) " + this.gameVersion);
                     break;
                 } else if (this.server.maximumProtocol >= Math.max(0, this.server.minimumProtocol) && this.protocol > this.server.maximumProtocol) {
                     this.close("", "Support for this Minecraft version is not enabled");
-                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with unsupported protocol (maximumProtocol) " + this.protocol);
+                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with unsupported protocol (Reason:maximumProtocol) " + this.gameVersion);
                     break;
                 }
 
@@ -3196,12 +3208,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 boolean valid = true;
                 int len = loginPacket.username.length();
-                if (((len > 16 || len < 3) && !Server.getInstance().netEaseMode)
+                if (((len > 16 || len < 3) && !gameVersion.isNetEase())
                         || loginPacket.username.trim().isEmpty()) {
                     valid = false;
                 }
 
-                if (valid && !Server.getInstance().netEaseMode) {
+                if (valid && !gameVersion.isNetEase()) {
                     for (int i = 0; i < len; i++) {
                         char c = loginPacket.username.charAt(i);
                         if ((c >= 'a' && c <= 'z') ||

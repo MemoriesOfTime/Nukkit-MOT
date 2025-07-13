@@ -585,11 +585,11 @@ public class Server {
     /**
      * Enable NetEase Client Support
      */
-    public boolean netEaseMode = true;
+    public boolean netEaseMode;
     /**
      * Only allow NetEase clients to join the server
      */
-    public boolean onlyNetEaseMode = false;
+    public boolean onlyNetEaseMode;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -3221,6 +3221,9 @@ public class Server {
         this.enableNewChickenEggsLaying = this.getPropertyBoolean("enable-new-chicken-eggs-laying", true);
         this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
         this.enableRakSendCookie = this.getPropertyBoolean("enable-rak-send-cookie", true);
+
+        this.netEaseMode = this.getPropertyBoolean("netease-client-support", false);
+        this.onlyNetEaseMode = this.getPropertyBoolean("only-allow-netease-client", false);
     }
 
     /**
@@ -3374,6 +3377,9 @@ public class Server {
             put("enable-raw-ores", true);
             put("enable-new-paintings", true);
             put("enable-new-chicken-eggs-laying", true);
+
+            put("netease-client-support", false);
+            put("only-allow-netease-client", false);
         }
     }
 
