@@ -238,7 +238,18 @@ public class CustomBlockManager {
     }
 
     private void recreateBlockPalette(BlockPalette palette, List<NbtMap> vanillaPalette) {
-        List<NbtMap> vanillaPaletteList = new ObjectArrayList<>();
+        Map<String, List<NbtMap>> vanillaPaletteList;
+        if (palette.getProtocol() >= ProtocolInfo.v1_18_30) {
+            vanillaPaletteList = new Object2ObjectRBTreeMap<>(HashedPaletteComparator.INSTANCE);
+        } else {
+            vanillaPaletteList = new Object2ObjectRBTreeMap<>(AlphabetPaletteComparator.INSTANCE);
+        }
+
+        int paletteVersion = -1;
+        String lastName = null;
+        List<NbtMap> group = new ObjectArrayList<>();
+        int runtimeId = 0;
+        Int2ObjectMap<NbtMap> runtimeId2State = new Int2ObjectOpenHashMap<>();
         for (NbtMap state : vanillaPalette) {
             //删除不属于原版的内容
             if (state.containsKey("network_id") || state.containsKey("name_hash") || state.containsKey("block_id")) {
@@ -248,37 +259,57 @@ public class CustomBlockManager {
                 builder.remove("block_id");
                 state = builder.build();
             }
-            vanillaPaletteList.add(state);
+
+            int version = state.getInt("version");
+            if (version != paletteVersion) {
+                paletteVersion = version;
+            }
+
+            String name = state.getString("name");
+            if (lastName != null && !name.equals(lastName)) {
+                vanillaPaletteList.put(lastName, group);
+                group = new ObjectArrayList<>();
+            }
+            group.add(state);
+            runtimeId2State.put(runtimeId++, state);
+            lastName = name;
+        }
+        if (lastName != null) {
+            vanillaPaletteList.put(lastName, group);
         }
 
         Object2ObjectMap<NbtMap, IntSet> state2Legacy = new Object2ObjectLinkedOpenHashMap<>();
 
-        int paletteVersion = vanillaPaletteList.get(0).getInt("version");
-
         for (Int2IntMap.Entry entry : palette.getLegacyToRuntimeIdMap().int2IntEntrySet()) {
-            int runtimeId = entry.getIntValue();
-            NbtMap state = vanillaPaletteList.get(runtimeId);
+            int rid = entry.getIntValue();
+            NbtMap state = runtimeId2State.get(rid);
             if (state == null) {
-                log.info("Unknown runtime ID {}! protocol={}", runtimeId, palette.getProtocol());
+                log.info("Unknown runtime ID {}! protocol={}", rid, palette.getProtocol());
                 continue;
             }
             IntSet legacyIds = state2Legacy.computeIfAbsent(state, s -> new IntOpenHashSet());
             legacyIds.add(entry.getIntKey());
         }
 
+        lastName = null;
+        group = new ObjectArrayList<>();
         for (CustomBlockState definition : this.legacy2CustomState.values()) {
             NbtMap state = definition.getBlockState();
             if (state.getInt("version") != paletteVersion) {
                 state = state.toBuilder().putInt("version", paletteVersion).build();
             }
             state2Legacy.computeIfAbsent(state, s -> new IntOpenHashSet()).add(legacyToFullId(definition.getLegacyId()));
-            vanillaPaletteList.add(state);
-        }
 
-        if (palette.getProtocol() >= ProtocolInfo.v1_18_30) {
-            vanillaPaletteList.sort(HashedPaletteComparator.INSTANCE);
-        } else {
-            vanillaPaletteList.sort(AlphabetPaletteComparator.INSTANCE);
+            String name = state.getString("name");
+            if (lastName != null && !name.equals(lastName)) {
+                vanillaPaletteList.put(lastName, group);
+                group = new ObjectArrayList<>();
+            }
+            group.add(state);
+            lastName = name;
+        }
+        if (lastName != null) {
+            vanillaPaletteList.put(lastName, group);
         }
 
         palette.clearStates();
@@ -287,22 +318,23 @@ public class CustomBlockManager {
             BlockStateMapping.get().clearMapping();
         }
 
-        for (int runtimeId = 0; runtimeId < vanillaPaletteList.size(); runtimeId++) {
-            NbtMap state = vanillaPaletteList.get(runtimeId);
-            if(!BlockStateMapping.get().containsState(state)) {
-                if (levelDb) {
-                    BlockStateMapping.get().registerState(runtimeId, state);
-                }
+        runtimeId = 0;
+        for (List<NbtMap> states : vanillaPaletteList.values()) {
+            for (NbtMap state : states) {
+                if(!levelDb || !BlockStateMapping.get().containsState(state)) {
+                    if (levelDb) {
+                        BlockStateMapping.get().registerState(runtimeId, state);
+                    }
 
-                IntSet legacyIds = state2Legacy.get(state);
-                if (legacyIds == null) {
-                    continue;
+                    IntSet legacyIds = state2Legacy.get(state);
+                    if (legacyIds != null) {
+                        CompoundTag nukkitState = convertNbtMap(state);
+                        for (Integer fullId : legacyIds) {
+                            palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
+                        }
+                    }
                 }
-
-                CompoundTag nukkitState = convertNbtMap(state);
-                for (Integer fullId : legacyIds) {
-                    palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
-                }
+                runtimeId++;
             }
         }
     }
@@ -383,10 +415,8 @@ public class CustomBlockManager {
     public static CompoundTag convertNbtMap(NbtMap nbt) {
         try {
             ByteArrayOutputStream stream = new ByteArrayOutputStream();
-            try (NBTOutputStream nbtOutputStream = NbtUtils.createWriter(stream)) {
+            try (stream; NBTOutputStream nbtOutputStream = NbtUtils.createWriter(stream)) {
                 nbtOutputStream.writeTag(nbt);
-            } finally {
-                stream.close();
             }
             return NBTIO.read(stream.toByteArray(), ByteOrder.BIG_ENDIAN, false);
         } catch (IOException e) {
