@@ -40,7 +40,7 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
 
         if (player.raknetProtocol == 8
                 && Server.getInstance().netEaseMode
-                && pk.protocolVersion >= ProtocolInfo.v1_21_2) {
+                && pk.protocolVersion >= GameVersion.V1_20_50_NETEASE.getProtocol()) {
             player.setGameVersion(GameVersion.byProtocol(pk.protocolVersion, true));
             playerHandle.getNetworkSession().setCompressionOut(CompressionProvider.NONE);
         } else {

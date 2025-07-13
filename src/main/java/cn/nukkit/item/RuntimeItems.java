@@ -52,6 +52,7 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping800;
     private static RuntimeItemMapping mapping818;
 
+    private static RuntimeItemMapping mapping_netease_630;
     private static RuntimeItemMapping mapping_netease_686;
 
     public static RuntimeItemMapping[] VALUES;
@@ -129,6 +130,7 @@ public class RuntimeItems {
         mapping800 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_80);
         mapping818 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_90);
 
+        mapping_netease_630 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_50_NETEASE);
         mapping_netease_686 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_2_NETEASE);
 
         VALUES = new RuntimeItemMapping[]{
@@ -162,6 +164,7 @@ public class RuntimeItems {
                 mapping800,
                 mapping818,
                 // NetEase
+                mapping_netease_630,
                 mapping_netease_686
         };
     }
@@ -241,7 +244,7 @@ public class RuntimeItems {
         if (protocolId >= ProtocolInfo.v1_21_2) {
             return mapping_netease_686;
         }
-        return mapping_netease_686;
+        return mapping_netease_630;
     }
 
     public static int getLegacyIdFromLegacyString(String identifier) {

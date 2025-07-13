@@ -73,6 +73,7 @@ public class CraftingManager {
     private static BatchPacket packet800;
     private static BatchPacket packet818;
 
+    private static BatchPacket packet_netease_630;
     private static BatchPacket packet_netease_686;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
@@ -827,6 +828,11 @@ public class CraftingManager {
                     packet_netease_686 = this.packetFor(GameVersion.V1_21_2_NETEASE);
                 }
                 return packet_netease_686;
+            } else if (protocol >= GameVersion.V1_20_50_NETEASE.getProtocol()) {
+                if (packet_netease_630 == null) {
+                    packet_netease_630 = this.packetFor(GameVersion.V1_20_50_NETEASE);
+                }
+                return packet_netease_630;
             }
         }
 

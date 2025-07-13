@@ -540,6 +540,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     private static final CreativeItems creative818 = new CreativeItems();
     private static final CreativeItems creative819 = new CreativeItems();
 
+    private static final CreativeItems creative_netease_630 = new CreativeItems();
     private static final CreativeItems creative_netease_686 = new CreativeItems();
 
     public static void initCreativeItems() {
@@ -592,6 +593,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCreativeItemsNew(GameVersion.V1_21_90, GameVersion.V1_21_90, creative818);
         registerCreativeItemsNew(GameVersion.V1_21_93, GameVersion.V1_21_93, creative819);
 
+        registerCreativeItemsNew(GameVersion.V1_20_50_NETEASE, GameVersion.V1_20_50_NETEASE, creative_netease_630);
         registerCreativeItemsNew(GameVersion.V1_21_2_NETEASE, GameVersion.V1_21_2_NETEASE, creative_netease_686);
         //TODO Multiversion 添加新版本支持时修改这里
     }
@@ -724,6 +726,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Item.creative818.clear();
         Item.creative819.clear();
 
+        Item.creative_netease_630.clear();
         Item.creative_netease_686.clear();
         //TODO Multiversion 添加新版本支持时修改这里
     }
@@ -882,6 +885,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             case V1_21_93:
                 return Item.creative819;
             // NetEase
+            case V1_20_50_NETEASE:
+                return Item.creative_netease_630;
             case V1_21_2_NETEASE:
                 return Item.creative_netease_686;
             // TODO Multiversion
@@ -954,7 +959,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             case V1_21_90 -> Item.creative818.add(item.clone(), category, group);
             case V1_21_93 -> Item.creative819.add(item.clone(), category, group);
             // NetEase
-            case V1_21_2_NETEASE -> Item.creative_netease_686.add(item, category, group);
+            case V1_20_50_NETEASE -> Item.creative_netease_630.add(item.clone(), category, group);
+            case V1_21_2_NETEASE -> Item.creative_netease_686.add(item.clone(), category, group);
             // TODO Multiversion
             default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
@@ -1155,6 +1161,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCustomItem(customItem, GameVersion.V1_21_90, addCreativeItem, GameVersion.V1_21_90, GameVersion.V1_21_93);
 
         // NetEase
+        registerCustomItem(customItem, GameVersion.V1_20_50_NETEASE, addCreativeItem, GameVersion.V1_20_50_NETEASE);
         registerCustomItem(customItem, GameVersion.V1_21_2_NETEASE, addCreativeItem, GameVersion.V1_21_2_NETEASE);
 
         //TODO Multiversion 添加新版本支持时修改这里
@@ -1212,6 +1219,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             deleteCustomItem(customItem, GameVersion.V1_21_90, GameVersion.V1_21_90, GameVersion.V1_21_93);
 
             // NetEase
+            deleteCustomItem(customItem, GameVersion.V1_20_50_NETEASE, GameVersion.V1_20_50_NETEASE);
             deleteCustomItem(customItem, GameVersion.V1_21_2_NETEASE, GameVersion.V1_21_2_NETEASE);
 
             //TODO Multiversion 添加新版本支持时修改这里
