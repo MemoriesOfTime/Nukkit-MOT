@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.data.RecipeUnlockingRequirement;
 import cn.nukkit.item.Item;
@@ -76,7 +77,7 @@ public class CraftingDataPacket extends DataPacket {
         if (protocol < 354) {
             BinaryStream writer = new BinaryStream();
             for (Object entry : entries) {
-                int entryType = writeEntryLegacy(entry, writer);
+                int entryType = writeEntryLegacy(gameVersion, entry, writer);
                 if (entryType >= 0) {
                     this.putVarInt(entryType);
                     this.put(writer.getBuffer());
@@ -98,13 +99,13 @@ public class CraftingDataPacket extends DataPacket {
                         this.putUnsignedVarInt(ingredients.size());
                         for (Item ingredient : ingredients) {
                             if (protocol < 361) {
-                                this.putSlot(protocol, ingredient);
+                                this.putSlot(gameVersion, ingredient);
                             } else {
-                                this.putRecipeIngredient(this.protocol, ingredient);
+                                this.putRecipeIngredient(gameVersion, ingredient);
                             }
                         }
                         this.putUnsignedVarInt(1); // Results length
-                        this.putSlot(protocol, shapeless.getResult(), protocol >= ProtocolInfo.v1_16_100);
+                        this.putSlot(gameVersion, shapeless.getResult(), protocol >= ProtocolInfo.v1_16_100);
                         this.putUUID(shapeless.getId());
                         if (protocol >= 354) {
                             this.putString(CRAFTING_TAG_CRAFTING_TABLE);
@@ -123,11 +124,11 @@ public class CraftingDataPacket extends DataPacket {
                         SmithingRecipe smithing = (SmithingRecipe) recipe;
                         this.putString(smithing.getRecipeId());
                         if (protocol >= ProtocolInfo.v1_19_80) {
-                            this.putRecipeIngredient(protocol, protocol >= ProtocolInfo.v1_20_0_23 ? smithing.getTemplate() : Item.AIR_ITEM); //template
+                            this.putRecipeIngredient(gameVersion, protocol >= ProtocolInfo.v1_20_0_23 ? smithing.getTemplate() : Item.AIR_ITEM); //template
                         }
-                        this.putRecipeIngredient(protocol, smithing.getEquipment());
-                        this.putRecipeIngredient(protocol, smithing.getIngredient());
-                        this.putSlot(protocol, smithing.getResult(), true);
+                        this.putRecipeIngredient(gameVersion, smithing.getEquipment());
+                        this.putRecipeIngredient(gameVersion, smithing.getIngredient());
+                        this.putSlot(gameVersion, smithing.getResult(), true);
                         this.putString(CRAFTING_TAG_SMITHING_TABLE);
                         this.putUnsignedVarInt(smithing.getNetworkId());
                         break;
@@ -142,9 +143,9 @@ public class CraftingDataPacket extends DataPacket {
                         for (int z = 0; z < shaped.getHeight(); ++z) {
                             for (int x = 0; x < shaped.getWidth(); ++x) {
                                 if (protocol < 361) {
-                                    this.putSlot(protocol, shaped.getIngredient(x, z));
+                                    this.putSlot(gameVersion, shaped.getIngredient(x, z));
                                 } else {
-                                    this.putRecipeIngredient(this.protocol, shaped.getIngredient(x, z));
+                                    this.putRecipeIngredient(gameVersion, shaped.getIngredient(x, z));
                                 }
                             }
                         }
@@ -153,7 +154,7 @@ public class CraftingDataPacket extends DataPacket {
                         outputs.addAll(shaped.getExtraResults());
                         this.putUnsignedVarInt(outputs.size());
                         for (Item output : outputs) {
-                            this.putSlot(protocol, output, protocol >= ProtocolInfo.v1_16_100);
+                            this.putSlot(gameVersion, output, protocol >= ProtocolInfo.v1_16_100);
                         }
                         this.putUUID(shaped.getId());
                         if (protocol >= 354) {
@@ -179,10 +180,10 @@ public class CraftingDataPacket extends DataPacket {
                         int runtimeId;
                         int damage;
                         if (!input.hasMeta()) {
-                            runtimeId = RuntimeItems.getMapping(protocol).toRuntime(input.getId(), 0).getRuntimeId();
+                            runtimeId = RuntimeItems.getMapping(gameVersion).toRuntime(input.getId(), 0).getRuntimeId();
                             damage = 0x7fff;
                         } else {
-                            RuntimeItemMapping.RuntimeEntry runtimeEntry = RuntimeItems.getMapping(protocol).toRuntime(input.getId(), input.getDamage());
+                            RuntimeItemMapping.RuntimeEntry runtimeEntry = RuntimeItems.getMapping(gameVersion).toRuntime(input.getId(), input.getDamage());
                             runtimeId = runtimeEntry.getRuntimeId();
                             damage = runtimeEntry.isHasDamage() ? 0 : input.getDamage();
                         }
@@ -190,7 +191,7 @@ public class CraftingDataPacket extends DataPacket {
                         if (recipe.getType() == RecipeType.FURNACE_DATA) {
                             this.putVarInt(damage);
                         }
-                        this.putSlot(protocol, furnace.getResult(), protocol >= ProtocolInfo.v1_16_100);
+                        this.putSlot(gameVersion, furnace.getResult(), protocol >= ProtocolInfo.v1_16_100);
                         if (protocol >= 354) {
                             this.putString(CRAFTING_TAG_FURNACE);
                         }
@@ -220,22 +221,22 @@ public class CraftingDataPacket extends DataPacket {
                 this.putUnsignedVarInt(this.brewingEntries.size());
                 for (BrewingRecipe recipe : brewingEntries) {
                     if (protocol >= 407) {
-                        this.putVarInt(recipe.getInput().getNetworkId(protocol));
+                        this.putVarInt(recipe.getInput().getNetworkId(gameVersion));
                     }
                     this.putVarInt(recipe.getInput().getDamage());
-                    this.putVarInt(recipe.getIngredient().getNetworkId(protocol));
+                    this.putVarInt(recipe.getIngredient().getNetworkId(gameVersion));
                     if (protocol >= 407) {
                         this.putVarInt(recipe.getIngredient().getDamage());
-                        this.putVarInt(recipe.getResult().getNetworkId(protocol));
+                        this.putVarInt(recipe.getResult().getNetworkId(gameVersion));
                     }
                     this.putVarInt(recipe.getResult().getDamage());
                 }
 
                 this.putUnsignedVarInt(this.containerEntries.size());
                 for (ContainerRecipe recipe : containerEntries) {
-                    this.putVarInt(recipe.getInput().getNetworkId(protocol));
-                    this.putVarInt(recipe.getIngredient().getNetworkId(protocol));
-                    this.putVarInt(recipe.getResult().getNetworkId(protocol));
+                    this.putVarInt(recipe.getInput().getNetworkId(gameVersion));
+                    this.putVarInt(recipe.getIngredient().getNetworkId(gameVersion));
+                    this.putVarInt(recipe.getResult().getNetworkId(gameVersion));
                 }
 
                 if (protocol >= ProtocolInfo.v1_17_30) {
@@ -255,55 +256,55 @@ public class CraftingDataPacket extends DataPacket {
     protected void writeRequirement(CraftingRecipe recipe) {
         this.putByte((byte) recipe.getRequirement().getContext().ordinal());
         if (recipe.getRequirement().getContext().equals(RecipeUnlockingRequirement.UnlockingContext.NONE)) {
-            this.putArray(recipe.getRequirement().getIngredients(), (ingredient) -> this.putRecipeIngredient(protocol, ingredient));
+            this.putArray(recipe.getRequirement().getIngredients(), (ingredient) -> this.putRecipeIngredient(gameVersion, ingredient));
         }
     }
 
-    private int writeEntryLegacy(Object entry, BinaryStream stream) {
+    private int writeEntryLegacy(GameVersion gameVersion, Object entry, BinaryStream stream) {
         if (entry instanceof ShapelessRecipe) {
-            return writeShapelessRecipeLegacy(((ShapelessRecipe) entry), stream);
+            return writeShapelessRecipeLegacy(gameVersion, ((ShapelessRecipe) entry), stream);
         } else if (entry instanceof ShapedRecipe) {
-            return writeShapedRecipeLegacy(((ShapedRecipe) entry), stream);
+            return writeShapedRecipeLegacy(gameVersion, ((ShapedRecipe) entry), stream);
         } else if (entry instanceof FurnaceRecipe) {
-            return writeFurnaceRecipeLegacy(((FurnaceRecipe) entry), stream);
+            return writeFurnaceRecipeLegacy(gameVersion, ((FurnaceRecipe) entry), stream);
         }
         return -1;
     }
 
-    private int writeShapelessRecipeLegacy(ShapelessRecipe recipe, BinaryStream stream) {
+    private int writeShapelessRecipeLegacy(GameVersion gameVersion, ShapelessRecipe recipe, BinaryStream stream) {
         stream.putUnsignedVarInt(recipe.getIngredientCount());
         for (Item item : recipe.getIngredientList()) {
-            stream.putSlot(0, item);
+            stream.putSlot(gameVersion, item);
         }
         stream.putUnsignedVarInt(1);
-        stream.putSlot(0, recipe.getResult());
+        stream.putSlot(gameVersion, recipe.getResult());
         stream.putUUID(recipe.getId());
         return 0;
     }
 
-    private int writeShapedRecipeLegacy(ShapedRecipe recipe, BinaryStream stream) {
+    private int writeShapedRecipeLegacy(GameVersion gameVersion, ShapedRecipe recipe, BinaryStream stream) {
         stream.putVarInt(recipe.getWidth());
         stream.putVarInt(recipe.getHeight());
         for (int z = 0; z < recipe.getHeight(); ++z) {
             for (int x = 0; x < recipe.getWidth(); ++x) {
-                stream.putSlot(0, recipe.getIngredient(x, z));
+                stream.putSlot(gameVersion, recipe.getIngredient(x, z));
             }
         }
         stream.putUnsignedVarInt(1);
-        stream.putSlot(0, recipe.getResult());
+        stream.putSlot(gameVersion, recipe.getResult());
         stream.putUUID(recipe.getId());
         return 1;
     }
 
-    private int writeFurnaceRecipeLegacy(FurnaceRecipe recipe, BinaryStream stream) {
+    private int writeFurnaceRecipeLegacy(GameVersion gameVersion, FurnaceRecipe recipe, BinaryStream stream) {
         if (recipe.getInput().hasMeta()) {
             stream.putVarInt(recipe.getInput().getId());
             stream.putVarInt(recipe.getInput().getDamage());
-            stream.putSlot(0, recipe.getResult());
+            stream.putSlot(gameVersion, recipe.getResult());
             return 3;
         } else {
             stream.putVarInt(recipe.getInput().getId());
-            stream.putSlot(0, recipe.getResult());
+            stream.putSlot(gameVersion, recipe.getResult());
             return 2;
         }
     }

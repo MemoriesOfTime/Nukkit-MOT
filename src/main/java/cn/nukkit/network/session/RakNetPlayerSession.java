@@ -73,7 +73,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
 
         int protocolVersion = channel.config().getProtocolVersion();
-        if (protocolVersion == 8 && Server.getInstance().netEaseMod) {
+        if (protocolVersion == 8 && Server.getInstance().netEaseMode) {
             this.compressionIn = CompressionProvider.NETEASE_UNKNOWN;
         } else {
             this.compressionIn = protocolVersion >= 11 ? CompressionProvider.NONE : (protocolVersion < 10 ? CompressionProvider.ZLIB : CompressionProvider.ZLIB_RAW);
@@ -97,10 +97,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
 
             byte[] packetBuffer;
 
-            boolean ci = false;
-            if (this.compressionInitialized && this.player.protocol >= ProtocolInfo.v1_20_60) {
-                ci = true;
-            }
+            boolean ci = this.compressionInitialized && this.player.protocol >= ProtocolInfo.v1_20_60;
 
             if (this.decryptionCipher != null) {
                 try {
@@ -308,10 +305,7 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     }
 
     private void sendPacket(byte[] compressedPayload) {
-        boolean ci = false;
-        if (this.compressionInitialized && this.player.protocol >= ProtocolInfo.v1_20_60) {
-            ci = true;
-        }
+        boolean ci = this.compressionInitialized && this.player.protocol >= ProtocolInfo.v1_20_60;
 
         ByteBuf finalPayload = ByteBufAllocator.DEFAULT.directBuffer((ci ? 10 : 9) + compressedPayload.length); // prefix(1)+id(1)+encryption(8)+data
         finalPayload.writeByte(0xfe);

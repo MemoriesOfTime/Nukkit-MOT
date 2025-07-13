@@ -19,7 +19,7 @@ public class ReplaceItemInSlotPacketV113 extends DataPacket_v113 {
     @Override
     public void encode() {
         this.reset();
-        this.putSlot(protocol, this.item);
+        this.putSlot(gameVersion, this.item);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package cn.nukkit.network;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
@@ -240,7 +241,7 @@ public class Network {
 
                 ByteArrayInputStream bais = new ByteArrayInputStream(buf);
 
-                if (raknetProtocol == 8 && Server.getInstance().netEaseMod) {
+                if (raknetProtocol == 8 && Server.getInstance().netEaseMode) {
                     raknetProtocol = 9;
                 }
 
@@ -264,8 +265,13 @@ public class Network {
                 DataPacket pk = this.getPacket(packetId, player == null ? ProtocolInfo.CURRENT_PROTOCOL : player.protocol);
 
                 if (pk != null) {
-                    pk.protocol = player == null ? Integer.MAX_VALUE : player.protocol;
-                    pk.isNetEase = player != null && player.isNetEase;
+                    if (player != null) {
+                        pk.protocol = player.protocol;
+                        pk.gameVersion = player.getGameVersion();
+                    } else {
+                        pk.protocol = Integer.MAX_VALUE;
+                        pk.gameVersion = GameVersion.getLastVersion();
+                    }
                     pk.setBuffer(buf, buf.length - bais.available());
                     try {
                         if (raknetProtocol > 8) {

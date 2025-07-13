@@ -1,10 +1,14 @@
 package cn.nukkit.level.format;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.Server;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.generic.BaseFullChunk;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 import java.util.Map;
 
@@ -17,7 +21,13 @@ public interface LevelProvider {
     byte ORDER_YZX = 0;
     byte ORDER_ZXY = 1;
 
-    void requestChunkTask(IntSet protocols, int chunkX, int chunkZ);
+    @Deprecated
+    default void requestChunkTask(IntSet protocols, int chunkX, int chunkZ) {
+        Server.mvw("LevelProvider#requestChunkTask(IntSet, int, int) is deprecated, please use LevelProvider#requestChunkTask(ObjectSet<GameVersion>, int, int) instead.");
+        requestChunkTask(Utils.intSet2GameVersionSet(protocols, false), chunkX, chunkZ);
+    }
+
+    void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ);
 
     String getPath();
 

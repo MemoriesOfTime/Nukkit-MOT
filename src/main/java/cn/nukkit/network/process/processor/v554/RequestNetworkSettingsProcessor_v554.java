@@ -1,5 +1,6 @@
 package cn.nukkit.network.process.processor.v554;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.PlayerHandle;
 import cn.nukkit.Server;
@@ -29,7 +30,7 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
         Player player = playerHandle.player;
 
         if (player.raknetProtocol < 11
-                && (player.raknetProtocol != 8 && !Server.getInstance().netEaseMod)) {
+                && (player.raknetProtocol != 8 && !Server.getInstance().netEaseMode)) {
             return;
         }
         if (playerHandle.isLoginPacketReceived()) {
@@ -37,12 +38,13 @@ public class RequestNetworkSettingsProcessor_v554 extends DataPacketProcessor<Re
             return;
         }
 
-        player.protocol = pk.protocolVersion;
         if (player.raknetProtocol == 8
-                && Server.getInstance().netEaseMod
-                && player.protocol == ProtocolInfo.v1_21_2) {
-            player.isNetEase = true;
+                && Server.getInstance().netEaseMode
+                && pk.protocolVersion >= ProtocolInfo.v1_21_2) {
+            player.setGameVersion(GameVersion.byProtocol(pk.protocolVersion, true));
             playerHandle.getNetworkSession().setCompressionOut(CompressionProvider.NONE);
+        } else {
+            player.setGameVersion(GameVersion.byProtocol(pk.protocolVersion, false));
         }
 
         NetworkSettingsPacket settingsPacket = new NetworkSettingsPacket();

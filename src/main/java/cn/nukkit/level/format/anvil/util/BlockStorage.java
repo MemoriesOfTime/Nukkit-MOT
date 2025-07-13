@@ -1,5 +1,7 @@
 package cn.nukkit.level.format.anvil.util;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
@@ -403,7 +405,13 @@ public class BlockStorage {
         writeTo(protocol, stream, false);
     }
 
+    @Deprecated
     public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
+        Server.mvw("BlockStorage#writeTo(int, BinaryStream, boolean) is deprecated, please use BlockStorage#writeTo(GameVersion, BinaryStream, boolean) instead.");
+        writeTo(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), stream, antiXray);
+    }
+
+    public void writeTo(GameVersion protocol, BinaryStream stream, boolean antiXray) {
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
         for (int i = 0; i < SECTION_SIZE; i++) {

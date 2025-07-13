@@ -1,5 +1,6 @@
 package cn.nukkit.network;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.server.BatchPacketsEvent;
@@ -11,10 +12,8 @@ import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.SnappyCompression;
 import cn.nukkit.utils.Zlib;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 
@@ -55,49 +54,48 @@ public class BatchingHelper {
         if (players.length == 1) {
             for (DataPacket packet : packets) {
                 packet.protocol = players[0].protocol;
-                packet.isNetEase = players[0].isNetEase;
+                packet.gameVersion = players[0].getGameVersion();
                 players[0].getNetworkSession().sendPacket(packet);
            }
            return;
         }
 
-        Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
+        Object2ObjectMap<GameVersion, ObjectList<Player>> targets = new Object2ObjectOpenHashMap<>();
         for (Player player : players) {
-            targets.computeIfAbsent(player.protocol, i -> new ObjectArrayList<>()).add(player);
+            targets.computeIfAbsent(player.getGameVersion(), i -> new ObjectArrayList<>()).add(player);
         }
 
         // Encoded packets by encoding protocol
-        Int2ObjectMap<ObjectList<DataPacket>> encodedPackets = new Int2ObjectOpenHashMap<>();
+        Object2ObjectMap<GameVersion, ObjectList<DataPacket>> encodedPackets = new Object2ObjectOpenHashMap<>();
 
         for (DataPacket packet : packets) {
-            Int2IntMap encodingProtocols = new Int2IntOpenHashMap();
-            for (int protocolId : targets.keySet()) {
+            Object2ObjectMap<GameVersion, GameVersion> encodingProtocols = new Object2ObjectOpenHashMap<>();
+            for (GameVersion gameVersion : targets.keySet()) {
                 // TODO: encode only by encoding protocols
                 // No need to have all versions here
-                encodingProtocols.put(protocolId, protocolId);
+                encodingProtocols.put(gameVersion, gameVersion);
             }
 
-            Int2ObjectMap<DataPacket> encodedPacket = new Int2ObjectOpenHashMap<>();
-            for (int encodingProtocol : encodingProtocols.values()) {
+            Object2ObjectMap<GameVersion, DataPacket> encodedPacket = new Object2ObjectOpenHashMap<>();
+            for (GameVersion encodingProtocol : encodingProtocols.values()) {
                 if (!encodedPacket.containsKey(encodingProtocol)) {
                     DataPacket pk = packet.clone();
-                    pk.protocol = encodingProtocol;
-                    //TODO
-                    //pk.isNetEase =
+                    pk.protocol = encodingProtocol.getProtocol();
+                    pk.gameVersion = encodingProtocol;
                     pk.tryEncode();
                     encodedPacket.put(encodingProtocol, pk);
                 }
             }
 
-            for (int protocolId : encodingProtocols.values()) {
-                int encodingProtocol = encodingProtocols.get(protocolId);
-                encodedPackets.computeIfAbsent(protocolId, i -> new ObjectArrayList<>()).add(encodedPacket.get(encodingProtocol));
+            for (GameVersion gameVersion : encodingProtocols.values()) {
+                GameVersion encodingGameVersion = encodingProtocols.get(gameVersion);
+                encodedPackets.computeIfAbsent(gameVersion, i -> new ObjectArrayList<>()).add(encodedPacket.get(encodingGameVersion));
             }
         }
 
-        for (int protocolId : targets.keySet()) {
-            ObjectList<DataPacket> packetList = encodedPackets.get(protocolId);
-            ObjectList<Player> finalTargets = targets.get(protocolId);
+        for (GameVersion gameVersion : targets.keySet()) {
+            ObjectList<DataPacket> packetList = encodedPackets.get(gameVersion);
+            ObjectList<Player> finalTargets = targets.get(gameVersion);
 
             BinaryStream batched = new BinaryStream();
             for (DataPacket packet : packetList) {
@@ -113,9 +111,9 @@ public class BatchingHelper {
             try {
                 byte[] bytes = Binary.appendBytes(batched.getBuffer());
                 BatchPacket pk = new BatchPacket();
-                if (Server.getInstance().useSnappy && protocolId >= ProtocolInfo.v1_19_30_23) {
+                if (Server.getInstance().useSnappy && gameVersion.getProtocol() >= ProtocolInfo.v1_19_30_23) {
                     pk.payload = SnappyCompression.compress(bytes);
-                } else if (protocolId >= ProtocolInfo.v1_16_0) {
+                } else if (gameVersion.getProtocol() >= ProtocolInfo.v1_16_0) {
                     pk.payload = Zlib.deflateRaw(bytes, Server.getInstance().networkCompressionLevel);
                 } else {
                     pk.payload = Zlib.deflatePre16Packet(bytes, Server.getInstance().networkCompressionLevel);

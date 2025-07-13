@@ -1,5 +1,6 @@
 package cn.nukkit.item.customitem;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.item.ItemBookEnchanted;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -24,7 +25,7 @@ public abstract class ItemCustomBookEnchanted extends ItemBookEnchanted implemen
     }
 
     @Override
-    public String getNamespaceId(int protocolId) {
+    public String getNamespaceId(GameVersion protocolId) {
         return this.getNamespaceId();
     }
 
