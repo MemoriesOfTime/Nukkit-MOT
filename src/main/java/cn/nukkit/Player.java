@@ -244,7 +244,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public boolean isNetEase;
     @Getter
-    private GameVersion gameVersion;
+    protected GameVersion gameVersion;
     /**
      * Client version string
      */
@@ -6429,7 +6429,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (formOpen) return -1;
         ModalFormRequestPacket packet = new ModalFormRequestPacket();
         packet.formId = id;
-        packet.data = window.getJSONData(this.protocol);
+        packet.data = window.getJSONData(this.gameVersion);
         this.formWindows.put(packet.formId, window);
         this.dataPacket(packet);
         this.formOpen = true;

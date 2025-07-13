@@ -1,5 +1,6 @@
 package cn.nukkit.form.window;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.form.handler.FormResponseHandler;
 import cn.nukkit.form.response.FormResponse;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -21,12 +22,23 @@ public abstract class FormWindow {
     protected final transient List<FormResponseHandler> handlers = new ObjectArrayList<>();
 
     public String getJSONData() {
-        return this.getJSONData(ProtocolInfo.CURRENT_PROTOCOL);
+        return this.getJSONData(GameVersion.getLastVersion());
     }
 
     public String getJSONData(int protocol) {
         if (this instanceof FormWindowSimple) {
             if (protocol >= ProtocolInfo.v1_21_70_24) {
+                return GSON_FORM_WINDOW_SIMPLE_785.toJson(this);
+            }
+            return GSON_FORM_WINDOW_SIMPLE.toJson(this);
+
+        }
+        return FormWindow.GSON.toJson(this);
+    }
+
+    public String getJSONData(GameVersion gameVersion) {
+        if (this instanceof FormWindowSimple) {
+            if (gameVersion.getProtocol() >= ProtocolInfo.v1_21_70_24) {
                 return GSON_FORM_WINDOW_SIMPLE_785.toJson(this);
             }
             return GSON_FORM_WINDOW_SIMPLE.toJson(this);

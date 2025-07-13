@@ -38,6 +38,10 @@ public final class PlayerHandle {
         return player.protocol;
     }
 
+    public GameVersion getGameVersion() {
+        return player.gameVersion;
+    }
+
     public NetworkPlayerSession getNetworkSession() {
         return player.networkSession;
     }
