@@ -1,7 +1,7 @@
 package cn.nukkit.level.format.leveldb;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.nbt.tag.IntTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.Collections;
@@ -34,7 +34,7 @@ public final class LevelDBConstants {
     /**
      * This is protocol version if block palette used in storage
      */
-    public static final int PALETTE_VERSION = ProtocolInfo.v1_21_70;
+    public static final int PALETTE_VERSION = GameVersion.getFeatureVersion().getProtocol();
 
     public static final int STATE_MAYOR_VERSION = 1;
     public static final int STATE_MINOR_VERSION = 21;
