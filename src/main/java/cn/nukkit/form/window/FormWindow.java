@@ -1,5 +1,6 @@
 package cn.nukkit.form.window;
 
+import cn.nukkit.Server;
 import cn.nukkit.form.handler.FormResponseHandler;
 import cn.nukkit.form.response.FormResponse;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -21,6 +22,7 @@ public abstract class FormWindow {
     protected final transient List<FormResponseHandler> handlers = new ObjectArrayList<>();
 
     public String getJSONData() {
+        Server.mvw("FormWindow#getJSONData()");
         return this.getJSONData(ProtocolInfo.CURRENT_PROTOCOL);
     }
 
