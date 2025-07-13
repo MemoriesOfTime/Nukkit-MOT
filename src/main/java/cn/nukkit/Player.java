@@ -3201,7 +3201,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     valid = false;
                 }
 
-                if (valid) {
+                if (valid && !Server.getInstance().netEaseMode) {
                     for (int i = 0; i < len; i++) {
                         char c = loginPacket.username.charAt(i);
                         if ((c >= 'a' && c <= 'z') ||
