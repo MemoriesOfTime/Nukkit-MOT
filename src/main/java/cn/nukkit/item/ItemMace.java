@@ -1,5 +1,7 @@
 package cn.nukkit.item;
 
+import cn.nukkit.entity.Entity;
+import cn.nukkit.math.NukkitMath;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
@@ -34,5 +36,18 @@ public class ItemMace extends StringItemToolBase {
     @Override
     public boolean isSword() {
         return true;
+    }
+
+    @Override
+    public int getAttackDamage(Entity entity) {
+        int damage = 6;
+        int height = NukkitMath.floorDouble(entity.highestPosition - entity.y);
+        if (height < 1.5f) return damage;
+        for (int i = 0; i <= height; i++) {
+            if (i < 3) damage+=4;
+            else if (i < 8) damage+=2;
+            else damage++;
+        }
+        return damage;
     }
 }

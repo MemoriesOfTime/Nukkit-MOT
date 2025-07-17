@@ -1858,8 +1858,17 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
+    public boolean isMace() {
+        return false;
+    }
+
+
     public int getEnchantAbility() {
         return 0;
+    }
+
+    public int getAttackDamage(Entity entity) {
+        return getAttackDamage();
     }
 
     public int getAttackDamage() {
