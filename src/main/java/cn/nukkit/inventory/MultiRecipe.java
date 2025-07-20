@@ -2,6 +2,7 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -73,5 +74,9 @@ public class MultiRecipe implements Recipe {
 
     public Recipe toRecipe(Item outputItem, List<Item> inputs) {
         return new ShapelessRecipe(outputItem, inputs);
+    }
+
+    public boolean isSupportedOn(int protocol) {
+        return protocol >= ProtocolInfo.v1_16_0;
     }
 }

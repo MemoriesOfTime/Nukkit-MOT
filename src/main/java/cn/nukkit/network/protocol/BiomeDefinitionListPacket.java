@@ -28,7 +28,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.BIOME_DEFINITION_LIST_PACKET;
 
-    private static final BatchPacket CACHED_PACKET_361;
+    private static final DataPacket CACHED_PACKET_361;
     private static final BatchPacket CACHED_PACKET_419;
     private static final BatchPacket CACHED_PACKET_486;
     private static final BatchPacket CACHED_PACKET_527;
@@ -51,7 +51,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
             pk.protocol = ProtocolInfo.v1_12_0;
             pk.tryEncode();
-            CACHED_PACKET_361 = pk.compress(Deflater.BEST_COMPRESSION);
+            CACHED_PACKET_361 = pk; //.compress(Deflater.BEST_COMPRESSION); 压缩会导致1.16.40无法进入服务器
         } catch (Exception e) {
             throw new AssertionError("Error whilst loading biome definitions 361", e);
         }
@@ -112,7 +112,11 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
     }
 
-    public static BatchPacket getCachedPacket(int protocol) {
+    public static DataPacket getCachedPacket(int protocol) {
+        if (protocol < ProtocolInfo.v1_12_0) {
+            throw new UnsupportedOperationException("Unsupported protocol version: " + protocol);
+        }
+
         if (protocol >= ProtocolInfo.v1_21_80) {
             return CACHED_PACKET;
         } else if (protocol >= ProtocolInfo.v1_21_70_24) {

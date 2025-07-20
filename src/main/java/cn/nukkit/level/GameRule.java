@@ -39,7 +39,7 @@ public enum GameRule {
     RECIPES_UNLOCK("recipesUnlock"),
     RESPAWN_BLOCKS_EXPLODE("respawnBlocksExplode"),
     DO_LIMITED_CRAFTING("doLimitedCrafting"),
-    SHOW_RECIPE_MESSAGE("showRecipeMessages"),
+    SHOW_RECIPE_MESSAGES("showRecipeMessages"),
     PROJECTILES_CAN_BREAK_BLOCKS("projectilesCanBreakBlocks");
 
     private final String name;
