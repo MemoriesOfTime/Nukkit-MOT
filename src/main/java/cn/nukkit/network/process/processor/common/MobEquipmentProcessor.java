@@ -55,6 +55,7 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
             } else {
                 player.getServer().getLogger().debug("Tried to equip " + pk.item + " but have {} in target slot " + fixItem);
                 inv.sendContents(player);
+                return;
             }
         }
 
