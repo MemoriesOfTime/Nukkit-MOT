@@ -1,5 +1,6 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
@@ -17,6 +18,8 @@ import com.google.gson.JsonParser;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nullable;
@@ -670,5 +673,13 @@ public class Utils {
         } catch (Exception e) {
             throw new RuntimeException("Unable to load " + file, e);
         }
+    }
+
+    public static ObjectSet<GameVersion> intSet2GameVersionSet(IntSet protocols, boolean isNetEase) {
+        ObjectSet<GameVersion> versions = new ObjectOpenHashSet<>();
+        for (int protocol : protocols) {
+            versions.add(GameVersion.byProtocol(protocol, isNetEase));
+        }
+        return versions;
     }
 }

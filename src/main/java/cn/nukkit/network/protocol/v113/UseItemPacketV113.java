@@ -53,7 +53,7 @@ public class UseItemPacketV113 extends DataPacket_v113 {
         this.posY = playerPos.y;
         this.posZ = playerPos.z;
         this.slot = this.getByte();
-        this.item = this.getSlot(this.protocol);
+        this.item = this.getSlot(this.gameVersion);
     }
 
     @Override

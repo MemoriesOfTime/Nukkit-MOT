@@ -35,6 +35,10 @@ public class PlayerAuthInputPacket extends DataPacket {
     private Vector3f vrGazeDirection;
     private long tick;
     private Vector3f delta;
+    /**
+     * netease only
+     */
+    private boolean cameraDeparted;
     // private ItemStackRequest itemStackRequest;
     private Map<PlayerActionType, PlayerBlockActionData> blockActionData = new EnumMap<>(PlayerActionType.class);
     /**
@@ -76,9 +80,14 @@ public class PlayerAuthInputPacket extends DataPacket {
         this.headYaw = this.getLFloat();
 
         long inputData = this.getUnsignedVarLong();
+        int inClientPredictedInVehicleOrdinal = AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE.ordinal();
         for (int i = 0; i < AuthInputAction.size(); i++) {
+            int offset = 0;
+            if (gameVersion.isNetEase() && protocol == ProtocolInfo.v1_21_2 && i >= inClientPredictedInVehicleOrdinal) {
+                offset = -1;
+            }
             if ((inputData & (1L << i)) != 0) {
-                this.inputData.add(AuthInputAction.from(i));
+                this.inputData.add(AuthInputAction.from(i + offset));
             }
         }
 
@@ -98,6 +107,10 @@ public class PlayerAuthInputPacket extends DataPacket {
 
         this.tick = this.getUnsignedVarLong();
         this.delta = this.getVector3f();
+
+        if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_16_200) {
+            this.cameraDeparted = this.getBoolean();
+        }
 
         if (this.inputData.contains(AuthInputAction.PERFORM_ITEM_STACK_REQUEST)) {
             // TODO: this.itemStackRequest = readItemStackRequest(buf, protocolVersion);

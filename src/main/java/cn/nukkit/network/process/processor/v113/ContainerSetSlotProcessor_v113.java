@@ -45,7 +45,7 @@ public class ContainerSetSlotProcessor_v113 extends DataPacketProcessor<Containe
                 return;
             }
             if (player.isCreative()) {
-                if (Item.getCreativeItemIndex(player.protocol, pk.item) != -1) {
+                if (Item.getCreativeItemIndex(player.getGameVersion(), pk.item) != -1) {
                     inv.setItem(pk.slot, pk.item);
                     player.getInventory().setHotbarSlotIndex(pk.slot, pk.slot); //links hotbar[packet.slot] to slots[packet.slot]
                 }

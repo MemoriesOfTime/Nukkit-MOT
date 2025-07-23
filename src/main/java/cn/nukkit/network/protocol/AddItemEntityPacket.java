@@ -40,10 +40,10 @@ public class AddItemEntityPacket extends DataPacket {
         this.reset();
         this.putEntityUniqueId(this.entityUniqueId);
         this.putEntityRuntimeId(this.entityRuntimeId);
-        this.putSlot(protocol, this.item);
+        this.putSlot(gameVersion, this.item);
         this.putVector3f(this.x, this.y, this.z);
         this.putVector3f(this.speedX, this.speedY, this.speedZ);
-        this.put(Binary.writeMetadata(protocol, metadata));
+        this.put(Binary.writeMetadata(gameVersion, metadata));
         if (protocol >= 223) {
             this.putBoolean(this.isFromFishing);
         }

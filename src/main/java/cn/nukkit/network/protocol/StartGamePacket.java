@@ -114,7 +114,7 @@ public class StartGamePacket extends DataPacket {
     public long currentTick;
     public int enchantmentSeed;
     public Collection<CustomBlockDefinition> blockDefinitions = CustomBlockManager.get().getBlockDefinitions();
-    public String multiplayerCorrelationId = "";
+    public String multiplayerCorrelationId = "00000000-0000-0000-0000-000000000000";
     public boolean isDisablingPersonas;
     public boolean isDisablingCustomSkins;
     /**
@@ -359,7 +359,7 @@ public class StartGamePacket extends DataPacket {
                 this.put(GlobalBlockPalette.getCompiledTable(this.protocol));
             }
             if (protocol >= ProtocolInfo.v1_12_0 && protocol < ProtocolInfo.v1_21_60) {
-                this.put(RuntimeItems.getMapping(protocol).getItemPalette());
+                this.put(RuntimeItems.getMapping(gameVersion).getItemPalette());
             }
             this.putString(this.multiplayerCorrelationId);
             if (protocol == 354 && version != null && version.startsWith("1.11.4")) {

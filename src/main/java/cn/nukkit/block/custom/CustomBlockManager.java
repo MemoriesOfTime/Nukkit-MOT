@@ -1,5 +1,6 @@
 package cn.nukkit.block.custom;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
@@ -201,15 +202,16 @@ public class CustomBlockManager {
 
         long startTime = System.currentTimeMillis();
 
-        BlockPalette storagePalette = GlobalBlockPalette.getPaletteByProtocol(LevelDBConstants.PALETTE_VERSION);
+        BlockPalette storagePalette = GlobalBlockPalette.getPaletteByProtocol(GameVersion.getFeatureVersion());
         boolean result = false;
         ObjectSet<BlockPalette> set = new ObjectArraySet<>();
-        for (int protocol : ProtocolInfo.SUPPORTED_PROTOCOLS) {
+        for (GameVersion gameVersion : GameVersion.values()) {
+            int protocol = gameVersion.getProtocol();
             if (protocol < ProtocolInfo.v1_16_100 || protocol < this.server.minimumProtocol) {
                 continue;
             }
 
-            BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(protocol);
+            BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
             if (set.contains(palette)) {
                 continue;
             }
@@ -313,7 +315,7 @@ public class CustomBlockManager {
         }
 
         palette.clearStates();
-        boolean levelDb = palette.getProtocol() == GlobalBlockPalette.getPaletteByProtocol(LevelDBConstants.PALETTE_VERSION).getProtocol(); //防止小版本不相等问题
+        boolean levelDb = palette.getProtocol() == GlobalBlockPalette.getPaletteByProtocol(GameVersion.getFeatureVersion()).getProtocol(); //防止小版本不相等问题
         if (levelDb) {
             BlockStateMapping.get().clearMapping();
         }

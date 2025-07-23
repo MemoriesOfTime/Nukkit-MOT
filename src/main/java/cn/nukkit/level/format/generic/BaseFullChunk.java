@@ -1,6 +1,8 @@
 package cn.nukkit.level.format.generic;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.PersistentDataContainerBlockEntity;
@@ -19,6 +21,7 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -72,7 +75,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected boolean isInit;
 
-    protected Map<Integer, BatchPacket> chunkPackets;
+    protected Map<GameVersion, BatchPacket> chunkPackets;
 
     @Override
     public BaseFullChunk clone() {
@@ -129,17 +132,27 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return chunk;
     }
 
+    @Deprecated
     public void setChunkPacket(int protocol, BatchPacket packet) {
+        this.setChunkPacket(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), packet);
+    }
+
+    public void setChunkPacket(GameVersion protocol, BatchPacket packet) {
         if (packet != null) {
             packet.trim();
             if (this.chunkPackets == null) {
-                this.chunkPackets = new Int2ObjectOpenHashMap<>();
+                this.chunkPackets = new Object2ObjectOpenHashMap<>();
             }
             this.chunkPackets.put(protocol, packet);
         }
     }
 
+    @Deprecated
     public BatchPacket getChunkPacket(int protocol) {
+        return getChunkPacket(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public BatchPacket getChunkPacket(GameVersion protocol) {
         if (this.chunkPackets == null) {
             return null;
         }
