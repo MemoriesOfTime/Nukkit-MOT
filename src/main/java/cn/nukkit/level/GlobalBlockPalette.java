@@ -620,7 +620,6 @@ public class GlobalBlockPalette {
 
     @Deprecated
     public static int getOrCreateRuntimeId(int protocol, int legacyId) throws NoSuchElementException {
-        Server.mvw("GlobalBlockPalette#getOrCreateRuntimeId(int, int) is deprecated, please use GlobalBlockPalette#getOrCreateRuntimeId(GameVersion, int) instead.");
         return getOrCreateRuntimeId(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), legacyId);
     }
 
@@ -678,7 +677,6 @@ public class GlobalBlockPalette {
 
     @Deprecated
     public static int getLegacyFullId(int protocolId, int runtimeId) {
-        Server.mvw("GlobalBlockPalette#getLegacyFullId(int, int) is deprecated, please use GlobalBlockPalette#getLegacyFullId(GameVersion, int) instead.");
         return getLegacyFullId(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode), runtimeId);
     }
 

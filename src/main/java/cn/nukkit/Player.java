@@ -236,15 +236,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public int protocol = Integer.MAX_VALUE;
     /**
+     * Client game version
+     */
+    @Getter
+    protected GameVersion gameVersion;
+    /**
      * Client RakNet protocol version
      */
     public int raknetProtocol;
-    /**
-     * 网易客户端
-     */
-    public boolean isNetEase;
-    @Getter
-    protected GameVersion gameVersion;
     /**
      * Client version string
      */
@@ -431,7 +430,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void setGameVersion(GameVersion gameVersion) {
         this.gameVersion = gameVersion;
         this.protocol = gameVersion.getProtocol();
-        this.isNetEase = gameVersion.isNetEase();
     }
 
     public int getStartActionTick() {
@@ -2912,7 +2910,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
                 String.valueOf(this.getPort()),
-                this.protocol + " (" + Utils.getVersionByProtocol(this.protocol) + (isNetEase ? "_NetEase" : "") + ")"));
+                this.protocol + " (" + this.gameVersion.toString() + ")"));
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);

@@ -5,7 +5,7 @@
     <name>Nukkit-MOT</name>
     <groupId>cn.nukkit</groupId>
     <artifactId>Nukkit</artifactId>
-    <version>MOT-NetEase-SNAPSHOT</version>
+    <version>MOT-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
