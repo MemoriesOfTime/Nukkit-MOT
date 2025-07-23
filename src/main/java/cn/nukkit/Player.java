@@ -427,11 +427,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private boolean lockMovementInput;
 
-    public void setGameVersion(GameVersion gameVersion) {
-        this.gameVersion = gameVersion;
-        this.protocol = gameVersion.getProtocol();
-    }
-
     public int getStartActionTick() {
         return startAction;
     }
