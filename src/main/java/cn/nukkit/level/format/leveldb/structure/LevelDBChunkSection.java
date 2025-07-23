@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.leveldb.structure;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.custom.container.BlockStorageContainer;
@@ -600,7 +601,7 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     @Override
-    public byte[] getBytes(int protocolId) {
+    public byte[] getBytes(GameVersion gameVersion) {
         try {
             this.readLock.lock();
 
@@ -610,7 +611,7 @@ public class LevelDBChunkSection implements ChunkSection {
             byte[] merged = new byte[ids.length + data.length];
             System.arraycopy(ids, 0, merged, 0, ids.length);
             System.arraycopy(data, 0, merged, ids.length, data.length);
-            if (protocolId < ProtocolInfo.v1_2_0) {
+            if (gameVersion.getProtocol() < ProtocolInfo.v1_2_0) {
                 ByteBuffer buffer = ByteBuffer.allocate(10240);
                 byte[] skyLight = new byte[2048];
                 byte[] blockLight = new byte[2048];
@@ -686,7 +687,7 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     @Override
-    public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
+    public void writeTo(GameVersion gameVersion, BinaryStream stream, boolean antiXray) {
         try {
             this.readLock.lock();
 
@@ -696,7 +697,7 @@ public class LevelDBChunkSection implements ChunkSection {
             stream.putByte((byte) layers);
 
             for (int i = 0; i < layers; i++) {
-                this.storages[i].writeTo(protocol, stream, antiXray);
+                this.storages[i].writeTo(gameVersion, stream, antiXray);
             }
         } finally {
             this.readLock.unlock();

@@ -1,5 +1,6 @@
 package cn.nukkit.level;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
@@ -30,6 +31,7 @@ import java.util.zip.GZIPInputStream;
 public class BlockPalette {
 
     private final int protocol;
+    private final GameVersion gameVersion;
     private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
     private final Map<CompoundTag, Integer> stateToLegacy = new HashMap<>();
@@ -38,8 +40,15 @@ public class BlockPalette {
 
     private volatile boolean locked;
 
+    @Deprecated
     public BlockPalette(int protocol) {
-        this.protocol = protocol;
+        this(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public BlockPalette(GameVersion gameVersion) {
+        this.protocol = gameVersion.getProtocol();
+        this.gameVersion = gameVersion;
+
         legacyToRuntimeId.defaultReturnValue(-1);
         runtimeIdToLegacy.defaultReturnValue(-1);
 
@@ -49,7 +58,11 @@ public class BlockPalette {
 
     private ListTag<CompoundTag> paletteFor(int protocol) {
         ListTag<CompoundTag> tag;
-        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream("runtime_block_states_" + protocol + ".dat")) {
+        String name = "runtime_block_states_" + protocol + ".dat";
+        if (gameVersion.isNetEase()) {
+            name = "runtime_block_states_netease_" + protocol + ".dat";
+        }
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(name)) {
             if (stream == null) {
                 throw new AssertionError("Unable to locate block state nbt " + protocol);
             }
@@ -181,7 +194,7 @@ public class BlockPalette {
             if (runtimeId == -1) {
                 Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyId);
                 if (cache == null) {
-                    log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
+                    log.info("({}) Missing block runtime id mappings for {}:{}", gameVersion, id, meta);
                     runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
                     legacyToRuntimeIdCache.put(legacyId, runtimeId);
                 } else {

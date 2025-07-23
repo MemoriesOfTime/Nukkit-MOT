@@ -41,7 +41,7 @@ public class ContainerSetContentPacketV113 extends DataPacket_v113 {
         this.slots = new Item[count];
 
         for (int s = 0; s < count && !this.feof(); ++s) {
-            this.slots[s] = this.getSlot(protocol);
+            this.slots[s] = this.getSlot(gameVersion);
         }
 
         count = (int) this.getUnsignedVarInt();
@@ -58,7 +58,7 @@ public class ContainerSetContentPacketV113 extends DataPacket_v113 {
         this.putVarLong(this.eid);
         this.putUnsignedVarInt(this.slots.length);
         for (Item slot : this.slots) {
-            this.putSlot(protocol, slot);
+            this.putSlot(gameVersion, slot);
         }
 
         if (this.windowid == SPECIAL_INVENTORY && this.hotbar.length > 0) {

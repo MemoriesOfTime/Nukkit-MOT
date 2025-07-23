@@ -22,6 +22,9 @@ public interface NetworkPlayerSession {
     Player getPlayer();
 
     void setCompression(CompressionProvider compression);
+
+    void setCompressionOut(CompressionProvider compression);
+
     CompressionProvider getCompression();
 
     default void setEncryption(SecretKey encryptionKey, Cipher encryptionCipher, Cipher decryptionCipher) {

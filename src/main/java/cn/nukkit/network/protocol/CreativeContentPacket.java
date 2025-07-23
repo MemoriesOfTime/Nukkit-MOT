@@ -52,12 +52,12 @@ public class CreativeContentPacket extends DataPacket {
     private void writeGroup(CreativeItemGroup group) {
         this.putLInt(group.getCategory().ordinal());
         this.putString(group.getName());
-        this.putSlot(this.protocol, group.getIcon(), true);
+        this.putSlot(gameVersion, group.getIcon(), true);
     }
 
     private void writeItem(CreativeItemData data) {
         this.putUnsignedVarInt(data.getNetId());
-        this.putSlot(this.protocol, data.getItem(), this.protocol >= ProtocolInfo.v1_16_220);
+        this.putSlot(gameVersion, data.getItem(), this.protocol >= ProtocolInfo.v1_16_220);
         if (this.protocol >= ProtocolInfo.v1_21_60) {
             this.putUnsignedVarInt(data.getGroupId());
         }

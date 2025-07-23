@@ -20,7 +20,7 @@ public class InventoryActionPacketV113 extends DataPacket_v113 {
     public void encode() {
         this.reset();
         this.putUnsignedVarInt(this.actionId);
-        this.putSlot(protocol, this.item);
+        this.putSlot(gameVersion, this.item);
         this.putVarInt(this.enchantmentId);
         this.putVarInt(this.enchantmentLevel);
     }

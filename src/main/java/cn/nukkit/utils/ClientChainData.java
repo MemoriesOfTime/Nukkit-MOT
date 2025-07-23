@@ -251,7 +251,8 @@ public final class ClientChainData implements LoginChainData {
     public static JsonObject decodeToken(String token) {
         String[] base = token.split("\\.", 5);
         if (base.length < 2) return null;
-        return GSON.fromJson(new String(Base64.getDecoder().decode(base[1]), StandardCharsets.UTF_8), JsonObject.class);
+        return GSON.fromJson(new String((Server.getInstance().netEaseMode ? Base64.getUrlDecoder() : Base64.getDecoder())
+                .decode(base[1]), StandardCharsets.UTF_8), JsonObject.class);
     }
 
     private void decodeChainData() {

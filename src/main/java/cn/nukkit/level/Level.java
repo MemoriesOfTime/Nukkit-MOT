@@ -1,5 +1,6 @@
 package cn.nukkit.level;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.api.NonComputationAtomic;
@@ -66,11 +67,12 @@ import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import cn.nukkit.utils.collection.nb.LongObjectEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import it.unimi.dsi.fastutil.ints.*;
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.*;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import it.unimi.dsi.fastutil.objects.ObjectList;
+import it.unimi.dsi.fastutil.objects.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
@@ -251,8 +253,8 @@ public class Level implements ChunkManager, Metadatable {
     private final Queue<QueuedUpdate> normalUpdateQueue = new ConcurrentLinkedDeque<>();
     private final Map<Long, Set<Integer>> lightQueue = new ConcurrentHashMap<>(8, 0.9f, 1);
 
-    private final Int2ObjectMap<ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Int2ObjectOpenHashMap<>();
-    private final Int2ObjectMap<LongSet> chunkSendTasks = new Int2ObjectOpenHashMap<>();
+    private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
+    private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
 
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
@@ -744,14 +746,14 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void addParticle(Particle particle, Player[] players, int count) {
-        Int2ObjectMap<ObjectList<Player>> targets;
+        Object2ObjectMap<GameVersion, ObjectList<Player>> targets;
         if (players == null) {
-            targets = Server.sortPlayers(this.getChunkPlayers(particle.getChunkX(), particle.getChunkZ()).values());
+            targets = Server.groupPlayersByGameVersion(this.getChunkPlayers(particle.getChunkX(), particle.getChunkZ()).values());
         } else {
-            targets = Server.sortPlayers(players);
+            targets = Server.groupPlayersByGameVersion(players);
         }
 
-        for (int protocolId : targets.keySet()) {
+        for (GameVersion protocolId : targets.keySet()) {
             ObjectList<Player> protocolPlayers = targets.get(protocolId);
             DataPacket[] packets = particle.mvEncode(protocolId);
             if (packets != null) {
@@ -1111,7 +1113,7 @@ public class Level implements ChunkManager, Metadatable {
             NetworkChunkSerializer.NetworkChunkSerializerCallbackData data;
             int count = (this.getPlayers().size() + 1) * this.server.chunksPerTick;
             for (int i = 0; i < count && (data = this.asyncChunkRequestCallbackQueue.poll()) != null; ++i) {
-                this.chunkRequestCallback(data.getProtocol(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload());
+                this.chunkRequestCallback(data.getGameVersion(), data.getTimestamp(), data.getX(), data.getZ(), data.getSubChunkCount(), data.getPayload());
             }
         }
 
@@ -1276,7 +1278,7 @@ public class Level implements ChunkManager, Metadatable {
             chunks = new LongOpenHashSet();
         }
 
-        Int2ObjectMap<ObjectList<Player>> targets = Server.sortPlayers(target);
+        Object2ObjectMap<GameVersion, ObjectList<Player>> targets = Server.groupPlayersByGameVersion(target);
         for (Vector3 b : blocks) {
             if (b == null) {
                 continue;
@@ -1297,15 +1299,18 @@ public class Level implements ChunkManager, Metadatable {
             updateBlockPacket.flags = first ? flags : UpdateBlockPacket.FLAG_NONE;
             updateBlockPacket.dataLayer = dataLayer;
 
-            for (int protocolId : targets.keySet()) {
-                ObjectList<Player> players = targets.get(protocolId);
+            for (GameVersion gameVersion : targets.keySet()) {
+                if (gameVersion.getProtocol() < ProtocolInfo.v1_4_0 && dataLayer > 0) {
+                    continue; //1.4以前的版本不支持dataLayer
+                }
+                ObjectList<Player> players = targets.get(gameVersion);
                 UpdateBlockPacket packet = (UpdateBlockPacket) updateBlockPacket.clone();
                 try {
-                    if (protocolId > 201) {
+                    if (gameVersion.getProtocol() > 201) {
                         if (b instanceof Block) {
-                            packet.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocolId, ((Block) b).getId(), ((Block) b).getDamage());
+                            packet.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, ((Block) b).getId(), ((Block) b).getDamage());
                         } else {
-                            packet.blockRuntimeId = this.getBlockRuntimeId(protocolId, (int) b.x, (int) b.y, (int) b.z, dataLayer);
+                            packet.blockRuntimeId = this.getBlockRuntimeId(gameVersion, (int) b.x, (int) b.y, (int) b.z, dataLayer);
                         }
                     } else {
                         Block bl = b instanceof Block ? (Block) b : getBlock((int) b.x, (int) b.y, (int) b.z);
@@ -1313,13 +1318,10 @@ public class Level implements ChunkManager, Metadatable {
                         packet.blockData = bl.getDamage();
                     }
                 } catch (NoSuchElementException e) {
-                    throw new IllegalStateException("Unable to create BlockUpdatePacket at (" + b.x + ", " + b.y + ", " + b.z + ") in " + getName() + " for players with protocol " + protocolId);
+                    throw new IllegalStateException("Unable to create BlockUpdatePacket at (" + b.x + ", " + b.y + ", " + b.z + ") in " + getName() + " for players with protocol " + gameVersion);
                 }
 
                 for (Player player : players) {
-                    if (player.protocol < ProtocolInfo.v1_4_0 && dataLayer > 0) {
-                        continue; //1.4以前的版本不支持dataLayer
-                    }
                     player.dataPacket(packet);
                 }
             }
@@ -1341,7 +1343,7 @@ public class Level implements ChunkManager, Metadatable {
             try {
                 if (target.protocol > 201) {
                     if (b instanceof Block) {
-                        updateBlockPacket.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(target.protocol, ((Block) b).getId(), ((Block) b).getDamage());
+                        updateBlockPacket.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(target.getGameVersion(), ((Block) b).getId(), ((Block) b).getDamage());
                     } else {
                         updateBlockPacket.blockRuntimeId = this.getBlockRuntimeId(target.protocol, (int) b.x, (int) b.y, (int) b.z);
                     }
@@ -1871,10 +1873,15 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public int getBlockRuntimeId(int x, int y, int z, int layer) {
-        return this.getBlockRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, x, y, z, layer);
+        return this.getBlockRuntimeId(GameVersion.getLastVersion(), x, y, z, layer);
     }
 
+    @Deprecated
     public int getBlockRuntimeId(int protocolId, int x, int y, int z, int layer) {
+        return this.getBlockRuntimeId(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode), x, y, z, layer);
+    }
+
+    public int getBlockRuntimeId(GameVersion protocolId, int x, int y, int z, int layer) {
         return this.getChunk(x >> 4, z >> 4, false).getBlockRuntimeId(protocolId, x & 0x0f, y, z & 0x0f, layer);
     }
 
@@ -2264,9 +2271,9 @@ public class Level implements ChunkManager, Metadatable {
             }
 
             if (player == null) {
-                Int2ObjectMap<ObjectList<Player>> players = Server.sortPlayers(this.getChunkPlayers(v.getChunkX(), v.getChunkZ()).values().toArray(Player.EMPTY_ARRAY));
-                for (Int2ObjectMap.Entry<ObjectList<Player>> entry : players.int2ObjectEntrySet()) {
-                    int protocol = entry.getIntKey();
+                Object2ObjectMap<GameVersion, ObjectList<Player>> players = Server.groupPlayersByGameVersion(this.getChunkPlayers(v.getChunkX(), v.getChunkZ()).values().toArray(Player.EMPTY_ARRAY));
+                for (Map.Entry<GameVersion, ObjectList<Player>> entry : players.entrySet()) {
+                    GameVersion gameVersion = entry.getKey();
 
                     UpdateBlockPacket pk = new UpdateBlockPacket();
                     pk.x = x;
@@ -2274,8 +2281,8 @@ public class Level implements ChunkManager, Metadatable {
                     pk.z = z;
                     pk.flags = UpdateBlockPacket.FLAG_ALL;
 
-                    if (protocol > ProtocolInfo.v1_2_10) {
-                        pk.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, id, fullId & 0xf);
+                    if (gameVersion.getProtocol() > ProtocolInfo.v1_2_10) {
+                        pk.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, id, fullId & 0xf);
                     } else {
                         pk.blockId = id;
                         pk.blockData = fullId & 0xf;
@@ -2293,7 +2300,7 @@ public class Level implements ChunkManager, Metadatable {
                 pk.flags = UpdateBlockPacket.FLAG_ALL;
 
                 if (player.protocol > ProtocolInfo.v1_2_10) {
-                    pk.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(player.protocol, id, fullId & 0xf);
+                    pk.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(player.getGameVersion(), id, fullId & 0xf);
                 } else {
                     pk.blockId = id;
                     pk.blockData = fullId & 0xf;
@@ -2867,10 +2874,10 @@ public class Level implements ChunkManager, Metadatable {
 
 
         if (playSound) {
-            Int2ObjectMap<ObjectList<Player>> players = Server.sortPlayers(this.getChunkPlayers(hand.getChunkX(), hand.getChunkZ()).values());
-            for (int protocolId : players.keySet()) {
-                ObjectList<Player> targets = players.get(protocolId);
-                int soundData = GlobalBlockPalette.getOrCreateRuntimeId(protocolId > ProtocolInfo.v1_2_10 ? protocolId : ProtocolInfo.CURRENT_PROTOCOL, // no block palette in <= 1.2.10
+            Object2ObjectMap<GameVersion, ObjectList<Player>> players = Server.groupPlayersByGameVersion(this.getChunkPlayers(hand.getChunkX(), hand.getChunkZ()).values());
+            for (GameVersion gameVersion : players.keySet()) {
+                ObjectList<Player> targets = players.get(gameVersion);
+                int soundData = GlobalBlockPalette.getOrCreateRuntimeId(gameVersion.getProtocol() > ProtocolInfo.v1_2_10 ? gameVersion : GameVersion.getLastVersion(), // no block palette in <= 1.2.10
                         hand.getId(), hand.getDamage());
                 this.addLevelSoundEvent(hand, LevelSoundEventPacket.SOUND_PLACE, soundData, targets.toArray(Player.EMPTY_ARRAY));
             }
@@ -3672,18 +3679,17 @@ public class Level implements ChunkManager, Metadatable {
         Preconditions.checkState(player.getLoaderId() > 0, player.getName() + " has no chunk loader");
         long index = Level.chunkHash(x, z);
 
-        this.getChunkSendQueue(player.protocol).computeIfAbsent(index, k ->
+        this.getChunkSendQueue(player.getGameVersion()).computeIfAbsent(index, k ->
                 new Int2ObjectOpenHashMap<>()).put(player.getLoaderId(), player);
     }
 
-    @Deprecated
     private void sendChunk(int x, int z, long index, DataPacket packet) {
-        for (int protocolId : chunkSendTasks.keySet()) {
-            this.sendChunkInternal(x, z, index, packet, protocolId);
+        for (GameVersion version : chunkSendTasks.keySet()) {
+            this.sendChunkInternal(x, z, index, packet, version);
         }
     }
 
-    private void sendChunkInternal(int x, int z, long index, DataPacket packet, int protocol) {
+    private void sendChunkInternal(int x, int z, long index, DataPacket packet, GameVersion protocol) {
         LongSet tasks = this.getChunkSendTasks(protocol);
         if (!tasks.contains(index)) {
             return;
@@ -3701,14 +3707,14 @@ public class Level implements ChunkManager, Metadatable {
 
     private void processChunkRequest() {
         // Map shorted by index => requested protocols
-        Long2ObjectMap<IntSet> chunkRequests = new Long2ObjectOpenHashMap<>();
-        for (int protocolId : this.chunkSendQueues.keySet()) {
+        Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = new Long2ObjectOpenHashMap<>();
+        for (GameVersion protocolId : this.chunkSendQueues.keySet()) {
             for (long index : this.getChunkSendQueue(protocolId).keySet()) {
                 LongSet tasks = this.getChunkSendTasks(protocolId);
                 if (tasks.contains(index)) {
                     continue;
                 }
-                chunkRequests.computeIfAbsent(index, l -> new IntOpenHashSet()).add(protocolId);
+                chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
                 tasks.add(index);
             }
         }
@@ -3716,13 +3722,13 @@ public class Level implements ChunkManager, Metadatable {
         this.chunkRequestInternal(chunkRequests);
     }
 
-    private void chunkRequestInternal(Long2ObjectMap<IntSet> chunkRequests) {
+    private void chunkRequestInternal(Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests) {
         for (long index : chunkRequests.keySet()) {
-            IntSet protocols = new IntOpenHashSet(chunkRequests.get(index));
+            ObjectSet<GameVersion> protocols = new ObjectOpenHashSet<>(chunkRequests.get(index));
             int x = getHashX(index);
             int z = getHashZ(index);
 
-            for (int protocol : chunkRequests.get(index)) {
+            for (GameVersion protocol : chunkRequests.get(index)) {
                 BaseFullChunk chunk = this.getChunk(x, z);
                 if (chunk != null) {
                     BatchPacket packet = chunk.getChunkPacket(protocol);
@@ -3742,11 +3748,16 @@ public class Level implements ChunkManager, Metadatable {
         }
     }
 
-    public void asyncChunkRequestCallback(int protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
-        this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(protocol, timestamp, x, z, subChunkCount, payload));
+    public void asyncChunkRequestCallback(GameVersion gameVersion, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
+        this.asyncChunkRequestCallbackQueue.add(new NetworkChunkSerializer.NetworkChunkSerializerCallbackData(gameVersion, timestamp, x, z, subChunkCount, payload));
     }
 
+    @Deprecated
     public void chunkRequestCallback(int protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
+        this.chunkRequestCallback(GameVersion.byProtocol(protocol, this.getServer().onlyNetEaseMode), timestamp, x, z, subChunkCount, payload);
+    }
+
+    public void chunkRequestCallback(GameVersion protocol, long timestamp, int x, int z, int subChunkCount, byte[] payload) {
         long index = Level.chunkHash(x, z);
 
         if (server.cacheChunks) {
@@ -3767,7 +3778,7 @@ public class Level implements ChunkManager, Metadatable {
             if (queue.containsKey(index)) {
                 for (Player player : queue.get(index).values()) {
                     if (player.isConnected() && player.usedChunks.containsKey(index)) {
-                        if (matchMVChunkProtocol(protocol, player.protocol)) {
+                        if (matchMVChunkProtocol(protocol, player.getGameVersion())) {
                             player.sendChunk(x, z, subChunkCount, payload, this.getDimension());
                         }
                     }
@@ -5065,99 +5076,113 @@ public class Level implements ChunkManager, Metadatable {
         return blockEntity != null && blockEntity.hasPersistentDataContainer();
     }
 
-    private ConcurrentMap<Long, Int2ObjectMap<Player>> getChunkSendQueue(int protocol) {
-        int protocolId = this.getChunkProtocol(protocol);
+    private ConcurrentMap<Long, Int2ObjectMap<Player>> getChunkSendQueue(GameVersion protocol) {
+        GameVersion protocolId = this.getChunkProtocol(protocol);
         return this.chunkSendQueues.computeIfAbsent(protocolId, i -> new ConcurrentHashMap<>());
     }
 
-    private LongSet getChunkSendTasks(int protocol) {
-        int protocolId = this.getChunkProtocol(protocol);
+    private LongSet getChunkSendTasks(GameVersion protocol) {
+        GameVersion protocolId = this.getChunkProtocol(protocol);
         return this.chunkSendTasks.computeIfAbsent(protocolId, i -> new LongOpenHashSet());
     }
 
-    private int getChunkProtocol(int protocol) {
+    private GameVersion getChunkProtocol(GameVersion version) {
+        int protocol = version.getProtocol();
+        if (version.isNetEase()) {
+            if (protocol >= ProtocolInfo.v1_21_2) {
+                return GameVersion.V1_21_2_NETEASE;
+            }
+            return GameVersion.V1_20_50_NETEASE;
+        }
+
         if (protocol >= ProtocolInfo.v1_21_90) {
-            return ProtocolInfo.v1_21_90;
+            return GameVersion.V1_21_90;
         } else if (protocol >= ProtocolInfo.v1_21_80) {
-            return ProtocolInfo.v1_21_80;
+            return GameVersion.V1_21_80;
         } else if (protocol >= ProtocolInfo.v1_21_70_24) {
-            return ProtocolInfo.v1_21_70;
+            return GameVersion.V1_21_70;
         } else if (protocol >= ProtocolInfo.v1_21_60) {
-            return ProtocolInfo.v1_21_60;
+            return GameVersion.V1_21_60;
         } else if (protocol >= ProtocolInfo.v1_21_50_26) {
-            return ProtocolInfo.v1_21_50;
+            return GameVersion.V1_21_50;
         } else if (protocol >= ProtocolInfo.v1_21_40) {
-            return ProtocolInfo.v1_21_40;
+            return GameVersion.V1_21_40;
         } else if (protocol >= ProtocolInfo.v1_21_30) {
-            return ProtocolInfo.v1_21_30;
+            return GameVersion.V1_21_30;
         } else if (protocol >= ProtocolInfo.v1_21_20) {
-            return ProtocolInfo.v1_21_20;
+            return GameVersion.V1_21_20;
         } else if (protocol >= ProtocolInfo.v1_21_0) {
-            return ProtocolInfo.v1_21_0;
+            return GameVersion.V1_21_0;
         } else if (protocol >= ProtocolInfo.v1_20_80) {
-            return ProtocolInfo.v1_20_80;
+            return GameVersion.V1_20_80;
         } else if (protocol >= ProtocolInfo.v1_20_70) {
-            return ProtocolInfo.v1_20_70;
+            return GameVersion.V1_20_70;
         } else if (protocol >= ProtocolInfo.v1_20_60) {
-            return ProtocolInfo.v1_20_60;
+            return GameVersion.V1_20_60;
         } else if (protocol >= ProtocolInfo.v1_20_50) {
-            return ProtocolInfo.v1_20_50;
+            return GameVersion.V1_20_50;
         } else if (protocol >= ProtocolInfo.v1_20_40) {
-            return ProtocolInfo.v1_20_40;
+            return GameVersion.V1_20_40;
         } else if (protocol >= ProtocolInfo.v1_20_30_24) {
-            return ProtocolInfo.v1_20_30;
+            return GameVersion.V1_20_30;
         } else if (protocol >= ProtocolInfo.v1_20_10_21) {
-            return ProtocolInfo.v1_20_10;
+            return GameVersion.V1_20_10;
         } else if (protocol >= ProtocolInfo.v1_20_0_23) {
-            return ProtocolInfo.v1_20_0;
+            return GameVersion.V1_20_0;
         } else if (protocol >= ProtocolInfo.v1_19_80) { //调色板 物品运行时id
-            return ProtocolInfo.v1_19_80;
+            return GameVersion.V1_19_80;
         } else if (protocol >= ProtocolInfo.v1_19_70_24) { //调色板 物品运行时id
-            return ProtocolInfo.v1_19_70;
+            return GameVersion.V1_19_70;
         } else if (protocol >= ProtocolInfo.v1_19_60) { //调色板 物品运行时id
-            return ProtocolInfo.v1_19_60;
+            return GameVersion.V1_19_60;
         } else if (protocol >= ProtocolInfo.v1_19_50_20) { //调色板 物品运行时id
-            return ProtocolInfo.v1_19_50;
+            return GameVersion.V1_19_50;
         } else if (protocol >= ProtocolInfo.v1_19_20) { //调色板 物品运行时id
-            return ProtocolInfo.v1_19_20;
+            return GameVersion.V1_19_20;
         } else if (protocol >= ProtocolInfo.v1_19_0_29) { //调色板 物品运行时id
-            return ProtocolInfo.v1_19_0;
+            return GameVersion.V1_19_0;
         } else if (protocol >= ProtocolInfo.v1_18_30) { //调色板 物品运行时id
-            return ProtocolInfo.v1_18_30;
+            return GameVersion.V1_18_30;
         } else if (protocol >= ProtocolInfo.v1_18_10_26) { //调色板修改
-            return ProtocolInfo.v1_18_10;
+            return GameVersion.V1_18_10;
         } else if (protocol >= ProtocolInfo.v1_18_0) { //世界高度改变
-            return ProtocolInfo.v1_18_0;
+            return GameVersion.V1_18_0;
         } else if (protocol >= ProtocolInfo.v1_17_40) {
-            return ProtocolInfo.v1_17_40;
+            return GameVersion.V1_17_40;
         } else if (protocol >= ProtocolInfo.v1_17_30) {
-            return ProtocolInfo.v1_17_30;
+            return GameVersion.V1_17_30;
         } else if (protocol >= ProtocolInfo.v1_17_10) {
-            return ProtocolInfo.v1_17_10;
+            return GameVersion.V1_17_10;
         } else if (protocol >= ProtocolInfo.v1_17_0) {
-            return ProtocolInfo.v1_17_0;
+            return GameVersion.V1_17_0;
         } else if (protocol >= ProtocolInfo.v1_16_210) {
-            return ProtocolInfo.v1_16_210;
+            return GameVersion.V1_16_210;
         } else if (protocol >= ProtocolInfo.v1_16_100) {
-            return ProtocolInfo.v1_16_100;
+            return GameVersion.V1_16_100;
         } else if (protocol >= ProtocolInfo.v1_16_0 && protocol <= ProtocolInfo.v1_16_100_52) {
-            return ProtocolInfo.v1_16_0;
+            return GameVersion.V1_16_0;
         } else if (protocol == ProtocolInfo.v1_14_0 || protocol == ProtocolInfo.v1_14_60) {
-            return ProtocolInfo.v1_14_0;
+            return GameVersion.V1_14_0;
         } else if (protocol == ProtocolInfo.v1_13_0) {
-            return ProtocolInfo.v1_13_0;
+            return GameVersion.V1_13_0;
         } else if (protocol == ProtocolInfo.v1_12_0) {
-            return ProtocolInfo.v1_12_0;
+            return GameVersion.V1_12_0;
         } else if (protocol >= ProtocolInfo.v1_2_0 && protocol < ProtocolInfo.v1_12_0) {
-            return ProtocolInfo.v1_2_0;
-        } else if (protocol < ProtocolInfo.v1_2_0) {
-            return 0;
+            return GameVersion.V1_2_0;
+        } else if (protocol == ProtocolInfo.v1_1_0) {
+            return GameVersion.V1_1_0;
         }
         throw new IllegalArgumentException("Invalid chunk protocol: " + protocol);
     }
 
-    private static boolean matchMVChunkProtocol(int chunk, int player) {
-        if (chunk == 0) if (player < ProtocolInfo.v1_2_0) return true;
+    private static boolean matchMVChunkProtocol(GameVersion chunkVersion, GameVersion playerVersion) {
+        if (chunkVersion == playerVersion) return true;
+        if (chunkVersion.isNetEase() != playerVersion.isNetEase()) return false;
+
+        int chunk = chunkVersion.getProtocol();
+        int player = playerVersion.getProtocol();
+
+        if (chunk <= ProtocolInfo.v1_1_0) if (player <= ProtocolInfo.v1_1_0) return true;
         if (chunk == ProtocolInfo.v1_2_0)
             if (player >= ProtocolInfo.v1_2_0) if (player < ProtocolInfo.v1_12_0) return true;
         if (chunk == ProtocolInfo.v1_12_0) if (player == ProtocolInfo.v1_12_0) return true;

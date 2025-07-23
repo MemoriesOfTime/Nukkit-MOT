@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.leveldb.structure;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import lombok.Builder;
@@ -14,7 +15,7 @@ public class BlockStateSnapshot {
 
     private final NbtMap vanillaState;
     private final int runtimeId;
-    private final int version;
+    private final GameVersion version;
 
     @Builder.Default
     private boolean custom = false;

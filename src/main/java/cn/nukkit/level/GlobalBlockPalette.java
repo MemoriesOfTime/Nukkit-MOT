@@ -1,5 +1,6 @@
 package cn.nukkit.level;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
@@ -86,6 +87,9 @@ public class GlobalBlockPalette {
     private static BlockPalette blockPalette800;
     private static BlockPalette blockPalette818;
 
+    private static BlockPalette blockPalette_netease_630;
+    private static BlockPalette blockPalette_netease_686;
+
     private static byte[] compiledTable282;
     private static byte[] compiledTable291;
     private static byte[] compiledTable313;
@@ -112,7 +116,11 @@ public class GlobalBlockPalette {
         legacyToRuntimeId389.defaultReturnValue(-1);
         legacyToRuntimeId407.defaultReturnValue(-1);
 
-        getPaletteByProtocol(ProtocolInfo.CURRENT_PROTOCOL); // cache current block palette
+        // cache current block palette
+        getPaletteByProtocol(GameVersion.getLastVersion());
+        if (Server.getInstance().netEaseMode) {
+            getPaletteByProtocol(GameVersion.V1_21_2_NETEASE);
+        }
     }
 
     public static void init() {
@@ -299,160 +307,171 @@ public class GlobalBlockPalette {
         }
     }
 
+    @Deprecated
     public static BlockPalette getPaletteByProtocol(int protocol) {
+        return getPaletteByProtocol(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public static BlockPalette getPaletteByProtocol(GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
+
+        if (gameVersion.isNetEase()) {
+            return getPaletteByProtocolNetEase(protocol);
+        }
+
         if (protocol >= ProtocolInfo.v1_21_90) {
             if (blockPalette818 == null) {
-                blockPalette818 = new BlockPalette(ProtocolInfo.v1_21_90);
+                blockPalette818 = new BlockPalette(GameVersion.V1_21_90);
             }
             return blockPalette818;
         } else if (protocol >= ProtocolInfo.v1_21_80) {
             if (blockPalette800 == null) {
-                blockPalette800 = new BlockPalette(ProtocolInfo.v1_21_80);
+                blockPalette800 = new BlockPalette(GameVersion.V1_21_80);
             }
             return blockPalette800;
         } else if (protocol >= ProtocolInfo.v1_21_70_24) {
             if (blockPalette786 == null) {
-                blockPalette786 = new BlockPalette(ProtocolInfo.v1_21_70);
+                blockPalette786 = new BlockPalette(GameVersion.V1_21_70);
             }
             return blockPalette786;
         } else if (protocol >= ProtocolInfo.v1_21_60) {
             if (blockPalette776 == null) {
-                blockPalette776 = new BlockPalette(ProtocolInfo.v1_21_60);
+                blockPalette776 = new BlockPalette(GameVersion.V1_21_60);
             }
             return blockPalette776;
         } else if (protocol >= ProtocolInfo.v1_21_50_26) {
             if (blockPalette766 == null) {
-                blockPalette766 = new BlockPalette(ProtocolInfo.v1_21_50);
+                blockPalette766 = new BlockPalette(GameVersion.V1_21_50);
             }
             return blockPalette766;
         } else if (protocol >= ProtocolInfo.v1_21_40) {
             if (blockPalette748 == null) {
-                blockPalette748 = new BlockPalette(ProtocolInfo.v1_21_40);
+                blockPalette748 = new BlockPalette(GameVersion.V1_21_40);
             }
             return blockPalette748;
         } else if (protocol >= ProtocolInfo.v1_21_30) {
             if (blockPalette729 == null) {
-                blockPalette729 = new BlockPalette(ProtocolInfo.v1_21_30);
+                blockPalette729 = new BlockPalette(GameVersion.V1_21_30);
             }
             return blockPalette729;
         } else if (protocol >= ProtocolInfo.v1_21_20) {
             if (blockPalette712 == null) {
-                blockPalette712 = new BlockPalette(ProtocolInfo.v1_21_20);
+                blockPalette712 = new BlockPalette(GameVersion.V1_21_20);
             }
             return blockPalette712;
         } else if (protocol >= ProtocolInfo.v1_21_0) {
             if (blockPalette685 == null) {
-                blockPalette685 = new BlockPalette(ProtocolInfo.v1_21_0);
+                blockPalette685 = new BlockPalette(GameVersion.V1_21_0);
             }
             return blockPalette685;
         } else if (protocol >= ProtocolInfo.v1_20_80) {
             if (blockPalette671 == null) {
-                blockPalette671 = new BlockPalette(ProtocolInfo.v1_20_80);
+                blockPalette671 = new BlockPalette(GameVersion.V1_20_80);
             }
             return blockPalette671;
         } else if (protocol >= ProtocolInfo.v1_20_70) {
             if (blockPalette662 == null) {
-                blockPalette662 = new BlockPalette(ProtocolInfo.v1_20_70);
+                blockPalette662 = new BlockPalette(GameVersion.V1_20_70);
             }
             return blockPalette662;
         } else if (protocol >= ProtocolInfo.v1_20_60) {
             if (blockPalette649 == null) {
-                blockPalette649 = new BlockPalette(ProtocolInfo.v1_20_60);
+                blockPalette649 = new BlockPalette(GameVersion.V1_20_60);
             }
             return blockPalette649;
         } else if (protocol >= ProtocolInfo.v1_20_50) {
             if (blockPalette630 == null) {
-                blockPalette630 = new BlockPalette(ProtocolInfo.v1_20_50);
+                blockPalette630 = new BlockPalette(GameVersion.V1_20_50);
             }
             return blockPalette630;
         } else if (protocol >= ProtocolInfo.v1_20_40) {
             if (blockPalette622 == null) {
-                blockPalette622 = new BlockPalette(ProtocolInfo.v1_20_40);
+                blockPalette622 = new BlockPalette(GameVersion.V1_20_40);
             }
             return blockPalette622;
         } else if (protocol >= ProtocolInfo.v1_20_30_24) {
             if (blockPalette618 == null) {
-                blockPalette618 = new BlockPalette(ProtocolInfo.v1_20_30);
+                blockPalette618 = new BlockPalette(GameVersion.V1_20_30);
             }
             return blockPalette618;
         } else if (protocol >= ProtocolInfo.v1_20_10_21) {
             if (blockPalette594 == null) {
-                blockPalette594 = new BlockPalette(ProtocolInfo.v1_20_10);
+                blockPalette594 = new BlockPalette(GameVersion.V1_20_10);
             }
             return blockPalette594;
         } else if (protocol >= ProtocolInfo.v1_20_0_23) {
             if (blockPalette589 == null) {
-                blockPalette589 = new BlockPalette(ProtocolInfo.v1_20_0);
+                blockPalette589 = new BlockPalette(GameVersion.V1_20_0);
             }
             return blockPalette589;
         } else if (protocol >= ProtocolInfo.v1_19_80) {
             if (blockPalette582 == null) {
-                blockPalette582 = new BlockPalette(ProtocolInfo.v1_19_80);
+                blockPalette582 = new BlockPalette(GameVersion.V1_19_80);
             }
             return blockPalette582;
         } else if (protocol >= ProtocolInfo.v1_19_70_24) {
             if (blockPalette575 == null) {
-                blockPalette575 = new BlockPalette(ProtocolInfo.v1_19_70);
+                blockPalette575 = new BlockPalette(GameVersion.V1_19_70);
             }
             return blockPalette575;
         } else if (protocol >= ProtocolInfo.v1_19_60) {
             if (blockPalette567 == null) {
-                blockPalette567 = new BlockPalette(ProtocolInfo.v1_19_60);
+                blockPalette567 = new BlockPalette(GameVersion.V1_19_60);
             }
             return blockPalette567;
         } else if (protocol >= ProtocolInfo.v1_19_50_20) {
             if (blockPalette560 == null) {
-                blockPalette560 = new BlockPalette(ProtocolInfo.v1_19_50);
+                blockPalette560 = new BlockPalette(GameVersion.V1_19_50);
             }
             return blockPalette560;
         } else if (protocol >= ProtocolInfo.v1_19_20) {
             if (blockPalette544 == null) {
-                blockPalette544 = new BlockPalette(ProtocolInfo.v1_19_20);
+                blockPalette544 = new BlockPalette(GameVersion.V1_19_20);
             }
             return blockPalette544;
         } else if (protocol >= ProtocolInfo.v1_19_0_29) {
             if (blockPalette527 == null) {
-                blockPalette527 = new BlockPalette(ProtocolInfo.v1_19_0);
+                blockPalette527 = new BlockPalette(GameVersion.V1_19_0);
             }
             return blockPalette527;
         } else if (protocol >= ProtocolInfo.v1_18_30) {
             if (blockPalette503 == null) {
-                blockPalette503 = new BlockPalette(ProtocolInfo.v1_18_30);
+                blockPalette503 = new BlockPalette(GameVersion.V1_18_30);
             }
             return blockPalette503;
         } else if (protocol >= ProtocolInfo.v1_18_10_26) {
             if (blockPalette486 == null) {
-                blockPalette486 = new BlockPalette(ProtocolInfo.v1_18_10);
+                blockPalette486 = new BlockPalette(GameVersion.V1_18_10);
             }
             return blockPalette486;
         } else if (protocol >= ProtocolInfo.v1_17_40) {
             if (blockPalette471 == null) {
-                blockPalette471 = new BlockPalette(ProtocolInfo.v1_17_40);
+                blockPalette471 = new BlockPalette(GameVersion.V1_17_40);
             }
             return blockPalette471;
         } else if (protocol >= ProtocolInfo.v1_17_30) {
             if (blockPalette465 == null) {
-                blockPalette465 = new BlockPalette(ProtocolInfo.v1_17_30);
+                blockPalette465 = new BlockPalette(GameVersion.V1_17_30);
             }
             return blockPalette465;
         } else if (protocol >= ProtocolInfo.v1_17_10) {
             if (blockPalette448 == null) {
-                blockPalette448 = new BlockPalette(ProtocolInfo.v1_17_10);
+                blockPalette448 = new BlockPalette(GameVersion.V1_17_10);
             }
             return blockPalette448;
         } else if (protocol >= ProtocolInfo.v1_17_0) {
             if (blockPalette440 == null) {
-                blockPalette440 = new BlockPalette(ProtocolInfo.v1_17_0);
+                blockPalette440 = new BlockPalette(GameVersion.V1_17_0);
             }
             return blockPalette440;
         } else if (protocol >= ProtocolInfo.v1_16_210) {
             if (blockPalette428 == null) {
-                blockPalette428 = new BlockPalette(ProtocolInfo.v1_16_210);
+                blockPalette428 = new BlockPalette(GameVersion.V1_16_210);
             }
             return blockPalette428;
         } else if (protocol >= ProtocolInfo.v1_16_100) {
             if (blockPalette419 == null) {
-                blockPalette419 = new BlockPalette(ProtocolInfo.v1_16_100);
+                blockPalette419 = new BlockPalette(GameVersion.V1_16_100);
             }
             return blockPalette419;
         }
@@ -460,9 +479,31 @@ public class GlobalBlockPalette {
         throw new IllegalArgumentException("Tried to get BlockPalette for unsupported protocol version: " + protocol);
     }
 
+    private static BlockPalette getPaletteByProtocolNetEase(int protocol) {
+        if (protocol >= GameVersion.V1_21_2_NETEASE.getProtocol()) {
+            if (blockPalette_netease_686 == null) {
+                blockPalette_netease_686 = new BlockPalette(GameVersion.V1_21_2_NETEASE);
+            }
+            return blockPalette_netease_686;
+        }
+        if (protocol >= GameVersion.V1_20_50_NETEASE.getProtocol()) {
+            if (blockPalette_netease_630 == null) {
+                blockPalette_netease_630 = new BlockPalette(GameVersion.V1_20_50_NETEASE);
+            }
+            return blockPalette_netease_630;
+        }
+        throw new IllegalArgumentException("Tried to get BlockPalette for unsupported protocol version: " + protocol + " (NetEase)");
+    }
+
+    @Deprecated
     public static int getOrCreateRuntimeId(int protocol, int id, int meta) {
+        return getOrCreateRuntimeId(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), id, meta);
+    }
+
+    public static int getOrCreateRuntimeId(GameVersion gameVersion, int id, int meta) {
+        int protocol = gameVersion.getProtocol();
         if (protocol >= ProtocolInfo.v1_16_100) {
-            return getPaletteByProtocol(protocol).getRuntimeId(id, meta);
+            return getPaletteByProtocol(gameVersion).getRuntimeId(id, meta);
         }
 
         if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
@@ -577,7 +618,13 @@ public class GlobalBlockPalette {
         }
     }
 
+    @Deprecated
     public static int getOrCreateRuntimeId(int protocol, int legacyId) throws NoSuchElementException {
+        return getOrCreateRuntimeId(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), legacyId);
+    }
+
+    public static int getOrCreateRuntimeId(GameVersion gameVersion, int legacyId) throws NoSuchElementException {
+        int protocol = gameVersion.getProtocol();
         if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
         int runtimeId;
         switch (protocol) {
@@ -624,11 +671,16 @@ public class GlobalBlockPalette {
                 if (runtimeId == -1) runtimeId = legacyToRuntimeId361.get(BlockID.INFO_UPDATE << 4);
                 return runtimeId;
             default: // 388+
-                return getOrCreateRuntimeId(protocol, legacyId >> Block.DATA_BITS, legacyId & Block.DATA_MASK);
+                return getOrCreateRuntimeId(gameVersion, legacyId >> Block.DATA_BITS, legacyId & Block.DATA_MASK);
         }
     }
 
+    @Deprecated
     public static int getLegacyFullId(int protocolId, int runtimeId) {
+        return getLegacyFullId(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode), runtimeId);
+    }
+
+    public static int getLegacyFullId(GameVersion protocolId, int runtimeId) {
         BlockPalette blockPalette = getPaletteByProtocol(protocolId);
         if (blockPalette != null) {
             return blockPalette.getLegacyFullId(runtimeId);
@@ -636,7 +688,16 @@ public class GlobalBlockPalette {
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }
 
+    @Deprecated
     public static int getLegacyFullId(int protocolId, CompoundTag compoundTag) {
+        BlockPalette blockPalette = getPaletteByProtocol(protocolId);
+        if (blockPalette != null) {
+            return blockPalette.getLegacyFullId(compoundTag);
+        }
+        throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
+    }
+
+    public static int getLegacyFullId(GameVersion protocolId, CompoundTag compoundTag) {
         BlockPalette blockPalette = getPaletteByProtocol(protocolId);
         if (blockPalette != null) {
             return blockPalette.getLegacyFullId(compoundTag);
@@ -646,12 +707,12 @@ public class GlobalBlockPalette {
 
     public static int getOrCreateRuntimeId(int legacyId) throws NoSuchElementException {
         Server.mvw("GlobalBlockPalette#getOrCreateRuntimeId(int)");
-        return getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, legacyId >> 4, legacyId & 0xf);
+        return getOrCreateRuntimeId(GameVersion.getLastVersion(), legacyId >> 4, legacyId & 0xf);
     }
 
     public static int getLegacyFullId(int runtimeId) {
         Server.mvw("GlobalBlockPalette#getLegacyFullId(int)");
-        return getLegacyFullId(ProtocolInfo.CURRENT_PROTOCOL, runtimeId);
+        return getLegacyFullId(GameVersion.getLastVersion(), runtimeId);
     }
 
     @SuppressWarnings("unused")
