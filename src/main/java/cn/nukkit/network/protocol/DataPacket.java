@@ -105,8 +105,8 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
     }
 
     public BatchPacket compress(int level) {
-        BinaryStream stream = new BinaryStream();
         byte[] buf = this.getBuffer();
+        BinaryStream stream = new BinaryStream(new byte[5 + buf.length]).reset();
         stream.putUnsignedVarInt(buf.length);
         stream.put(buf);
         try {

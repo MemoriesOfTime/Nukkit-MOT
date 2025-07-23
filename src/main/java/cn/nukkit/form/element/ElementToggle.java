@@ -2,6 +2,8 @@ package cn.nukkit.form.element;
 
 import com.google.gson.annotations.SerializedName;
 
+import org.jetbrains.annotations.Nullable;
+
 public class ElementToggle extends Element {
 
     @SuppressWarnings("unused")
@@ -9,6 +11,12 @@ public class ElementToggle extends Element {
     private String text;
     @SerializedName("default")
     private boolean defaultValue;
+    /**
+     * This option will show an exclamation icon that will display a tooltip if it is hovered.
+     * @since 1.21.80
+     */
+    @Nullable
+    private String tooltip;
 
     public ElementToggle(String text) {
         this(text, false);
@@ -33,5 +41,14 @@ public class ElementToggle extends Element {
 
     public void setDefaultValue(boolean defaultValue) {
         this.defaultValue = defaultValue;
+    }
+
+    @Nullable
+    public String getTooltip() {
+        return tooltip;
+    }
+
+    public void setTooltip(String tooltip) {
+        this.tooltip = tooltip;
     }
 }
