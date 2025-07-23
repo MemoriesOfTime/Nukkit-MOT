@@ -1862,7 +1862,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return false;
     }
 
-
     public int getEnchantAbility() {
         return 0;
     }

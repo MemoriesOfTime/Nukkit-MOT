@@ -4803,7 +4803,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                                 Enchantment[] enchantments = item.getEnchantments();
 
-                                float itemDamage = item.getAttackDamage(this);
+                                float itemDamage = item.getAttackDamage();
                                 for (Enchantment enchantment : enchantments) {
                                     itemDamage += enchantment.getDamageBonus(target, this);
                                 }
