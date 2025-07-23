@@ -20,6 +20,6 @@ public class AddItemPacketV113 extends DataPacket_v113 {
     @Override
     public void encode() {
         this.reset();
-        this.putSlot(protocol, item);
+        this.putSlot(gameVersion, item);
     }
 }

@@ -90,6 +90,8 @@ import io.netty.buffer.ByteBuf;
 import io.sentry.Sentry;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import lombok.extern.log4j.Log4j2;
@@ -589,6 +591,15 @@ public class Server {
      */
     public boolean enableRaytracing;
 
+    /**
+     * Enable NetEase Client Support
+     */
+    public boolean netEaseMode;
+    /**
+     * Only allow NetEase clients to join the server
+     */
+    public boolean onlyNetEaseMode;
+
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
         currentThread = Thread.currentThread(); // Saves the current thread instance as a reference, used in Server#isPrimaryThread()
@@ -726,7 +737,7 @@ public class Server {
         Attribute.init();
         DispenseBehaviorRegister.init();
         CustomBlockManager.init(this);
-        GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, 0, 0);
+        GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getLastVersion(), 0, 0);
 
         // Convert legacy data before plugins get the chance to mess with it
         try {
@@ -1359,7 +1370,7 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        BatchPacket cachedPacket = this.craftingManager.getCachedPacket(player.protocol);
+        BatchPacket cachedPacket = this.craftingManager.getCachedPacket(player.getGameVersion());
         if (cachedPacket != null) { // Don't send recipes if they wouldn't work anyways
             player.dataPacket(cachedPacket);
         }
@@ -2784,6 +2795,7 @@ public class Server {
      * @param players players
      * @return players sorted by protocol
      */
+    @Deprecated
     public static Int2ObjectMap<ObjectList<Player>> sortPlayers(Player[] players) {
         Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
         for (Player player : players) {
@@ -2798,10 +2810,39 @@ public class Server {
      * @param players players
      * @return players sorted by protocol
      */
+    @Deprecated
     public static Int2ObjectMap<ObjectList<Player>> sortPlayers(Collection<Player> players) {
         Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
         for (Player player : players) {
             targets.computeIfAbsent(player.protocol, i -> new ObjectArrayList<>()).add(player);
+        }
+        return targets;
+    }
+
+    /**
+     * Group players by game version
+     *
+     * @param players players
+     * @return players grouped by game version
+     */
+    public static Object2ObjectMap<GameVersion, ObjectList<Player>> groupPlayersByGameVersion(Player[] players) {
+        Object2ObjectMap<GameVersion, ObjectList<Player>> targets = new Object2ObjectOpenHashMap<>();
+        for (Player player : players) {
+            targets.computeIfAbsent(player.getGameVersion(), i -> new ObjectArrayList<>()).add(player);
+        }
+        return targets;
+    }
+
+    /**
+     * Group players by game version
+     *
+     * @param players players
+     * @return players grouped by game version
+     */
+    public static Object2ObjectMap<GameVersion, ObjectList<Player>> groupPlayersByGameVersion(Collection<Player> players) {
+        Object2ObjectMap<GameVersion, ObjectList<Player>> targets = new Object2ObjectOpenHashMap<>();
+        for (Player player : players) {
+            targets.computeIfAbsent(player.getGameVersion(), i -> new ObjectArrayList<>()).add(player);
         }
         return targets;
     }
@@ -3210,6 +3251,9 @@ public class Server {
         this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
         this.enableVibrantVisuals = this.getPropertyBoolean("enable-vibrant-visuals", true);
         this.enableRaytracing = this.getPropertyBoolean("enable-raytracing", true);
+
+        this.netEaseMode = this.getPropertyBoolean("netease-client-support", false);
+        this.onlyNetEaseMode = this.getPropertyBoolean("only-allow-netease-client", false);
     }
 
     /**
@@ -3364,6 +3408,9 @@ public class Server {
             put("enable-new-paintings", true);
             put("enable-new-chicken-eggs-laying", true);
             put("enable-vibrant-visuals", true);
+
+            put("netease-client-support", false);
+            put("only-allow-netease-client", false);
         }
     }
 

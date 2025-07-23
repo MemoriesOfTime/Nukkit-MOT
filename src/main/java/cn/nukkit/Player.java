@@ -236,6 +236,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public int protocol = Integer.MAX_VALUE;
     /**
+     * Client game version
+     */
+    @Getter
+    protected GameVersion gameVersion;
+    /**
      * Client RakNet protocol version
      */
     public int raknetProtocol;
@@ -1355,6 +1360,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         packet = packet.clone();
         packet.protocol = this.protocol;
+        packet.gameVersion = this.gameVersion;
 
         if (server.callDataPkSendEv) {
             DataPacketSendEvent ev = new DataPacketSendEvent(this, packet);
@@ -1398,6 +1404,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void forceDataPacket(DataPacket packet, Runnable callback) {
         packet.protocol = this.protocol;
+        packet.gameVersion = this.gameVersion;
         this.networkSession.sendImmediatePacket(packet, (callback == null ? () -> {
         } : callback));
     }
@@ -1687,7 +1694,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.protocol < ProtocolInfo.v1_16_0) {
                 InventoryContentPacket inventoryContentPacket = new InventoryContentPacket();
                 inventoryContentPacket.inventoryId = InventoryContentPacket.SPECIAL_CREATIVE;
-                inventoryContentPacket.slots = Item.getCreativeItems(this.protocol).toArray(Item.EMPTY_ARRAY);
+                inventoryContentPacket.slots = Item.getCreativeItems(this.gameVersion).toArray(Item.EMPTY_ARRAY);
                 this.dataPacket(inventoryContentPacket);
             }
         }
@@ -2898,7 +2905,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 TextFormat.AQUA + this.username + TextFormat.WHITE,
                 this.getAddress(),
                 String.valueOf(this.getPort()),
-                this.protocol + " (" + Utils.getVersionByProtocol(this.protocol) + ")"));
+                this.protocol + " (" + this.gameVersion.toString() + ")"));
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_CLIMB, true, false);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_SHOW_NAMETAG, true, false);
@@ -2916,7 +2923,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                         ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
                         if (this.protocol >= ProtocolInfo.v1_21_60) {
-                            Collection<ItemComponentPacket.ItemDefinition> vanillaItems = RuntimeItems.getMapping(this.protocol).getVanillaItemDefinitions();
+                            Collection<ItemComponentPacket.ItemDefinition> vanillaItems = RuntimeItems.getMapping(this.gameVersion).getVanillaItemDefinitions();
                             Set<Entry<String, CustomItemDefinition>> itemDefinitions = Item.getCustomItemDefinition().entrySet();
                             List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
                             entries.addAll(vanillaItems);
@@ -3058,6 +3065,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (packet.protocol == Integer.MAX_VALUE) {
             packet.protocol = this.protocol;
+            packet.gameVersion = this.gameVersion;
         }
 
         DataPacketReceiveEvent ev = new DataPacketReceiveEvent(this, packet);
@@ -3117,19 +3125,31 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                 }
 
+                if (Server.getInstance().netEaseMode) {
+                    if (Server.getInstance().onlyNetEaseMode && !this.gameVersion.isNetEase()) {
+                        this.close("", "You are running unsupported Minecraft version");
+                        this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (Reason:SupportedProtocols) " + this.gameVersion);
+                        break;
+                    }
+                } else if (this.gameVersion.isNetEase()) {
+                    this.close("", "You are running unsupported Minecraft version");
+                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (Reason:SupportedProtocols) " + this.gameVersion);
+                    break;
+                }
+
                 if (!ProtocolInfo.SUPPORTED_PROTOCOLS.contains(this.protocol)) {
                     this.close("", "You are running unsupported Minecraft version");
-                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (SupportedProtocols) " + this.protocol);
+                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (Reason:SupportedProtocols) " + this.gameVersion);
                     break;
                 }
 
                 if (this.protocol < server.minimumProtocol) {
                     this.close("", "Multiversion support for this Minecraft version is disabled");
-                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (minimumProtocol) " + this.protocol);
+                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with protocol (Reason:minimumProtocol) " + this.gameVersion);
                     break;
                 } else if (this.server.maximumProtocol >= Math.max(0, this.server.minimumProtocol) && this.protocol > this.server.maximumProtocol) {
                     this.close("", "Support for this Minecraft version is not enabled");
-                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with unsupported protocol (maximumProtocol) " + this.protocol);
+                    this.server.getLogger().debug(this.unverifiedUsername + " disconnected with unsupported protocol (Reason:maximumProtocol) " + this.gameVersion);
                     break;
                 }
 
@@ -3181,11 +3201,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 boolean valid = true;
                 int len = loginPacket.username.length();
-                if (len > 16 || len < 3 || loginPacket.username.trim().isEmpty()) {
+                if (((len > 16 || len < 3) && !gameVersion.isNetEase())
+                        || loginPacket.username.trim().isEmpty()) {
                     valid = false;
                 }
 
-                if (valid) {
+                if (valid && !gameVersion.isNetEase()) {
                     for (int i = 0; i < len; i++) {
                         char c = loginPacket.username.charAt(i);
                         if ((c >= 'a' && c <= 'z') ||
@@ -4803,7 +4824,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                                 Enchantment[] enchantments = item.getEnchantments();
 
-                                float itemDamage = item.getAttackDamage();
+                                float itemDamage = item.getAttackDamage(this);
                                 for (Enchantment enchantment : enchantments) {
                                     itemDamage += enchantment.getDamageBonus(target, this);
                                 }
@@ -6413,7 +6434,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (formOpen) return -1;
         ModalFormRequestPacket packet = new ModalFormRequestPacket();
         packet.formId = id;
-        packet.data = window.getJSONData(this.protocol);
+        packet.data = window.getJSONData(this.gameVersion);
         this.formWindows.put(packet.formId, window);
         this.dataPacket(packet);
         this.formOpen = true;
@@ -6807,17 +6828,24 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return getChunkCacheFromData(protocol, chunkX, chunkZ, subChunkCount, payload, 0);
     }
 
+    @Deprecated
+    public static BatchPacket getChunkCacheFromData(int protocol, int chunkX, int chunkZ, int subChunkCount, byte[] payload, int dimension) {
+        return getChunkCacheFromData(GameVersion.byProtocol(protocol, false), chunkX, chunkZ, subChunkCount, payload, dimension);
+    }
+
     /**
      * Get chunk cache from data
      *
-     * @param protocol      protocol version
+     * @param gameVersion      protocol version
      * @param chunkX        chunk x
      * @param chunkZ        chunk z
      * @param subChunkCount sub chunk count
      * @param payload       data
      * @return BatchPacket
      */
-    public static BatchPacket getChunkCacheFromData(int protocol, int chunkX, int chunkZ, int subChunkCount, byte[] payload, int dimension) {
+    public static BatchPacket getChunkCacheFromData(GameVersion gameVersion, int chunkX, int chunkZ, int subChunkCount, byte[] payload, int dimension) {
+        int protocol = gameVersion.getProtocol();
+
         LevelChunkPacket pk = new LevelChunkPacket();
         pk.chunkX = chunkX;
         pk.chunkZ = chunkZ;
@@ -6825,6 +6853,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         pk.subChunkCount = subChunkCount;
         pk.data = payload;
         pk.protocol = protocol;
+        pk.gameVersion = gameVersion;
         pk.tryEncode();
 
         byte[] buf = pk.getBuffer();
