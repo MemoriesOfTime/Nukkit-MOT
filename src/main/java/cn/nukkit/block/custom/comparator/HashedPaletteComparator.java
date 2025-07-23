@@ -12,15 +12,6 @@ public class HashedPaletteComparator implements Comparator<String> {
     private static final long FNV1_64_INIT = 0xcbf29ce484222325L;
     private static final long FNV1_PRIME_64 = 0x100000001b3L;
 
-    /*@Override
-    public int compare(NbtMap o1, NbtMap o2) {
-        byte[] b1 = getIdentifier(o1).getBytes(StandardCharsets.UTF_8);
-        byte[] b2 = getIdentifier(o2).getBytes(StandardCharsets.UTF_8);
-        long hash1 = fnv164(b1);
-        long hash2 = fnv164(b2);
-        return Long.compareUnsigned(hash1, hash2);
-    }*/
-
     @Override
     public int compare(String o1, String o2) {
         byte[] b1 = o1.getBytes(StandardCharsets.UTF_8);
