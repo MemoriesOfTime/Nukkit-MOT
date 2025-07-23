@@ -3319,7 +3319,6 @@ public class Server {
             put("space-name-mode", "ignore");
             put("xp-bottles-on-creative", true);
             put("spawn-eggs", true);
-            put("forced-safety-enchant", true);
             put("mob-ai", true);
             put("entity-auto-spawn-task", true);
             put("entity-despawn-task", true);
@@ -3407,7 +3406,9 @@ public class Server {
             put("enable-raw-ores", true);
             put("enable-new-paintings", true);
             put("enable-new-chicken-eggs-laying", true);
+            put("forced-safety-enchant", true);
             put("enable-vibrant-visuals", true);
+            put("enable-raytracing", true);
 
             put("netease-client-support", false);
             put("only-allow-netease-client", false);
