@@ -69,11 +69,11 @@ public class AddPlayerPacket extends DataPacket {
         this.putLFloat(this.pitch);
         this.putLFloat(this.yaw);
         this.putLFloat(this.yaw);
-        this.putSlot(protocol, this.item);
+        this.putSlot(gameVersion, this.item);
         if (protocol >= ProtocolInfo.v1_18_30) {
             this.putVarInt(this.gameType);
         }
-        this.put(Binary.writeMetadata(protocol, this.metadata));
+        this.put(Binary.writeMetadata(gameVersion, this.metadata));
         if (protocol > 274) {
             if (protocol < ProtocolInfo.v1_19_10) {
                 this.putUnsignedVarInt(0);

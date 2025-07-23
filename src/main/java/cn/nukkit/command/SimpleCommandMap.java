@@ -150,6 +150,23 @@ public class SimpleCommandMap implements CommandMap {
     }
 
     @Override
+    public void unregister(String... commands) {
+        for (String name : commands) {
+            Command command = this.getCommand(name);
+            if (command != null) {
+                command.unregister(this);
+            }
+        }
+    }
+
+    @Override
+    public void unregister(Command... commands) {
+        for (Command command : commands) {
+            command.unregister(this);
+        }
+    }
+
+    @Override
     public void registerSimpleCommands(Object object) {
         for (Method method : object.getClass().getDeclaredMethods()) {
             cn.nukkit.command.simple.Command def = method.getAnnotation(cn.nukkit.command.simple.Command.class);

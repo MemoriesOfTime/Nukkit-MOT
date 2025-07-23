@@ -1,5 +1,6 @@
 package cn.nukkit.item.customitem;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.item.ItemArmor;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.StringItem;
@@ -37,7 +38,7 @@ public abstract class ItemCustomArmor extends ItemArmor implements CustomItem {
     }
 
     @Override
-    public String getNamespaceId(int protocolId) {
+    public String getNamespaceId(GameVersion protocolId) {
         return this.getNamespaceId();
     }
 

@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.common.base.Preconditions;
 import org.jetbrains.annotations.NotNull;
@@ -24,7 +25,7 @@ public abstract class StringItemBase extends Item implements StringItem {
     }
 
     @Override
-    public String getNamespaceId(int protocolId) {
+    public String getNamespaceId(GameVersion protocolId) {
         return this.getNamespaceId();
     }
 
