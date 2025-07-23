@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
 import cn.nukkit.utils.Utils;
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -50,6 +51,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
             TAG_361 = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_361.dat"));
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
             pk.protocol = ProtocolInfo.v1_12_0;
+            pk.gameVersion = GameVersion.V1_12_0;
             pk.tryEncode();
             CACHED_PACKET_361 = pk; //.compress(Deflater.BEST_COMPRESSION); 压缩会导致1.16.40无法进入服务器
         } catch (Exception e) {
@@ -59,6 +61,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
             TAG_419 = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_419.dat"));
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
             pk.protocol = ProtocolInfo.v1_16_100;
+            pk.gameVersion = GameVersion.V1_16_100;
             pk.tryEncode();
             CACHED_PACKET_419 = pk.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
@@ -68,6 +71,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
             TAG_486 = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_486.dat"));
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
             pk.protocol = ProtocolInfo.v1_18_10;
+            pk.gameVersion = GameVersion.V1_18_10;
             pk.tryEncode();
             CACHED_PACKET_486 = pk.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
@@ -77,6 +81,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
             TAG_527 = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_527.dat"));
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
             pk.protocol = ProtocolInfo.v1_19_0;
+            pk.gameVersion = GameVersion.V1_19_0;
             pk.tryEncode();
             CACHED_PACKET_527 = pk.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
@@ -86,6 +91,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
             TAG_544 = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_554.dat"));
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
             pk.protocol = ProtocolInfo.v1_19_20;
+            pk.gameVersion = GameVersion.V1_19_20;
             pk.tryEncode();
             CACHED_PACKET_544 = pk.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
@@ -95,6 +101,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
             TAG_786 = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_786.dat"));
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
             pk.protocol = ProtocolInfo.v1_21_70;
+            pk.gameVersion = GameVersion.V1_21_70;
             pk.tryEncode();
             CACHED_PACKET_786 = pk.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
@@ -105,6 +112,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
             pk.biomeDefinitions = new GsonBuilder().registerTypeAdapter(Color.class, new ColorTypeAdapter()).create().fromJson(Utils.loadJsonResource("stripped_biome_definitions_800.json"), new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {
             }.getType());
             pk.protocol = ProtocolInfo.v1_21_80;
+            pk.gameVersion = GameVersion.V1_21_80;
             pk.tryEncode();
             CACHED_PACKET = pk.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {

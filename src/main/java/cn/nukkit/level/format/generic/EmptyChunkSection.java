@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.generic;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -215,8 +216,8 @@ public class EmptyChunkSection implements ChunkSection {
     }
 
     @Override
-    public byte[] getBytes(int protocolId) {
-        if (protocolId < ProtocolInfo.v1_2_0) {
+    public byte[] getBytes(GameVersion gameVersion) {
+        if (gameVersion.getProtocol() < ProtocolInfo.v1_2_0) {
             ByteBuffer buffer = ByteBuffer.allocate(10240);
             byte[] skyLight = new byte[2048];
             Arrays.fill(skyLight, (byte) 0xff);
@@ -229,8 +230,8 @@ public class EmptyChunkSection implements ChunkSection {
     }
 
     @Override
-    public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
-        stream.put(this.getBytes(protocol));
+    public void writeTo(GameVersion gameVersion, BinaryStream stream, boolean antiXray) {
+        stream.put(this.getBytes(gameVersion));
     }
 
     @Override

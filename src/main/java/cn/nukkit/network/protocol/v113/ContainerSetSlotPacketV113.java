@@ -25,7 +25,7 @@ public class ContainerSetSlotPacketV113 extends DataPacket_v113 {
         this.windowid = this.getByte();
         this.slot = this.getVarInt();
         this.hotbarSlot = this.getVarInt();
-        this.item = this.getSlot(protocol);
+        this.item = this.getSlot(gameVersion);
         this.selectedSlot = this.getByte();
     }
 
@@ -35,7 +35,7 @@ public class ContainerSetSlotPacketV113 extends DataPacket_v113 {
         this.putByte((byte) this.windowid);
         this.putVarInt(this.slot);
         this.putVarInt(this.hotbarSlot);
-        this.putSlot(protocol, this.item);
+        this.putSlot(gameVersion, this.item);
         this.putByte((byte) this.selectedSlot);
     }
 }

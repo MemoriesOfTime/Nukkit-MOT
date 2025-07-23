@@ -1,5 +1,6 @@
 package cn.nukkit.level.particle;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.DataPacket;
@@ -153,10 +154,16 @@ public abstract class Particle extends Vector3 {
 
     public DataPacket[] encode() {
         Server.mvw("Particle#encode()");
-        return this.mvEncode(ProtocolInfo.CURRENT_PROTOCOL);
+        return this.mvEncode(GameVersion.getLastVersion());
     }
 
+    @Deprecated
     public static int getMultiversionId(int protocol, int particle) {
+        return getMultiversionId(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), particle);
+    }
+
+    public static int getMultiversionId(GameVersion gameVersion, int particle) {
+        int protocol = gameVersion.getProtocol();
         int id = particle;
         if (protocol < ProtocolInfo.v1_20_70 && id == 91) {
             id = 18;
@@ -181,7 +188,12 @@ public abstract class Particle extends Vector3 {
         }
     }
 
-    public abstract DataPacket[] mvEncode(int protocol);
+    @Deprecated
+    public DataPacket[] mvEncode(int protocol) {
+        return this.mvEncode(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public abstract DataPacket[] mvEncode(GameVersion gameVersion);
 
     public static Integer getParticleIdByName(String name) {
         name = name.toUpperCase(Locale.ROOT);

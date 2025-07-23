@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.anvil;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.anvil.util.BlockStorage;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
@@ -576,7 +577,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
     }
 
     @Override
-    public byte[] getBytes(int protocolId) {
+    public byte[] getBytes(GameVersion gameVersion) {
         //TODO: properly mv support
         synchronized (storage) {
             byte[] ids = storage.get(0).getBlockIds();
@@ -584,7 +585,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
             byte[] merged = new byte[ids.length + data.length];
             System.arraycopy(ids, 0, merged, 0, ids.length);
             System.arraycopy(data, 0, merged, ids.length, data.length);
-            if (protocolId < ProtocolInfo.v1_2_0) {
+            if (gameVersion.getProtocol() < ProtocolInfo.v1_2_0) {
                 ByteBuffer buffer = ByteBuffer.allocate(10240);
                 byte[] skyLight = new byte[2048];
                 byte[] blockLight = new byte[2048];
@@ -612,7 +613,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
     }
 
     @Override
-    public void writeTo(int protocolId, BinaryStream stream, boolean antiXray) {
+    public void writeTo(GameVersion gameVersion, BinaryStream stream, boolean antiXray) {
         synchronized (storage) {
             stream.putByte((byte) STREAM_STORAGE_VERSION);
             stream.putByte((byte) storage.size());
@@ -620,7 +621,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
                 if (blockStorage == null) {
                     blockStorage = new BlockStorage();
                 }
-                blockStorage.writeTo(protocolId, stream, antiXray);
+                blockStorage.writeTo(gameVersion, stream, antiXray);
             }
         }
     }

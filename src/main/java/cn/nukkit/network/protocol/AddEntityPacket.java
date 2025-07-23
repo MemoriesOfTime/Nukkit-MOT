@@ -262,7 +262,7 @@ public class AddEntityPacket extends DataPacket {
             }
         }
         this.putAttributeList(this.attributes);
-        this.put(Binary.writeMetadata(protocol, this.metadata));
+        this.put(Binary.writeMetadata(gameVersion, this.metadata));
         if (protocol >= ProtocolInfo.v1_19_40) {
             int[] intProperties = this.properties.intProperties();
             this.putUnsignedVarInt(intProperties.length);

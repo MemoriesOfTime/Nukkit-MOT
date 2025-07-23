@@ -90,7 +90,7 @@ public class InventoryTransactionPacket extends DataPacket {
                 this.putBlockVector3(useItemData.blockPos);
                 this.putBlockFace(useItemData.face);
                 this.putVarInt(useItemData.hotbarSlot);
-                this.putSlot(protocol, useItemData.itemInHand);
+                this.putSlot(gameVersion, useItemData.itemInHand);
                 this.putVector3f(useItemData.playerPos.asVector3f());
                 this.putVector3f(useItemData.clickPos);
                 if (this.protocol >= ProtocolInfo.v1_16_210) {
@@ -106,7 +106,7 @@ public class InventoryTransactionPacket extends DataPacket {
                 this.putEntityRuntimeId(useItemOnEntityData.entityRuntimeId);
                 this.putUnsignedVarInt(useItemOnEntityData.actionType);
                 this.putVarInt(useItemOnEntityData.hotbarSlot);
-                this.putSlot(protocol, useItemOnEntityData.itemInHand);
+                this.putSlot(gameVersion, useItemOnEntityData.itemInHand);
                 this.putVector3f(useItemOnEntityData.playerPos.asVector3f());
                 this.putVector3f(useItemOnEntityData.clickPos.asVector3f());
                 break;
@@ -115,7 +115,7 @@ public class InventoryTransactionPacket extends DataPacket {
 
                 this.putUnsignedVarInt(releaseItemData.actionType);
                 this.putVarInt(releaseItemData.hotbarSlot);
-                this.putSlot(protocol, releaseItemData.itemInHand);
+                this.putSlot(gameVersion, releaseItemData.itemInHand);
                 this.putVector3f(releaseItemData.headRot.asVector3f());
                 break;
             default:
@@ -164,7 +164,7 @@ public class InventoryTransactionPacket extends DataPacket {
                 itemData.blockPos = this.getBlockVector3();
                 itemData.face = this.getBlockFace();
                 itemData.hotbarSlot = this.getVarInt();
-                itemData.itemInHand = this.getSlot(this.protocol);
+                itemData.itemInHand = this.getSlot(this.gameVersion);
                 itemData.playerPos = this.getVector3f().asVector3();
                 itemData.clickPos = this.getVector3f();
                 if (this.protocol >= ProtocolInfo.v1_16_210) {
@@ -182,7 +182,7 @@ public class InventoryTransactionPacket extends DataPacket {
                 useItemOnEntityData.entityRuntimeId = this.getEntityRuntimeId();
                 useItemOnEntityData.actionType = (int) this.getUnsignedVarInt();
                 useItemOnEntityData.hotbarSlot = this.getVarInt();
-                useItemOnEntityData.itemInHand = this.getSlot(this.protocol);
+                useItemOnEntityData.itemInHand = this.getSlot(this.gameVersion);
                 useItemOnEntityData.playerPos = this.getVector3f().asVector3();
                 useItemOnEntityData.clickPos = this.getVector3f().asVector3();
 
@@ -193,7 +193,7 @@ public class InventoryTransactionPacket extends DataPacket {
 
                 releaseItemData.actionType = (int) getUnsignedVarInt();
                 releaseItemData.hotbarSlot = getVarInt();
-                releaseItemData.itemInHand = this.getSlot(this.protocol);
+                releaseItemData.itemInHand = this.getSlot(this.gameVersion);
                 releaseItemData.headRot = this.getVector3f().asVector3();
 
                 this.transactionData = releaseItemData;

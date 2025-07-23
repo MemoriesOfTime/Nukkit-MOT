@@ -1,5 +1,6 @@
 package cn.nukkit.level.util;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.math.BlockVector3;
@@ -22,14 +23,24 @@ public class PalettedBlockStorage {
         return createFromBlockPalette(BitArrayVersion.V2, 0);
     }
 
+    @Deprecated
     public static PalettedBlockStorage createFromBlockPalette(int protocol) {
         return PalettedBlockStorage.createFromBlockPalette(BitArrayVersion.V2, protocol);
     }
 
+    @Deprecated
     public static PalettedBlockStorage createFromBlockPalette(BitArrayVersion version, int protocol) {
+        return PalettedBlockStorage.createFromBlockPalette(version, GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public static PalettedBlockStorage createFromBlockPalette(GameVersion gameVersion) {
+        return PalettedBlockStorage.createFromBlockPalette(BitArrayVersion.V2, gameVersion);
+    }
+
+    public static PalettedBlockStorage createFromBlockPalette(BitArrayVersion version, GameVersion gameVersion) {
         int runtimeId;
-        if (protocol >= ProtocolInfo.v1_16_100) {
-            runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, 0); // Air is first
+        if (gameVersion.getProtocol() >= ProtocolInfo.v1_16_100) {
+            runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(gameVersion, 0); // Air is first
         } else {
             runtimeId = 0;
         }

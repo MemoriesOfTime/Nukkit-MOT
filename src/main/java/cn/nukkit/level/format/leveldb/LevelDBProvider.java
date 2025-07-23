@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.leveldb;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GameRules;
@@ -23,11 +24,11 @@ import cn.nukkit.utils.*;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.netty.buffer.*;
-import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import lombok.extern.log4j.Log4j2;
 import net.daporkchop.ldbjni.DBProvider;
 import net.daporkchop.ldbjni.LevelDB;
@@ -311,7 +312,7 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     @Override
-    public void requestChunkTask(IntSet protocols, int chunkX, int chunkZ) {
+    public void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ) {
         LevelDBChunk chunk = (LevelDBChunk) this.getChunk(chunkX, chunkZ, false);
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk Set");
@@ -323,7 +324,7 @@ public class LevelDBProvider implements LevelProvider {
             final BaseChunk chunkClone = chunk.cloneForChunkSending();
             this.level.getAsyncChuckExecutor().execute(() -> {
                 NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
-                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
                             timestamp,
                             chunkX,
                             chunkZ,
@@ -334,7 +335,7 @@ public class LevelDBProvider implements LevelProvider {
             });
         }else {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
                         timestamp,
                         chunkX,
                         chunkZ,

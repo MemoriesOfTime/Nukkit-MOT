@@ -1,5 +1,6 @@
 package cn.nukkit.level.particle;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.EntityMetadata;
 import cn.nukkit.level.Level;
@@ -124,7 +125,7 @@ public class FloatingTextParticle extends Particle {
     }
 
     @Override
-    public DataPacket[] mvEncode(int protocol) {
+    public DataPacket[] mvEncode(GameVersion protocol) {
         ArrayList<DataPacket> packets = new ArrayList<>();
         if (this.entityId == -1) {
             this.entityId = Entity.entityCount++;
@@ -138,9 +139,10 @@ public class FloatingTextParticle extends Particle {
         return packets.toArray(new DataPacket[0]);
     }
 
-    private AddEntityPacket getAddPacket(int protocol) {
+    private AddEntityPacket getAddPacket(GameVersion protocol) {
         AddEntityPacket pk = new AddEntityPacket();
-        pk.protocol = protocol;
+        pk.protocol = protocol.getProtocol();
+        pk.gameVersion = protocol;
         pk.id = "minecraft:armor_stand";
         pk.entityUniqueId = this.entityId;
         pk.entityRuntimeId = this.entityId;
@@ -151,9 +153,10 @@ public class FloatingTextParticle extends Particle {
         return pk;
     }
 
-    private RemoveEntityPacket getRemovePacket(int protocol) {
+    private RemoveEntityPacket getRemovePacket(GameVersion protocol) {
         RemoveEntityPacket pk = new RemoveEntityPacket();
-        pk.protocol = protocol;
+        pk.protocol = protocol.getProtocol();
+        pk.gameVersion = protocol;
         pk.eid = this.entityId;
         return pk;
     }

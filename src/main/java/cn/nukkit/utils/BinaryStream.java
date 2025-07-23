@@ -1,5 +1,6 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Attribute;
@@ -513,12 +514,18 @@ public class BinaryStream {
 
     public Item getSlot() {
         Server.mvw("BinaryStream#getSlot()");
-        return this.getSlot(ProtocolInfo.CURRENT_PROTOCOL);
+        return this.getSlot(GameVersion.getLastVersion());
     }
 
+    @Deprecated
     public Item getSlot(int protocolId) {
+        return this.getSlot(GameVersion.byProtocol(protocolId, false));
+    }
+
+    public Item getSlot(GameVersion gameVersion) {
+        int protocolId = gameVersion.getProtocol();
         if (protocolId >= ProtocolInfo.v1_16_220) {
-            return this.getSlotNew(protocolId);
+            return this.getSlotNew(gameVersion);
         }
 
         int runtimeId = this.getVarInt();
@@ -537,7 +544,7 @@ public class BinaryStream {
         if (protocolId < ProtocolInfo.v1_16_100) {
             id = runtimeId;
         } else {
-            RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
+            RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
             try {
                 LegacyEntry legacyEntry = mapping.fromRuntime(runtimeId);
                 id = legacyEntry.getLegacyId();
@@ -699,7 +706,8 @@ public class BinaryStream {
         return item;
     }
 
-    private Item getSlotNew(int protocolId) {
+    private Item getSlotNew(GameVersion gameVersion) {
+        int protocolId = gameVersion.getProtocol();
         int runtimeId = this.getVarInt();
         if (runtimeId == 0) {
             return Item.get(Item.AIR, 0, 0);
@@ -708,8 +716,7 @@ public class BinaryStream {
         int cnt = this.getLShort();
         int damage = (int) this.getUnsignedVarInt();
 
-        RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
-
+        RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
 
         Integer id = null;
         String stringId = null;
@@ -740,7 +747,7 @@ public class BinaryStream {
         //TODO 在1.21.30会得到错误数据
         if (protocolId < ProtocolInfo.v1_19_0_31) {
             if (id != null && id < 256 && id != 166) { // ItemBlock
-                int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, blockRuntimeId);
+                int fullId = GlobalBlockPalette.getLegacyFullId(gameVersion, blockRuntimeId);
                 if (fullId != -1) {
                     damage = fullId & Block.DATA_MASK;
                 }
@@ -876,16 +883,27 @@ public class BinaryStream {
 
     public void putSlot(Item item) {
         Server.mvw("BinaryStream#putSlot(Item)");
-        this.putSlot(ProtocolInfo.CURRENT_PROTOCOL, item);
+        this.putSlot(GameVersion.getLastVersion(), item);
     }
 
+    @Deprecated
     public void putSlot(int protocolId, Item item) {
         this.putSlot(protocolId, item, false);
     }
 
+    @Deprecated
     public void putSlot(int protocolId, Item item, boolean crafting) {
+        this.putSlot(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode), item, crafting);
+    }
+
+    public void putSlot(GameVersion protocolId, Item item) {
+        this.putSlot(protocolId, item, false);
+    }
+
+    public void putSlot(GameVersion gameVersion, Item item, boolean crafting) {
+        int protocolId = gameVersion.getProtocol();
         if (protocolId >= ProtocolInfo.v1_16_220) {
-            this.putSlotNew(protocolId, item, crafting);
+            this.putSlotNew(gameVersion, item, crafting);
             return;
         }
 
@@ -962,7 +980,7 @@ public class BinaryStream {
 
         int damage = item.hasMeta() ? item.getDamage() : -1;
         if (protocolId >= ProtocolInfo.v1_16_100) {
-            RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
+            RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
             RuntimeEntry runtimeEntry;
             if (runtimeId == Item.INFO_UPDATE) { // Fix unknown item mapping errors with 1.16.100+ item replacements
                 runtimeEntry = mapping.toRuntime(Item.INFO_UPDATE, item.getDamage());
@@ -1107,7 +1125,7 @@ public class BinaryStream {
         this.putVarInt(0); //CanDestroy entry count
     }
 
-    private void putSlotNew(int protocolId, Item item, boolean instanceItem) {
+    private void putSlotNew(GameVersion protocolId, Item item, boolean instanceItem) {
         if (item == null || item.getId() == Item.AIR) {
             this.putByte((byte) 0);
             return;
@@ -1220,7 +1238,13 @@ public class BinaryStream {
         }
     }
 
+    @Deprecated
     public Item getRecipeIngredient(int protocolId) {
+        return this.getRecipeIngredient(GameVersion.byProtocol(protocolId, false));
+    }
+
+    public Item getRecipeIngredient(GameVersion gameVersion) {
+        int protocolId = gameVersion.getProtocol();
         int runtimeId = this.getVarInt();
         if (runtimeId == 0) {
             return Item.get(0, 0, 0);
@@ -1235,7 +1259,7 @@ public class BinaryStream {
         if (protocolId < ProtocolInfo.v1_16_100) {
             id = runtimeId;
         } else {
-            RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
+            RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
             LegacyEntry legacyEntry = mapping.fromRuntime(runtimeId);
             id = legacyEntry.getLegacyId();
             if (legacyEntry.isHasDamage()) {
@@ -1247,7 +1271,13 @@ public class BinaryStream {
         return Item.get(id, damage, count);
     }
 
+    @Deprecated
     public void putRecipeIngredient(int protocolId, Item item) {
+        this.putRecipeIngredient(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode), item);
+    }
+
+    public void putRecipeIngredient(GameVersion gameVersion, Item item) {
+        int protocolId = gameVersion.getProtocol();
         if (item == null || item.getId() == 0) {
             if (protocolId >= ProtocolInfo.v1_19_30_23) {
                 this.putByte((byte) 0); //ItemDescriptorType.INVALID
@@ -1264,7 +1294,7 @@ public class BinaryStream {
         int damage = item.hasMeta() ? item.getDamage() : Short.MAX_VALUE;
 
         if (protocolId >= ProtocolInfo.v1_16_100) {
-            RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
+            RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
             if (item instanceof StringItem) {
                 runtimeId = mapping.getNetworkId(item);
             } else if (!item.hasMeta()) {
