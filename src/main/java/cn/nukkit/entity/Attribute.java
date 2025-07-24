@@ -2,9 +2,8 @@ package cn.nukkit.entity;
 
 import cn.nukkit.utils.ServerException;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Attribute
@@ -41,6 +40,12 @@ public class Attribute implements Cloneable {
     protected String name;
     protected boolean shouldSend;
     private int id;
+    
+    // 修改器系统
+    private final Map<UUID, AttributeModifier> modifiers = new ConcurrentHashMap<>();
+
+    // 默认来源的UUID，用于setMovementSpeed等原有API
+    public static final UUID DEFAULT_SOURCE_UUID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     private Attribute(int id, String name, float minValue, float maxValue, float defaultValue, boolean shouldSend) {
         this.id = id;
@@ -103,7 +108,204 @@ public class Attribute implements Cloneable {
         }
         return null;
     }
+    
+    // 修改器管理方法
+    
+    /**
+     * 添加属性修改器
+     * @param modifier 修改器
+     * @return 当前属性实例
+     */
+    public Attribute addModifier(AttributeModifier modifier) {
+        if (modifier == null) {
+            throw new IllegalArgumentException("Modifier cannot be null");
+        }
+        this.modifiers.put(modifier.getUuid(), modifier);
+        return this;
+    }
+    
+    /**
+     * 移除属性修改器
+     * @param uuid 修改器UUID
+     * @return 当前属性实例
+     */
+    public Attribute removeModifier(UUID uuid) {
+        if (this.modifiers.remove(uuid) != null) {
+        }
+        return this;
+    }
+    
+    /**
+     * 移除属性修改器
+     * @param modifier 修改器
+     * @return 当前属性实例
+     */
+    public Attribute removeModifier(AttributeModifier modifier) {
+        return removeModifier(modifier.getUuid());
+    }
+    
+    /**
+     * 根据名称移除属性修改器
+     * @param name 修改器名称
+     * @return 当前属性实例
+     */
+    public Attribute removeModifier(String name) {
+        if (name == null || name.isEmpty()) {
+            return this;
+        }
+        
+        boolean removed = false;
+        Iterator<Map.Entry<UUID, AttributeModifier>> iterator = this.modifiers.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, AttributeModifier> entry = iterator.next();
+            if (name.equals(entry.getValue().getName())) {
+                iterator.remove();
+                removed = true;
+            }
+        }
+        
+        if (removed) {
+        }
+        return this;
+    }
+    
+    /**
+     * 根据名称获取修改器
+     * @param name 修改器名称
+     * @return 修改器，如果不存在则返回null
+     */
+    public AttributeModifier getModifier(String name) {
+        if (name == null || name.isEmpty()) {
+            return null;
+        }
+        
+        for (AttributeModifier modifier : this.modifiers.values()) {
+            if (name.equals(modifier.getName())) {
+                return modifier;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * 根据UUID获取修改器
+     * @param uuid 修改器UUID
+     * @return 修改器，如果不存在则返回null
+     */
+    public AttributeModifier getModifier(UUID uuid) {
+        return this.modifiers.get(uuid);
+    }
+    
+    /**
+     * 检查是否存在指定名称的修改器
+     * @param name 修改器名称
+     * @return 是否存在
+     */
+    public boolean hasModifier(String name) {
+        if (name == null || name.isEmpty()) {
+            return false;
+        }
+        
+        for (AttributeModifier modifier : this.modifiers.values()) {
+            if (name.equals(modifier.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * 检查是否存在指定UUID的修改器
+     * @param uuid 修改器UUID
+     * @return 是否存在
+     */
+    public boolean hasModifier(UUID uuid) {
+        return this.modifiers.containsKey(uuid);
+    }
+    
+    /**
+     * 获取所有修改器
+     * @return 修改器集合
+     */
+    public Collection<AttributeModifier> getModifiers() {
+        return new ArrayList<>(this.modifiers.values());
+    }
+    
+    /**
+     * 清除所有修改器
+     * @return 当前属性实例
+     */
+    public Attribute clearModifiers() {
+        if (!this.modifiers.isEmpty()) {
+            this.modifiers.clear();
+        }
+        return this;
+    }
+    
+    /**
+     * 计算应用修改器后的值
+     * @return 修改后的值
+     */
+    private float getModifiedValue() {
+        if (this.modifiers.isEmpty()) {
+            return this.currentValue;
+        }
+        
+        // 按操作类型分组
+        List<AttributeModifier> additions = new ArrayList<>();
+        List<AttributeModifier> baseMultipliers = new ArrayList<>();
+        List<AttributeModifier> totalMultipliers = new ArrayList<>();
+        List<AttributeModifier> caps = new ArrayList<>();
+        
+        for (AttributeModifier modifier : this.modifiers.values()) {
+            switch (modifier.getOperation()) {
+                case ADDITION:
+                    additions.add(modifier);
+                    break;
+                case MULTIPLY_BASE:
+                    baseMultipliers.add(modifier);
+                    break;
+                case MULTIPLY_TOTAL:
+                    totalMultipliers.add(modifier);
+                    break;
+                case CAP:
+                    caps.add(modifier);
+                    break;
+            }
+        }
+        
+        // 计算最终值
+        double result = this.currentValue;
+        
+        // 1. 应用加法修改器
+        for (AttributeModifier modifier : additions) {
+            result += modifier.getAmount();
+        }
+        
+        // 2. 应用基础乘法修改器
+        if (!baseMultipliers.isEmpty()) {
+            double multiplier = 1.0;
+            for (AttributeModifier modifier : baseMultipliers) {
+                multiplier += modifier.getAmount();
+            }
+            result *= multiplier;
+        }
+        
+        // 3. 应用总乘法修改器
+        for (AttributeModifier modifier : totalMultipliers) {
+            result *= (1.0 + modifier.getAmount());
+        }
+        
+        // 4. 应用上限修改器
+        for (AttributeModifier modifier : caps) {
+            result = Math.min(result, modifier.getAmount());
+        }
+        // 确保结果在有效范围内
+        return (float) Math.min(Math.max(result, this.minValue), this.maxValue);
+    }
 
+    // 原有方法保持兼容性
+    
     public float getMinValue() {
         return this.minValue;
     }
@@ -140,8 +342,13 @@ public class Attribute implements Cloneable {
         return this;
     }
 
+    /**
+     * 获取当前值（包含修改器效果）
+     * @return 当前值
+     */
     public float getValue() {
-        return this.currentValue;
+        // 如果有修改器，返回修改后的值；否则返回原始值
+        return this.modifiers.isEmpty() ? this.currentValue : getModifiedValue();
     }
 
     public Attribute setValue(float value) {
@@ -156,6 +363,29 @@ public class Attribute implements Cloneable {
             value = Math.min(Math.max(value, this.minValue), this.maxValue);
         }
         this.currentValue = value;
+        return this;
+    }
+    
+    /**
+     * 设置默认来源的值（兼容原有API）
+     * @param value 值
+     * @return 当前属性实例
+     */
+    public Attribute setDefaultSourceValue(float value) {
+        // 移除旧的默认来源修改器
+        removeModifier(DEFAULT_SOURCE_UUID);
+        
+        // 如果值不等于默认值，添加修改器
+        if (value != this.defaultValue) {
+            AttributeModifier defaultModifier = new AttributeModifier(
+                DEFAULT_SOURCE_UUID,
+                "default_source",
+                value - this.defaultValue,
+                AttributeModifier.Operation.ADDITION
+            );
+            addModifier(defaultModifier);
+        }
+        
         return this;
     }
 
@@ -174,7 +404,11 @@ public class Attribute implements Cloneable {
     @Override
     public Attribute clone() {
         try {
-            return (Attribute) super.clone();
+            Attribute cloned = (Attribute) super.clone();
+            // 深拷贝修改器映射
+            cloned.modifiers.clear();
+            cloned.modifiers.putAll(this.modifiers);
+            return cloned;
         } catch (CloneNotSupportedException e) {
             return null;
         }

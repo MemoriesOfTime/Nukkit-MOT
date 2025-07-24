@@ -37,6 +37,7 @@ abstract public class BaseRegionLoader {
             this.x = regionX;
             this.z = regionZ;
             this.levelProvider = level;
+
             String filePath = this.levelProvider.getPath() + "region/r." + regionX + '.' + regionZ + '.' + ext;
             File file = new File(filePath);
             boolean exists = file.exists();
