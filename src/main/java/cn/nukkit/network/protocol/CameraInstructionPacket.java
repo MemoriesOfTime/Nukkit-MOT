@@ -7,10 +7,7 @@ import cn.nukkit.nbt.tag.ByteTag;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.protocol.types.camera.CameraEase;
-import cn.nukkit.network.protocol.types.camera.CameraFadeInstruction;
-import cn.nukkit.network.protocol.types.camera.CameraSetInstruction;
-import cn.nukkit.network.protocol.types.camera.CameraTargetInstruction;
+import cn.nukkit.network.protocol.types.camera.*;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.CameraPresetManager;
 import lombok.Getter;
@@ -41,6 +38,10 @@ public class CameraInstructionPacket extends DataPacket {
      * @since v712
      */
     private OptionalBoolean removeTarget = OptionalBoolean.empty();
+    /**
+     * @since v827
+     */
+    private CameraFovInstruction fovInstruction;
 
     @Override
     @Deprecated
@@ -76,6 +77,16 @@ public class CameraInstructionPacket extends DataPacket {
                     return new CameraTargetInstruction(targetCenterOffset, uniqueEntityId);
                 }));
                 this.setRemoveTarget(this.getOptional(OptionalBoolean.empty(), buf -> OptionalBoolean.of(buf.getBoolean())));
+
+                if (this.protocol >= ProtocolInfo.v1_21_100) {
+                    this.setFovInstruction(this.getOptional(null, buf -> {
+                        float fov = buf.getFloat();
+                        float easeTime = buf.getFloat();
+                        CameraEase easeType = CameraEase.values()[buf.getByte()];
+                        boolean clear = buf.getBoolean();
+                        return new CameraFovInstruction(fov, easeTime, easeType, clear);
+                    }));
+                }
             }
         } else {
             CompoundTag data = this.getTag();
@@ -169,6 +180,15 @@ public class CameraInstructionPacket extends DataPacket {
                 });
                 this.putOptional(OptionalBoolean::isPresent, this.getRemoveTarget(),
                         (b, optional) -> b.putBoolean(optional.getAsBoolean()));
+
+                if (this.protocol >= ProtocolInfo.v1_21_100) {
+                    this.putOptionalNull(this.getFovInstruction(), (b, fovInstruction) -> {
+                        b.putLFloat(fovInstruction.getFov());
+                        b.putLFloat(fovInstruction.getEaseTime());
+                        b.putByte((byte) fovInstruction.getEaseType().ordinal());
+                        b.putBoolean(fovInstruction.isClear());
+                    });
+                }
             }
         } else {
             CompoundTag data = new CompoundTag();

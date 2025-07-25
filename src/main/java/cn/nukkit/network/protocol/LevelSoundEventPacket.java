@@ -739,8 +739,16 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v818
      */
     public static final int SOUND_UNSADDLE = 560;
+    /**
+     * @since v819
+     */
+    public static final int SOUND_RECORD_LAVA_CHICKEN = 561;
+    /**
+     * @since v827
+     */
+    public static final int SOUND_EQUIP_COPPER = 562;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(561);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(563);
 
     public int sound;
     public float x;
