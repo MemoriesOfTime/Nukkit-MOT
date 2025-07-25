@@ -220,7 +220,7 @@ public class CustomBlockManager {
             if (palette.getProtocol() == storagePalette.getProtocol()) {
                 this.recreateBlockPalette(palette, new ObjectArrayList<>(NukkitLegacyMapper.loadBlockPalette()));
             } else {
-                Path path = this.getVanillaPalettePath(palette.getProtocol());
+                Path path = this.getVanillaPalettePath(palette.getGameVersion());
                 if (!Files.exists(path)) {
                     log.warn("No vanilla palette found for {}.", Utils.getVersionByProtocol(palette.getProtocol()));
                     continue;
@@ -235,7 +235,7 @@ public class CustomBlockManager {
     }
 
     private void recreateBlockPalette(BlockPalette palette) throws IOException {
-        List<NbtMap> vanillaPalette = new ObjectArrayList<>(this.loadVanillaPalette(palette.getProtocol()));
+        List<NbtMap> vanillaPalette = new ObjectArrayList<>(this.loadVanillaPalette(palette.getGameVersion()));
         this.recreateBlockPalette(palette, vanillaPalette);
     }
 
@@ -341,7 +341,7 @@ public class CustomBlockManager {
         }
     }
 
-    private List<NbtMap> loadVanillaPalette(int version) throws FileNotFoundException {
+    private List<NbtMap> loadVanillaPalette(GameVersion version) throws FileNotFoundException {
         Path path = this.getVanillaPalettePath(version);
         if (!Files.exists(path)) {
             throw new FileNotFoundException("Missing vanilla palette for version " + version);
@@ -354,8 +354,8 @@ public class CustomBlockManager {
         }
     }
 
-    private Path getVanillaPalettePath(int version) {
-        return this.getBinPath().resolve("vanilla_palette_" + version + ".nbt");
+    private Path getVanillaPalettePath(GameVersion version) {
+        return this.getBinPath().resolve("vanilla_palette_" + version.getProtocol() + ".nbt");
     }
 
     public Block getBlock(int legacyId) {
