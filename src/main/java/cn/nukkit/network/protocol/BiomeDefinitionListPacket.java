@@ -34,6 +34,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
     private static final BatchPacket CACHED_PACKET_486;
     private static final BatchPacket CACHED_PACKET_527;
     private static final BatchPacket CACHED_PACKET_544;
+    private static final BatchPacket CACHED_PACKET_567;
     private static final BatchPacket CACHED_PACKET_786;
     private static final BatchPacket CACHED_PACKET;
 
@@ -42,6 +43,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
     private static final byte[] TAG_486;
     private static final byte[] TAG_527;
     private static final byte[] TAG_544;
+    private static final byte[] TAG_567;
     private static final byte[] TAG_786;
 
     private LinkedHashMap<String, BiomeDefinitionData> biomeDefinitions;
@@ -98,6 +100,16 @@ public class BiomeDefinitionListPacket extends DataPacket {
             throw new AssertionError("Error whilst loading biome definitions 554", e);
         }
         try {
+            TAG_567 = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_567.dat"));
+            BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
+            pk.protocol = ProtocolInfo.v1_19_60;
+            pk.gameVersion = GameVersion.V1_19_60;
+            pk.tryEncode();
+            CACHED_PACKET_567 = pk.compress(Deflater.BEST_COMPRESSION);
+        } catch (Exception e) {
+            throw new AssertionError("Error whilst loading biome definitions 554", e);
+        }
+        try {
             TAG_786 = ByteStreams.toByteArray(Nukkit.class.getClassLoader().getResourceAsStream("biome_definitions_786.dat"));
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
             pk.protocol = ProtocolInfo.v1_21_70;
@@ -129,6 +141,8 @@ public class BiomeDefinitionListPacket extends DataPacket {
             return CACHED_PACKET;
         } else if (protocol >= ProtocolInfo.v1_21_70_24) {
             return CACHED_PACKET_786;
+        } else if (protocol >= ProtocolInfo.v1_19_60) {
+            return CACHED_PACKET_567;
         } else if (protocol >= ProtocolInfo.v1_19_30_23) {
             return CACHED_PACKET_544;
         } else if (protocol >= ProtocolInfo.v1_19_0) {

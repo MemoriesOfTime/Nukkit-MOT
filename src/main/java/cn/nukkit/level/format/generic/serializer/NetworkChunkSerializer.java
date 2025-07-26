@@ -155,8 +155,7 @@ public class NetworkChunkSerializer {
             writtenSections += EXTENDED_NEGATIVE_SUB_CHUNKS;
         }
 
-        int offset = chunk.getSectionOffset();
-        for (int i = offset; i < subChunkCount; i++) {
+        for (int i = 0; i < subChunkCount; i++) {
             sections[i].writeTo(chunkData.getGameVersion(), stream, chunkData.isAntiXray());
         }
 
