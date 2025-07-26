@@ -80,7 +80,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>common</artifactId>
-            <version>3.0.0.Beta3-SNAPSHOT</version>
+            <version>3.0.0.Beta7-SNAPSHOT</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>

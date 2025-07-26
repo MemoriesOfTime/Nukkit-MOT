@@ -2,26 +2,27 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
+import cn.nukkit.block.Block;
+import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.network.protocol.types.biome.*;
 import cn.nukkit.utils.Utils;
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.google.common.io.ByteStreams;
 import com.google.common.reflect.TypeToken;
-import com.google.gson.GsonBuilder;
-import com.google.gson.TypeAdapter;
+import com.google.gson.*;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
-import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import lombok.ToString;
-import lombok.Value;
+import org.cloudburstmc.protocol.common.util.SequencedHashSet;
 
 import java.awt.*;
 import java.io.IOException;
+import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.*;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.zip.Deflater;
 
 @ToString()
@@ -121,8 +122,14 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
         try {
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
-            pk.biomeDefinitions = new GsonBuilder().registerTypeAdapter(Color.class, new ColorTypeAdapter()).create().fromJson(Utils.loadJsonResource("stripped_biome_definitions_800.json"), new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {
-            }.getType());
+            pk.biomeDefinitions = new GsonBuilder()
+                    .registerTypeAdapter(Color.class, new ColorTypeAdapter())
+                    .registerTypeAdapter(Block.class, new BlockSerializer())
+                    .create()
+                    .fromJson(
+                            Utils.loadJsonResource("stripped_biome_definitions_800.json"),
+                            new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {}.getType()
+                    );
             pk.protocol = ProtocolInfo.v1_21_80;
             pk.gameVersion = GameVersion.V1_21_80;
             pk.tryEncode();
@@ -178,21 +185,8 @@ public class BiomeDefinitionListPacket extends DataPacket {
             this.putUnsignedVarInt(this.biomeDefinitions.size());
             for (Map.Entry<String, BiomeDefinitionData> entry : this.biomeDefinitions.entrySet()) {
                 String name = entry.getKey();
-                BiomeDefinitionData definition = entry.getValue();
                 this.putLShort(strings.addAndGetIndex(name));
-                this.putBoolean(false); // Optional ID
-                this.putLFloat(definition.getTemperature());
-                this.putLFloat(definition.getDownfall());
-                this.putLFloat(definition.getRedSporeDensity());
-                this.putLFloat(definition.getBlueSporeDensity());
-                this.putLFloat(definition.getAshDensity());
-                this.putLFloat(definition.getWhiteAshDensity());
-                this.putLFloat(definition.getDepth());
-                this.putLFloat(definition.getScale());
-                this.putLInt(definition.getMapWaterColor().getRGB());
-                this.putBoolean(definition.isRain());
-                this.putBoolean(false); // Optional Tags
-                this.putBoolean(false); // Optional ChunkGenData
+                this.putBiomeDefinitionData(entry.getValue(), strings);
             }
 
             this.putUnsignedVarInt(strings.size());
@@ -214,184 +208,199 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
     }
 
-    @Value
-    private static class BiomeDefinitionData {
-
-        public float temperature;
-        public float downfall;
-        public float redSporeDensity;
-        public float blueSporeDensity;
-        public float ashDensity;
-        public float whiteAshDensity;
-        public float depth;
-        public float scale;
-        public Color mapWaterColor;
-        public boolean rain;
-
-        @JsonCreator
-        public BiomeDefinitionData(float temperature, float downfall, float redSporeDensity,
-                                   float blueSporeDensity, float ashDensity, float whiteAshDensity, float depth,
-                                   float scale, Color mapWaterColor, boolean rain) {
-            this.temperature = temperature;
-            this.downfall = downfall;
-            this.redSporeDensity = redSporeDensity;
-            this.blueSporeDensity = blueSporeDensity;
-            this.ashDensity = ashDensity;
-            this.whiteAshDensity = whiteAshDensity;
-            this.depth = depth;
-            this.scale = scale;
-            this.mapWaterColor = mapWaterColor;
-            this.rain = rain;
+    protected void putBiomeDefinitionData(BiomeDefinitionData definition, SequencedHashSet<String> strings) {
+        if (protocol >= GameVersion.V1_21_100.getProtocol()) {
+            if (definition.getId() == null) {
+                this.putLShort(-1); // Vanilla biomes don't contain ID field
+            } else {
+                this.putLShort(strings.addAndGetIndex(definition.getId()));
+            }
+        } else {
+            this.putOptional(Objects::nonNull, definition.getId(), id -> this.putLShort(strings.addAndGetIndex(id)));
         }
+        this.putLFloat(definition.getTemperature());
+        this.putLFloat(definition.getDownfall());
+        this.putLFloat(definition.getRedSporeDensity());
+        this.putLFloat(definition.getBlueSporeDensity());
+        this.putLFloat(definition.getAshDensity());
+        this.putLFloat(definition.getWhiteAshDensity());
+        this.putLFloat(definition.getDepth());
+        this.putLFloat(definition.getScale());
+        this.putLInt(definition.getMapWaterColor().getRGB());
+        this.putBoolean(definition.isRain());
+        this.putOptionalNull(definition.getTags(), tags -> {
+            this.putUnsignedVarInt(tags.size());
+            for (String tag : tags) {
+                this.putLShort(strings.addAndGetIndex(tag));
+            }
+        });
+        this.putOptionalNull(definition.getChunkGenData(), definitionChunkGen -> this.putBiomeDefinitionChunkGenData(definitionChunkGen, strings));
     }
 
-    @SuppressWarnings({"NullableProblems", "SuspiciousMethodCalls"})
-    private static class SequencedHashSet<E> implements java.util.List<E> {
-
-        private final Object2IntMap<E> map = new Object2IntLinkedOpenHashMap<>();
-        private final Int2ObjectMap<E> inverse = new Int2ObjectLinkedOpenHashMap<>();
-        private int index = 0;
-
-        @Override
-        public int indexOf(Object o) {
-            return map.getInt(o);
-        }
-
-        @Override
-        public int lastIndexOf(Object o) {
-            return map.getInt(o);
-        }
-
-        @Override
-        public ListIterator<E> listIterator() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public ListIterator<E> listIterator(int index) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public List<E> subList(int fromIndex, int toIndex) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int size() {
-            return map.size();
-        }
-
-        @Override
-        public boolean isEmpty() {
-            return map.isEmpty();
-        }
-
-        @Override
-        public boolean contains(Object o) {
-            return map.containsKey(o);
-        }
-
-        @Override
-        public Iterator<E> iterator() {
-            return map.keySet().iterator();
-        }
-
-        @Override
-        public Object[] toArray() {
-            return map.keySet().toArray();
-        }
-
-        @Override
-        public <T> T[] toArray(T[] a) {
-            return map.keySet().toArray(a);
-        }
-
-        @Override
-        public boolean add(E e) {
-            if (!this.map.containsKey(e)) {
-                int index = this.index++;
-                this.map.put(e, index);
-                this.inverse.put(index, e);
-                return true;
-            }
-            return false;
-        }
-
-        public int addAndGetIndex(E e) {
-            if (!this.map.containsKey(e)) {
-                int index = this.index++;
-                this.map.put(e, index);
-                this.inverse.put(index, e);
-                return index;
-            }
-            return this.map.getInt(e);
-        }
-
-        @Override
-        public boolean remove(Object o) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean containsAll(Collection<?> c) {
-            return map.keySet().containsAll(c);
-        }
-
-        @Override
-        public boolean addAll(Collection<? extends E> c) {
-            for (E e : c) {
-                this.add(e);
-            }
-            return true;
-        }
-
-        @Override
-        public boolean addAll(int index, Collection<? extends E> c) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean retainAll(Collection<?> c) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean removeAll(Collection<?> c) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void clear() {
-            throw new UnsupportedOperationException();
-        }
-
-        public E get(int index) {
-            return this.inverse.get(index);
-        }
-
-        @Override
-        public E set(int index, E element) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void add(int index, E element) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public E remove(int index) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String toString() {
-            return map.keySet().toString();
-        }
+    protected void putBiomeDefinitionChunkGenData(BiomeDefinitionChunkGenData definitionChunkGen, SequencedHashSet<String> strings) {
+        this.putOptionalNull(definitionChunkGen.getClimate(), this::putClimate);
+        this.putOptionalNull(definitionChunkGen.getConsolidatedFeatures(), (consolidatedFeatures) -> this.putConsolidatedFeatures(consolidatedFeatures, strings));
+        this.putOptionalNull(definitionChunkGen.getMountainParams(), this::putMountainParamsData);
+        this.putOptionalNull(definitionChunkGen.getSurfaceMaterialAdjustment(),
+                (surfaceMaterialAdjustment) -> this.putSurfaceMaterialAdjustment(surfaceMaterialAdjustment, strings));
+        this.putOptionalNull(definitionChunkGen.getSurfaceMaterial(), this::putSurfaceMaterial);
+        this.putBoolean(definitionChunkGen.isHasSwampSurface());
+        this.putBoolean(definitionChunkGen.isHasFrozenOceanSurface());
+        this.putBoolean(definitionChunkGen.isHasTheEndSurface());
+        this.putOptionalNull(definitionChunkGen.getMesaSurface(), this::putMesaSurface);
+        this.putOptionalNull(definitionChunkGen.getCappedSurface(), this::putCappedSurface);
+        this.putOptionalNull(definitionChunkGen.getOverworldGenRules(),
+                (overworldGenRules) -> this.putOverworldGenRules(overworldGenRules, strings));
+        this.putOptionalNull(definitionChunkGen.getMultinoiseGenRules(), this::putMultinoiseGenRules);
+        this.putOptionalNull(definitionChunkGen.getLegacyWorldGenRules(),
+                (legacyWorldGenRules) -> this.putLegacyWorldGenRules(legacyWorldGenRules, strings));
     }
 
-    private static class ColorTypeAdapter extends TypeAdapter<Color> {
+    protected void putClimate(BiomeClimateData climate) {
+        this.putLFloat(climate.getTemperature());
+        this.putLFloat(climate.getDownfall());
+        this.putLFloat(climate.getRedSporeDensity());
+        this.putLFloat(climate.getBlueSporeDensity());
+        this.putLFloat(climate.getAshDensity());
+        this.putLFloat(climate.getWhiteAshDensity());
+        this.putLFloat(climate.getSnowAccumulationMin());
+        this.putLFloat(climate.getSnowAccumulationMax());
+    }
+
+    protected void putConsolidatedFeatures(List<BiomeConsolidatedFeatureData> consolidatedFeatures, SequencedHashSet<String> strings) {
+        this.putArray(consolidatedFeatures, consolidatedFeature -> this.putConsolidatedFeature(consolidatedFeature, strings));
+    }
+
+    protected void putConsolidatedFeature(BiomeConsolidatedFeatureData consolidatedFeature, SequencedHashSet<String> strings) {
+        this.putScatterParam(consolidatedFeature.getScatter(), strings);
+        this.putLShort(strings.addAndGetIndex(consolidatedFeature.getFeature()));
+        this.putLShort(strings.addAndGetIndex(consolidatedFeature.getIdentifier()));
+        this.putLShort(strings.addAndGetIndex(consolidatedFeature.getPass()));
+        this.putBoolean(consolidatedFeature.isInternalUse());
+    }
+
+    protected void putScatterParam(BiomeScatterParamData scatterParam, SequencedHashSet<String> strings) {
+        this.putArray(scatterParam.getCoordinates(), (coordinate) -> this.putCoordinate(coordinate, strings));
+        this.putVarInt(scatterParam.getEvalOrder().ordinal());
+        this.putVarInt(scatterParam.getChancePercentType() == null ? -1 : scatterParam.getChancePercentType().ordinal());
+        this.putLShort(strings.addAndGetIndex(scatterParam.getChancePercent()));
+        this.putLInt(scatterParam.getChanceNumerator());
+        this.putLInt(scatterParam.getChangeDenominator());
+        this.putVarInt(scatterParam.getIterationsType() == null ? -1 : scatterParam.getIterationsType().ordinal());
+        this.putLShort(strings.addAndGetIndex(scatterParam.getIterations()));
+    }
+
+    protected void putCoordinate(BiomeCoordinateData coordinate, SequencedHashSet<String> strings) {
+        this.putExpressionOp(coordinate.getMinValueType());
+        this.putLShort(strings.addAndGetIndex(coordinate.getMinValue()));
+        this.putExpressionOp(coordinate.getMaxValueType());
+        this.putLShort(strings.addAndGetIndex(coordinate.getMaxValue()));
+        this.putLInt((int) coordinate.getGridOffset());
+        this.putLInt((int) coordinate.getGridStepSize());
+        this.putVarInt(coordinate.getDistribution().ordinal());
+    }
+
+    protected void putMountainParamsData(BiomeMountainParamsData mountainParams) {
+        this.putBlockNetId(mountainParams.getSteepBlock());
+        this.putBoolean(mountainParams.isNorthSlopes());
+        this.putBoolean(mountainParams.isSouthSlopes());
+        this.putBoolean(mountainParams.isWestSlopes());
+        this.putBoolean(mountainParams.isEastSlopes());
+        this.putBoolean(mountainParams.isTopSlideEnabled());
+    }
+
+    protected void putSurfaceMaterialAdjustment(BiomeSurfaceMaterialAdjustmentData surfaceMaterialAdjustment, SequencedHashSet<String> strings) {
+        this.putArray(surfaceMaterialAdjustment.getBiomeElements(), (biomeElement) -> this.putBiomeElement(biomeElement, strings));
+    }
+
+    protected void putBiomeElement(BiomeElementData biomeElement, SequencedHashSet<String> strings) {
+        this.putLFloat(biomeElement.getNoiseFrequencyScale());
+        this.putLFloat(biomeElement.getNoiseLowerBound());
+        this.putLFloat(biomeElement.getNoiseUpperBound());
+        this.putExpressionOp(biomeElement.getHeightMinType());
+        this.putLShort(strings.addAndGetIndex(biomeElement.getHeightMin()));
+        this.putExpressionOp(biomeElement.getHeightMaxType());
+        this.putLShort(strings.addAndGetIndex(biomeElement.getHeightMax()));
+        this.putSurfaceMaterial(biomeElement.getAdjustedMaterials());
+    }
+
+    protected void putSurfaceMaterial(BiomeSurfaceMaterialData surfaceMaterial) {
+        this.putBlockNetId(surfaceMaterial.getTopBlock());
+        this.putBlockNetId(surfaceMaterial.getMidBlock());
+        this.putBlockNetId(surfaceMaterial.getSeaFloorBlock());
+        this.putBlockNetId(surfaceMaterial.getFoundationBlock());
+        this.putBlockNetId(surfaceMaterial.getSeaBlock());
+        this.putLInt(surfaceMaterial.getSeaFloorDepth());
+    }
+
+    protected void putMesaSurface(BiomeMesaSurfaceData mesaSurface) {
+        this.putBlockNetId(mesaSurface.getClayMaterial());
+        this.putBlockNetId(mesaSurface.getHardClayMaterial());
+        this.putBoolean(mesaSurface.isBrycePillars());
+        this.putBoolean(mesaSurface.isHasForest());
+    }
+
+    protected void putCappedSurface(BiomeCappedSurfaceData cappedSurface) {
+        this.putArray(cappedSurface.getFloorBlocks(), this::putBlockNetId);
+        this.putArray(cappedSurface.getCeilingBlocks(), this::putBlockNetId);
+        this.putOptionalNull(cappedSurface.getSeaBlock(), this::putBlockNetId);
+        this.putOptionalNull(cappedSurface.getFoundationBlock(), this::putBlockNetId);
+        this.putOptionalNull(cappedSurface.getBeachBlock(), this::putBlockNetId);
+    }
+
+    protected void putOverworldGenRules(BiomeOverworldGenRulesData overworldGenRules, SequencedHashSet<String> strings) {
+        Consumer<BiomeWeightedData> writeWeight = (data) -> this.putWeight(data, strings);
+        this.putArray(overworldGenRules.getHillsTransformations(), writeWeight);
+        this.putArray(overworldGenRules.getMutateTransformations(), writeWeight);
+        this.putArray(overworldGenRules.getRiverTransformations(), writeWeight);
+        this.putArray(overworldGenRules.getShoreTransformations(), writeWeight);
+        Consumer<BiomeConditionalTransformationData> writeConditionalTransformation = (data) -> this.putConditionalTransformation(data, strings);
+        this.putArray(overworldGenRules.getPreHillsEdgeTransformations(), writeConditionalTransformation);
+        this.putArray(overworldGenRules.getPostShoreTransformations(), writeConditionalTransformation);
+        this.putArray(overworldGenRules.getClimateTransformations(), this::putWeightedTemperature);
+    }
+
+    protected void putWeight(BiomeWeightedData weightedData, SequencedHashSet<String> strings) {
+        this.putLShort(strings.addAndGetIndex(weightedData.getBiome()));
+        this.putLInt(weightedData.getWeight());
+    }
+
+    protected void putConditionalTransformation(BiomeConditionalTransformationData conditionalTransformation, SequencedHashSet<String> strings) {
+        this.putArray(conditionalTransformation.getWeightedBiomes(), (data) -> putWeight(data, strings));
+        this.putLShort(strings.addAndGetIndex(conditionalTransformation.getConditionJson()));
+        this.putLInt((int) conditionalTransformation.getMinPassingNeighbors());
+    }
+
+    protected void putWeightedTemperature(BiomeWeightedTemperatureData weightedTemperature) {
+        this.putVarInt(weightedTemperature.getTemperature().ordinal());
+        this.putLInt((int) weightedTemperature.getWeight());
+    }
+
+    protected void putMultinoiseGenRules(BiomeMultinoiseGenRulesData multinoiseGenRules) {
+        this.putLFloat(multinoiseGenRules.getTemperature());
+        this.putLFloat(multinoiseGenRules.getHumidity());
+        this.putLFloat(multinoiseGenRules.getAltitude());
+        this.putLFloat(multinoiseGenRules.getWeirdness());
+        this.putLFloat(multinoiseGenRules.getWeight());
+    }
+
+    protected void putLegacyWorldGenRules(BiomeLegacyWorldGenRulesData legacyWorldGenRules, SequencedHashSet<String> strings) {
+        this.putArray(legacyWorldGenRules.getLegacyPreHills(), (data) -> this.putConditionalTransformation(data, strings));
+    }
+
+    protected void putExpressionOp(ExpressionOp expressionOp) {
+        if (expressionOp == null) {
+            this.putVarInt(-1);
+            return;
+        }
+        this.putVarInt(expressionOp.ordinal());
+    }
+
+    protected void putBlockNetId(Block block) {
+        this.putLInt(GlobalBlockPalette.getOrCreateRuntimeId(this.gameVersion, block.getId(), block.getDamage()));
+    }
+
+    protected static class ColorTypeAdapter extends TypeAdapter<Color> {
 
         @Override
         public void write(JsonWriter out, Color color) {
@@ -417,6 +426,25 @@ public class BiomeDefinitionListPacket extends DataPacket {
             }
             in.endObject();
             return new Color(r, g, b, a);
+        }
+    }
+
+    protected static class BlockSerializer implements JsonSerializer<Block>, JsonDeserializer<Block> {
+
+        @Override
+        public JsonElement serialize(Block src, Type typeOfSrc, JsonSerializationContext context) {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("id", src.getId());
+            obj.addProperty("meta", src.getDamage());
+            return obj;
+        }
+
+        @Override
+        public Block deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
+            JsonObject obj = json.getAsJsonObject();
+            int id = obj.get("id").getAsInt();
+            int meta = obj.get("meta").getAsInt();
+            return Block.get(id, meta);
         }
     }
 }
