@@ -1,6 +1,5 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.GameVersion;
 import cn.nukkit.utils.Utils;
 import com.google.common.primitives.Ints;
 
@@ -98,7 +97,7 @@ public interface ProtocolInfo {
     int v1_21_80 = 800;
     int v1_21_90 = 818;
     int v1_21_93 = 819;
-    int v1_21_100 = GameVersion.V1_21_100.getProtocol();
+    int v1_21_100 = 827;
 
     int CURRENT_PROTOCOL = Utils.dynamic(v1_21_100);
 
