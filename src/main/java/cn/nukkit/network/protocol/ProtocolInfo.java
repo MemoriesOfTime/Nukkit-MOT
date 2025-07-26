@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.utils.Utils;
 import com.google.common.primitives.Ints;
 
@@ -361,6 +362,9 @@ public interface ProtocolInfo {
      * @since v800
      */
     int PLAYER_LOCATIONS_PACKET = 326;
+
+    @OnlyNetEase
+    int PACKET_CONFIRM_SKIN = 0xe4;
 
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;
