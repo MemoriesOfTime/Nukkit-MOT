@@ -1350,6 +1350,18 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return false;
     }
 
+    public boolean isWaxed() {
+        return false;
+    }
+
+    public boolean hasCopperBehavior() {
+        return false;
+    }
+
+    public int getCopperAge() {
+        return -1;
+    }
+
     protected static boolean canConnectToFullSolid(Block down) {
         if (down.isTransparent()) {
             switch (down.getId()) {
