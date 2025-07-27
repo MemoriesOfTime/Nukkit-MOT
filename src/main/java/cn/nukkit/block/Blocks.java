@@ -645,7 +645,8 @@ public class Blocks {
         list[STRIPPED_BAMBOO_BLOCK] = BlockStrippedBambooBlock.class; //783
         list[SUSPICIOUS_SAND] = BlockSuspiciousSand.class; //784
         list[CHERRY_BUTTON] = BlockButtonCherry.class; //785
-
+        list[CHERRY_DOOR_BLOCK] = BlockDoorCherry.class; //786
+        list[CHERRY_FENCE] = BlockFenceCherry.class; //787
         list[CHERRY_FENCE_GATE] = BlockFenceGateCherry.class; //788
 
         list[STRIPPED_CHERRY_LOG] = BlockLogStrippedCherry.class; //790

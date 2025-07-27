@@ -735,7 +735,7 @@ public interface BlockID {
     int STRIPPED_BAMBOO_BLOCK = 783;
     int SUSPICIOUS_SAND = 784;
     int CHERRY_BUTTON = 785;
-    int CHERRY_DOOR = 786;
+    int CHERRY_DOOR_BLOCK = 786;
     int CHERRY_FENCE = 787;
     int CHERRY_FENCE_GATE = 788;
     int CHERRY_HANGING_SIGN = 789;
