@@ -163,6 +163,10 @@ public class StartGamePacket extends DataPacket {
      * @since v685
      */
     public String scenarioId = "";
+    /**
+     * @since v818
+     */
+    private String ownerIdentifier = "";
 
     @Override
     public void decode() {
@@ -309,7 +313,7 @@ public class StartGamePacket extends DataPacket {
                         this.putString(this.worldId);
                         this.putString(this.scenarioId);
                         if (protocol >= ProtocolInfo.v1_21_90) {
-                            this.putString(""); // OwnerId
+                            this.putString(this.ownerIdentifier); // OwnerId
                         }
                     }
                 }
