@@ -902,7 +902,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static void addCreativeItem(Item item) {
         Server.mvw("Item#addCreativeItem(Item)");
-        addCreativeItem(GameVersion.V1_21_90, item);
+        addCreativeItem(GameVersion.V1_21_100, item);
     }
 
     @Deprecated
