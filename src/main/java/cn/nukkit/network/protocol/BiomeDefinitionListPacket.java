@@ -37,6 +37,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
     private static final BatchPacket CACHED_PACKET_544;
     private static final BatchPacket CACHED_PACKET_567;
     private static final BatchPacket CACHED_PACKET_786;
+    private static final BatchPacket CACHED_PACKET_800;
     private static final BatchPacket CACHED_PACKET;
 
     private static final byte[] TAG_361;
@@ -118,24 +119,38 @@ public class BiomeDefinitionListPacket extends DataPacket {
             pk.tryEncode();
             CACHED_PACKET_786 = pk.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
-            throw new AssertionError("Error whilst loading biome definitions 554", e);
+            throw new AssertionError("Error whilst loading biome definitions 786", e);
         }
+
+        Gson gson = new GsonBuilder()
+                .registerTypeAdapter(Color.class, new ColorTypeAdapter())
+                .registerTypeAdapter(Block.class, new BlockSerializer()) //避免GSON错误的扫描所有涉及方块的其他类
+                .create();
         try {
             BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
-            pk.biomeDefinitions = new GsonBuilder()
-                    .registerTypeAdapter(Color.class, new ColorTypeAdapter())
-                    .registerTypeAdapter(Block.class, new BlockSerializer())
-                    .create()
-                    .fromJson(
-                            Utils.loadJsonResource("stripped_biome_definitions_800.json"),
-                            new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {}.getType()
-                    );
+            pk.biomeDefinitions = gson.fromJson(
+                    Utils.loadJsonResource("stripped_biome_definitions_800.json"),
+                    new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {}.getType()
+            );
             pk.protocol = ProtocolInfo.v1_21_80;
             pk.gameVersion = GameVersion.V1_21_80;
             pk.tryEncode();
-            CACHED_PACKET = pk.compress(Deflater.BEST_COMPRESSION);
+            CACHED_PACKET_800 = pk.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
             throw new AssertionError("Error whilst loading biome definitions 800", e);
+        }
+        try {
+            BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
+            pk.biomeDefinitions = gson.fromJson(
+                    Utils.loadJsonResource("biome/stripped_biome_definitions_827.json"),
+                    new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {}.getType()
+            );
+            pk.protocol = ProtocolInfo.v1_21_100;
+            pk.gameVersion = GameVersion.V1_21_100;
+            pk.tryEncode();
+            CACHED_PACKET = pk.compress(Deflater.BEST_COMPRESSION);
+        } catch (Exception e) {
+            throw new AssertionError("Error whilst loading biome definitions 827", e);
         }
     }
 
@@ -144,8 +159,10 @@ public class BiomeDefinitionListPacket extends DataPacket {
             throw new UnsupportedOperationException("Unsupported protocol version: " + protocol);
         }
 
-        if (protocol >= ProtocolInfo.v1_21_80) {
+        if (protocol >= ProtocolInfo.v1_21_100) {
             return CACHED_PACKET;
+        } else if (protocol >= ProtocolInfo.v1_21_80) {
+            return CACHED_PACKET_800;
         } else if (protocol >= ProtocolInfo.v1_21_70_24) {
             return CACHED_PACKET_786;
         } else if (protocol >= ProtocolInfo.v1_19_60) {

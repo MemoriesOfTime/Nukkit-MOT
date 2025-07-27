@@ -539,6 +539,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     private static final CreativeItems creative800 = new CreativeItems();
     private static final CreativeItems creative818 = new CreativeItems();
     private static final CreativeItems creative819 = new CreativeItems();
+    private static final CreativeItems creative827 = new CreativeItems();
 
     private static final CreativeItems creative_netease_630 = new CreativeItems();
     private static final CreativeItems creative_netease_686 = new CreativeItems();
@@ -592,6 +593,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCreativeItemsNew(GameVersion.V1_21_80, GameVersion.V1_21_80, creative800);
         registerCreativeItemsNew(GameVersion.V1_21_90, GameVersion.V1_21_90, creative818);
         registerCreativeItemsNew(GameVersion.V1_21_93, GameVersion.V1_21_93, creative819);
+        registerCreativeItemsNew(GameVersion.V1_21_100, GameVersion.V1_21_100, creative827);
 
         registerCreativeItemsNew(GameVersion.V1_20_50_NETEASE, GameVersion.V1_20_50_NETEASE, creative_netease_630);
         registerCreativeItemsNew(GameVersion.V1_21_2_NETEASE, GameVersion.V1_21_2_NETEASE, creative_netease_686);
@@ -725,6 +727,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Item.creative800.clear();
         Item.creative818.clear();
         Item.creative819.clear();
+        Item.creative827.clear();
 
         Item.creative_netease_630.clear();
         Item.creative_netease_686.clear();
@@ -884,6 +887,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 return Item.creative818;
             case V1_21_93:
                 return Item.creative819;
+            case V1_21_100:
+                return Item.creative827;
             // NetEase
             case V1_20_50_NETEASE:
                 return Item.creative_netease_630;
@@ -958,6 +963,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             case V1_21_80 -> Item.creative800.add(item.clone(), category, group);
             case V1_21_90 -> Item.creative818.add(item.clone(), category, group);
             case V1_21_93 -> Item.creative819.add(item.clone(), category, group);
+            case V1_21_100 -> Item.creative827.add(item.clone(), category, group);
             // NetEase
             case V1_20_50_NETEASE -> Item.creative_netease_630.add(item.clone(), category, group);
             case V1_21_2_NETEASE -> Item.creative_netease_686.add(item.clone(), category, group);
@@ -1159,6 +1165,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCustomItem(customItem, GameVersion.V1_21_70, addCreativeItem, GameVersion.V1_21_70);
         registerCustomItem(customItem, GameVersion.V1_21_80, addCreativeItem, GameVersion.V1_21_80);
         registerCustomItem(customItem, GameVersion.V1_21_90, addCreativeItem, GameVersion.V1_21_90, GameVersion.V1_21_93);
+        registerCustomItem(customItem, GameVersion.V1_21_100, addCreativeItem, GameVersion.V1_21_100);
 
         // NetEase
         registerCustomItem(customItem, GameVersion.V1_20_50_NETEASE, addCreativeItem, GameVersion.V1_20_50_NETEASE);
@@ -1217,6 +1224,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             deleteCustomItem(customItem, GameVersion.V1_21_70, GameVersion.V1_21_70);
             deleteCustomItem(customItem, GameVersion.V1_21_80, GameVersion.V1_21_80);
             deleteCustomItem(customItem, GameVersion.V1_21_90, GameVersion.V1_21_90, GameVersion.V1_21_93);
+            deleteCustomItem(customItem, GameVersion.V1_21_100, GameVersion.V1_21_100);
 
             // NetEase
             deleteCustomItem(customItem, GameVersion.V1_20_50_NETEASE, GameVersion.V1_20_50_NETEASE);
