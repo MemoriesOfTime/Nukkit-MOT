@@ -460,6 +460,7 @@ public class Blocks {
         list[COPPER_ORE] = BlockOreCopper.class; //566
         list[LIGHTNING_ROD] = BlockLightningRod.class; //567
 
+        list[HEAVY_CORE] = BlockHeavyCore.class; //571
         list[DRIPSTONE_BLOCK] = BlockDripstone.class; //572
         list[ROOTED_DIRT] = BlockDirtRooted.class; //573
         list[HANGING_ROOTS] = BlockRootsHanging.class; //574

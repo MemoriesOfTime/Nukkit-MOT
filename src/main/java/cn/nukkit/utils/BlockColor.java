@@ -17,6 +17,7 @@ public class BlockColor  {
     public static final BlockColor CLOTH_BLOCK_COLOR = WOOL_BLOCK_COLOR;
     public static final BlockColor TNT_BLOCK_COLOR = new BlockColor(0xff, 0x00, 0x00);
     public static final BlockColor ICE_BLOCK_COLOR = new BlockColor(0xa0, 0xa0, 0xff);
+    public static final BlockColor METAL_BLOCK_COLOR = new BlockColor(0xa7, 0xa7, 0xa7);
     public static final BlockColor IRON_BLOCK_COLOR = new BlockColor(0xa7, 0xa7, 0xa7);
     public static final BlockColor FOLIAGE_BLOCK_COLOR = new BlockColor(0x00, 0x7c, 0x00);
     public static final BlockColor PLANT_BLOCK_COLOR = FOLIAGE_BLOCK_COLOR;
