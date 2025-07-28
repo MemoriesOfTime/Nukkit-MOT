@@ -1,5 +1,6 @@
 package cn.nukkit.level;
 
+import java.util.Locale;
 import java.util.Optional;
 
 public enum GameRule {
@@ -21,6 +22,7 @@ public enum GameRule {
     FREEZE_DAMAGE("freezeDamage"),
     FUNCTION_COMMAND_LIMIT("functionCommandLimit"),
     KEEP_INVENTORY("keepInventory"),
+    LOCATOR_BAR("locatorBar"),
     MAX_COMMAND_CHAIN_LENGTH("maxCommandChainLength"),
     MOB_GRIEFING("mobGriefing"),
     NATURAL_REGENERATION("naturalRegeneration"),
@@ -35,8 +37,9 @@ public enum GameRule {
     SHOW_BORDER_EFFECT("showBorderEffect"),
     PLAYERS_SLEEPING_PERCENTAGE("playersSleepingPercentage"),
     RECIPES_UNLOCK("recipesUnlock"),
+    RESPAWN_BLOCKS_EXPLODE("respawnBlocksExplode"),
     DO_LIMITED_CRAFTING("doLimitedCrafting"),
-    SHOW_RECIPE_MESSAGE("showRecipeMessages"),
+    SHOW_RECIPE_MESSAGES("showRecipeMessages"),
     PROJECTILES_CAN_BREAK_BLOCKS("projectilesCanBreakBlocks");
 
     private final String name;
@@ -44,7 +47,7 @@ public enum GameRule {
 
     GameRule(String name) {
         this.name = name;
-        this.bedrockName = name.toLowerCase();
+        this.bedrockName = name.toLowerCase(Locale.ROOT);
     }
 
     public static Optional<GameRule> parseString(String gameRuleString) {
@@ -67,7 +70,7 @@ public enum GameRule {
     public static String[] getNamesLowerCase() {
         String[] stringValues = new String[values().length];
         for (int i = 0; i < values().length; i++) {
-            stringValues[i] = values()[i].name.toLowerCase();
+            stringValues[i] = values()[i].name.toLowerCase(Locale.ROOT);
         }
         return stringValues;
     }

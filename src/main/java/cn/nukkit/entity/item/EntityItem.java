@@ -361,7 +361,7 @@ public class EntityItem extends Entity {
 
         this.checkBlockCollision();
 
-        if (this.y <= -16 && this.isAlive()) {
+        if (this.y <= (level.getMinBlockY() - 16) && this.isAlive()) {
             this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
             hasUpdate = true;
         }

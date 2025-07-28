@@ -35,7 +35,7 @@ public class SetEntityDataPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putEntityRuntimeId(this.eid);
-        this.put(Binary.writeMetadata(protocol, this.metadata));
+        this.put(Binary.writeMetadata(gameVersion, this.metadata));
         if (protocol >= ProtocolInfo.v1_16_100) {
             if (protocol >= ProtocolInfo.v1_19_40) {
                 this.putUnsignedVarInt(this.syncedProperties.intProperties().length);

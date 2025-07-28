@@ -126,6 +126,12 @@ public class TextPacket extends DataPacket {
             this.putString(this.platformChatId);
             if (protocol >= ProtocolInfo.v1_21_0) {
                 this.putString(this.filteredMessage);
+
+                if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_16_100_51) {
+                    if (this.type == TYPE_CHAT || this.type == TYPE_POPUP) {
+                        this.putString("");
+                    }
+                }
             }
         }
     }

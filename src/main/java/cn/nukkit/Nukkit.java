@@ -13,6 +13,7 @@ import org.apache.logging.log4j.core.config.LoggerConfig;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.Scanner;
 
@@ -77,7 +78,7 @@ public class Nukkit {
             //ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
             System.out.print("Debug stuff enabled!\n");
             System.out.print("Do you want to skip loading plugins? (yes/no) ");
-            loadPlugins = !new Scanner(System.in).nextLine().toLowerCase().startsWith("y");
+            loadPlugins = !new Scanner(System.in).nextLine().toLowerCase(Locale.ROOT).startsWith("y");
         }
 
         try {

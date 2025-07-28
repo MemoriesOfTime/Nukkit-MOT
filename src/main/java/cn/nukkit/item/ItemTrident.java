@@ -2,13 +2,10 @@ package cn.nukkit.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockWater;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.entity.projectile.EntityThrownTrident;
 import cn.nukkit.event.entity.EntityShootBowEvent;
 import cn.nukkit.event.entity.ProjectileLaunchEvent;
-import cn.nukkit.event.player.PlayerToggleSpinAttackEvent;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -16,6 +13,7 @@ import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.network.protocol.ProtocolInfo;
 
 /**
  * Created by PetteriM1
@@ -61,46 +59,7 @@ public class ItemTrident extends ItemTool {
 
     @Override
     public boolean onRelease(Player player, int ticksUsed) {
-        Enchantment riptide = this.getEnchantment(Enchantment.ID_TRIDENT_RIPTIDE);
-        if (riptide != null) {
-            PlayerToggleSpinAttackEvent playerToggleSpinAttackEvent = new PlayerToggleSpinAttackEvent(player, true);
-
-            int riptideLevel = riptide.getLevel();
-            if (riptideLevel < 1) {
-                playerToggleSpinAttackEvent.setCancelled(true);
-            } else {
-                boolean inWater = false;
-                for (Block block : player.getCollisionBlocks()) {
-                    if (block instanceof BlockWater) {
-                        inWater = true;
-                        break;
-                    }
-                }
-                if (!(inWater || (player.getLevel().isRaining() && player.canSeeSky()))) {
-                    playerToggleSpinAttackEvent.setCancelled(true);
-                }
-            }
-
-            player.getServer().getPluginManager().callEvent(playerToggleSpinAttackEvent);
-
-            if (playerToggleSpinAttackEvent.isCancelled()) {
-                player.setNeedSendData(true);
-            } else {
-                player.onSpinAttack(riptideLevel);
-                player.setSpinAttack(true);
-                player.resetFallDistance();
-
-                int riptideSound;
-                if (riptideLevel >= 3) {
-                    riptideSound = LevelSoundEventPacket.SOUND_ITEM_TRIDENT_RIPTIDE_3;
-                } else if (riptideLevel == 2) {
-                    riptideSound = LevelSoundEventPacket.SOUND_ITEM_TRIDENT_RIPTIDE_2;
-                } else {
-                    riptideSound = LevelSoundEventPacket.SOUND_ITEM_TRIDENT_RIPTIDE_1;
-                }
-
-                player.getLevel().addLevelSoundEvent(player, riptideSound);
-            }
+        if (this.getDamage() >= this.getMaxDurability() - 1 || this.hasEnchantment(Enchantment.ID_TRIDENT_RIPTIDE)) {
             return true;
         }
 
@@ -157,5 +116,10 @@ public class ItemTrident extends ItemTool {
         }
 
         return true;
+    }
+
+    @Override
+    public boolean isSupportedOn(int protocolId) {
+        return protocolId >= ProtocolInfo.v1_4_0;
     }
 }

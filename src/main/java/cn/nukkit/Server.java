@@ -58,6 +58,7 @@ import cn.nukkit.network.BatchingHelper;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.SourceInterface;
+import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.PlayerListPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -89,6 +90,8 @@ import io.netty.buffer.ByteBuf;
 import io.sentry.Sentry;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import lombok.extern.log4j.Log4j2;
@@ -422,6 +425,13 @@ public class Server {
      */
     public boolean opInGame;
     /**
+     * Handling player names with spaces.
+        [0] "disabled" - Players with names containing spaces are prohibited from entering the server.
+        [1] "ignore" - Ignore names with spaces (default).
+        [2] "replacing" - Replace spaces in player names with "_".
+     */
+    public int spaceMode;
+    /**
      * Sky light updates enabled.
      */
     public boolean lightUpdates;
@@ -457,6 +467,10 @@ public class Server {
      * More vanilla like portal logics enabled.
      */
     public boolean vanillaPortals;
+    /**
+     * Ticks required for the player to trigger the portal.
+     */
+    public int portalTicks;
     /**
      * Persona skins allowed.
      */
@@ -544,6 +558,14 @@ public class Server {
      */
     public boolean enableRawOres;
     /**
+     * Enable 1.21 paintings
+     */
+    public boolean enableNewPaintings;
+    /**
+     * Enable chicken egg laying from 1.21.70
+     */
+    public boolean enableNewChickenEggsLaying;
+    /**
      * A number of datagram packets each address can send within one RakNet tick (10ms)
      */
     public int rakPacketLimit;
@@ -551,6 +573,23 @@ public class Server {
      * Temporary disable world saving to allow safe backup of leveldb worlds.
      */
     public boolean holdWorldSave;
+    /**
+     * Enable RakNet cookies for additional security
+     */
+    public boolean enableRakSendCookie;
+    /**
+     * Enable forced safety enchantments (up max lvl)
+     */
+    public boolean forcedSafetyEnchant;
+
+    /**
+     * Enable NetEase Client Support
+     */
+    public boolean netEaseMode;
+    /**
+     * Only allow NetEase clients to join the server
+     */
+    public boolean onlyNetEaseMode;
 
     Server(final String filePath, String dataPath, String pluginPath, boolean loadPlugins, boolean debug) {
         Preconditions.checkState(instance == null, "Already initialized!");
@@ -689,7 +728,7 @@ public class Server {
         Attribute.init();
         DispenseBehaviorRegister.init();
         CustomBlockManager.init(this);
-        GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, 0, 0);
+        GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getLastVersion(), 0, 0);
 
         // Convert legacy data before plugins get the chance to mess with it
         try {
@@ -752,6 +791,7 @@ public class Server {
         Generator.addGenerator(Flat.class, "flat", Generator.TYPE_FLAT);
         Generator.addGenerator(Normal.class, "normal", Generator.TYPE_INFINITE);
         Generator.addGenerator(Normal.class, "default", Generator.TYPE_INFINITE);
+        Generator.addGenerator(OldNormal.class, "oldnormal", Generator.TYPE_INFINITE);
         Generator.addGenerator(Nether.class, "nether", Generator.TYPE_NETHER);
         Generator.addGenerator(End.class, "the_end", Generator.TYPE_THE_END);
         Generator.addGenerator(cn.nukkit.level.generator.Void.class, "void", Generator.TYPE_VOID);
@@ -811,6 +851,7 @@ public class Server {
             this.enablePlugins(PluginLoadOrder.POSTWORLD);
         }
 
+        EntityProperty.init();
         EntityProperty.buildPacket();
         EntityProperty.buildPlayerProperty();
 
@@ -1149,18 +1190,21 @@ public class Server {
         this.forceShutdown();
     }
 
+    private static final byte[] QUERY_PREFIX = {(byte) 0xfe, (byte) 0xfd};
+
+    /**
+     * Internal: Handle query
+     * @param address sender address
+     * @param payload payload
+     */
     public void handlePacket(InetSocketAddress address, ByteBuf payload) {
         try {
-            if (!payload.isReadable(3)) {
+            if (this.queryHandler == null || !payload.isReadable(3)) {
                 return;
             }
             byte[] prefix = new byte[2];
             payload.readBytes(prefix);
-
-            if (!Arrays.equals(prefix, new byte[]{(byte) 0xfe, (byte) 0xfd})) {
-                return;
-            }
-            if (this.queryHandler != null) {
+            if (Arrays.equals(prefix, QUERY_PREFIX)) {
                 this.queryHandler.handle(address, payload);
             }
         } catch (Exception e) {
@@ -1172,6 +1216,9 @@ public class Server {
 
     private int lastLevelGC;
 
+    /**
+     * Internal: Tick the server
+     */
     public void tickProcessor() {
         this.nextTick = System.currentTimeMillis();
         try {
@@ -1314,74 +1361,10 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        if (player.protocol >= ProtocolInfo.v1_21_40) {
-            player.dataPacket(CraftingManager.packet748);
-        } else if (player.protocol >= ProtocolInfo.v1_21_30) {
-            player.dataPacket(CraftingManager.packet729);
-        } else if (player.protocol >= ProtocolInfo.v1_21_20) {
-            player.dataPacket(CraftingManager.packet712);
-        } else if (player.protocol >= ProtocolInfo.v1_21_0) {
-            player.dataPacket(CraftingManager.packet685);
-        } else if (player.protocol >= ProtocolInfo.v1_20_80) {
-            player.dataPacket(CraftingManager.packet671);
-        } else if (player.protocol >= ProtocolInfo.v1_20_70) {
-            player.dataPacket(CraftingManager.packet662);
-        } else if (player.protocol >= ProtocolInfo.v1_20_60) {
-            player.dataPacket(CraftingManager.packet649);
-        } else if (player.protocol >= ProtocolInfo.v1_20_50) {
-            player.dataPacket(CraftingManager.packet630);
-        } else if (player.protocol >= ProtocolInfo.v1_20_40) {
-            player.dataPacket(CraftingManager.packet622);
-        } else if (player.protocol >= ProtocolInfo.v1_20_30_24) {
-            player.dataPacket(CraftingManager.packet618);
-        } else if (player.protocol >= ProtocolInfo.v1_20_10_21) {
-            player.dataPacket(CraftingManager.packet594);
-        } else if (player.protocol >= ProtocolInfo.v1_20_0_23) {
-            player.dataPacket(CraftingManager.packet589);
-        } else if (player.protocol >= ProtocolInfo.v1_19_80) {
-            player.dataPacket(CraftingManager.packet582);
-        } else if (player.protocol >= ProtocolInfo.v1_19_70_24) {
-            player.dataPacket(CraftingManager.packet575);
-        } else if (player.protocol >= ProtocolInfo.v1_19_60) {
-            player.dataPacket(CraftingManager.packet567);
-        } else if (player.protocol >= ProtocolInfo.v1_19_50_20) {
-            player.dataPacket(CraftingManager.packet560);
-        } else if (player.protocol >= ProtocolInfo.v1_19_30_23) {
-            player.dataPacket(CraftingManager.packet554);
-        } else if (player.protocol >= ProtocolInfo.v1_19_20) {
-            player.dataPacket(CraftingManager.packet544);
-        } else if (player.protocol >= ProtocolInfo.v1_19_0_29) {
-            player.dataPacket(CraftingManager.packet527);
-        } else if (player.protocol >= ProtocolInfo.v1_18_30) {
-            player.dataPacket(CraftingManager.packet503);
-        } else if (player.protocol >= ProtocolInfo.v1_18_10_26) {
-            player.dataPacket(CraftingManager.packet486);
-        } else if (player.protocol >= ProtocolInfo.v1_17_40) {
-            player.dataPacket(CraftingManager.packet471);
-        } else if (player.protocol >= ProtocolInfo.v1_17_30) {
-            player.dataPacket(CraftingManager.packet465);
-        } else if (player.protocol >= ProtocolInfo.v1_17_10) {
-            player.dataPacket(CraftingManager.packet448);
-        } else if (player.protocol >= ProtocolInfo.v1_17_0) {
-            player.dataPacket(CraftingManager.packet440);
-        } else if (player.protocol >= ProtocolInfo.v1_16_220) {
-            player.dataPacket(CraftingManager.packet431);
-        } else if (player.protocol >= ProtocolInfo.v1_16_100) {
-            player.dataPacket(CraftingManager.packet419);
-        } else if (player.protocol >= ProtocolInfo.v1_16_0) {
-            player.dataPacket(CraftingManager.packet407);
-        } else if (player.protocol >= ProtocolInfo.v1_13_0) {
-            player.dataPacket(CraftingManager.packet388);
-        } else if (player.protocol == ProtocolInfo.v1_12_0) {
-            player.dataPacket(CraftingManager.packet361);
-        } else if (player.protocol == ProtocolInfo.v1_11_0) {
-             player.dataPacket(CraftingManager.packet354);
-        } else if (player.protocol == ProtocolInfo.v1_10_0) {
-            player.dataPacket(CraftingManager.packet340);
-        } else if (player.protocol == ProtocolInfo.v1_9_0 || player.protocol == ProtocolInfo.v1_8_0 || player.protocol == ProtocolInfo.v1_7_0) { // these should work just fine
-            player.dataPacket(CraftingManager.packet313);
+        BatchPacket cachedPacket = this.craftingManager.getCachedPacket(player.getGameVersion());
+        if (cachedPacket != null) { // Don't send recipes if they wouldn't work anyways
+            player.dataPacket(cachedPacket);
         }
-        // Don't send recipes if they wouldn't work anyways
     }
 
     private void checkTickUpdates(int currentTick) {
@@ -1687,7 +1670,7 @@ public class Server {
     }
 
     public static int getGamemodeFromString(String str) {
-        return switch (str.trim().toLowerCase()) {
+        return switch (str.trim().toLowerCase(Locale.ROOT)) {
             case "0", "survival", "s" -> Player.SURVIVAL;
             case "1", "creative", "c" -> Player.CREATIVE;
             case "2", "adventure", "a" -> Player.ADVENTURE;
@@ -1697,7 +1680,7 @@ public class Server {
     }
 
     public static int getDifficultyFromString(String str) {
-        return switch (str.trim().toLowerCase()) {
+        return switch (str.trim().toLowerCase(Locale.ROOT)) {
             case "0", "peaceful", "p" -> 0;
             case "1", "easy", "e" -> 1;
             case "2", "normal", "n" -> 2;
@@ -1857,7 +1840,7 @@ public class Server {
     }
 
     public Optional<UUID> lookupName(String name) {
-        byte[] nameBytes = name.toLowerCase().getBytes(StandardCharsets.UTF_8);
+        byte[] nameBytes = name.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
         byte[] uuidBytes = nameLookup.get(nameBytes);
         if (uuidBytes == null) {
             return Optional.empty();
@@ -1874,7 +1857,7 @@ public class Server {
     }
 
     void updateName(UUID uuid, String name) {
-        byte[] nameBytes = name.toLowerCase().getBytes(StandardCharsets.UTF_8);
+        byte[] nameBytes = name.toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8);
 
         ByteBuffer buffer = ByteBuffer.allocate(16);
         buffer.putLong(uuid.getMostSignificantBits());
@@ -1884,7 +1867,7 @@ public class Server {
     }
 
     public IPlayer getOfflinePlayer(final String name) {
-        IPlayer result = this.getPlayerExact(name.toLowerCase());
+        IPlayer result = this.getPlayerExact(name.toLowerCase(Locale.ROOT));
         if (result != null) {
             return result;
         }
@@ -1920,7 +1903,7 @@ public class Server {
             Optional<UUID> uuid = lookupName(name);
             return getOfflinePlayerDataInternal(uuid.map(UUID::toString).orElse(name), true, create);
         } else {
-            return getOfflinePlayerDataInternal(name.toLowerCase(), true, create);
+            return getOfflinePlayerDataInternal(name.toLowerCase(Locale.ROOT), true, create);
         }
     }
 
@@ -2006,7 +1989,7 @@ public class Server {
     }
 
     private void saveOfflinePlayerData(String name, CompoundTag tag, boolean async, boolean runEvent) {
-        String nameLower = name.toLowerCase();
+        String nameLower = name.toLowerCase(Locale.ROOT);
         if (this.shouldSavePlayerData()) {
             PlayerDataSerializeEvent event = new PlayerDataSerializeEvent(nameLower, playerDataSerializer);
             if (runEvent) {
@@ -2112,10 +2095,10 @@ public class Server {
      */
     public Player getPlayer(String name) {
         Player found = null;
-        name = name.toLowerCase();
+        name = name.toLowerCase(Locale.ROOT);
         int delta = Integer.MAX_VALUE;
         for (Player player : this.getOnlinePlayers().values()) {
-            if (player.getName().toLowerCase().startsWith(name)) {
+            if (player.getName().toLowerCase(Locale.ROOT).startsWith(name)) {
                 int curDelta = player.getName().length() - name.length();
                 if (curDelta < delta) {
                     found = player;
@@ -2153,12 +2136,12 @@ public class Server {
      * @return matching players
      */
     public Player[] matchPlayer(String partialName) {
-        partialName = partialName.toLowerCase();
+        partialName = partialName.toLowerCase(Locale.ROOT);
         List<Player> matchedPlayer = new ArrayList<>();
         for (Player player : this.getOnlinePlayers().values()) {
-            if (player.getName().toLowerCase().equals(partialName)) {
+            if (player.getName().toLowerCase(Locale.ROOT).equals(partialName)) {
                 return new Player[]{player};
-            } else if (player.getName().toLowerCase().contains(partialName)) {
+            } else if (player.getName().toLowerCase(Locale.ROOT).contains(partialName)) {
                 matchedPlayer.add(player);
             }
         }
@@ -2566,7 +2549,18 @@ public class Server {
      * @return value
      */
     public int getPropertyInt(String variable, Integer defaultValue) {
-        return this.properties.exists(variable) ? (!this.properties.get(variable).equals("") ? Integer.parseInt(String.valueOf(this.properties.get(variable))) : defaultValue) : defaultValue;
+        Object value = this.properties.get(variable);
+        if (value == null) {
+            value = defaultValue;
+        }
+        if (value instanceof Integer) {
+            return (Integer) value;
+        }
+        String trimmed = String.valueOf(value).trim();
+        if (trimmed.isEmpty()) {
+            return defaultValue;
+        }
+        return Integer.parseInt(trimmed);
     }
 
     /**
@@ -2602,14 +2596,10 @@ public class Server {
         if (value instanceof Boolean) {
             return (Boolean) value;
         }
-        switch (String.valueOf(value)) {
-            case "on":
-            case "true":
-            case "1":
-            case "yes":
-                return true;
-        }
-        return false;
+        return switch (String.valueOf(value).trim().toLowerCase(Locale.ROOT)) {
+            case "on", "true", "1", "yes" -> true;
+            default -> false;
+        };
     }
 
     /**
@@ -2619,7 +2609,7 @@ public class Server {
      * @param value value
      */
     public void setPropertyBoolean(String variable, boolean value) {
-        this.properties.set(variable, value ? "1" : "0");
+        this.properties.set(variable, value);
         this.properties.save();
     }
 
@@ -2662,7 +2652,7 @@ public class Server {
      * @param name player name
      */
     public void addOp(String name) {
-        this.operators.set(name.toLowerCase(), true);
+        this.operators.set(name.toLowerCase(Locale.ROOT), true);
         Player player = this.getPlayerExact(name);
         if (player != null) {
             player.recalculatePermissions();
@@ -2676,7 +2666,7 @@ public class Server {
      * @param name player name
      */
     public void removeOp(String name) {
-        this.operators.remove(name.toLowerCase());
+        this.operators.remove(name.toLowerCase(Locale.ROOT));
         Player player = this.getPlayerExact(name);
         if (player != null) {
             player.recalculatePermissions();
@@ -2690,7 +2680,7 @@ public class Server {
      * @param name player name
      */
     public void addWhitelist(String name) {
-        this.whitelist.set(name.toLowerCase(), true);
+        this.whitelist.set(name.toLowerCase(Locale.ROOT), true);
         this.whitelist.save(true);
     }
 
@@ -2700,7 +2690,7 @@ public class Server {
      * @param name player name
      */
     public void removeWhitelist(String name) {
-        this.whitelist.remove(name.toLowerCase());
+        this.whitelist.remove(name.toLowerCase(Locale.ROOT));
         this.whitelist.save(true);
     }
 
@@ -2796,6 +2786,7 @@ public class Server {
      * @param players players
      * @return players sorted by protocol
      */
+    @Deprecated
     public static Int2ObjectMap<ObjectList<Player>> sortPlayers(Player[] players) {
         Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
         for (Player player : players) {
@@ -2810,10 +2801,39 @@ public class Server {
      * @param players players
      * @return players sorted by protocol
      */
+    @Deprecated
     public static Int2ObjectMap<ObjectList<Player>> sortPlayers(Collection<Player> players) {
         Int2ObjectMap<ObjectList<Player>> targets = new Int2ObjectOpenHashMap<>();
         for (Player player : players) {
             targets.computeIfAbsent(player.protocol, i -> new ObjectArrayList<>()).add(player);
+        }
+        return targets;
+    }
+
+    /**
+     * Group players by game version
+     *
+     * @param players players
+     * @return players grouped by game version
+     */
+    public static Object2ObjectMap<GameVersion, ObjectList<Player>> groupPlayersByGameVersion(Player[] players) {
+        Object2ObjectMap<GameVersion, ObjectList<Player>> targets = new Object2ObjectOpenHashMap<>();
+        for (Player player : players) {
+            targets.computeIfAbsent(player.getGameVersion(), i -> new ObjectArrayList<>()).add(player);
+        }
+        return targets;
+    }
+
+    /**
+     * Group players by game version
+     *
+     * @param players players
+     * @return players grouped by game version
+     */
+    public static Object2ObjectMap<GameVersion, ObjectList<Player>> groupPlayersByGameVersion(Collection<Player> players) {
+        Object2ObjectMap<GameVersion, ObjectList<Player>> targets = new Object2ObjectOpenHashMap<>();
+        for (Player player : players) {
+            targets.computeIfAbsent(player.getGameVersion(), i -> new ObjectArrayList<>()).add(player);
         }
         return targets;
     }
@@ -2915,6 +2935,9 @@ public class Server {
         Entity.registerEntity("Piglin", EntityPiglin.class);
         Entity.registerEntity("Zoglin", EntityZoglin.class);
         Entity.registerEntity("PiglinBrute", EntityPiglinBrute.class);
+        //Entity.registerEntity("Breeze", EntityBreeze.class);
+        //Entity.registerEntity("Bogged", EntityBogged.class);
+        Entity.registerEntity("Creaking", EntityCreaking.class);
         //Passive
         Entity.registerEntity("Bat", EntityBat.class);
         Entity.registerEntity("Cat", EntityCat.class);
@@ -2968,6 +2991,8 @@ public class Server {
         Entity.registerEntity("Human", EntityHuman.class, true);
         Entity.registerEntity("Lightning", EntityLightning.class);
         Entity.registerEntity("AreaEffectCloud", EntityAreaEffectCloud.class);
+
+        Entity.registerEntity("WindCharge", EntityWindCharge.class);
     }
 
     /**
@@ -3009,6 +3034,9 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.DECORATED_POT, BlockEntityDecoratedPot.class);
         BlockEntity.registerBlockEntity(BlockEntity.TARGET, BlockEntityTarget.class);
         BlockEntity.registerBlockEntity(BlockEntity.BRUSHABLE_BLOCK, BlockEntityBrushableBlock.class);
+        BlockEntity.registerBlockEntity(BlockEntity.CONDUIT, BlockEntityConduit.class);
+
+        // Persistent container, not on vanilla
         BlockEntity.registerBlockEntity(BlockEntity.PERSISTENT_CONTAINER, PersistentDataContainerBlockEntity.class);
     }
 
@@ -3100,6 +3128,7 @@ public class Server {
         this.pvpEnabled = this.getPropertyBoolean("pvp", true);
         this.announceAchievements = this.getPropertyBoolean("announce-player-achievements", false);
         this.spawnEggsEnabled = this.getPropertyBoolean("spawn-eggs", true);
+        this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
         this.xpBottlesOnCreative = this.getPropertyBoolean("xp-bottles-on-creative", false);
         this.shouldSavePlayerData = this.getPropertyBoolean("save-player-data", true);
         this.mobsFromBlocks = this.getPropertyBoolean("block-listener", true);
@@ -3107,6 +3136,13 @@ public class Server {
         this.vanillaBossBar = this.getPropertyBoolean("vanilla-bossbars", false);
         this.stopInGame = this.getPropertyBoolean("stop-in-game", false);
         this.opInGame = this.getPropertyBoolean("op-in-game", false);
+
+        switch (this.getPropertyString("space-name-mode")) {
+            case "disabled" -> this.spaceMode = 0;
+            case "replacing" -> this.spaceMode = 2;
+            default -> this.spaceMode = 1;
+        }
+
         this.lightUpdates = this.getPropertyBoolean("light-updates", false);
         this.queryPlugins = this.getPropertyBoolean("query-plugins", false);
         this.flyChecks = this.getPropertyBoolean("allow-flight", false);
@@ -3135,7 +3171,10 @@ public class Server {
         this.chunksPerTick = this.getPropertyInt("chunk-sending-per-tick", 4);
         this.spawnThreshold = this.getPropertyInt("spawn-threshold", 56);
         this.savePlayerDataByUuid = this.getPropertyBoolean("save-player-data-by-uuid", true);
+
         this.vanillaPortals = this.getPropertyBoolean("vanilla-portals", true);
+        this.portalTicks = this.getPropertyInt("portal-ticks", 80);
+
         this.personaSkins = this.getPropertyBoolean("persona-skins", true);
         this.cacheChunks = this.getPropertyBoolean("cache-chunks", false);
         this.callEntityMotionEv = this.getPropertyBoolean("call-entity-motion-event", true);
@@ -3178,7 +3217,13 @@ public class Server {
         this.levelDbCache = this.getPropertyInt("leveldb-cache-mb", 80);
         this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
         this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
+        this.enableNewPaintings = this.getPropertyBoolean("enable-new-paintings", true);
+        this.enableNewChickenEggsLaying = this.getPropertyBoolean("enable-new-chicken-eggs-laying", true);
         this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
+        this.enableRakSendCookie = this.getPropertyBoolean("enable-rak-send-cookie", true);
+
+        this.netEaseMode = this.getPropertyBoolean("netease-client-support", false);
+        this.onlyNetEaseMode = this.getPropertyBoolean("only-allow-netease-client", false);
     }
 
     /**
@@ -3241,8 +3286,10 @@ public class Server {
             put("explosion-break-blocks", true);
             put("stop-in-game", false);
             put("op-in-game", true);
+            put("space-name-mode", "ignore");
             put("xp-bottles-on-creative", true);
             put("spawn-eggs", true);
+            put("forced-safety-enchant", true);
             put("mob-ai", true);
             put("entity-auto-spawn-task", true);
             put("entity-despawn-task", true);
@@ -3260,6 +3307,7 @@ public class Server {
             put("compression-threshold", "256");
             put("use-snappy-compression", false);
             put("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
+            put("enable-rak-send-cookie", true);
             put("timeout-milliseconds", 25000);
 
             put("auto-tick-rate", true);
@@ -3283,6 +3331,7 @@ public class Server {
             put("nether", true);
             put("end", true);
             put("vanilla-portals", true);
+            put("portal-ticks", 80);
             put("multi-nether-worlds", "");
             put("anti-xray-worlds", "");
 
@@ -3326,6 +3375,11 @@ public class Server {
             put("leveldb-cache-mb", 80);
             put("use-native-leveldb", false);
             put("enable-raw-ores", true);
+            put("enable-new-paintings", true);
+            put("enable-new-chicken-eggs-laying", true);
+
+            put("netease-client-support", false);
+            put("only-allow-netease-client", false);
         }
     }
 

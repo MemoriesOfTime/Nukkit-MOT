@@ -1,7 +1,7 @@
 package cn.nukkit.level.format.leveldb;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.nbt.tag.IntTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.Collections;
@@ -18,11 +18,11 @@ public final class LevelDBConstants {
     public static final byte FINALISATION_DONE = 2;
 
     public static final byte CURRENT_STORAGE_VERSION = 8;
-    public static final byte CURRENT_LEVEL_CHUNK_VERSION = 40; // 1.18.0.25 beta
+    public static final byte CURRENT_LEVEL_CHUNK_VERSION = 41; // 1.21.40
     public static final byte CURRENT_LEVEL_SUBCHUNK_VERSION = 8;
 
     private static final byte LATEST_STORAGE_VERSION = 10; // 1.19.40
-    private static final byte LATEST_LEVEL_CHUNK_VERSION = 40; // 1.18.30
+    private static final byte LATEST_LEVEL_CHUNK_VERSION = 41; // 1.21.40
     private static final byte LATEST_LEVEL_SUBCHUNK_VERSION = 9; // 1.18
 
     public static final int CURRENT_NUKKIT_DATA_VERSION = 8;
@@ -34,14 +34,13 @@ public final class LevelDBConstants {
     /**
      * This is protocol version if block palette used in storage
      */
-    public static final int PALETTE_VERSION = ProtocolInfo.v1_21_0;
+    public static final int PALETTE_VERSION = GameVersion.getFeatureVersion().getProtocol();
 
     public static final int STATE_MAYOR_VERSION = 1;
     public static final int STATE_MINOR_VERSION = 21;
-    public static final int STATE_PATCH_VERSION = 0;
+    public static final int STATE_PATCH_VERSION = 60;
 
-    public static final int STATE_VERSION = makeVersion(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION) + 3; // ? 3 updaters were added in 1.21.0 ?
-
+    public static final int STATE_VERSION = makeVersion(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION) + 33; //33 update
     public static final List<IntTag> CURRENT_LEVEL_VERSION = Collections.unmodifiableList(ObjectArrayList.of(
             new IntTag("", STATE_MAYOR_VERSION), // major
             new IntTag("", STATE_MINOR_VERSION), // minor

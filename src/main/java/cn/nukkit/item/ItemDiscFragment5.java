@@ -18,6 +18,6 @@ public class ItemDiscFragment5 extends Item {
 
     @Override
     public boolean isSupportedOn(int protocolId) {
-        return protocolId >= ProtocolInfo.v1_19_0;
+        return protocolId >= ProtocolInfo.v1_19_0_29;
     }
 }

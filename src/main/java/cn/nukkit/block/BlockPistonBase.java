@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityChest;
 import cn.nukkit.blockentity.BlockEntityMovingBlock;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
 import cn.nukkit.event.block.BlockPistonEvent;
@@ -52,12 +53,12 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
     @Override
     public double getResistance() {
-        return 2.5;
+        return 1.5;
     }
 
     @Override
     public double getHardness() {
-        return 0.5;
+        return 1.5;
     }
 
     @Override
@@ -126,8 +127,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
         }
 
         BlockEntity blockEntity = this.level.getBlockEntity(this);
-        if (blockEntity instanceof BlockEntityPistonArm) {
-            BlockEntityPistonArm arm = (BlockEntityPistonArm) blockEntity;
+        if (blockEntity instanceof BlockEntityPistonArm arm) {
             boolean powered = this.isPowered();
 
             if (arm.state % 2 == 0 && arm.powered != powered && this.checkState(powered)) {
@@ -217,9 +217,14 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
             List<CompoundTag> namedTags = new ArrayList<>();
             for (Block oldBlock : newBlocks){
+                if (this.level.getBlock(oldBlock.getLocation()).getId() != oldBlock.getId()) return false; // The delay between the calculation of blocks and move is small, but it is enough to cancel the action.
+
                 CompoundTag tag = null;
                 BlockEntity blockEntity = this.level.getBlockEntity(oldBlock);
                 if (blockEntity != null && !(blockEntity instanceof BlockEntityMovingBlock)) {
+                    if (blockEntity instanceof BlockEntityChest chest) {
+                        chest.unpair();
+                    }
                     blockEntity.saveNBT();
                     tag = new CompoundTag(blockEntity.namedTag.getTags());
                     blockEntity.close();

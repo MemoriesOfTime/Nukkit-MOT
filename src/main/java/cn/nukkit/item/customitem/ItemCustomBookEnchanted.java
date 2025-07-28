@@ -1,9 +1,10 @@
 package cn.nukkit.item.customitem;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.item.ItemBookEnchanted;
 import cn.nukkit.item.ItemID;
-import cn.nukkit.item.customitem.data.ItemCreativeCategory;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory;
 
 public abstract class ItemCustomBookEnchanted extends ItemBookEnchanted implements CustomItem {
     private final String id;
@@ -24,13 +25,13 @@ public abstract class ItemCustomBookEnchanted extends ItemBookEnchanted implemen
     }
 
     @Override
-    public String getNamespaceId(int protocolId) {
+    public String getNamespaceId(GameVersion protocolId) {
         return this.getNamespaceId();
     }
 
     @Override
     public CustomItemDefinition getDefinition() {
-        return CustomItemDefinition.customBuilder(this, ItemCreativeCategory.ITEMS)
+        return CustomItemDefinition.customBuilder(this, CreativeItemCategory.ITEMS)
                 .allowOffHand(false)
                 .creativeGroup("itemGroup.name.enchantedBook")
                 .foil(true)

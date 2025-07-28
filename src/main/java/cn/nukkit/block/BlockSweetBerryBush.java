@@ -96,10 +96,7 @@ public class BlockSweetBerryBush extends BlockFlowable {
             return true;
         }
 
-        int amount = 1 + ThreadLocalRandom.current().nextInt(2);
-        if (age == 3) {
-            amount++;
-        }
+        int amount = age - 1 + ThreadLocalRandom.current().nextInt(2);
 
         BlockHarvestEvent event = new BlockHarvestEvent(this, new BlockSweetBerryBush(1), new Item[]{new ItemSweetBerries(0, amount)});
         this.getLevel().getServer().getPluginManager().callEvent(event);
@@ -181,10 +178,10 @@ public class BlockSweetBerryBush extends BlockFlowable {
 
     @Override
     public Item[] getDrops(Item item) {
-        int age = MathHelper.clamp(getDamage(), 0, 3);
-        int amount = 1 + ThreadLocalRandom.current().nextInt(2);
-        if (age == 3) {
-            amount++;
+        int age = MathHelper.clamp(this.getDamage(), 0, 3);
+        int amount = 0;
+        if(age > 1) {
+            amount = age - 1 + ThreadLocalRandom.current().nextInt(2);
         }
 
         return new Item[]{ new ItemSweetBerries(0, amount) };

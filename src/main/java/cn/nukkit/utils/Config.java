@@ -576,7 +576,7 @@ public class Config {
                 if (this.config.containsKey(key)) {
                     MainLogger.getLogger().debug("[Config] Repeated property " + key + " in file " + this.file.toString());
                 }
-                switch (value.toLowerCase()) {
+                switch (value.toLowerCase(Locale.ROOT)) {
                     case "on":
                     case "true":
                     case "yes":
@@ -621,7 +621,7 @@ public class Config {
             case Config.JSON:
                 GsonBuilder builder = new GsonBuilder();
                 Gson gson = builder.create();
-                this.config = new ConfigSection(gson.fromJson(content, new LinkedHashMapTypeToken().getType()));
+                this.config = new ConfigSection(gson.fromJson(content, new LinkedHashMapTypeToken()));
                 break;
             case Config.YAML:
                 LoadSettings settings = LoadSettings.builder()

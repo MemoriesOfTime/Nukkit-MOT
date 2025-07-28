@@ -13,7 +13,7 @@ public abstract class EntityTameableMob extends EntityWalkingMob implements Enti
 
     private String ownerUUID = "";
 
-    private boolean sitting = false;
+    private boolean sitting;
 
     public EntityTameableMob(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -31,6 +31,7 @@ public abstract class EntityTameableMob extends EntityWalkingMob implements Enti
                     this.setOwner(player);
                 }
                 this.setSitting(namedTag.getBoolean(NAMED_TAG_SITTING));
+                this.pitch = 0.0;
             }
         }
     }

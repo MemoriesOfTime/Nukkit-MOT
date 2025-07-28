@@ -1,5 +1,6 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.*;
@@ -15,6 +16,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -105,10 +107,16 @@ public class Binary {
 
     public static byte[] writeMetadata(EntityMetadata metadata) {
         Server.mvw("Binary#writeMetadata(EntityMetadata)");
-        return writeMetadata(ProtocolInfo.CURRENT_PROTOCOL, metadata);
+        return writeMetadata(GameVersion.getLastVersion(), metadata);
     }
 
+    @Deprecated
     public static byte[] writeMetadata(int protocol, EntityMetadata metadata) {
+        return writeMetadata(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), metadata);
+    }
+
+    public static byte[] writeMetadata(GameVersion gameVersion, EntityMetadata metadata) {
+        int protocol = gameVersion.getProtocol();
         BinaryStream stream = new BinaryStream();
         Map<Integer, EntityData> map = metadata.getMap();
         stream.putUnsignedVarInt(map.size());
@@ -174,7 +182,7 @@ public class Binary {
                 case Entity.DATA_TYPE_NBT:
                     NBTEntityData slot = (NBTEntityData) d;
                     if (protocol < ProtocolInfo.v1_12_0) {
-                        stream.putSlot(protocol, slot.item);
+                        stream.putSlot(gameVersion, slot.item);
                     } else {
                         try {
                             stream.put(NBTIO.write(slot.getData(), ByteOrder.LITTLE_ENDIAN, true));
@@ -510,7 +518,7 @@ public class Binary {
             }
             stringBuilder.append(hv);
         }
-        return stringBuilder.toString().toUpperCase();
+        return stringBuilder.toString().toUpperCase(Locale.ROOT);
     }
 
     public static byte[] hexStringToBytes(String hexString) {
@@ -518,7 +526,7 @@ public class Binary {
             return null;
         }
         String str = "0123456789ABCDEF";
-        hexString = hexString.toUpperCase().replace(" ", "");
+        hexString = hexString.toUpperCase(Locale.ROOT).replace(" ", "");
         int length = hexString.length() >> 1;
         char[] hexChars = hexString.toCharArray();
         byte[] d = new byte[length];

@@ -10,11 +10,11 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.types.ExperimentData;
 import cn.nukkit.network.protocol.types.NetworkPermissions;
+import cn.nukkit.utils.Binary;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.log4j.Log4j2;
 
 import java.io.IOException;
 import java.nio.ByteOrder;
@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
+@Log4j2
 @ToString
 public class StartGamePacket extends DataPacket {
 
@@ -32,7 +33,12 @@ public class StartGamePacket extends DataPacket {
     public static final int GAME_PUBLISH_SETTING_FRIENDS_ONLY = 2;
     public static final int GAME_PUBLISH_SETTING_FRIENDS_OF_FRIENDS = 3;
     public static final int GAME_PUBLISH_SETTING_PUBLIC = 4;
-    private static final Logger log = LoggerFactory.getLogger(StartGamePacket.class);
+
+    private static final byte[] EMPTY_UUID;
+
+    static {
+        EMPTY_UUID = Binary.writeUUID(new UUID(0, 0));
+    }
 
     @Override
     public byte pid() {
@@ -51,6 +57,13 @@ public class StartGamePacket extends DataPacket {
     public float pitch;
     public int seed;
     public byte dimension;
+    /**
+     * generator is the generator used for the world. It is a value from 0-4, with 0 being old limited worlds,
+     * 1 being infinite worlds, 2 being flat worlds, 3 being nether worlds and 4 being end worlds. A value of
+     * 0 will actually make the client stop rendering chunks you send beyond the world limit.
+     * <p>
+     * 防止主世界不渲染384高度，这里始终保持1
+     */
     public int generator = 1;
     public int worldGamemode;
     public int difficulty;
@@ -101,13 +114,16 @@ public class StartGamePacket extends DataPacket {
     public long currentTick;
     public int enchantmentSeed;
     public Collection<CustomBlockDefinition> blockDefinitions = CustomBlockManager.get().getBlockDefinitions();
-    public String multiplayerCorrelationId = "";
+    public String multiplayerCorrelationId = "00000000-0000-0000-0000-000000000000";
     public boolean isDisablingPersonas;
     public boolean isDisablingCustomSkins;
     /**
      * @since v527
      */
     public CompoundTag playerPropertyData = new CompoundTag("");
+    /**
+     * If true, the server will inform clients that they have the ability to generate visual level chunks outside of player interaction distances.
+     */
     public boolean clientSideGenerationEnabled;
     public byte chatRestrictionLevel;
     public boolean disablePlayerInteractions;
@@ -150,6 +166,10 @@ public class StartGamePacket extends DataPacket {
      * @since v685
      */
     public String scenarioId = "";
+    /**
+     * @since v827
+     */
+    private boolean tickDeathSystemsEnabled;
 
     @Override
     public void decode() {
@@ -295,6 +315,9 @@ public class StartGamePacket extends DataPacket {
                         this.putString(this.serverId);
                         this.putString(this.worldId);
                         this.putString(this.scenarioId);
+                        if (protocol >= ProtocolInfo.v1_21_90) {
+                            this.putString(""); // OwnerId
+                        }
                     }
                 }
             }
@@ -308,7 +331,9 @@ public class StartGamePacket extends DataPacket {
         if (protocol >= ProtocolInfo.v1_13_0) {
             if (protocol >= ProtocolInfo.v1_16_100) {
                 if (protocol >= ProtocolInfo.v1_16_210) {
-                    this.putVarInt(this.isMovementServerAuthoritative ? 1 : 0); // 2 - rewind
+                    if (protocol < ProtocolInfo.v1_21_90) {
+                        this.putVarInt(this.isMovementServerAuthoritative ? 1 : 0); // 2 - rewind
+                    }
                     this.putVarInt(0); // RewindHistorySize
                     this.putBoolean(this.isServerAuthoritativeBlockBreaking); // isServerAuthoritativeBlockBreaking
                 } else {
@@ -340,8 +365,8 @@ public class StartGamePacket extends DataPacket {
             } else {
                 this.put(GlobalBlockPalette.getCompiledTable(this.protocol));
             }
-            if (protocol >= ProtocolInfo.v1_12_0) {
-                this.put(RuntimeItems.getMapping(protocol).getItemPalette());
+            if (protocol >= ProtocolInfo.v1_12_0 && protocol < ProtocolInfo.v1_21_60) {
+                this.put(RuntimeItems.getMapping(gameVersion).getItemPalette());
             }
             this.putString(this.multiplayerCorrelationId);
             if (protocol == 354 && version != null && version.startsWith("1.11.4")) {
@@ -360,12 +385,16 @@ public class StartGamePacket extends DataPacket {
                         }
                         this.putLLong(0L); // BlockRegistryChecksum
                         if (protocol >= ProtocolInfo.v1_19_0_29) {
-                            this.putUUID(new UUID(0, 0)); // worldTemplateId
+                            //this.putUUID(new UUID(0, 0)); // worldTemplateId
+                            this.put(EMPTY_UUID); // worldTemplateId
                             if (protocol >= ProtocolInfo.v1_19_20) {
                                 this.putBoolean(this.clientSideGenerationEnabled);
                                 if (protocol >= ProtocolInfo.v1_19_80) {
                                     this.putBoolean(this.blockNetworkIdsHashed);
                                     if (protocol >= ProtocolInfo.v1_20_0_23) {
+                                        if (protocol >= ProtocolInfo.v1_21_100) {
+                                            this.putBoolean(this.tickDeathSystemsEnabled);
+                                        }
                                         this.putBoolean(this.networkPermissions.isServerAuthSounds());
                                     }
                                 }

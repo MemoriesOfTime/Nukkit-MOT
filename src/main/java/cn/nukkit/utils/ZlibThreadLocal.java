@@ -63,7 +63,7 @@ public final class ZlibThreadLocal implements ZlibProvider {
     public byte[] deflateRaw(byte[][] datas, int level) throws IOException {
         Deflater deflater = DEFLATER_RAW.get();
         deflater.reset();
-        deflater.setLevel(datas.length < Server.getInstance().networkCompressionThreshold ? 0 : level);
+        deflater.setLevel(level);
         FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
         bos.reset();
         byte[] buffer = BUFFER.get();
@@ -88,7 +88,7 @@ public final class ZlibThreadLocal implements ZlibProvider {
     public byte[] deflateRaw(byte[] data, int level) throws IOException {
         Deflater deflater = DEFLATER_RAW.get();
         deflater.reset();
-        deflater.setLevel(level);
+        deflater.setLevel(data.length < Server.getInstance().networkCompressionThreshold ? 0 : level);
         deflater.setInput(data);
         deflater.finish();
         FastByteArrayOutputStream bos = ThreadCache.fbaos.get();
@@ -116,6 +116,9 @@ public final class ZlibThreadLocal implements ZlibProvider {
             int length = 0;
             while (!inflater.finished()) {
                 int i = inflater.inflate(buffer);
+                if (i == 0) {
+                    throw new IOException("Could not decompress data");
+                }
                 length += i;
                 if (maxSize > 0 && length >= maxSize) {
                     throw new IOException("Inflated data exceeds maximum size");

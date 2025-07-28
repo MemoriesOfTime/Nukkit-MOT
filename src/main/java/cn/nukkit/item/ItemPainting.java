@@ -11,10 +11,10 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author MagicDroidX
@@ -56,24 +56,14 @@ public class ItemPainting extends Item {
 
         List<EntityPainting.Motive> validMotives = new ArrayList<>();
         for (EntityPainting.Motive motive : EntityPainting.motives) {
-            boolean valid = true;
-            for (int x = 0; x < motive.width && valid; x++) {
-                for (int z = 0; z < motive.height && valid; z++) {
-                    if (target.getSide(BlockFace.fromIndex(RIGHT[face.getIndex() - 2]), x).isTransparent() ||
-                            target.up(z).isTransparent() ||
-                            block.getSide(BlockFace.fromIndex(RIGHT[face.getIndex() - 2]), x).isSolid() ||
-                            block.up(z).isSolid()) {
-                        valid = false;
-                    }
-                }
-            }
-
-            if (valid) {
+            if (motive.predicate.test(target.getLevel(), face, block, target)) {
                 validMotives.add(motive);
             }
         }
+        if(validMotives.isEmpty()) return false;
+
         int direction = DIRECTION[face.getIndex() - 2];
-        EntityPainting.Motive motive = validMotives.get(Utils.random.nextInt(validMotives.size()));
+        EntityPainting.Motive motive = validMotives.get(ThreadLocalRandom.current().nextInt(validMotives.size()));
 
         Vector3 position = new Vector3(target.x + 0.5, target.y + 0.5, target.z + 0.5);
         double widthOffset = offset(motive.width);
@@ -124,6 +114,9 @@ public class ItemPainting extends Item {
     }
 
     private static double offset(int value) {
-        return value > 1 ? 0.5 : 0;
+        if(value > 1 && value != 3) {
+            return 0.5;
+        }
+        return 0;
     }
 }

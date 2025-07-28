@@ -4,6 +4,7 @@ import cn.nukkit.Server;
 import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.LoginPacket;
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import org.jetbrains.annotations.Nullable;
@@ -131,6 +132,11 @@ public final class ClientChainData implements LoginChainData {
     }
 
     @Override
+    public String getTitleId() {
+        return titleId;
+    }
+
+    @Override
     @Nullable
     public String getWaterdogXUID() {
         return waterdogXUID;
@@ -195,10 +201,9 @@ public final class ClientChainData implements LoginChainData {
     private int defaultInputMode;
     private String waterdogIP;
     private String waterdogXUID;
-
     private int UIProfile;
-
     private String capeData;
+    private String titleId;
 
     private JsonObject rawData;
 
@@ -244,9 +249,10 @@ public final class ClientChainData implements LoginChainData {
     }
 
     public static JsonObject decodeToken(String token) {
-        String[] base = token.split("\\.", 100);
+        String[] base = token.split("\\.", 5);
         if (base.length < 2) return null;
-        return GSON.fromJson(new String(Base64.getDecoder().decode(base[1]), StandardCharsets.UTF_8), JsonObject.class);
+        return GSON.fromJson(new String((Server.getInstance().netEaseMode ? Base64.getUrlDecoder() : Base64.getDecoder())
+                .decode(base[1]), StandardCharsets.UTF_8), JsonObject.class);
     }
 
     private void decodeChainData() {
@@ -254,9 +260,18 @@ public final class ClientChainData implements LoginChainData {
         if (size > 52428800) {
             throw new IllegalArgumentException("The chain data is too big: " + size);
         }
-        Map<String, List<String>> map = GSON.fromJson(new String(bs.get(size), StandardCharsets.UTF_8), new MapTypeToken().getType());
-        if (map.isEmpty() || !map.containsKey("chain") || map.get("chain").isEmpty()) return;
-        List<String> chains = map.get("chain");
+
+        Map<String, Object> map = GSON.fromJson(new String(bs.get(size), StandardCharsets.UTF_8), new MapTypeToken());
+
+        String certificate = (String) map.get("Certificate");
+        if (certificate != null) {
+            map = GSON.fromJson(certificate, new MapTypeToken());
+        }
+
+        List<String> chains = (List<String>) map.get("chain");
+        if (chains == null || chains.isEmpty()) {
+            return;
+        }
 
         // Validate keys
         try {
@@ -273,7 +288,13 @@ public final class ClientChainData implements LoginChainData {
                 if (extra.has("displayName")) this.username = extra.get("displayName").getAsString();
                 if (extra.has("identity")) this.clientUUID = UUID.fromString(extra.get("identity").getAsString());
                 if (extra.has("XUID")) this.xuid = extra.get("XUID").getAsString();
+
+                JsonElement titleIdElement = extra.get("titleId");
+                if (titleIdElement != null && !titleIdElement.isJsonNull()) {
+                    this.titleId = titleIdElement.getAsString();
+                }
             }
+
             if (chainMap.has("identityPublicKey")) {
                 this.identityPublicKey = chainMap.get("identityPublicKey").getAsString();
             }
@@ -292,7 +313,7 @@ public final class ClientChainData implements LoginChainData {
         }
     }
 
-    private static class MapTypeToken extends TypeToken<Map<String, List<String>>> {
+    private static class MapTypeToken extends TypeToken<Map<String, Object>> {
     }
 
     public static class TooBigSkinException extends RuntimeException {

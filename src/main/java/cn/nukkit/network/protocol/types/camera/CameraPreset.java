@@ -37,6 +37,14 @@ public final class CameraPreset implements NamedDefinition {
      * @since v712
      */
     private Float radius;
+    /**
+     * @since v776 1.21.60
+     */
+    private Float minYawLimit;
+    /**
+     * @since v776 1.21.60
+     */
+    private Float maxYawLimit;
     @Nullable
     private CameraAudioListener listener;
     private OptionalBoolean playEffect = OptionalBoolean.empty();
@@ -66,52 +74,46 @@ public final class CameraPreset implements NamedDefinition {
     private OptionalBoolean continueTargeting = OptionalBoolean.empty();
     /**
      * @since v748
+     * @deprecated v818
      */
     private OptionalBoolean alignTargetAndCameraForward = OptionalBoolean.empty();
+    /**
+     * @since v766
+     */
+    private Float blockListeningRadius;
+    /**
+     * @since v766
+     */
+    private CameraAimAssistPreset aimAssistPreset;
+    /**
+     * @since v800
+     */
+    @Nullable
+    private ControlScheme controlScheme;
 
     private int runtimeId;
 
     @Deprecated
-    public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, @Nullable CameraAudioListener listener, OptionalBoolean playEffect) {
-        this.identifier = identifier;
-        this.parentPreset = parentPreset;
-        this.pos = pos;
-        this.yaw = yaw;
-        this.pitch = pitch;
-        this.listener = listener;
-        this.playEffect = playEffect;
-    }
-
-    @Deprecated
-    public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, @Nullable Vector2f viewOffset, @Nullable Float radius, @Nullable CameraAudioListener listener, OptionalBoolean playEffect) {
-        this.identifier = identifier;
-        this.parentPreset = parentPreset;
-        this.pos = pos;
-        this.yaw = yaw;
-        this.pitch = pitch;
-        this.viewOffset = viewOffset;
-        this.radius = radius;
-        this.listener = listener;
-        this.playEffect = playEffect;
-    }
-
-    @Deprecated
-    public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, @Nullable Vector2f viewOffset, @Nullable Float radius, @Nullable CameraAudioListener listener, OptionalBoolean playEffect, @Nullable Float rotationSpeed, OptionalBoolean snapToTarget, @Nullable Vector3f entityOffset) {
-        this.identifier = identifier;
-        this.parentPreset = parentPreset;
-        this.pos = pos;
-        this.yaw = yaw;
-        this.pitch = pitch;
-        this.viewOffset = viewOffset;
-        this.radius = radius;
-        this.listener = listener;
-        this.playEffect = playEffect;
-        this.rotationSpeed = rotationSpeed;
-        this.snapToTarget = snapToTarget;
-        this.entityOffset = entityOffset;
-    }
-
-    public CameraPreset(String identifier, String parentPreset, @Nullable Vector3f pos, @Nullable Float yaw, @Nullable Float pitch, Vector2f viewOffset, Float radius, @Nullable CameraAudioListener listener, OptionalBoolean playEffect, Float rotationSpeed, OptionalBoolean snapToTarget, Vector3f entityOffset, Vector2f horizontalRotationLimit, Vector2f verticalRotationLimit, OptionalBoolean continueTargeting, OptionalBoolean alignTargetAndCameraForward) {
+    public CameraPreset(
+            String identifier,
+            String parentPreset,
+            @Nullable Vector3f pos,
+            @Nullable Float yaw,
+            @Nullable Float pitch,
+            Vector2f viewOffset,
+            Float radius,
+            Float minYawLimit,
+            Float maxYawLimit,
+            @Nullable CameraAudioListener listener,
+            OptionalBoolean playEffect, Float rotationSpeed,
+            OptionalBoolean snapToTarget, Vector3f entityOffset,
+            Vector2f horizontalRotationLimit,
+            Vector2f verticalRotationLimit,
+            OptionalBoolean continueTargeting,
+            OptionalBoolean alignTargetAndCameraForward,
+            Float blockListeningRadius,
+            CameraAimAssistPreset aimAssistPreset
+    ) {
         this.identifier = identifier;
         this.parentPreset = parentPreset;
         this.pos = pos;
@@ -119,6 +121,8 @@ public final class CameraPreset implements NamedDefinition {
         this.pitch = pitch;
         this.viewOffset = viewOffset;
         this.radius = radius;
+        this.minYawLimit = minYawLimit;
+        this.maxYawLimit = maxYawLimit;
         this.listener = listener;
         this.playEffect = playEffect;
         this.rotationSpeed = rotationSpeed;
@@ -128,6 +132,52 @@ public final class CameraPreset implements NamedDefinition {
         this.verticalRotationLimit = verticalRotationLimit;
         this.continueTargeting = continueTargeting;
         this.alignTargetAndCameraForward = alignTargetAndCameraForward;
+        this.blockListeningRadius = blockListeningRadius;
+        this.aimAssistPreset = aimAssistPreset;
+    }
+
+    public CameraPreset(
+            String identifier,
+            String parentPreset,
+            @Nullable Vector3f pos,
+            @Nullable Float yaw,
+            @Nullable Float pitch,
+            Vector2f viewOffset,
+            Float radius,
+            Float minYawLimit,
+            Float maxYawLimit,
+            @Nullable CameraAudioListener listener,
+            OptionalBoolean playEffect, Float rotationSpeed,
+            OptionalBoolean snapToTarget, Vector3f entityOffset,
+            Vector2f horizontalRotationLimit,
+            Vector2f verticalRotationLimit,
+            OptionalBoolean continueTargeting,
+            OptionalBoolean alignTargetAndCameraForward,
+            Float blockListeningRadius,
+            CameraAimAssistPreset aimAssistPreset,
+            ControlScheme controlScheme
+    ) {
+        this.identifier = identifier;
+        this.parentPreset = parentPreset;
+        this.pos = pos;
+        this.yaw = yaw;
+        this.pitch = pitch;
+        this.viewOffset = viewOffset;
+        this.radius = radius;
+        this.minYawLimit = minYawLimit;
+        this.maxYawLimit = maxYawLimit;
+        this.listener = listener;
+        this.playEffect = playEffect;
+        this.rotationSpeed = rotationSpeed;
+        this.snapToTarget = snapToTarget;
+        this.entityOffset = entityOffset;
+        this.horizontalRotationLimit = horizontalRotationLimit;
+        this.verticalRotationLimit = verticalRotationLimit;
+        this.continueTargeting = continueTargeting;
+        this.alignTargetAndCameraForward = alignTargetAndCameraForward;
+        this.blockListeningRadius = blockListeningRadius;
+        this.aimAssistPreset = aimAssistPreset;
+        this.controlScheme = controlScheme;
     }
 
     public String getParentPreset() {

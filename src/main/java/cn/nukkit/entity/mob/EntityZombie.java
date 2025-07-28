@@ -218,7 +218,7 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
         super.attack(ev);
 
         if (!ev.isCancelled() && ev.getCause() == EntityDamageEvent.DamageCause.DROWNING && !(this instanceof EntityZombieVillager)) {
-            CreatureSpawnEvent cse = new CreatureSpawnEvent(EntityDrowned.NETWORK_ID, this, CreatureSpawnEvent.SpawnReason.DROWNED);
+            CreatureSpawnEvent cse = new CreatureSpawnEvent(EntityDrowned.NETWORK_ID, this, CreatureSpawnEvent.SpawnReason.DROWNED, this);
             level.getServer().getPluginManager().callEvent(cse);
 
             if (!cse.isCancelled()) {

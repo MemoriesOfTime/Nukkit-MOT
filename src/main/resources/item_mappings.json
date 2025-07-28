@@ -136,6 +136,7 @@
     "8": "minecraft:damaged_anvil"
   },
   "minecraft:stone_block_slab": {
+    "protocol": 685,
     "0": "minecraft:smooth_stone_slab",
     "1": "minecraft:sandstone_slab",
     "2": "minecraft:petrified_oak_slab",
@@ -146,18 +147,20 @@
     "7": "minecraft:nether_brick_slab"
   },
   "minecraft:coral_block": {
+    "protocol": 685,
     "0": "minecraft:tube_coral_block",
     "1": "minecraft:brain_coral_block",
     "2": "minecraft:bubble_coral_block",
     "3": "minecraft:fire_coral_block",
     "4": "minecraft:horn_coral_block",
-    "5": "minecraft:dead_tube_coral_block",
-    "6": "minecraft:dead_brain_coral_block",
-    "7": "minecraft:dead_bubble_coral_block",
-    "8": "minecraft:dead_fire_coral_block",
-    "9": "minecraft:dead_horn_coral_block"
+    "8": "minecraft:dead_tube_coral_block",
+    "9": "minecraft:dead_brain_coral_block",
+    "10": "minecraft:dead_bubble_coral_block",
+    "11": "minecraft:dead_fire_coral_block",
+    "12": "minecraft:dead_horn_coral_block"
   },
   "minecraft:double_plant": {
+    "protocol": 685,
     "0": "minecraft:sunflower",
     "1": "minecraft:lilac",
     "2": "minecraft:tall_grass",
@@ -166,10 +169,12 @@
     "5": "minecraft:peony"
   },
   "minecraft:tallgrass": {
+    "protocol": 685,
     "1": "minecraft:short_grass",
     "2": "minecraft:fern"
   },
   "minecraft:coral_fan_dead": {
+    "protocol": 671,
     "0": "minecraft:dead_tube_coral_fan",
     "1": "minecraft:dead_brain_coral_fan",
     "2": "minecraft:dead_bubble_coral_fan",
@@ -177,6 +182,7 @@
     "4": "minecraft:dead_horn_coral_fan"
   },
   "minecraft:coral_fan": {
+    "protocol": 671,
     "0": "minecraft:tube_coral_fan",
     "1": "minecraft:brain_coral_fan",
     "2": "minecraft:bubble_coral_fan",
@@ -184,6 +190,7 @@
     "4": "minecraft:horn_coral_fan"
   },
   "minecraft:sapling": {
+    "protocol": 671,
     "0": "minecraft:oak_sapling",
     "1": "minecraft:spruce_sapling",
     "2": "minecraft:birch_sapling",
@@ -192,6 +199,7 @@
     "5": "minecraft:dark_oak_sapling"
   },
   "minecraft:red_flower": {
+    "protocol": 671,
     "0": "minecraft:poppy",
     "1": "minecraft:blue_orchid",
     "2": "minecraft:allium",
@@ -205,6 +213,7 @@
     "10": "minecraft:lily_of_the_valley"
   },
   "minecraft:wood": {
+    "protocol": 662,
     "0": "minecraft:oak_wood",
     "1": "minecraft:spruce_wood",
     "2": "minecraft:birch_wood",
@@ -219,6 +228,7 @@
     "13": "minecraft:stripped_dark_oak_wood"
   },
   "minecraft:double_wooden_slab": {
+    "protocol": 662,
     "0": "minecraft:oak_double_slab",
     "1": "minecraft:spruce_double_slab",
     "2": "minecraft:birch_double_slab",
@@ -227,6 +237,7 @@
     "5": "minecraft:dark_oak_double_slab"
   },
   "minecraft:wooden_slab": {
+    "protocol": 662,
     "0": "minecraft:oak_slab",
     "1": "minecraft:spruce_slab",
     "2": "minecraft:birch_slab",
@@ -235,22 +246,27 @@
     "5": "minecraft:dark_oak_slab"
   },
   "minecraft:leaves": {
+    "protocol": 662,
     "0": "minecraft:oak_leaves",
     "1": "minecraft:spruce_leaves",
     "2": "minecraft:birch_leaves",
     "3": "minecraft:jungle_leaves"
   },
   "minecraft:leaves2": {
+    "protocol": 662,
     "0": "minecraft:acacia_leaves",
     "1": "minecraft:dark_oak_leaves"
   },
   "minecraft:grass": {
+    "protocol": 662,
     "0": "minecraft:grass_block"
   },
   "minecraft:scute": {
+    "protocol": 649,
     "0": "minecraft:turtle_scute"
   },
   "minecraft:stone": {
+    "protocol": 630,
     "0": "minecraft:stone",
     "1": "minecraft:granite",
     "2": "minecraft:polished_granite",
@@ -260,6 +276,7 @@
     "6": "minecraft:polished_andesite"
   },
   "minecraft:planks": {
+    "protocol": 630,
     "0": "minecraft:oak_planks",
     "1": "minecraft:spruce_planks",
     "2": "minecraft:birch_planks",
@@ -339,35 +356,23 @@
     "14": "minecraft:red_concrete_powder",
     "15": "minecraft:black_concrete_powder"
   },
-  "minecraft:coral": {
-    "0": "minecraft:tube_coral",
-    "1": "minecraft:brain_coral",
-    "2": "minecraft:bubble_coral",
-    "3": "minecraft:fire_coral",
-    "4": "minecraft:horn_coral",
-    "5": "minecraft:dead_tube_coral",
-    "6": "minecraft:dead_brain_coral",
-    "7": "minecraft:dead_bubble_coral",
-    "8": "minecraft:dead_fire_coral",
-    "9": "minecraft:dead_horn_coral"
-  },
-  "minecraft:carpet": {
-    "0": "minecraft:white_carpet",
-    "1": "minecraft:orange_carpet",
-    "2": "minecraft:magenta_carpet",
-    "3": "minecraft:light_blue_carpet",
-    "4": "minecraft:yellow_carpet",
-    "5": "minecraft:lime_carpet",
-    "6": "minecraft:pink_carpet",
-    "7": "minecraft:gray_carpet",
-    "8": "minecraft:light_gray_carpet",
-    "9": "minecraft:cyan_carpet",
-    "10": "minecraft:purple_carpet",
-    "11": "minecraft:blue_carpet",
-    "12": "minecraft:brown_carpet",
-    "13": "minecraft:green_carpet",
-    "14": "minecraft:red_carpet",
-    "15": "minecraft:black_carpet"
+  "minecraft:concrete": {
+    "0": "minecraft:white_concrete",
+    "1": "minecraft:orange_concrete",
+    "2": "minecraft:magenta_concrete",
+    "3": "minecraft:light_blue_concrete",
+    "4": "minecraft:yellow_concrete",
+    "5": "minecraft:lime_concrete",
+    "6": "minecraft:pink_concrete",
+    "7": "minecraft:gray_concrete",
+    "8": "minecraft:light_gray_concrete",
+    "9": "minecraft:cyan_concrete",
+    "10": "minecraft:purple_concrete",
+    "11": "minecraft:blue_concrete",
+    "12": "minecraft:brown_concrete",
+    "13": "minecraft:green_concrete",
+    "14": "minecraft:red_concrete",
+    "15": "minecraft:black_concrete"
   },
   "minecraft:shulker_box": {
     "0": "minecraft:white_shulker_box",
@@ -387,23 +392,35 @@
     "14": "minecraft:red_shulker_box",
     "15": "minecraft:black_shulker_box"
   },
-  "minecraft:concrete": {
-    "0": "minecraft:white_concrete",
-    "1": "minecraft:orange_concrete",
-    "2": "minecraft:magenta_concrete",
-    "3": "minecraft:light_blue_concrete",
-    "4": "minecraft:yellow_concrete",
-    "5": "minecraft:lime_concrete",
-    "6": "minecraft:pink_concrete",
-    "7": "minecraft:gray_concrete",
-    "8": "minecraft:light_gray_concrete",
-    "9": "minecraft:cyan_concrete",
-    "10": "minecraft:purple_concrete",
-    "11": "minecraft:blue_concrete",
-    "12": "minecraft:brown_concrete",
-    "13": "minecraft:green_concrete",
-    "14": "minecraft:red_concrete",
-    "15": "minecraft:black_concrete"
+  "minecraft:coral": {
+    "0": "minecraft:tube_coral",
+    "1": "minecraft:brain_coral",
+    "2": "minecraft:bubble_coral",
+    "3": "minecraft:fire_coral",
+    "4": "minecraft:horn_coral",
+    "8": "minecraft:dead_tube_coral",
+    "9": "minecraft:dead_brain_coral",
+    "10": "minecraft:dead_bubble_coral",
+    "11": "minecraft:dead_fire_coral",
+    "12": "minecraft:dead_horn_coral"
+  },
+  "minecraft:carpet": {
+    "0": "minecraft:white_carpet",
+    "1": "minecraft:orange_carpet",
+    "2": "minecraft:magenta_carpet",
+    "3": "minecraft:light_blue_carpet",
+    "4": "minecraft:yellow_carpet",
+    "5": "minecraft:lime_carpet",
+    "6": "minecraft:pink_carpet",
+    "7": "minecraft:gray_carpet",
+    "8": "minecraft:light_gray_carpet",
+    "9": "minecraft:cyan_carpet",
+    "10": "minecraft:purple_carpet",
+    "11": "minecraft:blue_carpet",
+    "12": "minecraft:brown_carpet",
+    "13": "minecraft:green_carpet",
+    "14": "minecraft:red_carpet",
+    "15": "minecraft:black_carpet"
   },
   "minecraft:fence": {
     "0": "minecraft:oak_fence",
@@ -460,7 +477,8 @@
     "5": "minecraft:dark_oak_boat",
     "6": "minecraft:mangrove_boat",
     "7": "minecraft:bamboo_raft",
-    "8": "minecraft:cherry_boat"
+    "8": "minecraft:cherry_boat",
+    "9": "minecraft:pale_oak_boat"
   },
   "minecraft:bucket": {
     "0": "minecraft:bucket",
@@ -476,6 +494,7 @@
     "13": "minecraft:tadpole_bucket"
   },
   "minecraft:coal": {
+    "0": "minecraft:coal",
     "1": "minecraft:charcoal"
   },
   "minecraft:dye": {
@@ -580,6 +599,11 @@
     "133": "minecraft:tadpole_spawn_egg",
     "134": "minecraft:allay_spawn_egg",
     "135": "minecraft:firefly_spawn_egg",
-    "138": "minecraft:camel_spawn_egg"
+    "138": "minecraft:camel_spawn_egg",
+    "139": "minecraft:sniffer_spawn_egg",
+    "140": "minecraft:breeze_spawn_egg",
+    "142": "minecraft:armadillo_spawn_egg",
+    "144": "minecraft:bogged_spawn_egg",
+    "146": "minecraft:creaking_spawn_egg"
   }
 }

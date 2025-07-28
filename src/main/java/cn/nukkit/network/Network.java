@@ -1,10 +1,12 @@
 package cn.nukkit.network;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.network.process.DataPacketManager;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.netease.ConfirmSkinPacket;
 import cn.nukkit.network.protocol.v113.*;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.Utils;
@@ -44,6 +46,7 @@ public class Network {
     public static final byte CHANNEL_END = 31;
 
     private PacketPool packetPool113;
+    private PacketPool packetPool137;
     private PacketPool packetPoolCurrent;
 
     private final Server server;
@@ -176,6 +179,7 @@ public class Network {
 
     @Deprecated
     public void registerPacket(byte id, Class<? extends DataPacket> clazz) {
+        this.registerPacket(ProtocolInfo.v1_2_0, id, clazz);
         this.registerPacket(ProtocolInfo.CURRENT_PROTOCOL, id, clazz);
     }
 
@@ -191,6 +195,7 @@ public class Network {
 
     @Deprecated
     public void registerPacketNew(@Nonnegative int id, @NotNull Class<? extends DataPacket> clazz) {
+        this.registerPacketNew(ProtocolInfo.v1_2_0, id, clazz);
         this.registerPacketNew(ProtocolInfo.CURRENT_PROTOCOL, id, clazz);
     }
 
@@ -237,6 +242,10 @@ public class Network {
 
                 ByteArrayInputStream bais = new ByteArrayInputStream(buf);
 
+                if (raknetProtocol == 8 && Server.getInstance().netEaseMode) {
+                    raknetProtocol = 9;
+                }
+
                 int packetId;
                 switch (raknetProtocol) {
                     case 7:
@@ -257,7 +266,13 @@ public class Network {
                 DataPacket pk = this.getPacket(packetId, player == null ? ProtocolInfo.CURRENT_PROTOCOL : player.protocol);
 
                 if (pk != null) {
-                    pk.protocol = player == null ? Integer.MAX_VALUE : player.protocol;
+                    if (player != null) {
+                        pk.protocol = player.protocol;
+                        pk.gameVersion = player.getGameVersion();
+                    } else {
+                        pk.protocol = Integer.MAX_VALUE;
+                        pk.gameVersion = GameVersion.getLastVersion();
+                    }
                     pk.setBuffer(buf, buf.length - bais.available());
                     try {
                         if (raknetProtocol > 8) {
@@ -314,15 +329,19 @@ public class Network {
     }
 
     public PacketPool getPacketPool(int protocol) {
-        if (protocol > ProtocolInfo.v1_1_0) {
+        if (protocol >= ProtocolInfo.v1_21_80) {
             return this.packetPoolCurrent;
+        } else if (protocol >= ProtocolInfo.v1_2_0) {
+            return this.packetPool137;
         }
         return this.packetPool113;
     }
 
     public void setPacketPool(int protocol, PacketPool packetPool) {
-        if (protocol > ProtocolInfo.v1_1_0) {
+        if (protocol >= ProtocolInfo.v1_21_80) {
             this.packetPoolCurrent = packetPool;
+        } else if (protocol >= ProtocolInfo.v1_2_0) {
+            this.packetPool137 = packetPool;
         } else {
             this.packetPool113 = packetPool;
         }
@@ -438,9 +457,9 @@ public class Network {
                 .registerPacket(ProtocolInfoV113.UPDATE_TRADE_PACKET, UpdateTradePacket.class)
                 .build();
 
-        this.packetPoolCurrent = PacketPool.builder()
-                .protocolVersion(ProtocolInfo.CURRENT_PROTOCOL)
-                .minecraftVersion(ProtocolInfo.MINECRAFT_VERSION)
+        this.packetPool137 = PacketPool.builder()
+                .protocolVersion(ProtocolInfo.v1_2_0)
+                .minecraftVersion(Utils.getVersionByProtocol(ProtocolInfo.v1_2_0))
                 .registerPacket(ProtocolInfo.SERVER_TO_CLIENT_HANDSHAKE_PACKET, ServerToClientHandshakePacket.class)
                 .registerPacket(ProtocolInfo.CLIENT_TO_SERVER_HANDSHAKE_PACKET, ClientToServerHandshakePacket.class)
                 .registerPacket(ProtocolInfo.ADD_ENTITY_PACKET, AddEntityPacket.class)
@@ -589,6 +608,22 @@ public class Network {
                 .registerPacket(ProtocolInfo.JIGSAW_STRUCTURE_DATA_PACKET, JigsawStructureDataPacket.class)
                 .registerPacket(ProtocolInfo.CURRENT_STRUCTURE_FEATURE_PACKET, CurrentStructureFeaturePacket.class)
                 .registerPacket(ProtocolInfo.SERVERBOUND_DIAGNOSTICS_PACKET, ServerboundDiagnosticsPacket.class)
+                .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PACKET, CameraAimAssistPacket.class)
+                .registerPacket(ProtocolInfo.CONTAINER_REGISTRY_CLEANUP_PACKET, ContainerRegistryCleanupPacket.class)
+                .registerPacket(ProtocolInfo.MOVEMENT_EFFECT_PACKET, MovementEffectPacket.class)
+                .registerPacket(ProtocolInfo.SET_MOVEMENT_AUTHORITY_PACKET, SetMovementAuthorityPacket.class)
+                .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PRESETS_PACKET, CameraAimAssistPresetsPacket.class)
+
+                // NetEase
+                .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
+                .build();
+
+        this.packetPoolCurrent = this.packetPool137.toBuilder()
+                .protocolVersion(ProtocolInfo.CURRENT_PROTOCOL)
+                .minecraftVersion(ProtocolInfo.MINECRAFT_VERSION)
+                .deregisterPacket(ProtocolInfo.PLAYER_INPUT_PACKET)
+                .deregisterPacket(ProtocolInfo.RIDER_JUMP_PACKET)
+                .registerPacket(ProtocolInfo.PLAYER_LOCATIONS_PACKET, PlayerLocationPacket.class)
                 .build();
     }
 

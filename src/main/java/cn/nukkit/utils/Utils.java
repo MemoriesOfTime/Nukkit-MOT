@@ -1,6 +1,8 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.mob.*;
@@ -11,9 +13,13 @@ import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import io.netty.buffer.ByteBuf;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 import javax.annotation.Nonnegative;
 import javax.annotation.Nullable;
@@ -75,7 +81,7 @@ public class Utils {
     }
 
     public static boolean hasItemOrBlock(String id) {
-        return Item.NAMESPACED_ID_ITEM.containsKey(id.toLowerCase(Locale.ENGLISH));
+        return Item.NAMESPACED_ID_ITEM.containsKey(id.toLowerCase(Locale.ROOT));
     }
 
     public static boolean hasItemOrBlock(int id) {
@@ -502,6 +508,13 @@ public class Utils {
             case ProtocolInfo.v1_21_20 -> "1.21.20";
             case ProtocolInfo.v1_21_30 -> "1.21.30";
             case ProtocolInfo.v1_21_40 -> "1.21.40";
+            case ProtocolInfo.v1_21_50_26, ProtocolInfo.v1_21_50 -> "1.21.50";
+            case ProtocolInfo.v1_21_60 -> "1.21.60";
+            case ProtocolInfo.v1_21_70_24, ProtocolInfo.v1_21_70 -> "1.21.70";
+            case ProtocolInfo.v1_21_80 -> "1.21.80";
+            case ProtocolInfo.v1_21_90 -> "1.21.90";
+            case ProtocolInfo.v1_21_93 -> "1.21.93";
+            case ProtocolInfo.v1_21_100 -> "1.21.100";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };
@@ -529,9 +542,9 @@ public class Utils {
             case 6:
                 return "HoloLens";
             case 7:
-                return "Windows 10";
-            case 8:
                 return "Windows";
+            case 8:
+                return "Windows x86";
             case 9:
                 return "Dedicated";
             case 10:
@@ -646,5 +659,28 @@ public class Utils {
         }
 
         return blocks.toArray(new Block[0]);
+    }
+
+    public static JsonElement loadJsonResource(String file) {
+        try {
+            InputStream stream = Server.class.getClassLoader().getResourceAsStream(file);
+            if (stream == null) {
+                throw new AssertionError("Unable to load " + file);
+            }
+
+            JsonElement element = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
+            stream.close();
+            return element;
+        } catch (Exception e) {
+            throw new RuntimeException("Unable to load " + file, e);
+        }
+    }
+
+    public static ObjectSet<GameVersion> intSet2GameVersionSet(IntSet protocols, boolean isNetEase) {
+        ObjectSet<GameVersion> versions = new ObjectOpenHashSet<>();
+        for (int protocol : protocols) {
+            versions.add(GameVersion.byProtocol(protocol, isNetEase));
+        }
+        return versions;
     }
 }

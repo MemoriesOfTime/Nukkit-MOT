@@ -1,6 +1,7 @@
 package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
 import cn.nukkit.item.ItemPotato;
 import cn.nukkit.utils.Utils;
 
@@ -33,14 +34,26 @@ public class BlockPotato extends BlockCrops {
     }
 
     @Override
+    public String getIdentifier() {
+        return "minecraft:potato";
+    }
+
+    @Override
     public Item[] getDrops(Item item) {
-        if (getDamage() >= 0x07) {
-            return new Item[]{
-                    new ItemPotato(0, Utils.random.nextInt(3) + 2)
-            };
+        if (this.getPropertyValue(GROWTH) >= 7) {
+            if (Utils.random.nextDouble() < 0.02) {
+                return new Item[]{
+                        Item.get(ItemID.POTATO, 0, Utils.random.nextInt(3) + 2),
+                        Item.get(ItemID.POISONOUS_POTATO,0, 1)
+                };
+            } else {
+                return new Item[]{
+                        Item.get(ItemID.POTATO,0, Utils.random.nextInt(3) + 2)
+                };
+            }
         } else {
             return new Item[]{
-                    new ItemPotato()
+                    Item.get(ItemID.POTATO)
             };
         }
     }

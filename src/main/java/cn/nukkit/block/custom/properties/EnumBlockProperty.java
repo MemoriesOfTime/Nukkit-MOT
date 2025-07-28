@@ -11,6 +11,7 @@ import java.io.Serializable;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public class EnumBlockProperty<E extends Serializable> extends BlockProperty<E> {
     @Serial
@@ -88,6 +89,15 @@ public class EnumBlockProperty<E extends Serializable> extends BlockProperty<E> 
             return 0;
         }
         for (int i = 0; i < this.values.length; i++) {
+            if (value instanceof String) {
+                if (this.persistenceNames[i].equals(value)) {
+                    return i;
+                }
+            } else if (value instanceof Integer integer) {
+                if (integer >= 0 && integer < this.values.length) {
+                    return integer;
+                }
+            }
             if (this.values[i].equals(value)) {
                 return i;
             }
@@ -203,5 +213,11 @@ public class EnumBlockProperty<E extends Serializable> extends BlockProperty<E> 
         Preconditions.checkNotNull(universe, "universe can't be null");
         Preconditions.checkArgument(universe.length > 0, "The universe can't be empty");
         return universe;
+    }
+
+    @Override
+    public void forEach(Consumer<Serializable> func) {
+        for(String name : getPersistenceNames())
+            func.accept(name);
     }
 }

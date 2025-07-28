@@ -17,7 +17,7 @@ public class StraySpawner extends AbstractEntitySpawner {
     public void spawn(Player player, Position pos, Level level) {
         final int biomeId = level.getBiomeId((int) pos.x, (int) pos.z);
         if (biomeId == 12 || biomeId == 30 || biomeId == 140 || biomeId == 10 || biomeId == 46 || biomeId == 47) {
-            if (level.getBlockLightAt((int) pos.x, (int) pos.y + 1, (int) pos.z) <= 7) {
+            if (level.getBlockLightAt((int) pos.x, (int) pos.y + 1, (int) pos.z) == 0) {
                 if (level.isMobSpawningAllowedByTime()) {
                     this.spawnTask.createEntity("Stray", pos.add(0.5, 1, 0.5));
                 }

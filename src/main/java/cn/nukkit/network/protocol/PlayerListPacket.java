@@ -3,7 +3,9 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.entity.data.Skin;
 import lombok.ToString;
 
+import java.awt.*;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author Nukkit Project Team
@@ -31,23 +33,21 @@ public class PlayerListPacket extends DataPacket {
         switch (type) {
             case TYPE_ADD:
                 for (Entry entry : this.entries) {
-                    if (protocol >= 223) {
-                        this.putUUID(entry.uuid);
-                    }
+                    this.putUUID(entry.uuid);
                     this.putVarLong(entry.entityId);
                     this.putString(entry.name);
-                    if (protocol >= 223 && protocol <= 282) {
+                    if (protocol >= ProtocolInfo.v1_2_13 && protocol <= ProtocolInfo.v1_6_0) {
                         this.putString("");
                         this.putVarInt(0);
                     }
-                    if (protocol < 388) {
+                    if (protocol < ProtocolInfo.v1_13_0) {
                         this.putSkin(protocol, entry.skin);
-                        if (protocol < 223) {
+                        if (protocol < ProtocolInfo.v1_2_13) {
                             this.putByteArray(new byte[0]);
                         }
                     }
                     this.putString(entry.xboxUserId);
-                    if (protocol >= 223) {
+                    if (protocol >= ProtocolInfo.v1_2_13) {
                         this.putString(entry.platformChatId);
                         if (protocol >= 388) {
                             this.putLInt(entry.buildPlatform);
@@ -56,6 +56,9 @@ public class PlayerListPacket extends DataPacket {
                             this.putBoolean(entry.isHost);
                             if (protocol >= ProtocolInfo.v1_20_60) {
                                 this.putBoolean(entry.isSubClient);
+                                if (protocol >= ProtocolInfo.v1_21_80) {
+                                    this.putLInt(entry.color);
+                                }
                             }
                         }
                     }
@@ -68,9 +71,7 @@ public class PlayerListPacket extends DataPacket {
                 break;
             case TYPE_REMOVE:
                 for (Entry entry : this.entries) {
-                    if (protocol >= 223) {
-                        this.putUUID(entry.uuid);
-                    }
+                    this.putUUID(entry.uuid);
                 }
         }
     }
@@ -93,6 +94,7 @@ public class PlayerListPacket extends DataPacket {
         public boolean isTeacher;
         public boolean isHost;
         public boolean isSubClient;
+        public int color = Color.BLACK.getRGB();
 
         public Entry(UUID uuid) {
             this.uuid = uuid;
@@ -108,6 +110,12 @@ public class PlayerListPacket extends DataPacket {
             this.name = name;
             this.skin = skin;
             this.xboxUserId = xboxUserId == null ? "" : xboxUserId;
+
+            // Set random locator bar color when spawning player
+            if (this.skin != null) {
+                ThreadLocalRandom random = ThreadLocalRandom.current();
+                this.color = new Color(random.nextFloat(), random.nextFloat(), random.nextFloat()).getRGB();
+            }
         }
     }
 }

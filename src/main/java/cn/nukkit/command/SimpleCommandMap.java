@@ -125,8 +125,8 @@ public class SimpleCommandMap implements CommandMap {
         if (label == null) {
             label = command.getName();
         }
-        label = label.trim().toLowerCase();
-        fallbackPrefix = fallbackPrefix.trim().toLowerCase();
+        label = label.trim().toLowerCase(Locale.ROOT);
+        fallbackPrefix = fallbackPrefix.trim().toLowerCase(Locale.ROOT);
 
         boolean registered = this.registerAlias(command, false, fallbackPrefix, label);
 
@@ -147,6 +147,23 @@ public class SimpleCommandMap implements CommandMap {
         command.register(this);
 
         return registered;
+    }
+
+    @Override
+    public void unregister(String... commands) {
+        for (String name : commands) {
+            Command command = this.getCommand(name);
+            if (command != null) {
+                command.unregister(this);
+            }
+        }
+    }
+
+    @Override
+    public void unregister(Command... commands) {
+        for (Command command : commands) {
+            command.unregister(this);
+        }
     }
 
     @Override
@@ -282,7 +299,7 @@ public class SimpleCommandMap implements CommandMap {
             return false;
         }
 
-        String sentCommandLabel = parsed.remove(0).toLowerCase(Locale.ENGLISH);//command name
+        String sentCommandLabel = parsed.remove(0).toLowerCase(Locale.ROOT);//command name
         String[] args = parsed.toArray(EmptyArrays.EMPTY_STRINGS);
         Command target = this.getCommand(sentCommandLabel);
 

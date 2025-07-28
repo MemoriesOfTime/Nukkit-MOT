@@ -1,5 +1,7 @@
 package cn.nukkit.item;
 
+import cn.nukkit.network.protocol.ProtocolInfo;
+
 public class ItemChestBoatJungle extends ItemChestBoatBase {
     public ItemChestBoatJungle() {
         this(0, 1);
@@ -20,5 +22,10 @@ public class ItemChestBoatJungle extends ItemChestBoatBase {
     @Override
     public int getBoatId() {
         return 3;
+    }
+
+    @Override
+    public boolean isSupportedOn(int protocolId) {
+        return protocolId >= ProtocolInfo.v1_19_0_29;
     }
 }

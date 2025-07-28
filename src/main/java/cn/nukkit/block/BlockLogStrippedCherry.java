@@ -1,5 +1,7 @@
 package cn.nukkit.block;
 
+import cn.nukkit.utils.BlockColor;
+
 public class BlockLogStrippedCherry extends BlockWoodStripped {
 
     public BlockLogStrippedCherry() {
@@ -23,5 +25,10 @@ public class BlockLogStrippedCherry extends BlockWoodStripped {
     @Override
     public double getResistance() {
         return 2;
+    }
+
+    @Override
+    public BlockColor getColor() {
+        return BlockColor.WHITE_TERRACOTA_BLOCK_COLOR;
     }
 }

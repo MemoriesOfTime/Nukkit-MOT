@@ -68,13 +68,33 @@ public class BlockCactus extends BlockTransparentMeta {
     }
 
     @Override
-    protected AxisAlignedBB recalculateBoundingBox() {
-        return new SimpleAxisAlignedBB(this.x + 0.0625, this.y + 0.0625, this.z + 0.0625, this.x + 0.9375, this.y + 0.9375, this.z + 0.9375);
+    public double getMinX() {
+        return this.x + 0.0625;
+    }
+
+    @Override
+    public double getMinZ() {
+        return this.z + 0.0625;
+    }
+
+    @Override
+    public double getMaxX() {
+        return this.x + 0.9375;
+    }
+
+    @Override
+    public double getMaxZ() {
+        return this.z + 0.9375;
     }
 
     @Override
     protected AxisAlignedBB recalculateCollisionBoundingBox() {
-        return new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x + 1, this.y + 1, this.z + 1);
+        return new SimpleAxisAlignedBB(x, y, z, x + 1, y + 1, z + 1);
+    }
+
+    @Override
+    public double getMaxY() {
+        return this.y + 0.9375;
     }
 
     @Override
@@ -89,9 +109,8 @@ public class BlockCactus extends BlockTransparentMeta {
             if (down.getId() != SAND && down.getId() != CACTUS) {
                 this.getLevel().useBreakOn(this);
             } else {
-                for (int side = 2; side <= 5; ++side) {
-                    Block block = getSide(BlockFace.fromIndex(side));
-                    if (!block.canBeFlowedInto()) {
+                for (BlockFace side : BlockFace.Plane.HORIZONTAL) {
+                    if (!getSide(side).canBeFlowedInto()) {
                         this.getLevel().useBreakOn(this);
                     }
                 }

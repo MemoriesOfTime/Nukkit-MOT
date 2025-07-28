@@ -21,6 +21,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.Utils;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -113,7 +114,7 @@ public class ItemSpawnEgg extends Item {
             nbt.putString("CustomName", this.getCustomName());
         }
 
-        CreatureSpawnEvent ev = new CreatureSpawnEvent(this.meta, block, nbt, CreatureSpawnEvent.SpawnReason.SPAWN_EGG);
+        CreatureSpawnEvent ev = new CreatureSpawnEvent(this.meta, block, nbt, CreatureSpawnEvent.SpawnReason.SPAWN_EGG, player);
         level.getServer().getPluginManager().callEvent(ev);
 
         if (ev.isCancelled()) {
@@ -142,5 +143,20 @@ public class ItemSpawnEgg extends Item {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public boolean isSupportedOn(int protocolId) {
+        int meta = this.getDamage();
+        if (meta < 138) {
+            return true;
+        }
+        return switch (meta) {
+            case 138, 139 -> protocolId >= ProtocolInfo.v1_20_0_23;
+            case 142 -> protocolId >= ProtocolInfo.v1_20_80;
+            case 140, 144 -> protocolId >= ProtocolInfo.v1_21_0;
+            case 141, 143, 145, 146 -> protocolId >= ProtocolInfo.v1_21_50;
+            default -> true;
+        };
     }
 }

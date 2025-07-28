@@ -23,6 +23,7 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteOrder;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -42,6 +43,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
     protected CompoundTag levelData;
 
     private Vector3 spawn;
+    private Long cachedSeed;
 
     protected final AtomicReference<BaseRegionLoader> lastRegion = new AtomicReference<>();
 
@@ -93,7 +95,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
         }
 
         if (!this.levelData.contains("generatorName")) {
-            this.levelData.putString("generatorName", Generator.getGenerator("DEFAULT").getSimpleName().toLowerCase());
+            this.levelData.putString("generatorName", Generator.getGenerator("DEFAULT").getSimpleName().toLowerCase(Locale.ROOT));
         }
 
         if (!this.levelData.contains("generatorOptions")) {
@@ -247,11 +249,15 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Override
     public long getSeed() {
-        return this.levelData.getLong("RandomSeed");
+        if (this.cachedSeed == null) {
+            this.cachedSeed = this.levelData.getLong("RandomSeed");
+        }
+        return this.cachedSeed;
     }
 
     @Override
     public void setSeed(long value) {
+        this.cachedSeed = null;
         this.levelData.putLong("RandomSeed", value);
     }
 

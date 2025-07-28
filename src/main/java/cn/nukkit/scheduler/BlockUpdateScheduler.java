@@ -7,8 +7,12 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockUpdateEntry;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class BlockUpdateScheduler {
@@ -32,7 +36,7 @@ public class BlockUpdateScheduler {
                 perform(tick);
             }
         } else {
-            ArrayList<Long> times = new ArrayList<>(queuedUpdates.keySet());
+            LongArrayList times = new LongArrayList(queuedUpdates.keySet());
             Collections.sort(times);
             for (long tick : times) {
                 if (tick <= currentTick) {

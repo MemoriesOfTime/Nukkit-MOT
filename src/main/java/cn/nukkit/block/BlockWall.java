@@ -240,7 +240,7 @@ public class BlockWall extends BlockTransparentMeta implements BlockPropertiesHe
         WallType(BlockColor color) {
             this.color = color;
             String name = Arrays.stream(name().split("_"))
-                    .map(part-> part.charAt(0) + part.substring(1).toLowerCase())
+                    .map(part-> part.charAt(0) + part.substring(1).toLowerCase(Locale.ROOT))
                     .collect(Collectors.joining(" "));
             typeName = name + " Wall";
         }

@@ -55,6 +55,6 @@ public class PlayerInputProcessor extends DataPacketProcessor<PlayerInputPacket>
 
     @Override
     public boolean isSupported(int protocol) {
-        return protocol >= ProtocolInfo.v1_1_0;
+        return protocol >= ProtocolInfo.v1_1_0 && protocol < ProtocolInfo.v1_21_80;
     }
 }

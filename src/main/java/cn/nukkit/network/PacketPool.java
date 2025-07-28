@@ -38,7 +38,7 @@ public class PacketPool {
     }
 
     public DataPacket getPacket(int id) {
-        if (id > packetsById.length) {
+        if (id < 0 || id >= packetsById.length) {
             Server.getInstance().getLogger().debug("Packet exceeds limits, id: " + id);
             return null;
         }
@@ -92,6 +92,10 @@ public class PacketPool {
             packetsByClass.put(packetClass, id);
 
             return this;
+        }
+
+        public Builder deregisterPacket(byte id) {
+            return this.deregisterPacket(ProtocolInfo.toNewProtocolID(id));
         }
 
         public Builder deregisterPacket(int id) {

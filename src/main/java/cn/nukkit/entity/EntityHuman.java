@@ -34,6 +34,8 @@ public class EntityHuman extends EntityHumanType {
     public static final int DATA_PLAYER_FLAGS = 26;
     public static final int DATA_PLAYER_BUTTON_TEXT = 40;
 
+    protected static PlayerInventory EMPTY_INVENTORY = new PlayerInventory(null);
+
     protected UUID uuid;
     protected byte[] rawUUID;
 
@@ -326,7 +328,7 @@ public class EntityHuman extends EntityHumanType {
                 this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.skin, new Player[]{player});
             }
 
-            PlayerInventory playerInventory = Objects.requireNonNullElse(this.inventory, BaseEntity.EMPTY_INVENTORY);
+            PlayerInventory playerInventory = Objects.requireNonNullElse(this.inventory, EMPTY_INVENTORY);
 
             AddPlayerPacket pk = new AddPlayerPacket();
             pk.uuid = this.uuid;

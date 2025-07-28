@@ -109,6 +109,7 @@ public abstract class BaseInventory implements Inventory {
         return this.slots.containsKey(index) ? this.slots.get(index).clone() : new ItemBlock(Block.get(BlockID.AIR), null, 0);
     }
 
+    @Override
     public Item getItemFast(int index) {
         return this.slots.getOrDefault(index, air);
     }

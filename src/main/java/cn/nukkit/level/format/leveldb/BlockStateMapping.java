@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.leveldb;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.leveldb.structure.BlockStateSnapshot;
 import cn.nukkit.level.format.leveldb.updater.BlockStateUpdaterChunker;
@@ -22,16 +23,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-import static cn.nukkit.level.format.leveldb.LevelDBConstants.PALETTE_VERSION;
-
 @Log4j2
 public class BlockStateMapping {
 
-    private static final BlockStateMapping INSTANCE = new BlockStateMapping(PALETTE_VERSION);
+    private static final BlockStateMapping INSTANCE = new BlockStateMapping(GameVersion.getFeatureVersion());
     private static final CompoundTagUpdaterContext CONTEXT;
     private static final int LATEST_UPDATER_VERSION;
 
-    private final int version;
+    private final GameVersion version;
 
     private LegacyStateMapper legacyMapper;
 
@@ -98,12 +97,19 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_20_80.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_0.INSTANCE);
 
-        blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
-
+        // TODO 检查BlockStateUpdaterChunker是否可以移除
         if (Boolean.parseBoolean(System.getProperty("leveldb-chunker"))) {
             blockStateUpdaters.add(BlockStateUpdaterChunker.INSTANCE);
             log.warn("Enabled chunker.app LevelDB updater. This may impact chunk loading performance!");
         }
+
+        blockStateUpdaters.add(BlockStateUpdater_1_21_10.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_20.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_30.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_40.INSTANCE);
+        blockStateUpdaters.add(BlockStateUpdater_1_21_60.INSTANCE);
+
+        blockStateUpdaters.add(BlockStateUpdaterVanilla.INSTANCE);
 
         CompoundTagUpdaterContext context = new CompoundTagUpdaterContext();
         blockStateUpdaters.forEach(updater -> updater.registerUpdaters(context));
@@ -115,13 +121,17 @@ public class BlockStateMapping {
         return INSTANCE;
     }
 
-    public BlockStateMapping(int version) {
+    public BlockStateMapping(GameVersion version) {
         this(version, null);
     }
 
-    public BlockStateMapping(int version, LegacyStateMapper legacyStateMapper) {
+    public BlockStateMapping(GameVersion version, LegacyStateMapper legacyStateMapper) {
         this.version = version;
         this.legacyMapper = legacyStateMapper;
+    }
+
+    public boolean containsState(NbtMap state) {
+        return paletteMap.containsKey(state);
     }
 
     public void registerState(int runtimeId, NbtMap state) {
@@ -152,7 +162,7 @@ public class BlockStateMapping {
         return this.legacyMapper;
     }
 
-    public int getVersion() {
+    public GameVersion getVersion() {
         return this.version;
     }
 
@@ -172,7 +182,7 @@ public class BlockStateMapping {
     public BlockStateSnapshot getState(int runtimeId) {
         BlockStateSnapshot blockStateSnapshot = this.runtime2State.get(runtimeId);
         if (blockStateSnapshot == null) {
-            log.warn("Can not find state! No runtime2State mapping for " + runtimeId);
+            log.warn("Can not find state! No runtime2State mapping for {}", runtimeId);
             return this.getDefaultState();
         }
         return blockStateSnapshot;
@@ -203,7 +213,7 @@ public class BlockStateMapping {
     public int getRuntimeId(int legacyId, int data) {
         int runtimeId = this.legacyMapper.legacyToRuntime(legacyId, data);
         if (runtimeId == -1) {
-            log.warn("Can not find runtimeId! No legacy2runtime mapping for " + legacyId + ":" + data);
+            log.warn("Can not find runtimeId! No legacy2runtime mapping for {}:{}", legacyId, data);
             return this.getDefaultRuntimeId();
         }
         return runtimeId;
@@ -212,7 +222,7 @@ public class BlockStateMapping {
     public int getFullId(int runtimeId) {
         int fullId = this.legacyMapper.runtimeToFullId(runtimeId);
         if (fullId == -1) {
-            log.warn("Can not find legacyId! No runtime2FullId mapping for " + runtimeId);
+            log.warn("Can not find legacyId! No runtime2FullId mapping for {}", runtimeId);
             fullId = this.legacyMapper.runtimeToFullId(this.getDefaultRuntimeId());
             Preconditions.checkArgument(fullId != -1, "Can not find fullId for default runtimeId: " + this.getDefaultRuntimeId());
         }

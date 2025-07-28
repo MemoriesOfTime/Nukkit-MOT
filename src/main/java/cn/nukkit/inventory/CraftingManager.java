@@ -1,15 +1,15 @@
 package cn.nukkit.inventory;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.inventory.special.RepairItemRecipe;
+import cn.nukkit.inventory.special.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemFirework;
 import cn.nukkit.item.ItemID;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.CraftingDataPacket;
-import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
 import io.netty.util.collection.CharObjectHashMap;
@@ -35,39 +35,47 @@ public class CraftingManager {
     private final Collection<Recipe> recipes527 = new ArrayDeque<>();
     public final Collection<Recipe> recipes = new ArrayDeque<>(); //649
 
-    public static BatchPacket packet313;
-    public static BatchPacket packet340;
-    public static BatchPacket packet361;
-    public static BatchPacket packet354;
-    public static BatchPacket packet388;
-    public static DataPacket packet407;
-    public static DataPacket packet419;
-    public static DataPacket packet431;
-    public static DataPacket packet440;
-    public static DataPacket packet448;
-    public static DataPacket packet465;
-    public static DataPacket packet471;
-    public static DataPacket packet486;
-    public static DataPacket packet503;
-    public static DataPacket packet527;
-    public static DataPacket packet544;
-    public static DataPacket packet554;
-    public static DataPacket packet560;
-    public static DataPacket packet567;
-    public static DataPacket packet575;
-    public static DataPacket packet582;
-    public static DataPacket packet589;
-    public static DataPacket packet594;
-    public static DataPacket packet618;
-    public static DataPacket packet622;
-    public static DataPacket packet630;
-    public static DataPacket packet649;
-    public static DataPacket packet662;
-    public static DataPacket packet671;
-    public static DataPacket packet685;
-    public static DataPacket packet712;
-    public static DataPacket packet729;
-    public static DataPacket packet748;
+    private static BatchPacket packet313;
+    private static BatchPacket packet340;
+    private static BatchPacket packet361;
+    private static BatchPacket packet354;
+    private static BatchPacket packet388;
+    private static BatchPacket packet407;
+    private static BatchPacket packet419;
+    private static BatchPacket packet431;
+    private static BatchPacket packet440;
+    private static BatchPacket packet448;
+    private static BatchPacket packet465;
+    private static BatchPacket packet471;
+    private static BatchPacket packet486;
+    private static BatchPacket packet503;
+    private static BatchPacket packet527;
+    private static BatchPacket packet544;
+    private static BatchPacket packet554;
+    private static BatchPacket packet560;
+    private static BatchPacket packet567;
+    private static BatchPacket packet575;
+    private static BatchPacket packet582;
+    private static BatchPacket packet589;
+    private static BatchPacket packet594;
+    private static BatchPacket packet618;
+    private static BatchPacket packet622;
+    private static BatchPacket packet630;
+    private static BatchPacket packet649;
+    private static BatchPacket packet662;
+    private static BatchPacket packet671;
+    private static BatchPacket packet685;
+    private static BatchPacket packet712;
+    private static BatchPacket packet729;
+    private static BatchPacket packet748;
+    private static BatchPacket packet766;
+    private static BatchPacket packet776;
+    private static BatchPacket packet800;
+    private static BatchPacket packet818;
+    private static BatchPacket packet827;
+
+    private static BatchPacket packet_netease_630;
+    private static BatchPacket packet_netease_686;
 
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes313 = new Int2ObjectOpenHashMap<>();
     private final Map<Integer, Map<UUID, ShapedRecipe>> shapedRecipes332 = new Int2ObjectOpenHashMap<>();
@@ -128,6 +136,14 @@ public class CraftingManager {
     public CraftingManager() {
         MainLogger.getLogger().debug("Loading recipes...");
         this.registerMultiRecipe(new RepairItemRecipe());
+        this.registerMultiRecipe(new BookCloningRecipe());
+        this.registerMultiRecipe(new MapCloningRecipe());
+        this.registerMultiRecipe(new MapUpgradingRecipe());
+        this.registerMultiRecipe(new MapExtendingRecipe());
+        this.registerMultiRecipe(new BannerAddPatternRecipe());
+        this.registerMultiRecipe(new BannerDuplicateRecipe());
+        this.registerMultiRecipe(new FireworkRecipe());
+        this.registerMultiRecipe(new DecoratedPotRecipe());
 
         ConfigSection recipes_649_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes649.json")).getRootSection();
         ConfigSection recipes_419_config = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("recipes419.json")).getRootSection();
@@ -278,7 +294,7 @@ public class CraftingManager {
                             case "furnace":
                                 FurnaceRecipe furnaceRecipe = new FurnaceRecipe(resultItem, inputItem);
                                 this.registerRecipe(388, furnaceRecipe);
-                                String runtimeId = RuntimeItems.getMapping(388).toRuntime(inputItem.getId(), inputItem.getDamage()).getIdentifier();
+                                String runtimeId = RuntimeItems.getMapping(GameVersion.V1_13_0).toRuntime(inputItem.getId(), inputItem.getDamage()).getIdentifier();
                                 double xp = furnaceXpConfig.getDouble(runtimeId + ":" + inputItem.getDamage(), 0d);
                                 if (xp != 0) {
                                     this.setRecipeXp(furnaceRecipe, xp);
@@ -289,9 +305,13 @@ public class CraftingManager {
                                 break;
                         }
                         break;
-                    /*case 4:
-                        this.registerRecipe(new MultiRecipe(UUID.fromString((String) recipe.get("uuid"))));
-                        break;*/
+                    case 4:
+                        String uuid = (String) recipe.get("uuid");
+                        // TODO: when cartography is supported, this should be removed and add relevant checks like MapCloningRecipe.class.
+                        if (MultiRecipe.unsupportedRecipes.contains(uuid)) {
+                            this.registerRecipe(new UncheckedMultiRecipe(uuid));
+                        }
+                        break;
                     default:
                         break;
                 }
@@ -697,9 +717,11 @@ public class CraftingManager {
         return list;
     }
 
-    private CraftingDataPacket packetFor(int protocol) {
+    private BatchPacket packetFor(GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
         CraftingDataPacket pk = new CraftingDataPacket();
         pk.protocol = protocol;
+        pk.gameVersion = gameVersion;
         for (Recipe recipe : this.getRecipes(protocol)) {
             if (recipe instanceof ShapedRecipe) {
                 pk.addShapedRecipe((ShapedRecipe) recipe);
@@ -724,50 +746,290 @@ public class CraftingManager {
                 pk.addContainerRecipe(recipe);
             }
             if (protocol >= ProtocolInfo.v1_16_0) {
-                for (MultiRecipe recipe : this.getMultiRecipes(protocol).values()) {
-                    pk.addMultiRecipe(recipe);
+                for (MultiRecipe recipe : this.getMultiRecipes().values()) {
+                    if (recipe.isSupportedOn(protocol)) {
+                        pk.addMultiRecipe(recipe);
+                    }
                 }
             }
         }
         pk.tryEncode();
-        return pk;
+        return pk.compress(Deflater.BEST_COMPRESSION);
     }
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
-        packet748 = packetFor(ProtocolInfo.v1_21_40).compress(Deflater.BEST_COMPRESSION);
-        packet729 = packetFor(ProtocolInfo.v1_21_30).compress(Deflater.BEST_COMPRESSION);
-        packet712 = packetFor(ProtocolInfo.v1_21_20).compress(Deflater.BEST_COMPRESSION);
-        packet685 = packetFor(ProtocolInfo.v1_21_0).compress(Deflater.BEST_COMPRESSION);
-        packet671 = packetFor(ProtocolInfo.v1_20_80).compress(Deflater.BEST_COMPRESSION);
-        packet662 = packetFor(ProtocolInfo.v1_20_70).compress(Deflater.BEST_COMPRESSION);
-        packet649 = packetFor(ProtocolInfo.v1_20_60).compress(Deflater.BEST_COMPRESSION);
-        packet630 = packetFor(ProtocolInfo.v1_20_50).compress(Deflater.BEST_COMPRESSION);
-        packet622 = packetFor(ProtocolInfo.v1_20_40).compress(Deflater.BEST_COMPRESSION);
-        packet618 = packetFor(ProtocolInfo.v1_20_30).compress(Deflater.BEST_COMPRESSION);
-        packet594 = packetFor(ProtocolInfo.v1_20_10).compress(Deflater.BEST_COMPRESSION);
-        packet589 = packetFor(ProtocolInfo.v1_20_0).compress(Deflater.BEST_COMPRESSION);
-        packet582 = packetFor(582);
-        packet575 = packetFor(575);
-        packet567 = packetFor(567);
-        packet560 = packetFor(560);
-        packet554 = packetFor(554);
-        packet544 = packetFor(544);
-        packet527 = packetFor(527);
-        packet503 = packetFor(503);
-        packet486 = packetFor(486);
-        packet471 = packetFor(471);
-        packet465 = packetFor(465);
-        packet448 = packetFor(448);
-        packet440 = packetFor(440);
-        packet431 = packetFor(431);
-        packet419 = packetFor(419);
-        packet407 = packetFor(407).compress(Deflater.BEST_COMPRESSION);
-        packet388 = packetFor(388).compress(Deflater.BEST_COMPRESSION);
-        packet361 = packetFor(361).compress(Deflater.BEST_COMPRESSION);
-        packet354 = packetFor(354).compress(Deflater.BEST_COMPRESSION);
-        packet340 = packetFor(340).compress(Deflater.BEST_COMPRESSION);
-        packet313 = packetFor(313).compress(Deflater.BEST_COMPRESSION);
+        packet827 = null;
+        packet818 = null;
+        packet800 = null;
+        packet776 = null;
+        packet766 = null;
+        packet748 = null;
+        packet729 = null;
+        packet712 = null;
+        packet685 = null;
+        packet671 = null;
+        packet662 = null;
+        packet649 = null;
+        packet630 = null;
+        packet622 = null;
+        packet618 = null;
+        packet594 = null;
+        packet589 = null;
+        packet582 = null;
+        packet575 = null;
+        packet567 = null;
+        packet560 = null;
+        packet554 = null;
+        packet544 = null;
+        packet527 = null;
+        packet503 = null;
+        packet486 = null;
+        packet471 = null;
+        packet465 = null;
+        packet448 = null;
+        packet440 = null;
+        packet431 = null;
+        packet419 = null;
+        packet407 = null;
+        packet388 = null;
+        packet361 = null;
+        packet354 = null;
+        packet340 = null;
+        packet313 = null;
+
+        packet_netease_686 = null;
+
+        this.getCachedPacket(GameVersion.getLastVersion()); // 缓存当前协议版本的数据包
+        this.getCachedPacket(GameVersion.V1_21_2_NETEASE);
+    }
+
+    @Deprecated
+    public BatchPacket getCachedPacket(int protocol) {
+        return getCachedPacket(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    /**
+     * 获取缓存的数据包，根据不同的协议版本返回对应的数据包实例。<br/>
+     * 该方法通过检查协议版本号，选择合适的缓存数据包。如果缓存中没有对应的数据包，则创建一个新的并缓存起来。<br/>
+     * Get cached data packet based on the protocol version.<br/>
+     * Choose the appropriate cached data packet based on the protocol version. If no cached data packet is found, create a new one and cache it.
+     *
+     * @param gameVersion 协议版本号，用于确定使用哪个缓存的数据包 <br/>
+     *                 Protocol version used to determine which cached data packet to use
+     * @return 返回对应协议版本的缓存数据包，如果没有找到对应的缓存，则返回null <br/>
+     * Return the cached data packet for the specified protocol version, or null if no cached data packet is found
+     */
+    public BatchPacket getCachedPacket(GameVersion gameVersion) {
+        //TODO Multiversion 添加新版本支持时修改这里
+        int protocol = gameVersion.getProtocol();
+
+        if (gameVersion.isNetEase()) {
+            if (protocol >= GameVersion.V1_21_2_NETEASE.getProtocol()) {
+                if (packet_netease_686 == null) {
+                    packet_netease_686 = this.packetFor(GameVersion.V1_21_2_NETEASE);
+                }
+                return packet_netease_686;
+            } else if (protocol >= GameVersion.V1_20_50_NETEASE.getProtocol()) {
+                if (packet_netease_630 == null) {
+                    packet_netease_630 = this.packetFor(GameVersion.V1_20_50_NETEASE);
+                }
+                return packet_netease_630;
+            }
+        }
+
+        if (protocol >= GameVersion.V1_21_100.getProtocol()) {
+            if (packet827 == null) {
+                packet827 = packetFor(GameVersion.V1_21_100);
+            }
+            return packet827;
+        } else if (protocol >= ProtocolInfo.v1_21_90) {
+            if (packet818 == null) {
+                packet818 = packetFor(GameVersion.V1_21_90);
+            }
+            return packet818;
+        } else if (protocol >= ProtocolInfo.v1_21_80) {
+            if (packet800 == null) {
+                packet800 = packetFor(GameVersion.V1_21_80);
+            }
+            return packet800;
+        } else if (protocol >= ProtocolInfo.v1_21_60) {
+            if (packet776 == null) {
+                packet776 = packetFor(GameVersion.V1_21_60);
+            }
+            return packet776;
+        } else if (protocol >= ProtocolInfo.v1_21_50_26) {
+            if (packet766 == null) {
+                packet766 = packetFor(GameVersion.V1_21_50);
+            }
+            return packet766;
+        } else if (protocol >= ProtocolInfo.v1_21_40) {
+            if (packet748 == null) {
+                packet748 = packetFor(GameVersion.V1_21_40);
+            }
+            return packet748;
+        } else if (protocol >= ProtocolInfo.v1_21_30) {
+            if (packet729 == null) {
+                packet729 = packetFor(GameVersion.V1_21_30);
+            }
+            return packet729;
+        } else if (protocol >= ProtocolInfo.v1_21_20) {
+            if (packet712 == null) {
+                packet712 = packetFor(GameVersion.V1_21_20);
+            }
+            return packet712;
+        } else if (protocol >= ProtocolInfo.v1_21_0) {
+            if (packet685 == null) {
+                packet685 = packetFor(GameVersion.V1_21_0);
+            }
+            return packet685;
+        } else if (protocol >= ProtocolInfo.v1_20_80) {
+            if (packet671 == null) {
+                packet671 = packetFor(GameVersion.V1_20_80);
+            }
+            return packet671;
+        } else if (protocol >= ProtocolInfo.v1_20_70) {
+            if (packet662 == null) {
+                packet662 = packetFor(GameVersion.V1_20_70);
+            }
+            return packet662;
+        } else if (protocol >= ProtocolInfo.v1_20_60) {
+            if (packet649 == null) {
+                packet649 = packetFor(GameVersion.V1_20_60);
+            }
+            return packet649;
+        } else if (protocol >= ProtocolInfo.v1_20_50) {
+            if (packet630 == null) {
+                packet630 = packetFor(GameVersion.V1_20_50);
+            }
+            return packet630;
+        } else if (protocol >= ProtocolInfo.v1_20_40) {
+            if (packet622 == null) {
+                packet622 = packetFor(GameVersion.V1_20_40);
+            }
+            return packet622;
+        } else if (protocol >= ProtocolInfo.v1_20_30_24) {
+            if (packet618 == null) {
+                packet618 = packetFor(GameVersion.V1_20_30);
+            }
+            return packet618;
+        } else if (protocol >= ProtocolInfo.v1_20_10_21) {
+            if (packet594 == null) {
+                packet594 = packetFor(GameVersion.V1_20_10);
+            }
+            return packet594;
+        } else if (protocol >= ProtocolInfo.v1_20_0_23) {
+            if (packet589 == null) {
+                packet589 = packetFor(GameVersion.V1_20_0);
+            }
+            return packet589;
+        } else if (protocol >= ProtocolInfo.v1_19_80) {
+            if (packet582 == null) {
+                packet582 = packetFor(GameVersion.V1_19_80);
+            }
+            return packet582;
+        } else if (protocol >= ProtocolInfo.v1_19_70_24) {
+            if (packet575 == null) {
+                packet575 = packetFor(GameVersion.V1_19_70);
+            }
+            return packet575;
+        } else if (protocol >= ProtocolInfo.v1_19_60) {
+            if (packet567 == null) {
+                packet567 = packetFor(GameVersion.V1_19_60);
+            }
+            return packet567;
+        } else if (protocol >= ProtocolInfo.v1_19_50_20) {
+            if (packet560 == null) {
+                packet560 = packetFor(GameVersion.V1_19_50);
+            }
+            return packet560;
+        } else if (protocol >= ProtocolInfo.v1_19_30_23) {
+            if (packet554 == null) {
+                packet554 = packetFor(GameVersion.V1_19_30);
+            }
+            return packet554;
+        } else if (protocol >= ProtocolInfo.v1_19_20) {
+            if (packet544 == null) {
+                packet544 = packetFor(GameVersion.V1_19_20);
+            }
+            return packet544;
+        } else if (protocol >= ProtocolInfo.v1_19_0_29) {
+            if (packet527 == null) {
+                packet527 = packetFor(GameVersion.V1_19_0);
+            }
+            return packet527;
+        } else if (protocol >= ProtocolInfo.v1_18_30) {
+            if (packet503 == null) {
+                packet503 = packetFor(GameVersion.V1_18_30);
+            }
+            return packet503;
+        } else if (protocol >= ProtocolInfo.v1_18_10_26) {
+            if (packet486 == null) {
+                packet486 = packetFor(GameVersion.V1_18_10);
+            }
+            return packet486;
+        } else if (protocol >= ProtocolInfo.v1_17_40) {
+            if (packet471 == null) {
+                packet471 = packetFor(GameVersion.V1_17_40);
+            }
+            return packet471;
+        } else if (protocol >= ProtocolInfo.v1_17_30) {
+            if (packet465 == null) {
+                packet465 = packetFor(GameVersion.V1_17_30);
+            }
+            return packet465;
+        } else if (protocol >= ProtocolInfo.v1_17_10) {
+            if (packet448 == null) {
+                packet448 = packetFor(GameVersion.V1_17_10);
+            }
+            return packet448;
+        } else if (protocol >= ProtocolInfo.v1_17_0) {
+            if (packet440 == null) {
+                packet440 = packetFor(GameVersion.V1_17_0);
+            }
+            return packet440;
+        } else if (protocol >= ProtocolInfo.v1_16_220) {
+            if (packet431 == null) {
+                packet431 = packetFor(GameVersion.V1_16_220);
+            }
+            return packet431;
+        } else if (protocol >= ProtocolInfo.v1_16_100) {
+            if (packet419 == null) {
+                packet419 = packetFor(GameVersion.V1_16_100);
+            }
+            return packet419;
+        } else if (protocol >= ProtocolInfo.v1_16_0) {
+            if (packet407 == null) {
+                packet407 = packetFor(GameVersion.V1_16_0);
+            }
+            return packet407;
+        } else if (protocol >= ProtocolInfo.v1_13_0) {
+            if (packet388 == null) {
+                packet388 = packetFor(GameVersion.V1_13_0);
+            }
+            return packet388;
+        } else if (protocol == ProtocolInfo.v1_12_0) {
+            if (packet361 == null) {
+                packet361 = packetFor(GameVersion.V1_12_0);
+            }
+            return packet361;
+        } else if (protocol == ProtocolInfo.v1_11_0) {
+            if (packet354 == null) {
+                packet354 = packetFor(GameVersion.V1_11_0);
+            }
+            return packet354;
+        } else if (protocol == ProtocolInfo.v1_10_0) {
+            if (packet340 == null) {
+                packet340 = packetFor(GameVersion.V1_10_0);
+            }
+            return packet340;
+        } else if (protocol == ProtocolInfo.v1_9_0 || protocol == ProtocolInfo.v1_8_0 || protocol == ProtocolInfo.v1_7_0) { // these should work just fine
+            if (packet313 == null) {
+                packet313 = packetFor(GameVersion.V1_8_0);
+            }
+            return packet313;
+        }
+        return null;
     }
 
     public Map<UUID, SmithingRecipe> getSmithingRecipes(int protocol) {
@@ -858,11 +1120,16 @@ public class CraftingManager {
         return this.brewingRecipesOld;
     }
 
+    @Deprecated
     public Map<UUID, MultiRecipe> getMultiRecipes(int protocol) {
         if (protocol >= ProtocolInfo.v1_16_0) {
             return this.multiRecipes;
         }
         throw new IllegalArgumentException("Multi recipes are not supported for protocol " + protocol + " (< 407)");
+    }
+
+    public Map<UUID, MultiRecipe> getMultiRecipes() {
+        return this.multiRecipes;
     }
 
     public MultiRecipe getMultiRecipe(Player player, Item outputItem, List<Item> inputs) {
@@ -1239,7 +1506,7 @@ public class CraftingManager {
             for (Item item : inputList) {
                 Item clone = item.clone();
                 clone.setCount(1);
-                if (item.isTool() && item.getDamage() > 0) {
+                if ((item.isTool() || item.isArmor()) && item.getDamage() > 0) {
                     clone.setDamage(0);
                 }
                 list.add(clone);

@@ -8,6 +8,8 @@ import lombok.ToString;
 import lombok.Value;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
 @ToString
 public class ResourcePacksInfoPacket extends DataPacket {
@@ -19,6 +21,10 @@ public class ResourcePacksInfoPacket extends DataPacket {
      * @since v662 1.20.70
      */
     public boolean hasAddonPacks;
+    /**
+     * @since v818 1.21.90
+     */
+    public boolean forceDisableVibrantVisuals;
     public boolean scripting;
     public boolean forceServerPacks;
     public ResourcePack[] behaviourPackEntries = ResourcePack.EMPTY_ARRAY;
@@ -30,6 +36,14 @@ public class ResourcePacksInfoPacket extends DataPacket {
     @Getter
     @Setter
     private List<CDNEntry> CDNEntries = new ObjectArrayList<>();
+    /**
+     * @since v766
+     */
+    public UUID worldTemplateId = new UUID(0, 0);
+    /**
+     * @since v766
+     */
+    public String worldTemplateVersion = "";
 
     @Override
     public void decode() {
@@ -44,9 +58,16 @@ public class ResourcePacksInfoPacket extends DataPacket {
         }
         if (this.protocol >= ProtocolInfo.v1_9_0) {
             this.putBoolean(this.scripting);
+            if (this.protocol >= ProtocolInfo.v1_21_90) {
+                this.putBoolean(this.forceDisableVibrantVisuals);
+            }
             if (this.protocol >= ProtocolInfo.v1_17_10 && this.protocol < ProtocolInfo.v1_21_30) {
                 this.putBoolean(this.forceServerPacks);
             }
+        }
+        if (this.protocol >= ProtocolInfo.v1_21_50) {
+            this.putUUID(this.worldTemplateId);
+            this.putString(this.worldTemplateVersion);
         }
 
         if (this.protocol < ProtocolInfo.v1_21_30) {
@@ -55,7 +76,14 @@ public class ResourcePacksInfoPacket extends DataPacket {
         this.encodeResourcePacks(this.resourcePackEntries);
 
         if (this.protocol >= ProtocolInfo.v1_20_30_24 && this.protocol < ProtocolInfo.v1_21_40) {
-            this.putArray(this.CDNEntries, (entry) -> {
+            List<CDNEntry> cacheCDNEntries = new ObjectArrayList<>(this.CDNEntries);
+            for (ResourcePack entry : this.resourcePackEntries) {
+                CDNEntry cdnEntry = new CDNEntry(entry.getPackId().toString(), entry.getCDNUrl());
+                if (!"".equals(entry.getCDNUrl()) && !cacheCDNEntries.contains(cdnEntry)) {
+                    cacheCDNEntries.add(cdnEntry);
+                }
+            }
+            this.putArray(cacheCDNEntries, (entry) -> {
                 this.putString(entry.getPackId());
                 this.putString(entry.getRemoteUrl());
             });
@@ -78,7 +106,11 @@ public class ResourcePacksInfoPacket extends DataPacket {
     private void encodeResourcePacks(ResourcePack[] packs) {
         this.putLShort(packs.length);
         for (ResourcePack entry : packs) {
-            this.putString(entry.getPackId().toString());
+            if (this.protocol >= ProtocolInfo.v1_21_50) {
+                this.putUUID(entry.getPackId());
+            } else {
+                this.putString(entry.getPackId().toString());
+            }
             this.putString(entry.getPackVersion());
             this.putLLong(entry.getPackSize());
             this.putString(entry.getEncryptionKey()); // encryption key
@@ -112,5 +144,17 @@ public class ResourcePacksInfoPacket extends DataPacket {
     public static class CDNEntry {
         String packId;
         String remoteUrl;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof CDNEntry cdnEntry)) return false;
+            return Objects.equals(packId, cdnEntry.packId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(packId);
+        }
     }
 }

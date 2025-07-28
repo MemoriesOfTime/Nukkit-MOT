@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
+import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -19,6 +20,7 @@ public class ZippedResourcePack extends AbstractResourcePack {
     private byte[] sha256;
 
     private String encryptionKey = "";
+    private String cdnUrl = "";
 
     public ZippedResourcePack(File file) {
         if (!file.exists()) {
@@ -32,7 +34,7 @@ public class ZippedResourcePack extends AbstractResourcePack {
             ZipEntry entry = zip.getEntry("manifest.json");
             if (entry == null) {
                 entry = zip.stream()
-                        .filter(e-> e.getName().toLowerCase().endsWith("manifest.json") && !e.isDirectory())
+                        .filter(e-> e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") && !e.isDirectory())
                         .filter(e-> {
                             File fe = new File(e.getName());
                             if (!fe.getName().equalsIgnoreCase("manifest.json")) {
@@ -107,5 +109,14 @@ public class ZippedResourcePack extends AbstractResourcePack {
     @Override
     public String getEncryptionKey() {
         return this.encryptionKey;
+    }
+
+    @Override
+    public String getCDNUrl() {
+        return this.cdnUrl;
+    }
+
+    public void setCdnUrl(String cdnUrl) {
+        this.cdnUrl = cdnUrl;
     }
 }

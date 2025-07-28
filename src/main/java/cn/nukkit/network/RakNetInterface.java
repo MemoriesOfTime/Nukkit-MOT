@@ -30,6 +30,7 @@ import org.cloudburstmc.netty.handler.codec.raknet.server.RakServerRateLimiter;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -72,7 +73,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .option(RakChannelOption.RAK_GUID, this.serverId)
                 .option(RakChannelOption.RAK_SUPPORTED_PROTOCOLS, new int[]{8, 9, 10, 11})
                 .childOption(RakChannelOption.RAK_ORDERING_CHANNELS, 1)
-                .option(RakChannelOption.RAK_SEND_COOKIE, true)
+                .option(RakChannelOption.RAK_SEND_COOKIE, this.server.enableRakSendCookie)
                 .option(RakChannelOption.RAK_PACKET_LIMIT, this.server.rakPacketLimit)
                 .handler(new ChannelInitializer<>() {
                     @Override
@@ -99,6 +100,14 @@ public class RakNetInterface implements AdvancedSourceInterface {
         String address = Strings.isNullOrEmpty(this.server.getIp()) ? "0.0.0.0" : this.server.getIp();
 
         this.channel = bootstrap.bind(address, this.server.getPort()).awaitUninterruptibly().channel();
+
+        try {
+            RakServerRateLimiter rakServerRateLimiter = this.channel.pipeline().get(RakServerRateLimiter.class);
+            rakServerRateLimiter.addException(InetAddress.getLocalHost());
+            rakServerRateLimiter.addException(InetAddress.getByName("127.0.0.1"));
+        } catch (UnknownHostException e) {
+            log.error("Failed to add localhost to exception list", e);
+        }
     }
 
     @Override

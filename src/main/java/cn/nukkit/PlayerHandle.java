@@ -15,7 +15,7 @@ import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.LoginChainData;
 import com.google.common.cache.Cache;
 import com.google.common.collect.BiMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -36,6 +36,15 @@ public final class PlayerHandle {
 
     public int getProtocol() {
         return player.protocol;
+    }
+
+    public void setGameVersion(GameVersion gameVersion) {
+        player.gameVersion = gameVersion;
+        player.protocol = gameVersion.getProtocol();
+    }
+
+    public GameVersion getGameVersion() {
+        return player.gameVersion;
     }
 
     public NetworkPlayerSession getNetworkSession() {
@@ -83,7 +92,7 @@ public final class PlayerHandle {
         return player.permanentWindows;
     }
 
-    public Long2ObjectLinkedOpenHashMap<Boolean> getLoadQueue() {
+    public LongLinkedOpenHashSet getLoadQueue() {
         return player.loadQueue;
     }
 
@@ -477,5 +486,13 @@ public final class PlayerHandle {
 
     public boolean isLoginPacketReceived() {
         return player.loginPacketReceived;
+    }
+
+    public int getFailedMobEquipmentPacket() {
+        return player.failedMobEquipmentPacket;
+    }
+
+    public void setFailedMobEquipmentPacket(int failedCount) {
+        player.failedMobEquipmentPacket = failedCount;
     }
 }

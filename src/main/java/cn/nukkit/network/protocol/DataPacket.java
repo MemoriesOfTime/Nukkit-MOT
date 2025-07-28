@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.network.Network;
@@ -16,6 +17,7 @@ import lombok.extern.log4j.Log4j2;
 public abstract class DataPacket extends BinaryStream implements Cloneable {
 
     public int protocol = Integer.MAX_VALUE;
+    public GameVersion gameVersion = GameVersion.getLastVersion();
 
     public volatile boolean isEncoded = false;
     private int channel = Network.CHANNEL_NONE;
@@ -85,7 +87,13 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
     public DataPacket clone() {
         try {
             DataPacket packet = (DataPacket) super.clone();
-            packet.setBuffer(this.getBuffer()); // prevent reflecting same buffer instance
+            if (this.count >= 0) {
+                packet.setBuffer(this.getBuffer()); // prevent reflecting same buffer instance
+            } else if (this.getBufferUnsafe() != null) {
+                packet.setBuffer(this.getBufferUnsafe().clone());
+            } else {
+                packet.setBuffer(new byte[32]);
+            }
             packet.offset = this.offset;
             packet.count = this.count;
             return packet;
@@ -99,8 +107,8 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
     }
 
     public BatchPacket compress(int level) {
-        BinaryStream stream = new BinaryStream();
         byte[] buf = this.getBuffer();
+        BinaryStream stream = new BinaryStream(new byte[5 + buf.length]).reset();
         stream.putUnsignedVarInt(buf.length);
         stream.put(buf);
         try {
@@ -115,6 +123,19 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
             return batched;
         } catch (Exception e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    void decodeUnsupported() {
+        if (Nukkit.DEBUG > 1) {
+            Server.getInstance().getLogger().debug("Warning: decode() not implemented for " + this.getClass().getName());
+        }
+    }
+
+    void encodeUnsupported() {
+        if (Nukkit.DEBUG > 1) {
+            Server.getInstance().getLogger().debug("Warning: encode() not implemented for " + this.getClass().getName());
+            Thread.dumpStack();
         }
     }
 }

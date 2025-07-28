@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.leveldb;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -11,8 +12,6 @@ import org.cloudburstmc.nbt.NbtUtils;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Objects;
-
-import static cn.nukkit.level.format.leveldb.LevelDBConstants.PALETTE_VERSION;
 
 public class NukkitLegacyMapper implements LegacyStateMapper {
 
@@ -46,12 +45,12 @@ public class NukkitLegacyMapper implements LegacyStateMapper {
 
     @Override
     public int legacyToRuntime(int legacyId, int meta) {
-        return GlobalBlockPalette.getOrCreateRuntimeId(PALETTE_VERSION, legacyId, meta);
+        return GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getFeatureVersion(), legacyId, meta);
     }
 
     @Override
     public int runtimeToFullId(int runtimeId) {
-        return GlobalBlockPalette.getLegacyFullId(PALETTE_VERSION, runtimeId);
+        return GlobalBlockPalette.getLegacyFullId(GameVersion.getFeatureVersion(), runtimeId);
     }
 
     @Override

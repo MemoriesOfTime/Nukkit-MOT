@@ -21,10 +21,7 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.nio.file.Files;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -128,7 +125,7 @@ public class StatusCommand extends VanillaCommand {
         // MAC地址检测
         List<NetworkIF> nifs = hardware.getNetworkIFs();
         for (NetworkIF nif : nifs) {
-            String mac = nif.getMacaddr().toUpperCase();
+            String mac = nif.getMacaddr().toUpperCase(Locale.ROOT);
             String oui = mac.length() > 7 ? mac.substring(0, 8) : mac;
             if (vmMac.containsKey(oui)) {
                 return vmMac.get(oui);
@@ -154,7 +151,7 @@ public class StatusCommand extends VanillaCommand {
 
         //检查Windows系统参数
         //Wmi虚拟机查询只能在Windows上使用，Linux上不执行这个部分即可
-        if (System.getProperties().getProperty("os.name").toUpperCase().contains("WINDOWS")) {
+        if (System.getProperties().getProperty("os.name").toUpperCase(Locale.ROOT).contains("WINDOWS")) {
             WbemcliUtil.WmiQuery<Win32ComputerSystem.ComputerSystemProperty> computerSystemQuery = new WbemcliUtil.WmiQuery("Win32_ComputerSystem", ComputerSystemEntry.class);
             WbemcliUtil.WmiResult result = WmiQueryHandler.createInstance().queryWMI(computerSystemQuery);
             Object tmp = result.getValue(ComputerSystemEntry.HYPERVISORPRESENT, 0);

@@ -1,5 +1,6 @@
 package cn.nukkit.level.format.leveldb;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GameRules;
@@ -23,11 +24,11 @@ import cn.nukkit.utils.*;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.netty.buffer.*;
-import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import lombok.extern.log4j.Log4j2;
 import net.daporkchop.ldbjni.DBProvider;
 import net.daporkchop.ldbjni.LevelDB;
@@ -36,20 +37,15 @@ import org.cloudburstmc.nbt.*;
 import org.iq80.leveldb.*;
 
 import javax.annotation.Nullable;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -72,10 +68,14 @@ public class LevelDBProvider implements LevelProvider {
     protected final String path;
 
     protected CompoundTag levelData;
+    private Vector3 spawn;
+    private Long cachedSeed;
 
     protected volatile boolean closed;
     protected final Lock gcLock;
     private final ExecutorService executor;
+
+    private Task autoCompactionTask;
 
     public LevelDBProvider(Level level, String path) {
         this.level = level;
@@ -87,12 +87,41 @@ public class LevelDBProvider implements LevelProvider {
             throw new RuntimeException(e);
         }
 
-        try (InputStream stream = Files.newInputStream(dirPath.resolve("level.dat"))) {
+        Path levelDatFile = dirPath.resolve("level.dat");
+        try (InputStream stream = Files.newInputStream(levelDatFile)) {
             //noinspection ResultOfMethodCallIgnored
             stream.skip(8);
             this.levelData = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
         } catch (IOException e) {
-            throw new LevelException("Invalid level.dat", e);
+            log.fatal("Failed to load the level.dat file at {}, attempting to load level.dat.bak instead!", levelDatFile, e);
+            try {
+                Path bakPath = levelDatFile.resolveSibling("level.dat.bak");
+                if (!bakPath.toFile().isFile()) {
+                    log.fatal("The file {} does not exists!", bakPath);
+                    FileNotFoundException ex = new FileNotFoundException("The file " + bakPath + " does not exists!");
+                    ex.addSuppressed(e);
+                    throw ex;
+                }
+                try (InputStream stream = Files.newInputStream(bakPath)) {
+                    //noinspection ResultOfMethodCallIgnored
+                    stream.skip(8);
+                    this.levelData = NBTIO.read(stream, ByteOrder.LITTLE_ENDIAN);
+                } catch (Exception e2) {
+                    log.fatal("Failed to load the level.dat.bak file at {}", levelDatFile);
+                    e2.addSuppressed(e);
+                    throw e2;
+                }
+            } catch (Exception e2) {
+                LevelException ex = new LevelException("Could not load the level.dat and the level.dat.bak files. You might need to restore them from a backup!", e);
+                ex.addSuppressed(e2);
+                throw ex;
+            }
+        }
+
+        try {
+            Files.copy(levelDatFile, levelDatFile.resolveSibling("level.dat.bak"), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            log.warn("Failed to backup level.dat to level.dat.bak", e);
         }
 
         if (!this.levelData.contains("Generator")) {
@@ -112,13 +141,13 @@ public class LevelDBProvider implements LevelProvider {
         this.gcLock = new ReentrantLock();
 
         ThreadFactoryBuilder builder = new ThreadFactoryBuilder();
-        builder.setNameFormat("LevelDB Executor-" + this.getName() + " #%s");
+        builder.setNameFormat("LevelDB Executor for " + this.getName());
         builder.setUncaughtExceptionHandler((thread, ex) -> Server.getInstance().getLogger().error("Exception in " + thread.getName(), ex));
-        this.executor = Executors.newFixedThreadPool(3, builder.build());
+        this.executor = Executors.newSingleThreadExecutor(builder.build());
 
         if (level.isAutoCompaction()) {
             int delay = level.getServer().getAutoCompactionTicks();
-            level.getServer().getScheduler().scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, new Task() {
+            this.autoCompactionTask = new Task() {
                 @Override
                 public void onRun(int currentTick) {
                     if (closed || !level.isAutoCompaction()) {
@@ -127,7 +156,8 @@ public class LevelDBProvider implements LevelProvider {
                     }
                     CompletableFuture.runAsync(new AutoCompaction(), LevelDBProvider.this.executor);
                 }
-            }, delay + ThreadLocalRandom.current().nextInt(delay), delay);
+            };
+            level.getServer().getScheduler().scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, autoCompactionTask, delay + ThreadLocalRandom.current().nextInt(delay), delay);
         }
     }
 
@@ -285,7 +315,7 @@ public class LevelDBProvider implements LevelProvider {
     }
 
     @Override
-    public void requestChunkTask(IntSet protocols, int chunkX, int chunkZ) {
+    public void requestChunkTask(ObjectSet<GameVersion> protocols, int chunkX, int chunkZ) {
         LevelDBChunk chunk = (LevelDBChunk) this.getChunk(chunkX, chunkZ, false);
         if (chunk == null) {
             throw new ChunkException("Invalid Chunk Set");
@@ -297,7 +327,7 @@ public class LevelDBProvider implements LevelProvider {
             final BaseChunk chunkClone = chunk.cloneForChunkSending();
             this.level.getAsyncChuckExecutor().execute(() -> {
                 NetworkChunkSerializer.serialize(protocols, chunkClone, networkChunkSerializerCallback -> {
-                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                    getLevel().asyncChunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
                             timestamp,
                             chunkX,
                             chunkZ,
@@ -308,7 +338,7 @@ public class LevelDBProvider implements LevelProvider {
             });
         }else {
             NetworkChunkSerializer.serialize(protocols, chunk, networkChunkSerializerCallback -> {
-                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getProtocolId(),
+                this.getLevel().chunkRequestCallback(networkChunkSerializerCallback.getGameVersion(),
                         timestamp,
                         chunkX,
                         chunkZ,
@@ -469,80 +499,8 @@ public class LevelDBProvider implements LevelProvider {
 
         chunk.setChanged(false);
 
-        WriteBatch writeBatch = this.db.createWriteBatch();
-
-        if (chunk.isSubChunksDirty()) {
-            ChunkSerializers.serializeChunk(writeBatch, chunk, CURRENT_LEVEL_CHUNK_VERSION);
-        }
-
-        if (chunk.isHeightmapOrBiomesDirty()) {
-            if (chunk.has3dBiomes()) {
-                Data3dSerializer.serialize(writeBatch, chunk);
-            } else {
-                Data2dSerializer.serialize(writeBatch, chunk);
-            }
-        }
-
-        writeBatch.put(LevelDBKey.VERSION.getKey(chunkX, chunkZ, this.level.getDimension()), CHUNK_VERSION_SAVE_DATA);
-        writeBatch.put(STATE_FINALIZATION.getKey(chunkX, chunkZ, this.level.getDimensionData().getDimensionId()), Binary.writeLInt(chunk.getState().ordinal()));
-
-        BlockEntitySerializer.saveBlockEntities(writeBatch, chunk);
-        EntitySerializer.saveEntities(writeBatch, chunk);
-
-        Collection<BlockUpdateEntry> blockUpdateEntries = null;
-        // TODO randomBlockUpdate
-        //Collection<BlockUpdateEntry> randomBlockUpdateEntries = null;
-        long currentTick = 0;
-
-        LevelProvider provider;
-        if ((provider = chunk.getProvider()) != null) {
-            Level level = provider.getLevel();
-            currentTick = level.getCurrentTick();
-            //dirty?
-            blockUpdateEntries = level.getPendingBlockUpdates(chunk);
-            //randomBlockUpdateEntries = level.getPendingRandomBlockUpdates(chunk);
-        }
-
-        try {
-            byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension());
-            if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
-                NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
-                if (ticks != null) {
-                    ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
-                    NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
-                    outputStream.writeTag(ticks);
-                    writeBatch.put(pendingScheduledTicksKey, Utils.convertByteBuf2Array(byteBuf));
-                    byteBuf.release();
-                } else {
-                    writeBatch.delete(pendingScheduledTicksKey);
-                }
-            } else {
-                writeBatch.delete(pendingScheduledTicksKey);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-       /* byte[] pendingRandomTicksKey = PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ);
-        if (randomBlockUpdateEntries != null && !randomBlockUpdateEntries.isEmpty()) {
-            CompoundTag ticks = saveBlockTickingQueue(randomBlockUpdateEntries, currentTick);
-            if (ticks != null) {
-                try {
-                    writeBatch.put(pendingRandomTicksKey, NBTIO.write(ticks, ByteOrder.LITTLE_ENDIAN));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            } else {
-                writeBatch.delete(pendingRandomTicksKey);
-            }
-        } else {
-            writeBatch.delete(pendingRandomTicksKey);
-        }*/
-
-        writeBatch.delete(DATA_2D_LEGACY.getKey(chunkX, chunkZ, this.level.getDimension()));
-        writeBatch.delete(LEGACY_TERRAIN.getKey(chunkX, chunkZ, this.level.getDimension()));
-
-        return CompletableFuture.runAsync(() -> this.saveChunkCallback(writeBatch, chunk), this.executor);
+        WriteBatch batch = this.save0(chunkX, chunkZ, chunk);
+        return CompletableFuture.runAsync(() -> this.saveChunkCallback(batch, chunk), this.executor);
     }
 
     public void saveChunkSync(int chunkX, int chunkZ, FullChunk fullChunk) {
@@ -559,6 +517,11 @@ public class LevelDBProvider implements LevelProvider {
 
         chunk.setChanged(false);
 
+        WriteBatch batch = this.save0(chunkX, chunkZ, chunk);
+        this.saveChunkCallback(batch, chunk);
+    }
+
+    private WriteBatch save0(int chunkX, int chunkZ, LevelDBChunk chunk) {
         WriteBatch writeBatch = this.db.createWriteBatch();
 
         if (chunk.isSubChunksDirty()) {
@@ -593,23 +556,23 @@ public class LevelDBProvider implements LevelProvider {
             //randomBlockUpdateEntries = level.getPendingRandomBlockUpdates(chunk);
         }
 
-        try {
-            byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension());
-            if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
-                NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
-                if (ticks != null) {
-                    ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
-                    NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf));
+        byte[] pendingScheduledTicksKey = PENDING_TICKS.getKey(chunkX, chunkZ, this.level.getDimension());
+        if (blockUpdateEntries != null && !blockUpdateEntries.isEmpty()) {
+            NbtMap ticks = saveBlockTickingQueue(blockUpdateEntries, currentTick);
+            if (ticks != null) {
+                ByteBuf byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+                try (NBTOutputStream outputStream = NbtUtils.createWriterLE(new ByteBufOutputStream(byteBuf))) {
                     outputStream.writeTag(ticks);
-                    writeBatch.put(pendingScheduledTicksKey, Utils.convertByteBuf2Array(byteBuf));
-                } else {
-                    writeBatch.delete(pendingScheduledTicksKey);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
+                writeBatch.put(pendingScheduledTicksKey, Utils.convertByteBuf2Array(byteBuf));
+                byteBuf.release();
             } else {
                 writeBatch.delete(pendingScheduledTicksKey);
             }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+        } else {
+            writeBatch.delete(pendingScheduledTicksKey);
         }
 
        /* byte[] pendingRandomTicksKey = PENDING_RANDOM_TICKS.getKey(chunkX, chunkZ);
@@ -631,20 +594,16 @@ public class LevelDBProvider implements LevelProvider {
         writeBatch.delete(DATA_2D_LEGACY.getKey(chunkX, chunkZ, this.level.getDimension()));
         writeBatch.delete(LEGACY_TERRAIN.getKey(chunkX, chunkZ, this.level.getDimension()));
 
-        this.saveChunkCallback(writeBatch, chunk);
+        return writeBatch;
     }
 
     private void saveChunkCallback(WriteBatch batch, LevelDBChunk chunk) {
-        if (this.closed) {
-            return;
-        }
-
         chunk.writeLock().lock();
         try {
             this.db.write(batch);
             batch.close();
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to close WriteBatch for " + this.getName(), e);
+        } catch (Exception e) {
+            log.error("Exception in saveChunkCallback for {}", this.getName(), e);
         } finally {
             chunk.writeLock().unlock();
         }
@@ -766,14 +725,25 @@ public class LevelDBProvider implements LevelProvider {
         if (this.closed) {
             return;
         }
-        this.closed = true;
 
         try {
+            if (this.autoCompactionTask != null) {
+                this.autoCompactionTask.cancel();
+                this.autoCompactionTask = null;
+            }
+
             gcLock.lock();
 
             this.unloadChunksUnsafe(true);
+            this.closed = true;
             this.level = null;
             this.executor.shutdown();
+            try {
+                this.executor.awaitTermination(1, TimeUnit.DAYS);
+            } catch (InterruptedException e) {
+                Server.getInstance().getLogger().error("Stopping LevelDB Executor interrupted", e);
+            }
+
             try {
                 this.db.close();
             } catch (IOException e) {
@@ -870,17 +840,24 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public long getSeed() {
-        return this.levelData.getLong("RandomSeed");
+        if (this.cachedSeed == null) {
+            this.cachedSeed = this.levelData.getLong("RandomSeed");
+        }
+        return this.cachedSeed;
     }
 
     @Override
     public void setSeed(long value) {
+        this.cachedSeed = null;
         this.levelData.putLong("RandomSeed", value);
     }
 
     @Override
     public Vector3 getSpawn() {
-        return new Vector3(this.levelData.getInt("SpawnX"), this.levelData.getInt("SpawnY"), this.levelData.getInt("SpawnZ"));
+        if (this.spawn == null) {
+            this.spawn = new Vector3(this.levelData.getInt("SpawnX"), this.levelData.getInt("SpawnY"), this.levelData.getInt("SpawnZ"));
+        }
+        return this.spawn;
     }
 
     @Override
@@ -888,6 +865,7 @@ public class LevelDBProvider implements LevelProvider {
         this.levelData.putInt("SpawnX", (int) pos.x);
         this.levelData.putInt("SpawnY", (int) pos.y);
         this.levelData.putInt("SpawnZ", (int) pos.z);
+        this.spawn = pos;
     }
 
     @Override
@@ -1092,7 +1070,7 @@ public class LevelDBProvider implements LevelProvider {
                     break;
                 }
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException("iteration failed", e);
         }
     }
@@ -1106,7 +1084,9 @@ public class LevelDBProvider implements LevelProvider {
 
             log.debug("Running AutoCompaction... ({})", path);
             try {
-                gcLock.lock();
+                if (!gcLock.tryLock(500, TimeUnit.MILLISECONDS)) {
+                    return;
+                }
 
                 if (!canRun()) {
                     return;
@@ -1131,6 +1111,8 @@ public class LevelDBProvider implements LevelProvider {
                     return next;
                 }, true);
                 log.debug("{} chunks have been compressed ({})", count, path);
+            } catch (InterruptedException e) {
+                log.debug("AutoCompaction interrupted", e);
             } finally {
                 gcLock.unlock();
             }

@@ -177,6 +177,10 @@ public class ListTag<T extends Tag> extends Tag {
         return list.isEmpty();
     }
 
+    public boolean contains(T tag) {
+        return list.contains(tag);
+    }
+
     @Override
     public Tag copy() {
         ListTag<T> res = new ListTag<>(getName());

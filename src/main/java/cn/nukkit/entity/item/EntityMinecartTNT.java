@@ -19,6 +19,8 @@ import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.MinecartType;
 import cn.nukkit.utils.Utils;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
  * @author Adam Matthew [larryTheCoder]
  * 
@@ -58,28 +60,26 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     }
 
     @Override
-    public boolean onUpdate(int currentTick) {
-        if (fuse < 80) {
-            int tickDiff = currentTick - lastUpdate;
+    public boolean entityBaseTick(int tickDiff) {
+        boolean hasUpdate = super.entityBaseTick(tickDiff);
 
-            lastUpdate = currentTick;
-
+        if (!this.closed && this.isAlive() && this.fuse < 80) {
             if (fuse % 5 == 0) {
                 setDataProperty(new IntEntityData(DATA_FUSE_LENGTH, fuse));
             }
 
             fuse -= tickDiff;
 
-            if (isAlive() && fuse <= 0) {
+            if (fuse <= 0) {
                 if (this.level.getGameRules().getBoolean(GameRule.TNT_EXPLODES)) {
-                    this.explode(Utils.random.nextInt(5));
+                    this.explode(ThreadLocalRandom.current().nextInt(5));
                 }
                 this.close();
                 return false;
             }
         }
 
-        return super.onUpdate(currentTick);
+        return hasUpdate;
     }
 
     @Override

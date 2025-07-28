@@ -120,7 +120,7 @@ public class PluginI18n {
         final Map<String, String> fallbackMap;
         if (map.containsKey(id)) {
             return map.get(id);
-        } else if ((fallbackMap = this.MULTI_LANGUAGE.get(fallback)).containsKey(id)) {
+        } else if ((fallbackMap = this.MULTI_LANGUAGE.get(fallback)) != null && fallbackMap.containsKey(id)) {
             return fallbackMap.get(id);
         } else {
             return Server.getInstance().getLanguage().internalGet(id);

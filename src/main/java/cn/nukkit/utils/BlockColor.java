@@ -17,8 +17,10 @@ public class BlockColor  {
     public static final BlockColor CLOTH_BLOCK_COLOR = WOOL_BLOCK_COLOR;
     public static final BlockColor TNT_BLOCK_COLOR = new BlockColor(0xff, 0x00, 0x00);
     public static final BlockColor ICE_BLOCK_COLOR = new BlockColor(0xa0, 0xa0, 0xff);
+    public static final BlockColor METAL_BLOCK_COLOR = new BlockColor(0xa7, 0xa7, 0xa7);
     public static final BlockColor IRON_BLOCK_COLOR = new BlockColor(0xa7, 0xa7, 0xa7);
     public static final BlockColor FOLIAGE_BLOCK_COLOR = new BlockColor(0x00, 0x7c, 0x00);
+    public static final BlockColor PLANT_BLOCK_COLOR = FOLIAGE_BLOCK_COLOR;
     public static final BlockColor SNOW_BLOCK_COLOR = new BlockColor(0xff, 0xff, 0xff);
     public static final BlockColor CLAY_BLOCK_COLOR = new BlockColor(0xa4, 0xa8, 0xb8);
     public static final BlockColor DIRT_BLOCK_COLOR = new BlockColor(0x97, 0x6d, 0x4d);
@@ -56,6 +58,7 @@ public class BlockColor  {
     public static final BlockColor EMERALD_BLOCK_COLOR = new BlockColor(0x00, 0xd9, 0x3a);
     public static final BlockColor OBSIDIAN_BLOCK_COLOR = new BlockColor(0x15, 0x14, 0x1f);
     public static final BlockColor SPRUCE_BLOCK_COLOR = new BlockColor(0x81, 0x56, 0x31);
+    public static final BlockColor PODZOL_BLOCK_COLOR = SPRUCE_BLOCK_COLOR;
     public static final BlockColor NETHERRACK_BLOCK_COLOR = new BlockColor(0x70, 0x02, 0x00);
     public static final BlockColor NETHER_BLOCK_COLOR = NETHERRACK_BLOCK_COLOR;
     public static final BlockColor REDSTONE_BLOCK_COLOR = TNT_BLOCK_COLOR;

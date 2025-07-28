@@ -3,6 +3,7 @@ package cn.nukkit.command;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.command.data.*;
+import cn.nukkit.command.defaults.ExecuteCommand;
 import cn.nukkit.command.tree.ParamList;
 import cn.nukkit.command.tree.ParamTree;
 import cn.nukkit.command.utils.CommandLogger;
@@ -66,14 +67,16 @@ public abstract class Command {
 
     public Command(String name, String description, String usageMessage, String[] aliases) {
         this.commandData = new CommandData();
-        this.name = name.toLowerCase(Locale.ENGLISH); // Uppercase letters crash the client?!?
+        this.name = name.toLowerCase(Locale.ROOT); // Uppercase letters crash the client?!?
         this.nextLabel = name;
         this.label = name;
         this.description = description;
         this.usageMessage = usageMessage == null ? "/" + name : usageMessage;
         this.aliases = aliases;
         this.activeAliases = aliases;
-        this.commandParameters.put("default", new CommandParameter[]{CommandParameter.newType("args", true, CommandParamType.RAWTEXT)});
+        this.commandParameters.put("default", new CommandParameter[]{
+                CommandParameter.newType("args", true, CommandParamType.RAWTEXT)
+        });
     }
 
     /**
@@ -140,6 +143,9 @@ public abstract class Command {
         this.commandParameters.forEach((key, params) -> {
             CommandOverload overload = new CommandOverload();
             overload.input.parameters = params;
+            if (this instanceof ExecuteCommand) {
+                overload.chaining = true;
+            }
             customData.overloads.put(key, overload);
         });
 
@@ -281,13 +287,13 @@ public abstract class Command {
             for (CommandParameter commandParameter : commandParameters) {
                 if (!commandParameter.optional) {
                     if (commandParameter.enumData == null) {
-                        builder.append(" <").append(commandParameter.name + ": " + commandParameter.type.name().toLowerCase(Locale.ENGLISH)).append(">");
+                        builder.append(" <").append(commandParameter.name + ": " + commandParameter.type.name().toLowerCase(Locale.ROOT)).append(">");
                     } else {
                         builder.append(" <").append(commandParameter.enumData.getValues().subList(0, Math.min(commandParameter.enumData.getValues().size(), 10)).stream().collect(Collectors.joining("|"))).append(commandParameter.enumData.getValues().size() > 10 ? "|..." : "").append(">");
                     }
                 } else {
                     if (commandParameter.enumData == null) {
-                        builder.append(" [").append(commandParameter.name + ": " + commandParameter.type.name().toLowerCase(Locale.ENGLISH)).append("]");
+                        builder.append(" [").append(commandParameter.name + ": " + commandParameter.type.name().toLowerCase(Locale.ROOT)).append("]");
                     } else {
                         builder.append(" [").append(commandParameter.enumData.getValues().subList(0, Math.min(commandParameter.enumData.getValues().size(), 10)).stream().collect(Collectors.joining("|"))).append(commandParameter.enumData.getValues().size() > 10 ? "|..." : "").append("]");
                     }

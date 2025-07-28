@@ -31,7 +31,7 @@ public class EnumNode extends ParamNode<String> {
     public IParamNode<String> init(ParamList parent, String name, boolean optional, CommandParamType type, CommandEnum enumData, String postFix) {
         this.paramList = parent;
         this.commandEnum = enumData;
-        this.enums = Sets.newHashSet(this.commandEnum.getValues());
+        this.enums = enumData == null ? Sets.newHashSet() : Sets.newHashSet(this.commandEnum.getValues());
         this.optional = optional;
         return this;
     }

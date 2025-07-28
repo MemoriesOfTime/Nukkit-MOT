@@ -1,5 +1,6 @@
 package cn.nukkit.level;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
@@ -13,6 +14,7 @@ import com.google.common.cache.CacheBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntMaps;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.BufferedInputStream;
@@ -29,6 +31,7 @@ import java.util.zip.GZIPInputStream;
 public class BlockPalette {
 
     private final int protocol;
+    private final GameVersion gameVersion;
     private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
     private final Map<CompoundTag, Integer> stateToLegacy = new HashMap<>();
@@ -37,8 +40,15 @@ public class BlockPalette {
 
     private volatile boolean locked;
 
+    @Deprecated
     public BlockPalette(int protocol) {
-        this.protocol = protocol;
+        this(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public BlockPalette(GameVersion gameVersion) {
+        this.protocol = gameVersion.getProtocol();
+        this.gameVersion = gameVersion;
+
         legacyToRuntimeId.defaultReturnValue(-1);
         runtimeIdToLegacy.defaultReturnValue(-1);
 
@@ -48,7 +58,11 @@ public class BlockPalette {
 
     private ListTag<CompoundTag> paletteFor(int protocol) {
         ListTag<CompoundTag> tag;
-        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream("runtime_block_states_" + protocol + ".dat")) {
+        String name = "runtime_block_states_" + protocol + ".dat";
+        if (gameVersion.isNetEase()) {
+            name = "runtime_block_states_netease_" + protocol + ".dat";
+        }
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(name)) {
             if (stream == null) {
                 throw new AssertionError("Unable to locate block state nbt " + protocol);
             }
@@ -61,17 +75,36 @@ public class BlockPalette {
     }
 
     private void loadBlockStates(ListTag<CompoundTag> blockStates) {
+        List<CompoundTag> stateOverloads = new ObjectArrayList<>();
         for (CompoundTag state : blockStates.getAll()) {
-            int id = state.getInt("id");
-            int data = state.getShort("data");
-            int runtimeId = state.getInt("runtimeId");
-            int legacyId = id << 6 | data;
-            legacyToRuntimeId.put(legacyId, runtimeId);
-            if (!runtimeIdToLegacy.containsKey(runtimeId)) {
-                runtimeIdToLegacy.put(runtimeId, legacyId);
+            if (!this.registerBlockState(state, false)) {
+                stateOverloads.add(state);
             }
-            stateToLegacy.put(state, legacyId);
         }
+
+        for (CompoundTag state : stateOverloads) {
+            log.debug("[{}] Registering block palette overload: {}", this.getProtocol(), state.getString("name"));
+            this.registerBlockState(state, true);
+        }
+    }
+
+    private boolean registerBlockState(CompoundTag state, boolean force) {
+        int id = state.getInt("id");
+        int data = state.getShort("data");
+        int runtimeId = state.getInt("runtimeId");
+        boolean stateOverload = state.getBoolean("stateOverload");
+
+        if (stateOverload && !force) {
+            return false;
+        }
+
+        CompoundTag vanillaState = state
+                .remove("id")
+                .remove("data")
+                .remove("runtimeId")
+                .remove("stateOverload");
+        this.registerState(id, data, runtimeId, vanillaState);
+        return true;
     }
 
     /**
@@ -88,7 +121,7 @@ public class BlockPalette {
                 int id = Utils.toInt(map.get("id"));
                 int data = Utils.toInt(map.getOrDefault("data", 0));
                 int runtimeId = Utils.toInt(map.get("runtimeId"));
-                int legacyId = id << 6 | data;
+                int legacyId = id << Block.DATA_BITS | data;
                 legacyToRuntimeId.put(legacyId, runtimeId);
                 if (!runtimeIdToLegacy.containsKey(runtimeId)) {
                     runtimeIdToLegacy.put(runtimeId, legacyId);
@@ -101,6 +134,10 @@ public class BlockPalette {
 
     public int getProtocol() {
         return this.protocol;
+    }
+
+    public GameVersion getGameVersion() {
+        return this.gameVersion;
     }
 
     public Int2IntMap getLegacyToRuntimeIdMap() {
@@ -153,16 +190,16 @@ public class BlockPalette {
     }
 
     public int getRuntimeId(int id, int meta) {
-        int legacyId = protocol >= 388 ? ((id << 6) | meta) : ((id << 4) | meta);
+        int legacyId = protocol >= 388 ? ((id << Block.DATA_BITS) | meta) : ((id << 4) | meta);
         int runtimeId;
         runtimeId = legacyToRuntimeId.get(legacyId);
         if (runtimeId == -1) {
-            runtimeId = legacyToRuntimeId.get(id << 6);
+            runtimeId = legacyToRuntimeId.get(id << Block.DATA_BITS);
             if (runtimeId == -1) {
                 Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyId);
                 if (cache == null) {
-                    log.info("(" + protocol + ") Missing block runtime id mappings for " + id + ':' + meta);
-                    runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << 6);
+                    log.info("({}) Missing block runtime id mappings for {}:{}", gameVersion, id, meta);
+                    runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
                     legacyToRuntimeIdCache.put(legacyId, runtimeId);
                 } else {
                     runtimeId = cache;

@@ -1,5 +1,6 @@
 package cn.nukkit.item;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.gson.JsonObject;
@@ -45,6 +46,15 @@ public class RuntimeItems {
     private static RuntimeItemMapping mapping712;
     private static RuntimeItemMapping mapping729;
     private static RuntimeItemMapping mapping748;
+    private static RuntimeItemMapping mapping766;
+    private static RuntimeItemMapping mapping776;
+    private static RuntimeItemMapping mapping786;
+    private static RuntimeItemMapping mapping800;
+    private static RuntimeItemMapping mapping818;
+    private static RuntimeItemMapping mapping827;
+
+    private static RuntimeItemMapping mapping_netease_630;
+    private static RuntimeItemMapping mapping_netease_686;
 
     public static RuntimeItemMapping[] VALUES;
 
@@ -73,48 +83,57 @@ public class RuntimeItems {
         JsonObject itemMapping = JsonParser.parseReader(new InputStreamReader(mappingStream)).getAsJsonObject();
 
         Map<String, MappingEntry> mappingEntries = new HashMap<>();
-        Map<String, MappingEntry> mappingEntries630 = new HashMap<>();
         for (String legacyName : itemMapping.keySet()) {
             JsonObject convertData = itemMapping.getAsJsonObject(legacyName);
-            for (String damageStr : convertData.keySet()) {
-                if ("protocol".equalsIgnoreCase(damageStr)) {
+            int protocol = 0;
+            try {
+                protocol = convertData.get("protocol").getAsInt();
+            } catch (Exception ignored) {
+
+            }
+            for (String key : convertData.keySet()) {
+                if ("protocol".equalsIgnoreCase(key)) {
                     continue;
                 }
-                String identifier = convertData.get(damageStr).getAsString();
-                int damage = Integer.parseInt(damageStr);
-                MappingEntry value = new MappingEntry(legacyName, damage);
-                mappingEntries630.put(identifier, value);
-                if ("minecraft:stone".equals(legacyName)) {
-                    continue; // Stone 在1.20.50及以后拆分，对于以前的版本，不需要重复注册
-                }
-                mappingEntries.put(identifier, value);
+                String identifier = convertData.get(key).getAsString();
+                int damage = Integer.parseInt(key);
+                mappingEntries.put(identifier, new MappingEntry(legacyName, damage, protocol));
             }
         }
 
-        mapping361 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_12_0);
-        mapping419 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_16_100);
-        mapping440 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_17_0);
-        mapping448 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_17_10);
-        mapping475 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_18_0);
-        mapping486 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_18_10);
-        mapping503 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_18_30);
-        mapping527 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_0);
-        mapping534 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_10);
-        mapping560 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_50);
-        mapping567 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_60);
-        mapping575 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_70);
-        mapping582 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_19_80);
-        mapping589 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_0);
-        mapping594 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_10);
-        mapping618 = new RuntimeItemMapping(mappingEntries, ProtocolInfo.v1_20_30);
-        mapping630 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_50);
-        mapping649 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_60);
-        mapping662 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_70);
-        mapping671 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_20_80);
-        mapping685 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_0);
-        mapping712 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_20);
-        mapping729 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_30);
-        mapping748 = new RuntimeItemMapping(mappingEntries630, ProtocolInfo.v1_21_40);
+        mapping361 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_12_0);
+        mapping419 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_16_100);
+        mapping440 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_17_0);
+        mapping448 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_17_10);
+        mapping475 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_18_0);
+        mapping486 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_18_10);
+        mapping503 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_18_30);
+        mapping527 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_19_0);
+        mapping534 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_19_10);
+        mapping560 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_19_50);
+        mapping567 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_19_60);
+        mapping575 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_19_70);
+        mapping582 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_19_80);
+        mapping589 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_0);
+        mapping594 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_10);
+        mapping618 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_30);
+        mapping630 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_50);
+        mapping649 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_60);
+        mapping662 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_70);
+        mapping671 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_80);
+        mapping685 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_0);
+        mapping712 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_20);
+        mapping729 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_30);
+        mapping748 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_40);
+        mapping766 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_50);
+        mapping776 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_60);
+        mapping786 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_70);
+        mapping800 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_80);
+        mapping818 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_90);
+        mapping827 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_100);
+
+        mapping_netease_630 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_20_50_NETEASE);
+        mapping_netease_686 = new RuntimeItemMapping(mappingEntries, GameVersion.V1_21_2_NETEASE);
 
         VALUES = new RuntimeItemMapping[]{
                 mapping361,
@@ -140,12 +159,43 @@ public class RuntimeItems {
                 mapping685,
                 mapping712,
                 mapping729,
-                mapping748
+                mapping748,
+                mapping766,
+                mapping776,
+                mapping786,
+                mapping800,
+                mapping818,
+                mapping827,
+                // NetEase
+                mapping_netease_630,
+                mapping_netease_686
         };
     }
 
+    @Deprecated
     public static RuntimeItemMapping getMapping(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_21_40) {
+        return getMapping(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public static RuntimeItemMapping getMapping(GameVersion gameVersion) {
+        int protocolId = gameVersion.getProtocol();
+        if (gameVersion.isNetEase()) {
+            return getMappingNetEase(protocolId);
+        }
+
+        if (protocolId >= ProtocolInfo.v1_21_100) {
+            return mapping827;
+        } else if (protocolId >= ProtocolInfo.v1_21_90) {
+            return mapping818;
+        } else if (protocolId >= ProtocolInfo.v1_21_80) {
+            return mapping800;
+        } else if (protocolId >= ProtocolInfo.v1_21_70_24) {
+            return mapping786;
+        } else if (protocolId >= ProtocolInfo.v1_21_60) {
+            return mapping776;
+        } else if (protocolId >= ProtocolInfo.v1_21_50_26) {
+            return mapping766;
+        } else if (protocolId >= ProtocolInfo.v1_21_40) {
             return mapping748;
         } else if (protocolId >= ProtocolInfo.v1_21_30) {
             return mapping729;
@@ -195,6 +245,13 @@ public class RuntimeItems {
         return mapping361;
     }
 
+    private static RuntimeItemMapping getMappingNetEase(int protocolId) {
+        if (protocolId >= ProtocolInfo.v1_21_2) {
+            return mapping_netease_686;
+        }
+        return mapping_netease_630;
+    }
+
     public static int getLegacyIdFromLegacyString(String identifier) {
         return legacyString2LegacyInt.getOrDefault(identifier, -1);
     }
@@ -203,6 +260,7 @@ public class RuntimeItems {
     public static class MappingEntry {
         private final String legacyName;
         private final int damage;
+        private final int protocol;
     }
 
     public static int getId(int fullId) {
@@ -225,6 +283,7 @@ public class RuntimeItems {
         return (id & 0x1) != 0;
     }
 
+    @Deprecated
     @ToString
     @RequiredArgsConstructor
     static class Entry {

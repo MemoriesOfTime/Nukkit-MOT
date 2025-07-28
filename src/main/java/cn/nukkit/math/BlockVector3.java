@@ -201,6 +201,18 @@ public class BlockVector3 implements Cloneable {
         return Math.pow(this.x - x, 2) + Math.pow(this.y - y, 2) + Math.pow(this.z - z, 2);
     }
 
+    public int distanceManhattan(Vector3 pos) {
+        return distanceManhattan(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ());
+    }
+
+    public int distanceManhattan(BlockVector3 pos) {
+        return distanceManhattan(pos.x, pos.y, pos.z);
+    }
+
+    public int distanceManhattan(int x, int y, int z) {
+        return Math.abs(x - this.x) + Math.abs(y - this.y) + Math.abs(z - this.z);
+    }
+
     public int getChunkX() {
         return x >> 4;
     }

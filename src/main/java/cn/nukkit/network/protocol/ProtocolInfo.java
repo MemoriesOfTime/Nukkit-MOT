@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.api.OnlyNetEase;
 import cn.nukkit.utils.Utils;
 import com.google.common.primitives.Ints;
 
@@ -89,8 +90,17 @@ public interface ProtocolInfo {
     int v1_21_20 = 712;
     int v1_21_30 = 729;
     int v1_21_40 = 748;
+    int v1_21_50_26 = 765;
+    int v1_21_50 = 766;
+    int v1_21_60 = 776;
+    int v1_21_70_24 = 785; //TODO
+    int v1_21_70 = 786;
+    int v1_21_80 = 800;
+    int v1_21_90 = 818;
+    int v1_21_93 = 819;
+    int v1_21_100 = 827;
 
-    int CURRENT_PROTOCOL = Utils.dynamic(v1_21_40);
+    int CURRENT_PROTOCOL = Utils.dynamic(v1_21_100);
 
     List<Integer> SUPPORTED_PROTOCOLS = Ints.asList(
             /*v1_1_0, */v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
@@ -99,7 +109,8 @@ public interface ProtocolInfo {
             v1_16_230_54, v1_17_0, v1_17_10, v1_17_20_20, v1_17_30, v1_17_40, v1_18_0, v1_18_10, v1_18_30, v1_19_0_29, v1_19_0_31, v1_19_0,
             v1_19_10, v1_19_20, v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50_20, v1_19_50, v1_19_60, v1_19_63, v1_19_70_24, v1_19_70,
             v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40, v1_20_50, v1_20_60, v1_20_70, v1_20_80,
-            v1_21_0, v1_21_2, v1_21_20, v1_21_30, v1_21_40
+            v1_21_0, v1_21_2, v1_21_20, v1_21_30, v1_21_40, v1_21_50_26, v1_21_50, v1_21_60, v1_21_70_24, v1_21_70, v1_21_80, v1_21_90, v1_21_93,
+            v1_21_100
     );
 
     String MINECRAFT_VERSION_NETWORK = Utils.getVersionByProtocol(CURRENT_PROTOCOL);
@@ -309,12 +320,53 @@ public interface ProtocolInfo {
     int SET_PLAYER_INVENTORY_OPTIONS_PACKET = 307;
     int SET_HUD_PACKET = 308;
     int AWARD_ACHIEVEMENT_PACKET = 309;
+    /**
+     * @since v686
+     */
     int CLIENTBOUND_CLOSE_FORM_PACKET = 310;
-
+    /**
+     * @since v712
+     */
     int SERVERBOUND_LOADING_SCREEN_PACKET = 312;
+    /**
+     * @since v712
+     */
     int JIGSAW_STRUCTURE_DATA_PACKET = 313;
+    /**
+     * @since v712
+     */
     int CURRENT_STRUCTURE_FEATURE_PACKET = 314;
+    /**
+     * @since v712
+     */
     int SERVERBOUND_DIAGNOSTICS_PACKET = 315;
+    /**
+     * @since v729
+     */
+    int CAMERA_AIM_ASSIST_PACKET = 316;
+    /**
+     * @since v729
+     */
+    int CONTAINER_REGISTRY_CLEANUP_PACKET = 317;
+    /**
+     * @since v748
+     */
+    int MOVEMENT_EFFECT_PACKET = 318;
+    /**
+     * @since v748
+     */
+    int SET_MOVEMENT_AUTHORITY_PACKET = 319;
+    /**
+     * @since v766
+     */
+    int CAMERA_AIM_ASSIST_PRESETS_PACKET = 320;
+    /**
+     * @since v800
+     */
+    int PLAYER_LOCATIONS_PACKET = 326;
+
+    @OnlyNetEase
+    int PACKET_CONFIRM_SKIN = 0xe4;
 
     static int toNewProtocolID(byte oldProtocolID) {
         return oldProtocolID & 0xff;

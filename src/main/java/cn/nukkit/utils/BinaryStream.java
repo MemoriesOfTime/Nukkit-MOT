@@ -1,5 +1,6 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Attribute;
@@ -7,6 +8,7 @@ import cn.nukkit.entity.data.Skin;
 import cn.nukkit.item.*;
 import cn.nukkit.item.RuntimeItemMapping.LegacyEntry;
 import cn.nukkit.item.RuntimeItemMapping.RuntimeEntry;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -23,6 +25,7 @@ import cn.nukkit.network.LittleEndianByteBufOutputStream;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.EntityLink;
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequest;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.ItemStackRequestSlotData;
 import cn.nukkit.network.protocol.types.inventory.itemstack.request.TextProcessingEventOrigin;
@@ -511,12 +514,18 @@ public class BinaryStream {
 
     public Item getSlot() {
         Server.mvw("BinaryStream#getSlot()");
-        return this.getSlot(ProtocolInfo.CURRENT_PROTOCOL);
+        return this.getSlot(GameVersion.getLastVersion());
     }
 
+    @Deprecated
     public Item getSlot(int protocolId) {
+        return this.getSlot(GameVersion.byProtocol(protocolId, false));
+    }
+
+    public Item getSlot(GameVersion gameVersion) {
+        int protocolId = gameVersion.getProtocol();
         if (protocolId >= ProtocolInfo.v1_16_220) {
-            return this.getSlotNew(protocolId);
+            return this.getSlotNew(gameVersion);
         }
 
         int runtimeId = this.getVarInt();
@@ -535,7 +544,7 @@ public class BinaryStream {
         if (protocolId < ProtocolInfo.v1_16_100) {
             id = runtimeId;
         } else {
-            RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
+            RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
             try {
                 LegacyEntry legacyEntry = mapping.fromRuntime(runtimeId);
                 id = legacyEntry.getLegacyId();
@@ -577,7 +586,13 @@ public class BinaryStream {
                     if (tag.contains("__DamageConflict__")) {
                         tag.put("Damage", tag.removeAndGet("__DamageConflict__"));
                     }
-                    if (tag.getAllTags().size() > 0) {
+                    if (tag.containsList("ench")) {
+                        int enchCount = tag.getList("ench", CompoundTag.class).getAll().size();
+                        if (enchCount > Enchantment.getEnchantments().length * 1.5) {
+                            throw new RuntimeException("Too many enchantment: " + enchCount);
+                        }
+                    }
+                    if (!tag.getAllTags().isEmpty()) {
                         nbt = NBTIO.write(tag, ByteOrder.LITTLE_ENDIAN, false);
                     }
                 } catch (IOException e) {
@@ -587,12 +602,22 @@ public class BinaryStream {
             setOffset(offset + (int) stream.position());
         }
 
-        String[] canPlaceOn = new String[this.getVarInt()];
+        int canPlaceCount = this.getVarInt();
+        if (canPlaceCount > 4096) {
+            throw new RuntimeException("Too many CanPlaceOn blocks: " + canPlaceCount);
+        }
+
+        String[] canPlaceOn = new String[canPlaceCount];
         for (int i = 0; i < canPlaceOn.length; ++i) {
             canPlaceOn[i] = this.getString();
         }
 
-        String[] canDestroy = new String[this.getVarInt()];
+        int canBreakCount = this.getVarInt();
+        if (canBreakCount > 4096) {
+            throw new RuntimeException("Too many CanDestroy blocks: " + canBreakCount);
+        }
+
+        String[] canDestroy = new String[canBreakCount];
         for (int i = 0; i < canDestroy.length; ++i) {
             canDestroy[i] = this.getString();
         }
@@ -681,7 +706,8 @@ public class BinaryStream {
         return item;
     }
 
-    private Item getSlotNew(int protocolId) {
+    private Item getSlotNew(GameVersion gameVersion) {
+        int protocolId = gameVersion.getProtocol();
         int runtimeId = this.getVarInt();
         if (runtimeId == 0) {
             return Item.get(Item.AIR, 0, 0);
@@ -690,8 +716,7 @@ public class BinaryStream {
         int cnt = this.getLShort();
         int damage = (int) this.getUnsignedVarInt();
 
-        RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
-
+        RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
 
         Integer id = null;
         String stringId = null;
@@ -720,9 +745,9 @@ public class BinaryStream {
 
         int blockRuntimeId = this.getVarInt();// blockRuntimeId
         //TODO 在1.21.30会得到错误数据
-        if (protocolId < ProtocolInfo.v1_21_30) {
+        if (protocolId < ProtocolInfo.v1_19_0_31) {
             if (id != null && id < 256 && id != 166) { // ItemBlock
-                int fullId = GlobalBlockPalette.getLegacyFullId(protocolId, blockRuntimeId);
+                int fullId = GlobalBlockPalette.getLegacyFullId(gameVersion, blockRuntimeId);
                 if (fullId != -1) {
                     damage = fullId & Block.DATA_MASK;
                 }
@@ -759,17 +784,33 @@ public class BinaryStream {
                 if (compoundTag.contains("__DamageConflict__")) {
                     compoundTag.put("Damage", compoundTag.removeAndGet("__DamageConflict__"));
                 }
+                if (compoundTag.containsList("ench")) {
+                    int enchCount = compoundTag.getList("ench", CompoundTag.class).getAll().size();
+                    if (enchCount > Enchantment.getEnchantments().length * 1.5) {
+                        throw new RuntimeException("Too many enchantment: " + enchCount);
+                    }
+                }
                 if (!compoundTag.isEmpty()) {
                     nbt = NBTIO.write(compoundTag, ByteOrder.LITTLE_ENDIAN);
                 }
             }
 
-            canPlace = new String[stream.readInt()];
+            int canPlaceCount = stream.readInt();
+            if (canPlaceCount > 4096) {
+                throw new RuntimeException("Too many CanPlaceOn blocks: " + canPlaceCount);
+            }
+
+            canPlace = new String[canPlaceCount];
             for (int i = 0; i < canPlace.length; i++) {
                 canPlace[i] = stream.readUTF();
             }
 
-            canBreak = new String[stream.readInt()];
+            int canBreakCount = stream.readInt();
+            if (canBreakCount > 4096) {
+                throw new RuntimeException("Too many CanDestroy blocks: " + canBreakCount);
+            }
+
+            canBreak = new String[canBreakCount];
             for (int i = 0; i < canBreak.length; i++) {
                 canBreak[i] = stream.readUTF();
             }
@@ -842,16 +883,27 @@ public class BinaryStream {
 
     public void putSlot(Item item) {
         Server.mvw("BinaryStream#putSlot(Item)");
-        this.putSlot(ProtocolInfo.CURRENT_PROTOCOL, item);
+        this.putSlot(GameVersion.getLastVersion(), item);
     }
 
+    @Deprecated
     public void putSlot(int protocolId, Item item) {
         this.putSlot(protocolId, item, false);
     }
 
+    @Deprecated
     public void putSlot(int protocolId, Item item, boolean crafting) {
+        this.putSlot(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode), item, crafting);
+    }
+
+    public void putSlot(GameVersion protocolId, Item item) {
+        this.putSlot(protocolId, item, false);
+    }
+
+    public void putSlot(GameVersion gameVersion, Item item, boolean crafting) {
+        int protocolId = gameVersion.getProtocol();
         if (protocolId >= ProtocolInfo.v1_16_220) {
-            this.putSlotNew(protocolId, item, crafting);
+            this.putSlotNew(gameVersion, item, crafting);
             return;
         }
 
@@ -928,7 +980,7 @@ public class BinaryStream {
 
         int damage = item.hasMeta() ? item.getDamage() : -1;
         if (protocolId >= ProtocolInfo.v1_16_100) {
-            RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
+            RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
             RuntimeEntry runtimeEntry;
             if (runtimeId == Item.INFO_UPDATE) { // Fix unknown item mapping errors with 1.16.100+ item replacements
                 runtimeEntry = mapping.toRuntime(Item.INFO_UPDATE, item.getDamage());
@@ -1073,7 +1125,7 @@ public class BinaryStream {
         this.putVarInt(0); //CanDestroy entry count
     }
 
-    private void putSlotNew(int protocolId, Item item, boolean instanceItem) {
+    private void putSlotNew(GameVersion protocolId, Item item, boolean instanceItem) {
         if (item == null || item.getId() == Item.AIR) {
             this.putByte((byte) 0);
             return;
@@ -1186,7 +1238,13 @@ public class BinaryStream {
         }
     }
 
+    @Deprecated
     public Item getRecipeIngredient(int protocolId) {
+        return this.getRecipeIngredient(GameVersion.byProtocol(protocolId, false));
+    }
+
+    public Item getRecipeIngredient(GameVersion gameVersion) {
+        int protocolId = gameVersion.getProtocol();
         int runtimeId = this.getVarInt();
         if (runtimeId == 0) {
             return Item.get(0, 0, 0);
@@ -1201,7 +1259,7 @@ public class BinaryStream {
         if (protocolId < ProtocolInfo.v1_16_100) {
             id = runtimeId;
         } else {
-            RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
+            RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
             LegacyEntry legacyEntry = mapping.fromRuntime(runtimeId);
             id = legacyEntry.getLegacyId();
             if (legacyEntry.isHasDamage()) {
@@ -1213,7 +1271,13 @@ public class BinaryStream {
         return Item.get(id, damage, count);
     }
 
+    @Deprecated
     public void putRecipeIngredient(int protocolId, Item item) {
+        this.putRecipeIngredient(GameVersion.byProtocol(protocolId, Server.getInstance().onlyNetEaseMode), item);
+    }
+
+    public void putRecipeIngredient(GameVersion gameVersion, Item item) {
+        int protocolId = gameVersion.getProtocol();
         if (item == null || item.getId() == 0) {
             if (protocolId >= ProtocolInfo.v1_19_30_23) {
                 this.putByte((byte) 0); //ItemDescriptorType.INVALID
@@ -1230,7 +1294,7 @@ public class BinaryStream {
         int damage = item.hasMeta() ? item.getDamage() : Short.MAX_VALUE;
 
         if (protocolId >= ProtocolInfo.v1_16_100) {
-            RuntimeItemMapping mapping = RuntimeItems.getMapping(protocolId);
+            RuntimeItemMapping mapping = RuntimeItems.getMapping(gameVersion);
             if (item instanceof StringItem) {
                 runtimeId = mapping.getNetworkId(item);
             } else if (!item.hasMeta()) {
@@ -1419,7 +1483,7 @@ public class BinaryStream {
         });
         this.putUnsignedVarInt(rulesToSend.size());
         rulesToSend.forEach((gameRule, value) -> {
-            putString(gameRule.getName().toLowerCase());
+            putString(gameRule.getName().toLowerCase(Locale.ROOT));
             value.write(protocol, this);
         });
     }
@@ -1433,7 +1497,7 @@ public class BinaryStream {
         });
         this.putUnsignedVarInt(rulesToSend.size());
         rulesToSend.forEach((gameRule, value) -> {
-            putString(gameRule.getName().toLowerCase());
+            putString(gameRule.getName().toLowerCase(Locale.ROOT));
             value.write(protocol, this);
         });
     }
@@ -1583,6 +1647,11 @@ public class BinaryStream {
 
     public <T> void putOptionalNull(T object, BiConsumer<BinaryStream, T> consumer) {
         this.putOptional(Objects::nonNull, object, consumer);
+    }
+
+    public void writeFullContainerName(FullContainerName fullContainerName) {
+        this.putByte((byte) fullContainerName.getContainer().getId());
+        this.putOptionalNull(fullContainerName.getDynamicId(), this::putLInt);
     }
 
     public boolean isReadable(int length) {

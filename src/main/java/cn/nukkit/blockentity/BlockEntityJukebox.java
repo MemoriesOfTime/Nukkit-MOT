@@ -65,6 +65,17 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
                 case Item.RECORD_OTHERSIDE -> LevelSoundEventPacket.SOUND_RECORD_OTHERSIDE;
                 case Item.RECORD_5 -> LevelSoundEventPacket.SOUND_RECORD_5;
                 case Item.RECORD_RELIC -> LevelSoundEventPacket.SOUND_RECORD_RELIC;
+                case Item.STRING_IDENTIFIED_ITEM -> {
+                    switch (this.recordItem.getNamespaceId()) {
+                        case Item.MUSIC_DISC_CREATOR:
+                            yield LevelSoundEventPacket.SOUND_RECORD_CREATOR;
+                        case Item.MUSIC_DISC_CREATOR_BOX:
+                            yield LevelSoundEventPacket.SOUND_RECORD_CREATOR_MUSIC_BOX;
+                        case Item.MUSIC_DISC_PRECIPICE:
+                            yield LevelSoundEventPacket.SOUND_RECORD_PRECIPICE;
+                    }
+                    throw new IllegalStateException("Sound is not implemented for item: " + this.recordItem.getNamespaceId());
+                }
                 default ->
                     throw new IllegalStateException("Sound is not implemented for item: " + this.recordItem.getId());
             });
@@ -97,5 +108,56 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
     @Override
     public void onBreak() {
         this.dropItem();
+    }
+
+    /**
+     * 获取唱片机对应的比较器信号强度。
+     * Get the comparator signal strength corresponding to the jukebox.
+     *
+     * <p>该方法根据唱片机中当前放置的唱片类型返回对应的比较器信号强度值。
+     * 如果唱片机中没有放置唱片或者放置的物品不是唱片，将返回 0。</p>
+     * <p>This method returns the corresponding comparator signal strength value based on the type of the record currently placed in the jukebox.
+     * If there is no record in the jukebox or the placed item is not a record, it will return 0.</p>
+     *
+     * @return 比较器信号强度值，范围从 0 到 15。
+     *         The comparator signal strength value, ranging from 0 to 15.
+     */
+    public int getComparatorSignal() {
+        if (this.recordItem instanceof ItemRecord) {
+            switch (this.recordItem.getId()) {
+                case Item.RECORD_13:
+                    return 1;
+                case Item.RECORD_CAT:
+                    return 2;
+                case Item.RECORD_BLOCKS:
+                    return 3;
+                case Item.RECORD_CHIRP:
+                    return 4;
+                case Item.RECORD_FAR:
+                    return 5;
+                case Item.RECORD_MALL:
+                    return 6;
+                case Item.RECORD_MELLOHI:
+                    return 7;
+                case Item.RECORD_STAL:
+                    return 8;
+                case Item.RECORD_STRAD:
+                    return 9;
+                case Item.RECORD_WARD:
+                    return 10;
+                case Item.RECORD_11:
+                    return 11;
+                case Item.RECORD_WAIT:
+                    return 12;
+                case Item.RECORD_PIGSTEP:
+                    return 13;
+                case Item.RECORD_OTHERSIDE:
+                    return 14;
+                case Item.RECORD_5:
+                case Item.RECORD_RELIC:
+                    return 15;
+            }
+        }
+        return 0;
     }
 }

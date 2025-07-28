@@ -15,6 +15,7 @@ import cn.nukkit.utils.MainLogger;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -49,7 +50,7 @@ public abstract class Generator implements BlockID {
     private static final Map<Integer, Class<? extends Generator>> typeList = new HashMap<>();
 
     public static boolean addGenerator(Class<? extends Generator> clazz, String name, int type) {
-        name = name.toLowerCase();
+        name = name.toLowerCase(Locale.ROOT);
         if (clazz != null && !Generator.nameList.containsKey(name)) {
             Generator.nameList.put(name, clazz);
             if (!Generator.typeList.containsKey(type)) {
@@ -66,18 +67,18 @@ public abstract class Generator implements BlockID {
     }
 
     public static Class<? extends Generator> getGenerator(String name) {
-        name = name.toLowerCase();
+        name = name.toLowerCase(Locale.ROOT);
         if (Generator.nameList.containsKey(name)) {
             return Generator.nameList.get(name);
         }
-        return Normal.class;
+        return OldNormal.class;
     }
 
     public static Class<? extends Generator> getGenerator(int type) {
         if (Generator.typeList.containsKey(type)) {
             return Generator.typeList.get(type);
         }
-        return Normal.class;
+        return OldNormal.class;
     }
 
     public static String getGeneratorName(Class<? extends Generator> c) {

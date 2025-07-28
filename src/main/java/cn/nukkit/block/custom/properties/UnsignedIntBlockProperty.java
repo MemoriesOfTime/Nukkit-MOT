@@ -7,6 +7,7 @@ import com.google.common.base.Preconditions;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.function.Consumer;
 
 public class UnsignedIntBlockProperty extends BlockProperty<Integer> {
     @Serial
@@ -135,6 +136,12 @@ public class UnsignedIntBlockProperty extends BlockProperty<Integer> {
     @Override
     public UnsignedIntBlockProperty copy() {
         return new UnsignedIntBlockProperty(this.getName(), this.isExportedToItem(), (int) this.getMaxValue(), (int) this.getMinValue(), this.getBitSize(), this.getPersistenceName());
+    }
+
+    @Override
+    public void forEach(Consumer<Serializable> func) {
+        for(long value = minValue;value <= maxValue;value++)
+            func.accept(value);
     }
 
     @Override

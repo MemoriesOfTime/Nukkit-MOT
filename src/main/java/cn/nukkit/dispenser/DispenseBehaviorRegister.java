@@ -33,9 +33,12 @@ public final class DispenseBehaviorRegister {
         registerBehavior(ItemID.FIREWORKS, new FireworksDispenseBehavior());
         registerBehavior(ItemID.FLINT_AND_STEEL, new FlintAndSteelDispenseBehavior());
         registerBehavior(BlockID.SHULKER_BOX, new ShulkerBoxDispenseBehavior());
+        registerBehavior(BlockID.UNDYED_SHULKER_BOX, new UndyedShulkerBoxDispenseBehavior());
         registerBehavior(ItemID.SPAWN_EGG, new SpawnEggDispenseBehavior());
         registerBehavior(BlockID.TNT, new TNTDispenseBehavior());
         registerBehavior(ItemID.FIRE_CHARGE, new FireChargeDispenseBehavior());
+        registerBehavior(ItemID.SHEARS, new ShearsDispenseBehaviour());
+        registerBehavior(ItemID.POTION, new PotionDispenseBehaviour());
         registerBehavior(ItemID.ARROW, new ProjectileDispenseBehavior("Arrow") {
             @Override
             protected double getMotion() {
@@ -90,5 +93,17 @@ public final class DispenseBehaviorRegister {
                 return super.getMotion() * 1.25;
             }
         });
+        registerBehavior(ItemID.ACACIA_CHEST_BOAT, new ChestBoatDispenseBehavior());
+        registerBehavior(ItemID.DARK_OAK_CHEST_BOAT, new ChestBoatDispenseBehavior());
+        registerBehavior(ItemID.BIRCH_CHEST_BOAT, new ChestBoatDispenseBehavior());
+        registerBehavior(ItemID.JUNGLE_CHEST_BOAT, new ChestBoatDispenseBehavior());
+        registerBehavior(ItemID.MANGROVE_CHEST_BOAT, new ChestBoatDispenseBehavior());
+        registerBehavior(ItemID.SPRUCE_CHEST_BOAT, new ChestBoatDispenseBehavior());
+        registerBehavior(ItemID.OAK_CHEST_BOAT, new ChestBoatDispenseBehavior());
+
+        registerBehavior(ItemID.MINECART, new MinecartDispenseBehavior());
+        registerBehavior(ItemID.MINECART_WITH_CHEST, new MinecartDispenseBehavior());
+        registerBehavior(ItemID.MINECART_WITH_HOPPER, new MinecartDispenseBehavior());
+        registerBehavior(ItemID.MINECART_WITH_TNT, new MinecartDispenseBehavior());
     }
 }
