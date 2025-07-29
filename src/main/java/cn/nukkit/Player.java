@@ -3102,6 +3102,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 LoginPacket loginPacket = (LoginPacket) packet;
 
                 this.protocol = loginPacket.getProtocol();
+                if (this.gameVersion == null) {
+                    // 低版本仅兼容国际版，高于554的版本在RequestNetworkSettingsProcessor_v554中处理
+                    this.gameVersion = GameVersion.byProtocol(this.protocol, false);
+                }
 
                 switch (this.server.spaceMode) {
                     case 0:

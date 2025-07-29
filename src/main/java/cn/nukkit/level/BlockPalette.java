@@ -136,6 +136,10 @@ public class BlockPalette {
         return this.protocol;
     }
 
+    public GameVersion getGameVersion() {
+        return this.gameVersion;
+    }
+
     public Int2IntMap getLegacyToRuntimeIdMap() {
         return Int2IntMaps.unmodifiable(this.legacyToRuntimeId);
     }

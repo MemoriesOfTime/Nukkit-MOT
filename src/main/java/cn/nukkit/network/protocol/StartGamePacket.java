@@ -121,6 +121,9 @@ public class StartGamePacket extends DataPacket {
      * @since v527
      */
     public CompoundTag playerPropertyData = new CompoundTag("");
+    /**
+     * If true, the server will inform clients that they have the ability to generate visual level chunks outside of player interaction distances.
+     */
     public boolean clientSideGenerationEnabled;
     public byte chatRestrictionLevel;
     public boolean disablePlayerInteractions;
@@ -164,9 +167,9 @@ public class StartGamePacket extends DataPacket {
      */
     public String scenarioId = "";
     /**
-     * @since v818
+     * @since v827
      */
-    private String ownerIdentifier = "";
+    private boolean tickDeathSystemsEnabled;
 
     @Override
     public void decode() {
@@ -389,6 +392,9 @@ public class StartGamePacket extends DataPacket {
                                 if (protocol >= ProtocolInfo.v1_19_80) {
                                     this.putBoolean(this.blockNetworkIdsHashed);
                                     if (protocol >= ProtocolInfo.v1_20_0_23) {
+                                        if (protocol >= ProtocolInfo.v1_21_100) {
+                                            this.putBoolean(this.tickDeathSystemsEnabled);
+                                        }
                                         this.putBoolean(this.networkPermissions.isServerAuthSounds());
                                     }
                                 }

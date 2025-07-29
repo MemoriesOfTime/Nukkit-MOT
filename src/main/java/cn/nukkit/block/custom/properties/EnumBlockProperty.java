@@ -89,6 +89,15 @@ public class EnumBlockProperty<E extends Serializable> extends BlockProperty<E> 
             return 0;
         }
         for (int i = 0; i < this.values.length; i++) {
+            if (value instanceof String) {
+                if (this.persistenceNames[i].equals(value)) {
+                    return i;
+                }
+            } else if (value instanceof Integer integer) {
+                if (integer >= 0 && integer < this.values.length) {
+                    return integer;
+                }
+            }
             if (this.values[i].equals(value)) {
                 return i;
             }
