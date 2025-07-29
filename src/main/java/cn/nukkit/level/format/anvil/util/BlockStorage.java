@@ -13,12 +13,12 @@ import java.util.Arrays;
 
 public class BlockStorage {
     public static final int SECTION_SIZE = 4096;
-    private final byte[] blockIds;
-    private final byte[] blockIdsExtra;
-    private final NibbleArray blockData;
-    private final NibbleArray blockDataExtra;
-    private final byte[] blockDataHyperA;
-    private final short[] blockDataHyperB;
+    private final byte[] blockIds; //8bit
+    private final byte[] blockIdsExtra; //8bit
+    private final NibbleArray blockData; //4bit
+    private final NibbleArray blockDataExtra; //4bit
+    private final byte[] blockDataHyperA; //8bit
+    private final short[] blockDataHyperB; //16bit
     private boolean hasBlockIds;
     private boolean hasBlockIdExtras;
     private boolean hasBlockDataExtras;
@@ -60,10 +60,10 @@ public class BlockStorage {
 
     private int getBlockData(int index) {
         int base = blockData.get(index) & 0xf;
-        int extra = hasBlockDataExtras? ((blockDataExtra.get(index) & 0xF) << 4) : 0;
-        int hyperA = hasBlockDataHyperA? ((blockDataHyperA[index] & 0xff) << 8) : 0;
-        int hyperB = hasBlockDataHyperB? ((blockDataHyperB[index] & 0xffff) << 16) : 0;
-        return base | extra | hyperA | hyperB;
+        int extra = hasBlockDataExtras ? ((blockDataExtra.get(index) & 0xF) << 4) : 0;
+        int hyperA = hasBlockDataHyperA ? ((blockDataHyperA[index] & 0xff) << 8) : 0;
+        int hyperB = hasBlockDataHyperB ? ((blockDataHyperB[index] & 0xffff) << 16) : 0;
+        return (base | extra | hyperA | hyperB) & Block.DATA_MASK;
     }
 
     public int getBlockDataExtra(int x, int y, int z) {
@@ -157,6 +157,7 @@ public class BlockStorage {
     }
 
     private void setBlockData(int index, int data) {
+        data = data & Block.DATA_MASK;
         byte data1 = (byte) (data & 0xF);
         byte data2 = (byte) (data >> 4 & 0xF);
         byte data3 = (byte) (data >> 8 & 0xFF);
@@ -203,15 +204,23 @@ public class BlockStorage {
     }
 
     private int getAndSetFullBlock(int index, int value) {
-        Preconditions.checkArgument(value < (32767), "Invalid full block");
-        byte oldBlockExtra = hasBlockIdExtras? blockIdsExtra[index] : 0;
-        byte oldBlock = hasBlockIds? blockIds[index] : 0;
-        byte oldData = hasBlockIds? blockData.get(index) : 0;
-        byte oldDataExtra = hasBlockDataExtras? blockDataExtra.get(index) : 0;
-        byte newBlockExtra = (byte) ((value >> (14)) & 0xFF);
+        Preconditions.checkArgument(value < Block.FULL_SIZE, "Invalid full block");
+        byte oldBlockExtra = hasBlockIdExtras ? blockIdsExtra[index] : 0;
+        byte oldBlock = hasBlockIds ? blockIds[index] : 0;
+        byte oldData = hasBlockIds ? blockData.get(index) : 0;
+        byte oldDataExtra = hasBlockDataExtras ? blockDataExtra.get(index) : 0;
+        byte oldDataHyperA = hasBlockDataHyperA ? blockDataHyperA[index] : 0;
+        short oldDataHyperB = hasBlockDataHyperB ? blockDataHyperB[index] : 0;
+        int oldFullData = (oldDataHyperB << 16 | oldDataHyperA << 8 | oldDataExtra << 4 | oldData) & Block.DATA_MASK;
+
+        byte newBlockExtra = (byte) ((value >> (Block.DATA_BITS + 8)) & 0xFF);
         byte newBlock = (byte) ((value >> Block.DATA_BITS) & 0xFF);
-        byte newData = (byte) (value & 0xf);
-        byte newDataExtra = (byte) (value >> 4 & 3 & 0xF);
+        int newFullData = value & Block.DATA_MASK;
+        byte newData = (byte) (newFullData & 0xf);
+        byte newDataExtra = (byte) (newFullData >> 4 & 0xf);
+        byte newDataHyperA = (byte) (newFullData >> 8 & 0xff);
+        short newDataHyperB = (short) (newFullData >> 16 & 0xffff);
+
         if (oldBlock != newBlock) {
             blockIds[index] = newBlock;
         }
@@ -224,13 +233,19 @@ public class BlockStorage {
         if (oldDataExtra != newDataExtra) {
             blockDataExtra.set(index, newDataExtra);
         }
-        blockDataHyperA[index] = 0;
-        blockDataHyperB[index] = 0;
+        if (oldDataHyperA != newDataHyperA) {
+            blockDataHyperA[index] = newDataHyperA;
+        }
+        if (oldDataHyperB != newDataHyperB) {
+            blockDataHyperB[index] = newDataHyperB;
+        }
         hasBlockIdExtras |= newBlockExtra != 0;
         hasBlockDataExtras |= newDataExtra != 0;
         hasBlockIds |= newBlock != 0 || hasBlockIdExtras || hasBlockDataExtras;
+        hasBlockDataHyperA |= newDataHyperA != 0;
+        hasBlockDataHyperB |= newDataHyperB != 0;
 
-        return (oldBlockExtra & 0xff) << 14 | (oldBlock & 0xff) << Block.DATA_BITS | (oldDataExtra & 0xF) << 4 | oldData;
+        return (oldBlockExtra & 0xff) << (Block.DATA_BITS + 8) | (oldBlock & 0xff) << Block.DATA_BITS | oldFullData;
     }
 
     private int getFullBlock(int index) {
@@ -241,7 +256,10 @@ public class BlockStorage {
         byte extra = hasBlockIdExtras ? blockIdsExtra[index] : 0;
         byte data = blockData.get(index);
         byte dataExtra = hasBlockDataExtras ? blockDataExtra.get(index) : 0;
-        return (extra & 0xff) << 14 | ((block & 0xff) << Block.DATA_BITS) | ((dataExtra & 0xF) << 4) | data;
+        byte hyperA = hasBlockDataHyperA ? blockDataHyperA[index] : 0;
+        short hyperB = hasBlockDataHyperB ? blockDataHyperB[index] : 0;
+        int fullData = (hyperB << 16 | hyperA << 8 | dataExtra << 4 | data) & Block.DATA_MASK;
+        return (extra & 0xff) << (Block.DATA_BITS + 8) | ((block & 0xff) << Block.DATA_BITS) | fullData;
     }
 
     private int[] getBlockState(int index) {
@@ -252,24 +270,27 @@ public class BlockStorage {
     }
 
     private void setFullBlock(int index, int value) {
-        //TODO 如果DATA_BITS增加到9 方块id最大2048 则我们需要20位二进制
-
-        Preconditions.checkArgument(value < 32767, "Invalid full block");
-        byte extra = (byte) ((value >> (14)) & 0xFF);
+        Preconditions.checkArgument(value < Block.FULL_SIZE, "Invalid full block");
+        byte extra = (byte) ((value >> (Block.DATA_BITS + 8)) & 0xFF);
         byte block = (byte) ((value >> Block.DATA_BITS) & 0xFF);
-        byte dataExtra = (byte) (value >> 4 & 3 & 0xF);
-        byte data = (byte) (value & 0xf);
+        int fullData = value & Block.DATA_MASK;
+        byte data = (byte) (fullData & 0xf);
+        byte dataExtra = (byte) (fullData >> 4 & 0xf);
+        byte hyperA = (byte) (fullData >> 8 & 0xff);
+        short hyperB = (short) (fullData >> 16 & 0xffff);
 
         blockIds[index] = block;
         blockIdsExtra[index] = extra;
         blockData.set(index, data);
         blockDataExtra.set(index, dataExtra);
-        blockDataHyperA[index] = 0;
-        blockDataHyperB[index] = 0;
+        blockDataHyperA[index] = hyperA;
+        blockDataHyperB[index] = hyperB;
 
         hasBlockIdExtras |= extra != 0;
         hasBlockDataExtras |= dataExtra != 0;
         hasBlockIds |= block != 0 || hasBlockIdExtras || hasBlockDataExtras;
+        hasBlockDataHyperA |= hyperA != 0;
+        hasBlockDataHyperB |= hyperB != 0;
     }
 
     public int[] getBlockState(int x, int y, int z) {
