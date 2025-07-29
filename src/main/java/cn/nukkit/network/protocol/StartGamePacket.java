@@ -167,6 +167,10 @@ public class StartGamePacket extends DataPacket {
      */
     public String scenarioId = "";
     /**
+     * @since v818
+     */
+    private String ownerIdentifier = "";
+    /**
      * @since v827
      */
     private boolean tickDeathSystemsEnabled;
