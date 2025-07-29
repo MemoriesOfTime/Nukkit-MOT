@@ -18,4 +18,9 @@ public class BlockWallDeepslateBrick extends BlockWallDeepslateCobbled {
     public int getId() {
         return DEEPSLATE_BRICK_WALL;
     }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:deepslate_brick_wall";
+    }
 }

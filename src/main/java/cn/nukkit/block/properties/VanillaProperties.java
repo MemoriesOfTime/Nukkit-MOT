@@ -25,25 +25,6 @@ public interface VanillaProperties {
 
     EnumBlockProperty<CrackedState> CRACKED_STATE = new EnumBlockProperty<>("cracked_state", false, CrackedState.class);
 
-    BlockProperty<BlockWall.WallType> WALL_TYPE = new EnumBlockProperty<>("wall_block_type",
-            false,
-            new BlockWall.WallType[] {
-                    BlockWall.WallType.COBBLESTONE,
-                    BlockWall.WallType.MOSSY_COBBLESTONE,
-                    BlockWall.WallType.GRANITE,
-                    BlockWall.WallType.DIORITE,
-                    BlockWall.WallType.ANDESITE,
-                    BlockWall.WallType.SANDSTONE,
-                    BlockWall.WallType.BRICK,
-                    BlockWall.WallType.STONE_BRICK,
-                    BlockWall.WallType.MOSSY_STONE_BRICK,
-                    BlockWall.WallType.NETHER_BRICK,
-                    BlockWall.WallType.END_BRICK,
-                    BlockWall.WallType.PRISMARINE,
-                    BlockWall.WallType.RED_SANDSTONE,
-                    BlockWall.WallType.RED_NETHER_BRICK
-            }).ordinal(true);
-
     BlockProperty<BlockWall.WallConnectionType> WALL_CONNECTION_TYPE_EAST = new EnumBlockProperty<>("wall_connection_type_east",
             false,
             new BlockWall.WallConnectionType[] {

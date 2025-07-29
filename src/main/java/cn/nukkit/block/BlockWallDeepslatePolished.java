@@ -18,4 +18,9 @@ public class BlockWallDeepslatePolished extends BlockWallDeepslateCobbled {
     public int getId() {
         return POLISHED_DEEPSLATE_WALL;
     }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:polished_deepslate_wall";
+    }
 }

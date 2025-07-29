@@ -1,10 +1,9 @@
 package cn.nukkit.block;
 
-import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockWallBlackstone extends BlockWall {
+public class BlockWallBlackstone extends BlockWallFull {
 
     public BlockWallBlackstone() {
         this(0);
@@ -52,5 +51,10 @@ public class BlockWallBlackstone extends BlockWall {
     @Override
     public BlockColor getColor() {
         return BlockColor.BLACK_BLOCK_COLOR;
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:blackstone_wall";
     }
 }
