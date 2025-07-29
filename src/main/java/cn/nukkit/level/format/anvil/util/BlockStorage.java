@@ -252,6 +252,8 @@ public class BlockStorage {
     }
 
     private void setFullBlock(int index, int value) {
+        //TODO 如果DATA_BITS增加到9 方块id最大2048 则我们需要20位二进制
+
         Preconditions.checkArgument(value < 32767, "Invalid full block");
         byte extra = (byte) ((value >> (14)) & 0xFF);
         byte block = (byte) ((value >> Block.DATA_BITS) & 0xFF);
