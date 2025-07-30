@@ -581,6 +581,15 @@ public class Server {
      * Enable forced safety enchantments (up max lvl)
      */
     public boolean forcedSafetyEnchant;
+    /**
+     * Enable vibrant visuals
+     * @since 1.21.80
+     */
+    public boolean enableVibrantVisuals;
+    /**
+     * Enable raytracing
+     */
+    public boolean enableRaytracing;
 
     /**
      * Enable NetEase Client Support
@@ -3049,6 +3058,25 @@ public class Server {
         return this.netherEnabled;
     }
 
+
+    /**
+     * Is vibrant visuals enabled on this server
+     *
+     * @return vibrant visuals enabled
+     */
+    public boolean isVibrantVisualsEnabled() {
+        return this.enableVibrantVisuals;
+    }
+
+    /**
+     * Is ray tracing enabled on this server
+     *
+     * @return ray tracing enabled
+     */
+    public boolean isRaytracingEnabled() {
+        return this.enableRaytracing;
+    }
+
     public boolean isWaterdogCapable() {
         return this.useWaterdog;
     }
@@ -3128,7 +3156,6 @@ public class Server {
         this.pvpEnabled = this.getPropertyBoolean("pvp", true);
         this.announceAchievements = this.getPropertyBoolean("announce-player-achievements", false);
         this.spawnEggsEnabled = this.getPropertyBoolean("spawn-eggs", true);
-        this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
         this.xpBottlesOnCreative = this.getPropertyBoolean("xp-bottles-on-creative", false);
         this.shouldSavePlayerData = this.getPropertyBoolean("save-player-data", true);
         this.mobsFromBlocks = this.getPropertyBoolean("block-listener", true);
@@ -3221,6 +3248,9 @@ public class Server {
         this.enableNewChickenEggsLaying = this.getPropertyBoolean("enable-new-chicken-eggs-laying", true);
         this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
         this.enableRakSendCookie = this.getPropertyBoolean("enable-rak-send-cookie", true);
+        this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
+        this.enableVibrantVisuals = this.getPropertyBoolean("enable-vibrant-visuals", true);
+        this.enableRaytracing = this.getPropertyBoolean("enable-raytracing", true);
 
         this.netEaseMode = this.getPropertyBoolean("netease-client-support", false);
         this.onlyNetEaseMode = this.getPropertyBoolean("only-allow-netease-client", false);
@@ -3289,7 +3319,6 @@ public class Server {
             put("space-name-mode", "ignore");
             put("xp-bottles-on-creative", true);
             put("spawn-eggs", true);
-            put("forced-safety-enchant", true);
             put("mob-ai", true);
             put("entity-auto-spawn-task", true);
             put("entity-despawn-task", true);
@@ -3377,6 +3406,9 @@ public class Server {
             put("enable-raw-ores", true);
             put("enable-new-paintings", true);
             put("enable-new-chicken-eggs-laying", true);
+            put("forced-safety-enchant", true);
+            put("enable-vibrant-visuals", true);
+            put("enable-raytracing", true);
 
             put("netease-client-support", false);
             put("only-allow-netease-client", false);

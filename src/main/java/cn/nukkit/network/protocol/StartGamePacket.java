@@ -167,6 +167,10 @@ public class StartGamePacket extends DataPacket {
      */
     public String scenarioId = "";
     /**
+     * @since v818
+     */
+    private String ownerIdentifier = "";
+    /**
      * @since v827
      */
     private boolean tickDeathSystemsEnabled;
@@ -316,7 +320,7 @@ public class StartGamePacket extends DataPacket {
                         this.putString(this.worldId);
                         this.putString(this.scenarioId);
                         if (protocol >= ProtocolInfo.v1_21_90) {
-                            this.putString(""); // OwnerId
+                            this.putString(this.ownerIdentifier); // OwnerId
                         }
                     }
                 }
