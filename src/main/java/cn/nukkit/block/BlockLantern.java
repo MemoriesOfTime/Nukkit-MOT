@@ -68,11 +68,7 @@ public class BlockLantern extends BlockFlowable {
             return false;
         }
 
-        if (hanging) {
-            this.setDamage(1);
-        } else {
-            this.setDamage(0);
-        }
+        this.setHanging(hanging);
 
         this.getLevel().setBlock(this, this, true, true);
         return true;
@@ -81,7 +77,7 @@ public class BlockLantern extends BlockFlowable {
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
-            if (this.getDamage() == 0) {
+            if (!this.isHanging()) {
                 if (!this.isBlockUnderValid()) {
                     level.useBreakOn(this);
                 }
@@ -95,6 +91,10 @@ public class BlockLantern extends BlockFlowable {
 
     public boolean isHanging() {
         return this.getDamage(HANGING_BIT) == 1;
+    }
+
+    public void setHanging(boolean hanging) {
+        this.setDamage(HANGING_BIT, hanging ? 1 : 0);
     }
 
     @Override
