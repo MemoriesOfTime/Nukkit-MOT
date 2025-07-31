@@ -10,6 +10,8 @@ import cn.nukkit.utils.BlockColor;
 
 public class BlockLantern extends BlockFlowable {
 
+    public static final int HANGING_BIT = 0x01;
+
     public BlockLantern() {
         this(0);
     }
@@ -89,6 +91,10 @@ public class BlockLantern extends BlockFlowable {
             return type;
         }
         return 0;
+    }
+
+    public boolean isHanging() {
+        return this.getDamage(HANGING_BIT) == 1;
     }
 
     @Override
