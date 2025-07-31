@@ -3,7 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockWallDeepslateCobbled extends BlockWallFull {
+public class BlockWallDeepslateCobbled extends BlockWallIndependentID {
     public BlockWallDeepslateCobbled() {
         this(0);
     }
