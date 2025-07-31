@@ -5,10 +5,7 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class ListTag<T extends Tag> extends Tag {
@@ -203,5 +200,10 @@ public class ListTag<T extends Tag> extends Tag {
             }
         }
         return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), type, list);
     }
 }
