@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
+import java.util.stream.IntStream;
 
 import static cn.nukkit.utils.Utils.dynamic;
 
@@ -88,7 +89,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
             Blocks.init();
 
-            for (int id = 0; id < MAX_BLOCK_ID; id++) {
+            int processors = Runtime.getRuntime().availableProcessors();
+            IntStream idStream = IntStream.range(0, MAX_BLOCK_ID);
+            (processors > 3 ? idStream.parallel() : idStream).forEach(id -> {
                 Class<?> c = list[id];
                 if (c != null) {
                     Block block;
@@ -98,7 +101,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                             @SuppressWarnings("rawtypes")
                             Constructor constructor = c.getDeclaredConstructor(int.class);
                             constructor.setAccessible(true);
-                            for (int data = 0; data < (1 << DATA_BITS); ++data) {
+                            for (int data = 0; data < DATA_SIZE; ++data) {
                                 int fullId = (id << DATA_BITS) | data;
                                 Block b;
                                 try {
@@ -158,7 +161,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                         fullList[(id << DATA_BITS) | data] = new BlockUnknown(id, data);
                     }*/
                 }
-            }
+            });
         }
     }
 
