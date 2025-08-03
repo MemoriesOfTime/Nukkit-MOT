@@ -559,7 +559,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public void setAllowFlight(boolean value) {
         this.adventureSettings.set(Type.ALLOW_FLIGHT, value);
-        if (!value && (this.gamemode == 0 || this.gamemode == 2)) {
+        if (!value && (this.gamemode == SURVIVAL || this.gamemode == ADVENTURE)) {
             this.adventureSettings.set(Type.FLYING, false);
         }
         this.adventureSettings.update();
