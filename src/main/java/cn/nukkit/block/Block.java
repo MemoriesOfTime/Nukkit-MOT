@@ -175,7 +175,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            return CustomBlockManager.get().getBlock(id, 0);
+            return CustomBlockManager.get().getBlock(id, meta == null ? 0 : meta);
         }
 
         int fullId = id << DATA_BITS;
@@ -219,31 +219,31 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             id = 255 - id;
         }
 
-        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            return CustomBlockManager.get().getBlock(id, 0);
-        }
-
         Block block;
-        int fullId = id << DATA_BITS;
-        if (meta != null && meta > DATA_SIZE) {
-            if (fullId >= fullList.length || fullList[fullId] == null) {
-                log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
-                BlockUnknown blockUnknown = new BlockUnknown(id, meta);
-                fullList[fullId] = blockUnknown;
-                return blockUnknown.clone();
-            }
-            block = fullList[fullId].clone();
-            block.setDamage(meta);
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            block = CustomBlockManager.get().getBlock(id, meta == null ? 0 : meta);
         } else {
-            meta = meta == null ? 0 : meta;
-            fullId = fullId | meta;
-            if (fullId >= fullList.length || fullList[fullId] == null) {
-                log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
-                BlockUnknown blockUnknown = new BlockUnknown(id, meta);
-                fullList[fullId] = blockUnknown;
-                return blockUnknown.clone();
+            int fullId = id << DATA_BITS;
+            if (meta != null && meta > DATA_SIZE) {
+                if (fullId >= fullList.length || fullList[fullId] == null) {
+                    log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
+                    BlockUnknown blockUnknown = new BlockUnknown(id, meta);
+                    fullList[fullId] = blockUnknown;
+                    return blockUnknown.clone();
+                }
+                block = fullList[fullId].clone();
+                block.setDamage(meta);
+            } else {
+                meta = meta == null ? 0 : meta;
+                fullId = fullId | meta;
+                if (fullId >= fullList.length || fullList[fullId] == null) {
+                    log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
+                    BlockUnknown blockUnknown = new BlockUnknown(id, meta);
+                    fullList[fullId] = blockUnknown;
+                    return blockUnknown.clone();
+                }
+                block = fullList[fullId].clone();
             }
-            block = fullList[fullId].clone();
         }
 
         if (pos != null) {
@@ -293,18 +293,19 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static Block get(int fullId, Level level, int x, int y, int z, int layer) {
         int id = fullId << DATA_BITS;
 
+        Block block;
         if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            return CustomBlockManager.get().getBlock(id, 0);
+            block = CustomBlockManager.get().getBlock(id, 0);
+        } else {
+            if (fullId >= fullList.length || fullList[fullId] == null) {
+                int meta = fullId & DATA_BITS;
+                log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
+                BlockUnknown blockUnknown = new BlockUnknown(id, meta);
+                fullList[fullId] = blockUnknown;
+                return blockUnknown.clone();
+            }
+            block = fullList[fullId].clone();
         }
-
-        if (fullId >= fullList.length || fullList[fullId] == null) {
-            int meta = fullId & DATA_BITS;
-            log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
-            BlockUnknown blockUnknown = new BlockUnknown(id, meta);
-            fullList[fullId] = blockUnknown;
-            return blockUnknown.clone();
-        }
-        Block block = fullList[fullId].clone();
         block.x = x;
         block.y = y;
         block.z = z;
@@ -318,30 +319,30 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public static Block get(int id, int meta, Level level, int x, int y, int z, int layer) {
-        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            return CustomBlockManager.get().getBlock(id, 0);
-        }
-
         Block block;
-        if (meta <= DATA_SIZE) {
-            int index = id << DATA_BITS | meta;
-            if (fullList[index] == null) {
-                log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
-                BlockUnknown blockUnknown = new BlockUnknown(id, meta);
-                fullList[index] = blockUnknown;
-                return blockUnknown.clone();
-            }
-            block = fullList[index].clone();
+        if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            block = CustomBlockManager.get().getBlock(id, 0);
         } else {
-            int index = id << DATA_BITS;
-            if (fullList[index] == null) {
-                log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
-                BlockUnknown blockUnknown = new BlockUnknown(id, meta);
-                fullList[index] = blockUnknown;
-                return blockUnknown.clone();
+            if (meta <= DATA_SIZE) {
+                int index = id << DATA_BITS | meta;
+                if (fullList[index] == null) {
+                    log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
+                    BlockUnknown blockUnknown = new BlockUnknown(id, meta);
+                    fullList[index] = blockUnknown;
+                    return blockUnknown.clone();
+                }
+                block = fullList[index].clone();
+            } else {
+                int index = id << DATA_BITS;
+                if (fullList[index] == null) {
+                    log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
+                    BlockUnknown blockUnknown = new BlockUnknown(id, meta);
+                    fullList[index] = blockUnknown;
+                    return blockUnknown.clone();
+                }
+                block = fullList[index].clone();
+                block.setDamage(meta);
             }
-            block = fullList[index].clone();
-            block.setDamage(meta);
         }
         block.x = x;
         block.y = y;

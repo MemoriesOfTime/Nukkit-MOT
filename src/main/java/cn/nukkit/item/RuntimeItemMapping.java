@@ -182,6 +182,32 @@ public class RuntimeItemMapping {
         }
     }
 
+    public void registerCustomBlockItem(String identifier, int legacyId, int damage) {
+        int fullId = this.getFullId(legacyId, damage);
+        LegacyEntry legacyEntry = new LegacyEntry(legacyId, false, damage);
+
+        if (Nukkit.DEBUG > 1) {
+            if (this.runtime2Legacy.containsKey(legacyId)) {
+                log.warn("RuntimeItemMapping: Registering " + identifier + " but runtime id " + legacyId + " is already used");
+            }
+        }
+
+        this.customItems.add(identifier);
+
+        this.runtimeId2Name.put(legacyId, identifier);
+        this.name2RuntimeId.put(identifier, legacyId);
+
+        this.runtime2Legacy.put(legacyId, legacyEntry);
+        this.identifier2Legacy.put(identifier, legacyEntry);
+        if (this.legacy2Runtime.containsKey(fullId)) {
+            log.debug("RuntimeItemMapping contains duplicated legacy item state runtimeId=" + legacyId + " identifier=" + identifier);
+        } else {
+            RuntimeEntry runtimeEntry = new RuntimeEntry(identifier, legacyId, false, true);
+            this.legacy2Runtime.put(fullId, runtimeEntry);
+            this.itemPaletteEntries.add(runtimeEntry);
+        }
+    }
+
     synchronized boolean registerCustomItem(CustomItem customItem) {
         int runtimeId = CustomItemDefinition.getRuntimeId(customItem.getNamespaceId());
         String namespaceId = customItem.getNamespaceId();
