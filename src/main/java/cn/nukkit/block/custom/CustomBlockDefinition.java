@@ -84,14 +84,13 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
             //molang版本
             this.nbt.putInt("molangVersion", 9);
 
+            this.nbt.putCompound("vanilla_block_data", new CompoundTag().putInt("block_id", blockContainer.getNukkitId()));
+
             //设置方块的properties
             var propertiesNBT = getPropertiesNBT();
             if (propertiesNBT != null) {
-                nbt.putList("properties", propertiesNBT);
+                this.nbt.putList("properties", propertiesNBT);
             }
-
-            nbt.putCompound("vanilla_block_data", new CompoundTag().putInt("block_id", blockContainer.getNukkitId())
-                    /*.putString("material", "")*/); //todo Figure what is dirt, maybe that corresponds to https://wiki.bedrock.dev/documentation/materials.html
         }
 
         public Builder texture(String texture) {

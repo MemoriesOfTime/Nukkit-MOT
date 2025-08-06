@@ -81,7 +81,13 @@ public class CustomBlockManager {
     }
 
     public void registerCustomBlock(String identifier, int nukkitId, CustomBlockDefinition blockDefinition, Supplier<BlockContainer> factory) {
-        this.registerCustomBlock(identifier, nukkitId, null, blockDefinition, meta -> factory.get());
+        this.registerCustomBlock(identifier, nukkitId, null, blockDefinition, meta -> {
+            BlockContainer blockContainer = factory.get();
+            if (blockContainer instanceof BlockStorageContainer storageContainer) {
+                storageContainer.setStorage(meta);
+            }
+            return blockContainer;
+        });
     }
 
     private static void variantGenerations(BlockProperties properties, String[] states, List<Map<String, Serializable>> variants, Map<String, Serializable> temp, int offset) {
@@ -140,30 +146,34 @@ public class CustomBlockManager {
         this.blockDefinitions.put(defaultState.getLegacyId(), blockDefinition);
 
         int itemId = 255 - nukkitId;
-        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
-            mapping.registerItem(identifier, nukkitId, itemId, 0);
-        }
 
         if (properties != null) {
             BlockProperties finalProperties = properties;
             variantGenerations(properties, properties.getNames().toArray(new String[0]))
                     .forEach(states -> {
-                        final int[] meta = {0};
-                        states.forEach((name, value) -> {
-                            meta[0] = finalProperties.setValue(meta[0], name, value);
-                        });
+                        int meta = 0;
 
-                        if(meta[0] != 0) {
-                            CustomBlockState state;
-                            try {
-                                state = this.createBlockState(identifier, (nukkitId << Block.DATA_BITS) | meta[0], finalProperties, factory);
-                            } catch (InvalidBlockPropertyMetaException e) {
-                                log.error(e);
-                                return; // Nukkit has more states than our block
-                            }
-                            this.legacy2CustomState.put(state.getLegacyId(), state);
+                        for (String name : states.keySet()) {
+                            meta = finalProperties.setValue(meta, name, states.get(name));
                         }
+
+                        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+                            mapping.registerCustomBlockItem(identifier, itemId, meta);
+                        }
+
+                        CustomBlockState state;
+                        try {
+                            state = this.createBlockState(identifier, (nukkitId << Block.DATA_BITS) | (meta & Block.DATA_MASK), finalProperties, factory);
+                        } catch (InvalidBlockPropertyMetaException e) {
+                            log.error(e);
+                            return; // Nukkit has more states than our block
+                        }
+                        this.legacy2CustomState.put(state.getLegacyId(), state);
                     });
+        } else {
+            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+                mapping.registerCustomBlockItem(identifier, itemId, 0);
+            }
         }
     }
 
