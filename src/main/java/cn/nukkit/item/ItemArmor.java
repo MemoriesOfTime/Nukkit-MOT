@@ -14,12 +14,13 @@ import cn.nukkit.network.protocol.LevelSoundEventPacket;
 abstract public class ItemArmor extends Item implements ItemDurable {
 
     public static final int TIER_LEATHER = 1;
-    public static final int TIER_IRON = 2;
-    public static final int TIER_CHAIN = 3;
-    public static final int TIER_GOLD = 4;
-    public static final int TIER_DIAMOND = 5;
-    public static final int TIER_NETHERITE = 6;
-    public static final int TIER_OTHER = 7;
+    public static final int TIER_COPPER = 2;
+    public static final int TIER_IRON = 3;
+    public static final int TIER_CHAIN = 4;
+    public static final int TIER_GOLD = 5;
+    public static final int TIER_DIAMOND = 6;
+    public static final int TIER_NETHERITE = 7;
+    public static final int TIER_OTHER = 8;
 
     public ItemArmor(int id) {
         super(id);
@@ -93,6 +94,9 @@ abstract public class ItemArmor extends Item implements ItemDurable {
                 case TIER_NETHERITE:
                     player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_NETHERITE);
                     break;
+                case TIER_COPPER:
+                    player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_COPPER);
+                    break;
                 case TIER_OTHER:
                 default:
                     player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_GENERIC);
@@ -105,7 +109,7 @@ abstract public class ItemArmor extends Item implements ItemDurable {
     @Override
     public int getEnchantAbility() {
         switch (this.getTier()) {
-            case TIER_CHAIN:
+            case TIER_CHAIN, TIER_COPPER:
                 return 12;
             case TIER_LEATHER:
                 return 15;
