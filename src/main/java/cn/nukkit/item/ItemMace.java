@@ -20,7 +20,7 @@ public class ItemMace extends StringItemToolBase {
 
     @Override
     public int getMaxDurability() {
-        return ItemTool.DURABILITY_BRUSH;
+        return ItemTool.DURABILITY_MACE;
     }
 
     @Override
