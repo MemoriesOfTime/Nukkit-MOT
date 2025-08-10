@@ -11,6 +11,7 @@ public interface ItemNamespaceId {
     String RECOVERY_COMPASS = "minecraft:recovery_compass";
 
     String MANGROVE_DOOR = "minecraft:mangrove_door";
+    String CHERRY_DOOR = "minecraft:cherry_door";
 
     String NETHERITE_UPGRADE_SMITHING_TEMPLATE = "minecraft:netherite_upgrade_smithing_template";
     String SENTRY_ARMOR_TRIM_SMITHING_TEMPLATE = "minecraft:sentry_armor_trim_smithing_template";
@@ -49,5 +50,16 @@ public interface ItemNamespaceId {
 
     String BLUE_EGG = "minecraft:blue_egg";
     String BROWN_EGG = "minecraft:brown_egg";
+
+    String COPPER_SWORD = "minecraft:copper_sword";
+    String COPPER_AXE = "minecraft:copper_axe";
+    String COPPER_PICKAXE = "minecraft:copper_pickaxe";
+    String COPPER_HOE = "minecraft:copper_hoe";
+    String COPPER_SHOVEL = "minecraft:copper_shovel";
+    String COPPER_HELMET = "minecraft:copper_helmet";
+    String COPPER_CHESTPLATE = "minecraft:copper_chestplate";
+    String COPPER_LEGGINGS = "minecraft:copper_leggings";
+    String COPPER_BOOTS = "minecraft:copper_boots";
+    String COPPER_NUGGET = "minecraft:copper_nugget";
 
 }

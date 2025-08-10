@@ -8,7 +8,7 @@ public class DisconnectPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.DISCONNECT_PACKET;
 
-    public DisconnectFailReason reason = DisconnectFailReason.UNKNOWN;
+    public DisconnectFailReason reason = DisconnectFailReason.DISCONNECTED;
     public boolean hideDisconnectionScreen = false;
     public String message;
     /**

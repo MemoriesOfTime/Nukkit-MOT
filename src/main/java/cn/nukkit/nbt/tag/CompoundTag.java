@@ -5,11 +5,8 @@ import cn.nukkit.nbt.stream.NBTOutputStream;
 
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.StringJoiner;
 
 public class CompoundTag extends Tag implements Cloneable {
 
@@ -412,6 +409,11 @@ public class CompoundTag extends Tag implements Cloneable {
             return tags.entrySet().equals(o.tags.entrySet());
         }
         return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), tags);
     }
 
     /**

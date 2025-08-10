@@ -81,7 +81,13 @@ public class CustomBlockManager {
     }
 
     public void registerCustomBlock(String identifier, int nukkitId, CustomBlockDefinition blockDefinition, Supplier<BlockContainer> factory) {
-        this.registerCustomBlock(identifier, nukkitId, null, blockDefinition, meta -> factory.get());
+        this.registerCustomBlock(identifier, nukkitId, null, blockDefinition, meta -> {
+            BlockContainer blockContainer = factory.get();
+            if (blockContainer instanceof BlockStorageContainer storageContainer) {
+                storageContainer.setStorage(meta);
+            }
+            return blockContainer;
+        });
     }
 
     private static void variantGenerations(BlockProperties properties, String[] states, List<Map<String, Serializable>> variants, Map<String, Serializable> temp, int offset) {
@@ -140,30 +146,34 @@ public class CustomBlockManager {
         this.blockDefinitions.put(defaultState.getLegacyId(), blockDefinition);
 
         int itemId = 255 - nukkitId;
-        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
-            mapping.registerItem(identifier, nukkitId, itemId, 0);
-        }
 
         if (properties != null) {
             BlockProperties finalProperties = properties;
             variantGenerations(properties, properties.getNames().toArray(new String[0]))
                     .forEach(states -> {
-                        final int[] meta = {0};
-                        states.forEach((name, value) -> {
-                            meta[0] = finalProperties.setValue(meta[0], name, value);
-                        });
+                        int meta = 0;
 
-                        if(meta[0] != 0) {
-                            CustomBlockState state;
-                            try {
-                                state = this.createBlockState(identifier, (nukkitId << Block.DATA_BITS) | meta[0], finalProperties, factory);
-                            } catch (InvalidBlockPropertyMetaException e) {
-                                log.error(e);
-                                return; // Nukkit has more states than our block
-                            }
-                            this.legacy2CustomState.put(state.getLegacyId(), state);
+                        for (String name : states.keySet()) {
+                            meta = finalProperties.setValue(meta, name, states.get(name));
                         }
+
+                        for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+                            mapping.registerCustomBlockItem(identifier, itemId, meta);
+                        }
+
+                        CustomBlockState state;
+                        try {
+                            state = this.createBlockState(identifier, (nukkitId << Block.DATA_BITS) | (meta & Block.DATA_MASK), finalProperties, factory);
+                        } catch (InvalidBlockPropertyMetaException e) {
+                            log.error(e);
+                            return; // Nukkit has more states than our block
+                        }
+                        this.legacy2CustomState.put(state.getLegacyId(), state);
                     });
+        } else {
+            for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
+                mapping.registerCustomBlockItem(identifier, itemId, 0);
+            }
         }
     }
 
@@ -220,7 +230,7 @@ public class CustomBlockManager {
             if (palette.getProtocol() == storagePalette.getProtocol()) {
                 this.recreateBlockPalette(palette, new ObjectArrayList<>(NukkitLegacyMapper.loadBlockPalette()));
             } else {
-                Path path = this.getVanillaPalettePath(palette.getProtocol());
+                Path path = this.getVanillaPalettePath(palette.getGameVersion());
                 if (!Files.exists(path)) {
                     log.warn("No vanilla palette found for {}.", Utils.getVersionByProtocol(palette.getProtocol()));
                     continue;
@@ -235,7 +245,7 @@ public class CustomBlockManager {
     }
 
     private void recreateBlockPalette(BlockPalette palette) throws IOException {
-        List<NbtMap> vanillaPalette = new ObjectArrayList<>(this.loadVanillaPalette(palette.getProtocol()));
+        List<NbtMap> vanillaPalette = new ObjectArrayList<>(this.loadVanillaPalette(palette.getGameVersion()));
         this.recreateBlockPalette(palette, vanillaPalette);
     }
 
@@ -341,7 +351,7 @@ public class CustomBlockManager {
         }
     }
 
-    private List<NbtMap> loadVanillaPalette(int version) throws FileNotFoundException {
+    private List<NbtMap> loadVanillaPalette(GameVersion version) throws FileNotFoundException {
         Path path = this.getVanillaPalettePath(version);
         if (!Files.exists(path)) {
             throw new FileNotFoundException("Missing vanilla palette for version " + version);
@@ -354,8 +364,8 @@ public class CustomBlockManager {
         }
     }
 
-    private Path getVanillaPalettePath(int version) {
-        return this.getBinPath().resolve("vanilla_palette_" + version + ".nbt");
+    private Path getVanillaPalettePath(GameVersion version) {
+        return this.getBinPath().resolve("vanilla_palette_" + version.getProtocol() + ".nbt");
     }
 
     public Block getBlock(int legacyId) {

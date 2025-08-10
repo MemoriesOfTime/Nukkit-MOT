@@ -3,7 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockWallDeepslateCobbled extends BlockWall {
+public class BlockWallDeepslateCobbled extends BlockWallIndependentID {
     public BlockWallDeepslateCobbled() {
         this(0);
     }
@@ -20,6 +20,11 @@ public class BlockWallDeepslateCobbled extends BlockWall {
     @Override
     public int getId() {
         return COBBLED_DEEPSLATE_WALL;
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:cobbled_deepslate_wall";
     }
 
     @Override

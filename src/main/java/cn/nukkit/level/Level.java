@@ -2096,7 +2096,11 @@ public class Level implements ChunkManager, Metadatable {
 
     @Override
     public void setBlockFullIdAt(int x, int y, int z, int layer, int fullId) {
-        this.setBlock(x, y, z, layer, Block.fullList[fullId], false, false);
+        Block block = Block.fullList[fullId];
+        if (block == null) {
+            block = new BlockUnknown(fullId >> Block.DATA_BITS, fullId & Block.DATA_MASK);
+        }
+        this.setBlock(x, y, z, layer, block, false, false);
     }
 
     public boolean setBlock(Vector3 pos, Block block) {
@@ -5094,8 +5098,9 @@ public class Level implements ChunkManager, Metadatable {
             }
             return GameVersion.V1_20_50_NETEASE;
         }
-
-        if (protocol >= ProtocolInfo.v1_21_90) {
+        if (protocol >= GameVersion.V1_21_100.getProtocol()) {
+            return GameVersion.V1_21_100;
+        } else if (protocol >= ProtocolInfo.v1_21_90) {
             return GameVersion.V1_21_90;
         } else if (protocol >= ProtocolInfo.v1_21_80) {
             return GameVersion.V1_21_80;
@@ -5236,8 +5241,10 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_21_60) if (player == ProtocolInfo.v1_21_60) return true;
         if (chunk == ProtocolInfo.v1_21_70)
             if (player >= ProtocolInfo.v1_21_70_24) if (player < ProtocolInfo.v1_21_80) return true;
-        if (chunk == ProtocolInfo.v1_21_80) if (player < ProtocolInfo.v1_21_90) return true;
-        if (chunk == ProtocolInfo.v1_21_90) if (player >= ProtocolInfo.v1_21_90) return true;
+        if (chunk == ProtocolInfo.v1_21_80) if (player == ProtocolInfo.v1_21_80) return true;
+        if (chunk == ProtocolInfo.v1_21_90)
+            if (player >= ProtocolInfo.v1_21_90) if (player <= ProtocolInfo.v1_21_93) return true;
+        if (chunk == GameVersion.V1_21_100.getProtocol()) if (player >= GameVersion.V1_21_100.getProtocol()) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

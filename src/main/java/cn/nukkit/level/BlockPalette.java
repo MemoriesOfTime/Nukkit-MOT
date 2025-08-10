@@ -21,7 +21,6 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteOrder;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +33,7 @@ public class BlockPalette {
     private final GameVersion gameVersion;
     private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
-    private final Map<CompoundTag, Integer> stateToLegacy = new HashMap<>();
+    private final Int2IntMap stateHashToLegacy = new Int2IntOpenHashMap();
 
     private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
@@ -136,6 +135,10 @@ public class BlockPalette {
         return this.protocol;
     }
 
+    public GameVersion getGameVersion() {
+        return this.gameVersion;
+    }
+
     public Int2IntMap getLegacyToRuntimeIdMap() {
         return Int2IntMaps.unmodifiable(this.legacyToRuntimeId);
     }
@@ -144,7 +147,7 @@ public class BlockPalette {
         this.locked = false;
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
-        this.stateToLegacy.clear();
+        this.stateHashToLegacy.clear();
     }
 
     public void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
@@ -155,7 +158,7 @@ public class BlockPalette {
         int legacyId = blockId << Block.DATA_BITS | data;
         this.legacyToRuntimeId.put(legacyId, runtimeId);
         this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
-        this.stateToLegacy.putIfAbsent(blockState, legacyId);
+        this.stateHashToLegacy.putIfAbsent(blockState.hashCode(), legacyId);
 
         // Hack: Map IDs for item frame up & down states
         if (blockId == BlockID.ITEM_FRAME_BLOCK || blockId == BlockID.GLOW_FRAME) {
@@ -210,7 +213,7 @@ public class BlockPalette {
     }
 
     public int getLegacyFullId(CompoundTag compoundTag) {
-        return stateToLegacy.getOrDefault(compoundTag, -1);
+        return stateHashToLegacy.getOrDefault(compoundTag.hashCode(), -1);
     }
 
 }

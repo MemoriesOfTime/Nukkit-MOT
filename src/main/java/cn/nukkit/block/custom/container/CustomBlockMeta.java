@@ -51,11 +51,6 @@ public class CustomBlockMeta extends BlockMeta implements BlockStorageContainer 
     }
 
     @Override
-    public void setDamage(int meta) {
-        super.setDamage(meta);
-    }
-
-    @Override
     public BlockProperties getBlockProperties() {
         return this.properties;
     }
