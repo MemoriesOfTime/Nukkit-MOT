@@ -2,6 +2,7 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.network.protocol.types.biome.*;
@@ -154,7 +155,13 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
     }
 
+    @Deprecated
     public static DataPacket getCachedPacket(int protocol) {
+        return getCachedPacket(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+    }
+
+    public static DataPacket getCachedPacket(GameVersion gameVersion) {
+        int protocol = gameVersion.getProtocol();
         if (protocol < ProtocolInfo.v1_12_0) {
             throw new UnsupportedOperationException("Unsupported protocol version: " + protocol);
         }

@@ -131,14 +131,25 @@ abstract public class ItemArmor extends Item implements ItemDurable {
         return this.isHelmet();
     }
 
+    /**
+     * @deprecated
+     * use {@link #setArmorTrim(ItemTrimPatternType, ItemTrimMaterialType)} instead
+     */
+    @Deprecated
     public void setTrim(ItemTrimPatternType pattern, ItemTrimMaterialType material) {
-        CompoundTag tag = new CompoundTag();
-        if (this.hasCompoundTag()) {
-            tag = this.getNamedTag();
+        this.setArmorTrim(pattern, material);
+    }
+
+    public ItemArmor setArmorTrim(ItemTrimPatternType pattern, ItemTrimMaterialType material) {
+        CompoundTag tag = this.getNamedTag();
+        if (tag == null) {
+            tag = new CompoundTag();
         }
-        tag = tag.putCompound("Trim", new CompoundTag()
+
+        this.setCompoundTag(tag.putCompound("Trim", new CompoundTag()
                 .putString("Pattern", pattern.getTrimPattern())
-                .putString("Material", material.getMaterialName()));
-        this.setCompoundTag(tag);
+                .putString("Material", material.getMaterialName())));
+
+        return this;
     }
 }

@@ -39,7 +39,7 @@ public class BossEventPacket extends DataPacket {
      * @since v776 1.21.60
      */
     public String filteredTitle = "";
-    public short unknown;
+    public short darkenScreen;
     public int color;
     public int overlay;
     
@@ -66,7 +66,7 @@ public class BossEventPacket extends DataPacket {
                     }
                     this.healthPercent = this.getLFloat();
                 case TYPE_UPDATE_PROPERTIES:
-                    this.unknown = (short) this.getShort();
+                    this.darkenScreen = (short) this.getShort();
                 case TYPE_TEXTURE:
                     this.color = (int) this.getUnsignedVarInt();
                     this.overlay = (int) this.getUnsignedVarInt();
@@ -103,7 +103,7 @@ public class BossEventPacket extends DataPacket {
                     }
                     this.putLFloat(this.healthPercent);
                 case TYPE_UPDATE_PROPERTIES:
-                    this.putShort(this.unknown);
+                    this.putShort(this.darkenScreen);
                 case TYPE_TEXTURE:
                     this.putUnsignedVarInt(this.color);
                     this.putUnsignedVarInt(this.overlay);

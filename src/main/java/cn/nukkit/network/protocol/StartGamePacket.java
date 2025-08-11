@@ -169,11 +169,11 @@ public class StartGamePacket extends DataPacket {
     /**
      * @since v818
      */
-    private String ownerIdentifier = "";
+    public String ownerIdentifier = "";
     /**
      * @since v827
      */
-    private boolean tickDeathSystemsEnabled;
+    public boolean tickDeathSystemsEnabled;
 
     @Override
     public void decode() {

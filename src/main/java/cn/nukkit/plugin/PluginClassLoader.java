@@ -13,9 +13,9 @@ import java.util.Map;
  */
 public class PluginClassLoader extends URLClassLoader {
 
-    private JavaPluginLoader loader;
+    private final JavaPluginLoader loader;
 
-    private final Map<String, Class> classes = new HashMap<>();
+    private final Map<String, Class<?>> classes = new HashMap<>();
 
     public PluginClassLoader(JavaPluginLoader loader, ClassLoader parent, File file) throws MalformedURLException {
         super(new URL[]{file.toURI().toURL()}, parent);

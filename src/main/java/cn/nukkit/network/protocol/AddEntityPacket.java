@@ -206,6 +206,17 @@ public class AddEntityPacket extends DataPacket {
         //1.21.60
         mapping.put(145, "minecraft:ominous_item_spawner");
         mapping.put(EntityCreaking.NETWORK_ID, "minecraft:creaking");
+        //1.21.90
+        if (protocolId >= ProtocolInfo.v1_21_90) {
+            mapping.put(EntityHappyGhast.NETWORK_ID, "minecraft:happy_ghast");
+        } else {
+            mapping.put(EntityHappyGhast.NETWORK_ID, "minecraft:ghast");
+        }
+        if (protocolId >= ProtocolInfo.v1_21_100) {
+            mapping.put(EntityCopperGolem.NETWORK_ID, "minecraft:copper_golem");
+        } else {
+            mapping.put(EntityCopperGolem.NETWORK_ID, "minecraft:iron_golem");
+        }
     }
 
     @Override

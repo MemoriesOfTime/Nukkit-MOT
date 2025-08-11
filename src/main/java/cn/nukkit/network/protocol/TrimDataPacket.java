@@ -1,5 +1,7 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.item.trim.TrimFactory;
 import cn.nukkit.network.protocol.types.TrimMaterial;
 import cn.nukkit.network.protocol.types.TrimPattern;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -8,6 +10,7 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 import java.util.List;
+import java.util.zip.Deflater;
 
 @Data
 @EqualsAndHashCode(doNotUseGetters = true, callSuper = false)
@@ -16,8 +19,26 @@ public class TrimDataPacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.TRIM_DATA_PACKET;
 
+    private static final BatchPacket CACHED_PACKET;
+
     private final List<TrimPattern> patterns = new ObjectArrayList<>();
     private final List<TrimMaterial> materials = new ObjectArrayList<>();
+
+    static {
+        TrimDataPacket pk = new TrimDataPacket();
+        pk.getMaterials().addAll(TrimFactory.trimMaterials);
+        pk.getPatterns().addAll(TrimFactory.trimPatterns);
+        pk.tryEncode();
+        CACHED_PACKET = pk.compress(Deflater.BEST_COMPRESSION);
+    }
+
+    public static BatchPacket getCachedPacket() {
+        return getCachedPacket(GameVersion.getLastVersion());
+    }
+
+    public static BatchPacket getCachedPacket(GameVersion gameVersion) {
+        return CACHED_PACKET;
+    }
 
     @Override
     public int packetId() {

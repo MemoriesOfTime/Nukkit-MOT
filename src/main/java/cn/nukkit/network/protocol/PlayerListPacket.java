@@ -5,7 +5,6 @@ import lombok.ToString;
 
 import java.awt.*;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author Nukkit Project Team
@@ -57,7 +56,7 @@ public class PlayerListPacket extends DataPacket {
                             if (protocol >= ProtocolInfo.v1_20_60) {
                                 this.putBoolean(entry.isSubClient);
                                 if (protocol >= ProtocolInfo.v1_21_80) {
-                                    this.putLInt(entry.color);
+                                    this.putLInt(entry.color.getRGB());
                                 }
                             }
                         }
@@ -94,7 +93,7 @@ public class PlayerListPacket extends DataPacket {
         public boolean isTeacher;
         public boolean isHost;
         public boolean isSubClient;
-        public int color = Color.BLACK.getRGB();
+        public Color color;
 
         public Entry(UUID uuid) {
             this.uuid = uuid;
@@ -105,17 +104,16 @@ public class PlayerListPacket extends DataPacket {
         }
 
         public Entry(UUID uuid, long entityId, String name, Skin skin, String xboxUserId) {
+            this(uuid, entityId, name, skin, xboxUserId, Color.WHITE);
+        }
+
+        public Entry(UUID uuid, long entityId, String name, Skin skin, String xboxUserId, Color color) {
             this.uuid = uuid;
             this.entityId = entityId;
             this.name = name;
             this.skin = skin;
             this.xboxUserId = xboxUserId == null ? "" : xboxUserId;
-
-            // Set random locator bar color when spawning player
-            if (this.skin != null) {
-                ThreadLocalRandom random = ThreadLocalRandom.current();
-                this.color = new Color(random.nextFloat(), random.nextFloat(), random.nextFloat()).getRGB();
-            }
+            this.color = color;
         }
     }
 }

@@ -7,6 +7,7 @@ import cn.nukkit.block.BlockID;
 import cn.nukkit.event.block.ItemFrameDropItemEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
+import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -112,36 +113,48 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
             this.setItem(new ItemBlock(Block.get(BlockID.AIR)), false);
         }
 
+        CompoundTag itemOriginal = namedTag.getCompound("Item");
+
         CompoundTag tag = new CompoundTag()
                 .putString("id", BlockEntity.ITEM_FRAME)
                 .putInt("x", (int) this.x)
                 .putInt("y", (int) this.y)
                 .putInt("z", (int) this.z);
 
-        Item item = this.getItem();
-        if (!item.isNull()) {
-            CompoundTag itemTag = NBTIO.putItemHelper(item, null, protocol);
+        int itemId = itemOriginal.getShort("id");
+        String itemName = itemOriginal.getString("Name");
+        if (itemId != Item.AIR || (itemName != null && !itemName.equals("minecraft:air"))) {
+            CompoundTag item = itemOriginal.copy();
+            item.setName("Item");
             if (protocol >= ProtocolInfo.v1_16_0) {
-                if (!itemTag.contains("Name")) {
-                    itemTag.remove("id");
+                if (!item.contains("Name")) {
+                    item.remove("id");
+                    int damage = itemOriginal.getShort("Damage");
                     String namespaceId;
                     try {
-                        namespaceId = item.getNamespaceId(protocol);
+                        namespaceId = RuntimeItems.getMapping(protocol).toRuntime(itemId, damage).getIdentifier();
                         if (namespaceId == null || namespaceId.isBlank()) {
                             throw new Exception("Empty namespaceId");
                         }
                     } catch (Exception e) {
                         namespaceId = "minecraft:unknown";
-                        Server.getInstance().getLogger().error("Failed to get namespaceId of " + item.getId() + ":" + item.getDamage() + " (" + item.getName() + ")", e);
+                        Server.getInstance().getLogger().error("Failed to get namespaceId of " + itemId + ":" + damage, e);
                     }
-                    itemTag.putString("Name", namespaceId);
+                    item.putString("Name", namespaceId);
                 }
-            } else {
-                if (!itemTag.contains("id")) {
-                    itemTag.putShort("id", Item.INFO_UPDATE);
+            } else { // < 1.16 used item id
+                if (!item.contains("id")) {
+                    item.putShort("id", Item.INFO_UPDATE);
                 }
             }
-            tag.putCompound("Item", itemTag)
+
+            if (itemId == Item.MAP) {
+                item.getCompound("tag").remove("Colors");
+            } else {
+                item.getCompound("tag").remove("Items");
+            }
+
+            tag.putCompound("Item", item)
                     .putByte("ItemRotation", this.getItemRotation());
         }
         return tag;

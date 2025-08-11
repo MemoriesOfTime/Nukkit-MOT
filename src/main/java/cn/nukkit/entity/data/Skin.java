@@ -4,8 +4,7 @@ import cn.nukkit.Server;
 import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
 import cn.nukkit.utils.*;
 import com.google.common.base.Preconditions;
-import com.nimbusds.jose.shaded.json.JSONObject;
-import com.nimbusds.jose.shaded.json.JSONValue;
+import com.google.gson.Gson;
 import lombok.ToString;
 
 import java.awt.*;
@@ -33,6 +32,8 @@ public class Skin {
     public static final int SKIN_256_256_SIZE = SKIN_PERSONA_SIZE;
 
     private static final int MAX_DATA_SIZE = SKIN_PERSONA_SIZE;
+
+    private static final Gson GSON = new Gson();
 
     public static final String GEOMETRY_CUSTOM = convertLegacyGeometryName("geometry.humanoid.custom");
     public static final String GEOMETRY_CUSTOM_SLIM = convertLegacyGeometryName("geometry.humanoid.customSlim");
@@ -105,9 +106,12 @@ public class Skin {
             return false;
         }
         try {
-            JSONObject geometry = (JSONObject) ((JSONObject) JSONValue.parse(skinResourcePatch)).get("geometry");
-            return geometry.containsKey("default") && geometry.get("default") instanceof String;
-        } catch (ClassCastException | NullPointerException e) {
+            Map<String, Object> geometry = (Map<String, Object>) GSON.fromJson(skinResourcePatch, Map.class).get("geometry");
+            if (geometry == null) {
+                return false;
+            }
+            return geometry.get("default") instanceof String;
+        } catch (ClassCastException e) {
             return false;
         }
     }

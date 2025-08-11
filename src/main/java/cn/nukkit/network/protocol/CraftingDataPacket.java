@@ -209,12 +209,12 @@ public class CraftingDataPacket extends DataPacket {
                 // Identical smithing_trim recipe sent by BDS that uses tag-descriptors, as the client seems to ignore the
                 // approach of using many default-descriptors (which we do for smithing_transform)
                 this.putVarInt(RecipeType.SMITHING_TRIM.getNetworkType(protocol));
-                this.putString("minecraft:smithing_armor_trim");
+                this.putString("minecraft:smithing_armor_trim"); // Recipe
                 this.putRecipeIngredient(protocol, "minecraft:trim_templates", 1);
                 this.putRecipeIngredient(protocol, "minecraft:trimmable_armors", 1);
                 this.putRecipeIngredient(protocol, "minecraft:trim_materials", 1);
                 this.putString(CRAFTING_TAG_SMITHING_TABLE);
-                this.putUnsignedVarInt(1);
+                this.putUnsignedVarInt(1); // Network ID (hardcoded in CraftingManager)
             }
 
             if (protocol >= 388) {
