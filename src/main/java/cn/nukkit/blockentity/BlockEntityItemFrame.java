@@ -131,7 +131,7 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
                     item.remove("id");
                     int damage = itemOriginal.getShort("Damage");
                     String namespaceId;
-                    if (id == 0) {
+                    if (itemId == 0) {
                         namespaceId = "minecraft:air";
                     } else {
                         try {

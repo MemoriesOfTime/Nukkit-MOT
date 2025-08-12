@@ -3350,8 +3350,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 // 传送玩家后，可能会由于网络延迟接收错误数据包
                 // 在这种情况下为了避免错误调整玩家视角，直接忽略移动数据包
-                if (this.lastTeleportTick + 10 > this.server.getTick()
-                        && newPos.distance(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) < 5) {
+                if (this.lastTeleportTick + 20 > this.server.getTick()
+                        && newPos.distance(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) < 3) {
                     break;
                 }
 
@@ -3680,6 +3680,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
+                //发生传送时，丢弃客户端未处理传送前的所有移动包，避免错误处理传送前的坐标
+                if (this.lastTeleportTick + 60 > this.server.getTick()) {
+                    if (!authPacket.getInputData().contains(AuthInputAction.HANDLE_TELEPORT)) {
+                        log.debug("Player {} is teleporting, but not handle teleport packet", this.username);
+                        return;
+                    }
+                    this.lastTeleportTick = -1;
+                }
+
                 Vector3 clientPosition = authPacket.getPosition().subtract(0, this.riding == null ? this.getBaseOffset() : this.riding.getMountedOffset(this).getY(), 0).asVector3();
 
                 double distSqrt = clientPosition.distanceSquared(this);
@@ -3687,17 +3696,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
-                // 传送玩家后，可能会由于网络延迟接收错误数据包
-                // 在这种情况下为了避免错误调整玩家视角，直接忽略移动数据包
-                if (this.lastTeleportTick + 10 > this.server.getTick()
-                        && clientPosition.distance(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) < 5) {
-                    break;
-                }
-
                 if (distSqrt > 100) {
-                    if (this.lastTeleportTick + 30 < this.server.getTick()) {
-                        this.sendPosition(this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
-                    }
+                    this.sendPosition(this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
                     break;
                 }
 
@@ -3707,8 +3707,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.forceMovement = new Vector3(this.x, this.y, this.z);
                 }
 
-                if (this.forceMovement != null
-                        && ((clientPosition.distanceSquared(this.forceMovement) > 0.1 && this.lastTeleportTick + 10 > this.server.getTick()) || revertMotion)) {
+                if (this.forceMovement != null && (clientPosition.distanceSquared(this.forceMovement) > 0.1 || revertMotion)) {
                     this.sendPosition(this.forceMovement, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
                 } else {
                     float yaw = authPacket.getYaw() % 360;
@@ -7526,12 +7525,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         List<ExperimentData> experiments = new ObjectArrayList<>();
         //TODO Multiversion 当新版本删除部分实验性玩法时，这里也需要加上判断
         if (this.server.enableExperimentMode) {
-            experiments.add(new ExperimentData("data_driven_items", true));
+            if (this.protocol < ProtocolInfo.v1_21_20) {
+                experiments.add(new ExperimentData("data_driven_items", true));
+            }
             experiments.add(new ExperimentData("experimental_custom_ui", true));
             experiments.add(new ExperimentData("upcoming_creator_features", true));
-            experiments.add(new ExperimentData("experimental_molang_features", true));
+            if (this.protocol >= ProtocolInfo.v1_17_30 && this.protocol < ProtocolInfo.v1_20_70) {
+                experiments.add(new ExperimentData("experimental_molang_features", true));
+            }
             if (this.protocol >= ProtocolInfo.v1_20_0_23) {
-                experiments.add(new ExperimentData("cameras", true));
+                if (this.protocol < ProtocolInfo.v1_20_30) {
+                    experiments.add(new ExperimentData("cameras", true));
+                }
                 if (this.protocol >= ProtocolInfo.v1_20_10_21 && this.protocol < ProtocolInfo.v1_20_30_24) {
                     experiments.add(new ExperimentData("short_sneaking", true));
                 }
