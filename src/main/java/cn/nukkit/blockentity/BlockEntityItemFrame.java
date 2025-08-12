@@ -131,14 +131,18 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
                     item.remove("id");
                     int damage = itemOriginal.getShort("Damage");
                     String namespaceId;
-                    try {
-                        namespaceId = RuntimeItems.getMapping(protocol).toRuntime(itemId, damage).getIdentifier();
-                        if (namespaceId == null || namespaceId.isBlank()) {
-                            throw new Exception("Empty namespaceId");
+                    if (id == 0) {
+                        namespaceId = "minecraft:air";
+                    } else {
+                        try {
+                            namespaceId = RuntimeItems.getMapping(protocol).toRuntime(itemId, damage).getIdentifier();
+                            if (namespaceId == null || namespaceId.isBlank()) {
+                                throw new Exception("Empty namespaceId");
+                            }
+                        } catch (Exception e) {
+                            namespaceId = "minecraft:unknown";
+                            Server.getInstance().getLogger().error("Failed to get namespaceId of " + itemId + ":" + damage, e);
                         }
-                    } catch (Exception e) {
-                        namespaceId = "minecraft:unknown";
-                        Server.getInstance().getLogger().error("Failed to get namespaceId of " + itemId + ":" + damage, e);
                     }
                     item.putString("Name", namespaceId);
                 }
