@@ -2188,7 +2188,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public String getNamespaceId() {
-        return this.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL);
+        return this.getNamespaceId(GameVersion.getLastVersion());
     }
 
     @Deprecated

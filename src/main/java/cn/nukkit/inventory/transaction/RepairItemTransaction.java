@@ -1,5 +1,6 @@
 package cn.nukkit.inventory.transaction;
 
+import cn.nukkit.Nukkit;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.event.block.AnvilDamageEvent;
@@ -8,17 +9,20 @@ import cn.nukkit.event.inventory.RepairItemEvent;
 import cn.nukkit.inventory.AnvilInventory;
 import cn.nukkit.inventory.FakeBlockMenu;
 import cn.nukkit.inventory.Inventory;
-import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.RepairItemAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.StringItem;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.network.protocol.types.NetworkInventoryAction;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -27,24 +31,17 @@ public class RepairItemTransaction extends InventoryTransaction {
     private Item inputItem;
     private Item materialItem;
     private Item outputItem;
+    private final List<Item> outputItemCheck = new ArrayList<>();
 
     private int cost;
 
-    private boolean isError = false;
-
     public RepairItemTransaction(Player source, List<InventoryAction> actions) {
         super(source, actions);
-        //额外检查 保证在所有action处理完成后再检查
-        boolean hasSlotChangeAction = false;
+
         for (InventoryAction action : actions) {
             if (action instanceof SlotChangeAction slotChangeAction) {
-                if (slotChangeAction.getInventory() instanceof PlayerInventory) { //真正给玩家背包物品的操作
-                    if (hasSlotChangeAction) {
-                        this.isError = true;
-                        return;
-                    }
-                    hasSlotChangeAction = true;
-                    this.outputItem = slotChangeAction.getTargetItem();
+                if (!(slotChangeAction.getInventory() instanceof AnvilInventory)) {
+                    this.outputItemCheck.add(slotChangeAction.getTargetItemUnsafe());
                 }
             }
         }
@@ -57,15 +54,25 @@ public class RepairItemTransaction extends InventoryTransaction {
         }
 
         Inventory inventory = getSource().getWindowById(Player.ANVIL_WINDOW_ID);
-        if (inventory == null) {
+        if (!(inventory instanceof AnvilInventory anvilInventory)) {
             return false;
         }
-        AnvilInventory anvilInventory = (AnvilInventory) inventory;
-        return !this.isError
-                && this.inputItem != null && this.outputItem != null
+
+        if (this.outputItem == null || this.outputItem.isNull() || this.inputItem == null || this.inputItem.isNull()) {
+            return false;
+        }
+
+        for (Item check : this.outputItemCheck) {
+            if (check != null && !this.outputItem.equals(check)) {
+                source.getServer().getLogger().debug("Illegal output");
+                return false;
+            }
+        }
+
+        return (!this.hasMaterial() || this.materialItem.equals(anvilInventory.getMaterialSlot(), true, true))
                 && this.inputItem.equals(anvilInventory.getInputSlot(), true, true)
-                && (!this.hasMaterial() || this.materialItem.equals(anvilInventory.getMaterialSlot(), true, true))
-                && this.inputItem.getCount() == this.outputItem.getCount()
+                && (this.outputItem.equals(anvilInventory.getOutputSlot(), true, true) ||
+                (anvilInventory.getOutputSlot().isNull() && this.inputItem.getId() == this.outputItem.getId()))
                 && this.checkRecipeValid();
     }
 
@@ -85,8 +92,8 @@ public class RepairItemTransaction extends InventoryTransaction {
         RepairItemEvent event = new RepairItemEvent(inventory, this.inputItem, this.outputItem, this.materialItem, this.cost, this.source);
         this.source.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
-            this.source.removeAllWindows(false);
             this.sendInventories();
+            source.setNeedSendInventory(true);
             return true;
         }
 
@@ -157,6 +164,7 @@ public class RepairItemTransaction extends InventoryTransaction {
 
         if (this.isMapRecipe()) {
             if (!this.matchMapRecipe()) {
+                source.getServer().getLogger().debug("failed: map recipe");
                 return false;
             }
             baseRepairCost = 0;
@@ -176,11 +184,13 @@ public class RepairItemTransaction extends InventoryTransaction {
                     repairDamage = Math.min(damage, maxRepairDamage);
                 }
                 if (this.outputItem.getDamage() != damage) {
+                    source.getServer().getLogger().debug("failed: durable damage");
                     return false;
                 }
             } else {
                 boolean consumeEnchantedBook = this.materialItem.getId() == Item.ENCHANTED_BOOK && this.materialItem.hasEnchantments();
                 if (!consumeEnchantedBook && (this.inputItem.getMaxDurability() == -1 || this.inputItem.getId() != this.materialItem.getId())) {
+                    source.getServer().getLogger().debug("failed: type");
                     return false;
                 }
 
@@ -192,6 +202,7 @@ public class RepairItemTransaction extends InventoryTransaction {
 
                     if (damage < this.inputItem.getDamage()) {
                         if (this.outputItem.getDamage() != damage) {
+                            source.getServer().getLogger().debug("failed: damage");
                             return false;
                         }
                         cost += 2;
@@ -259,14 +270,45 @@ public class RepairItemTransaction extends InventoryTransaction {
 
                 Enchantment[] outputEnchantments = this.outputItem.getEnchantments();
                 if (hasIncompatibleEnchantments && !hasCompatibleEnchantments || enchantments.size() != outputEnchantments.length) {
+                    source.getServer().getLogger().debug("failed: enchantments");
                     return false;
                 }
 
                 for (Enchantment enchantment : outputEnchantments) {
                     if (enchantments.get(enchantment.getId()) != enchantment.getLevel()) {
+                        source.getServer().getLogger().debug("failed: enchantment level");
                         return false;
                     }
                 }
+            }
+        } else {
+            CompoundTag a = this.inputItem.getNamedTag();
+            a = a == null ? new CompoundTag() : a.clone().remove("RepairCost");
+            Tag displayA = a.get("display");
+            if (displayA != null) {
+                CompoundTag tag = (CompoundTag) displayA;
+                tag.remove("Name");
+                if (tag.isEmpty()) {
+                    a.remove("display");
+                }
+            }
+
+            CompoundTag b = this.outputItem.getNamedTag();
+            b = b == null ? new CompoundTag() : b.clone().remove("RepairCost");
+            Tag displayB = b.get("display");
+            if (displayB != null) {
+                CompoundTag tag = (CompoundTag) displayB;
+                tag.remove("Name");
+                if (tag.isEmpty()) {
+                    b.remove("display");
+                }
+            }
+
+            if (!a.equals(b)) {
+                if (Nukkit.DEBUG > 1) {
+                    source.getServer().getLogger().debug("NBT check failed: input=" + a + ", output=" + b);
+                }
+                return false;
             }
         }
 
@@ -279,6 +321,7 @@ public class RepairItemTransaction extends InventoryTransaction {
         int renameCost = 0;
         if (!this.inputItem.getCustomName().equals(this.outputItem.getCustomName())) {
             if (this.outputItem.getCustomName().length() > 30) {
+                source.getServer().getLogger().debug("failed: name length");
                 return false;
             }
             renameCost = 1;
@@ -290,6 +333,7 @@ public class RepairItemTransaction extends InventoryTransaction {
             this.cost = 39;
         }
         if (baseRepairCost < 0 || cost < 0 || cost == 0 && !this.isMapRecipe() || this.cost > 39 && !this.source.isCreative()) {
+            source.getServer().getLogger().debug("failed: cost");
             return false;
         }
 
@@ -336,73 +380,82 @@ public class RepairItemTransaction extends InventoryTransaction {
     }
 
     private boolean matchRepairItem() {
-        switch (this.inputItem.getId()) {
-            case Item.LEATHER_CAP:
-            case Item.LEATHER_TUNIC:
-            case Item.LEATHER_PANTS:
-            case Item.LEATHER_BOOTS:
-                return this.materialItem.getId() == Item.LEATHER;
-            case Item.WOODEN_SWORD:
-            case Item.WOODEN_PICKAXE:
-            case Item.WOODEN_SHOVEL:
-            case Item.WOODEN_AXE:
-            case Item.WOODEN_HOE:
-            case Item.SHIELD:
-                return this.materialItem.getId() == Item.PLANKS;
-            case Item.STONE_SWORD:
-            case Item.STONE_PICKAXE:
-            case Item.STONE_SHOVEL:
-            case Item.STONE_AXE:
-            case Item.STONE_HOE:
-                return this.materialItem.getId() == Item.COBBLESTONE;
-            case Item.IRON_SWORD:
-            case Item.IRON_PICKAXE:
-            case Item.IRON_SHOVEL:
-            case Item.IRON_AXE:
-            case Item.IRON_HOE:
-            case Item.IRON_HELMET:
-            case Item.IRON_CHESTPLATE:
-            case Item.IRON_LEGGINGS:
-            case Item.IRON_BOOTS:
-            case Item.CHAIN_HELMET:
-            case Item.CHAIN_CHESTPLATE:
-            case Item.CHAIN_LEGGINGS:
-            case Item.CHAIN_BOOTS:
-                return this.materialItem.getId() == Item.IRON_INGOT;
-            case Item.GOLD_SWORD:
-            case Item.GOLD_PICKAXE:
-            case Item.GOLD_SHOVEL:
-            case Item.GOLD_AXE:
-            case Item.GOLD_HOE:
-            case Item.GOLD_HELMET:
-            case Item.GOLD_CHESTPLATE:
-            case Item.GOLD_LEGGINGS:
-            case Item.GOLD_BOOTS:
-                return this.materialItem.getId() == Item.GOLD_INGOT;
-            case Item.DIAMOND_SWORD:
-            case Item.DIAMOND_PICKAXE:
-            case Item.DIAMOND_SHOVEL:
-            case Item.DIAMOND_AXE:
-            case Item.DIAMOND_HOE:
-            case Item.DIAMOND_HELMET:
-            case Item.DIAMOND_CHESTPLATE:
-            case Item.DIAMOND_LEGGINGS:
-            case Item.DIAMOND_BOOTS:
-                return this.materialItem.getId() == Item.DIAMOND;
-            case Item.NETHERITE_SWORD:
-            case Item.NETHERITE_PICKAXE:
-            case Item.NETHERITE_SHOVEL:
-            case Item.NETHERITE_AXE:
-            case Item.NETHERITE_HOE:
-            case Item.NETHERITE_HELMET:
-            case Item.NETHERITE_CHESTPLATE:
-            case Item.NETHERITE_LEGGINGS:
-            case Item.NETHERITE_BOOTS:
-                return this.materialItem.getId() == Item.NETHERITE_INGOT;
-            case Item.TURTLE_SHELL:
-                return this.materialItem.getId() == Item.SCUTE;
-            case Item.ELYTRA:
-                return this.materialItem.getId() == Item.PHANTOM_MEMBRANE;
+        if (this.inputItem instanceof StringItem) {
+            switch (this.inputItem.getNamespaceId()) {
+                case Item.COPPER_SWORD, Item.COPPER_AXE, Item.COPPER_PICKAXE, Item.COPPER_HOE, Item.COPPER_SHOVEL,
+                     Item.COPPER_HELMET, Item.COPPER_CHESTPLATE, Item.COPPER_LEGGINGS, Item.COPPER_BOOTS -> {
+                    return this.materialItem.getNamespaceId().equals(Item.COPPER_INGOT);
+                }
+            }
+        } else {
+            switch (this.inputItem.getId()) {
+                case Item.LEATHER_CAP:
+                case Item.LEATHER_TUNIC:
+                case Item.LEATHER_PANTS:
+                case Item.LEATHER_BOOTS:
+                    return this.materialItem.getId() == Item.LEATHER;
+                case Item.WOODEN_SWORD:
+                case Item.WOODEN_PICKAXE:
+                case Item.WOODEN_SHOVEL:
+                case Item.WOODEN_AXE:
+                case Item.WOODEN_HOE:
+                case Item.SHIELD:
+                    return this.materialItem.getId() == Item.PLANKS;
+                case Item.STONE_SWORD:
+                case Item.STONE_PICKAXE:
+                case Item.STONE_SHOVEL:
+                case Item.STONE_AXE:
+                case Item.STONE_HOE:
+                    return this.materialItem.getId() == Item.COBBLESTONE;
+                case Item.IRON_SWORD:
+                case Item.IRON_PICKAXE:
+                case Item.IRON_SHOVEL:
+                case Item.IRON_AXE:
+                case Item.IRON_HOE:
+                case Item.IRON_HELMET:
+                case Item.IRON_CHESTPLATE:
+                case Item.IRON_LEGGINGS:
+                case Item.IRON_BOOTS:
+                case Item.CHAIN_HELMET:
+                case Item.CHAIN_CHESTPLATE:
+                case Item.CHAIN_LEGGINGS:
+                case Item.CHAIN_BOOTS:
+                    return this.materialItem.getId() == Item.IRON_INGOT;
+                case Item.GOLD_SWORD:
+                case Item.GOLD_PICKAXE:
+                case Item.GOLD_SHOVEL:
+                case Item.GOLD_AXE:
+                case Item.GOLD_HOE:
+                case Item.GOLD_HELMET:
+                case Item.GOLD_CHESTPLATE:
+                case Item.GOLD_LEGGINGS:
+                case Item.GOLD_BOOTS:
+                    return this.materialItem.getId() == Item.GOLD_INGOT;
+                case Item.DIAMOND_SWORD:
+                case Item.DIAMOND_PICKAXE:
+                case Item.DIAMOND_SHOVEL:
+                case Item.DIAMOND_AXE:
+                case Item.DIAMOND_HOE:
+                case Item.DIAMOND_HELMET:
+                case Item.DIAMOND_CHESTPLATE:
+                case Item.DIAMOND_LEGGINGS:
+                case Item.DIAMOND_BOOTS:
+                    return this.materialItem.getId() == Item.DIAMOND;
+                case Item.NETHERITE_SWORD:
+                case Item.NETHERITE_PICKAXE:
+                case Item.NETHERITE_SHOVEL:
+                case Item.NETHERITE_AXE:
+                case Item.NETHERITE_HOE:
+                case Item.NETHERITE_HELMET:
+                case Item.NETHERITE_CHESTPLATE:
+                case Item.NETHERITE_LEGGINGS:
+                case Item.NETHERITE_BOOTS:
+                    return this.materialItem.getId() == Item.NETHERITE_INGOT;
+                case Item.TURTLE_SHELL:
+                    return this.materialItem.getId() == Item.SCUTE;
+                case Item.ELYTRA:
+                    return this.materialItem.getId() == Item.PHANTOM_MEMBRANE;
+            }
         }
         return false;
     }

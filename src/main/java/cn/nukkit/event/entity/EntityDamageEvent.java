@@ -60,8 +60,9 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
     }
 
     public float getOriginalDamage(DamageModifier type) {
-        if (this.originals.containsKey(type)) {
-            return this.originals.get(type);
+        Float original = this.originals.get(type);
+        if (original != null) {
+            return original;
         }
 
         return 0;
@@ -72,8 +73,9 @@ public class EntityDamageEvent extends EntityEvent implements Cancellable {
     }
 
     public float getDamage(DamageModifier type) {
-        if (this.modifiers.containsKey(type)) {
-            return this.modifiers.get(type);
+        Float modifier = this.modifiers.get(type);
+        if (modifier != null) {
+            return modifier;
         }
 
         return 0;

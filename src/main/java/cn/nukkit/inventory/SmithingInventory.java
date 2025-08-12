@@ -41,7 +41,6 @@ public class SmithingInventory extends FakeBlockUIComponent {
     private static final int TEMPLATE = 2;
 
     public static final int SMITHING_EQUIPMENT_UI_SLOT = 51;
-
     public static final int SMITHING_INGREDIENT_UI_SLOT = 52;
     public static final int SMITHING_TEMPLATE_UI_SLOT = 53;
 
@@ -136,7 +135,7 @@ public class SmithingInventory extends FakeBlockUIComponent {
     @Override
     public void onOpen(Player who) {
         super.onOpen(who);
-        who.craftingType = Player.CRAFTING_SMITHING;
+        who.craftingType = Player.SMITHING_WINDOW_ID;
     }
 
     @Override
@@ -163,8 +162,7 @@ public class SmithingInventory extends FakeBlockUIComponent {
                 ItemArmor trimmedArmor = (ItemArmor) input.clone();
                 ItemTrimMaterial material = (ItemTrimMaterial) this.getIngredient();
                 ItemTrimPattern pattern = (ItemTrimPattern) this.getTemplate();
-                trimmedArmor.setTrim(pattern.getPattern(), material.getMaterial());
-                return trimmedArmor;
+                return trimmedArmor.setArmorTrim(pattern.getPattern(), material.getMaterial());
             }
         }
         return Item.AIR_ITEM.clone();

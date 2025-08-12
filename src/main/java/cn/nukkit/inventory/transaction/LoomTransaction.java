@@ -35,7 +35,7 @@ public class LoomTransaction extends InventoryTransaction {
         }
 
         Inventory inventory = getSource().getWindowById(Player.LOOM_WINDOW_ID);
-        if (!(inventory instanceof LoomInventory)) {
+        if (!(inventory instanceof LoomInventory loomInventory)) {
             return false;
         }
 
@@ -43,7 +43,6 @@ public class LoomTransaction extends InventoryTransaction {
             return false;
         }
 
-        LoomInventory loomInventory = (LoomInventory) inventory;
         Item banner = loomInventory.getBanner();
         Item dye = loomInventory.getDye();
         if (banner.getId() != Item.BANNER || dye.getId() != Item.DYE || banner.getDamage() != outputItem.getDamage()) {
@@ -77,24 +76,23 @@ public class LoomTransaction extends InventoryTransaction {
         LoomItemEvent event = new LoomItemEvent(inventory, this.outputItem, this.source);
         event.call();
         if (event.isCancelled()) {
-            this.source.removeAllWindows(false);
             this.sendInventories();
+            source.setNeedSendInventory(true);
             return false;
         }
         return true;
-    }
-
-    @Override
-    protected void sendInventories() {
-        this.source.removeAllWindows(false);
-        super.sendInventories();
     }
 
     public Item getOutputItem() {
         return this.outputItem;
     }
 
-    public static boolean checkForItemPart(List<InventoryAction> actions) {
+    public static boolean isIn(List<InventoryAction> actions) {
         return actions.stream().anyMatch(it-> it instanceof LoomItemAction);
+    }
+
+    @Override
+    public boolean checkForItemPart(List<InventoryAction> actions) {
+        return isIn(actions);
     }
 }

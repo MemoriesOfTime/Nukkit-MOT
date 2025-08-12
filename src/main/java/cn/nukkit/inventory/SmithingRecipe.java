@@ -18,6 +18,7 @@
 
 package cn.nukkit.inventory;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.inventory.data.RecipeUnlockingRequirement;
 import cn.nukkit.item.Item;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -44,8 +45,10 @@ public class SmithingRecipe extends ShapelessRecipe {
 
     public SmithingRecipe(String recipeId, int priority, Collection<Item> ingredients, Item result) {
         super(recipeId, priority, result, ingredients);
+
         this.equipment = (Item) ingredients.toArray()[0];
         this.ingredient = (Item) ingredients.toArray()[1];
+
         if (ingredients.size() >= 3) {
             this.template = (Item) ingredients.toArray()[2];
         } else {
@@ -83,7 +86,7 @@ public class SmithingRecipe extends ShapelessRecipe {
     }
 
     public Item getFinalResult(Item equip, Item template) {
-        if (template.getNamespaceId(ProtocolInfo.CURRENT_PROTOCOL).equals("minecraft:netherite_upgrade_smithing_template")) { //We do not use the recipe check template for the time being
+        if (template.getNamespaceId(GameVersion.getLastVersion()).equals("minecraft:netherite_upgrade_smithing_template")) { //We do not use the recipe check template for the time being
             Item finalResult = getResult().clone();
 
             if (equip.hasCompoundTag()) {
@@ -150,7 +153,7 @@ public class SmithingRecipe extends ShapelessRecipe {
             haveInputs.add(item.clone());
         }
         List<Item> needInputs = new ArrayList<>();
-        if(multiplier != 1){
+        if (multiplier != 1) {
             for (Item item : ingredientsAggregate) {
                 if (item.isNull())
                     continue;
