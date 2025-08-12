@@ -13,7 +13,6 @@ import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.ProjectileHitEvent;
 import cn.nukkit.event.player.PlayerFishEvent;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemBookEnchanted;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.randomitem.Fishing;
 import cn.nukkit.level.MovingObjectPosition;
@@ -342,5 +341,9 @@ public class EntityFishingHook extends EntitySlenderProjectile {
         this.target = eid;
         this.setDataProperty(new LongEntityData(DATA_TARGET_EID, eid));
         this.canCollide = eid == 0;
+    }
+
+    public long getTarget() {
+        return this.target;
     }
 }

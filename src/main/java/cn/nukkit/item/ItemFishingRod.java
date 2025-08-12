@@ -25,10 +25,16 @@ public class ItemFishingRod extends ItemTool {
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
         if (player.fishing != null) {
+            if (!this.isUnbreakable()) {
+                if (player.fishing.getTarget() > 0) {
+                    this.meta = this.meta + 2;
+                } else {
+                    this.meta++;
+                }
+            }
 			player.stopFishing(true);
 		} else {
 			player.startFishing(this);
-            this.meta++;
         }
         return true;
     }
