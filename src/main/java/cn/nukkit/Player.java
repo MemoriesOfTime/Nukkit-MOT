@@ -3358,6 +3358,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (dis > 100) {
                     if (this.lastTeleportTick + 30 < this.server.getTick()) {
                         this.sendPosition(this, movePlayerPacket.yaw, movePlayerPacket.pitch, MovePlayerPacket.MODE_RESET);
+                        log.debug("{}: move {} > 100", username, dis);
                     }
                     break;
                 }
@@ -3680,16 +3681,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                 }
 
+                Vector3 clientPosition = authPacket.getPosition().subtract(0, this.riding == null ? this.getBaseOffset() : this.riding.getMountedOffset(this).getY(), 0).asVector3();
+
                 //发生传送时，丢弃客户端未处理传送前的所有移动包，避免错误处理传送前的坐标
-                if (this.lastTeleportTick + 60 > this.server.getTick()) {
-                    if (!authPacket.getInputData().contains(AuthInputAction.HANDLE_TELEPORT)) {
-                        log.debug("Player {} is teleporting, but not handle teleport packet", this.username);
+                if (this.protocol >= ProtocolInfo.v1_19_60) {
+                    if (this.lastTeleportTick + 60 > this.server.getTick()) {
+                        if (!authPacket.getInputData().contains(AuthInputAction.HANDLE_TELEPORT)) {
+                            log.debug("Player {} is teleporting, but not handle teleport packet", this.username);
+                            return;
+                        }
+                        this.lastTeleportTick = -1;
+                    }
+                } else {
+                    if (this.lastTeleportTick + 20 > this.server.getTick()
+                            && clientPosition.distance(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) < 3) {
                         return;
                     }
-                    this.lastTeleportTick = -1;
                 }
-
-                Vector3 clientPosition = authPacket.getPosition().subtract(0, this.riding == null ? this.getBaseOffset() : this.riding.getMountedOffset(this).getY(), 0).asVector3();
 
                 double distSqrt = clientPosition.distanceSquared(this);
                 if (distSqrt == 0.0 && authPacket.getYaw() % 360 == this.yaw && authPacket.getPitch() % 360 == this.pitch) {
@@ -3698,7 +3706,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (distSqrt > 100) {
                     this.sendPosition(this, authPacket.getYaw(), authPacket.getPitch(), MovePlayerPacket.MODE_RESET);
-                    break;
+                    log.debug("{}: move {} > 100", username, distSqrt);
+                    return;
                 }
 
                 boolean revertMotion = false;
@@ -6362,7 +6371,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             //this.removeAllWindows();
             //this.formOpen = false;
 
-            this.lastTeleportTick = this.server.getTick();
+            if (from.getLevel() == to.getLevel()) { //TODO 跨世界时客户端不发flag，我们无法正确排除错误移动包
+                this.lastTeleportTick = this.server.getTick();
+            }
             this.teleportPosition = this;
             if (cause != TeleportCause.ENDER_PEARL) {
                 this.forceMovement = this.teleportPosition;
@@ -6961,9 +6972,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     protected void preSwitchLevel() {
-        // Make sure batch packets from the previous world gets through first
-        this.networkSession.flush();
-
         // Remove old chunks
         this.unloadChunks(true);
     }
