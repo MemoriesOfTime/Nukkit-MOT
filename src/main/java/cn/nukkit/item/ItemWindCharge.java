@@ -18,11 +18,6 @@ public class ItemWindCharge extends StringItemProjectileBase {
     }
 
     @Override
-    public int getMaxStackSize() {
-        return 16;
-    }
-
-    @Override
     public String getProjectileEntityType() {
         return "WindCharge";
     }
