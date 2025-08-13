@@ -724,27 +724,74 @@ public class CraftingManager {
         pk.protocol = protocol;
         pk.gameVersion = gameVersion;
         for (Recipe recipe : this.getRecipes(protocol)) {
-            if (recipe instanceof ShapedRecipe) {
-                pk.addShapedRecipe((ShapedRecipe) recipe);
-            } else if (recipe instanceof ShapelessRecipe) {
-                pk.addShapelessRecipe((ShapelessRecipe) recipe);
+            if (recipe instanceof ShapedRecipe shapedRecipe) {
+                boolean isSupported = true;
+                for (Item item : shapedRecipe.getAllResults()) {
+                    if (!item.isSupportedOn(protocol)) {
+                        isSupported = false;
+                        break;
+                    }
+                }
+                if (isSupported) {
+                    for (Item ingredient : shapedRecipe.getIngredientList()) {
+                        if (!ingredient.isSupportedOn(protocol)) {
+                            isSupported = false;
+                            break;
+                        }
+                    }
+                }
+                if (isSupported) {
+                    pk.addShapedRecipe(shapedRecipe);
+                }
+            } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
+                boolean isSupported = true;
+                if (!shapelessRecipe.getResult().isSupportedOn(protocol)) {
+                    isSupported = false;
+                    break;
+                }
+                if (isSupported) {
+                    for (Item ingredient : shapelessRecipe.getIngredientList()) {
+                        if (!ingredient.isSupportedOn(protocol)) {
+                            isSupported = false;
+                            break;
+                        }
+                    }
+                }
+                if (isSupported) {
+                    pk.addShapelessRecipe(shapelessRecipe);
+                }
             }
         }
         for (SmithingRecipe recipe : this.getSmithingRecipes(protocol).values()) {
-            pk.addShapelessRecipe(recipe);
+            if (recipe.getIngredient().isSupportedOn(protocol)
+                    && recipe.getEquipment().isSupportedOn(protocol)
+                    && recipe.getTemplate().isSupportedOn(protocol)
+                    && recipe.getResult().isSupportedOn(protocol)) {
+                pk.addShapelessRecipe(recipe);
+            }
         }
         //TODO Fix 1.10.0 - 1.14.0 client crash
         if (protocol < ProtocolInfo.v1_10_0 || protocol > ProtocolInfo.v1_13_0) {
             for (FurnaceRecipe recipe : this.getFurnaceRecipes(protocol).values()) {
-                pk.addFurnaceRecipe(recipe);
+                if (recipe.getInput().isSupportedOn(protocol) && recipe.getResult().isSupportedOn(protocol)) {
+                    pk.addFurnaceRecipe(recipe);
+                }
             }
         }
         if (protocol >= ProtocolInfo.v1_13_0) {
             for (BrewingRecipe recipe : this.getBrewingRecipes(protocol).values()) {
-                pk.addBrewingRecipe(recipe);
+                if (recipe.getIngredient().isSupportedOn(protocol)
+                        && recipe.getInput().isSupportedOn(protocol)
+                        && recipe.getResult().isSupportedOn(protocol)) {
+                    pk.addBrewingRecipe(recipe);
+                }
             }
             for (ContainerRecipe recipe : this.getContainerRecipes(protocol).values()) {
-                pk.addContainerRecipe(recipe);
+                if (recipe.getIngredient().isSupportedOn(protocol)
+                        && recipe.getInput().isSupportedOn(protocol)
+                        && recipe.getResult().isSupportedOn(protocol)) {
+                    pk.addContainerRecipe(recipe);
+                }
             }
             if (protocol >= ProtocolInfo.v1_16_0) {
                 for (MultiRecipe recipe : this.getMultiRecipes().values()) {
