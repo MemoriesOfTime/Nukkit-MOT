@@ -10,14 +10,18 @@ import cn.nukkit.utils.BlockColor;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-public class BlockSlabCopperCut extends BlockSlab implements CopperBehavior {
+public class BlockSlabCutCopper extends BlockSlab implements CopperBehavior {
 
-    public BlockSlabCopperCut() {
+    public BlockSlabCutCopper() {
         this(0);
     }
 
-    public BlockSlabCopperCut(int meta) {
+    public BlockSlabCutCopper(int meta) {
         super(meta, DOUBLE_CUT_COPPER_SLAB);
+    }
+    
+    public BlockSlabCutCopper(int meta, int doubleSlab) {
+        super(meta, doubleSlab);
     }
 
     @Override
@@ -27,7 +31,13 @@ public class BlockSlabCopperCut extends BlockSlab implements CopperBehavior {
 
     @Override
     public String getName() {
-        return hasTopBit() ? "Upper Cut Copper Slab" : "Cut Copper Slab";
+        String s = "";
+        int age = this.getCopperAge();
+        if (age == 1) s = "Exposed ";
+        else if (age == 2) s = "Weathered ";
+        else if (age == 3) s = "Oxidized ";
+        else s = "";
+        return hasTopBit() ? "Upper " + s + "Cut Copper Slab" : s + "Cut Copper Slab";
     }
 
     @Override

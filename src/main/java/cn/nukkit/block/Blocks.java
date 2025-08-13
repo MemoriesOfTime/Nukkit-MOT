@@ -505,10 +505,20 @@ public class Blocks {
         list[WAXED_CUT_COPPER_STAIRS] = BlockStairsCopperCutWaxed.class; //613
         list[WAXED_EXPOSED_CUT_COPPER_STAIRS] = BlockStairsCopperCutExposedWaxed.class; //614
         list[WAXED_WEATHERED_CUT_COPPER_STAIRS] = BlockStairsCopperCutWeatheredWaxed.class; //615
-        list[CUT_COPPER_SLAB] = BlockSlabCopperCut.class; //616
-
-        list[DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCopperCut.class; //623
-
+        list[CUT_COPPER_SLAB] = BlockSlabCutCopper.class; //616
+        list[EXPOSED_CUT_COPPER_SLAB] = BlockSlabExposedCutCopper.class; //617
+        list[WEATHERED_CUT_COPPER_SLAB] = BlockSlabWeatheredCutCopper.class; //618
+        list[OXIDIZED_CUT_COPPER_SLAB] = BlockSlabOxidizedCutCopper.class; //619
+        list[WAXED_CUT_COPPER_SLAB] = BlockSlabCutCopperWaxed.class; //620
+        list[WAXED_EXPOSED_CUT_COPPER_SLAB] = BlockSlabExposedCutCopperWaxed.class; //621
+        list[WAXED_WEATHERED_CUT_COPPER_SLAB] = BlockSlabWeatheredCutCopperWaxed.class; //622
+        list[DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCutCopper.class; //623
+        list[EXPOSED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabExposedCutCopper.class; //624
+        list[WEATHERED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabWeatheredCutCopper.class; //625
+        list[OXIDIZED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabOxidizedCutCopper.class; //626
+        list[WAXED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabCutCopperWaxed.class; //627
+        list[WAXED_EXPOSED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabExposedCutCopperWaxed.class; //628
+        list[WAXED_WEATHERED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabWeatheredCutCopperWaxed.class; //629
         list[CAVE_VINES_BODY_WITH_BERRIES] = BlockCaveVinesBerriesBody.class; //630
         list[CAVE_VINES_HEAD_WITH_BERRIES] = BlockCaveVinesBerriesHead.class; //631
         list[SMOOTH_BASALT] = BlockBasaltSmooth.class; //632
@@ -583,7 +593,8 @@ public class Blocks {
         list[WAXED_OXIDIZED_COPPER] = BlockCopperOxidizedWaxed.class; //701
         list[WAXED_OXIDIZED_CUT_COPPER] = BlockCopperCutOxidizedWaxed.class; //702
         list[WAXED_OXIDIZED_CUT_COPPER_STAIRS] = BlockStairsCopperCutOxidizedWaxed.class; //703
-
+        list[WAXED_OXIDIZED_CUT_COPPER_SLAB] = BlockSlabOxidizedCutCopper.class; //704
+        list[WAXED_OXIDIZED_DOUBLE_CUT_COPPER_SLAB] = BlockDoubleSlabOxidizedCutCopper.class; //705
         list[RAW_IRON_BLOCK] = BlockRawIron.class; //706
         list[RAW_COPPER_BLOCK] = BlockRawCopper.class; //707
         list[RAW_GOLD_BLOCK] = BlockRawGold.class; //708
