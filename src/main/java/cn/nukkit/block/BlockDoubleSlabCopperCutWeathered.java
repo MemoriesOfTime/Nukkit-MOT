@@ -4,13 +4,13 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockDoubleSlabWeatheredCutCopper extends BlockDoubleSlabCutCopper {
+public class BlockDoubleSlabCopperCutWeathered extends BlockDoubleSlabCopperCut {
 
-    public BlockDoubleSlabWeatheredCutCopper() {
+    public BlockDoubleSlabCopperCutWeathered() {
         this(0);
     }
 
-    public BlockDoubleSlabWeatheredCutCopper(int meta) {
+    public BlockDoubleSlabCopperCutWeathered(int meta) {
         super(meta);
     }
 

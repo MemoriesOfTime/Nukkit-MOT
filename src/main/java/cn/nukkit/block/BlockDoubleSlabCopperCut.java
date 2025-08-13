@@ -11,13 +11,13 @@ import cn.nukkit.utils.BlockColor;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-public class BlockDoubleSlabCutCopper extends BlockDoubleSlab implements CopperBehavior {
+public class BlockDoubleSlabCopperCut extends BlockDoubleSlab implements CopperBehavior {
 
-    public BlockDoubleSlabCutCopper() {
+    public BlockDoubleSlabCopperCut() {
         this(0);
     }
 
-    public BlockDoubleSlabCutCopper(int meta) {
+    public BlockDoubleSlabCopperCut(int meta) {
         super(meta);
     }
 

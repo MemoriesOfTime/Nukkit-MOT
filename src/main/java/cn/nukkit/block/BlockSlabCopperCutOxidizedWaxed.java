@@ -2,12 +2,12 @@ package cn.nukkit.block;
 
 import cn.nukkit.utils.BlockColor;
 
-public class BlockSlabOxidizedCutCopperWaxed extends BlockSlabCutCopper {
-    public BlockSlabOxidizedCutCopperWaxed() {
+public class BlockSlabCopperCutOxidizedWaxed extends BlockSlabCopperCut {
+    public BlockSlabCopperCutOxidizedWaxed() {
         this(0);
     }
 
-    public BlockSlabOxidizedCutCopperWaxed(int meta) {
+    public BlockSlabCopperCutOxidizedWaxed(int meta) {
         super(meta, WAXED_OXIDIZED_DOUBLE_CUT_COPPER_SLAB);
     }
 

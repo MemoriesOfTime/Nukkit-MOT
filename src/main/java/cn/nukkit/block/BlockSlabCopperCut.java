@@ -10,17 +10,17 @@ import cn.nukkit.utils.BlockColor;
 
 import java.util.concurrent.ThreadLocalRandom;
 
-public class BlockSlabCutCopper extends BlockSlab implements CopperBehavior {
+public class BlockSlabCopperCut extends BlockSlab implements CopperBehavior {
 
-    public BlockSlabCutCopper() {
+    public BlockSlabCopperCut() {
         this(0);
     }
 
-    public BlockSlabCutCopper(int meta) {
+    public BlockSlabCopperCut(int meta) {
         super(meta, DOUBLE_CUT_COPPER_SLAB);
     }
     
-    public BlockSlabCutCopper(int meta, int doubleSlab) {
+    public BlockSlabCopperCut(int meta, int doubleSlab) {
         super(meta, doubleSlab);
     }
 

@@ -4,30 +4,35 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockDoubleSlabExposedCutCopper extends BlockDoubleSlabCutCopper {
+public class BlockDoubleSlabCopperCutOxidizedWaxed extends BlockDoubleSlabCopperCut {
 
-    public BlockDoubleSlabExposedCutCopper() {
+    public BlockDoubleSlabCopperCutOxidizedWaxed() {
         this(0);
     }
 
-    public BlockDoubleSlabExposedCutCopper(int meta) {
+    public BlockDoubleSlabCopperCutOxidizedWaxed(int meta) {
         super(meta);
     }
 
     @Override
     public int getId() {
-        return EXPOSED_DOUBLE_CUT_COPPER_SLAB;
+        return WAXED_OXIDIZED_DOUBLE_CUT_COPPER_SLAB;
+    }
+    
+    @Override
+    public int onUpdate(int type) {
+        return 0;
     }
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(EXPOSED_CUT_COPPER_SLAB));
+        return new ItemBlock(Block.get(WAXED_OXIDIZED_CUT_COPPER_SLAB));
     }
 
     @Override
     public Item[] getDrops(Item item) {
         return new Item[]{
-                new ItemBlock(Block.get(EXPOSED_CUT_COPPER_SLAB), 0, 2)
+                new ItemBlock(Block.get(WAXED_OXIDIZED_CUT_COPPER_SLAB), 0, 2)
         };
     }
 
@@ -38,21 +43,21 @@ public class BlockDoubleSlabExposedCutCopper extends BlockDoubleSlabCutCopper {
 
     @Override
     public int getCopperAge() {
-        return 1;
+        return 3;
     }
 
     @Override
     public int getWaxedBlockId() {
-        return WAXED_EXPOSED_DOUBLE_CUT_COPPER_SLAB;
+        return WAXED_OXIDIZED_DOUBLE_CUT_COPPER_SLAB;
     }
 
     @Override
     public int getIncrementAgeBlockId() {
-        return WEATHERED_DOUBLE_CUT_COPPER_SLAB;
+        throw new UnsupportedOperationException();
     }
 
     @Override
     public int getDecrementAgeBlockId() {
-        return DOUBLE_CUT_COPPER_SLAB;
+        return WEATHERED_DOUBLE_CUT_COPPER_SLAB;
     }
 }
