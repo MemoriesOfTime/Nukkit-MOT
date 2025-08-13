@@ -47,6 +47,7 @@ public final class CameraPreset implements NamedDefinition {
     private Float maxYawLimit;
     @Nullable
     private CameraAudioListener listener;
+    @Builder.Default
     private OptionalBoolean playEffect = OptionalBoolean.empty();
     /**
      * @since v729
@@ -55,6 +56,7 @@ public final class CameraPreset implements NamedDefinition {
     /**
      * @since v729
      */
+    @Builder.Default
     private OptionalBoolean snapToTarget = OptionalBoolean.empty();
     /**
      * @since v729
@@ -71,11 +73,14 @@ public final class CameraPreset implements NamedDefinition {
     /**
      * @since v748
      */
+    @Builder.Default
     private OptionalBoolean continueTargeting = OptionalBoolean.empty();
     /**
      * @since v748
      * @deprecated v818
      */
+    @Builder.Default
+    @SuppressWarnings("dep-ann")
     private OptionalBoolean alignTargetAndCameraForward = OptionalBoolean.empty();
     /**
      * @since v766

@@ -36,6 +36,7 @@ public class ResourcePacksInfoPacket extends DataPacket {
      */
     @Getter
     @Setter
+    @SuppressWarnings("dep-ann")
     private List<CDNEntry> CDNEntries = new ObjectArrayList<>();
     /**
      * @since v766

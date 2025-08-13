@@ -11,6 +11,7 @@ public class CameraAimAssistPresetDefinition {
     /**
      * @deprecated since v776
      */
+    @SuppressWarnings("dep-ann")
     public String categories;
     public final List<String> exclusionList = new ObjectArrayList<>();
     public final List<String> liquidTargetingList = new ObjectArrayList<>();

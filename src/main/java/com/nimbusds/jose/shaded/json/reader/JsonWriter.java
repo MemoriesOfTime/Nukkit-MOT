@@ -317,6 +317,7 @@ public class JsonWriter {
 	 * @param writer writer Object
 	 * @deprecated use registerWriterInterfaceFirst
 	 */
+	@Deprecated
 	public void addInterfaceWriterFirst(Class<?> interFace, JsonWriterI<?> writer) {
 		registerWriterInterfaceFirst(interFace, writer);
 	}
@@ -327,6 +328,7 @@ public class JsonWriter {
 	 * @param writer writer Object
 	 * @deprecated use registerWriterInterfaceLast
 	 */
+	@Deprecated
 	public void addInterfaceWriterLast(Class<?> interFace, JsonWriterI<?> writer) {
 		registerWriterInterfaceLast(interFace, writer);
 	}

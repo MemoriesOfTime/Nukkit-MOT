@@ -14,6 +14,7 @@ public class LecternUpdatePacket extends DataPacket {
     /**
      * @deprecated since v662 1.20.70
      */
+    @SuppressWarnings("dep-ann")
     public boolean dropBook;
 
     @Override
