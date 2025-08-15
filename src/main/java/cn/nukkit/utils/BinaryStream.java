@@ -335,7 +335,7 @@ public class BinaryStream {
                     this.putByteArray(skin.getCapeData().data);
                 }
                 this.putString("geometry.humanoid.custom");
-                this.putString(Skin.STEVE_GEOMETRY);
+                this.putString(Skin.STEVE_GEOMETRY_OLD);
             } else {
                 this.putByteArray(skin.getSkinData().data);
                 if (protocol >= ProtocolInfo.v1_2_13) {

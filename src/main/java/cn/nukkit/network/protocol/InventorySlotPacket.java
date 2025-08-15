@@ -31,6 +31,7 @@ public class InventorySlotPacket extends DataPacket {
      * @since v729
      * @deprecated since v748. Use storageItem ItemData size instead.
      */
+    @SuppressWarnings("dep-ann")
     public int dynamicContainerSize;
     /**
      * @since v748

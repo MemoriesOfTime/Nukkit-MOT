@@ -32,6 +32,7 @@ public class PlayerAuthInputPacket extends DataPacket {
     /**
      * @deprecated since v748
      */
+    @SuppressWarnings("dep-ann")
     private Vector3f vrGazeDirection;
     private long tick;
     private Vector3f delta;

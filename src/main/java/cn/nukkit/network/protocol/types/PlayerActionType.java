@@ -28,6 +28,7 @@ public enum PlayerActionType {
     /**
      * @deprecated since v729
      */
+    @SuppressWarnings("dep-ann")
     START_SPIN_ATTACK,
     STOP_SPIN_ATTACK,
     INTERACT_WITH_BLOCK,

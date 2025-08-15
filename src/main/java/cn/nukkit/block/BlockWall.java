@@ -537,8 +537,8 @@ public class BlockWall extends BlockTransparentMeta implements BlockPropertiesHe
         BRICK(RED_BLOCK_COLOR),
         STONE_BRICK,
         MOSSY_STONE_BRICK,
-        END_BRICK(SAND_BLOCK_COLOR),
         NETHER_BRICK(NETHERRACK_BLOCK_COLOR),
+        END_BRICK(SAND_BLOCK_COLOR),
         PRISMARINE(CYAN_BLOCK_COLOR),
         RED_SANDSTONE(ORANGE_BLOCK_COLOR),
         RED_NETHER_BRICK(NETHERRACK_BLOCK_COLOR);

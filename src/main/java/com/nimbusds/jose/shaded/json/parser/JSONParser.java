@@ -182,6 +182,7 @@ public class JSONParser {
 	/**
 	 * @deprecated prefer usage of new JSONParser(JSONParser.MODE_*)
 	 */
+	@Deprecated
 	public JSONParser() {
 		this.mode = DEFAULT_PERMISSIVE_MODE;
 	}
