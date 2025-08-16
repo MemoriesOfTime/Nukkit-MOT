@@ -20,6 +20,11 @@ public class BlockDoubleSlabCopperCutWeathered extends BlockDoubleSlabCopperCut 
     }
 
     @Override
+    public BlockColor getColor() {
+        return BlockColor.WARPED_STEM_BLOCK_COLOR;
+    }
+
+    @Override
     public Item toItem() {
         return new ItemBlock(Block.get(WEATHERED_CUT_COPPER_SLAB));
     }

@@ -20,6 +20,11 @@ public class BlockDoubleSlabCopperCutExposed extends BlockDoubleSlabCopperCut {
     }
 
     @Override
+    public BlockColor getColor() {
+        return BlockColor.LIGHT_GRAY_TERRACOTA_BLOCK_COLOR;
+    }
+
+    @Override
     public Item toItem() {
         return new ItemBlock(Block.get(EXPOSED_CUT_COPPER_SLAB));
     }

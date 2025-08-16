@@ -25,6 +25,11 @@ public class BlockDoubleSlabCopperCutOxidized extends BlockDoubleSlabCopperCut {
     }
 
     @Override
+    public BlockColor getColor() {
+        return BlockColor.WARPED_NYLIUM_BLOCK_COLOR;
+    }
+
+    @Override
     public Item toItem() {
         return new ItemBlock(Block.get(OXIDIZED_CUT_COPPER_SLAB));
     }
