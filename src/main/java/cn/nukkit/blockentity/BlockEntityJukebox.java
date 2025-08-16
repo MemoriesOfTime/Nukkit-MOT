@@ -39,7 +39,8 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
 
     public void setRecordItem(Item recordItem) {
         Objects.requireNonNull(recordItem, "Record item cannot be null");
-        this.recordItem = recordItem;
+        this.recordItem = recordItem.clone();
+        this.setDirty();
     }
 
     public Item getRecordItem() {
@@ -91,6 +92,7 @@ public class BlockEntityJukebox extends BlockEntitySpawnable {
             stop();
             this.level.dropItem(this.up(), this.recordItem);
             this.recordItem = Item.get(0);
+            this.setDirty();
         }
     }
 

@@ -25,4 +25,9 @@ public class ItemRecordOtherside extends ItemRecord {
     public boolean isSupportedOn(int protocolId) {
         return protocolId >= ProtocolInfo.v1_18_10_26;
     }
+
+    @Override
+    public String getDiscName() {
+        return "Lena Raine - otherside";
+    }
 }

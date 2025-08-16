@@ -22,6 +22,11 @@ public class ItemRecordRelic extends ItemRecord {
     }
 
     @Override
+    public String getDiscName() {
+        return "Aaron Cherof - Relic";
+    }
+
+    @Override
     public boolean isSupportedOn(int protocolId) {
         return protocolId >= ProtocolInfo.v1_20_0_23;
     }

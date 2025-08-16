@@ -25,6 +25,11 @@ public class ItemRecordPigstep extends ItemRecord {
     }
 
     @Override
+    public String getDiscName() {
+        return "Lena Raine - Pigstep";
+    }
+
+    @Override
     public boolean isSupportedOn(int protocolId) {
         return protocolId >= ProtocolInfo.v1_16_0;
     }

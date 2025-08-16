@@ -14,6 +14,11 @@ public class ItemRecordCreatorMusicBox extends ItemRecord implements StringItem 
     }
 
     @Override
+    public String getDiscName() {
+        return "Lena Raine - Creator";
+    }
+
+    @Override
     public String getNamespaceId() {
         return "minecraft:music_disc_creator_music_box";
     }

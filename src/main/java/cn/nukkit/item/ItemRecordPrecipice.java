@@ -14,6 +14,11 @@ public class ItemRecordPrecipice extends ItemRecord implements StringItem {
     }
 
     @Override
+    public String getDiscName() {
+        return "Aaron Cherof - Precipice";
+    }
+
+    @Override
     public String getNamespaceId() {
         return "minecraft:music_disc_precipice";
     }

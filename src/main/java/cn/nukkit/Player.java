@@ -5299,8 +5299,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.dataPacket(pk);
     }
 
+    @Deprecated
     public void sendPopup(String message, String subtitle) {
         this.sendPopup(message);
+    }
+
+    public void sendPopupJukebox(String message) {
+        TextPacket pk = new TextPacket();
+        pk.type = TextPacket.TYPE_JUKEBOX_POPUP;
+        pk.message = message;
+        this.dataPacket(pk);
+    }
+
+    public void sendPopupJukebox(String message, String[] parameters, boolean isLocalized) {
+        TextPacket pk = new TextPacket();
+        pk.type = TextPacket.TYPE_JUKEBOX_POPUP;
+        pk.message = message;
+        pk.parameters = parameters;
+        pk.isLocalized = isLocalized;
+        this.dataPacket(pk);
     }
 
     public void sendTip(String message) {
