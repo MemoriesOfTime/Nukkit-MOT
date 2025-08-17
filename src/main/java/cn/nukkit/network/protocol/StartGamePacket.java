@@ -120,6 +120,7 @@ public class StartGamePacket extends DataPacket {
      */
     @SuppressWarnings("dep-ann")
     public AuthoritativeMovementMode authoritativeMovementMode;
+    public int rewindHistorySize;
     public boolean isServerAuthoritativeBlockBreaking;
     public long currentTick;
     public int enchantmentSeed;
@@ -352,10 +353,10 @@ public class StartGamePacket extends DataPacket {
                     if (protocol < ProtocolInfo.v1_21_90) {
                         this.putVarInt(this.authoritativeMovementMode.ordinal());
                     }
-                    this.putVarInt(0); // RewindHistorySize
-                    this.putBoolean(this.isServerAuthoritativeBlockBreaking); // isServerAuthoritativeBlockBreaking
+                    this.putVarInt(this.rewindHistorySize);
+                    this.putBoolean(this.isServerAuthoritativeBlockBreaking);
                 } else {
-                    this.putVarInt(this.authoritativeMovementMode.ordinal()); // 2 - rewind
+                    this.putVarInt(this.authoritativeMovementMode.ordinal());
                 }
             } else {
                 this.putBoolean(this.authoritativeMovementMode != AuthoritativeMovementMode.CLIENT);
