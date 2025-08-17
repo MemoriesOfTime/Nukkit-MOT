@@ -7,9 +7,6 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-/**
- * @author LT_Name
- */
 @Setter
 @Getter
 @EqualsAndHashCode(doNotUseGetters = true, callSuper = false)
@@ -76,7 +73,6 @@ public class CorrectPlayerMovePredictionPacket extends DataPacket {
 
     @Override
     public void decode() {
-
     }
 
     @Override
