@@ -585,6 +585,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.EMOTE_PACKET, EmotePacket.class)
                 .registerPacket(ProtocolInfo.ANIMATE_ENTITY_PACKET, AnimateEntityPacket.class)
                 .registerPacket(ProtocolInfo.PLAYER_FOG_PACKET, PlayerFogPacket.class)
+                .registerPacket(ProtocolInfo.CORRECT_PLAYER_MOVE_PREDICTION_PACKET, CorrectPlayerMovePredictionPacket.class)
                 .registerPacket(ProtocolInfo.ITEM_COMPONENT_PACKET, ItemComponentPacket.class)
                 .registerPacket(ProtocolInfo.FILTER_TEXT_PACKET, FilterTextPacket.class)
                 .registerPacket(ProtocolInfo.SYNC_ENTITY_PROPERTY_PACKET, SyncEntityPropertyPacket.class)
