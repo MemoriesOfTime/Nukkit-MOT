@@ -2,7 +2,9 @@ package cn.nukkit.block;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 
@@ -65,8 +67,15 @@ public class BlockDeepslate extends BlockSolidMeta {
         if (!canHarvest(item)) {
             return Item.EMPTY_ARRAY;
         }
-
-        return new Item[]{this.toItem()};
+        if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
+                return new Item[]{this.toItem()};
+        }
+        return new Item[]{new ItemBlock(Block.get(BlockID.COBBLED_DEEPSLATE))};
+    }
+    
+    @Override
+    public Item toItem() {
+        return new ItemBlock(Block.get(this.getId(), 0), 0);
     }
 
     @Override

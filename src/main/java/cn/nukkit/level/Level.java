@@ -160,6 +160,18 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.CORAL_FAN_DEAD] = true;
         randomTickBlocks[Block.BLOCK_KELP] = true;
         randomTickBlocks[Block.SWEET_BERRY_BUSH] = true;
+        
+        randomTickBlocks[Block.CAVE_VINES] = true;
+        randomTickBlocks[Block.CAVE_VINES_BODY_WITH_BERRIES] = true;
+        randomTickBlocks[Block.CAVE_VINES_HEAD_WITH_BERRIES] = true;
+        randomTickBlocks[Block.AZALEA_LEAVES] = true;
+        randomTickBlocks[Block.AZALEA_LEAVES_FLOWERED] = true;
+        randomTickBlocks[Block.AZALEA] = true;
+        randomTickBlocks[Block.FLOWERING_AZALEA] = true;
+        randomTickBlocks[Block.MANGROVE_PROPAGULE] = true;
+        randomTickBlocks[Block.MANGROVE_LEAVES] = true;
+        randomTickBlocks[Block.CHERRY_SAPLING] = true;
+        randomTickBlocks[Block.CHERRY_LEAVES] = true;
 
         xrayableBlocks[Block.GOLD_ORE] = true;
         xrayableBlocks[Block.IRON_ORE] = true;
@@ -181,11 +193,11 @@ public class Level implements ChunkManager, Metadatable {
         xrayableBlocks[Block.DEEPSLATE_EMERALD_ORE] = true;
         xrayableBlocks[Block.DEEPSLATE_COPPER_ORE] = true;
 
-        randomTickBlocks[BlockID.CAVE_VINES] = true;
-        randomTickBlocks[BlockID.CAVE_VINES_BODY_WITH_BERRIES] = true;
-        randomTickBlocks[BlockID.CAVE_VINES_HEAD_WITH_BERRIES] = true;
-        randomTickBlocks[BlockID.AZALEA_LEAVES] = true;
-        randomTickBlocks[BlockID.AZALEA_LEAVES_FLOWERED] = true;
+        randomTickBlocks[Block.CAVE_VINES] = true;
+        randomTickBlocks[Block.CAVE_VINES_BODY_WITH_BERRIES] = true;
+        randomTickBlocks[Block.CAVE_VINES_HEAD_WITH_BERRIES] = true;
+        randomTickBlocks[Block.AZALEA_LEAVES] = true;
+        randomTickBlocks[Block.AZALEA_LEAVES_FLOWERED] = true;
         randomTickBlocks[Block.COPPER_BLOCK] = true;
         randomTickBlocks[Block.CUT_COPPER] = true;
         randomTickBlocks[Block.EXPOSED_COPPER] = true;
@@ -206,6 +218,11 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.EXPOSED_DOUBLE_CUT_COPPER_SLAB] = true;
         randomTickBlocks[Block.WEATHERED_DOUBLE_CUT_COPPER_SLAB] = true;
         randomTickBlocks[Block.OXIDIZED_DOUBLE_CUT_COPPER_SLAB] = true;
+        randomTickBlocks[Block.COPPER_BULB] = true;
+        randomTickBlocks[Block.EXPOSED_COPPER_BULB] = true;
+        randomTickBlocks[Block.WEATHERED_COPPER_BULB] = true;
+        randomTickBlocks[Block.OXIDIZED_COPPER_BULB] = true;
+        
         randomTickBlocks[BlockID.BUDDING_AMETHYST] = true;
     }
 
