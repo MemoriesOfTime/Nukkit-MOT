@@ -68,7 +68,7 @@ public class BlockDeepslate extends BlockSolidMeta {
             return Item.EMPTY_ARRAY;
         }
         if (item.hasEnchantment(Enchantment.ID_SILK_TOUCH)) {
-                return new Item[]{this.toItem()};
+            return new Item[]{this.toItem()};
         }
         return new Item[]{new ItemBlock(Block.get(BlockID.COBBLED_DEEPSLATE))};
     }
