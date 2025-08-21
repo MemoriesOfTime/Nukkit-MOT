@@ -40,11 +40,15 @@ public class JarPluginResourcePack extends AbstractResourcePack {
     protected static ZipEntry findManifestInJar(ZipFile jar) {
         ZipEntry manifest = jar.getEntry(RESOURCE_PACK_PATH + "manifest.json");
         if (manifest == null) {
+            manifest = jar.getEntry(RESOURCE_PACK_PATH + "pack_manifest.json");
+        }
+        if (manifest == null) {
             manifest = jar.stream()
-                    .filter(e -> e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") && !e.isDirectory())
+                    .filter(e -> (e.getName().toLowerCase(Locale.ROOT).endsWith("manifest.json") || e.getName().toLowerCase(Locale.ROOT).endsWith("pack_manifest"))
+                            && !e.isDirectory())
                     .filter(e -> {
                         File fe = new File(e.getName());
-                        if (!fe.getName().equalsIgnoreCase("manifest.json")) {
+                        if (!fe.getName().equalsIgnoreCase("manifest.json") && !fe.getName().equalsIgnoreCase("pack_manifest.json")) {
                             return false;
                         }
                         return fe.getParent() == null || fe.getParentFile().getParent() == null;
