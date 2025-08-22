@@ -67,7 +67,10 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
     private static File loadDirectoryPack(File directory) {
         File manifestFile = new File(directory, "manifest.json");
         if (!manifestFile.exists() || !manifestFile.isFile()) {
-            return null;
+            manifestFile = new File(directory, "pack_manifest.json");
+            if (!manifestFile.exists() || !manifestFile.isFile()) {
+                return null;
+            }
         }
 
         File tempFile;
