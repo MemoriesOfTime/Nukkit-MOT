@@ -1848,7 +1848,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        boolean portal = false;
+        boolean netherPortal = false;
         boolean endPortal = false;
         boolean scaffolding = false;
         boolean powderSnow = false;
@@ -1856,7 +1856,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         for (Block block : this.getCollisionBlocks()) {
             switch (block.getId()) {
                 case Block.NETHER_PORTAL:
-                    portal = true;
+                    netherPortal = true;
                     continue;
                 case Block.END_PORTAL:
                     endPortal = true;
@@ -1886,17 +1886,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.inEndPortalTicks = 0;
         }
 
-        if (server.endEnabled && inEndPortalTicks == (this.gamemode == CREATIVE ? 1 : 80)) {
+        if (server.endEnabled && inEndPortalTicks == 1) {
             EntityPortalEnterEvent ev = new EntityPortalEnterEvent(this, EntityPortalEnterEvent.PortalType.END);
-
-            if (this.portalPos == null) {
-                ev.setCancelled();
-            }
-
             this.getServer().getPluginManager().callEvent(ev);
 
             if (!ev.isCancelled()) {
-                if (this.getLevel().isEnd) {
+                int oldDimension = this.getLevel().getDimension();
+                if (oldDimension == Level.DIMENSION_THE_END) {
                     if (server.vanillaPortals && this.getSpawn().getLevel().getDimension() == Level.DIMENSION_OVERWORLD) {
                         this.teleport(this.getSpawn(), TeleportCause.END_PORTAL);
                     } else {
@@ -1905,13 +1901,34 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 } else {
                     Level end = this.getServer().getLevelByName("the_end");
                     if (end != null) {
-                        this.teleport(end.getSafeSpawn(), TeleportCause.END_PORTAL);
+                        Position pos = new Position(100.5, 49, 0.5, end);
+
+                        FullChunk chunk = end.getChunk(pos.getChunkX(), pos.getChunkZ(), false);
+                        if (chunk == null || !(chunk.isGenerated() || chunk.isPopulated())) {
+                            end.populateChunk(pos.getChunkX(), pos.getChunkZ(), true);
+
+                            int x = pos.getFloorX();
+                            int y = pos.getFloorY();
+                            int z = pos.getFloorZ();
+                            for (int xx = x - 2; xx < x + 3; xx++) {
+                                for (int zz = z - 2; zz < z + 3; zz++)  {
+                                    end.setBlockAt(xx, y - 1, zz, BlockID.OBSIDIAN);
+                                    for (int yy = y; yy < y + 4; yy++) {
+                                        end.setBlockAt(xx, yy, zz, BlockID.AIR);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (this.teleport(pos, TeleportCause.END_PORTAL) && oldDimension == Level.DIMENSION_OVERWORLD) {
+                            this.awardAchievement("theEnd");
+                        }
                     }
                 }
             }
         }
 
-        if (portal) {
+        if (netherPortal) {
             this.inPortalTicks++;
         } else {
             this.inPortalTicks = 0;
@@ -1939,6 +1956,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
             if (this.inPortalTicks == this.server.portalTicks || (this.server.vanillaPortals && this.inPortalTicks == 25 && this.gamemode == CREATIVE)) {
                 EntityPortalEnterEvent ev = new EntityPortalEnterEvent(this, EntityPortalEnterEvent.PortalType.NETHER);
+
+                if (this.portalPos == null) {
+                    ev.setCancelled();
+                }
+
                 this.getServer().getPluginManager().callEvent(ev);
 
                 if (ev.isCancelled()) {
