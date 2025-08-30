@@ -19,7 +19,6 @@ import cn.nukkit.utils.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -34,8 +33,6 @@ public class EntityHuman extends EntityHumanType {
 
     public static final int DATA_PLAYER_FLAGS = 26;
     public static final int DATA_PLAYER_BUTTON_TEXT = 40;
-
-    protected static PlayerInventory EMPTY_INVENTORY = new PlayerInventory(null);
 
     protected UUID uuid;
     protected byte[] rawUUID;
@@ -331,7 +328,7 @@ public class EntityHuman extends EntityHumanType {
                 this.server.updatePlayerListData(this.uuid, this.getId(), this.getName(), this.skin, new Player[]{player});
             }
 
-            PlayerInventory playerInventory = Objects.requireNonNullElse(this.inventory, EMPTY_INVENTORY);
+            PlayerInventory playerInventory = this.getInventory();
 
             AddPlayerPacket pk = new AddPlayerPacket();
             pk.uuid = this.uuid;
@@ -346,14 +343,16 @@ public class EntityHuman extends EntityHumanType {
             pk.speedZ = (float) this.motionZ;
             pk.yaw = (float) this.yaw;
             pk.pitch = (float) this.pitch;
-            pk.item = playerInventory.getItemInHand();
+            pk.item = playerInventory != null ? playerInventory.getItemInHand() : Item.AIR_ITEM;
             pk.metadata = this.dataProperties.clone();
             player.dataPacket(pk);
 
-            if (this.isPlayer) {
-                playerInventory.sendArmorContents(player);
-            } else {
-                playerInventory.sendArmorContentsIfNotAr(player);
+            if (playerInventory != null) {
+                if (this.isPlayer) {
+                    playerInventory.sendArmorContents(player);
+                } else {
+                    playerInventory.sendArmorContentsIfNotAr(player);
+                }
             }
             this.offhandInventory.sendContents(player);
 
