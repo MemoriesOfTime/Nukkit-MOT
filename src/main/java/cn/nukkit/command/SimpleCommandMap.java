@@ -154,7 +154,9 @@ public class SimpleCommandMap implements CommandMap {
         for (String name : commands) {
             Command command = this.getCommand(name);
             if (command != null) {
-                command.unregister(this);
+                if (command.unregister(this)) {
+                    removeCommand(command);
+                }
             }
         }
     }
@@ -162,8 +164,15 @@ public class SimpleCommandMap implements CommandMap {
     @Override
     public void unregister(Command... commands) {
         for (Command command : commands) {
-            command.unregister(this);
+            if (command.unregister(this)) {
+                removeCommand(command);
+            }
         }
+    }
+
+    private boolean removeCommand(Command command) {
+        return knownCommands.entrySet()
+                .removeIf(entry -> entry.getValue().equals(command));
     }
 
     @Override
