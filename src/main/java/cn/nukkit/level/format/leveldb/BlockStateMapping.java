@@ -16,6 +16,7 @@ import net.jodah.expiringmap.ExpiringMap;
 import org.cloudburstmc.blockstateupdater.*;
 import org.cloudburstmc.blockstateupdater.util.tagupdater.CompoundTagUpdaterContext;
 import org.cloudburstmc.nbt.NbtMap;
+import org.cloudburstmc.nbt.NbtMapBuilder;
 import org.cloudburstmc.protocol.common.util.Preconditions;
 
 import java.util.ArrayList;
@@ -291,11 +292,29 @@ public class BlockStateMapping {
         return null;
     }
 
+    private static final List<String> STATE_EXPECTED_KEYS = List.of("name", "states", "version");
+
     public NbtMap updateVanillaState(NbtMap state) {
         NbtMap cached = BLOCK_UPDATE_CACHE.get(state);
         if (cached == null) {
             int version = state.getInt("version"); // TODO: validate this when updating next time
+
+            // 1.18.10/1.18.30/1.19.0/1.19.20 三个版本号一致，避免漏掉更新，这里版本号-1处理
+            if (version == 17959425) {
+                version -= 1;
+            }
+
             cached = CONTEXT.update(state, LATEST_UPDATER_VERSION == version ? version - 1 : version);
+
+            if (!new ArrayList<>(cached.keySet()).equals(STATE_EXPECTED_KEYS)) {
+                //重新排序顺序 name states version
+                NbtMapBuilder newNbtMap = NbtMap.builder()
+                        .putString("name", cached.getString("name"))
+                        .putCompound("states", cached.getCompound("states"))
+                        .putInt("version", cached.getInt("version"));
+                cached = newNbtMap.build();
+            }
+
             BLOCK_UPDATE_CACHE.put(state, cached);
         }
         return cached;

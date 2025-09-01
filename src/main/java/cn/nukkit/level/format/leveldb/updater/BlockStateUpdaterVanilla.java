@@ -18,17 +18,21 @@ public class BlockStateUpdaterVanilla implements BlockStateUpdater {
 
     @Override
     public void registerUpdaters(CompoundTagUpdaterContext ctx) {
-        ctx.addUpdater(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION, true)
-                .match("name", "minecraft:water")
-                .visit("states")
-                .tryAdd("liquid_depth", (int) 0);
-
-        ctx.addUpdater(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION, true)
-                .match("name", "minecraft:polished_blackstone_double_slab")
-                .visit("states")
-                .tryAdd("top_slot_bit", (byte) 0);
+        this.addProperty(ctx, "minecraft:water", "liquid_depth", (int) 0);
+        this.addProperty(ctx, "minecraft:polished_blackstone_double_slab", "top_slot_bit", (byte) 0);
+        this.addProperty(ctx, "minecraft:bedrock", "infiniburn_bit", (byte) 0);
+        this.addProperty(ctx,"minecraft:snow_layer", "covered_bit", (byte) 0);
+        this.addProperty(ctx, "minecraft:leaves", "update_bit", (byte) 0);
+        this.addProperty(ctx, "minecraft:leaves2", "update_bit", (byte) 0);
 
         this.replaceState(ctx, "minecraft:wood", "pillar_axis", "y");
+    }
+
+    private void addProperty(CompoundTagUpdaterContext ctx, String identifier, String propertyName, Object value) {
+        ctx.addUpdater(STATE_MAYOR_VERSION, STATE_MINOR_VERSION, STATE_PATCH_VERSION, true)
+                .match("name", identifier)
+                .visit("states")
+                .tryAdd(propertyName, value);
     }
 
     private void replaceState(CompoundTagUpdaterContext ctx, String identifier, String propertyName, Object value) {
