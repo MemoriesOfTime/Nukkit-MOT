@@ -77,6 +77,7 @@ public class CorrectPlayerMovePredictionPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         if (this.protocol >= ProtocolInfo.v1_20_80) {
             this.putByte((byte) this.predictionType.ordinal());
         }
