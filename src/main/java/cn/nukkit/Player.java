@@ -1423,10 +1423,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param packet packet to send
      * @return packet successfully sent
      */
+    @Deprecated
     public boolean directDataPacket(DataPacket packet) {
         return this.dataPacket(packet);
     }
 
+    @Deprecated
     public int directDataPacket(DataPacket packet, boolean needACK) {
         return this.directDataPacket(packet) ? 0 : -1;
     }
@@ -1434,6 +1436,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void forceDataPacket(DataPacket packet, Runnable callback) {
         packet.protocol = this.protocol;
         packet.gameVersion = this.gameVersion;
+
+        if (server.callDataPkSendEv) {
+            new DataPacketSendEvent(this, packet).call();
+            // forceDataPacket不允许取消事件
+        }
+
         this.networkSession.sendImmediatePacket(packet, (callback == null ? () -> {
         } : callback));
     }
