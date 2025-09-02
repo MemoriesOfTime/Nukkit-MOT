@@ -244,10 +244,14 @@ public class BiomeDefinitionListPacket extends DataPacket {
         }
         this.putLFloat(definition.getTemperature());
         this.putLFloat(definition.getDownfall());
-        this.putLFloat(definition.getRedSporeDensity());
-        this.putLFloat(definition.getBlueSporeDensity());
-        this.putLFloat(definition.getAshDensity());
-        this.putLFloat(definition.getWhiteAshDensity());
+        if (protocol >= GameVersion.V1_21_110.getProtocol()) {
+            this.putLFloat(definition.getFoliageSnow());
+        } else {
+            this.putLFloat(definition.getRedSporeDensity());
+            this.putLFloat(definition.getBlueSporeDensity());
+            this.putLFloat(definition.getAshDensity());
+            this.putLFloat(definition.getWhiteAshDensity());
+        }
         this.putLFloat(definition.getDepth());
         this.putLFloat(definition.getScale());
         this.putLInt(definition.getMapWaterColor().getRGB());
@@ -283,10 +287,12 @@ public class BiomeDefinitionListPacket extends DataPacket {
     protected void putClimate(BiomeClimateData climate) {
         this.putLFloat(climate.getTemperature());
         this.putLFloat(climate.getDownfall());
-        this.putLFloat(climate.getRedSporeDensity());
-        this.putLFloat(climate.getBlueSporeDensity());
-        this.putLFloat(climate.getAshDensity());
-        this.putLFloat(climate.getWhiteAshDensity());
+        if (protocol <= GameVersion.V1_21_100.getProtocol()) {
+            this.putLFloat(climate.getRedSporeDensity());
+            this.putLFloat(climate.getBlueSporeDensity());
+            this.putLFloat(climate.getAshDensity());
+            this.putLFloat(climate.getWhiteAshDensity());
+        }
         this.putLFloat(climate.getSnowAccumulationMin());
         this.putLFloat(climate.getSnowAccumulationMax());
     }
