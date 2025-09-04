@@ -46,7 +46,8 @@ public class ResourcePackManager {
     public ResourcePack[] getResourceStack(GameVersion gameVersion) {
         return this.resourcePacks.stream()
                 .filter(pack -> pack.getPackProtocol() <= gameVersion.getProtocol())
-                .filter(pack -> pack instanceof NetEaseResourcePack && gameVersion.isNetEase())
+                .filter(pack -> (gameVersion.isNetEase() && pack instanceof NetEaseResourcePack)
+                        || (!gameVersion.isNetEase() && !(pack instanceof NetEaseResourcePack)))
                 .toArray(ResourcePack[]::new);
     }
 
