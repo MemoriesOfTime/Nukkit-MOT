@@ -1,13 +1,12 @@
 package cn.nukkit.resourcepacks;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
-
 import com.google.common.collect.Sets;
 import com.google.gson.JsonArray;
-
 import lombok.extern.log4j.Log4j2;
 
 import java.io.File;
@@ -36,8 +35,19 @@ public class ResourcePackManager {
         this(new ZippedResourcePackLoader(path));
     }
 
+    /**
+     * @deprecated use {@link #getResourceStack(GameVersion)}
+     */
+    @Deprecated
     public ResourcePack[] getResourceStack() {
         return this.resourcePacks.toArray(ResourcePack.EMPTY_ARRAY);
+    }
+
+    public ResourcePack[] getResourceStack(GameVersion gameVersion) {
+        return this.resourcePacks.stream()
+                .filter(pack -> pack.getPackProtocol() <= gameVersion.getProtocol())
+                .filter(pack -> pack instanceof NetEaseResourcePack && gameVersion.isNetEase())
+                .toArray(ResourcePack[]::new);
     }
 
     public ResourcePack getPackById(UUID id) {

@@ -2905,11 +2905,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.forceMovement = this.teleportPosition = this.getPosition();
 
         ResourcePacksInfoPacket infoPacket = new ResourcePacksInfoPacket();
-
-        infoPacket.resourcePackEntries = Arrays.stream(this.server.getResourcePackManager().getResourceStack())
-                .filter(pack -> pack.getPackProtocol() <= protocol)
-                .toArray(ResourcePack[]::new);
-
+        infoPacket.resourcePackEntries = this.server.getResourcePackManager().getResourceStack(this.gameVersion);
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
     }
@@ -3352,7 +3348,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case ResourcePackClientResponsePacket.STATUS_HAVE_ALL_PACKS:
                         ResourcePackStackPacket stackPacket = new ResourcePackStackPacket();
                         stackPacket.mustAccept = this.server.getForceResources() && !this.server.forceResourcesAllowOwnPacks;
-                        stackPacket.resourcePackStack = this.server.getResourcePackManager().getResourceStack();
+                        stackPacket.resourcePackStack = this.server.getResourcePackManager().getResourceStack(this.gameVersion);
                         stackPacket.experiments.addAll(this.getExperiments());
                         this.dataPacket(stackPacket);
                         break;

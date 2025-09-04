@@ -761,7 +761,7 @@ public class Server {
         this.craftingManager = new CraftingManager();
         this.resourcePackManager = new ResourcePackManager(
                 new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")),
-                new NetEaseResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")),
+                new NetEaseResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs_netease")),
                 new JarPluginResourcePackLoader(new File(this.pluginPath))
         );
 
