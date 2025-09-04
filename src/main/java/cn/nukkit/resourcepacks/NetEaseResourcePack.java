@@ -10,7 +10,8 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.security.MessageDigest;
-import java.util.Locale;
+import java.util.*;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -23,6 +24,9 @@ public class NetEaseResourcePack extends AbstractResourcePack {
     private String cdnUrl = "";
     private String packType = "unknown"; // "resources" 或 "data"
     private File manifestFile;
+    private List<String> packTypes = new ArrayList<>(); // 支持多种包类型
+    private List<File> manifestFiles = new ArrayList<>();
+    private List<JsonObject> manifests = new ArrayList<>();
 
     public NetEaseResourcePack(File file) {
         if (!file.exists()) {
@@ -58,20 +62,29 @@ public class NetEaseResourcePack extends AbstractResourcePack {
         for (File subDir : subDirs) {
             File manifestFile = findManifestInDirectory(subDir);
             if (manifestFile != null) {
-                this.manifestFile = manifestFile;
-                this.manifest = new JsonParser()
+                JsonObject manifestObj = new JsonParser()
                         .parse(new InputStreamReader(new FileInputStream(manifestFile), StandardCharsets.UTF_8))
                         .getAsJsonObject();
                 
+                this.manifestFiles.add(manifestFile);
+                this.manifests.add(manifestObj);
+                
                 // 确定包类型
-                determinePackType();
-                break;
+                String packType = determinePackTypeFromManifest(manifestObj);
+                if (packType != null && !this.packTypes.contains(packType)) {
+                    this.packTypes.add(packType);
+                    log.info("Detected NetEase pack type: " + packType + " in " + subDir.getName());
+                }
             }
         }
 
-        if (this.manifest == null) {
+        if (this.manifests.isEmpty()) {
             throw new IllegalArgumentException("No valid manifest found in NetEase resource pack subdirectories");
         }
+        
+        // 设置主manifest为第一个找到的
+        this.manifest = this.manifests.get(0);
+        this.manifestFile = this.manifestFiles.get(0);
 
         // 检查加密密钥文件
         File keyFile = new File(directory, directory.getName() + ".key");
@@ -82,8 +95,8 @@ public class NetEaseResourcePack extends AbstractResourcePack {
 
     private void loadFromZip(File zipFile) throws IOException {
         try (ZipFile zip = new ZipFile(zipFile)) {
-            // 网易格式：忽略根目录的manifest，查找子文件夹中的manifest
-            ZipEntry manifestEntry = zip.stream()
+            // 网易格式：忽略根目录的manifest，查找子文件夹中的所有manifest
+            List<ZipEntry> manifestEntries = zip.stream()
                     .filter(entry -> !entry.isDirectory())
                     .filter(entry -> {
                         String name = entry.getName().toLowerCase(Locale.ROOT);
@@ -94,15 +107,29 @@ public class NetEaseResourcePack extends AbstractResourcePack {
                         String[] pathParts = entry.getName().split("/");
                         return pathParts.length >= 2; // 至少在一级子目录中
                     })
-                    .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("No valid manifest found in NetEase resource pack subdirectories"));
+                    .collect(Collectors.toList());
 
-            this.manifest = new JsonParser()
-                    .parse(new InputStreamReader(zip.getInputStream(manifestEntry), StandardCharsets.UTF_8))
-                    .getAsJsonObject();
+            if (manifestEntries.isEmpty()) {
+                throw new IllegalArgumentException("No valid manifest found in NetEase resource pack subdirectories");
+            }
+
+            for (ZipEntry manifestEntry : manifestEntries) {
+                JsonObject manifestObj = new JsonParser()
+                        .parse(new InputStreamReader(zip.getInputStream(manifestEntry), StandardCharsets.UTF_8))
+                        .getAsJsonObject();
+                
+                this.manifests.add(manifestObj);
+                
+                // 确定包类型
+                String packType = determinePackTypeFromManifest(manifestObj);
+                if (packType != null && !this.packTypes.contains(packType)) {
+                    this.packTypes.add(packType);
+                    log.info("Detected NetEase pack type: " + packType + " in " + manifestEntry.getName());
+                }
+            }
             
-            // 确定包类型
-            determinePackType();
+            // 设置主manifest为第一个找到的
+            this.manifest = this.manifests.get(0);
 
             // 检查加密密钥文件
             File parentFolder = zipFile.getParentFile();
@@ -129,17 +156,17 @@ public class NetEaseResourcePack extends AbstractResourcePack {
         return null;
     }
 
-    private void determinePackType() {
+    private String determinePackTypeFromManifest(JsonObject manifest) {
         if (manifest != null && manifest.has("modules")) {
             JsonArray modules = manifest.getAsJsonArray("modules");
             if (modules.size() > 0) {
                 JsonObject firstModule = modules.get(0).getAsJsonObject();
                 if (firstModule.has("type")) {
-                    this.packType = firstModule.get("type").getAsString();
-                    log.info("Detected NetEase pack type: " + this.packType);
+                    return firstModule.get("type").getAsString();
                 }
             }
         }
+        return null;
     }
 
     protected boolean verifyNetEaseManifest() {
@@ -180,14 +207,6 @@ public class NetEaseResourcePack extends AbstractResourcePack {
 
     public String getPackType() {
         return packType;
-    }
-
-    public boolean isResourcePack() {
-        return "resources".equals(packType);
-    }
-
-    public boolean isBehaviorPack() {
-        return "data".equals(packType);
     }
 
     @Override
@@ -267,5 +286,39 @@ public class NetEaseResourcePack extends AbstractResourcePack {
 
     public void setCdnUrl(String cdnUrl) {
         this.cdnUrl = cdnUrl;
+    }
+
+    public List<String> getPackTypes() {
+        return new ArrayList<>(packTypes);
+    }
+    
+    public String getPrimaryPackType() {
+        return packTypes.isEmpty() ? "unknown" : packTypes.get(0);
+    }
+
+    public boolean isResourcePack() {
+        return packTypes.contains("resources");
+    }
+
+    public boolean isBehaviorPack() {
+        return packTypes.contains("data");
+    }
+    
+    public boolean isCompositeResourcePack() {
+        return packTypes.size() > 1;
+    }
+    
+    public List<JsonObject> getAllManifests() {
+        return new ArrayList<>(manifests);
+    }
+    
+    public JsonObject getManifestByType(String type) {
+        for (int i = 0; i < manifests.size(); i++) {
+            String manifestType = determinePackTypeFromManifest(manifests.get(i));
+            if (type.equals(manifestType)) {
+                return manifests.get(i);
+            }
+        }
+        return null;
     }
 }
