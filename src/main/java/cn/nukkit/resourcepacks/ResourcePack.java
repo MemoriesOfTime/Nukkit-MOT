@@ -34,6 +34,13 @@ public interface ResourcePack {
         return false;
     }
 
+    default boolean isBehaviorPack() {
+        return false;
+    }
+
+    /**
+     * @since v712 1.21.20
+     */
     default boolean isAddonPack() {
         return false;
     }

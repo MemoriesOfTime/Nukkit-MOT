@@ -2906,6 +2906,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         ResourcePacksInfoPacket infoPacket = new ResourcePacksInfoPacket();
         infoPacket.resourcePackEntries = this.server.getResourcePackManager().getResourceStack(this.gameVersion);
+        infoPacket.behaviourPackEntries = this.server.getResourcePackManager().getBehaviorStack(this.gameVersion);
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
     }
@@ -3349,6 +3350,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         ResourcePackStackPacket stackPacket = new ResourcePackStackPacket();
                         stackPacket.mustAccept = this.server.getForceResources() && !this.server.forceResourcesAllowOwnPacks;
                         stackPacket.resourcePackStack = this.server.getResourcePackManager().getResourceStack(this.gameVersion);
+                        stackPacket.behaviourPackStack = this.server.getResourcePackManager().getBehaviorStack(this.gameVersion);
                         stackPacket.experiments.addAll(this.getExperiments());
                         this.dataPacket(stackPacket);
                         break;
