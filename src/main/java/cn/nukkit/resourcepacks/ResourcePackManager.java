@@ -84,7 +84,7 @@ public class ResourcePackManager {
                         String versionKey = fieldName.substring(1).replace("_", ".");
                         PROTOCOL_MAP.put(versionKey, (Integer) field.get(null));
                     } catch (IllegalAccessException e) {
-                        System.err.println("Error accessing field " + fieldName + ": " + e.getMessage());
+                        log.error("Error accessing field {}: {}", fieldName, e.getMessage());
                     }
                 }
             }
