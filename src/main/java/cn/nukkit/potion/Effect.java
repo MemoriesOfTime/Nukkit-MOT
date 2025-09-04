@@ -2,10 +2,7 @@ package cn.nukkit.potion;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.entity.Attribute;
-import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.EntityBoss;
-import cn.nukkit.entity.EntityLiving;
+import cn.nukkit.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityEffectRemoveEvent;
@@ -299,7 +296,11 @@ public class Effect implements Cloneable {
                     player.setMovementSpeed(player.getMovementSpeed() / (1 + 0.2f * (oldEffect.amplifier + 1)), false);
                 }
                 player.setMovementSpeed(player.getMovementSpeed() * (1 + 0.2f * (this.amplifier + 1)));*/
-                entityLiving.setMovementSpeed(Player.DEFAULT_SPEED * (1 + 0.2f * (this.amplifier + 1)));
+                // 原来的代码
+                // entityLiving.setMovementSpeed(Player.DEFAULT_SPEED * (1 + 0.2f * (this.amplifier + 1)));
+                
+                // 改为使用修改器
+                entityLiving.addMovementSpeedModifier("speed_effect", 0.2f * (this.amplifier + 1), AttributeModifier.Operation.MULTIPLY_BASE);
             }
 
             if (this.id == Effect.SLOWNESS) {
@@ -307,7 +308,10 @@ public class Effect implements Cloneable {
                     player.setMovementSpeed(player.getMovementSpeed() / (1 - 0.15f * (oldEffect.amplifier + 1)), false);
                 }
                 player.setMovementSpeed(player.getMovementSpeed() * (1 - 0.15f * (this.amplifier + 1)));*/
-                entityLiving.setMovementSpeed(Player.DEFAULT_SPEED * (1 - 0.15f * (this.amplifier + 1)));
+//                entityLiving.setMovementSpeed(Player.DEFAULT_SPEED * (1 - 0.15f * (this.amplifier + 1)));
+
+                // 改为使用修改器
+                entityLiving.addMovementSpeedModifier("slowness_effect", -0.15f * (this.amplifier + 1), AttributeModifier.Operation.MULTIPLY_BASE);
             }
         }
 
@@ -339,19 +343,23 @@ public class Effect implements Cloneable {
                 player.dataPacket(pk);
 
                 if (this.id == Effect.SPEED) {
-                    player.setMovementSpeed(player.isSprinting() ? Player.DEFAULT_SPEED * 1.3f : Player.DEFAULT_SPEED, false);
-                    player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
+//                    player.setMovementSpeed(player.isSprinting() ? Player.DEFAULT_SPEED * 1.3f : Player.DEFAULT_SPEED, false);
+//                    player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
+                    entityLiving.removeMovementSpeedModifier("speed_effect");
                 }
                 if (this.id == Effect.SLOWNESS) {
-                    player.setMovementSpeed(player.isSprinting() ? Player.DEFAULT_SPEED * 1.3f : Player.DEFAULT_SPEED, false);
-                    player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
+//                    player.setMovementSpeed(player.isSprinting() ? Player.DEFAULT_SPEED * 1.3f : Player.DEFAULT_SPEED, false);
+//                    player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
+                    entityLiving.removeMovementSpeedModifier("slowness_effect");
                 }
             } else {
                 if (this.id == Effect.SPEED) {
-                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 + 0.2f * (this.amplifier + 1)));
+//                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 + 0.2f * (this.amplifier + 1)));
+                    entityLiving.removeMovementSpeedModifier("speed_effect");
                 }
                 if (this.id == Effect.SLOWNESS) {
-                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 - 0.15f * (this.amplifier + 1)));
+//                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 - 0.15f * (this.amplifier + 1)));
+                    entityLiving.removeMovementSpeedModifier("slowness_effect");
                 }
             }
             if (this.id == Effect.HEALTH_BOOST) {

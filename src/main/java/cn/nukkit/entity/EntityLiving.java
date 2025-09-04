@@ -30,8 +30,10 @@ import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.TextPacket;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.utils.BlockIterator;
+import lombok.Getter;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author MagicDroidX
@@ -63,6 +65,105 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     private boolean blocking = false;
 
     protected final boolean isDrowned = this instanceof EntityDrowned;
+
+    /**
+     * -- GETTER --
+     * 获取所有属性
+     *
+     * @return 属性映射
+     */
+    // 属性系统
+    @Getter
+    private final Map<Integer, Attribute> attributes = new ConcurrentHashMap<>();
+
+    // 初始化属性系统
+    protected void initAttributes() {
+        // 初始化移动速度属性
+        Attribute movementSpeedAttr = Attribute.getAttribute(Attribute.MOVEMENT_SPEED);
+        movementSpeedAttr.setValue(this.movementSpeed);
+        this.attributes.put(Attribute.MOVEMENT_SPEED, movementSpeedAttr);
+    }
+
+    /**
+     * 获取属性
+     *
+     * @param attributeId 属性ID
+     * @return 属性实例
+     */
+    public Attribute getAttribute(int attributeId) {
+        // 确保属性系统已初始化
+        if (!this.getAttributes().containsKey(Attribute.MOVEMENT_SPEED)) {
+            initAttributes();
+        }
+        return this.attributes.get(attributeId);
+    }
+
+    /**
+     * 设置属性
+     *
+     * @param attribute 属性实例
+     */
+    public void setAttribute(Attribute attribute) {
+        // 确保属性系统已初始化
+        if (!this.getAttributes().containsKey(Attribute.MOVEMENT_SPEED)) {
+            initAttributes();
+        }
+        this.attributes.put(attribute.getId(), attribute);
+
+        // 如果是移动速度属性，更新movementSpeed字段
+        if (attribute.getId() == Attribute.MOVEMENT_SPEED) {
+            this.movementSpeed = attribute.getValue();
+        }
+    }
+
+    /**
+     * 添加移动速度修改器
+     *
+     * @param source    来源标识
+     * @param amount    修改数值
+     * @param operation 操作类型
+     * @return 修改器UUID
+     */
+    public UUID addMovementSpeedModifier(String source, double amount, AttributeModifier.Operation operation) {
+        Attribute movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+        if (movementAttr == null) {
+            initAttributes();
+            movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+        }
+
+        AttributeModifier modifier = new AttributeModifier(source, amount, operation);
+        movementAttr.addModifier(modifier);
+        // 更新movementSpeed字段
+        this.movementSpeed = movementAttr.getValue();
+
+        return modifier.getUuid();
+    }
+
+    /**
+     * 移除移动速度修改器
+     *
+     * @param uuid 修改器UUID
+     */
+    public void removeMovementSpeedModifier(UUID uuid) {
+        Attribute movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+        if (movementAttr != null) {
+            movementAttr.removeModifier(uuid);
+            this.movementSpeed = movementAttr.getValue();
+        }
+    }
+
+    /**
+     * 根据来源移除移动速度修改器
+     *
+     * @param source 来源标识
+     */
+    public void removeMovementSpeedModifier(String source) {
+        Attribute movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+        if (movementAttr != null) {
+            movementAttr.removeModifier(source);
+            this.movementSpeed = movementAttr.getValue();
+        }
+    }
 
     @Override
     protected void initEntity() {
@@ -424,7 +525,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
      * Get an array of blocks within the entity's line of sight.
      *
      * @param maxDistance 视线的最大距离，超过 120 会被限制为 120 / The maximum distance of the line of sight. If it exceeds 120, it will be limited to 120.
-     * @param maxLength  返回的方块列表的最大长度，若不为 0，列表长度超过该值时会移除最早添加的方块 / The maximum length of the returned block list. If it is not 0, the earliest added block will be removed when the list length exceeds this value.
+     * @param maxLength   返回的方块列表的最大长度，若不为 0，列表长度超过该值时会移除最早添加的方块 / The maximum length of the returned block list. If it is not 0, the earliest added block will be removed when the list length exceeds this value.
      * @param transparent 透明方块 ID 的集合，若方块 ID 在该集合中，会停止遍历 / A set of transparent block IDs. If a block ID is in this set, the traversal will stop.
      * @return 视线范围内的方块数组 / An array of blocks within the line of sight.
      */
@@ -489,19 +590,42 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                     return block;
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         return null;
     }
 
+    /**
+     * 设置移动速度（兼容原有API，作为默认来源）
+     *
+     * @param speed 移动速度
+     */
     public void setMovementSpeed(float speed) {
-        this.movementSpeed = speed;
+        // 确保属性系统已初始化
+        if (!this.attributes.containsKey(Attribute.MOVEMENT_SPEED)) {
+            initAttributes();
+        }
+
+        Attribute movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+        if (movementAttr != null) {
+            // 使用默认来源设置值
+            movementAttr.setDefaultSourceValue(speed);
+            this.movementSpeed = movementAttr.getValue();
+        } else {
+            // 回退到原有方式
+            this.movementSpeed = speed;
+        }
     }
 
     public float getMovementSpeed() {
+        Attribute movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+        if (movementAttr != null) {
+            return movementAttr.getValue();
+        }
         return this.movementSpeed;
     }
-    
+
     public int getAirTicks() {
         return this.airTicks;
     }

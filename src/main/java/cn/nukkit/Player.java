@@ -3500,7 +3500,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (playerToggleSprintEvent.isCancelled()) {
                         this.needSendData = true;
                     } else {
-                        this.setSprinting(true, false);
+                        this.setSprinting(true, true);
                     }
                     this.setUsingItem(false);
                 }
@@ -3514,7 +3514,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (playerToggleSneakEvent.isCancelled()) {
                         this.needSendData = true;
                     } else {
-                        this.setSprinting(false, false);
+                        this.setSprinting(false, true);
                     }
                 }
 
@@ -6133,10 +6133,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setAttribute(Attribute attribute) {
-        UpdateAttributesPacket pk = new UpdateAttributesPacket();
-        pk.entries = new Attribute[]{attribute};
-        pk.entityId = this.id;
-        this.dataPacket(pk);
+        // 调用父类方法更新本地属性系统
+        super.setAttribute(attribute);
+        
+        // 如果玩家已生成且属性需要同步，发送更新包
+        if (this.spawned && attribute.isSyncable()) {
+            UpdateAttributesPacket pk = new UpdateAttributesPacket();
+            pk.entries = new Attribute[]{attribute};
+            pk.entityId = this.id;
+            this.dataPacket(pk);
+        }
     }
 
     @Override
@@ -6145,15 +6151,38 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void setMovementSpeed(float speed, boolean send) {
-        super.setMovementSpeed(speed);
-        if (this.spawned && send) {
-            this.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speed).setDefaultValue(speed));
+        
+        Attribute movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+        if (movementAttr != null) {
+            // 使用默认来源设置值（兼容原有API）
+            movementAttr.setDefaultSourceValue(speed);
+            this.movementSpeed = movementAttr.getValue();
+            
+            // 如果需要发送且玩家已生成，发送属性更新
+            if (send && this.spawned) {
+                setAttribute(movementAttr);
+            }
+        } else {
+            // 回退到原有方式
+            super.setMovementSpeed(speed);
+            if (this.spawned && send) {
+                this.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speed).setDefaultValue(speed));
+            }
         }
     }
 
     public void sendMovementSpeed(float speed) {
         Attribute attribute = Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speed);
         this.setAttribute(attribute);
+    }
+
+    @Override
+    public float getMovementSpeed() {
+        Attribute movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+        if (movementAttr != null) {
+            return movementAttr.getValue();
+        }
+        return this.movementSpeed;
     }
 
     public Entity getKiller() {
@@ -7093,9 +7122,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param send send updated speed to client
      */
     public void setSprinting(boolean value, boolean send) {
-        if (isSprinting() != value) {
-            super.setSprinting(value);
-            this.setMovementSpeed(value ? getMovementSpeed() * 1.3f : getMovementSpeed() / 1.3f, send);
+        if (value) {
+            // 疾跑：1.3倍速度，所以 amount = 0.3
+            addMovementSpeedModifier("sprint", 0.3f, AttributeModifier.Operation.MULTIPLY_BASE);
+        }else{
+            if (this.getAttribute(Attribute.MOVEMENT_SPEED).hasModifier("sprint")) {
+                removeMovementSpeedModifier("sprint");
+            }
+        }
+
+        if (send && this.spawned) {
+            // 直接使用玩家当前的属性，而不是克隆的属性
+            this.setAttribute(this.getAttribute(Attribute.MOVEMENT_SPEED));
         }
     }
 
@@ -7108,7 +7146,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void setSneaking(boolean value) {
         if (isSneaking() != value) {
             super.setSneaking(value);
-            this.setMovementSpeed(value ? getMovementSpeed() * 0.3f : getMovementSpeed() / 0.3f, false);
+//
+//            if (this.getAttribute(Attribute.MOVEMENT_SPEED).hasModifier("sneak")) {
+//                removeMovementSpeedModifier("sneak");
+//            }
+//
+//            if (value) {
+//                // 潜行：0.3倍速度，所以 amount = -0.3
+//                addMovementSpeedModifier("sneak", -0.3f, AttributeModifier.Operation.MULTIPLY_BASE);
+//            }
+//
+//            if (this.spawned) {
+//                this.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED));
+//            }
         }
     }
 
@@ -7116,7 +7166,18 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void setCrawling(boolean value) {
         if (isCrawling() != value) {
             super.setCrawling(value);
-            this.setMovementSpeed(value ? getMovementSpeed() * 0.3f : getMovementSpeed() / 0.3f, false);
+            
+//            if (this.getAttribute(Attribute.MOVEMENT_SPEED).hasModifier("crawl")) {
+//                removeMovementSpeedModifier("crawl");
+//            }
+//
+//            if (value) {
+//                // 爬行：0.3倍速度，所以 amount = -0.3
+//                addMovementSpeedModifier("crawl", -0.3f, AttributeModifier.Operation.MULTIPLY_BASE);
+//            }
+//            if (this.spawned) {
+//                this.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED));
+//            }
         }
     }
 
@@ -7816,5 +7877,55 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public boolean isLockMovementInput() {
         return this.lockMovementInput;
+    }
+
+    /**
+     * 添加移动速度修改器（玩家专用，自动发包）
+     */
+    @Override
+    public UUID addMovementSpeedModifier(String source, double amount, AttributeModifier.Operation operation) {
+        UUID uuid = super.addMovementSpeedModifier(source, amount, operation);
+        
+        // 自动发送属性更新包
+        if (this.spawned) {
+            Attribute movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+            if (movementAttr != null) {
+                setAttribute(movementAttr);
+            }
+        }
+        
+        return uuid;
+    }
+
+    /**
+     * 移除移动速度修改器（玩家专用，自动发包）
+     */
+    @Override
+    public void removeMovementSpeedModifier(UUID uuid) {
+        super.removeMovementSpeedModifier(uuid);
+        
+        // 自动发送属性更新包
+        if (this.spawned) {
+            Attribute movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+            if (movementAttr != null) {
+                setAttribute(movementAttr);
+            }
+        }
+    }
+
+    /**
+     * 根据来源移除移动速度修改器（玩家专用，自动发包）
+     */
+    @Override
+    public void removeMovementSpeedModifier(String source) {
+        super.removeMovementSpeedModifier(source);
+        
+        // 自动发送属性更新包
+        if (this.spawned) {
+            Attribute movementAttr = getAttribute(Attribute.MOVEMENT_SPEED);
+            if (movementAttr != null) {
+                setAttribute(movementAttr);
+            }
+        }
     }
 }
