@@ -1944,6 +1944,14 @@ public class Level implements ChunkManager, Metadatable {
         return this.getBlock(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ(), layer, load);
     }
 
+    public Block getBlock(Vector3 pos, BlockLayer layer) {
+        return this.getBlock(pos, layer.ordinal());
+    }
+
+    public Block getBlock(Vector3 pos, BlockLayer layer, boolean load) {
+        return this.getBlock(pos, layer.ordinal(), load);
+    }
+
     public Block getBlock(int x, int y, int z) {
         return getBlock(x, y, z, 0);
     }
