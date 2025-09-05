@@ -1,13 +1,13 @@
 package cn.nukkit.resourcepacks;
 
+import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
-
 import com.google.common.collect.Sets;
 import com.google.gson.JsonArray;
-
+import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.File;
@@ -19,8 +19,11 @@ import static cn.nukkit.network.protocol.ProtocolInfo.SUPPORTED_PROTOCOLS;
 @Log4j2
 public class ResourcePackManager {
 
-    private final Map<UUID, ResourcePack> resourcePacksById = new HashMap<>();
+    private final Map<UUID, ResourcePack> allPacksById = new Object2ObjectLinkedOpenHashMap<>();
+    private final Map<UUID, ResourcePack> resourcePacksById = new Object2ObjectLinkedOpenHashMap<>();
     private final Set<ResourcePack> resourcePacks = new HashSet<>();
+    private final Map<UUID, ResourcePack> behaviorPacksById = new Object2ObjectLinkedOpenHashMap<>();
+    private final Set<ResourcePack> behaviorPacks = new HashSet<>();
     private final Set<ResourcePackLoader> loaders;
 
     public ResourcePackManager(ResourcePackLoader... loaders) {
@@ -36,12 +39,32 @@ public class ResourcePackManager {
         this(new ZippedResourcePackLoader(path));
     }
 
+    /**
+     * @deprecated use {@link #getResourceStack(GameVersion)}
+     */
+    @Deprecated
     public ResourcePack[] getResourceStack() {
         return this.resourcePacks.toArray(ResourcePack.EMPTY_ARRAY);
     }
 
+    public ResourcePack[] getResourceStack(GameVersion gameVersion) {
+        return this.resourcePacks.stream()
+                .filter(pack -> pack.getPackProtocol() <= gameVersion.getProtocol())
+                .filter(pack -> (gameVersion.isNetEase() && pack.isNetEase())
+                        || (!gameVersion.isNetEase() && !pack.isNetEase()))
+                .toArray(ResourcePack[]::new);
+    }
+
+    public ResourcePack[] getBehaviorStack(GameVersion gameVersion) {
+        return this.behaviorPacks.stream()
+                .filter(pack -> pack.getPackProtocol() <= gameVersion.getProtocol())
+                .filter(pack -> (gameVersion.isNetEase() && pack.isNetEase())
+                        || (!gameVersion.isNetEase() && !pack.isNetEase()))
+                .toArray(ResourcePack[]::new);
+    }
+
     public ResourcePack getPackById(UUID id) {
-        return this.resourcePacksById.get(id);
+        return this.allPacksById.get(id);
     }
 
     public void registerPackLoader(ResourcePackLoader loader) {
@@ -53,8 +76,17 @@ public class ResourcePackManager {
         this.resourcePacks.clear();
         this.loaders.forEach(loader -> {
             var loadedPacks = loader.loadPacks();
-            loadedPacks.forEach(pack -> resourcePacksById.put(pack.getPackId(), pack));
-            this.resourcePacks.addAll(loadedPacks);
+            loadedPacks.forEach(pack -> {
+                this.allPacksById.put(pack.getPackId(), pack);
+                if (pack.isBehaviourPack()) {
+                    this.behaviorPacksById.put(pack.getPackId(), pack);
+                    this.behaviorPacks.add(pack);
+                } else {
+                    this.resourcePacksById.put(pack.getPackId(), pack);
+                    this.resourcePacks.add(pack);
+                }
+            });
+
         });
 
         log.info(Server.getInstance().getLanguage().translateString("nukkit.resources.success", String.valueOf(this.resourcePacks.size())));
@@ -73,7 +105,7 @@ public class ResourcePackManager {
                         String versionKey = fieldName.substring(1).replace("_", ".");
                         PROTOCOL_MAP.put(versionKey, (Integer) field.get(null));
                     } catch (IllegalAccessException e) {
-                        System.err.println("Error accessing field " + fieldName + ": " + e.getMessage());
+                        log.error("Error accessing field {}: {}", fieldName, e.getMessage());
                     }
                 }
             }

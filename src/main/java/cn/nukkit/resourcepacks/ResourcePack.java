@@ -34,6 +34,13 @@ public interface ResourcePack {
         return false;
     }
 
+    default boolean isBehaviourPack() {
+        return false;
+    }
+
+    /**
+     * @since v712 1.21.20
+     */
     default boolean isAddonPack() {
         return false;
     }
@@ -43,5 +50,13 @@ public interface ResourcePack {
      */
     default String getCDNUrl() {
         return "";
+    }
+
+    default void setNetEase(boolean isNetEase) {
+
+    }
+
+    default boolean isNetEase() {
+        return false;
     }
 }

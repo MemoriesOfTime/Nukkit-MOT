@@ -2905,11 +2905,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.forceMovement = this.teleportPosition = this.getPosition();
 
         ResourcePacksInfoPacket infoPacket = new ResourcePacksInfoPacket();
-
-        infoPacket.resourcePackEntries = Arrays.stream(this.server.getResourcePackManager().getResourceStack())
-                .filter(pack -> pack.getPackProtocol() <= protocol)
-                .toArray(ResourcePack[]::new);
-
+        infoPacket.resourcePackEntries = this.server.getResourcePackManager().getResourceStack(this.gameVersion);
+        infoPacket.behaviourPackEntries = this.server.getResourcePackManager().getBehaviorStack(this.gameVersion);
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
     }
@@ -3346,13 +3343,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             dataInfoPacket.chunkCount = MathHelper.ceil(resourcePack.getPackSize() / (float) RESOURCE_PACK_CHUNK_SIZE);
                             dataInfoPacket.compressedPackSize = resourcePack.getPackSize();
                             dataInfoPacket.sha256 = resourcePack.getSha256();
+                            if (resourcePack.isBehaviourPack()) {
+                                dataInfoPacket.type = ResourcePackDataInfoPacket.TYPE_BEHAVIOR;
+                            } else {
+                                dataInfoPacket.type = protocol < ProtocolInfo.v1_13_0 ? 1 : ResourcePackDataInfoPacket.TYPE_RESOURCE;
+                            }
                             this.dataPacket(dataInfoPacket);
                         }
                         break;
                     case ResourcePackClientResponsePacket.STATUS_HAVE_ALL_PACKS:
                         ResourcePackStackPacket stackPacket = new ResourcePackStackPacket();
                         stackPacket.mustAccept = this.server.getForceResources() && !this.server.forceResourcesAllowOwnPacks;
-                        stackPacket.resourcePackStack = this.server.getResourcePackManager().getResourceStack();
+                        stackPacket.resourcePackStack = this.server.getResourcePackManager().getResourceStack(this.gameVersion);
+                        stackPacket.behaviourPackStack = this.server.getResourcePackManager().getBehaviorStack(this.gameVersion);
                         stackPacket.experiments.addAll(this.getExperiments());
                         this.dataPacket(stackPacket);
                         break;

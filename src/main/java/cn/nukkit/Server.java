@@ -72,6 +72,8 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
 import cn.nukkit.resourcepacks.ResourcePackManager;
 import cn.nukkit.resourcepacks.loader.JarPluginResourcePackLoader;
+import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
+import cn.nukkit.resourcepacks.loader.ZippedBehaviourPackLoader;
 import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
 import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.scheduler.Task;
@@ -758,10 +760,14 @@ public class Server {
         this.serverID = UUID.randomUUID();
 
         this.craftingManager = new CraftingManager();
-        this.resourcePackManager = new ResourcePackManager(
-                new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")),
-                new JarPluginResourcePackLoader(new File(this.pluginPath))
-        );
+        HashSet<ResourcePackLoader> packLoaders = new HashSet<>();
+        packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")));
+        packLoaders.add(new JarPluginResourcePackLoader(new File(this.pluginPath)));
+        if (this.netEaseMode) {
+            packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs_netease"), true));
+            packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs_netease"), true));
+        }
+        this.resourcePackManager = new ResourcePackManager(packLoaders);
 
         this.pluginManager = new PluginManager(this, this.commandMap);
         this.pluginManager.subscribeToPermission(Server.BROADCAST_CHANNEL_ADMINISTRATIVE, this.consoleSender);
