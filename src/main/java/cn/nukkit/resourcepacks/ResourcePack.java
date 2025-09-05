@@ -34,7 +34,7 @@ public interface ResourcePack {
         return false;
     }
 
-    default boolean isBehaviorPack() {
+    default boolean isBehaviourPack() {
         return false;
     }
 
@@ -50,5 +50,13 @@ public interface ResourcePack {
      */
     default String getCDNUrl() {
         return "";
+    }
+
+    default void setNetEase(boolean isNetEase) {
+
+    }
+
+    default boolean isNetEase() {
+        return false;
     }
 }
