@@ -2144,6 +2144,10 @@ public class Level implements ChunkManager, Metadatable {
         return this.setBlock(pos, 0, block);
     }
 
+    public boolean setBlock(Vector3 pos, BlockLayer layer, Block block) {
+        return this.setBlock(pos, layer.ordinal(), block);
+    }
+
     public boolean setBlock(Vector3 pos, int layer, Block block) {
         return this.setBlock(pos, layer, block, false);
     }
@@ -2156,8 +2160,16 @@ public class Level implements ChunkManager, Metadatable {
         return this.setBlock(pos, layer, block, direct, true);
     }
 
+    public boolean setBlock(Vector3 pos, BlockLayer layer, Block block, boolean direct) {
+        return this.setBlock(pos, layer.ordinal(), block, direct);
+    }
+
     public boolean setBlock(Vector3 pos, Block block, boolean direct, boolean update) {
         return this.setBlock(pos, 0, block, direct, update);
+    }
+
+    public boolean setBlock(Vector3 pos, BlockLayer layer, Block block, boolean direct, boolean update) {
+        return this.setBlock(pos, layer.ordinal(), block, direct, update);
     }
 
     public boolean setBlock(Vector3 pos, int layer, Block block, boolean direct, boolean update) {
@@ -2166,6 +2178,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public boolean setBlock(int x, int y, int z, Block block, boolean direct, boolean update) {
         return this.setBlock(x, y, z, 0, block, direct, update);
+    }
+
+    public boolean setBlock(int x, int y, int z, BlockLayer layer, Block block, boolean direct, boolean update) {
+        return this.setBlock(x, y, z, layer.ordinal(), block, direct, update);
     }
 
     public boolean setBlock(int x, int y, int z, int layer, Block block, boolean direct, boolean update) {
