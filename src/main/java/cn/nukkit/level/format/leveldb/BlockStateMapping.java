@@ -97,11 +97,7 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_20_80.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_0.INSTANCE);
 
-        // TODO 检查BlockStateUpdaterChunker是否可以移除
-        if (Boolean.parseBoolean(System.getProperty("leveldb-chunker"))) {
-            blockStateUpdaters.add(BlockStateUpdaterChunker.INSTANCE);
-            log.warn("Enabled chunker.app LevelDB updater. This may impact chunk loading performance!");
-        }
+        blockStateUpdaters.add(BlockStateUpdaterChunker.INSTANCE);
 
         blockStateUpdaters.add(BlockStateUpdater_1_21_10.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_20.INSTANCE);
@@ -295,7 +291,14 @@ public class BlockStateMapping {
         NbtMap cached = BLOCK_UPDATE_CACHE.get(state);
         if (cached == null) {
             int version = state.getInt("version"); // TODO: validate this when updating next time
+
+            // 1.18.10/1.18.30/1.19.0/1.19.20 三个版本号一致，避免漏掉更新，这里版本号-1处理
+            if (version == 17959425) {
+                version -= 1;
+            }
+
             cached = CONTEXT.update(state, LATEST_UPDATER_VERSION == version ? version - 1 : version);
+
             BLOCK_UPDATE_CACHE.put(state, cached);
         }
         return cached;
