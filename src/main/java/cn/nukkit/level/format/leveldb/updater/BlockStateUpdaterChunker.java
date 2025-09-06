@@ -16,8 +16,11 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
     @Override
     public void registerUpdaters(CompoundTagUpdaterContext ctx) {
         this.addProperty(ctx, "minecraft:anvil", "damage", "undamaged");
+        this.addProperty(ctx, "minecraft:leaves", "update_bit", (byte) 0);
+        this.addProperty(ctx, "minecraft:leaves2", "update_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:azalea_leaves", "update_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:azalea_leaves_flowered", "update_bit", (byte) 0);
+        this.addProperty(ctx, "minecraft:jungle_leaves", "update_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:bamboo_sapling", "age_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:big_dripleaf", "big_dripleaf_tilt", "none");
         this.addProperty(ctx, "minecraft:blackstone_double_slab", "top_slot_bit", (byte) 0);
@@ -37,7 +40,7 @@ public class BlockStateUpdaterChunker implements BlockStateUpdater {
         this.addProperty(ctx, "minecraft:dirt", "dirt_type", "normal");
         this.addProperty(ctx, "minecraft:double_cut_copper_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:double_wooden_slab", "wood_type", "oak");
-        this.addProperty(ctx, "minecraft:double_stone_block_slab", "top_slot_bit", (byte) 0);
+        this.addProperty(ctx, "minecraft:double_stone_slab4", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:double_stone_block_slab2", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:double_stone_block_slab3", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:double_stone_block_slab4", "top_slot_bit", (byte) 0);

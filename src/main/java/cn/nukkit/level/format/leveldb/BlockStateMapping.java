@@ -16,7 +16,6 @@ import net.jodah.expiringmap.ExpiringMap;
 import org.cloudburstmc.blockstateupdater.*;
 import org.cloudburstmc.blockstateupdater.util.tagupdater.CompoundTagUpdaterContext;
 import org.cloudburstmc.nbt.NbtMap;
-import org.cloudburstmc.nbt.NbtMapBuilder;
 import org.cloudburstmc.protocol.common.util.Preconditions;
 
 import java.util.ArrayList;
@@ -98,11 +97,7 @@ public class BlockStateMapping {
         blockStateUpdaters.add(BlockStateUpdater_1_20_80.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_0.INSTANCE);
 
-        // TODO 检查BlockStateUpdaterChunker是否可以移除
-        if (Boolean.parseBoolean(System.getProperty("leveldb-chunker"))) {
-            blockStateUpdaters.add(BlockStateUpdaterChunker.INSTANCE);
-            log.warn("Enabled chunker.app LevelDB updater. This may impact chunk loading performance!");
-        }
+        blockStateUpdaters.add(BlockStateUpdaterChunker.INSTANCE);
 
         blockStateUpdaters.add(BlockStateUpdater_1_21_10.INSTANCE);
         blockStateUpdaters.add(BlockStateUpdater_1_21_20.INSTANCE);
@@ -292,8 +287,6 @@ public class BlockStateMapping {
         return null;
     }
 
-    private static final List<String> STATE_EXPECTED_KEYS = List.of("name", "states", "version");
-
     public NbtMap updateVanillaState(NbtMap state) {
         NbtMap cached = BLOCK_UPDATE_CACHE.get(state);
         if (cached == null) {
@@ -305,15 +298,6 @@ public class BlockStateMapping {
             }
 
             cached = CONTEXT.update(state, LATEST_UPDATER_VERSION == version ? version - 1 : version);
-
-            if (!new ArrayList<>(cached.keySet()).equals(STATE_EXPECTED_KEYS)) {
-                //重新排序顺序 name states version
-                NbtMapBuilder newNbtMap = NbtMap.builder()
-                        .putString("name", cached.getString("name"))
-                        .putCompound("states", cached.getCompound("states"))
-                        .putInt("version", cached.getInt("version"));
-                cached = newNbtMap.build();
-            }
 
             BLOCK_UPDATE_CACHE.put(state, cached);
         }

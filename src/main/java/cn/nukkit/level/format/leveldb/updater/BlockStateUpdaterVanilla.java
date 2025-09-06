@@ -22,8 +22,6 @@ public class BlockStateUpdaterVanilla implements BlockStateUpdater {
         this.addProperty(ctx, "minecraft:polished_blackstone_double_slab", "top_slot_bit", (byte) 0);
         this.addProperty(ctx, "minecraft:bedrock", "infiniburn_bit", (byte) 0);
         this.addProperty(ctx,"minecraft:snow_layer", "covered_bit", (byte) 0);
-        this.addProperty(ctx, "minecraft:leaves", "update_bit", (byte) 0);
-        this.addProperty(ctx, "minecraft:leaves2", "update_bit", (byte) 0);
 
         this.replaceState(ctx, "minecraft:wood", "pillar_axis", "y");
     }
