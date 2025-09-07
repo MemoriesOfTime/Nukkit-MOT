@@ -480,6 +480,7 @@ public abstract class Entity extends Location implements Metadatable {
     public float fallDistance = 0;
     public int lastUpdate;
     public int inLavaTicks = 0;
+    public int inFireTicks = 0;
     public int fireTicks = 0;
     public int inPortalTicks = 0;
     public int freezingTicks = 0;//0 - 140
@@ -1875,8 +1876,8 @@ public abstract class Entity extends Location implements Metadatable {
                     this.fireTicks = 0;
                 }
             } else {
-                if (!this.hasEffect(Effect.FIRE_RESISTANCE) && ((this.fireTicks % 20) == 0 || tickDiff > 20)) {
-                    if (!isInsideOfLava()){
+                if (!this.hasEffect(Effect.FIRE_RESISTANCE) && ((this.fireTicks % 20) == 0 || tickDiff > 20) && this.level.getGameRules().getBoolean(GameRule.FIRE_DAMAGE)) {
+                    if (!isInsideOfLava() && !isInsideOfFire()){
                         this.attack(new EntityDamageEvent(this, DamageCause.FIRE_TICK, 1));
                     }
                 }

@@ -322,19 +322,33 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 this.resetFallDistance();
             }
 
-            if (this.isInsideOfLava()){
-                this.inLavaTicks ++;
-                if ((this.inLavaTicks % 10) == 0){
-                    if (!this.hasEffect(Effect.FIRE_RESISTANCE)) {
-                        Block lavaBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
-                        if (!(lavaBlock instanceof BlockLava)){
-                            lavaBlock = lavaBlock.getLevelBlockAtLayer(1);
+            if (this.level.getGameRules().getBoolean(GameRule.FIRE_DAMAGE)){
+                if (this.isInsideOfLava()){
+                    this.inLavaTicks ++;
+                    if ((this.inLavaTicks % 10) == 0){
+                        if (!this.hasEffect(Effect.FIRE_RESISTANCE)) {
+                            Block lavaBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+                            if (!(lavaBlock instanceof BlockLava)){
+                                lavaBlock = lavaBlock.getLevelBlockAtLayer(1);
+                            }
+                            this.attack(new EntityDamageByBlockEvent(lavaBlock, this, DamageCause.LAVA, 4));
                         }
-                        this.attack(new EntityDamageByBlockEvent(lavaBlock, this, DamageCause.LAVA, 4));
+                        this.inLavaTicks = 0;
                     }
-                    this.inLavaTicks = 0;
+                }
+
+                if (this.isInsideOfFire()){
+                    this.inFireTicks ++;
+                    if ((this.inFireTicks % 10) == 0) {
+                        if (!this.hasEffect(Effect.FIRE_RESISTANCE)) {
+                            Block fireBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+                            this.attack(new EntityDamageByBlockEvent(fireBlock, this, DamageCause.FIRE, 1));
+                        }
+                        this.inFireTicks = 0;
+                    }
                 }
             }
+
 
             if (inWater && !this.hasEffect(Effect.WATER_BREATHING)) {
                 if (this instanceof EntitySwimming || this.isDrowned || (this instanceof Player && (((Player) this).isCreative() || ((Player) this).isSpectator()))) {
