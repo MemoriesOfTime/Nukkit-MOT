@@ -58,11 +58,17 @@ public class BlockLava extends BlockLiquid {
                 // Making sure the entity is actually alive and not invulnerable.
                 && entity.isAlive()
                 && entity.noDamageTicks == 0) {
-            entity.setOnFire(ev.getDuration());
+            if (!entity.isOnFire()){
+                entity.setOnFire(ev.getDuration());
+            }
         }
 
-        if (!entity.hasEffect(Effect.FIRE_RESISTANCE)) {
-            entity.attack(new EntityDamageByBlockEvent(this, entity, DamageCause.LAVA, 4));
+        entity.inLavaTicks ++;
+        if ((entity.inLavaTicks % 10) == 0){
+            if (!entity.hasEffect(Effect.FIRE_RESISTANCE)) {
+                entity.attack(new EntityDamageByBlockEvent(this, entity, DamageCause.LAVA, 4));
+            }
+            entity.inLavaTicks = 0;
         }
 
         super.onEntityCollide(entity);

@@ -482,6 +482,7 @@ public abstract class Entity extends Location implements Metadatable {
     protected boolean noFallDamage;
     public float fallDistance = 0;
     public int lastUpdate;
+    public int inLavaTicks = 0;
     public int fireTicks = 0;
     public int inPortalTicks = 0;
     public int freezingTicks = 0;//0 - 140
