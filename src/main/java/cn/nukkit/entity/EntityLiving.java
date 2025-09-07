@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockCactus;
+import cn.nukkit.block.BlockLava;
 import cn.nukkit.block.BlockMagma;
 import cn.nukkit.entity.mob.EntityDrowned;
 import cn.nukkit.entity.mob.EntityWolf;
@@ -319,6 +320,20 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
             if (this.isOnLadder() || this.hasEffect(Effect.LEVITATION) || this.hasEffect(Effect.SLOW_FALLING)) {
                 this.resetFallDistance();
+            }
+
+            if (this.isInsideOfLava()){
+                this.inLavaTicks ++;
+                if ((this.inLavaTicks % 10) == 0){
+                    if (!this.hasEffect(Effect.FIRE_RESISTANCE)) {
+                        Block lavaBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+                        if (!(lavaBlock instanceof BlockLava)){
+                            lavaBlock = lavaBlock.getLevelBlockAtLayer(1);
+                        }
+                        this.attack(new EntityDamageByBlockEvent(lavaBlock, this, DamageCause.LAVA, 4));
+                    }
+                    this.inLavaTicks = 0;
+                }
             }
 
             if (inWater && !this.hasEffect(Effect.WATER_BREATHING)) {

@@ -2,10 +2,7 @@ package cn.nukkit.entity;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockFire;
-import cn.nukkit.block.BlockID;
-import cn.nukkit.block.BlockWater;
+import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
 import cn.nukkit.entity.custom.CustomEntity;
 import cn.nukkit.entity.custom.EntityDefinition;
@@ -1879,7 +1876,9 @@ public abstract class Entity extends Location implements Metadatable {
                 }
             } else {
                 if (!this.hasEffect(Effect.FIRE_RESISTANCE) && ((this.fireTicks % 20) == 0 || tickDiff > 20)) {
-                    this.attack(new EntityDamageEvent(this, DamageCause.FIRE_TICK, 1));
+                    if (!isInsideOfLava()){
+                        this.attack(new EntityDamageEvent(this, DamageCause.FIRE_TICK, 1));
+                    }
                 }
                 this.fireTicks -= tickDiff;
             }
@@ -2421,6 +2420,11 @@ public abstract class Entity extends Location implements Metadatable {
     public boolean isInsideOfWater() {
         Block block = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
         return block.isWater() || block.getWaterloggingType() != Block.WaterloggingType.NO_WATERLOGGING && block.getLevelBlockAtLayer(1).isWater();
+    }
+
+    public boolean isInsideOfLava() {
+        Block block = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+        return block instanceof BlockLava || block.getLevelBlockAtLayer(1) instanceof BlockLava;
     }
 
     public boolean isInsideOfSolid() {
