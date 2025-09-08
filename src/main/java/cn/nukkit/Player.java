@@ -5045,7 +5045,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         Block block = target.getSide(face);
-        if (block.getId() == Block.FIRE) {
+        if (block.getId() == Block.FIRE || block.getId() == Block.SOUL_FIRE) {
             this.level.setBlock(block, Block.get(BlockID.AIR), true);
             this.level.addLevelSoundEvent(block, LevelSoundEventPacket.SOUND_EXTINGUISH_FIRE);
             return;

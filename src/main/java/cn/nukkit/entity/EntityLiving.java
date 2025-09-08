@@ -2,10 +2,7 @@ package cn.nukkit.entity;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockCactus;
-import cn.nukkit.block.BlockLava;
-import cn.nukkit.block.BlockMagma;
+import cn.nukkit.block.*;
 import cn.nukkit.entity.mob.EntityDrowned;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.projectile.EntityProjectile;
@@ -322,17 +319,15 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 this.resetFallDistance();
             }
 
-            if (this.level.getGameRules().getBoolean(GameRule.FIRE_DAMAGE)){
+            if (this.level.getGameRules().getBoolean(GameRule.FIRE_DAMAGE) && !this.hasEffect(Effect.FIRE_RESISTANCE)){
                 if (this.isInsideOfLava()){
                     this.inLavaTicks ++;
                     if ((this.inLavaTicks % 10) == 0){
-                        if (!this.hasEffect(Effect.FIRE_RESISTANCE)) {
-                            Block lavaBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
-                            if (!(lavaBlock instanceof BlockLava)){
-                                lavaBlock = lavaBlock.getLevelBlockAtLayer(1);
-                            }
-                            this.attack(new EntityDamageByBlockEvent(lavaBlock, this, DamageCause.LAVA, 4));
+                        Block lavaBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+                        if (!(lavaBlock instanceof BlockLava)){
+                            lavaBlock = lavaBlock.getLevelBlockAtLayer(1);
                         }
+                        this.attack(new EntityDamageByBlockEvent(lavaBlock, this, DamageCause.LAVA, 4));
                         this.inLavaTicks = 0;
                     }
                 }
@@ -340,10 +335,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 if (this.isInsideOfFire()){
                     this.inFireTicks ++;
                     if ((this.inFireTicks % 10) == 0) {
-                        if (!this.hasEffect(Effect.FIRE_RESISTANCE)) {
-                            Block fireBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
-                            this.attack(new EntityDamageByBlockEvent(fireBlock, this, DamageCause.FIRE, 1));
+                        Block fireBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+                        int fireDamage = 1;
+                        if (fireBlock instanceof BlockSoulFire){
+                            fireDamage = 2;
                         }
+                        this.attack(new EntityDamageByBlockEvent(fireBlock, this, DamageCause.FIRE, fireDamage));
                         this.inFireTicks = 0;
                     }
                 }

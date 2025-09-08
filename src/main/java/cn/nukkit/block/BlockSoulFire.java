@@ -24,6 +24,11 @@ public class BlockSoulFire extends BlockFire {
     }
 
     @Override
+    public int getLightLevel() {
+        return 10;
+    }
+
+    @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
             int downId = down().getId();
