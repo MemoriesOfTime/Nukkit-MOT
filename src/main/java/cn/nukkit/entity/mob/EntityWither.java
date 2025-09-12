@@ -193,6 +193,12 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         }
 
         if (!this.exploded && this.lastDamageCause != null && EntityDamageEvent.DamageCause.SUICIDE != this.lastDamageCause.getCause()) {
+            if (this.lastDamageCause instanceof EntityDamageByEntityEvent event) {
+                if (event.getDamager() instanceof Player player) {
+                    player.awardAchievement("killWither");
+                }
+            }
+
             this.exploded = true;
             this.explode();
         }
