@@ -160,7 +160,7 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.CORAL_FAN_DEAD] = true;
         randomTickBlocks[Block.BLOCK_KELP] = true;
         randomTickBlocks[Block.SWEET_BERRY_BUSH] = true;
-        
+
         randomTickBlocks[Block.CAVE_VINES] = true;
         randomTickBlocks[Block.CAVE_VINES_BODY_WITH_BERRIES] = true;
         randomTickBlocks[Block.CAVE_VINES_HEAD_WITH_BERRIES] = true;
@@ -222,7 +222,7 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.EXPOSED_COPPER_BULB] = true;
         randomTickBlocks[Block.WEATHERED_COPPER_BULB] = true;
         randomTickBlocks[Block.OXIDIZED_COPPER_BULB] = true;
-        
+
         randomTickBlocks[BlockID.BUDDING_AMETHYST] = true;
     }
 
@@ -2855,27 +2855,52 @@ public class Level implements ChunkManager, Metadatable {
                         }
                     }
                 } else if (item.getId() == Item.SKULL && item.getDamage() == 1) {
-                    if (block.getSide(BlockFace.DOWN).getId() == Item.SOUL_SAND && block.getSide(BlockFace.DOWN, 2).getId() == Item.SOUL_SAND) {
-                        Block first, second;
+                    Block down = block.getSide(BlockFace.DOWN);
+                    Block down2 = block.getSide(BlockFace.DOWN, 2);
 
-                        if (!(((first = block.getSide(BlockFace.EAST)).getId() == Item.SKULL_BLOCK && first.toItem().getDamage() == 1) && ((second = block.getSide(BlockFace.WEST)).getId() == Item.SKULL_BLOCK && second.toItem().getDamage() == 1) || ((first = block.getSide(BlockFace.NORTH)).getId() == Item.SKULL_BLOCK && first.toItem().getDamage() == 1) && ((second = block.getSide(BlockFace.SOUTH)).getId() == Item.SKULL_BLOCK && second.toItem().getDamage() == 1))) {
+                    if (down.getId() == Item.SOUL_SAND && down2.getId() == Item.SOUL_SAND) {
+
+                        Block east = block.getSide(BlockFace.EAST);
+                        Block west = block.getSide(BlockFace.WEST);
+                        Block north = block.getSide(BlockFace.NORTH);
+                        Block south = block.getSide(BlockFace.SOUTH);
+
+                        boolean eastWestValid = east instanceof BlockSkullWitherSkeleton && east.toItem().getDamage() == 1 &&
+                                west instanceof BlockSkullWitherSkeleton && west.toItem().getDamage() == 1;
+
+                        boolean northSouthValid = north instanceof BlockSkullWitherSkeleton && north.toItem().getDamage() == 1 &&
+                                south instanceof BlockSkullWitherSkeleton && south.toItem().getDamage() == 1;
+
+                        if (!eastWestValid && !northSouthValid) {
                             return null;
                         }
 
-                        block = block.getSide(BlockFace.DOWN);
+                        block = down;
 
-                        Block first2, second2;
+                        Block eastSoul = block.getSide(BlockFace.EAST);
+                        Block westSoul = block.getSide(BlockFace.WEST);
+                        Block northSoul = block.getSide(BlockFace.NORTH);
+                        Block southSoul = block.getSide(BlockFace.SOUTH);
 
-                        if (!((first2 = block.getSide(BlockFace.EAST)).getId() == Item.SOUL_SAND && (second2 = block.getSide(BlockFace.WEST)).getId() == Item.SOUL_SAND || (first2 = block.getSide(BlockFace.NORTH)).getId() == Item.SOUL_SAND && (second2 = block.getSide(BlockFace.SOUTH)).getId() == Item.SOUL_SAND)) {
+                        boolean eastWestSoulValid = eastSoul.getId() == Item.SOUL_SAND && westSoul.getId() == Item.SOUL_SAND;
+                        boolean northSouthSoulValid = northSoul.getId() == Item.SOUL_SAND && southSoul.getId() == Item.SOUL_SAND;
+
+                        if (!eastWestSoulValid && !northSouthSoulValid) {
                             return null;
                         }
 
-                        block.getLevel().setBlock(first, Block.get(BlockID.AIR));
-                        block.getLevel().setBlock(second, Block.get(BlockID.AIR));
-                        block.getLevel().setBlock(first2, Block.get(BlockID.AIR));
-                        block.getLevel().setBlock(second2, Block.get(BlockID.AIR));
-                        block.getLevel().setBlock(block, Block.get(BlockID.AIR));
-                        block.getLevel().setBlock(block.add(0, -1, 0), Block.get(BlockID.AIR));
+                        Block[] blocksToRemove = {
+                                east, west, north, south,
+                                eastSoul, westSoul, northSoul, southSoul,
+                                block,
+                                block.getSide(BlockFace.DOWN)
+                        };
+
+                        for (Block removeBlock : blocksToRemove) {
+                            if (removeBlock != null) {
+                                block.getLevel().setBlock(removeBlock, Block.get(BlockID.AIR));
+                            }
+                        }
 
                         Position spawnPos = block.add(0.5, -1, 0.5);
 

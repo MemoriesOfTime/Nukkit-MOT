@@ -23,8 +23,14 @@ import cn.nukkit.network.protocol.AddEntityPacket;
 import cn.nukkit.network.protocol.BossEventPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.potion.Effect;
+
+import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.Utils;
+
 import org.apache.commons.math3.util.FastMath;
+
+import java.util.HashMap;
+import java.util.UUID;
 
 public class EntityWither extends EntityFlyingMob implements EntityBoss, EntitySmite {
 
@@ -35,6 +41,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
      */
     private boolean exploded;
     private boolean wasExplosion;
+
+    private HashMap<UUID, DummyBossBar> dummyBossBars;
 
     public EntityWither(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -65,6 +73,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         this.setMaxHealth(witherMaxHealth());
 
         super.initEntity();
+
+        this.dummyBossBars = new HashMap<>();
 
         this.fireProof = true;
         this.setDamage(new int[]{0, 2, 4, 6});
@@ -183,12 +193,6 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         }
 
         if (!this.exploded && this.lastDamageCause != null && EntityDamageEvent.DamageCause.SUICIDE != this.lastDamageCause.getCause()) {
-            if (this.lastDamageCause instanceof EntityDamageByEntityEvent event) {
-                if (event.getDamager() instanceof Player player) {
-                    player.awardAchievement("killWither");
-                }
-            }
-
             this.exploded = true;
             this.explode();
         }
@@ -203,6 +207,11 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         }
 
         boolean r = super.attack(ev);
+
+        if (r && !this.closed) {
+            updateBossBars();
+        }
+
         if (this.wasExplosion) {
             this.wasExplosion = false;
         } else if (r && ev instanceof EntityDamageByEntityEvent && ((EntityDamageByEntityEvent) ev).getDamager() instanceof Player && !this.closed && this.isAlive() && Utils.rand() && this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
@@ -238,6 +247,23 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         return r;
     }
 
+    private void updateBossBars() {
+        this.getViewers().forEach((id, player) -> {
+            if (this.dummyBossBars.containsKey(player.getUniqueId())) {
+                DummyBossBar dummyBossBar = this.dummyBossBars.get(player.getUniqueId());
+                dummyBossBar.setLength((this.health / this.getMaxHealth()) * 100);
+            } else {
+                DummyBossBar dummyBossBar = new DummyBossBar.Builder(player)
+                        .text(this.getName())
+                        .length((this.health / this.getMaxHealth()) * 100)
+                        .build();
+                player.createBossBar(dummyBossBar);
+
+                this.dummyBossBars.put(player.getUniqueId(), dummyBossBar);
+            }
+        });
+    }
+
     private int witherMaxHealth() {
         switch (this.getServer().getDifficulty()) {
             case 2:
@@ -265,6 +291,13 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     }
 
     @Override
+    public boolean onUpdate(int currentTick) {
+        updateBossBars();
+
+        return super.onUpdate(currentTick);
+    }
+
+    @Override
     public boolean canTarget(Entity entity) {
         return entity.canBeFollowed();
     }
@@ -272,12 +305,14 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     @Override
     public void spawnTo(Player player) {
         super.spawnTo(player);
-        BossEventPacket pkBoss = new BossEventPacket();
-        pkBoss.bossEid = this.id;
-        pkBoss.type = BossEventPacket.TYPE_SHOW;
-        pkBoss.title = this.getName();
-        pkBoss.healthPercent = this.health / 100;
-        player.dataPacket(pkBoss);
+
+        DummyBossBar dummyBossBar = new DummyBossBar.Builder(player)
+                .text(this.getName())
+                .length((this.health / this.getMaxHealth()) * 100)
+                .build();
+        player.createBossBar(dummyBossBar);
+
+        this.dummyBossBars.put(player.getUniqueId(), dummyBossBar);
     }
 
     @Override
