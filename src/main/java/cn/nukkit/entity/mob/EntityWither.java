@@ -254,14 +254,17 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     }
 
     private void updateBossBars() {
+        float progress = (this.health / this.getMaxHealth()) * 100;
+
         this.getViewers().forEach((id, player) -> {
             if (this.dummyBossBars.containsKey(player.getUniqueId())) {
                 DummyBossBar dummyBossBar = this.dummyBossBars.get(player.getUniqueId());
-                dummyBossBar.setLength((this.health / this.getMaxHealth()) * 100);
+
+                if (dummyBossBar.getLength() != progress) dummyBossBar.setLength(progress);
             } else {
                 DummyBossBar dummyBossBar = new DummyBossBar.Builder(player)
                         .text(this.getName())
-                        .length((this.health / this.getMaxHealth()) * 100)
+                        .length(progress)
                         .build();
                 player.createBossBar(dummyBossBar);
 
@@ -271,14 +274,11 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     }
 
     private int witherMaxHealth() {
-        switch (this.getServer().getDifficulty()) {
-            case 2:
-                return 450;
-            case 3:
-                return 600;
-            default:
-                return 300;
-        }
+        return switch (this.getServer().getDifficulty()) {
+            case 2 -> 450;
+            case 3 -> 600;
+            default -> 300;
+        };
     }
 
     private void explode() {
