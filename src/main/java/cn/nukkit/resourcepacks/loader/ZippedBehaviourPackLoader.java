@@ -33,12 +33,12 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null)
-                        resourcePack = new ZippedBehaviourPack(file);
+                        resourcePack = new ZippedBehaviourPack(file, this.isNetEase);
                 } else if (!fileExt.equals("key")) {
                     switch (fileExt) {
                         case "zip":
                         case "mcpack":
-                            resourcePack = new ZippedBehaviourPack(pack);
+                            resourcePack = new ZippedBehaviourPack(pack, this.isNetEase);
                             break;
                         default:
                             log.warn(baseLang.translateString("nukkit.resources.unknown-format", new String[] { pack.getName() }));
@@ -46,7 +46,6 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
                     }
                 }
                 if (resourcePack != null && resourcePack.isBehaviourPack()) {
-                    resourcePack.setNetEase(this.isNetEase);
                     loadedResourcePacks.add(resourcePack);
                     log.info(baseLang.translateString("nukkit.resources.zip.loaded", pack.getName()));
                 }

@@ -12,7 +12,11 @@ public class ZippedBehaviourPack extends ZippedResourcePack {
     private boolean isBehaviourPack = false;
 
     public ZippedBehaviourPack(File file) {
-        super(file);
+        this(file, false);
+    }
+
+    public ZippedBehaviourPack(File file, boolean isNetEase) {
+        super(file, isNetEase);
         if (this.manifest.has("modules"))
             for (JsonElement moduleElement : this.manifest.getAsJsonArray("modules")) {
                 try {

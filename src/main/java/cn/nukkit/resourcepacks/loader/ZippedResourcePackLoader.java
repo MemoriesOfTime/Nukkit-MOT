@@ -52,16 +52,15 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null) {
-                        resourcePack = new ZippedResourcePack(file);
+                        resourcePack = new ZippedResourcePack(file, this.isNetEase);
                     }
                 } else if (!fileExt.equals("key")) { //directory resource packs temporarily unsupported
                     switch (fileExt) {
-                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack);
+                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack, this.isNetEase);
                         default -> log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
                     }
                 }
                 if (resourcePack != null) {
-                    resourcePack.setNetEase(this.isNetEase);
                     loadedResourcePacks.add(resourcePack);
                     log.info(baseLang.translateString("nukkit.resources.zip.loaded", pack.getName()));
                 }

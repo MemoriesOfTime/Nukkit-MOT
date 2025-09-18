@@ -17,8 +17,7 @@ public abstract class AbstractResourcePack implements ResourcePack {
     protected boolean verifyManifest() {
         if (this.manifest.has("format_version") && this.manifest.has("header") && this.manifest.has("modules")) {
             JsonObject header = this.manifest.getAsJsonObject("header");
-            return header.has("description") &&
-                    header.has("name") &&
+            return (this.isNetEase || (header.has("description") && header.has("name"))) &&
                     header.has("uuid") &&
                     header.has("version") &&
                     header.getAsJsonArray("version").size() == 3;
