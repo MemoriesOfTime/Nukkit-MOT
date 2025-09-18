@@ -3,8 +3,8 @@ package cn.nukkit.resourcepacks;
 import cn.nukkit.Server;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
-import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
 
+import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
 import com.google.common.collect.Sets;
 import com.google.gson.JsonArray;
 
@@ -21,6 +21,7 @@ public class ResourcePackManager {
 
     private final Map<UUID, ResourcePack> resourcePacksById = new HashMap<>();
     private final Set<ResourcePack> resourcePacks = new HashSet<>();
+    private final Set<ResourcePack> behaviorPacks = new HashSet<>();
     private final Set<ResourcePackLoader> loaders;
 
     public ResourcePackManager(ResourcePackLoader... loaders) {
@@ -40,6 +41,10 @@ public class ResourcePackManager {
         return this.resourcePacks.toArray(ResourcePack.EMPTY_ARRAY);
     }
 
+    public ResourcePack[] getBehaviorPacks() {
+        return this.behaviorPacks.toArray(ResourcePack.EMPTY_ARRAY);
+    }
+
     public ResourcePack getPackById(UUID id) {
         return this.resourcePacksById.get(id);
     }
@@ -54,7 +59,16 @@ public class ResourcePackManager {
         this.loaders.forEach(loader -> {
             var loadedPacks = loader.loadPacks();
             loadedPacks.forEach(pack -> resourcePacksById.put(pack.getPackId(), pack));
-            this.resourcePacks.addAll(loadedPacks);
+
+            loadedPacks.forEach(pack -> {
+                if (pack instanceof ZippedResourcePack zippedResourcePack) {
+                    if (zippedResourcePack.isBehaviourPack()) {
+                        this.behaviorPacks.add(pack);
+                    } else {
+                        this.resourcePacks.add(pack);
+                    }
+                }
+            });
         });
 
         log.info(Server.getInstance().getLanguage().translateString("nukkit.resources.success", String.valueOf(this.resourcePacks.size())));

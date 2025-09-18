@@ -72,6 +72,7 @@ import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
 import cn.nukkit.resourcepacks.ResourcePackManager;
 import cn.nukkit.resourcepacks.loader.JarPluginResourcePackLoader;
+import cn.nukkit.resourcepacks.loader.ZippedBehaviorPackLoader;
 import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
 import cn.nukkit.scheduler.ServerScheduler;
 import cn.nukkit.scheduler.Task;
@@ -760,6 +761,7 @@ public class Server {
         this.craftingManager = new CraftingManager();
         this.resourcePackManager = new ResourcePackManager(
                 new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")),
+                new ZippedBehaviorPackLoader(new File(Nukkit.DATA_PATH, "resource_packs")),
                 new JarPluginResourcePackLoader(new File(this.pluginPath))
         );
 

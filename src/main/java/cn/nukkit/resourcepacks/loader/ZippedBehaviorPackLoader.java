@@ -3,32 +3,28 @@ package cn.nukkit.resourcepacks.loader;
 import cn.nukkit.Server;
 import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.resourcepacks.ZippedResourcePack;
-import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
 import com.google.common.io.Files;
 import lombok.extern.log4j.Log4j2;
-import org.iq80.leveldb.fileenv.FileUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.TreeSet;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 @Log4j2
-public class ZippedResourcePackLoader implements ResourcePackLoader {
+public class ZippedBehaviorPackLoader implements ResourcePackLoader {
 
     //资源包文件存放地址
     protected final File path;
 
     protected boolean isNetEase = false;
 
-    public ZippedResourcePackLoader(File path) {
+    public ZippedBehaviorPackLoader(File path) {
         this.path = path;
         if (!path.exists()) {
             path.mkdirs();
@@ -37,7 +33,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         }
     }
 
-    public ZippedResourcePackLoader(File path, boolean isNetEase) {
+    public ZippedBehaviorPackLoader(File path, boolean isNetEase) {
         this(path);
         this.isNetEase = isNetEase;
     }
@@ -61,7 +57,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
                         default -> log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
                     }
                 }
-                if (resourcePack != null && !resourcePack.isBehaviourPack()) {
+                if (resourcePack != null && resourcePack.isBehaviourPack()) {
 //                    resourcePack.setNetEase(this.isNetEase);
                     loadedResourcePacks.add(resourcePack);
                     log.info(baseLang.translateString("nukkit.resources.zip.loaded", pack.getName()));
