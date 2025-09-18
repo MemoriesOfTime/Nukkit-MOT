@@ -42,8 +42,9 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     /**
      *  Whether the wither is exploded and dying
      */
-    private boolean exploded;
-    private boolean wasExplosion;
+    protected boolean exploded;
+    protected boolean wasExplosion;
+    protected int invul;
 
     private HashMap<UUID, DummyBossBar> dummyBossBars;
 
@@ -77,15 +78,28 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
 
         super.initEntity();
 
+        if (this.namedTag.contains("Invul")) {
+            this.invul = this.namedTag.getInt("Invul");
+        } else {
+            this.invul = 200;
+        }
+
         this.dummyBossBars = new HashMap<>();
 
         this.fireProof = true;
         this.setDamage(new int[]{0, 2, 4, 6});
-        if (this.age == 0) {
-            this.setDataProperty(new IntEntityData(DATA_WITHER_INVULNERABLE_TICKS, 200));
+        if (this.invul > 0) {
+            this.setDataProperty(new IntEntityData(DATA_WITHER_INVULNERABLE_TICKS, this.invul));
 
-            this.stayTime = 220;
+            this.stayTime = this.invul + 20;
         }
+    }
+
+    @Override
+    public void saveNBT() {
+        super.saveNBT();
+
+        this.namedTag.putInt("Invul", this.invul);
     }
 
     @Override
@@ -105,7 +119,7 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
 
     @Override
     public void attackEntity(Entity player) {
-        if (this.age > 220 && this.attackDelay > 40 && this.distanceSquared(player) <= 4096) {
+        if (this.invul <= 0 && this.attackDelay > 40 && this.distanceSquared(player) <= 4096) {
             this.attackDelay = 0;
 
             double f = 1;
@@ -213,7 +227,7 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
 
     @Override
     public boolean attack(EntityDamageEvent ev) {
-        if (this.age <= 200 && ev.getCause() != EntityDamageEvent.DamageCause.SUICIDE) {
+        if (this.invul > 0 && ev.getCause() != EntityDamageEvent.DamageCause.SUICIDE) {
             return false;
         }
 
@@ -260,33 +274,32 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
 
     private void updateBossBars() {
         float progress;
-        if (this.age < 200) {
-            progress = (this.age / 200f) * 100;
+        if (this.invul > 0) {
+            progress = (200 - this.invul) / 2f;
         } else {
             progress = (this.health / this.getMaxHealth()) * 100;
         }
 
         if (this.isAlive()) {
             this.getViewers().forEach((id, player) -> {
-                if (this.dummyBossBars.containsKey(player.getUniqueId())) {
-                    DummyBossBar dummyBossBar = this.dummyBossBars.get(player.getUniqueId());
-
-                    if (dummyBossBar.getLength() != progress) dummyBossBar.setLength(progress);
-                } else {
-                    DummyBossBar dummyBossBar = new DummyBossBar.Builder(player)
+                DummyBossBar bossBar = this.dummyBossBars.get(player.getUniqueId());
+                if (bossBar == null) {
+                    bossBar = new DummyBossBar.Builder(player)
                             .text(this.getName())
                             .length(progress)
                             .build();
-                    player.createBossBar(dummyBossBar);
-
-                    this.dummyBossBars.put(player.getUniqueId(), dummyBossBar);
+                    player.createBossBar(bossBar);
+                    this.dummyBossBars.put(player.getUniqueId(), bossBar);
+                }
+                if (bossBar.getLength() != progress) {
+                    bossBar.setLength(progress);
                 }
             });
         } else {
             this.getViewers().forEach((id, player) -> {
-                if (this.dummyBossBars.containsKey(player.getUniqueId())) {
-                    DummyBossBar dummyBossBar = this.dummyBossBars.get(player.getUniqueId());
-                    player.removeBossBar(dummyBossBar.getBossBarId());
+                DummyBossBar bossBar = this.dummyBossBars.get(player.getUniqueId());
+                if (bossBar != null) {
+                    player.removeBossBar(bossBar.getBossBarId());
                     this.dummyBossBars.remove(player.getUniqueId());
                 }
             });
@@ -318,6 +331,11 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
 
     @Override
     public boolean onUpdate(int currentTick) {
+        if (this.invul > 0) {
+            int tickDiff = currentTick - this.lastUpdate;
+            this.invul -= Math.max(0, tickDiff);
+        }
+
         this.updateBossBars();
 
         return super.onUpdate(currentTick);
@@ -340,6 +358,16 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
             player.createBossBar(dummyBossBar);
 
             this.dummyBossBars.put(player.getUniqueId(), dummyBossBar);
+        }
+    }
+
+    @Override
+    public void despawnFrom(Player player) {
+        super.despawnFrom(player);
+        DummyBossBar dummyBossBar = this.dummyBossBars.get(player.getUniqueId());
+        if (dummyBossBar != null) {
+            player.removeBossBar(dummyBossBar.getBossBarId());
+            this.dummyBossBars.remove(player.getUniqueId());
         }
     }
 
