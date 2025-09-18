@@ -20,13 +20,10 @@ import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
-import cn.nukkit.network.protocol.BossEventPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.potion.Effect;
-
 import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.Utils;
-
 import org.apache.commons.math3.util.FastMath;
 
 import java.util.HashMap;
@@ -204,6 +201,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         }
 
         super.kill();
+
+        this.updateBossBars();
     }
 
     @Override
@@ -215,7 +214,7 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         boolean r = super.attack(ev);
 
         if (r && !this.closed) {
-            updateBossBars();
+            this.updateBossBars();
         }
 
         if (this.wasExplosion) {
@@ -256,21 +255,31 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     private void updateBossBars() {
         float progress = (this.health / this.getMaxHealth()) * 100;
 
-        this.getViewers().forEach((id, player) -> {
-            if (this.dummyBossBars.containsKey(player.getUniqueId())) {
-                DummyBossBar dummyBossBar = this.dummyBossBars.get(player.getUniqueId());
+        if (this.isAlive()) {
+            this.getViewers().forEach((id, player) -> {
+                if (this.dummyBossBars.containsKey(player.getUniqueId())) {
+                    DummyBossBar dummyBossBar = this.dummyBossBars.get(player.getUniqueId());
 
-                if (dummyBossBar.getLength() != progress) dummyBossBar.setLength(progress);
-            } else {
-                DummyBossBar dummyBossBar = new DummyBossBar.Builder(player)
-                        .text(this.getName())
-                        .length(progress)
-                        .build();
-                player.createBossBar(dummyBossBar);
+                    if (dummyBossBar.getLength() != progress) dummyBossBar.setLength(progress);
+                } else {
+                    DummyBossBar dummyBossBar = new DummyBossBar.Builder(player)
+                            .text(this.getName())
+                            .length(progress)
+                            .build();
+                    player.createBossBar(dummyBossBar);
 
-                this.dummyBossBars.put(player.getUniqueId(), dummyBossBar);
-            }
-        });
+                    this.dummyBossBars.put(player.getUniqueId(), dummyBossBar);
+                }
+            });
+        } else {
+            this.getViewers().forEach((id, player) -> {
+                if (this.dummyBossBars.containsKey(player.getUniqueId())) {
+                    DummyBossBar dummyBossBar = this.dummyBossBars.get(player.getUniqueId());
+                    player.removeBossBar(dummyBossBar.getBossBarId());
+                    this.dummyBossBars.remove(player.getUniqueId());
+                }
+            });
+        }
     }
 
     private int witherMaxHealth() {
@@ -298,7 +307,7 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
 
     @Override
     public boolean onUpdate(int currentTick) {
-        updateBossBars();
+        this.updateBossBars();
 
         return super.onUpdate(currentTick);
     }
@@ -312,13 +321,15 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     public void spawnTo(Player player) {
         super.spawnTo(player);
 
-        DummyBossBar dummyBossBar = new DummyBossBar.Builder(player)
-                .text(this.getName())
-                .length((this.health / this.getMaxHealth()) * 100)
-                .build();
-        player.createBossBar(dummyBossBar);
+        if (!this.dummyBossBars.containsKey(player.getUniqueId())) {
+            DummyBossBar dummyBossBar = new DummyBossBar.Builder(player)
+                    .text(this.getName())
+                    .length((this.health / this.getMaxHealth()) * 100)
+                    .build();
+            player.createBossBar(dummyBossBar);
 
-        this.dummyBossBars.put(player.getUniqueId(), dummyBossBar);
+            this.dummyBossBars.put(player.getUniqueId(), dummyBossBar);
+        }
     }
 
     @Override
