@@ -93,7 +93,7 @@ public class BlockSkullSkeleton extends BlockTransparentMeta implements Faceable
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, BlockFace face, double fx, double fy, double fz, @NotNull Player player) {
         switch (face) {
             case NORTH:
             case SOUTH:
@@ -123,8 +123,6 @@ public class BlockSkullSkeleton extends BlockTransparentMeta implements Faceable
 
         BlockEntitySkull blockEntity = (BlockEntitySkull) BlockEntity.createBlockEntity(BlockEntity.SKULL, this.getChunk(), nbt);
         blockEntity.spawnToAll();
-
-        // TODO: 2016/2/3 SPAWN WITHER
 
         return true;
     }
