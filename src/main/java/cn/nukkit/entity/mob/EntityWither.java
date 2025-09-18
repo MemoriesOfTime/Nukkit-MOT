@@ -1,6 +1,7 @@
 package cn.nukkit.entity.mob;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.*;
@@ -17,14 +18,22 @@ import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.nbt.tag.DoubleTag;
+import cn.nukkit.nbt.tag.FloatTag;
+import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.AddEntityPacket;
-import cn.nukkit.network.protocol.BossEventPacket;
 import cn.nukkit.network.protocol.DataPacket;
 import cn.nukkit.potion.Effect;
+import cn.nukkit.utils.DummyBossBar;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
+
+import java.util.HashMap;
+import java.util.Set;
+import java.util.UUID;
 
 public class EntityWither extends EntityFlyingMob implements EntityBoss, EntitySmite {
 
@@ -35,6 +44,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
      */
     private boolean exploded;
     private boolean wasExplosion;
+
+    private HashMap<UUID, DummyBossBar> dummyBossBars;
 
     public EntityWither(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -65,6 +76,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         this.setMaxHealth(witherMaxHealth());
 
         super.initEntity();
+
+        this.dummyBossBars = new HashMap<>();
 
         this.fireProof = true;
         this.setDamage(new int[]{0, 2, 4, 6});
@@ -194,6 +207,8 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         }
 
         super.kill();
+
+        this.updateBossBars();
     }
 
     @Override
@@ -203,6 +218,11 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         }
 
         boolean r = super.attack(ev);
+
+        if (r && !this.closed) {
+            this.updateBossBars();
+        }
+
         if (this.wasExplosion) {
             this.wasExplosion = false;
         } else if (r && ev instanceof EntityDamageByEntityEvent && ((EntityDamageByEntityEvent) ev).getDamager() instanceof Player && !this.closed && this.isAlive() && Utils.rand() && this.level.getGameRules().getBoolean(GameRule.MOB_GRIEFING)) {
@@ -238,15 +258,47 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
         return r;
     }
 
-    private int witherMaxHealth() {
-        switch (this.getServer().getDifficulty()) {
-            case 2:
-                return 450;
-            case 3:
-                return 600;
-            default:
-                return 300;
+    private void updateBossBars() {
+        float progress;
+        if (this.age < 200) {
+            progress = (this.age / 200f) * 100;
+        } else {
+            progress = (this.health / this.getMaxHealth()) * 100;
         }
+
+        if (this.isAlive()) {
+            this.getViewers().forEach((id, player) -> {
+                if (this.dummyBossBars.containsKey(player.getUniqueId())) {
+                    DummyBossBar dummyBossBar = this.dummyBossBars.get(player.getUniqueId());
+
+                    if (dummyBossBar.getLength() != progress) dummyBossBar.setLength(progress);
+                } else {
+                    DummyBossBar dummyBossBar = new DummyBossBar.Builder(player)
+                            .text(this.getName())
+                            .length(progress)
+                            .build();
+                    player.createBossBar(dummyBossBar);
+
+                    this.dummyBossBars.put(player.getUniqueId(), dummyBossBar);
+                }
+            });
+        } else {
+            this.getViewers().forEach((id, player) -> {
+                if (this.dummyBossBars.containsKey(player.getUniqueId())) {
+                    DummyBossBar dummyBossBar = this.dummyBossBars.get(player.getUniqueId());
+                    player.removeBossBar(dummyBossBar.getBossBarId());
+                    this.dummyBossBars.remove(player.getUniqueId());
+                }
+            });
+        }
+    }
+
+    private int witherMaxHealth() {
+        return switch (this.getServer().getDifficulty()) {
+            case 2 -> 450;
+            case 3 -> 600;
+            default -> 300;
+        };
     }
 
     private void explode() {
@@ -265,6 +317,13 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     }
 
     @Override
+    public boolean onUpdate(int currentTick) {
+        this.updateBossBars();
+
+        return super.onUpdate(currentTick);
+    }
+
+    @Override
     public boolean canTarget(Entity entity) {
         return entity.canBeFollowed();
     }
@@ -272,12 +331,16 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     @Override
     public void spawnTo(Player player) {
         super.spawnTo(player);
-        BossEventPacket pkBoss = new BossEventPacket();
-        pkBoss.bossEid = this.id;
-        pkBoss.type = BossEventPacket.TYPE_SHOW;
-        pkBoss.title = this.getName();
-        pkBoss.healthPercent = this.health / 100;
-        player.dataPacket(pkBoss);
+
+        if (!this.dummyBossBars.containsKey(player.getUniqueId())) {
+            DummyBossBar dummyBossBar = new DummyBossBar.Builder(player)
+                    .text(this.getName())
+                    .length((this.health / this.getMaxHealth()) * 100)
+                    .build();
+            player.createBossBar(dummyBossBar);
+
+            this.dummyBossBars.put(player.getUniqueId(), dummyBossBar);
+        }
     }
 
     @Override
@@ -289,5 +352,90 @@ public class EntityWither extends EntityFlyingMob implements EntityBoss, EntityS
     @Override
     public boolean canBeAffected(int effectId) {
         return effectId == Effect.INSTANT_DAMAGE || effectId == Effect.INSTANT_HEALTH;
+    }
+
+    /**
+     * 检查并生成凋零实体 <br/>
+     * Check and spawn wither entity
+     *
+     * @param block 要检查的方块实例 <br/>
+     *              The block instance to check
+     * @return 如果成功生成凋零实体则返回 true，否则返回 false <br/>
+     * Returns true if the wither entity is successfully spawned, otherwise false
+     */
+    public static boolean checkAndSpawnWither(Block block) {
+        Block check = block;
+        BlockFace skullFace = null;
+        if (Server.getInstance().mobsFromBlocks && block.getLevel().getGameRules().getBoolean(GameRule.DO_MOB_SPAWNING)) {
+            for (BlockFace face : Set.of(BlockFace.NORTH, BlockFace.EAST)) {
+                boolean[] skulls = new boolean[5];
+                for (int i = -2; i <= 2; i++) {
+                    skulls[i + 2] = block.getSide(face, i).getId() == Block.WITHER_SKELETON_SKULL;
+                }
+                int inrow = 0;
+                for (int i = 0; i < skulls.length; i++) {
+                    if (skulls[i]) {
+                        inrow++;
+                        if (inrow == 2) check = block.getSide(face, i - 2);
+                    } else if (inrow < 3) {
+                        inrow = 0;
+                    }
+                }
+                if (inrow >= 3) {
+                    skullFace = face;
+                }
+            }
+            if (skullFace == null) return false;
+            if (check.getId() == Block.WITHER_SKELETON_SKULL) {
+                faces:
+                for (BlockFace blockFace : BlockFace.values()) {
+                    for (int i = 1; i <= 2; i++) {
+                        if (!(check.getSide(blockFace, i).getId() == Block.SOUL_SAND)) {
+                            continue faces;
+                        }
+                    }
+                    faces1:
+                    for (BlockFace face : Set.of(BlockFace.UP, BlockFace.NORTH, BlockFace.EAST)) {
+                        for (int i = -1; i <= 1; i++) {
+                            if (!(check.getSide(blockFace).getSide(face, i).getId() == Block.SOUL_SAND)) {
+                                continue faces1;
+                            }
+                        }
+
+                        for (int i = 0; i <= 2; i++) {
+                            Block location = check.getSide(blockFace, i);
+                            location.level.breakBlock(location);
+                        }
+                        for (int i = -1; i <= 1; i++) {
+                            Block location = check.getSide(blockFace).getSide(face, i);
+                            location.level.breakBlock(location);
+                            location.level.breakBlock(location.getSide(blockFace.getOpposite()));
+                        }
+                        Block pos = check.getSide(blockFace, 2);
+                        CompoundTag nbt = new CompoundTag()
+                                .putList("Pos", new ListTag<DoubleTag>()
+                                        .add(new DoubleTag(pos.x + 0.5))
+                                        .add(new DoubleTag(pos.y))
+                                        .add(new DoubleTag(pos.z + 0.5)))
+                                .putList("Motion", new ListTag<DoubleTag>()
+                                        .add(new DoubleTag(0))
+                                        .add(new DoubleTag(0))
+                                        .add(new DoubleTag(0)))
+                                .putList("Rotation", new ListTag<FloatTag>()
+                                        .add(new FloatTag(0f))
+                                        .add(new FloatTag(0f)));
+
+                        EntityWither wither = (EntityWither) Entity.createEntity("Wither", check.level.getChunk(check.getChunkX(), check.getChunkZ()), nbt);
+                        if (wither != null) {
+                            wither.stayTime = 220;
+                            wither.spawnToAll();
+                            wither.getLevel().addSoundToViewers(wither, Sound.MOB_WITHER_SPAWN);
+                        }
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 }

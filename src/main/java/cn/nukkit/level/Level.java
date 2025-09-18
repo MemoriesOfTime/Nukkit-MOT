@@ -13,7 +13,6 @@ import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
 import cn.nukkit.entity.mob.EntitySnowGolem;
-import cn.nukkit.entity.mob.EntityWither;
 import cn.nukkit.entity.passive.EntityIronGolem;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.weather.EntityLightning;
@@ -160,7 +159,7 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.CORAL_FAN_DEAD] = true;
         randomTickBlocks[Block.BLOCK_KELP] = true;
         randomTickBlocks[Block.SWEET_BERRY_BUSH] = true;
-        
+
         randomTickBlocks[Block.CAVE_VINES] = true;
         randomTickBlocks[Block.CAVE_VINES_BODY_WITH_BERRIES] = true;
         randomTickBlocks[Block.CAVE_VINES_HEAD_WITH_BERRIES] = true;
@@ -222,7 +221,7 @@ public class Level implements ChunkManager, Metadatable {
         randomTickBlocks[Block.EXPOSED_COPPER_BULB] = true;
         randomTickBlocks[Block.WEATHERED_COPPER_BULB] = true;
         randomTickBlocks[Block.OXIDIZED_COPPER_BULB] = true;
-        
+
         randomTickBlocks[BlockID.BUDDING_AMETHYST] = true;
     }
 
@@ -2242,6 +2241,22 @@ public class Level implements ChunkManager, Metadatable {
         return true;
     }
 
+    /**
+     * 破坏指定方块并生成破坏效果 <br/>
+     * Break the specified block and generate destruction effects
+     *
+     * @param block 要破坏的方块实例 <br/>
+     *              The block instance to break
+     */
+    public void breakBlock(@NotNull Block block) {
+        if(block.isValid() && block.level == this) {
+            this.setBlock(block, Block.get(Block.AIR));
+            Position position = block.add(0.5, 0.5, 0.5);
+            this.addParticle(new DestroyBlockParticle(position, block));
+            //this.getVibrationManager().callVibrationEvent(new VibrationEvent(null, position, VibrationType.BLOCK_DESTROY));
+        }
+    }
+
     private void addBlockChange(int x, int y, int z) {
         long index = Level.chunkHash(x >> 4, z >> 4);
         addBlockChange(index, x, y, z);
@@ -2853,51 +2868,6 @@ public class Level implements ChunkManager, Metadatable {
                             }
                             return null;
                         }
-                    }
-                } else if (item.getId() == Item.SKULL && item.getDamage() == 1) {
-                    if (block.getSide(BlockFace.DOWN).getId() == Item.SOUL_SAND && block.getSide(BlockFace.DOWN, 2).getId() == Item.SOUL_SAND) {
-                        Block first, second;
-
-                        if (!(((first = block.getSide(BlockFace.EAST)).getId() == Item.SKULL_BLOCK && first.toItem().getDamage() == 1) && ((second = block.getSide(BlockFace.WEST)).getId() == Item.SKULL_BLOCK && second.toItem().getDamage() == 1) || ((first = block.getSide(BlockFace.NORTH)).getId() == Item.SKULL_BLOCK && first.toItem().getDamage() == 1) && ((second = block.getSide(BlockFace.SOUTH)).getId() == Item.SKULL_BLOCK && second.toItem().getDamage() == 1))) {
-                            return null;
-                        }
-
-                        block = block.getSide(BlockFace.DOWN);
-
-                        Block first2, second2;
-
-                        if (!((first2 = block.getSide(BlockFace.EAST)).getId() == Item.SOUL_SAND && (second2 = block.getSide(BlockFace.WEST)).getId() == Item.SOUL_SAND || (first2 = block.getSide(BlockFace.NORTH)).getId() == Item.SOUL_SAND && (second2 = block.getSide(BlockFace.SOUTH)).getId() == Item.SOUL_SAND)) {
-                            return null;
-                        }
-
-                        block.getLevel().setBlock(first, Block.get(BlockID.AIR));
-                        block.getLevel().setBlock(second, Block.get(BlockID.AIR));
-                        block.getLevel().setBlock(first2, Block.get(BlockID.AIR));
-                        block.getLevel().setBlock(second2, Block.get(BlockID.AIR));
-                        block.getLevel().setBlock(block, Block.get(BlockID.AIR));
-                        block.getLevel().setBlock(block.add(0, -1, 0), Block.get(BlockID.AIR));
-
-                        Position spawnPos = block.add(0.5, -1, 0.5);
-
-                        CreatureSpawnEvent ev = new CreatureSpawnEvent(EntityWither.NETWORK_ID, spawnPos, CreatureSpawnEvent.SpawnReason.BUILD_WITHER, player);
-                        server.getPluginManager().callEvent(ev);
-
-                        if (ev.isCancelled()) {
-                            return null;
-                        }
-
-                        if (!player.isCreative()) {
-                            item.setCount(item.getCount() - 1);
-                            player.getInventory().setItemInHand(item);
-                        }
-
-                        player.awardAchievement("spawnWither");
-
-                        EntityWither wither = (EntityWither) Entity.createEntity("Wither", spawnPos);
-                        wither.stayTime = 220;
-                        wither.spawnToAll();
-                        this.addSoundToViewers(wither, cn.nukkit.level.Sound.MOB_WITHER_SPAWN);
-                        return null;
                     }
                 }
             }
