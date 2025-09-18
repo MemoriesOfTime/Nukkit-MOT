@@ -13,7 +13,6 @@ import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
 import cn.nukkit.entity.mob.EntitySnowGolem;
-import cn.nukkit.entity.mob.EntityWither;
 import cn.nukkit.entity.passive.EntityIronGolem;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.weather.EntityLightning;
@@ -2242,6 +2241,22 @@ public class Level implements ChunkManager, Metadatable {
         return true;
     }
 
+    /**
+     * 破坏指定方块并生成破坏效果 <br/>
+     * Break the specified block and generate destruction effects
+     *
+     * @param block 要破坏的方块实例 <br/>
+     *              The block instance to break
+     */
+    public void breakBlock(@NotNull Block block) {
+        if(block.isValid() && block.level == this) {
+            this.setBlock(block, Block.get(Block.AIR));
+            Position position = block.add(0.5, 0.5, 0.5);
+            this.addParticle(new DestroyBlockParticle(position, block));
+            //this.getVibrationManager().callVibrationEvent(new VibrationEvent(null, position, VibrationType.BLOCK_DESTROY));
+        }
+    }
+
     private void addBlockChange(int x, int y, int z) {
         long index = Level.chunkHash(x >> 4, z >> 4);
         addBlockChange(index, x, y, z);
@@ -2853,76 +2868,6 @@ public class Level implements ChunkManager, Metadatable {
                             }
                             return null;
                         }
-                    }
-                } else if (item.getId() == Item.SKULL && item.getDamage() == 1) {
-                    Block down = block.getSide(BlockFace.DOWN);
-                    Block down2 = block.getSide(BlockFace.DOWN, 2);
-
-                    if (down.getId() == Item.SOUL_SAND && down2.getId() == Item.SOUL_SAND) {
-
-                        Block east = block.getSide(BlockFace.EAST);
-                        Block west = block.getSide(BlockFace.WEST);
-                        Block north = block.getSide(BlockFace.NORTH);
-                        Block south = block.getSide(BlockFace.SOUTH);
-
-                        boolean eastWestValid = east instanceof BlockSkullWitherSkeleton && east.toItem().getDamage() == 1 &&
-                                west instanceof BlockSkullWitherSkeleton && west.toItem().getDamage() == 1;
-
-                        boolean northSouthValid = north instanceof BlockSkullWitherSkeleton && north.toItem().getDamage() == 1 &&
-                                south instanceof BlockSkullWitherSkeleton && south.toItem().getDamage() == 1;
-
-                        if (!eastWestValid && !northSouthValid) {
-                            return null;
-                        }
-
-                        block = down;
-
-                        Block eastSoul = block.getSide(BlockFace.EAST);
-                        Block westSoul = block.getSide(BlockFace.WEST);
-                        Block northSoul = block.getSide(BlockFace.NORTH);
-                        Block southSoul = block.getSide(BlockFace.SOUTH);
-
-                        boolean eastWestSoulValid = eastSoul.getId() == Item.SOUL_SAND && westSoul.getId() == Item.SOUL_SAND;
-                        boolean northSouthSoulValid = northSoul.getId() == Item.SOUL_SAND && southSoul.getId() == Item.SOUL_SAND;
-
-                        if (!eastWestSoulValid && !northSouthSoulValid) {
-                            return null;
-                        }
-
-                        Block[] blocksToRemove = {
-                                east, west, north, south,
-                                eastSoul, westSoul, northSoul, southSoul,
-                                block,
-                                block.getSide(BlockFace.DOWN)
-                        };
-
-                        for (Block removeBlock : blocksToRemove) {
-                            if (removeBlock != null) {
-                                block.getLevel().setBlock(removeBlock, Block.get(BlockID.AIR));
-                            }
-                        }
-
-                        Position spawnPos = block.add(0.5, -1, 0.5);
-
-                        CreatureSpawnEvent ev = new CreatureSpawnEvent(EntityWither.NETWORK_ID, spawnPos, CreatureSpawnEvent.SpawnReason.BUILD_WITHER, player);
-                        server.getPluginManager().callEvent(ev);
-
-                        if (ev.isCancelled()) {
-                            return null;
-                        }
-
-                        if (!player.isCreative()) {
-                            item.setCount(item.getCount() - 1);
-                            player.getInventory().setItemInHand(item);
-                        }
-
-                        player.awardAchievement("spawnWither");
-
-                        EntityWither wither = (EntityWither) Entity.createEntity("Wither", spawnPos);
-                        wither.stayTime = 220;
-                        wither.spawnToAll();
-                        this.addSoundToViewers(wither, cn.nukkit.level.Sound.MOB_WITHER_SPAWN);
-                        return null;
                     }
                 }
             }
