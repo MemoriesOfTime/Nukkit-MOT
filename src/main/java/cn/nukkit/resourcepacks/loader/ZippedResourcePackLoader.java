@@ -25,6 +25,8 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
     //资源包文件存放地址
     protected final File path;
 
+    protected boolean isNetEase = false;
+
     public ZippedResourcePackLoader(File path) {
         this.path = path;
         if (!path.exists()) {
@@ -32,6 +34,11 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         } else if (!path.isDirectory()) {
             throw new IllegalArgumentException(Server.getInstance().getLanguage().translateString("nukkit.resources.invalid-path", path.getName()));
         }
+    }
+
+    public ZippedResourcePackLoader(File path, boolean isNetEase) {
+        this(path);
+        this.isNetEase = isNetEase;
     }
 
     @Override
@@ -45,11 +52,11 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null) {
-                        resourcePack = new ZippedResourcePack(file);
+                        resourcePack = new ZippedResourcePack(file, this.isNetEase);
                     }
                 } else if (!fileExt.equals("key")) { //directory resource packs temporarily unsupported
                     switch (fileExt) {
-                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack);
+                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack, this.isNetEase);
                         default -> log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
                     }
                 }
@@ -64,7 +71,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         return loadedResourcePacks;
     }
 
-    private static File loadDirectoryPack(File directory) {
+    protected static File loadDirectoryPack(File directory) {
         File manifestFile = new File(directory, "manifest.json");
         if (!manifestFile.exists() || !manifestFile.isFile()) {
             manifestFile = new File(directory, "pack_manifest.json");
@@ -85,7 +92,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
                 for (File file : files) {
                     if (file.isDirectory()) {
                         for (File directoryFile : getDirectoryFiles(file)) {
-                            ZipEntry entry = new ZipEntry(file.toPath().relativize(directoryFile.toPath()).toString())
+                            ZipEntry entry = new ZipEntry(directory.toPath().relativize(directoryFile.toPath()).toString())
                                     .setCreationTime(time)
                                     .setLastModifiedTime(time)
                                     .setLastAccessTime(time);
