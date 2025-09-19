@@ -8,6 +8,7 @@ import cn.nukkit.block.custom.properties.RegisteredBlockProperty;
 import cn.nukkit.block.properties.BlockPropertiesHelper;
 import cn.nukkit.block.properties.VanillaProperties;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.format.leveldb.LevelDBConstants;
@@ -512,6 +513,11 @@ public class BlockWall extends BlockTransparentMeta implements BlockPropertiesHe
                 .putCompound("states", states.build())
                 .putInt("version", LevelDBConstants.STATE_VERSION)
                 .build();
+    }
+
+    @Override
+    public Item toItem() {
+        return new ItemBlock(Block.get(this.getId(), this.getWallType().ordinal()), this.getWallType().ordinal(), 1);
     }
 
     public static BlockFace.Axis calculateAxis(Vector3 base, Vector3 side) {
