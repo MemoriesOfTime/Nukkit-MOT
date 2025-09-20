@@ -2424,8 +2424,13 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfLava() {
-        Block block = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
-        return block instanceof BlockLava || block.getLevelBlockAtLayer(1) instanceof BlockLava;
+        for (Block block : this.getCollisionBlocks()) {
+            if (block instanceof BlockLava) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public boolean isInsideOfSolid() {

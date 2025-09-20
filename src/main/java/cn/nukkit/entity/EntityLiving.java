@@ -319,12 +319,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 this.resetFallDistance();
             }
 
-            if (this.level.getGameRules().getBoolean(GameRule.FIRE_DAMAGE) && !this.hasEffect(Effect.FIRE_RESISTANCE)){
-                if (this.isInsideOfLava()){
-                    this.inLavaTicks ++;
-                    if ((this.inLavaTicks % 10) == 0){
+            if (this.level.getGameRules().getBoolean(GameRule.FIRE_DAMAGE) && !this.hasEffect(Effect.FIRE_RESISTANCE)) {
+                if (this.isInsideOfLava()) {
+                    this.inLavaTicks++;
+                    if ((this.inLavaTicks % 10) == 0) {
                         Block lavaBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
-                        if (!(lavaBlock instanceof BlockLava)){
+                        if (!(lavaBlock instanceof BlockLava)) {
                             lavaBlock = lavaBlock.getLevelBlockAtLayer(1);
                         }
                         this.attack(new EntityDamageByBlockEvent(lavaBlock, this, DamageCause.LAVA, 4));
@@ -332,12 +332,12 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                     }
                 }
 
-                if (this.isInsideOfFire()){
-                    this.inFireTicks ++;
+                if (this.isInsideOfFire()) {
+                    this.inFireTicks++;
                     if ((this.inFireTicks % 10) == 0) {
                         Block fireBlock = level.getBlock(this.getFloorX(), this.getFloorY(), this.getFloorZ());
                         int fireDamage = 1;
-                        if (fireBlock instanceof BlockSoulFire){
+                        if (fireBlock instanceof BlockSoulFire) {
                             fireDamage = 2;
                         }
                         this.attack(new EntityDamageByBlockEvent(fireBlock, this, DamageCause.FIRE, fireDamage));
