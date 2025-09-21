@@ -658,7 +658,7 @@ public class Utils {
             }
         }
 
-        return blocks.toArray(new Block[0]);
+        return blocks.toArray(Block.EMPTY_ARRAY);
     }
 
     public static JsonElement loadJsonResource(String file) {

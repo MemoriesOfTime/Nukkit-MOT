@@ -45,6 +45,8 @@ import static cn.nukkit.utils.Utils.dynamic;
 @Log4j2
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
 
+    public static final Block[] EMPTY_ARRAY = new Block[0];
+
     public static final int ID_BITS = dynamic(11);
     public static final int MAX_BLOCK_ID = dynamic(1 << ID_BITS);
     public static final int ID_MASK = dynamic(MAX_BLOCK_ID - 1);
