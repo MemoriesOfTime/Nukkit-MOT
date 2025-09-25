@@ -1720,7 +1720,10 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
         } else {
-            int capacity = (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+            int capacity = Math.max(0, maxX - minX + 1) * Math.max(0, maxY - minY + 1) * Math.max(0, maxZ - minZ + 1);
+            if (capacity == 0) {
+                return Block.EMPTY_ARRAY;
+            }
             Block[] collides = new Block[capacity];
             int count = 0;
             for (int z = minZ; z <= maxZ; ++z) {
@@ -1733,8 +1736,7 @@ public class Level implements ChunkManager, Metadatable {
                     }
                 }
             }
-
-            return Arrays.copyOf(collides, count);
+            return count == capacity ? collides : Arrays.copyOf(collides, count);
         }
 
         return Block.EMPTY_ARRAY;
