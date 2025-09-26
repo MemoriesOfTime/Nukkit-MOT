@@ -61,10 +61,6 @@ public class BlockLava extends BlockLiquid {
             entity.setOnFire(ev.getDuration());
         }
 
-        if (!entity.hasEffect(Effect.FIRE_RESISTANCE)) {
-            entity.attack(new EntityDamageByBlockEvent(this, entity, DamageCause.LAVA, 4));
-        }
-
         super.onEntityCollide(entity);
     }
 
