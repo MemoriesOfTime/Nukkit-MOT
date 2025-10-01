@@ -1,4 +1,8 @@
 {
+  "minecraft:chain": {
+    "protocol": 844,
+    "0": "minecraft:iron_chain"
+  },
   "minecraft:skull": {
     "protocol": 748,
     "0": "minecraft:skeleton_skull",
