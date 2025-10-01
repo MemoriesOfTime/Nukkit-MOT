@@ -45,6 +45,8 @@ import static cn.nukkit.utils.Utils.dynamic;
 @Log4j2
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
 
+    public static final Block[] EMPTY_ARRAY = new Block[0];
+
     public static final int ID_BITS = dynamic(11);
     public static final int MAX_BLOCK_ID = dynamic(1 << ID_BITS);
     public static final int ID_MASK = dynamic(MAX_BLOCK_ID - 1);
@@ -384,7 +386,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return get(fullId >> DATA_BITS, fullId & DATA_MASK);
     }
 
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @NotNull Player player) {
         return this.canPlaceOn(block.down(), target) && this.getLevel().setBlock(this, this, true, true);
     }
 
