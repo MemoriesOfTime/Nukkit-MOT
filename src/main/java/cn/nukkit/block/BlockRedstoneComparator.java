@@ -134,7 +134,7 @@ public abstract class BlockRedstoneComparator extends BlockRedstoneDiode impleme
         }
 
         this.level.addSound(new ClickSound(this, getMode() == Mode.SUBTRACT ? 0.55F : 0.5F));
-        this.level.setBlock(this, this, true, false);
+        this.level.setBlock(this, this, true, true);
         //bug?
 
         this.onChange();
@@ -156,8 +156,7 @@ public abstract class BlockRedstoneComparator extends BlockRedstoneDiode impleme
         BlockEntity blockEntity = this.level.getBlockEntity(this);
         int currentOutput = 0;
 
-        if (blockEntity instanceof BlockEntityComparator) {
-            BlockEntityComparator blockEntityComparator = (BlockEntityComparator) blockEntity;
+        if (blockEntity instanceof BlockEntityComparator blockEntityComparator) {
             currentOutput = blockEntityComparator.getOutputSignal();
             blockEntityComparator.setOutputSignal(output);
         }
@@ -167,9 +166,9 @@ public abstract class BlockRedstoneComparator extends BlockRedstoneDiode impleme
             boolean isPowered = this.isPowered();
 
             if (isPowered && !shouldBePowered) {
-                this.level.setBlock(this, getUnpowered(), true, false);
+                this.level.setBlock(this, getUnpowered(), true, true);
             } else if (!isPowered && shouldBePowered) {
-                this.level.setBlock(this, getPowered(), true, false);
+                this.level.setBlock(this, getPowered(), true, true);
             }
 
             this.level.updateAroundRedstone(this, null); //TODO: remove

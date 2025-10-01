@@ -39,6 +39,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
     private static final BatchPacket CACHED_PACKET_567;
     private static final BatchPacket CACHED_PACKET_786;
     private static final BatchPacket CACHED_PACKET_800;
+    private static final BatchPacket CACHED_PACKET_827;
     private static final BatchPacket CACHED_PACKET;
 
     private static final byte[] TAG_361;
@@ -149,9 +150,22 @@ public class BiomeDefinitionListPacket extends DataPacket {
             pk.protocol = ProtocolInfo.v1_21_100;
             pk.gameVersion = GameVersion.V1_21_100;
             pk.tryEncode();
-            CACHED_PACKET = pk.compress(Deflater.BEST_COMPRESSION);
+            CACHED_PACKET_827 = pk.compress(Deflater.BEST_COMPRESSION);
         } catch (Exception e) {
             throw new AssertionError("Error whilst loading biome definitions 827", e);
+        }
+        try {
+            BiomeDefinitionListPacket pk = new BiomeDefinitionListPacket();
+            pk.biomeDefinitions = gson.fromJson(
+                    Utils.loadJsonResource("biome/stripped_biome_definitions_844.json"),
+                    new TypeToken<LinkedHashMap<String, BiomeDefinitionData>>() {}.getType()
+            );
+            pk.protocol = ProtocolInfo.v1_21_110;
+            pk.gameVersion = GameVersion.V1_21_110;
+            pk.tryEncode();
+            CACHED_PACKET = pk.compress(Deflater.BEST_COMPRESSION);
+        } catch (Exception e) {
+            throw new AssertionError("Error whilst loading biome definitions 844", e);
         }
     }
 
@@ -166,8 +180,10 @@ public class BiomeDefinitionListPacket extends DataPacket {
             throw new UnsupportedOperationException("Unsupported protocol version: " + protocol);
         }
 
-        if (protocol >= ProtocolInfo.v1_21_100) {
+        if (protocol >= ProtocolInfo.v1_21_110_26) {
             return CACHED_PACKET;
+        } else if (protocol >= ProtocolInfo.v1_21_100) {
+            return CACHED_PACKET_827;
         } else if (protocol >= ProtocolInfo.v1_21_80) {
             return CACHED_PACKET_800;
         } else if (protocol >= ProtocolInfo.v1_21_70_24) {

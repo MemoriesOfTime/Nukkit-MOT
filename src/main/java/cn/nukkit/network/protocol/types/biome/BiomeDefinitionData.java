@@ -32,18 +32,22 @@ public class BiomeDefinitionData {
     /**
      * @deprecated 1.21.110
      */
+    @SuppressWarnings("dep-ann")
     public float redSporeDensity;
     /**
      * @deprecated 1.21.110
      */
+    @SuppressWarnings("dep-ann")
     public float blueSporeDensity;
     /**
      * @deprecated 1.21.110
      */
+    @SuppressWarnings("dep-ann")
     public float ashDensity;
     /**
      * @deprecated 1.21.110
      */
+    @SuppressWarnings("dep-ann")
     public float whiteAshDensity;
     public float depth;
     public float scale;
@@ -83,7 +87,7 @@ public class BiomeDefinitionData {
         this.id = id == null ? null : new Unindexed<>(id);
         this.temperature = temperature;
         this.downfall = downfall;
-        this.foliageSnow = 0;
+        this.foliageSnow = 0; //0 for old behavior
         this.redSporeDensity = redSporeDensity;
         this.blueSporeDensity = blueSporeDensity;
         this.ashDensity = ashDensity;

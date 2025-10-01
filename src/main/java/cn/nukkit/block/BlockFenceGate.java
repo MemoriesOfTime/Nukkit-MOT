@@ -5,6 +5,7 @@ import cn.nukkit.event.block.DoorToggleEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.Sound;
 import cn.nukkit.level.sound.DoorSound;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
@@ -153,8 +154,12 @@ public class BlockFenceGate extends BlockTransparentMeta implements Faceable {
         }
 
         this.setDamage(direction | ((~this.getDamage()) & OPEN_BIT));
-        this.level.addSound(new DoorSound(this));
-        this.level.setBlock(this, this, false, false);
+        this.level.setBlock(this, this, false, true);
+        if (this.isOpen()) {
+            this.level.addSound(this, Sound.RANDOM_DOOR_OPEN);
+        } else {
+            this.level.addSound(this, Sound.RANDOM_DOOR_CLOSE);
+        }
         return true;
     }
 

@@ -195,7 +195,7 @@ public class SpawnerTask implements Runnable {
         int max = getMaxSpawns(networkId, level.getDimension() == Level.DIMENSION_NETHER, level.getDimension() == Level.DIMENSION_THE_END);
         if (max == 0) return false;
         int count = 0;
-        for (Entity entity : level.entities.values()) {
+        for (Entity entity : level.getEntities()) {
             if (entity.isAlive() && entity.getNetworkId() == networkId && new Vector3(player.x, entity.y, player.z).distanceSquared(entity) < 16384) { // 128 blocks
                 count++;
                 if (count > max) {

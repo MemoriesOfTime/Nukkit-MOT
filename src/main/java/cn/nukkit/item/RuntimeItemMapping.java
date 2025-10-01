@@ -4,6 +4,7 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.item.RuntimeItems.MappingEntry;
 import cn.nukkit.item.customitem.CustomItem;
 import cn.nukkit.item.customitem.CustomItemDefinition;
@@ -372,6 +373,10 @@ public class RuntimeItemMapping {
                 }
                 damage = fullId & Block.DATA_MASK;
             }
+        }
+
+        if (legacyId == BlockID.RED_MUSHROOM_BLOCK || legacyId == BlockID.BROWN_MUSHROOM_BLOCK) {
+            damage = 14;
         }
 
         int count = json.has("count") ? json.get("count").getAsInt() : 1;
