@@ -5,6 +5,7 @@ import cn.nukkit.form.response.FormResponseCustom;
 import cn.nukkit.form.response.FormResponseData;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.gson.reflect.TypeToken;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,6 +48,7 @@ public class FormWindowCustom extends FormWindow {
         this.title = title;
     }
 
+    @Nullable
     public String getSubmitButtonText() {
         return submit;
     }
