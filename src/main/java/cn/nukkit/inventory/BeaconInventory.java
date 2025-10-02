@@ -2,20 +2,14 @@ package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemID;
 import cn.nukkit.level.Position;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
 
 /**
  * @author Rover656
  */
 public class BeaconInventory extends FakeBlockUIComponent {
 
-    /**
-     * Items that can be put into beacon inventory
-     */
-    public static final IntSet ITEMS = new IntOpenHashSet(new int[]{Item.AIR, ItemID.NETHERITE_INGOT, ItemID.EMERALD, ItemID.DIAMOND, ItemID.GOLD_INGOT, ItemID. IRON_INGOT});
+    private int material;
 
     public BeaconInventory(PlayerUIInventory playerUI, Position position) {
         super(playerUI, InventoryType.BEACON, 27, position);
@@ -28,11 +22,6 @@ public class BeaconInventory extends FakeBlockUIComponent {
     }
 
     @Override
-    public boolean allowedToAdd(Item item) {
-        return ITEMS.contains(item.getId());
-    }
-
-    @Override
     public void onClose(Player who) {
         super.onClose(who);
 
@@ -41,5 +30,16 @@ public class BeaconInventory extends FakeBlockUIComponent {
             this.getHolder().getLevel().dropItem(this.getHolder().add(0.5, 0.5, 0.5), this.getItem(0));
         }
         this.clear(0);
+    }
+
+    public int useMaterial() {
+        int usedMaterial = this.material;
+        this.material = 0;
+        return usedMaterial;
+    }
+
+    public void setMaterial() {
+        this.material = this.getItemFast(0).getId();
+        this.setItem(0, Item.get(Item.AIR));
     }
 }

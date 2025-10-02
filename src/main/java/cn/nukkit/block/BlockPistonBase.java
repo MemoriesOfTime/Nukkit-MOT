@@ -236,7 +236,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
                 Block newBlock = newBlocks.get(i);
                 Vector3 oldPos = newBlock.add(0);
                 newBlock.position(newBlock.add(0).getSide(side));
-                this.level.setBlock(newBlock, Block.get(BlockID.MOVING_BLOCK), true);
+                this.level.setBlock(newBlock, Block.get(BlockID.MOVING_BLOCK), true, true);
 
                 CompoundTag nbt = BlockEntity.getDefaultCompound(newBlock, BlockEntity.MOVING_BLOCK)
                         .putInt("pistonPosX", this.getFloorX())
@@ -253,13 +253,13 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
 
                 BlockEntity.createBlockEntity(BlockEntity.MOVING_BLOCK, newBlock, nbt);
                 if (this.level.getBlockIdAt(oldPos.getFloorX(), oldPos.getFloorY(), oldPos.getFloorZ()) != BlockID.MOVING_BLOCK) {
-                    this.level.setBlock(oldPos, Block.get(BlockID.AIR));
+                    this.level.setBlock(oldPos, Block.get(BlockID.AIR), true, true);
                 }
             }
         }
 
         if (extending) {
-            this.level.setBlock(this.getSide(direction), this.createHead(this.getDamage()));
+            this.level.setBlock(this.getSide(direction), this.createHead(this.getDamage()), true, true);
         }
 
         BlockEntityPistonArm blockEntity = (BlockEntityPistonArm) this.level.getBlockEntity(this);

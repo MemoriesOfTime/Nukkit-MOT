@@ -1,6 +1,6 @@
 package cn.nukkit.block;
 
-public class BlockLitDeepslateRedstoneOre extends BlockOreRedstoneGlowing {
+public class BlockOreRedstoneDeepslateGlowing extends BlockOreRedstoneGlowing {
     @Override
     public String getName() {
         return "Lit Deepslate Redstone Ore";
@@ -14,5 +14,10 @@ public class BlockLitDeepslateRedstoneOre extends BlockOreRedstoneGlowing {
     @Override
     public double getHardness() {
         return 4.5;
+    }
+
+    @Override
+    protected int getTypeId() {
+        return DEEPSLATE_REDSTONE_ORE;
     }
 }

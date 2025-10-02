@@ -3,8 +3,11 @@ package cn.nukkit.inventory.transaction.action;
 import cn.nukkit.Player;
 import cn.nukkit.inventory.FurnaceInventory;
 import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.PlayerUIInventory;
 import cn.nukkit.inventory.transaction.InventoryTransaction;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemTool;
+import lombok.Setter;
 import lombok.ToString;
 
 import java.util.HashSet;
@@ -18,6 +21,8 @@ public class SlotChangeAction extends InventoryAction {
 
     protected Inventory inventory;
     private final int inventorySlot;
+    @Setter
+    private boolean smithingClientAuth;
 
     public SlotChangeAction(Inventory inventory, int inventorySlot, Item sourceItem, Item targetItem) {
         super(sourceItem, targetItem);
@@ -53,7 +58,11 @@ public class SlotChangeAction extends InventoryAction {
     public boolean isValid(Player source) {
         Item check = inventory.getItem(this.inventorySlot);
 
-        return check.equalsExact(this.sourceItem);
+        if (this.smithingClientAuth && this.inventory instanceof PlayerUIInventory && (check.getTier() == ItemTool.TIER_NETHERITE && this.sourceItem.getId() == Item.AIR)) {
+            return true;
+        }
+
+        return (check.getId() == Item.AIR && this.sourceItem.getId() == Item.AIR) || check.equalsExact(this.sourceItem);
     }
 
     /**

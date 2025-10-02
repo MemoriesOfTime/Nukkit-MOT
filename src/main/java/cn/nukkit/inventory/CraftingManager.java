@@ -5,10 +5,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.inventory.special.*;
-import cn.nukkit.item.Item;
-import cn.nukkit.item.ItemFirework;
-import cn.nukkit.item.ItemID;
-import cn.nukkit.item.RuntimeItems;
+import cn.nukkit.item.*;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.CraftingDataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -74,6 +71,7 @@ public class CraftingManager {
     private static BatchPacket packet800;
     private static BatchPacket packet818;
     private static BatchPacket packet827;
+    private static BatchPacket packet844;
 
     private static BatchPacket packet_netease_630;
     private static BatchPacket packet_netease_686;
@@ -807,6 +805,7 @@ public class CraftingManager {
 
     public void rebuildPacket() {
         //TODO Multiversion 添加新版本支持时修改这里
+        packet844 = null;
         packet827 = null;
         packet818 = null;
         packet800 = null;
@@ -886,7 +885,12 @@ public class CraftingManager {
             }
         }
 
-        if (protocol >= GameVersion.V1_21_100.getProtocol()) {
+        if (protocol >= GameVersion.V1_21_110_26.getProtocol()) {
+            if (packet844 == null) {
+                packet844 = packetFor(GameVersion.V1_21_110);
+            }
+            return packet844;
+        } else if (protocol >= GameVersion.V1_21_100.getProtocol()) {
             if (packet827 == null) {
                 packet827 = packetFor(GameVersion.V1_21_100);
             }
@@ -1533,7 +1537,7 @@ public class CraftingManager {
         for (Item item : inputList) {
             Item clone = item.clone();
             clone.setCount(1);
-            if ((item.isTool() || item.isArmor()) && item.getDamage() > 0) {
+            if (item instanceof ItemDurable && item.getDamage() > 0) {
                 clone.setDamage(0);
             }
             list.add(clone);
