@@ -480,7 +480,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
         }
 
-        return blocks.toArray(new Block[0]);
+        return blocks.toArray(Block.EMPTY_ARRAY);
     }
 
     public Block getTargetBlock(int maxDistance) {

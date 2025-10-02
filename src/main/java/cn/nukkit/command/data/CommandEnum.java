@@ -8,6 +8,7 @@ import cn.nukkit.utils.CameraPresetManager;
 import cn.nukkit.utils.Identifier;
 import com.google.common.collect.ImmutableList;
 import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.lang.reflect.Modifier;
 import java.util.*;
@@ -16,6 +17,7 @@ import java.util.function.Supplier;
 /**
  * @author CreeperFace
  */
+@ToString
 @EqualsAndHashCode
 public class CommandEnum {
 

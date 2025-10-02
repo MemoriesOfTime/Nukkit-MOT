@@ -281,7 +281,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected Position spawnBlockPosition;
 
     protected int inAirTicks = 0;
-    protected int startAirTicks = 10;
+    protected int startAirTicks = 5;
     protected int lastInAirTick = 0;
 
     protected AdventureSettings adventureSettings;
@@ -673,7 +673,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void resetFallDistance() {
         super.resetFallDistance();
         if (this.inAirTicks != 0) {
-            this.startAirTicks = 10;
+            this.startAirTicks = 5;
         }
         this.inAirTicks = 0;
     }
@@ -1711,11 +1711,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.dataPacket(pk);
         }
 
+        if (this.isSpectator()) {
+            // Tp not on ground to not fly slowly
+            this.teleport(this.add(0, 0.0001, 0), null);
+        }
+
         this.setAdventureSettings(ev.getNewAdventureSettings());
 
         if (this.isSpectator()) {
-            this.teleport(this, null);
-
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_SILENT, true, false);
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_HAS_COLLISION, false);
 
@@ -2131,7 +2134,22 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         // Replacement for this.fastMove(dx, dy, dz) start
-        if (this.isSpectator() || !this.level.hasCollision(this, this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, this.getStepHeight(), 0.1), false)) {
+        boolean canPass = this.isSpectator();
+        if (!canPass) {
+            Block[] blocks = this.level.getCollisionBlocks(this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, this.getStepHeight(), 0.1));
+            if (blocks.length == 0) {
+                canPass = true;
+            } else {
+                canPass = true;
+                for (Block b : blocks) {
+                    if (b.getId() != Block.SCAFFOLDING) { //脚手架特殊判断，移动时可以穿过
+                        canPass = false;
+                        break;
+                    }
+                }
+            }
+        }
+        if (canPass) {
             this.x = clientPos.x;
             this.y = clientPos.y;
             this.z = clientPos.z;
@@ -2502,6 +2520,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     PlayerInvalidMoveEvent ev = new PlayerInvalidMoveEvent(this, true);
                                     this.getServer().getPluginManager().callEvent(ev);
                                     if (!ev.isCancelled()) {
+                                        this.startAirTicks = this.inAirTicks - 5;
                                         this.setMotion(new Vector3(0, expectedVelocity, 0));
                                     }
                                 } else if (this.kick(PlayerKickEvent.Reason.FLYING_DISABLED, "Flying is not enabled on this server", true, "type=MOVE, expectedVelocity=" + expectedVelocity + ", diff=" + diff + ", speed.y=" + speed.y)) {
@@ -2905,11 +2924,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.forceMovement = this.teleportPosition = this.getPosition();
 
         ResourcePacksInfoPacket infoPacket = new ResourcePacksInfoPacket();
-
-        infoPacket.resourcePackEntries = Arrays.stream(this.server.getResourcePackManager().getResourceStack())
-                .filter(pack -> pack.getPackProtocol() <= protocol)
-                .toArray(ResourcePack[]::new);
-
+        infoPacket.resourcePackEntries = this.server.getResourcePackManager().getResourceStack(this.gameVersion);
+        infoPacket.behaviourPackEntries = this.server.getResourcePackManager().getBehaviorStack(this.gameVersion);
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
     }
@@ -3346,13 +3362,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             dataInfoPacket.chunkCount = MathHelper.ceil(resourcePack.getPackSize() / (float) RESOURCE_PACK_CHUNK_SIZE);
                             dataInfoPacket.compressedPackSize = resourcePack.getPackSize();
                             dataInfoPacket.sha256 = resourcePack.getSha256();
+                            if (resourcePack.isBehaviourPack()) {
+                                dataInfoPacket.type = ResourcePackDataInfoPacket.TYPE_BEHAVIOR;
+                            } else {
+                                dataInfoPacket.type = protocol < ProtocolInfo.v1_13_0 ? 1 : ResourcePackDataInfoPacket.TYPE_RESOURCE;
+                            }
                             this.dataPacket(dataInfoPacket);
                         }
                         break;
                     case ResourcePackClientResponsePacket.STATUS_HAVE_ALL_PACKS:
                         ResourcePackStackPacket stackPacket = new ResourcePackStackPacket();
                         stackPacket.mustAccept = this.server.getForceResources() && !this.server.forceResourcesAllowOwnPacks;
-                        stackPacket.resourcePackStack = this.server.getResourcePackManager().getResourceStack();
+                        stackPacket.resourcePackStack = this.server.getResourcePackManager().getResourceStack(this.gameVersion);
+                        stackPacket.behaviourPackStack = this.server.getResourcePackManager().getBehaviorStack(this.gameVersion);
                         stackPacket.experiments.addAll(this.getExperiments());
                         this.dataPacket(stackPacket);
                         break;
@@ -4443,8 +4465,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             if (this.loomTransaction.execute()) {
                                 level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_LOOM_USE);
                             }
-                            this.loomTransaction = null;
                         }
+                        this.loomTransaction = null; // Must be here or stuff will break
                         return;
                     }
 
@@ -6322,14 +6344,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     @Override
     protected void checkChunks() {
-        if (this.chunk == null || (this.chunk.getX() != ((int) this.x >> 4) || this.chunk.getZ() != ((int) this.z >> 4))) {
+        if (this.chunk == null || (this.chunk.getX() != this.getChunkX() || this.chunk.getZ() != this.getChunkZ())) {
             if (this.chunk != null) {
                 this.chunk.removeEntity(this);
             }
-            this.chunk = this.level.getChunk((int) this.x >> 4, (int) this.z >> 4, true);
+            this.chunk = this.level.getChunk(this.getChunkX(), this.getChunkZ(), true);
 
             if (!this.justCreated) {
-                Map<Integer, Player> newChunk = this.level.getChunkPlayers((int) this.x >> 4, (int) this.z >> 4);
+                Map<Integer, Player> newChunk = this.level.getChunkPlayers(this.getChunkX(), this.getChunkZ());
                 newChunk.remove(this.loaderId);
 
                 for (Player player : new ArrayList<>(this.hasSpawned.values())) {
@@ -6638,8 +6660,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param bossBarId The BossBar ID
      */
     public void updateBossBar(String text, int length, long bossBarId) {
-        if (this.dummyBossBars.containsKey(bossBarId)) {
-            DummyBossBar bossBar = this.dummyBossBars.get(bossBarId);
+        DummyBossBar bossBar = this.dummyBossBars.get(bossBarId);
+        if (bossBar != null) {
             bossBar.setText(text);
             bossBar.setLength(length);
         }
@@ -6651,8 +6673,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * @param bossBarId The BossBar ID
      */
     public void removeBossBar(long bossBarId) {
-        if (this.dummyBossBars.containsKey(bossBarId)) {
-            this.dummyBossBars.get(bossBarId).destroy();
+        DummyBossBar bossBar = this.dummyBossBars.get(bossBarId);
+        if (bossBar != null) {
+            bossBar.destroy();
             this.dummyBossBars.remove(bossBarId);
         }
     }

@@ -23,12 +23,17 @@ public class ZippedResourcePack extends AbstractResourcePack {
     private String cdnUrl = "";
 
     public ZippedResourcePack(File file) {
+        this(file, false);
+    }
+
+    public ZippedResourcePack(File file, boolean isNetEase) {
         if (!file.exists()) {
             throw new IllegalArgumentException(Server.getInstance().getLanguage()
                     .translateString("nukkit.resources.zip.not-found", file.getName()));
         }
 
         this.file = file;
+        this.setNetEase(isNetEase);
 
         try (ZipFile zip = new ZipFile(file)) {
             ZipEntry entry = zip.getEntry("manifest.json");

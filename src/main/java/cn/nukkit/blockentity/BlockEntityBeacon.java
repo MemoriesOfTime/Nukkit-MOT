@@ -4,14 +4,17 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.event.entity.EntityPotionEffectEvent;
+import cn.nukkit.inventory.BeaconInventory;
+import cn.nukkit.inventory.Inventory;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.potion.Effect;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -221,7 +224,8 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
         }
     }
 
-    private static final List<Integer> allowedEffects = Arrays.asList(Effect.SPEED, Effect.HASTE, Effect.DAMAGE_RESISTANCE, Effect.JUMP, Effect.STRENGTH, Effect.REGENERATION);
+    private static final IntSet ALLOWED_EFFECTS = new IntOpenHashSet(new int[]{Effect.SPEED, Effect.HASTE, Effect.DAMAGE_RESISTANCE, Effect.JUMP, Effect.STRENGTH, Effect.REGENERATION});
+    private static final IntSet ITEMS = new IntOpenHashSet(new int[]{Item.AIR, ItemID.NETHERITE_INGOT, ItemID.EMERALD, ItemID.DIAMOND, ItemID.GOLD_INGOT, ItemID. IRON_INGOT});
 
     @Override
     public boolean updateCompoundTag(CompoundTag nbt, Player player) {
@@ -229,23 +233,40 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
             return false;
         }
 
+        Inventory inv = player.getWindowById(Player.BEACON_WINDOW_ID);
+        if (inv instanceof BeaconInventory beaconInventory) {
+            int power = getPowerLevel();
+            if (power < 1) {
+                Server.getInstance().getLogger().debug(player.getName() + " beacon has no power");
+                return false;
+            }
+
+            int material = beaconInventory.useMaterial();
+            if (!ITEMS.contains(material)) {
+                Server.getInstance().getLogger().debug(player.getName() + " tried to set effect but there's no payment in beacon inventory");
+                return false;
+            }
+            inv.setItem(0, Item.get(Item.AIR));
+        } else {
+            Server.getInstance().getLogger().debug(player.getName() + " tried to set effect but beacon inventory is null");
+            return false;
+        }
+
         int primary = nbt.getInt("primary");
-        if (allowedEffects.contains(primary)) {
+        if (ALLOWED_EFFECTS.contains(primary)) {
             this.setPrimaryPower(primary);
         } else {
             Server.getInstance().getLogger().debug(player.getName() + " tried to set an invalid primary effect to a beacon: " + primary);
         }
 
         int secondary = nbt.getInt("secondary");
-        if (allowedEffects.contains(secondary)) {
+        if (ALLOWED_EFFECTS.contains(secondary)) {
             this.setSecondaryPower(secondary);
         } else {
             Server.getInstance().getLogger().debug(player.getName() + " tried to set an invalid secondary effect to a beacon: " + secondary);
         }
 
         this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BEACON_POWER);
-
-        player.getWindowById(Player.BEACON_WINDOW_ID).setItem(0, Item.get(Item.AIR));
         return true;
     }
 }

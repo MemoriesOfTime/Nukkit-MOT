@@ -1,6 +1,6 @@
 package cn.nukkit.block;
 
-public class BlockDeepslateRedstoneOre extends BlockOreRedstone {
+public class BlockOreRedstoneDeepslate extends BlockOreRedstone {
     @Override
     public int getId() {
         return DEEPSLATE_REDSTONE_ORE;
