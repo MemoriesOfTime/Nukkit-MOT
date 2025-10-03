@@ -132,4 +132,9 @@ public class EntityBee extends EntityFlyingMob implements EntityArthropod { // A
     public void leftBeehive(BlockEntityBeehive blockEntityBeehive) {
         //TODO
     }
+
+    @Override
+    protected boolean canBeDamagedBySweetBerryBush() {
+        return false;
+    }
 }

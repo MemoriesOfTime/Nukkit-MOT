@@ -9,6 +9,7 @@ import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.data.property.*;
+import cn.nukkit.entity.item.EntityMinecartEmpty;
 import cn.nukkit.entity.item.EntityVehicle;
 import cn.nukkit.entity.mob.EntityCreeper;
 import cn.nukkit.entity.mob.EntityWolf;
@@ -1911,10 +1912,37 @@ public abstract class Entity extends Location implements Metadatable {
             }
         }
 
+        //  每10tick检查一次实体是否可以被甜浆果丛伤害
+        //  如果是玩家则在Player类的handleMovement方法中处理
+        if (ticksLived % 10 == 0 && !this.isPlayer) {
+            if (this.canBeDamagedBySweetBerryBush()) {
+                this.attack(new EntityDamageEvent(this, DamageCause.CONTACT, 1));
+            }
+        }
+
         this.age += tickDiff;
         this.ticksLived += tickDiff;
 
         return hasUpdate;
+    }
+
+    /**
+     * @return 实体是否可以被甜浆果丛伤害
+     */
+    protected boolean canBeDamagedBySweetBerryBush() {
+        if (this.isPlayer || this instanceof EntityLiving) {
+            if (getRiding() != null && getRiding().getNetworkId() == EntityMinecartEmpty.NETWORK_ID) {
+                return false;
+            }
+            if (!this.isPlayer && !positionChanged) return false;
+            List<Block> blocks = this.getBlocksAround();
+            for (Block block : blocks) {
+                if (block.getId() == Block.SWEET_BERRY_BUSH && block.getDamage() >= 2) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public void updateMovement() {
@@ -2710,7 +2738,7 @@ public abstract class Entity extends Location implements Metadatable {
         } else {
             this.inPortalTicks = 0;
         }
-        
+
         if (vector.lengthSquared() > 0) {
             vector = vector.normalize();
             double d = 0.014d;
@@ -2798,8 +2826,8 @@ public abstract class Entity extends Location implements Metadatable {
         // 当坐标接近int类型范围上限时，与碰撞相关的方法有可能计算出超出int表示上限的时
         // eg: Entity::getBlocksAround(), 在示例方法中，会导致服务端迅速OOM
         if (Math.abs(pos.x) > ENTITY_COORDINATES_MAX_VALUE ||
-            Math.abs(pos.y) > ENTITY_COORDINATES_MAX_VALUE ||
-            Math.abs(pos.z) > ENTITY_COORDINATES_MAX_VALUE) {
+                Math.abs(pos.y) > ENTITY_COORDINATES_MAX_VALUE ||
+                Math.abs(pos.z) > ENTITY_COORDINATES_MAX_VALUE) {
             server.getLogger().warning("Entity " + this.getName() + " is trying to set position to " + pos + " which is out of bounds!");
             return false;
         }

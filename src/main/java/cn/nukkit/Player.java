@@ -436,6 +436,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     private boolean lockMovementInput;
 
+    /**
+     * 上一次被甜浆果丛伤害的tick
+     */
+    protected int lastSweetBerryBushDamageTick;
+
     public int getStartActionTick() {
         return startAction;
     }
@@ -1484,8 +1489,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (this.getServer().bedSpawnpoints) {
             //if (!this.getSpawn().equals(pos)) {
             //    this.setSpawn(pos);
-                this.setSpawnBlock(pos);
-                this.sendTranslation("§7%tile.bed.respawnSet");
+            this.setSpawnBlock(pos);
+            this.sendTranslation("§7%tile.bed.respawnSet");
             //}
         }
 
@@ -2204,6 +2209,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (moveEvent.isCancelled()) {
                 this.teleport(from, null);
                 return;
+            }
+
+            // 甜浆果丛伤害逻辑
+            if (this.canBeDamagedBySweetBerryBush()) {
+                this.attack(new EntityDamageEvent(this, DamageCause.CONTACT, 1));
+                this.lastSweetBerryBushDamageTick = this.server.getTick();
             }
 
             this.lastX = to.x;
@@ -7839,5 +7850,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public boolean isLockMovementInput() {
         return this.lockMovementInput;
+    }
+
+    @Override
+    protected boolean canBeDamagedBySweetBerryBush() {
+        if (this.server.getTick() - lastSweetBerryBushDamageTick < 10) return false;
+        return super.canBeDamagedBySweetBerryBush();
     }
 }
