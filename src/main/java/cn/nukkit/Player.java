@@ -7855,7 +7855,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     @Override
     protected boolean canBeDamagedBySweetBerryBush() {
         if (this.server.getTick() - lastSweetBerryBushDamageTick < 10) return false;
-        var b = super.canBeDamagedBySweetBerryBush();
-        return b;
+        return super.canBeDamagedBySweetBerryBush();
     }
 }

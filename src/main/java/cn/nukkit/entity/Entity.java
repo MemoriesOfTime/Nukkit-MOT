@@ -9,6 +9,7 @@ import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.data.property.*;
+import cn.nukkit.entity.item.EntityMinecartEmpty;
 import cn.nukkit.entity.item.EntityVehicle;
 import cn.nukkit.entity.mob.EntityCreeper;
 import cn.nukkit.entity.mob.EntityWolf;
@@ -1913,7 +1914,7 @@ public abstract class Entity extends Location implements Metadatable {
 
         //  每10tick检查一次实体是否可以被甜浆果丛伤害
         //  如果是玩家则在Player类的handleMovement方法中处理
-        if (ticksLived % 10 > 0 && !this.isPlayer) {
+        if (ticksLived % 10 == 0 && !this.isPlayer) {
             if (this.canBeDamagedBySweetBerryBush()) {
                 this.attack(new EntityDamageEvent(this, DamageCause.CONTACT, 1));
             }
@@ -1930,13 +1931,13 @@ public abstract class Entity extends Location implements Metadatable {
      */
     protected boolean canBeDamagedBySweetBerryBush() {
         if (this.isPlayer || this instanceof EntityLiving) {
-            if (getRiding() != null && getRiding().getNetworkId() == 84) {
+            if (getRiding() != null && getRiding().getNetworkId() == EntityMinecartEmpty.NETWORK_ID) {
                 return false;
             }
             if (!this.isPlayer && !positionChanged) return false;
             List<Block> blocks = this.getBlocksAround();
             for (Block block : blocks) {
-                if (block.getId() == Block.SWEET_BERRY_BUSH && block.getDamage() >= 1) {
+                if (block.getId() == Block.SWEET_BERRY_BUSH && block.getDamage() >= 2) {
                     return true;
                 }
             }
