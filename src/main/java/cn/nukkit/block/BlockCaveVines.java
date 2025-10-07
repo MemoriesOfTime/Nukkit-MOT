@@ -10,6 +10,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -52,7 +53,7 @@ public class BlockCaveVines extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @NotNull Player player) {
         if (!this.canPlaceOn(block.down(), target)) {
             return false;
         }
@@ -97,18 +98,11 @@ public class BlockCaveVines extends BlockTransparentMeta {
             return false;
         }
 
-        Block bottom = this;
-        BlockCaveVines plantHead = null;
-        while (bottom instanceof BlockCaveVines) {
-            plantHead = (BlockCaveVines) bottom;
-            bottom = bottom.down();
-        }
-
-        if (!plantHead.tryGrow()) {
+        if (!this.tryGrowBerries()) {
             return false;
         }
 
-        this.level.addParticle(new BoneMealParticle(plantHead));
+        this.level.addParticle(new BoneMealParticle(this));
         if (player != null && !player.isCreative()) {
             item.count--;
         }
@@ -181,9 +175,20 @@ public class BlockCaveVines extends BlockTransparentMeta {
         return true;
     }
 
+    private boolean tryGrowBerries() {
+        BlockGrowEvent event = new BlockGrowEvent(this, this.getStateWithBerries(this));
+        this.getLevel().getServer().getPluginManager().callEvent(event);
+        if (event.isCancelled()) {
+            return false;
+        }
+        this.getLevel().setBlock(this, event.getNewState(), true, true);
+        return true;
+    }
+
     public BlockCaveVines getStateWithBerries(Position position) {
-        if (this.getDamage() == 0) {
-            return (BlockCaveVines) Block.get(CAVE_VINES_HEAD_WITH_BERRIES, 0, position);
+        Block down = this.getLevel().getBlock(position.add(0, -1, 0));
+        if (down instanceof BlockCaveVines) {
+            return (BlockCaveVines) Block.get(CAVE_VINES_BODY_WITH_BERRIES, this.getDamage(), position);
         }
         return (BlockCaveVines) Block.get(CAVE_VINES_HEAD_WITH_BERRIES, this.getDamage(), position);
     }
