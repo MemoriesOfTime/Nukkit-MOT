@@ -7,6 +7,7 @@ import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -17,6 +18,33 @@ public class BlockCoral extends BlockFlowable {
     public static final int TYPE_BUBBLE = 2;
     public static final int TYPE_FIRE = 3;
     public static final int TYPE_HORN = 4;
+
+    public static final int TYPE_BIT = 0x7;
+    public static final int DEAD_BIT = 0x8;
+
+    private static final String[] NAMES = {
+            "Tube Coral", //0
+            "Brain Coral", //1
+            "Bubble Coral", //2
+            "Fire Coral", //3
+            "Horn Coral", //4
+            // Invalid
+            "Tube Coral",
+            "Tube Coral",
+            "Tube Coral"
+    };
+
+    private static final BlockColor[] COLORS = new BlockColor[] {
+            BlockColor.BLUE_BLOCK_COLOR,
+            BlockColor.PINK_BLOCK_COLOR,
+            BlockColor.PURPLE_BLOCK_COLOR,
+            BlockColor.RED_BLOCK_COLOR,
+            BlockColor.YELLOW_BLOCK_COLOR,
+            // Invalid
+            BlockColor.BLUE_BLOCK_COLOR,
+            BlockColor.BLUE_BLOCK_COLOR,
+            BlockColor.BLUE_BLOCK_COLOR
+    };
     
     public BlockCoral() {
         this(0);
@@ -60,12 +88,12 @@ public class BlockCoral extends BlockFlowable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @NotNull Player player) {
         if (this.down().isTransparent()) {
             return false;
         }
         if (this.getDamage() < 8 && !(block instanceof BlockWater || block.level.isBlockWaterloggedAt(block.getChunk(), (int) block.x, (int) block.y, (int) block.z))) {
-            this.setDamage(8 + this.getDamage()); // Dead
+            this.setDamage(this.getDamage() | DEAD_BIT); // Dead
         }
         if (this.getLevel().setBlock(this, this, true, true)) {
             if (block instanceof BlockWater) {
@@ -78,23 +106,11 @@ public class BlockCoral extends BlockFlowable {
 
     @Override
     public String getName() {
-        String[] names = new String[] {
-                "Tube Coral",
-                "Brain Coral",
-                "Bubble Coral",
-                "Fire Coral",
-                "Horn Coral",
-                // Invalid
-                "Tube Coral",
-                "Tube Coral",
-                "Tube Coral"
-        };
-        String name = names[this.getDamage() & 0x7];
+        int type = this.getDamage() & TYPE_BIT;
         if (this.isDead()) {
-            return "Dead " + name;
-        } else {
-            return name;
+            return "Dead " + NAMES[type];
         }
+        return NAMES[type];
     }
 
     @Override
@@ -103,18 +119,7 @@ public class BlockCoral extends BlockFlowable {
             return BlockColor.GRAY_BLOCK_COLOR;
         }
 
-        BlockColor[] colors = new BlockColor[] {
-                BlockColor.BLUE_BLOCK_COLOR,
-                BlockColor.PINK_BLOCK_COLOR,
-                BlockColor.PURPLE_BLOCK_COLOR,
-                BlockColor.RED_BLOCK_COLOR,
-                BlockColor.YELLOW_BLOCK_COLOR,
-                // Invalid
-                BlockColor.BLUE_BLOCK_COLOR,
-                BlockColor.BLUE_BLOCK_COLOR,
-                BlockColor.BLUE_BLOCK_COLOR
-        };
-        return colors[this.getDamage() & 0x7];
+        return COLORS[this.getDamage() & TYPE_BIT];
     }
 
     @Override
@@ -132,14 +137,14 @@ public class BlockCoral extends BlockFlowable {
     }
 
     public boolean isDead() {
-        return (this.getDamage() & 0x8) == 0x8;
+        return (this.getDamage() & DEAD_BIT) != 0;
     }
 
     public void setDead(boolean dead) {
         if (dead) {
-            this.setDamage(this.getDamage() | 0x8);
+            this.setDamage(this.getDamage() | DEAD_BIT);
         } else {
-            this.setDamage(this.getDamage() ^ 0x8);
+            this.setDamage(this.getDamage() ^ DEAD_BIT);
         }
     }
 }
