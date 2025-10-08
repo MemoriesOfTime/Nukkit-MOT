@@ -23,19 +23,15 @@ public class BlockCoral extends BlockFlowable {
     public static final int DEAD_BIT = 0x8;
 
     private static final String[] NAMES = {
+            "Tube Coral", //0
+            "Brain Coral", //1
+            "Bubble Coral", //2
+            "Fire Coral", //3
+            "Horn Coral", //4
+            // Invalid
             "Tube Coral",
-            "Brain Coral",
-            "Bubble Coral",
-            "Fire Coral",
-            "Horn Coral",
-            "",
-            "",
-            "",
-            "Dead Tube Coral",
-            "Dead Brain Coral",
-            "Dead Bubble Coral",
-            "Dead Fire Coral",
-            "Dead Horn Coral"
+            "Tube Coral",
+            "Tube Coral"
     };
 
     private static final BlockColor[] COLORS = new BlockColor[] {
@@ -110,11 +106,11 @@ public class BlockCoral extends BlockFlowable {
 
     @Override
     public String getName() {
-        int variant = this.getDamage();
-        if (variant >= NAMES.length) {
-            return NAMES[0];
+        int type = this.getDamage() & TYPE_BIT;
+        if (this.isDead()) {
+            return "Dead " + NAMES[type];
         }
-        return NAMES[variant];
+        return NAMES[type];
     }
 
     @Override
