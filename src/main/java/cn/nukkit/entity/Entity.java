@@ -2273,12 +2273,23 @@ public abstract class Entity extends Location implements Metadatable {
                 if (!this.noFallDamage) {
                     float damage = (float) Math.floor(fallDistance - 3 - (this.hasEffect(Effect.JUMP) ? this.getEffect(Effect.JUMP).getAmplifier() + 1 : 0));
 
+                    // 掉落到蜘蛛网和甜浆果丛中免受摔落伤害
+                    if (block == BlockID.COBWEB || block == BlockID.SWEET_BERRY_BUSH) {
+                        damage = 0;
+                    }
+
                     if (floor == BlockID.HAY_BALE || block == BlockID.HAY_BALE) {
                         damage -= (damage * 0.8f);
                     } else if (floor == BlockID.BED_BLOCK || block == BlockID.BED_BLOCK) {
                         damage -= (damage * 0.5f);
-                    } else if (floor == BlockID.SLIME_BLOCK || floor == BlockID.COBWEB || floor == BlockID.SCAFFOLDING || floor == BlockID.SWEET_BERRY_BUSH) {
+                    } else if (floor == BlockID.SLIME_BLOCK) {
                         damage = 0;
+                    } else if (floor == BlockID.SCAFFOLDING) {
+                        // 掉落到多层脚手架上免受摔落伤害
+                        Block under = this.level.getBlock(down.getFloorX(), down.getFloorY() - 1, down.getFloorZ());
+                        if (under.getId() == BlockID.SCAFFOLDING) {
+                            damage = 0;
+                        }
                     }
 
                     if (isPlayer) {
