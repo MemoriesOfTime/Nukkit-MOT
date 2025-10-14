@@ -79,7 +79,7 @@ dependencies {
 ## Credits
 [<img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="18"/>]() [Nukkit](https://github.com/CloudburstMC/Nukkit)  
 [<img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="18"/>]() [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
-[<img src="https://www.powernukkitx.com/assets/image/PNX_LOGO_sm.png" width="18"/>]() [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)  
+[<img src="https://docs.powernukkitx.org/img/PNX_LOGO_sm.png" width="18"/>]() [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)  
 
 ![YourKit](https://www.yourkit.com/images/yklogo.png)  
 YourKit supports open source projects with innovative and intelligent tools
