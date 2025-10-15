@@ -115,7 +115,7 @@ public class Scoreboard {
     /**
      * Queued score updates when holdUpdates is true
      */
-    private final List<QueuedScoreUpdate> queuedUpdates = new ArrayList<>(0);
+    private final List<QueuedScoreUpdate> queuedUpdates = new ArrayList<>();
 
     /**
      * Update score for given scorer.

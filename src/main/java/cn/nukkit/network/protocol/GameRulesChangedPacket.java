@@ -25,15 +25,16 @@ public class GameRulesChangedPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
     public void encode() {
         this.reset();
         if (gameRulesMap == null) { // For compatibility
-            putGameRules(protocol, gameRules);
+            putGameRules(gameVersion, gameRules, false);
         } else {
-            putGameRulesMap(protocol, gameRulesMap);
+            putGameRulesMap(gameVersion, gameRulesMap, false);
         }
     }
 }

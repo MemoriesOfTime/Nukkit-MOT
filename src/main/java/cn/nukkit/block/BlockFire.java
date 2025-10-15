@@ -80,10 +80,6 @@ public class BlockFire extends BlockFlowable {
             return;
         }
 
-        if (!entity.hasEffect(Effect.FIRE_RESISTANCE) && this.level.getGameRules().getBoolean(GameRule.FIRE_DAMAGE)) {
-            entity.attack(new EntityDamageByBlockEvent(this, entity, DamageCause.FIRE, 1));
-        }
-
         EntityCombustByBlockEvent ev = new EntityCombustByBlockEvent(this, entity, 8);
         if (entity instanceof EntityArrow) {
             ev.setCancelled();

@@ -286,13 +286,14 @@ public class NetworkInventoryAction {
                 return null;
             case SOURCE_WORLD:
                 if (this.inventorySlot != InventoryTransactionPacket.ACTION_MAGIC_SLOT_DROP_ITEM) {
-                    player.getServer().getLogger().debug("Only expecting drop-item world actions from the client!");
+                    player.getServer().getLogger().debug(player.getName() + ": Only expecting drop-item world actions from the client!");
                     return null;
                 }
 
                 return new DropItemAction(this.oldItem, this.newItem);
             case SOURCE_CREATIVE:
                 if (!player.isCreative()) {
+                    player.getServer().getLogger().debug(player.getName() + ": Unexpected creative inventory action");
                     return null;
                 }
 
@@ -306,7 +307,7 @@ public class NetworkInventoryAction {
                         type = CreativeInventoryAction.TYPE_CREATE_ITEM;
                         break;
                     default:
-                        player.getServer().getLogger().debug("Unexpected creative action type " + this.inventorySlot);
+                        player.getServer().getLogger().debug(player.getName() + ": Unexpected creative action type " + this.inventorySlot);
                         return null;
                 }
 
@@ -339,6 +340,12 @@ public class NetworkInventoryAction {
                     Inventory inv = player.getWindowById(Player.ANVIL_WINDOW_ID);
 
                     if (!(inv instanceof AnvilInventory)) {
+                        // Hack: Fix beacon payment // TODO: Better fix
+                        if ((inv = player.getWindowById(Player.BEACON_WINDOW_ID)) instanceof BeaconInventory) {
+                            ((BeaconInventory) inv).setMaterial();
+                            return null;
+                        }
+
                         if (player.getWindowById(Player.SMITHING_WINDOW_ID) instanceof SmithingInventory) {
                             switch (this.windowId) {
                                 case SOURCE_TYPE_ANVIL_INPUT:
@@ -373,11 +380,10 @@ public class NetworkInventoryAction {
                 } else if (this.windowId >= SOURCE_TYPE_ENCHANT_OUTPUT && this.windowId <= SOURCE_TYPE_ENCHANT_INPUT) { //-17 -15
                     Inventory inv = player.getWindowById(Player.ENCHANT_WINDOW_ID);
 
-                    if (!(inv instanceof EnchantInventory)) {
+                    if (!(inv instanceof EnchantInventory enchant)) {
                         player.getServer().getLogger().debug("Player " + player.getName() + " has no open enchant inventory");
                         return null;
                     }
-                    EnchantInventory enchant = (EnchantInventory) inv;
 
                     switch (this.windowId) {
                         case SOURCE_TYPE_ENCHANT_INPUT:
@@ -442,11 +448,10 @@ public class NetworkInventoryAction {
                 } else if (this.windowId == SOURCE_TYPE_BEACON) {
                     Inventory inv = player.getWindowById(Player.BEACON_WINDOW_ID);
 
-                    if (!(inv instanceof BeaconInventory)) {
+                    if (!(inv instanceof BeaconInventory beacon)) {
                         player.getServer().getLogger().debug("Player " + player.getName() + " has no open beacon inventory");
                         return null;
                     }
-                    BeaconInventory beacon = (BeaconInventory) inv;
 
                     this.inventorySlot = 0;
                     return new SlotChangeAction(beacon, this.inventorySlot, this.oldItem, this.newItem);

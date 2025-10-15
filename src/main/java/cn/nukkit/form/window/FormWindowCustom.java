@@ -5,6 +5,7 @@ import cn.nukkit.form.response.FormResponseCustom;
 import cn.nukkit.form.response.FormResponseData;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import com.google.gson.reflect.TypeToken;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,6 +48,7 @@ public class FormWindowCustom extends FormWindow {
         this.title = title;
     }
 
+    @Nullable
     public String getSubmitButtonText() {
         return submit;
     }
@@ -102,14 +104,11 @@ public class FormWindowCustom extends FormWindow {
         int responseIndex = 0;
         for (int i = 0; i < content.size(); i++) {
             Element e = content.get(i);
-            String elementData = responseIndex >= elementResponses.size() ? "" : elementResponses.get(responseIndex);
-            if (e instanceof ElementLabel) {
-                labelResponses.put(i, ((ElementLabel) e).getText());
-                responses.put(i, ((ElementLabel) e).getText());
-                if (protocol < ProtocolInfo.v1_21_70_24 || protocol >= ProtocolInfo.v1_21_80) {
-                    // to be compatible with the older response before 1.21.70
-                    responseIndex++;
-                }
+            int i1 = (protocol >= ProtocolInfo.v1_21_70_24 && protocol < ProtocolInfo.v1_21_80) ? responseIndex : i;
+            String elementData = responseIndex >= elementResponses.size() ? "" : elementResponses.get(i1);
+            if (e instanceof ElementLabel elementLabel) {
+                labelResponses.put(i, elementLabel.getText());
+                responses.put(i, elementLabel.getText());
             } else if (e instanceof ElementDropdown elementDropdown) {
                 int index = Integer.parseInt(elementData);
                 String answer = elementDropdown.getOptions().get(index);

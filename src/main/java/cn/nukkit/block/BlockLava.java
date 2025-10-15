@@ -61,16 +61,12 @@ public class BlockLava extends BlockLiquid {
             entity.setOnFire(ev.getDuration());
         }
 
-        if (!entity.hasEffect(Effect.FIRE_RESISTANCE)) {
-            entity.attack(new EntityDamageByBlockEvent(this, entity, DamageCause.LAVA, 4));
-        }
-
         super.onEntityCollide(entity);
     }
 
     @Override
     public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
-        boolean ret = this.getLevel().setBlock(this, this, true, false);
+        boolean ret = this.getLevel().setBlock(this, this, true, true);
         this.getLevel().scheduleUpdate(this, this.tickRate());
 
         return ret;

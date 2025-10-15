@@ -235,7 +235,7 @@ public class Level implements ChunkManager, Metadatable {
     private final Long2ObjectNonBlockingMap<Player> players = new Long2ObjectNonBlockingMap<>();
 
     @NonComputationAtomic
-    public final Long2ObjectNonBlockingMap<Entity> entities = new Long2ObjectNonBlockingMap<>();
+    private final Long2ObjectNonBlockingMap<Entity> entities = new Long2ObjectNonBlockingMap<>();
 
     private final ConcurrentLinkedQueue<BlockEntity> updateBlockEntities = new ConcurrentLinkedQueue<>();
 
@@ -1720,7 +1720,10 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
         } else {
-            int capacity = (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+            int capacity = Math.max(0, maxX - minX + 1) * Math.max(0, maxY - minY + 1) * Math.max(0, maxZ - minZ + 1);
+            if (capacity == 0) {
+                return Block.EMPTY_ARRAY;
+            }
             Block[] collides = new Block[capacity];
             int count = 0;
             for (int z = minZ; z <= maxZ; ++z) {
@@ -1733,8 +1736,7 @@ public class Level implements ChunkManager, Metadatable {
                     }
                 }
             }
-
-            return Arrays.copyOf(collides, count);
+            return count == capacity ? collides : Arrays.copyOf(collides, count);
         }
 
         return Block.EMPTY_ARRAY;
@@ -5179,7 +5181,9 @@ public class Level implements ChunkManager, Metadatable {
             }
             return GameVersion.V1_20_50_NETEASE;
         }
-        if (protocol >= GameVersion.V1_21_100.getProtocol()) {
+        if (protocol >= GameVersion.V1_21_110_26.getProtocol()) {
+            return GameVersion.V1_21_110;
+        } else if (protocol >= GameVersion.V1_21_100.getProtocol()) {
             return GameVersion.V1_21_100;
         } else if (protocol >= ProtocolInfo.v1_21_90) {
             return GameVersion.V1_21_90;
@@ -5325,7 +5329,8 @@ public class Level implements ChunkManager, Metadatable {
         if (chunk == ProtocolInfo.v1_21_80) if (player == ProtocolInfo.v1_21_80) return true;
         if (chunk == ProtocolInfo.v1_21_90)
             if (player >= ProtocolInfo.v1_21_90) if (player <= ProtocolInfo.v1_21_93) return true;
-        if (chunk == GameVersion.V1_21_100.getProtocol()) if (player >= GameVersion.V1_21_100.getProtocol()) return true;
+        if (chunk == GameVersion.V1_21_100.getProtocol()) if (player == GameVersion.V1_21_100.getProtocol()) return true;
+        if (chunk == GameVersion.V1_21_110.getProtocol()) if (player >= GameVersion.V1_21_110_26.getProtocol()) return true;
         return false; //TODO Multiversion  Remember to update when block palette changes
     }
 

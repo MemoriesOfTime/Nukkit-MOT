@@ -11,6 +11,7 @@ import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -60,7 +61,7 @@ public class BlockSapling extends BlockFlowable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @NotNull Player player) {
         if (!(this instanceof BlockMangrovePropagule) &&
                 (block instanceof BlockWater || block.level.isBlockWaterloggedAt(block.getChunk(), (int) block.x, (int) block.y, (int) block.z))) {
             return false;
@@ -171,12 +172,12 @@ public class BlockSapling extends BlockFlowable {
         Block air = Block.get(BlockID.AIR);
 
         if (bigTree) {
-            this.level.setBlock(this.add(x, 0, z), air, true, false);
-            this.level.setBlock(this.add(x + 1, 0, z), air, true, false);
-            this.level.setBlock(this.add(x, 0, z + 1), air, true, false);
-            this.level.setBlock(this.add(x + 1, 0, z + 1), air, true, false);
+            this.level.setBlock(this.add(x, 0, z), air, true, true);
+            this.level.setBlock(this.add(x + 1, 0, z), air, true, true);
+            this.level.setBlock(this.add(x, 0, z + 1), air, true, true);
+            this.level.setBlock(this.add(x + 1, 0, z + 1), air, true, true);
         } else {
-            this.level.setBlock(this, air, true, false);
+            this.level.setBlock(this, air, true, true);
         }
 
         if (!generator.generate(this.level, new NukkitRandom(), this.add(x, 0, z))) {
