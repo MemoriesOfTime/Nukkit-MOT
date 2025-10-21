@@ -92,7 +92,14 @@ gitProperties {
 }
 
 publishing {
+    publications {
+        create<MavenPublication>("mavenJava") {
+            // 使用 shadow jar 作为发布产物
+            project.shadow.component(this)
+        }
+    }
     repositories {
+        mavenLocal()
         maven {
             name = "repo-lanink-cn-snapshots"
             url = uri("https://repo.lanink.cn/repository/maven-snapshots/")
@@ -102,13 +109,7 @@ publishing {
             }
         }
     }
-    publications {
-        create<MavenPublication>("mavenJava") {
-            from(components["java"])
-        }
-    }
 }
-
 
 tasks {
     compileJava {
@@ -125,7 +126,6 @@ tasks {
 
     shadowJar {
         manifest.attributes["Multi-Release"] = "true"
-
         transform(Log4j2PluginsCacheFileTransformer())
 
         // Backwards compatible jar directory
@@ -146,5 +146,11 @@ tasks {
 
     javadoc {
         options.encoding = "UTF-8"
+    }
+
+    // 新增任务：在构建 shadow jar 后自动安装到 MavenLocal
+    register("shadowPublishToMavenLocal") {
+        dependsOn(shadowJar)
+        finalizedBy(publishToMavenLocal)
     }
 }

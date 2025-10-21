@@ -4916,12 +4916,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 Map<DamageModifier, Float> damage = new EnumMap<>(DamageModifier.class);
                                 damage.put(DamageModifier.BASE, itemDamage);
 
-                                float knockBack = 0.3f;
+                                float knockBack = server.knockbackParam.getHorizontal();
                                 Enchantment knockBackEnchantment = item.getEnchantment(Enchantment.ID_KNOCKBACK);
                                 if (knockBackEnchantment != null) {
-                                    knockBack += knockBackEnchantment.getLevel() * 0.1f;
+                                    knockBack += knockBackEnchantment.getLevel() * server.knockbackParam.getHorizontalIncrementPerEnchantLevel();
                                 }
-
                                 EntityDamageByEntityEvent entityDamageByEntityEvent = new EntityDamageByEntityEvent(this, target, DamageCause.ENTITY_ATTACK, damage, knockBack, enchantments);
                                 entityDamageByEntityEvent.setBreakShield(item.canBreakShield());
                                 if (this.isSpectator()) entityDamageByEntityEvent.setCancelled();
