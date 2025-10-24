@@ -107,6 +107,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
@@ -238,6 +239,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected String displayName;
     protected Map<Integer, String> displayNameMap = new ConcurrentSkipListMap<>();
     protected Map<Integer, String> nameTagMap = new ConcurrentSkipListMap<>();
+
+    protected Map<Class<? extends ExtraInfo>, ExtraInfo> extraInfoMap = new ConcurrentHashMap<>();
 
     /**
      * Client protocol version
@@ -7909,5 +7912,34 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected boolean canBeDamagedBySweetBerryBush() {
         if (this.server.getTick() - lastSweetBerryBushDamageTick < 10) return false;
         return super.canBeDamagedBySweetBerryBush();
+    }
+
+    // 供插件使用的玩家拓展字段，跟随玩家生命周期
+    public static class ExtraInfo {
+        public Player player;
+    }
+
+    // 在PlayerJoinEvent中调用这个方法注册，或者在需要的时候自动注册
+    public void registerExtraInfo(ExtraInfo extraInfo) {
+        extraInfo.player = this;
+        this.extraInfoMap.put(extraInfo.getClass(), extraInfo);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T extends ExtraInfo> T getExtraInfo(Class<T> extraInfoClass) {
+        Objects.requireNonNull(extraInfoClass, "extraInfoClass cannot be null");
+        if (!this.extraInfoMap.containsKey(extraInfoClass)) {
+            try {
+                this.registerExtraInfo(extraInfoClass.getDeclaredConstructor().newInstance());
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return (T) this.extraInfoMap.get(extraInfoClass);
+    }
+
+    // getExtraInfo 简写
+    public <T extends ExtraInfo> T extra(Class<T> extraInfoClass) {
+        return this.getExtraInfo(extraInfoClass);
     }
 }
