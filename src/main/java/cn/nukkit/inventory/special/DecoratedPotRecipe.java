@@ -1,6 +1,7 @@
 package cn.nukkit.inventory.special;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
 import cn.nukkit.inventory.MultiRecipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemID;
@@ -18,17 +19,17 @@ public class DecoratedPotRecipe extends MultiRecipe {
 
     @Override
     public boolean canExecute(Player player, Item outputItem, List<Item> inputs) {
-        if (outputItem.getId() != Item.DECORATED_POT) {
+        if (outputItem.getBlockId() != Block.DECORATED_POT) {
             return false;
         }
         int brickCount = 0;
         int sherdCount = 0;
         for (Item input : inputs) {
             if (input.getId() == ItemID.BRICK) {
-                brickCount += 1;
+                brickCount += input.getCount();
             }
             if (input instanceof ItemPotterySherd) {
-                sherdCount += 1;
+                sherdCount += input.getCount();
             }
         }
         if (sherdCount + brickCount < 4) {
