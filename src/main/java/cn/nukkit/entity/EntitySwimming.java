@@ -13,6 +13,7 @@ import org.apache.commons.math3.util.FastMath;
 public abstract class EntitySwimming extends BaseEntity {
 
     private boolean inWaterCached = true;
+    private boolean inBubbleColumnCached = false;
 
     public EntitySwimming(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -135,6 +136,7 @@ public abstract class EntitySwimming extends BaseEntity {
 
             boolean inWater = this.isInsideOfWater();
             this.inWaterCached = inWater;
+            this.inBubbleColumnCached = this.isInsideBubbleColumn();
             if (inWater && (this.motionX > 0 || this.motionZ > 0)) {
                 this.motionY = Utils.rand(-0.12, 0.12);
             } else if (!this.isOnGround() && !inWater) {
@@ -171,7 +173,7 @@ public abstract class EntitySwimming extends BaseEntity {
     @Override
     public boolean entityBaseTick(int tickDiff) {
         boolean result = super.entityBaseTick(tickDiff);
-        if (this.inWaterCached) {
+        if (this.inWaterCached && !this.inBubbleColumnCached) {
             this.setAirTicks(300);
         } else {
             int airTicks = getAirTicks() - tickDiff * 6;

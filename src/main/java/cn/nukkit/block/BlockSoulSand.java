@@ -40,11 +40,6 @@ public class BlockSoulSand extends BlockSolid {
     }
 
     @Override
-    public double getMaxY() {
-        return this.y + 1;
-    }
-
-    @Override
     public boolean hasEntityCollision() {
         return true;
     }
