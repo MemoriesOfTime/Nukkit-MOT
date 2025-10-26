@@ -54,11 +54,11 @@ public class BlockSoulSand extends BlockSolid {
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
             Block up = up();
-            if (up instanceof BlockWater && (up.getDamage() == 0 || up.getDamage() == 8)) {
-                BlockFormEvent event = new BlockFormEvent(up, new BlockBubbleColumn(0));
+            if (up instanceof BlockWater && up.getDamage() == 0) {
+                BlockFormEvent event = new BlockFormEvent(up, Block.get(BUBBLE_COLUMN, BlockBubbleColumn.DIRECTION_UP));
                 if (!event.isCancelled()) {
                     if (event.getNewState().getWaterloggingType() != WaterloggingType.NO_WATERLOGGING) {
-                        this.getLevel().setBlock(up, 1, new BlockWater(), true, false);
+                        this.getLevel().setBlock(up, 1, Block.get(WATER), true, false);
                     }
                     this.getLevel().setBlock(up, 0, event.getNewState(), true, true);
                 }
