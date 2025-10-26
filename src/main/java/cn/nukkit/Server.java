@@ -28,6 +28,7 @@ import cn.nukkit.inventory.Recipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItemMapping;
 import cn.nukkit.item.RuntimeItems;
+import cn.nukkit.item.customitem.ItemAutoRegister.NeteaseItemAutoRegister;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.lang.BaseLang;
 import cn.nukkit.lang.TextContainer;
@@ -768,6 +769,11 @@ public class Server {
             packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs_netease"), true));
         }
         this.resourcePackManager = new ResourcePackManager(packLoaders);
+
+        // 自动化注册网易组件物品
+        if (this.netEaseMode) {
+            NeteaseItemAutoRegister.registerNeteaseItems();
+        }
 
         this.pluginManager = new PluginManager(this, this.commandMap);
         this.pluginManager.subscribeToPermission(Server.BROADCAST_CHANNEL_ADMINISTRATIVE, this.consoleSender);
