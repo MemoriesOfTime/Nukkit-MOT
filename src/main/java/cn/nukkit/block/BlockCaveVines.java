@@ -11,6 +11,7 @@ import cn.nukkit.level.Position;
 import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -53,7 +54,7 @@ public class BlockCaveVines extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(@NotNull Item item, Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @NotNull Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @Nullable Player player) {
         if (!this.canPlaceOn(block.down(), target)) {
             return false;
         }

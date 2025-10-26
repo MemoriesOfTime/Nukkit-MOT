@@ -13,8 +13,8 @@ import cn.nukkit.level.particle.SplashParticle;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockBubbleColumn extends BlockTransparentMeta {

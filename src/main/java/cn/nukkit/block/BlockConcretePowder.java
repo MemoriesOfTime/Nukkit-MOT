@@ -7,6 +7,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by CreeperFace on 2.6.2017.
@@ -69,7 +70,7 @@ public class BlockConcretePowder extends BlockFallableMeta {
     }
 
     @Override
-    public boolean place(Item item, Block b, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block b, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         boolean concrete = false;
 
         for (int side = 1; side <= 5; side++) {

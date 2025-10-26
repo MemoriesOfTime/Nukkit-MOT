@@ -9,6 +9,7 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Nukkit Project Team
@@ -81,7 +82,7 @@ public class BlockCake extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (down().getId() != Block.AIR) {
             getLevel().setBlock(block, this, true, true);
 

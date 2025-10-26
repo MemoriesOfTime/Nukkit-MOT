@@ -15,6 +15,7 @@ import cn.nukkit.math.MathHelper;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.network.protocol.AnimatePacket;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
@@ -106,7 +107,7 @@ public class BlockBamboo extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = this.down();
         int downId = down.getId();
         if (downId != BAMBOO && downId != BAMBOO_SAPLING) {

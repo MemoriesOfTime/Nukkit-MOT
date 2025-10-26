@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockWoodBark extends BlockWood {
 
@@ -57,7 +58,7 @@ public class BlockWoodBark extends BlockWood {
     }
     
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (face.getAxis().isHorizontal()) {
             if (face.getAxis() == BlockFace.Axis.X) {
                 setDamage(getDamage() | 0x10);

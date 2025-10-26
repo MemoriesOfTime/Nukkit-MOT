@@ -67,7 +67,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (Math.abs(player.getFloorX() - this.x) < 2 && Math.abs(player.getFloorZ() - this.z) < 2) {
             double y = player.y + player.getEyeHeight();
 
@@ -204,7 +204,7 @@ public abstract class BlockPistonBase extends BlockSolidMeta implements Faceable
             List<Block> destroyBlocks = calculator.getBlocksToDestroy();
             for (int i = destroyBlocks.size() - 1; i >= 0; --i) {
                 Block block = destroyBlocks.get(i);
-                this.level.useBreakOn(block, null, null, false);
+                this.level.useBreakOn(block, null, null, true);
 
                 if (Server.getInstance().dropSpawners && block instanceof BlockMobSpawner){
                     this.level.dropItem(block.add(0.5, 0.5, 0.5), Item.get(Item.MONSTER_SPAWNER, 0, 1));

@@ -2,7 +2,6 @@ package cn.nukkit.block;
 
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
-import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
 public class BlockDoubleSlabWarped extends BlockSolid {
@@ -42,7 +41,7 @@ public class BlockDoubleSlabWarped extends BlockSolid {
             slab.setCount(2);
             return new Item[]{ slab };
         } else {
-            return new Item[0];
+            return Item.EMPTY_ARRAY;
         }
     }
     

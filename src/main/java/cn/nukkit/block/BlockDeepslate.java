@@ -7,6 +7,7 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockDeepslate extends BlockSolidMeta {
 
@@ -84,7 +85,7 @@ public class BlockDeepslate extends BlockSolidMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(faces[face.getIndex()]);
         this.getLevel().setBlock(block, this, true, true);
         return true;

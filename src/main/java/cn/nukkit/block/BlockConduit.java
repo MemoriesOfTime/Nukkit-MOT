@@ -65,7 +65,7 @@ public class BlockConduit extends BlockSolidMeta implements BlockEntityHolder {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (this.getLevel().setBlock(this, this, true, true)) {
             BlockEntity.createBlockEntity(BlockEntity.CONDUIT, this.getChunk(), BlockEntity.getDefaultCompound(this, BlockEntity.CONDUIT));
             return true;

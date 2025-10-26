@@ -10,6 +10,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.DyeColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -36,7 +37,7 @@ public abstract class BlockMushroom extends BlockFlowable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (canStay()) {
             getLevel().setBlock(block, this, true, true);
             return true;

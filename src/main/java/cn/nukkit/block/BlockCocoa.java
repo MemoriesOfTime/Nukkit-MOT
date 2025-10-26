@@ -14,6 +14,7 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.utils.DyeColor;
 import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Utils;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * Created by CreeperFace on 27. 10. 2016.
@@ -99,7 +100,7 @@ public class BlockCocoa extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (target.getId() == Block.WOOD && (target.getDamage() & 0x03) == BlockWood.JUNGLE) {
             if (face != BlockFace.DOWN && face != BlockFace.UP) {
                 this.setDamage(faces[face.getIndex()]);

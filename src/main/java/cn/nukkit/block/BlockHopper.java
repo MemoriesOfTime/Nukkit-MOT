@@ -75,7 +75,7 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         BlockFace facing = face.getOpposite();
 
         if (facing == BlockFace.UP) {

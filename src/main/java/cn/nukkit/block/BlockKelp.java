@@ -9,6 +9,7 @@ import cn.nukkit.level.Level;
 import cn.nukkit.level.particle.BoneMealParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -43,7 +44,7 @@ public class BlockKelp extends BlockFlowable {
     }
     
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = this.down();
         Block layer1Block = block.getLevelBlockAtLayer(1);
         int waterDamage;

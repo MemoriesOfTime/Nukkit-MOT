@@ -8,6 +8,7 @@ import cn.nukkit.block.properties.enums.CrackedState;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockSnifferEgg extends BlockTransparentMeta implements BlockPropertiesHelper {
     private static final BlockProperties PROPERTIES = new BlockProperties(VanillaProperties.CRACKED_STATE);
@@ -41,7 +42,7 @@ public class BlockSnifferEgg extends BlockTransparentMeta implements BlockProper
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setCrackedState(CrackedState.NO_CRACKS);
         return this.getLevel().setBlock(this, this, true, true);
     }

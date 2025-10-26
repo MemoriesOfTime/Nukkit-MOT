@@ -10,6 +10,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Plane;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.EnumSet;
 
@@ -40,7 +41,7 @@ public class BlockRedstoneWire extends BlockFlowable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (!canBePlacedOn(block.down())) {
             return false;
         }

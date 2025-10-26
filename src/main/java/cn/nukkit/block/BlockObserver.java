@@ -11,6 +11,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.plugin.PluginManager;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class BlockObserver extends BlockSolidMeta implements Faceable {
 
@@ -69,7 +70,7 @@ public class BlockObserver extends BlockSolidMeta implements Faceable {
     }
     
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @Nullable Player player) {
         if (player != null) {
             if (Math.abs(player.getFloorX() - this.x) <= 1 && Math.abs(player.getFloorZ() - this.z) <= 1) {
                 double y = player.y + player.getEyeHeight();

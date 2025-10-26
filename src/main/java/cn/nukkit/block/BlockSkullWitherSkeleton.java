@@ -6,6 +6,7 @@ import cn.nukkit.entity.mob.EntityWither;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.BlockFace;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * @author Justin
@@ -41,10 +42,12 @@ public class BlockSkullWitherSkeleton extends BlockSkullSkeleton {
     }
 
     @Override
-    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @NotNull Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @Nullable Player player) {
         if (super.place(item, block, target, face, fx, fy, fz, player)) {
             if (EntityWither.checkAndSpawnWither(this)) {
-                player.awardAchievement("spawnWither");
+                if (player != null) {
+                    player.awardAchievement("spawnWither");
+                }
             }
             return true;
         }

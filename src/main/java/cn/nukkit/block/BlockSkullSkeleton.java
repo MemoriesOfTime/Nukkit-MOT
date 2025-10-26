@@ -14,6 +14,7 @@ import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * @author Justin
@@ -93,7 +94,7 @@ public class BlockSkullSkeleton extends BlockTransparentMeta implements Faceable
     }
 
     @Override
-    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, BlockFace face, double fx, double fy, double fz, @NotNull Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @Nullable Player player) {
         switch (face) {
             case NORTH:
             case SOUTH:
@@ -114,7 +115,7 @@ public class BlockSkullSkeleton extends BlockTransparentMeta implements Faceable
                 .putInt("x", block.getFloorX())
                 .putInt("y", block.getFloorY())
                 .putInt("z", block.getFloorZ())
-                .putByte("Rot", (int) Math.floor((player.yaw * 16 / 360) + 0.5) & 0x0f);
+                .putByte("Rot", (int) Math.floor((player != null ? player.yaw: 0) * 16 / 360) & 0x0f);
         if (item.hasCustomBlockData()) {
             for (Tag aTag : item.getCustomBlockData().getAllTags()) {
                 nbt.put(aTag.getName(), aTag);

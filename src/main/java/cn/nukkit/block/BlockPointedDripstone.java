@@ -24,6 +24,7 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
 import it.unimi.dsi.fastutil.ints.IntObjectPair;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
@@ -66,7 +67,7 @@ public class BlockPointedDripstone extends BlockSolidMeta implements BlockProper
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (!this.canPlaceOn(block.down(), target)) {
             return false;
         }

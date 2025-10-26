@@ -91,7 +91,7 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable, Blo
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (face != BlockFace.DOWN) {
             CompoundTag nbt = new CompoundTag()
                     .putString("id", BlockEntity.SIGN)

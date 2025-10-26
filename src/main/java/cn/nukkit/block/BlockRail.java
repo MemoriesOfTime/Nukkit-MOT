@@ -13,6 +13,7 @@ import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
 import cn.nukkit.utils.Rail;
 import cn.nukkit.utils.Rail.Orientation;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -90,7 +91,7 @@ public class BlockRail extends BlockFlowable implements Faceable {
 
     //Information from http://minecraft.gamepedia.com/Rail
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         Block down = this.down();
         if (!canStayOnFullSolid(this.down())) {
             return false;

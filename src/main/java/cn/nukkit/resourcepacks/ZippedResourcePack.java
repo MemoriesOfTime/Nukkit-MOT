@@ -66,7 +66,7 @@ public class ZippedResourcePack extends AbstractResourcePack {
             }
             File keyFile = new File(parentFolder, this.file.getName() + ".key");
             if (keyFile.exists()) {
-                this.encryptionKey = new String(Files.readAllBytes(keyFile.toPath()), StandardCharsets.UTF_8);
+                this.encryptionKey = Files.readString(keyFile.toPath());
             }
         } catch (IOException e) {
             Server.getInstance().getLogger().logException(e);

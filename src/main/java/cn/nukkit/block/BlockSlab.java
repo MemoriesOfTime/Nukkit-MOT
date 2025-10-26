@@ -7,6 +7,7 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author MagicDroidX
@@ -67,7 +68,7 @@ public abstract class BlockSlab extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(this.getDamage() & SLAB_BLOCK_TYPE_BIT);
         if (face == BlockFace.DOWN) {
             if (target instanceof BlockSlab && ((BlockSlab) target).doubleSlab == this.doubleSlab && ((BlockSlab) target).hasTopBit() && (target.getDamage() & SLAB_BLOCK_TYPE_BIT) == (this.getDamage() & SLAB_BLOCK_TYPE_BIT)) {

@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.math.BlockFace;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockLightningRod extends BlockTransparentMeta {
 
@@ -63,7 +64,7 @@ public class BlockLightningRod extends BlockTransparentMeta {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         this.setDamage(FACES[player != null ? face.getIndex() : 0]);
         this.getLevel().setBlock(this, this, true, true);
         return true;

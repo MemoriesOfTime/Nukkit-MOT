@@ -88,7 +88,7 @@ public class BlockBeacon extends BlockTransparent implements BlockEntityHolder<B
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         boolean blockSuccess = super.place(item, block, target, face, fx, fy, fz, player);
 
         if (blockSuccess) {

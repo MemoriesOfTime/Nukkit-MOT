@@ -168,7 +168,9 @@ public abstract class Biome implements BlockID {
 
     @Override
     public boolean equals(Object obj) {
-        return hashCode() == obj.hashCode();
+        if (obj == null) return false;
+        if (obj instanceof Biome) return hashCode() == obj.hashCode();
+        return false;
     }
 
     /**

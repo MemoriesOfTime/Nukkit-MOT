@@ -13,6 +13,7 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
     public static final int DIRECTION_MASK = 0b11;
@@ -135,7 +136,7 @@ public class BlockTrapdoor extends BlockTransparentMeta implements Faceable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         BlockFace facing;
         boolean top;
         int meta = 0;

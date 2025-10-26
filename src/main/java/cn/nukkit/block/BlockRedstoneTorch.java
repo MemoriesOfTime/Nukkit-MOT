@@ -8,6 +8,7 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Angelic47
@@ -39,7 +40,7 @@ public class BlockRedstoneTorch extends BlockTorch implements Faceable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (!super.place(item, block, target, face, fx, fy, fz, player)) {
             return false;
         }
