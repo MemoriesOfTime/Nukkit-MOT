@@ -3,6 +3,7 @@ package cn.nukkit.item.customitem.ItemAutoRegister;
 import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.customitem.dynamic.DynamicItemConfig;
 import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.resourcepacks.ZippedBehaviourPack;
 import cn.nukkit.resourcepacks.ZippedResourcePack;
@@ -12,10 +13,11 @@ import com.google.gson.JsonParser;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -83,7 +85,7 @@ public class NeteaseItemAutoRegister {
             JsonObject resourceDef = itemPair.getResourceDefinition();
 
             // 解析物品配置
-            Item.ItemConfig itemConfig = parseItemConfig(behaviorDef, resourceDef);
+            DynamicItemConfig itemConfig = parseItemConfig(behaviorDef, resourceDef);
 
             // 生成纹理名称（从图标路径提取）
             String textureName = extractTextureName(itemPair.getIconPath());
@@ -98,14 +100,14 @@ public class NeteaseItemAutoRegister {
 
         } catch (Exception e) {
             log.error("解析物品配置时发生错误: {}", identifier, e);
-            return false;
         }
+        return false;
     }
 
     /**
      * 从JSON定义中解析物品配置
      */
-    private Item.ItemConfig parseItemConfig(JsonObject behaviorDef, JsonObject resourceDef) {
+    private DynamicItemConfig parseItemConfig(JsonObject behaviorDef, JsonObject resourceDef) {
         // 默认配置
         int maxStackSize = 64;
         int maxDurability = 0;
@@ -172,7 +174,7 @@ public class NeteaseItemAutoRegister {
             log.warn("解析物品配置时发生错误，使用默认配置", e);
         }
 
-        return new Item.ItemConfig(maxStackSize, maxDurability, attackDamage, scaleOffset, isSword, isTool, allowOffHand, handEquipped, foil, creativeCategory, creativeGroup, canDestroyInCreative);
+        return new DynamicItemConfig(maxStackSize, maxDurability, attackDamage, scaleOffset, isSword, isTool, allowOffHand, handEquipped, foil, creativeCategory, creativeGroup, canDestroyInCreative);
     }
 
 //    /**
@@ -382,7 +384,7 @@ public class NeteaseItemAutoRegister {
     public Map<String, Map<String, JsonObject>> getAllNeteaseItemsAsMap() {
         Map<String, Map<String, JsonObject>> allItems = new HashMap<>();
 
-        ResourcePack[] behaviorPacks = Server.getInstance().getResourcePackManager().getBehaviorStackIgnoreNetease(GameVersion.getLastVersion());
+        ResourcePack[] behaviorPacks = Server.getInstance().getResourcePackManager().getBehaviorStack(GameVersion.getLastVersionNetEase());
 
         for (ResourcePack pack : behaviorPacks) {
             if (pack instanceof ZippedBehaviourPack) {
@@ -411,7 +413,7 @@ public class NeteaseItemAutoRegister {
     public Map<String, Map<String, JsonObject>> getAllNeteaseResourceItemsAsMap() {
         Map<String, Map<String, JsonObject>> allItems = new HashMap<>();
 
-        ResourcePack[] resourcePacks = Server.getInstance().getResourcePackManager().getResourceStackIgnoreNetease(GameVersion.getLastVersion());
+        ResourcePack[] resourcePacks = Server.getInstance().getResourcePackManager().getResourceStack(GameVersion.getLastVersionNetEase());
 
         for (ResourcePack pack : resourcePacks) {
             if (pack instanceof ZippedResourcePack) {

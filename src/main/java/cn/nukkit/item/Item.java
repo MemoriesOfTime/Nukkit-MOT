@@ -12,10 +12,8 @@ import cn.nukkit.inventory.ItemTag;
 import cn.nukkit.item.RuntimeItemMapping.RuntimeEntry;
 import cn.nukkit.item.customitem.CustomItem;
 import cn.nukkit.item.customitem.CustomItemDefinition;
-import cn.nukkit.item.customitem.ItemCustom;
-import cn.nukkit.item.customitem.data.ItemCreativeCategory;
-import cn.nukkit.item.customitem.data.ItemCreativeGroup;
-import cn.nukkit.item.customitem.data.RenderOffsets;
+import cn.nukkit.item.customitem.dynamic.DynamicItemConfig;
+import cn.nukkit.item.customitem.dynamic.DynamicItemCustom;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
@@ -1104,6 +1102,26 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         };
     }
 
+    /**
+     * 动态注册自定义物品，通过配置数据创建物品实例
+     * Dynamically register custom item through configuration data
+     *
+     * @param namespaceId 物品的命名空间ID
+     * @param displayName 物品显示名称
+     * @param textureName 贴图名称
+     * @param itemConfig 物品配置数据
+     * @param addCreativeItem 是否添加到创造模式物品栏
+     * @return 注册结果
+     */
+    public static OK<?> registerDynamicCustomItem(@NotNull String namespaceId,
+                                                  @Nullable String displayName,
+                                                  @NotNull String textureName,
+                                                  @NotNull DynamicItemConfig itemConfig,
+                                                  boolean addCreativeItem) {
+        Supplier<Item> supplier = () -> new DynamicItemCustom(namespaceId, displayName, textureName, itemConfig);
+        return registerCustomItem(supplier, addCreativeItem);
+    }
+
     public static OK<?> registerCustomItem(@NotNull List<Class<? extends CustomItem>> itemClassList) {
         for (Class<? extends CustomItem> itemClass : itemClassList) {
             OK<?> result = registerCustomItem(itemClass);
@@ -1119,18 +1137,12 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static OK<?> registerCustomItem(@NotNull Class<? extends CustomItem> clazz, boolean addCreativeItem) {
-        if (!Server.getInstance().enableExperimentMode) {
-            Server.getInstance().getLogger().warning("The server does not have the experiment mode feature enabled. Unable to register the custom item!");
-            return new OK<>(false, "The server does not have the experiment mode feature enabled. Unable to register the custom item!");
-        }
-
-        CustomItem customItem;
         Supplier<Item> supplier;
 
         try {
             var method = clazz.getDeclaredConstructor();
             method.setAccessible(true);
-            customItem = method.newInstance();
+            CustomItem customItem = method.newInstance();
             supplier = () -> {
                 try {
                     return (Item) method.newInstance();
@@ -1143,6 +1155,16 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             return new OK<>(false, e);
         }
 
+        return registerCustomItem(supplier, addCreativeItem);
+    }
+
+    public static OK<?> registerCustomItem(@NotNull Supplier<Item> supplier, boolean addCreativeItem) {
+        if (!Server.getInstance().enableExperimentMode) {
+            Server.getInstance().getLogger().warning("The server does not have the experiment mode feature enabled. Unable to register the custom item!");
+            return new OK<>(false, "The server does not have the experiment mode feature enabled. Unable to register the custom item!");
+        }
+
+        CustomItem customItem = (CustomItem) supplier.get();
         if (CUSTOM_ITEMS.containsKey(customItem.getNamespaceId())) {
             return new OK<>(false, "The custom item with the namespace ID \"" + customItem.getNamespaceId() + "\" is already registered!");
         }
@@ -1202,224 +1224,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         return new OK<Void>(true);
-    }
-
-    /**
-     * 动态注册自定义物品，通过配置数据创建物品实例
-     * Dynamically register custom item through configuration data
-     * 
-     * @param namespaceId 物品的命名空间ID
-     * @param displayName 物品显示名称
-     * @param textureName 贴图名称
-     * @param itemConfig 物品配置数据
-     * @param addCreativeItem 是否添加到创造模式物品栏
-     * @return 注册结果
-     */
-    public static OK<?> registerDynamicCustomItem(@NotNull String namespaceId, 
-                                                  @Nullable String displayName,
-                                                  @NotNull String textureName,
-                                                  @NotNull ItemConfig itemConfig,
-                                                  boolean addCreativeItem) {
-        if (!Server.getInstance().enableExperimentMode) {
-            Server.getInstance().getLogger().warning("The server does not have the experiment mode feature enabled. Unable to register the custom item!");
-            return new OK<>(false, "The server does not have the experiment mode feature enabled. Unable to register the custom item!");
-        }
-
-        if (CUSTOM_ITEMS.containsKey(namespaceId)) {
-            return new OK<>(false, "The custom item with the namespace ID \"" + namespaceId + "\" is already registered!");
-        }
-
-        // 创建动态ItemCustom实例
-        DynamicItemCustom dynamicItem = new DynamicItemCustom(namespaceId, displayName, textureName, itemConfig);
-        
-        // 创建供应商
-        Supplier<Item> supplier = () -> new DynamicItemCustom(namespaceId, displayName, textureName, itemConfig);
-
-        CUSTOM_ITEMS.put(namespaceId, supplier);
-        CustomItemDefinition customDef = dynamicItem.getDefinition();
-        CUSTOM_ITEM_DEFINITIONS.put(namespaceId, customDef);
-        registerNamespacedIdItem(namespaceId, supplier);
-
-        // 在服务端注册自定义物品的tag
-        if (customDef.getNbt(ProtocolInfo.CURRENT_PROTOCOL).get("components") instanceof CompoundTag componentTag) {
-            var tagList = componentTag.getList("item_tags", StringTag.class);
-            if (!tagList.isEmpty()) {
-                ItemTag.registerItemTag(namespaceId, tagList.getAll().stream().map(tag -> tag.data).collect(Collectors.toSet()));
-            }
-        }
-
-        registerCustomItem(dynamicItem, GameVersion.V1_16_100, addCreativeItem, GameVersion.V1_16_0);
-        registerCustomItem(dynamicItem, GameVersion.V1_17_0, addCreativeItem, GameVersion.V1_17_0);
-        registerCustomItem(dynamicItem, GameVersion.V1_17_10, addCreativeItem, GameVersion.V1_17_10, GameVersion.V1_17_30, GameVersion.V1_17_40);
-        registerCustomItem(dynamicItem, GameVersion.V1_18_0, addCreativeItem, GameVersion.V1_18_0);
-        registerCustomItem(dynamicItem, GameVersion.V1_18_10, addCreativeItem, GameVersion.V1_18_10);
-        registerCustomItem(dynamicItem, GameVersion.V1_18_30, addCreativeItem, GameVersion.V1_18_30);
-        registerCustomItem(dynamicItem, GameVersion.V1_19_0, addCreativeItem, GameVersion.V1_19_0);
-        registerCustomItem(dynamicItem, GameVersion.V1_19_10, addCreativeItem, GameVersion.V1_19_10, GameVersion.V1_19_20);
-        registerCustomItem(dynamicItem, GameVersion.V1_19_50, addCreativeItem, GameVersion.V1_19_50);
-        registerCustomItem(dynamicItem, GameVersion.V1_19_60, addCreativeItem, GameVersion.V1_19_60);
-        registerCustomItem(dynamicItem, GameVersion.V1_19_70, addCreativeItem, GameVersion.V1_19_70);
-        registerCustomItem(dynamicItem, GameVersion.V1_19_80, addCreativeItem, GameVersion.V1_19_80);
-        registerCustomItem(dynamicItem, GameVersion.V1_20_0, addCreativeItem, GameVersion.V1_20_0);
-        registerCustomItem(dynamicItem, GameVersion.V1_20_10, addCreativeItem, GameVersion.V1_20_10);
-        registerCustomItem(dynamicItem, GameVersion.V1_20_30, addCreativeItem, GameVersion.V1_20_30);
-        registerCustomItem(dynamicItem, GameVersion.V1_20_40, addCreativeItem, GameVersion.V1_20_40);
-        registerCustomItem(dynamicItem, GameVersion.V1_20_50, addCreativeItem, GameVersion.V1_20_50);
-        registerCustomItem(dynamicItem, GameVersion.V1_20_60, addCreativeItem, GameVersion.V1_20_60);
-        registerCustomItem(dynamicItem, GameVersion.V1_20_70, addCreativeItem, GameVersion.V1_20_70);
-        registerCustomItem(dynamicItem, GameVersion.V1_20_80, addCreativeItem, GameVersion.V1_20_80);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_0, addCreativeItem, GameVersion.V1_21_0);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_20, addCreativeItem, GameVersion.V1_21_20);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_30, addCreativeItem, GameVersion.V1_21_30);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_40, addCreativeItem, GameVersion.V1_21_40);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_50, addCreativeItem, GameVersion.V1_21_50);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_60, addCreativeItem, GameVersion.V1_21_60);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_70, addCreativeItem, GameVersion.V1_21_70);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_80, addCreativeItem, GameVersion.V1_21_80);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_90, addCreativeItem, GameVersion.V1_21_90, GameVersion.V1_21_93);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_100, addCreativeItem, GameVersion.V1_21_100);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_110, addCreativeItem, GameVersion.V1_21_110);
-
-        // NetEase
-        registerCustomItem(dynamicItem, GameVersion.V1_20_50_NETEASE, addCreativeItem, GameVersion.V1_20_50_NETEASE);
-        registerCustomItem(dynamicItem, GameVersion.V1_21_2_NETEASE, addCreativeItem, GameVersion.V1_21_2_NETEASE);
-
-        //TODO Multiversion 添加新版本支持时修改这里
-
-        if (addCreativeItem) {
-            CUSTOM_ITEM_NEED_ADD_CREATIVE.put(namespaceId, dynamicItem);
-        }
-
-        return new OK<Void>(true);
-    }
-
-    /**
-     * 物品配置数据类
-     * Item configuration data class
-     */
-    public static class ItemConfig {
-        private final int maxStackSize;
-        private final int maxDurability;
-        private final int attackDamage;
-        private final int scaleOffset;
-        private final boolean isSword;
-        private final boolean isTool;
-        private final boolean allowOffHand;
-        private final boolean handEquipped;
-        private final boolean foil;
-        private final String creativeCategory;
-        private final String creativeGroup;
-        private final boolean canDestroyInCreative;
-
-        public ItemConfig(int maxStackSize, int maxDurability, int attackDamage, int scaleOffset,
-                         boolean isSword, boolean isTool, boolean allowOffHand, boolean handEquipped,
-                         boolean foil, String creativeCategory, String creativeGroup, boolean canDestroyInCreative) {
-            this.maxStackSize = maxStackSize;
-            this.maxDurability = maxDurability;
-            this.attackDamage = attackDamage;
-            this.scaleOffset = scaleOffset;
-            this.isSword = isSword;
-            this.isTool = isTool;
-            this.allowOffHand = allowOffHand;
-            this.handEquipped = handEquipped;
-            this.foil = foil;
-            this.creativeCategory = creativeCategory;
-            this.creativeGroup = creativeGroup;
-            this.canDestroyInCreative = canDestroyInCreative;
-        }
-
-        // Getters
-        public int getMaxStackSize() { return maxStackSize; }
-        public int getMaxDurability() { return maxDurability; }
-        public int getAttackDamage() { return attackDamage; }
-        public int getScaleOffset() { return scaleOffset; }
-        public boolean isSword() { return isSword; }
-        public boolean isTool() { return isTool; }
-        public boolean isAllowOffHand() { return allowOffHand; }
-        public boolean isHandEquipped() { return handEquipped; }
-        public boolean isFoil() { return foil; }
-        public String getCreativeCategory() { return creativeCategory; }
-        public String getCreativeGroup() { return creativeGroup; }
-        public boolean isCanDestroyInCreative() { return canDestroyInCreative; }
-    }
-
-    /**
-     * 动态ItemCustom实现类
-     * Dynamic ItemCustom implementation class
-     */
-    public static class DynamicItemCustom extends ItemCustom {
-        private final ItemConfig config;
-
-        public DynamicItemCustom(@NotNull String id, @Nullable String name, @NotNull String textureName, @NotNull ItemConfig config) {
-            super(id, name, textureName);
-            this.config = config;
-        }
-
-        @Override
-        public int getMaxStackSize() {
-            return config.getMaxStackSize();
-        }
-
-        @Override
-        public int getMaxDurability() {
-            return config.getMaxDurability();
-        }
-
-        @Override
-        public int getAttackDamage() {
-            return config.getAttackDamage();
-        }
-
-        @Override
-        public boolean isSword() {
-            return config.isSword();
-        }
-
-        @Override
-        public boolean isTool() {
-            return config.isTool();
-        }
-
-        public int scaleOffset() {
-            return config.getScaleOffset();
-        }
-
-        @Override
-        public CustomItemDefinition getDefinition() {
-            try {
-                // 解析创造模式分类
-                ItemCreativeCategory category = 
-                    ItemCreativeCategory.valueOf(config.getCreativeCategory().toUpperCase());
-                
-                // 解析创造模式组
-                ItemCreativeGroup group = null;
-                if (config.getCreativeGroup() != null && !config.getCreativeGroup().isEmpty()) {
-                    group = ItemCreativeGroup.valueOf(config.getCreativeGroup().toUpperCase());
-                }
-
-                CustomItemDefinition.SimpleBuilder builder = CustomItemDefinition.simpleBuilder(this, category);
-
-                if (group != null) {
-                    builder.creativeGroup(group);
-                }
-
-                return builder
-                    .allowOffHand(config.isAllowOffHand())
-                    .handEquipped(config.isHandEquipped())
-                    .foil(config.isFoil())
-                    .canDestroyInCreative(config.isCanDestroyInCreative())
-                    .renderOffsets(RenderOffsets.scaleOffset(config.getScaleOffset()))
-                    .build();
-            } catch (Exception e) {
-                // 如果解析失败，使用默认配置
-                return CustomItemDefinition
-                    .simpleBuilder(this, ItemCreativeCategory.EQUIPMENT)
-                    .allowOffHand(config.isAllowOffHand())
-                    .handEquipped(config.isHandEquipped())
-                    .renderOffsets(RenderOffsets.scaleOffset(config.getScaleOffset()))
-                    .build();
-            }
-        }
     }
 
     private static void registerCustomItem(CustomItem item, GameVersion protocol, boolean addCreativeItem, GameVersion... creativeProtocols) {

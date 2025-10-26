@@ -209,7 +209,7 @@ public class RuntimeItemMapping {
         }
     }
 
-    public synchronized boolean registerCustomItem(CustomItem customItem) {
+    synchronized boolean registerCustomItem(CustomItem customItem) {
         int runtimeId = CustomItemDefinition.getRuntimeId(customItem.getNamespaceId());
         String namespaceId = customItem.getNamespaceId();
         if (!Server.getInstance().enableExperimentMode) {

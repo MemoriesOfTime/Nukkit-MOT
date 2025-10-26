@@ -55,27 +55,11 @@ public class ResourcePackManager {
                 .toArray(ResourcePack[]::new);
     }
 
-    public ResourcePack[] getResourceStackIgnoreNetease(GameVersion gameVersion) {
-        return this.resourcePacks.stream()
-                .filter(pack -> pack.getPackProtocol() <= gameVersion.getProtocol())
-                .toArray(ResourcePack[]::new);
-    }
-
     public ResourcePack[] getBehaviorStack(GameVersion gameVersion) {
         return this.behaviorPacks.stream()
-                .filter(pack -> {
-                    boolean protocolMatch = pack.getPackProtocol() <= gameVersion.getProtocol();
-                    boolean netEaseMatch = (gameVersion.isNetEase() && pack.isNetEase())
-                                        || (!gameVersion.isNetEase() && !pack.isNetEase());
-                    
-                    return protocolMatch && netEaseMatch;
-                })
-                .toArray(ResourcePack[]::new);
-    }
-
-    public ResourcePack[] getBehaviorStackIgnoreNetease(GameVersion gameVersion) {
-        return this.behaviorPacks.stream()
                 .filter(pack -> pack.getPackProtocol() <= gameVersion.getProtocol())
+                .filter(pack -> (gameVersion.isNetEase() && pack.isNetEase())
+                        || (!gameVersion.isNetEase() && !pack.isNetEase()))
                 .toArray(ResourcePack[]::new);
     }
 

@@ -176,11 +176,7 @@ public interface CompressionProvider {
             case (byte) 0xff -> {
                 return NONE;
             }
-            default -> {
-                // 添加对未知压缩类型的处理，记录警告并使用默认压缩
-                Server.getInstance().getLogger().warning("Unknown compression type: " + prefix + ", using default ZLIB compression");
-                return raknetProtocol >= 10 ? ZLIB_RAW : ZLIB;
-            }
+            default -> throw new IllegalArgumentException("Unsupported compression type: " + prefix);
         }
     }
 }

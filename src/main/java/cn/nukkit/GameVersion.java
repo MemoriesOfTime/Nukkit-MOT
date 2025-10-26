@@ -107,6 +107,7 @@ public enum GameVersion {
 
     private static GameVersion FEATURE_VERSION = GameVersion.V1_21_70;
     private static final GameVersion LAST_VERSION = GameVersion.V1_21_110; //TODO MultiVersion
+    private static final GameVersion LAST_VERSION_NETEASE = GameVersion.V1_21_2_NETEASE; //TODO MultiVersion
 
     private final int protocol;
     private final boolean isNetEase;
@@ -220,5 +221,9 @@ public enum GameVersion {
 
     public static GameVersion getLastVersion() {
         return LAST_VERSION;
+    }
+
+    public static GameVersion getLastVersionNetEase() {
+        return LAST_VERSION_NETEASE;
     }
 }
