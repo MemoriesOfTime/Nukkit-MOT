@@ -3041,7 +3041,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         Item item = Item.fromString(entry.getKey());
                                         entries.add(new ItemComponentPacket.ItemDefinition(
                                                 entry.getKey(),
-                                                item.getNetworkId(this.protocol),
+                                                item.getNetworkId(this.gameVersion),
                                                 true,
                                                 1,
                                                 entry.getValue().getNbt(this.protocol)
@@ -3062,7 +3062,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         Item item = Item.fromString(entry.getKey());
                                         entries.add(new ItemComponentPacket.ItemDefinition(
                                                 entry.getKey(),
-                                                item.getNetworkId(this.protocol),
+                                                item.getNetworkId(this.gameVersion),
                                                 true,
                                                 1,
                                                 entry.getValue().getNbt(this.protocol).putShort("minecraft:identifier", i)
