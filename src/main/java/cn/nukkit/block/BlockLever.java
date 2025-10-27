@@ -9,6 +9,7 @@ import cn.nukkit.level.sound.LeverSound;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * @author Nukkit Project Team
@@ -90,7 +91,7 @@ public class BlockLever extends BlockFlowable implements Faceable {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         LeverOrientation faces = LeverOrientation.forFacings(face, player.getHorizontalFacing());
         this.setDamage(faces.getMetadata());
         if (!isSupportValid(this.getSide(faces.facing.getOpposite()))) {

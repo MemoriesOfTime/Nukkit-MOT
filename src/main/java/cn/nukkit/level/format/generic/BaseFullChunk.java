@@ -163,10 +163,6 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         return pk;
     }
 
-    public void backwardCompatibilityUpdate(Level level) {
-        // Does nothing here
-    }
-
     @Override
     public void initChunk() {
         if (this.getProvider() != null && !this.isInit) {

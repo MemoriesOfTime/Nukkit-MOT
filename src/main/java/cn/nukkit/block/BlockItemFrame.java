@@ -146,7 +146,7 @@ public class BlockItemFrame extends BlockTransparentMeta implements Faceable, Bl
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (face.getIndex() > 1 && target.isSolid() && (!block.isSolid() || block.canBeReplaced())) {
             this.setBlockFace(face);
             this.getLevel().setBlock(block, this, true, true);

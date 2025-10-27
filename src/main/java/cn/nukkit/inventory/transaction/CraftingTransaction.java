@@ -3,10 +3,7 @@ package cn.nukkit.inventory.transaction;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
-import cn.nukkit.inventory.BigCraftingGrid;
-import cn.nukkit.inventory.CraftingRecipe;
-import cn.nukkit.inventory.InventoryType;
-import cn.nukkit.inventory.Recipe;
+import cn.nukkit.inventory.*;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -120,7 +117,14 @@ public class CraftingTransaction extends InventoryTransaction {
                 setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
             }
         }*/
-        this.setTransactionRecipe(source.getServer().getCraftingManager().matchRecipe(source.protocol, this.inputs, this.primaryOutput, this.secondaryOutputs));
+        Recipe recipe = source.getServer().getCraftingManager().matchRecipe(source.protocol, this.inputs, this.primaryOutput, this.secondaryOutputs);
+        if (recipe == null) {
+            MultiRecipe multiRecipe = source.getServer().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
+            if (multiRecipe != null) {
+                recipe = multiRecipe.toRecipe(this.getPrimaryOutput(), this.getInputList());
+            }
+        }
+        this.setTransactionRecipe(recipe);
         return this.getTransactionRecipe() != null && super.canExecute();
     }
 

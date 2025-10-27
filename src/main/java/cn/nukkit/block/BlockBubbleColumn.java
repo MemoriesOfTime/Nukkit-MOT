@@ -3,6 +3,7 @@ package cn.nukkit.block;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
+import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.event.block.BlockFadeEvent;
 import cn.nukkit.event.block.BlockFromToEvent;
 import cn.nukkit.item.Item;
@@ -13,12 +14,14 @@ import cn.nukkit.level.particle.SplashParticle;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class BlockBubbleColumn extends BlockTransparentMeta {
 
+    public static final int DIRECTION_UP = 0;
+    public static final int DIRECTION_DOWN = 1;
 
     public BlockBubbleColumn() {
         this(0);
@@ -99,43 +102,12 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
     }
 
     @Override
-    public void onEntityCollide(Entity entity) {
-        if (entity.canBeMovedByCurrents()) {
-            if (up().getId() == AIR) {
-                if (getDamage() == 1) {
-                    entity.motionY = Math.max(-0.9, entity.motionY - 0.03);
-                } else {
-                    if ((entity instanceof EntityCreature entityCreature) && entity.motionY < -entityCreature.getGravity() * 8) {
-                        entity.motionY = -entityCreature.getGravity() * 2;
-                    }
-                    entity.motionY = Math.min(1.8, entity.motionY + 0.1);
-                }
-
-                ThreadLocalRandom random = ThreadLocalRandom.current();
-                for(int i = 0; i < 2; ++i) {
-                    level.addParticle(new SplashParticle(add(random.nextFloat(), random.nextFloat() + 1, random.nextFloat())));
-                    level.addParticle(new BubbleParticle(add(random.nextFloat(), random.nextFloat() + 1, random.nextFloat())));
-                }
-
-            } else {
-                if (getDamage() == 1) {
-                    entity.motionY = Math.max(-0.3, entity.motionY - 0.3);
-                } else {
-                    entity.motionY = Math.min(0.7, entity.motionY + 0.06);
-                }
-            }
-            entity.resetFallDistance();
-        }
-    }
-
-    @Override
     public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @Nullable Player player) {
-        if (down().getId() == MAGMA) {
-            setDamage(1);
+        if (this.getLevel().setBlock(this, this, true, true)) {
+            this.getLevel().setBlock(this, 1, Block.get(Block.STILL_WATER), true, true);
+            return true;
         }
-        this.getLevel().setBlock(this, 1, new BlockWater(), true, false);
-        this.getLevel().setBlock(this, this, true, true);
-        return true;
+        return false;
     }
 
     @Override
@@ -146,11 +118,6 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
     @Override
     public double getResistance() {
         return 500;
-    }
-
-    @Override
-    public boolean hasEntityCollision() {
-        return true;
     }
 
     @Override
@@ -167,24 +134,19 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
                 return type;
             }
 
-            if (water.getDamage() == 8) {
-                water.setDamage(0);
-                this.getLevel().setBlock(this, 1, water, true, false);
-            }
-
             Block down = down();
             if (down.getId() == BUBBLE_COLUMN) {
                 if (down.getDamage() != this.getDamage()) {
                     this.getLevel().setBlock(this, down, true, true);
                 }
-            } else if (down.getId() == MAGMA) {
-                if (this.getDamage() != 1) {
-                    setDamage(1);
+            } else if (down.getId() == SOUL_SAND) {
+                if (this.getDamage() != DIRECTION_UP) {
+                    setDamage(DIRECTION_UP);
                     this.getLevel().setBlock(this, this, true, true);
                 }
-            } else if (down.getId() == SOUL_SAND) {
-                if (this.getDamage() != 0) {
-                    setDamage(0);
+            } else if (down.getId() == MAGMA) {
+                if (this.getDamage() != DIRECTION_DOWN) {
+                    setDamage(DIRECTION_DOWN);
                     this.getLevel().setBlock(this, this, true, true);
                 }
             } else {
@@ -195,9 +157,10 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
             Block up = up();
             if (up instanceof BlockWater && (up.getDamage() == 0 || up.getDamage() == 8)) {
                 BlockFromToEvent event = new BlockFromToEvent(this, up);
+                event.call();
                 if (!event.isCancelled()) {
-                    this.getLevel().setBlock(up, 1, new BlockWater(), true, false);
-                    this.getLevel().setBlock(up, 0, new BlockBubbleColumn(this.getDamage()), true, true);
+                    this.getLevel().setBlock(up, 1, Block.get(WATER), true, false);
+                    this.getLevel().setBlock(up, 0, Block.get(BUBBLE_COLUMN, this.getDamage()), true, true);
                 }
             }
 
@@ -207,10 +170,63 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
         return 0;
     }
 
+    @Override
+    public boolean hasEntityCollision() {
+        return true;
+    }
+
+    @Override
+    public void onEntityCollide(Entity entity) {
+        if (entity.canBeMovedByCurrents()) {
+            if (up().getId() == AIR) {
+                double motY = entity.motionY;
+
+                if (this.getDamage() == DIRECTION_DOWN) {
+                    motY = Math.max(-0.9, motY - 0.03);
+                } else {
+                    if ((entity instanceof EntityCreature entityCreature) && motY < -entityCreature.getGravity() * 8) {
+                        motY = -entityCreature.getGravity() * 2;
+                    }
+                    motY = Math.min(1.8, motY + 0.1);
+                }
+
+                ThreadLocalRandom random = ThreadLocalRandom.current();
+                for(int i = 0; i < 2; ++i) {
+                    level.addParticle(new SplashParticle(add(random.nextFloat(), random.nextFloat() + 1, random.nextFloat())));
+                    level.addParticle(new BubbleParticle(add(random.nextFloat(), random.nextFloat() + 1, random.nextFloat())));
+                }
+
+                if (entity instanceof Player player) {
+                    player.setMotionLocally(entity.getMotion().setY(motY));
+                } else {
+                    entity.motionY = motY;
+                }
+            } else {
+                double motY = entity.motionY;
+
+                if (getDamage() == DIRECTION_DOWN) {
+                    motY = Math.max(-0.3, motY - 0.3);
+                } else {
+                    motY = Math.min(0.7, motY + 0.06);
+                }
+
+                if (entity instanceof Player) {
+                    ((Player) entity).setMotionLocally(entity.getMotion().setY(motY));
+                } else {
+                    entity.motionY = motY;
+                }
+            }
+            if (entity instanceof EntityItem) {
+                entity.collisionBlocks = null;
+            }
+            entity.resetFallDistance();
+        }
+    }
+
     private void fadeOut(Block water) {
         BlockFadeEvent event = new BlockFadeEvent(this, water.clone());
         if (!event.isCancelled()) {
-            this.getLevel().setBlock(this, 1, new BlockAir(), true, false);
+            this.getLevel().setBlock(this, 1, Block.get(AIR), true, false);
             this.getLevel().setBlock(this, 0, event.getNewState(), true, true);
         }
     }

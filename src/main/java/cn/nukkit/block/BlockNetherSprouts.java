@@ -6,6 +6,7 @@ import cn.nukkit.item.ItemTool;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
+import org.jetbrains.annotations.NotNull;
 
 import static cn.nukkit.item.ItemID.NETHER_SPROUTS;
 
@@ -36,7 +37,7 @@ public class BlockNetherSprouts extends BlockRoots {
     }
 
     @Override
-    public boolean place(Item item, Block block, Block target, BlockFace face, double fx, double fy, double fz, Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, Player player) {
         if (block.isLiquid() || !block.isAir() && block.getWaterloggingType() != WaterloggingType.NO_WATERLOGGING && level.getBlock(this, 1).isWater()) {
             return false;
         }

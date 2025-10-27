@@ -52,7 +52,7 @@ public class BlockDoubleSlabBlackstonePolished extends BlockSolid {
             slab.setCount(2);
             return new Item[]{ slab };
         } else {
-            return new Item[0];
+            return Item.EMPTY_ARRAY;
         }
     }
     

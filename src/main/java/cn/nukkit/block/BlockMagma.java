@@ -5,6 +5,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.event.block.BlockFormEvent;
 import cn.nukkit.event.entity.EntityDamageByBlockEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
@@ -61,29 +62,31 @@ public class BlockMagma extends BlockSolid {
 
     @Override
     public void onEntityCollide(Entity entity) {
-        if (entity.hasEffect(Effect.FIRE_RESISTANCE)) {
-            return;
-        }
-
-        if (entity instanceof Player p) {
-            if (p.getInventory().getBoots().getEnchantment(Enchantment.ID_FROST_WALKER) != null
-                    || p.isCreative() || p.isSpectator() || p.isSneaking() || !p.level.gameRules.getBoolean(GameRule.FIRE_DAMAGE)) {
-                return;
+        if (entity.y >= this.y + 1 && !entity.hasEffect(Effect.FIRE_RESISTANCE)) {
+            if (entity instanceof Player p) {
+                PlayerInventory inv = p.getInventory();
+                if (inv == null || inv.getBootsFast().hasEnchantment(Enchantment.ID_FROST_WALKER) || !entity.level.gameRules.getBoolean(GameRule.FIRE_DAMAGE)) {
+                    return;
+                }
+                if (!p.isCreative() && !p.isSpectator() && !p.isSneaking()) {
+                    entity.attack(new EntityDamageByBlockEvent(this, entity, EntityDamageEvent.DamageCause.HOT_FLOOR, 1));
+                }
+            } else {
+                entity.attack(new EntityDamageByBlockEvent(this, entity, EntityDamageEvent.DamageCause.HOT_FLOOR, 1));
             }
         }
-
-        entity.attack(new EntityDamageByBlockEvent(this, entity, EntityDamageEvent.DamageCause.HOT_FLOOR, 1));
     }
 
     @Override
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
             Block up = up();
-            if (up instanceof BlockWater && (up.getDamage() == 0 || up.getDamage() == 8)) {
-                BlockFormEvent event = new BlockFormEvent(up, new BlockBubbleColumn(1));
+            if (up instanceof BlockWater && up.getDamage() == 0) {
+                BlockFormEvent event = new BlockFormEvent(up, Block.get(BUBBLE_COLUMN, BlockBubbleColumn.DIRECTION_DOWN));
+                event.call();
                 if (!event.isCancelled()) {
                     if (event.getNewState().getWaterloggingType() != WaterloggingType.NO_WATERLOGGING) {
-                        this.getLevel().setBlock(up, 1, new BlockWater(), true, false);
+                        this.getLevel().setBlock(up, 1, Block.get(WATER), true, false);
                     }
                     this.getLevel().setBlock(up, 0, event.getNewState(), true, true);
                 }
@@ -97,4 +100,8 @@ public class BlockMagma extends BlockSolid {
         return false;
     }
 
+    @Override
+    public boolean hasEntityCollision() {
+        return true;
+    }
 }

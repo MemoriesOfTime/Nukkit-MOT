@@ -312,7 +312,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         block.y = y;
         block.z = z;
         block.level = level;
-        //block.layer = layer;
+        block.layer = layer;
         return block;
     }
 
@@ -386,7 +386,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return get(fullId >> DATA_BITS, fullId & DATA_MASK);
     }
 
-    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @NotNull Player player) {
+    public boolean place(@NotNull Item item, @NotNull Block block, @NotNull Block target, @NotNull BlockFace face, double fx, double fy, double fz, @Nullable Player player) {
         return this.canPlaceOn(block.down(), target) && this.getLevel().setBlock(this, this, true, true);
     }
 

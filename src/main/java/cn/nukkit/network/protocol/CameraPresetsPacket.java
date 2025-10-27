@@ -138,9 +138,7 @@ public class CameraPresetsPacket extends DataPacket {
             this.putOptional(o -> o != null && o.isPresent(), preset.getAlignTargetAndCameraForward(), (optional) -> this.putBoolean(optional.getAsBoolean()));
         }
         if (this.protocol >= ProtocolInfo.v1_21_50) {
-            this.putOptionalNull(preset.getAimAssistPreset(), cameraAimAssistPreset -> {
-                this.putCameraAimAssist(cameraAimAssistPreset);
-            });
+            this.putOptionalNull(preset.getAimAssistPreset(), this::putCameraAimAssist);
         }
         if (this.protocol >= ProtocolInfo.v1_21_80) {
             this.putOptionalNull(preset.getControlScheme(), (controlScheme) -> this.putByte((byte) controlScheme.ordinal()));

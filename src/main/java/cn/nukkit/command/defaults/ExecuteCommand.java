@@ -521,7 +521,7 @@ public class ExecuteCommand extends VanillaCommand {
 
                 String operation = list.getResult(4);
                 List<Entity> scorers = list.getResult(5);
-                Set<IScorer> selectorScorers = scorers.stream().filter(t -> t != null).map(t -> t instanceof Player ? new PlayerScorer((Player) t) : new EntityScorer(t)).collect(Collectors.toSet());
+                Set<IScorer> selectorScorers = scorers.stream().filter(Objects::nonNull).map(t -> t instanceof Player ? new PlayerScorer((Player) t) : new EntityScorer(t)).collect(Collectors.toSet());
                 if (selectorScorers.size() > 1) {
                     log.addTooManyTargets().output();
                     return 0;
