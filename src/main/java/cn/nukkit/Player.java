@@ -107,6 +107,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.net.URL;
@@ -221,6 +222,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected TradingTransaction tradingTransaction;
 
     protected long randomClientId;
+
+    @Getter
+    protected long uid = 0;
 
     protected Vector3 forceMovement = null;
 
@@ -3220,6 +3224,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.server.getPluginManager().callEvent(ev);
         if (ev.isCancelled()) {
             return;
+        }
+
+        // 将 网易uid存入 Player对象属性，需加载网易NukkitMaster插件才能正常获取，若使用waterdog代理需转发extraData uid字段
+        // 网易登录使用NeteaseLoginPacket，继承于LoginPacket，在NukkitMaster中。
+        // 这里通过是否有proxyUid字段判断是否为NeteaseLoginPacket，并通过反射获取其uid long值。
+        if (ev.getPacket() instanceof LoginPacket loginPacket) {
+            try {
+                Class<?> clazz = loginPacket.getClass();
+                Field field = clazz.getDeclaredField("proxyUid");
+                this.uid = (long) field.get(loginPacket);
+            } catch (Exception ignored) {}
         }
 
         if (Nukkit.DEBUG > 2 /*&& !server.isIgnoredPacket(packet.getClass())*/) {
