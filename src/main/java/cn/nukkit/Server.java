@@ -13,6 +13,7 @@ import cn.nukkit.entity.data.Skin;
 import cn.nukkit.entity.data.profession.Profession;
 import cn.nukkit.entity.data.property.EntityProperty;
 import cn.nukkit.entity.item.*;
+import cn.nukkit.entity.knockback.KnockbackParam;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.entity.passive.*;
 import cn.nukkit.entity.projectile.*;
@@ -223,6 +224,8 @@ public class Server {
     public static final List<String> noTickingWorlds = new ArrayList<>();
 
     private static final Pattern uuidPattern = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}.dat$");
+
+    public KnockbackParam knockbackParam = new KnockbackParam();
 
     private final Map<Integer, Level> levels = new ConcurrentHashMap<>() {
         @Override

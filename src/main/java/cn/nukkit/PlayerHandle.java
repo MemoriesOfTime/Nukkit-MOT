@@ -241,7 +241,7 @@ public final class PlayerHandle {
     }
 
     public void setDisplayName(String displayName) {
-        player.displayName = displayName;
+        player.setDisplayName(displayName);
     }
 
     public int getStartAction() {

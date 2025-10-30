@@ -767,6 +767,10 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setNameTag(String name) {
+        // 给common插件用客户端textboard显示nameTag
+        if (this.isNameTagVisible()) {
+            server.getPluginManager().callEvent(new EntitySetNameTagEvent(this, name));
+        }
         this.setDataProperty(new StringEntityData(DATA_NAMETAG, name));
     }
 
@@ -974,8 +978,9 @@ public abstract class Entity extends Location implements Metadatable {
 
     /**
      * Remove an effect from the entity
+     *
      * @param effectId the effect id
-     * @param cause the cause of the removal
+     * @param cause    the cause of the removal
      */
     public void removeEffect(int effectId, EntityPotionEffectEvent.Cause cause) {
         Effect effect = this.effects.get(effectId);
@@ -1716,6 +1721,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     /**
      * 设置实体是否可以保存到区块
+     *
      * @param saveWithChunk 是否可以保存到区块
      */
     public void setCanBeSavedWithChunk(boolean saveWithChunk) {
@@ -1875,7 +1881,8 @@ public abstract class Entity extends Location implements Metadatable {
         }
         if (this.y <= minY && this.isAlive()) {
             if (this.isPlayer) {
-                if (((Player) this).getGamemode() != Player.CREATIVE) this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
+                if (((Player) this).getGamemode() != Player.CREATIVE)
+                    this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
             } else {
                 this.attack(new EntityDamageEvent(this, DamageCause.VOID, 10));
                 hasUpdate = true;
@@ -2214,7 +2221,8 @@ public abstract class Entity extends Location implements Metadatable {
     public void setAbsorption(float absorption) {
         if (absorption != this.absorption) {
             this.absorption = absorption;
-            if (this.isPlayer) ((Player) this).setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
+            if (this.isPlayer)
+                ((Player) this).setAttribute(Attribute.getAttribute(Attribute.ABSORPTION).setValue(absorption));
         }
     }
 
@@ -3046,6 +3054,14 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean setDataProperty(EntityData data, boolean send) {
+        if (data.getId() == DATA_ALWAYS_SHOW_NAMETAG && this.isNameTagAlwaysVisible() != ((Integer) data.getData() == 1)) {
+            if (((Integer) data.getData() == 1) || this.isNameTagVisible()) {
+                server.getPluginManager().callEvent(new EntitySetNameTagEvent(this, this.getNameTag()));
+            } else {
+                server.getPluginManager().callEvent(new EntitySetNameTagEvent(this, null));
+            }
+        }
+
         if (Objects.equals(data, this.dataProperties.get(data.getId()))) {
             return false;
         }
@@ -3142,6 +3158,15 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void setDataFlag(int propertyId, int id, boolean value, boolean send) {
+        // Call NameTag Event
+        if (propertyId == DATA_FLAGS && id == DATA_FLAG_CAN_SHOW_NAMETAG && this.isNameTagVisible() != value) {
+            if (value || this.isNameTagAlwaysVisible()) {
+                server.getPluginManager().callEvent(new EntitySetNameTagEvent(this, this.getNameTag()));
+            } else {
+                server.getPluginManager().callEvent(new EntitySetNameTagEvent(this, null));
+            }
+        }
+
         if (this.getDataFlag(propertyId, id) != value) {
             if (propertyId == EntityHuman.DATA_PLAYER_FLAGS) {
                 byte flags = (byte) this.getDataPropertyByte(propertyId);
