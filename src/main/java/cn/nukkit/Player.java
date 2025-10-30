@@ -107,6 +107,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLConnection;
@@ -222,6 +223,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected TradingTransaction tradingTransaction;
 
     protected long randomClientId;
+
+    @Getter
+    protected long uid = 0;
 
     protected Vector3 forceMovement = null;
 
@@ -1927,7 +1931,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             int y = pos.getFloorY();
                             int z = pos.getFloorZ();
                             for (int xx = x - 2; xx < x + 3; xx++) {
-                                for (int zz = z - 2; zz < z + 3; zz++)  {
+                                for (int zz = z - 2; zz < z + 3; zz++) {
                                     end.setBlockAt(xx, y - 1, zz, BlockID.OBSIDIAN);
                                     for (int yy = y; yy < y + 4; yy++) {
                                         end.setBlockAt(xx, yy, zz, BlockID.AIR);
@@ -2099,7 +2103,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         if (distanceSquared > maxDist) {
             this.revertClientMotion(this);
-            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared +  " > maxDist=" + maxDist);
+            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > maxDist=" + maxDist);
             return;
         }
 
@@ -2462,7 +2466,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.lastUpdate = currentTick;
 
         this.failedTransactions = 0;
-        if (currentTick%20 == 0) {
+        if (currentTick % 20 == 0) {
             this.failedMobEquipmentPacket = 0;
         }
 
@@ -2624,7 +2628,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
 
         if (protocol >= ProtocolInfo.v1_20_10_21) {
-            if (this.age%200 == 0) {
+            if (this.age % 200 == 0) {
                 this.dataPacket(new NetworkStackLatencyPacket());
             }
         }
@@ -3177,6 +3181,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.server.getPluginManager().callEvent(ev);
         if (ev.isCancelled()) {
             return;
+        }
+
+        // 将 网易uid存入 Player对象属性，需加载网易NukkitMaster插件才能正常获取，若使用waterdog代理需转发extraData uid字段
+        // 网易登录使用NeteaseLoginPacket，继承于LoginPacket，在NukkitMaster中。
+        // 这里通过是否有proxyUid字段判断是否为NeteaseLoginPacket，并通过反射获取其uid long值。
+        if (ev.getPacket() instanceof LoginPacket loginPacket) {
+            try {
+                Class<?> clazz = loginPacket.getClass();
+                Field field = clazz.getDeclaredField("proxyUid");
+                this.uid = (long) field.get(loginPacket);
+            } catch (Exception ignored) {}
         }
 
         if (Nukkit.DEBUG > 2 /*&& !server.isIgnoredPacket(packet.getClass())*/) {
@@ -4614,7 +4629,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         int tradeXP = ta.getInt("traderExp");
                                         this.addExperience(ta.getByte("rewardExp"));
                                         ent.addExperience(tradeXP);
-                                        this.level.addSound(this, Sound.RANDOM_ORB, 0,3f, this);
+                                        this.level.addSound(this, Sound.RANDOM_ORB, 0, 3f, this);
                                     }
                                 }
                             }
@@ -6978,7 +6993,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     /**
      * Get chunk cache from data
      *
-     * @param gameVersion      protocol version
+     * @param gameVersion   protocol version
      * @param chunkX        chunk x
      * @param chunkZ        chunk z
      * @param subChunkCount sub chunk count
@@ -7146,7 +7161,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     /**
      * Update movement speed to start/stop sprinting
      * @param value sprinting
-     * @param send send updated speed to client
+     * @param send  send updated speed to client
      */
     public void setSprinting(boolean value, boolean send) {
         if (isSprinting() != value) {

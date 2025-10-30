@@ -362,7 +362,7 @@ public abstract class Entity extends Location implements Metadatable {
     /**
      * @since v786 1.21.70
      */
-    public static final int DATA_FLAG_BODY_ROTATION_AXIS_ALIGNED= 120;
+    public static final int DATA_FLAG_BODY_ROTATION_AXIS_ALIGNED = 120;
     /**
      * @since v786 1.21.70
      */
@@ -654,7 +654,19 @@ public abstract class Entity extends Location implements Metadatable {
 
         this.temporalVector = new Vector3();
 
-        this.id = entityCount++;
+        // 2^31 - 2^33 给网易uid预留使用
+        if (entityCount >= Integer.MAX_VALUE && entityCount < Integer.MAX_VALUE * 4L) {
+            entityCount = Integer.MAX_VALUE * 4L;
+        }
+        // 玩家id使用网易uid
+        if (this instanceof Player player) {
+            long uid = player.getUid();
+            this.id = uid == 0 ? entityCount : uid;
+        } else {
+            this.id = entityCount;
+        }
+        entityCount++;
+
         this.justCreated = true;
         this.namedTag = nbt;
 
@@ -1389,7 +1401,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final String getSaveId() {
-        if(this instanceof CustomEntity) {
+        if (this instanceof CustomEntity) {
             EntityDefinition entityDefinition = ((CustomEntity) this).getEntityDefinition();
             return entityDefinition == null ? "" : entityDefinition.getIdentifier();
         }
@@ -1673,7 +1685,7 @@ public abstract class Entity extends Location implements Metadatable {
      * Get maximum health including health from health boost effect.
      *
      * @return 当前的最大生命值。
-     *         current max health
+     * current max health
      */
     public int getMaxHealth() {
         return maxHealth + (this.hasEffect(Effect.HEALTH_BOOST) ? (this.getEffect(Effect.HEALTH_BOOST).getAmplifier() + 1) << 2 : 0);
@@ -1688,7 +1700,7 @@ public abstract class Entity extends Location implements Metadatable {
      * Get normal maximum health excluding health from effects.
      *
      * @return 实际的最大生命值。
-     *         real max health
+     * real max health
      */
     public int getRealMaxHealth() {
         return maxHealth;
@@ -1815,9 +1827,9 @@ public abstract class Entity extends Location implements Metadatable {
      * Entity base tick, called from onUpdate if the entity is alive. Result is applied to onUpdate. updateMovement is called afterward automatically.
      *
      * @param tickDiff 间隔 tick
-     *                  Interval tick
+     *                 Interval tick
      * @return 是否继续 tick
-     *          Whether to continue tick
+     * Whether to continue tick
      */
     public boolean entityBaseTick(int tickDiff) {
         if (!this.isPlayer) {
@@ -1878,7 +1890,7 @@ public abstract class Entity extends Location implements Metadatable {
                 }
             } else {
                 if (!this.hasEffect(Effect.FIRE_RESISTANCE) && ((this.fireTicks % 20) == 0 || tickDiff > 20) && this.level.getGameRules().getBoolean(GameRule.FIRE_DAMAGE)) {
-                    if (!isInsideOfLava() && !isInsideOfFire()){
+                    if (!isInsideOfLava() && !isInsideOfFire()) {
                         this.attack(new EntityDamageEvent(this, DamageCause.FIRE_TICK, 1));
                     }
                 }
@@ -1963,7 +1975,7 @@ public abstract class Entity extends Location implements Metadatable {
             this.lastHeadYaw = this.headYaw;
 
             this.positionChanged = true;
-        }else {
+        } else {
             this.positionChanged = false;
         }
 
@@ -2380,7 +2392,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void onPushByPiston(BlockEntityPistonArm piston, BlockFace moveDirection) {
-        if (this.closed){
+        if (this.closed) {
             return;
         }
 
@@ -3136,7 +3148,7 @@ public abstract class Entity extends Location implements Metadatable {
                 flags ^= 1 << id;
                 this.setDataProperty(new ByteEntityData(propertyId, flags), send);
             } else {
-                LongEntityData longEntityData = (LongEntityData)this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
+                LongEntityData longEntityData = (LongEntityData) this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
                 long flags = longEntityData.getData() ^ 1L << id;
                 LongEntityData newLongEntityData = new LongEntityData(propertyId, flags);
                 if (propertyId == DATA_FLAGS) {
@@ -3158,7 +3170,7 @@ public abstract class Entity extends Location implements Metadatable {
                         data137 = 0L;
                     }
 
-                    newLongEntityData.dataVersions = new long[] {
+                    newLongEntityData.dataVersions = new long[]{
                             data137 ^ 1L << id137,
                             data223 ^ 1L << id223,
                             data291 ^ 1L << id291
@@ -3180,7 +3192,7 @@ public abstract class Entity extends Location implements Metadatable {
                 flags ^= 1 << id;
                 this.setDataPropertyAndSendOnlyToSelf(new ByteEntityData(propertyId, flags));
             } else {
-                LongEntityData longEntityData = (LongEntityData)this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
+                LongEntityData longEntityData = (LongEntityData) this.dataProperties.getOrDefault(propertyId, new LongEntityData(propertyId, 0L));
                 long flags = longEntityData.getData() ^ 1L << id;
                 LongEntityData newLongEntityData = new LongEntityData(propertyId, flags);
                 if (propertyId == DATA_FLAGS) {
@@ -3202,7 +3214,7 @@ public abstract class Entity extends Location implements Metadatable {
                         data137 = 0L;
                     }
 
-                    newLongEntityData.dataVersions = new long[] {
+                    newLongEntityData.dataVersions = new long[]{
                             data137 ^ 1L << id137,
                             data223 ^ 1L << id223,
                             data291 ^ 1L << id291
@@ -3374,7 +3386,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     private boolean validateAndSetIntProperty(String identifier, int value) {
-        if(!intProperties.containsKey(identifier)) {
+        if (!intProperties.containsKey(identifier)) {
             return false;
         }
         intProperties.put(identifier, value);
@@ -3390,7 +3402,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final boolean setFloatEntityProperty(String identifier, float value) {
-        if(!floatProperties.containsKey(identifier)) {
+        if (!floatProperties.containsKey(identifier)) {
             return false;
         }
         floatProperties.put(identifier, value);
@@ -3398,14 +3410,14 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public final boolean setEnumEntityProperty(String identifier, String value) {
-        if(!intProperties.containsKey(identifier)) return false;
+        if (!intProperties.containsKey(identifier)) return false;
         List<EntityProperty> entityPropertyList = EntityProperty.getEntityProperty(this.getIdentifier().toString());
 
         for (EntityProperty property : entityPropertyList) {
-            if(Objects.equals(property.getIdentifier(), identifier) && property instanceof EnumEntityProperty enumEntityProperty) {
+            if (Objects.equals(property.getIdentifier(), identifier) && property instanceof EnumEntityProperty enumEntityProperty) {
                 int index = enumEntityProperty.findIndex(value);
 
-                if(index >= 0) {
+                if (index >= 0) {
                     intProperties.put(identifier, index);
                     return true;
                 }
@@ -3429,7 +3441,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     private void initEntityProperties() {
-        if(this.getIdentifier() != null) {
+        if (this.getIdentifier() != null) {
             initEntityProperties(this.getIdentifier().toString());
         }
     }
