@@ -3039,12 +3039,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 for (Entry<String, CustomItemDefinition> entry : itemDefinitions) {
                                     try {
                                         Item item = Item.fromString(entry.getKey());
+                                        CustomItemDefinition def = entry.getValue();
                                         entries.add(new ItemComponentPacket.ItemDefinition(
                                                 entry.getKey(),
                                                 item.getNetworkId(this.protocol),
-                                                true,
-                                                1,
-                                                entry.getValue().getNbt(this.protocol)
+                                                def.isComponentBased(),
+                                                def.getVersion(),
+                                                def.getNbt(this.protocol)
                                         ));
                                     } catch (Exception e) {
                                         log.error("ItemComponentPacket encoding error", e);
@@ -3060,12 +3061,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 for (var entry : itemDefinition.entrySet()) {
                                     try {
                                         Item item = Item.fromString(entry.getKey());
+                                        CustomItemDefinition def = entry.getValue();
                                         entries.add(new ItemComponentPacket.ItemDefinition(
                                                 entry.getKey(),
                                                 item.getNetworkId(this.protocol),
-                                                true,
-                                                1,
-                                                entry.getValue().getNbt(this.protocol).putShort("minecraft:identifier", i)
+                                                def.isComponentBased(),
+                                                def.getVersion(),
+                                                def.getNbt(this.protocol).putShort("minecraft:identifier", i)
                                         ));
                                         i++;
                                     } catch (Exception e) {
