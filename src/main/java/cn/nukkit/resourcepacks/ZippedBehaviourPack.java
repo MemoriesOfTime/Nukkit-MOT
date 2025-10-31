@@ -12,11 +12,19 @@ public class ZippedBehaviourPack extends ZippedResourcePack {
     private boolean isBehaviourPack = false;
 
     public ZippedBehaviourPack(File file) {
-        this(file, false);
+        this(file, SupportType.UNIVERSAL);
     }
 
+    /**
+     * @deprecated Use {@link #ZippedBehaviourPack(File, SupportType)} instead
+     */
+    @Deprecated
     public ZippedBehaviourPack(File file, boolean isNetEase) {
-        super(file, isNetEase);
+        this(file, isNetEase ? SupportType.NETEASE : SupportType.UNIVERSAL);
+    }
+
+    public ZippedBehaviourPack(File file, SupportType supportType) {
+        super(file, supportType);
         if (this.manifest.has("modules"))
             for (JsonElement moduleElement : this.manifest.getAsJsonArray("modules")) {
                 try {

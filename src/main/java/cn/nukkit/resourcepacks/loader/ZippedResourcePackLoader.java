@@ -25,7 +25,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
     //资源包文件存放地址
     protected final File path;
 
-    protected boolean isNetEase = false;
+    protected ResourcePack.SupportType supportType = ResourcePack.SupportType.UNIVERSAL;
 
     public ZippedResourcePackLoader(File path) {
         this.path = path;
@@ -36,9 +36,17 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         }
     }
 
-    public ZippedResourcePackLoader(File path, boolean isNetEase) {
+    public ZippedResourcePackLoader(File path, ResourcePack.SupportType supportType) {
         this(path);
-        this.isNetEase = isNetEase;
+        this.supportType = supportType;
+    }
+
+    /**
+     * @deprecated Use {@link #ZippedResourcePackLoader(File, ResourcePack.SupportType)} instead
+     */
+    @Deprecated
+    public ZippedResourcePackLoader(File path, boolean isNetEase) {
+        this(path, isNetEase ? ResourcePack.SupportType.NETEASE : ResourcePack.SupportType.UNIVERSAL);
     }
 
     @Override
@@ -52,11 +60,11 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null) {
-                        resourcePack = new ZippedResourcePack(file, this.isNetEase);
+                        resourcePack = new ZippedResourcePack(file, this.supportType);
                     }
                 } else if (!fileExt.equals("key")) { //directory resource packs temporarily unsupported
                     switch (fileExt) {
-                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack, this.isNetEase);
+                        case "zip", "mcpack" -> resourcePack = new ZippedResourcePack(pack, this.supportType);
                         default -> log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
                     }
                 }
