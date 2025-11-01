@@ -104,12 +104,18 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
                     ByteBuffer buf = buffer.nioBuffer();
                     this.decryptionCipher.update(buf, buf.duplicate());
                 } catch (Exception e) {
-                    log.error("Packet decryption failed for " + player.getName(), e);
+                    log.error("Packet decryption failed for {}", player.getName(), e);
                     return;
                 }
 
                 if (ci) {
-                    this.compressionIn = CompressionProvider.byPrefix(buffer.readByte(), this.channel.config().getProtocolVersion());
+                    try {
+                        this.compressionIn = CompressionProvider.byPrefix(buffer.readByte(), this.channel.config().getProtocolVersion());
+                    } catch (Exception e) {
+                        this.disconnect("Invalid compression prefix");
+                        log.error("Packet decompression failed for {}", player.getName(), e);
+                        return;
+                    }
                 }
 
                 // Verify the checksum

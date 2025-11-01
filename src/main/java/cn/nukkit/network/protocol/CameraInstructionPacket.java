@@ -21,6 +21,8 @@ import org.cloudburstmc.protocol.common.util.Preconditions;
 import java.awt.*;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -42,6 +44,18 @@ public class CameraInstructionPacket extends DataPacket {
      * @since v827
      */
     private CameraFovInstruction fovInstruction;
+    /**
+     * @since v859
+     */
+    private CameraSplineInstruction splineInstruction;
+    /**
+     * @since v859
+     */
+    private CameraAttachToEntityInstruction attachInstruction;
+    /**
+     * @since v859
+     */
+    private OptionalBoolean detachFromEntity = OptionalBoolean.empty();
 
     @Override
     @Deprecated
@@ -77,16 +91,36 @@ public class CameraInstructionPacket extends DataPacket {
                     return new CameraTargetInstruction(targetCenterOffset, uniqueEntityId);
                 }));
                 this.setRemoveTarget(this.getOptional(OptionalBoolean.empty(), buf -> OptionalBoolean.of(buf.getBoolean())));
+            }
 
-                if (this.protocol >= ProtocolInfo.v1_21_100) {
-                    this.setFovInstruction(this.getOptional(null, buf -> {
-                        float fov = buf.getFloat();
-                        float easeTime = buf.getFloat();
-                        CameraEase easeType = CameraEase.values()[buf.getByte()];
-                        boolean clear = buf.getBoolean();
-                        return new CameraFovInstruction(fov, easeTime, easeType, clear);
-                    }));
-                }
+            if (this.protocol >= ProtocolInfo.v1_21_100) {
+                this.setFovInstruction(this.getOptional(null, buf -> {
+                    float fov = buf.getFloat();
+                    float easeTime = buf.getFloat();
+                    CameraEase easeType = CameraEase.values()[buf.getByte()];
+                    boolean clear = buf.getBoolean();
+                    return new CameraFovInstruction(fov, easeTime, easeType, clear);
+                }));
+            }
+
+            if (this.protocol >= ProtocolInfo.v1_21_120) {
+                this.setSplineInstruction(this.getOptional(null, buf -> {
+                    float totalTime = buf.getFloat();
+                    CameraSplineType type = CameraSplineType.values()[buf.getByte()];
+                    List<Vector3f> curve = new ArrayList<>();
+                    buf.getArray(curve, BinaryStream::getVector3f);
+                    List<Vector2f> progressKeyFrames = new ArrayList<>();
+                    buf.getArray(progressKeyFrames, BinaryStream::getVector2f);
+                    List<CameraSplineInstruction.SplineRotationOption> rotationOption = new ArrayList<>();
+                    buf.getArray(rotationOption, buf2 -> {
+                        Vector3f keyFrameValues = buf2.getVector3f();
+                        float keyFrameTimes = buf2.getFloat();
+                        return new CameraSplineInstruction.SplineRotationOption(keyFrameValues, keyFrameTimes);
+                    });
+                    return new CameraSplineInstruction(totalTime, type, curve, progressKeyFrames, rotationOption);
+                }));
+                this.setAttachInstruction(this.getOptional(null, buf -> new CameraAttachToEntityInstruction(buf.getLLong())));
+                this.setDetachFromEntity(this.getOptional(OptionalBoolean.empty(), buf -> OptionalBoolean.of(buf.getBoolean())));
             }
         } else {
             CompoundTag data = this.getTag();
@@ -180,15 +214,30 @@ public class CameraInstructionPacket extends DataPacket {
                 });
                 this.putOptional(OptionalBoolean::isPresent, this.getRemoveTarget(),
                         (b, optional) -> b.putBoolean(optional.getAsBoolean()));
+            }
 
-                if (this.protocol >= ProtocolInfo.v1_21_100) {
-                    this.putOptionalNull(this.getFovInstruction(), (b, fovInstruction) -> {
-                        b.putLFloat(fovInstruction.getFov());
-                        b.putLFloat(fovInstruction.getEaseTime());
-                        b.putByte((byte) fovInstruction.getEaseType().ordinal());
-                        b.putBoolean(fovInstruction.isClear());
+            if (this.protocol >= ProtocolInfo.v1_21_100) {
+                this.putOptionalNull(this.getFovInstruction(), (b, fovInstruction) -> {
+                    b.putLFloat(fovInstruction.getFov());
+                    b.putLFloat(fovInstruction.getEaseTime());
+                    b.putByte((byte) fovInstruction.getEaseType().ordinal());
+                    b.putBoolean(fovInstruction.isClear());
+                });
+            }
+
+            if (this.protocol >= ProtocolInfo.v1_21_120) {
+                this.putOptionalNull(this.getSplineInstruction(), (buf, splineInstruction) -> {
+                    buf.putLFloat(splineInstruction.getTotalTime());
+                    buf.putByte((byte) splineInstruction.getType().ordinal());
+                    buf.putArray(splineInstruction.getCurve(), BinaryStream::putVector3f);
+                    buf.putArray(splineInstruction.getProgressKeyFrames(), BinaryStream::putVector2f);
+                    buf.putArray(splineInstruction.getRotationOption(), (buf2, rotationOption) -> {
+                        buf2.putVector3f(rotationOption.getKeyFrameValues());
+                        buf2.putLFloat(rotationOption.getKeyFrameTimes());
                     });
-                }
+                });
+                this.putOptionalNull(this.getAttachInstruction(), (b, attachInstruction) -> b.putLLong(attachInstruction.getUniqueEntityId()));
+                this.putOptional(OptionalBoolean::isPresent,this.getDetachFromEntity(), (b, detachFromEntity) -> b.putBoolean(detachFromEntity.getAsBoolean()));
             }
         } else {
             CompoundTag data = new CompoundTag();
