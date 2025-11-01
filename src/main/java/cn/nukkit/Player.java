@@ -3224,8 +3224,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     case 2:
                         if (protocol >= ProtocolInfo.v1_16_0) {
-                            this.unverifiedUsername = TextFormat.clean(loginPacket.username)
-                                    .replace(" ", "_");
+                            this.unverifiedUsername = Optional.ofNullable(TextFormat.clean(loginPacket.username))
+                                    .map(s -> s.replace(" ", "_"))
+                                    .orElse(null);
                         } else {
                             // There are compatibility issues in <1.16, ignore
                             this.unverifiedUsername = TextFormat.clean(loginPacket.username);
