@@ -3301,7 +3301,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.username = this.unverifiedUsername;
                 this.unverifiedUsername = null;
                 this.displayName = this.username;
-                this.iusername = this.username.toLowerCase(Locale.ROOT);
+                this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
                 this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
 
                 this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
