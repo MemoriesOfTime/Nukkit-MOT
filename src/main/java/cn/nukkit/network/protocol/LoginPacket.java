@@ -2,6 +2,12 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
 import cn.nukkit.entity.data.Skin;
+import cn.nukkit.network.encryption.ChainValidationResult;
+import cn.nukkit.network.encryption.EncryptionUtils;
+import cn.nukkit.network.protocol.types.auth.AuthPayload;
+import cn.nukkit.network.protocol.types.auth.AuthType;
+import cn.nukkit.network.protocol.types.auth.CertificateChainPayload;
+import cn.nukkit.network.protocol.types.auth.TokenPayload;
 import cn.nukkit.utils.*;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -17,9 +23,16 @@ public class LoginPacket extends DataPacket {
 
     public static final byte NETWORK_ID = ProtocolInfo.LOGIN_PACKET;
 
+    /**
+     * The JWT payload signed by Minecraft's authentication server.
+     * Assuming this is a valid signature, it can be trusted to contain the player's identity and other information.
+     */
+    private AuthPayload authPayload;
+
     public String username;
     private int protocol_;
     public UUID clientUUID;
+    public String minecraftId;
     public long clientId;
     public Skin skin;
 
@@ -65,34 +78,50 @@ public class LoginPacket extends DataPacket {
         return protocol_;
     }
 
+    protected AuthPayload readAuthJwt(String authJwt) {
+        Map<String, Object> map = GSON.fromJson(authJwt, new MapTypeToken());
+
+        AuthType authType = AuthType.UNKNOWN;
+        if (map.containsKey("AuthenticationType")) { // >= v1.21.90
+            int authTypeOrdinal = ((Number) map.get("AuthenticationType")).intValue();
+            if (authTypeOrdinal < 0 || authTypeOrdinal >= AuthType.values().length - 1) {
+                throw new IllegalArgumentException("Invalid AuthenticationType ordinal: " + authTypeOrdinal);
+            }
+            authType = AuthType.values()[authTypeOrdinal + 1];
+        }
+
+        if (map.containsKey("Token") && map.get("Token") instanceof String token && !((String) map.get("Token")).isBlank()) {
+            return new TokenPayload(token, authType);
+        } else {
+            String certificate = (String) map.get("Certificate");
+            if (certificate != null && !certificate.isBlank()) {
+                map = GSON.fromJson(certificate, new MapTypeToken());
+            }
+
+            List<String> chains = (List<String>) map.get("chain");
+            if (chains == null || chains.isEmpty()) {
+                throw new IllegalArgumentException("Invalid Certificate chain in JWT");
+            }
+
+            return new CertificateChainPayload(chains, authType);
+        }
+    }
+
     private void decodeChainData() {
         int size = this.getLInt();
         if (size > 3145728) {
             throw new IllegalArgumentException("The chain data is too big: " + size);
         }
 
-        String data = new String(this.get(size), StandardCharsets.UTF_8);
+        this.authPayload = this.readAuthJwt(new String(this.get(size), StandardCharsets.UTF_8));
 
-        Map<String, Object> map = GSON.fromJson(data, new MapTypeToken());
-
-        String certificate = (String) map.get("Certificate");
-        if (certificate != null) {
-            map = GSON.fromJson(certificate, new MapTypeToken());
-        }
-
-        List<String> chains = (List<String>) map.get("chain");
-        if (chains == null || chains.isEmpty()) {
-            return;
-        }
-
-        for (String c : chains) {
-            JsonObject chainMap = ClientChainData.decodeToken(c);
-            if (chainMap == null) continue;
-            if (chainMap.has("extraData")) {
-                JsonObject extra = chainMap.get("extraData").getAsJsonObject();
-                if (extra.has("displayName")) this.username = extra.get("displayName").getAsString();
-                if (extra.has("identity")) this.clientUUID = UUID.fromString(extra.get("identity").getAsString());
-            }
+        try {
+            ChainValidationResult result = EncryptionUtils.validatePayload(this.authPayload);
+            this.username = result.identityClaims().extraData.displayName;
+            this.clientUUID = result.identityClaims().extraData.identity;
+            this.minecraftId = result.identityClaims().extraData.minecraftId;
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Invalid JWT: " + e.getMessage(), e);
         }
     }
 
