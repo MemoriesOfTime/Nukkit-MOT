@@ -32,6 +32,7 @@ public class LoginPacket extends DataPacket {
     public String username;
     private int protocol_;
     public UUID clientUUID;
+    public String minecraftId;
     public long clientId;
     public Skin skin;
 
@@ -118,6 +119,7 @@ public class LoginPacket extends DataPacket {
             ChainValidationResult result = EncryptionUtils.validatePayload(this.authPayload);
             this.username = result.identityClaims().extraData.displayName;
             this.clientUUID = result.identityClaims().extraData.identity;
+            this.minecraftId = result.identityClaims().extraData.minecraftId;
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid JWT: " + e.getMessage(), e);
         }

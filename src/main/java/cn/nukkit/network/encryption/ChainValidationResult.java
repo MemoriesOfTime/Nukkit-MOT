@@ -135,7 +135,7 @@ public final class ChainValidationResult {
         @Nullable
         public final String minecraftId;
 
-        private IdentityData(String displayName, UUID identity, String xuid, @Nullable String titleId, @Nullable String minecraftId) {
+        private IdentityData(String displayName, @Nullable UUID identity, String xuid, @Nullable String titleId, @Nullable String minecraftId) {
             this.displayName = displayName;
             this.identity = identity;
             this.xuid = xuid;

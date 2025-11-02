@@ -66,27 +66,128 @@ public class EncryptionUtils {
             "https://client.discovery.minecraft-services.net/api/v1.0/discovery/MinecraftPE/builds/1.0.0.0";
     private static final JSONParser JSON_PARSER = new JSONParser();
 
-    private static final Map<String, Object> DISCOVERY_DATA = getDiscoveryData();
-    private static final Map<String, Object> OPENID_CONFIGURATION = getOpenIdConfiguration();
-    private static final String JWKS_URL = getJwksUrl();
-    private static final String ISSUER = getIssuer();
-    private static final HttpsJwks JWKS = new HttpsJwks(JWKS_URL);
-    private static final HttpsJwksVerificationKeyResolver RESOLVER = new HttpsJwksVerificationKeyResolver(JWKS);
-
-    private static final JwtConsumer MOJANG_CONSUMER = new JwtConsumerBuilder()
-            .setVerificationKeyResolver(RESOLVER)
-            .setRequireExpirationTime()
-            .setRequireSubject()
-            .setExpectedAudience(true, "api://auth-minecraft-services/multiplayer")
-            .setExpectedIssuer(ISSUER)
-            .build();
-
     private static final JwtConsumer OFFLINE_CONSUMER = new JwtConsumerBuilder()
             .setSkipAllValidators()
             .setSkipSignatureVerification()
             .setRequireExpirationTime()
             .setSkipDefaultAudienceValidation()
             .build();
+
+    /**
+     * Lazy holder for JWT consumers to avoid blocking network calls during class initialization.
+     * These are only needed for v1.21.90+ authentication.
+     */
+    private static class JwtConsumerHolder {
+        private static final Map<String, Object> DISCOVERY_DATA = getDiscoveryData();
+        private static final Map<String, Object> OPENID_CONFIGURATION = getOpenIdConfiguration();
+        private static final String JWKS_URL = getJwksUrl();
+        private static final String ISSUER = getIssuer();
+        private static final HttpsJwks JWKS = new HttpsJwks(JWKS_URL);
+        private static final HttpsJwksVerificationKeyResolver RESOLVER = new HttpsJwksVerificationKeyResolver(JWKS);
+
+        private static final JwtConsumer MOJANG_CONSUMER = new JwtConsumerBuilder()
+                .setVerificationKeyResolver(RESOLVER)
+                .setRequireExpirationTime()
+                .setRequireSubject()
+                .setExpectedAudience(true, "api://auth-minecraft-services/multiplayer")
+                .setExpectedIssuer(ISSUER)
+                .build();
+
+        private static final JwtConsumer OFFLINE_CONSUMER = EncryptionUtils.OFFLINE_CONSUMER;
+
+        private static Map<String, Object> getDiscoveryData() {
+            try {
+                URL url = new URL(DISCOVERY_ENDPOINT);
+                HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setRequestProperty("Accept", "application/json");
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+                connection.connect();
+                if (connection.getResponseCode() != 200) {
+                    throw new IOException("Failed to fetch discovery data: " + connection.getResponseMessage());
+                }
+                try(InputStream stream = connection.getInputStream();
+                    InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+                    //noinspection unchecked
+                    return (Map<String, Object>) JSON_PARSER.parse(reader);
+                }
+            } catch (ParseException | IOException e) {
+                throw new AssertionError("Unable to fetch discovery data from " + DISCOVERY_ENDPOINT, e);
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private static Map<String, Object> getAuthEnvironment() {
+            Map<String, Object> result = (Map<String, Object>) DISCOVERY_DATA.get("result");
+
+            if (result == null) {
+                throw new AssertionError("Discovery data does not contain 'result' key" + DISCOVERY_DATA);
+            }
+            Map<String, Object> environments = (Map<String, Object>) result.get("serviceEnvironments");
+            if (environments == null) {
+                throw new AssertionError("Discovery data does not contain 'serviceEnvironments' key" + result);
+            }
+            Map<String, Object> authEnv = (Map<String, Object>) environments.get("auth");
+            if (authEnv == null) {
+                throw new AssertionError("Discovery data does not contain 'auth' environment" + environments);
+            }
+            Map<String, Object> prodEnv = (Map<String, Object>) authEnv.get("prod");
+            if (prodEnv == null) {
+                throw new AssertionError("Discovery data does not contain 'prod' environment" + authEnv);
+            }
+            return prodEnv;
+        }
+
+        private static String getServiceUri() {
+            String issuer = (String) getAuthEnvironment().get("serviceUri");
+            if (issuer == null) {
+                throw new AssertionError("Discovery data does not contain 'issuer' key in 'prod' environment");
+            }
+            return issuer;
+        }
+
+        private static Map<String, Object> getOpenIdConfiguration() {
+            String serviceUri = getServiceUri();
+
+            String openIdConfigUrl = serviceUri + "/.well-known/openid-configuration";
+            try {
+                URL url = new URL(openIdConfigUrl);
+                HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setRequestProperty("Accept", "application/json");
+                connection.setConnectTimeout(5000);
+                connection.setReadTimeout(5000);
+                connection.connect();
+                if (connection.getResponseCode() != 200) {
+                    throw new IOException("Failed to fetch OpenID configuration: " + connection.getResponseMessage());
+                }
+                try (InputStream stream = connection.getInputStream();
+                     InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+                    //noinspection unchecked
+                    return (Map<String, Object>) JSON_PARSER.parse(reader);
+                }
+            } catch (ParseException | IOException e) {
+                throw new AssertionError("Unable to fetch OpenID configuration from " + openIdConfigUrl, e);
+            }
+        }
+
+        private static String getJwksUrl() {
+            String jwksUrl = (String) OPENID_CONFIGURATION.get("jwks_uri");
+            if (jwksUrl == null || jwksUrl.isEmpty()) {
+                throw new AssertionError("OpenID configuration does not contain 'jwks_uri' key: " + OPENID_CONFIGURATION);
+            }
+            return jwksUrl;
+        }
+
+        private static String getIssuer() {
+            String issuer = (String) OPENID_CONFIGURATION.get("issuer");
+            if (issuer == null || issuer.isEmpty()) {
+                throw new AssertionError("OpenID configuration does not contain 'issuer' key: " + OPENID_CONFIGURATION);
+            }
+            return issuer;
+        }
+    }
 
     static {
         // DO NOT REMOVE THIS
@@ -102,99 +203,6 @@ public class EncryptionUtils {
         } catch (NoSuchAlgorithmException | InvalidAlgorithmParameterException | InvalidKeySpecException e) {
             throw new AssertionError("Unable to initialize required encryption", e);
         }
-    }
-
-    private static Map<String, Object> getDiscoveryData() {
-        try {
-            URL url = new URL(DISCOVERY_ENDPOINT);
-            HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Accept", "application/json");
-            connection.setConnectTimeout(5000);
-            connection.setReadTimeout(5000);
-            connection.connect();
-            if (connection.getResponseCode() != 200) {
-                throw new IOException("Failed to fetch discovery data: " + connection.getResponseMessage());
-            }
-            try(InputStream stream = connection.getInputStream();
-                InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-                //noinspection unchecked
-                return (Map<String, Object>) JSON_PARSER.parse(reader);
-            }
-        } catch (ParseException | IOException e) {
-            throw new AssertionError("Unable to fetch discovery data from " + DISCOVERY_ENDPOINT, e);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> getAuthEnvironment() {
-        Map<String, Object> result = (Map<String, Object>) DISCOVERY_DATA.get("result");
-
-        if (result == null) {
-            throw new AssertionError("Discovery data does not contain 'result' key" + DISCOVERY_DATA);
-        }
-        Map<String, Object> environments = (Map<String, Object>) result.get("serviceEnvironments");
-        if (environments == null) {
-            throw new AssertionError("Discovery data does not contain 'serviceEnvironments' key" + result);
-        }
-        Map<String, Object> authEnv = (Map<String, Object>) environments.get("auth");
-        if (authEnv == null) {
-            throw new AssertionError("Discovery data does not contain 'auth' environment" + environments);
-        }
-        Map<String, Object> prodEnv = (Map<String, Object>) authEnv.get("prod");
-        if (prodEnv == null) {
-            throw new AssertionError("Discovery data does not contain 'prod' environment" + authEnv);
-        }
-        return prodEnv;
-    }
-
-    private static String getServiceUri() {
-        String issuer = (String) getAuthEnvironment().get("serviceUri");
-        if (issuer == null) {
-            throw new AssertionError("Discovery data does not contain 'issuer' key in 'prod' environment");
-        }
-        return issuer;
-    }
-
-    private static Map<String, Object> getOpenIdConfiguration() {
-        String serviceUri = getServiceUri();
-
-        String openIdConfigUrl = serviceUri + "/.well-known/openid-configuration";
-        try {
-            URL url = new URL(openIdConfigUrl);
-            HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("Accept", "application/json");
-            connection.setConnectTimeout(5000);
-            connection.setReadTimeout(5000);
-            connection.connect();
-            if (connection.getResponseCode() != 200) {
-                throw new IOException("Failed to fetch OpenID configuration: " + connection.getResponseMessage());
-            }
-            try (InputStream stream = connection.getInputStream();
-                 InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-                //noinspection unchecked
-                return (Map<String, Object>) JSON_PARSER.parse(reader);
-            }
-        } catch (ParseException | IOException e) {
-            throw new AssertionError("Unable to fetch OpenID configuration from " + openIdConfigUrl, e);
-        }
-    }
-
-    private static String getJwksUrl() {
-        String jwksUrl = (String) OPENID_CONFIGURATION.get("jwks_uri");
-        if (jwksUrl == null || jwksUrl.isEmpty()) {
-            throw new AssertionError("OpenID configuration does not contain 'jwks_uri' key: " + OPENID_CONFIGURATION);
-        }
-        return jwksUrl;
-    }
-
-    private static String getIssuer() {
-        String issuer = (String) OPENID_CONFIGURATION.get("issuer");
-        if (issuer == null || issuer.isEmpty()) {
-            throw new AssertionError("OpenID configuration does not contain 'issuer' key: " + OPENID_CONFIGURATION);
-        }
-        return issuer;
     }
 
     /**
@@ -306,7 +314,7 @@ public class EncryptionUtils {
                 throw new JoseException("Unsupported AuthType: " + type);
             }
         } else {
-            context = MOJANG_CONSUMER.process(token);
+            context = JwtConsumerHolder.MOJANG_CONSUMER.process(token);
             return new ChainValidationResult(true, context);
         }
     }

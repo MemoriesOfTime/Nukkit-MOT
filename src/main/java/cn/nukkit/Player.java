@@ -3310,6 +3310,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.uuid = loginPacket.clientUUID;
                 this.rawUUID = Binary.writeUUID(this.uuid);
+                this.minecraftId = loginPacket.minecraftId;
 
                 boolean valid = true;
                 int len = loginPacket.username.length();

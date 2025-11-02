@@ -57,6 +57,11 @@ public final class ClientChainData implements LoginChainData {
     }
 
     @Override
+    public String getMinecraftId() {
+        return minecraftId;
+    }
+
+    @Override
     public String getIdentityPublicKey() {
         return identityPublicKey;
     }
@@ -188,6 +193,7 @@ public final class ClientChainData implements LoginChainData {
     private String username;
     private UUID clientUUID;
     private String xuid;
+    public String minecraftId;
 
     private static ECPublicKey generateKey(String base64) throws NoSuchAlgorithmException, InvalidKeySpecException {
         return (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(Base64.getDecoder().decode(base64)));
@@ -307,6 +313,7 @@ public final class ClientChainData implements LoginChainData {
             this.username = extraData.displayName;
             this.clientUUID = extraData.identity;
             this.xuid = extraData.xuid;
+            this.minecraftId = extraData.minecraftId;
 
             this.titleId = extraData.titleId;
 

@@ -36,6 +36,11 @@ public class EntityHuman extends EntityHumanType {
 
     protected UUID uuid;
     protected byte[] rawUUID;
+    /**
+     * The player's Minecraft PlayFab ID
+     * @since v818
+     */
+    protected String minecraftId;
 
     protected Skin skin;
 
