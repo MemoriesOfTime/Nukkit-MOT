@@ -66,7 +66,7 @@ public class EncryptionUtils {
             "https://client.discovery.minecraft-services.net/api/v1.0/discovery/MinecraftPE/builds/1.0.0.0";
     private static final JSONParser JSON_PARSER = new JSONParser();
 
-    private static final JwtConsumer OFFLINE_CONSUMER = new JwtConsumerBuilder()
+    public static final JwtConsumer OFFLINE_CONSUMER = new JwtConsumerBuilder()
             .setSkipAllValidators()
             .setSkipSignatureVerification()
             .setRequireExpirationTime()
@@ -269,6 +269,7 @@ public class EncryptionUtils {
                 identity.setCompactSerialization(chain.get(0));
                 return new ChainValidationResult(false, identity.getUnverifiedPayload());
             case 3:
+                boolean signed = true;
                 ECPublicKey currentKey = null;
                 Map<String, Object> parsedPayload = null;
                 for (int i = 0; i < 3; i++) {
@@ -280,25 +281,28 @@ public class EncryptionUtils {
                     if (currentKey == null) {
                         currentKey = expectedKey;
                     } else if (!currentKey.equals(expectedKey)) {
-                        throw new IllegalStateException("Received broken chain");
+                        signed = false;
+                        // throw new IllegalStateException("Received broken chain");
                     }
 
                     signature.setAlgorithmConstraints(ALGORITHM_CONSTRAINTS);
                     signature.setKey(currentKey);
                     if (!signature.verifySignature()) {
-                        throw new IllegalStateException("Chain signature doesn't match content");
+                        signed = false;
+                        // throw new IllegalStateException("Chain signature doesn't match content");
                     }
 
                     // the second chain entry has to be signed by Mojang
                     if (i == 1 && (!currentKey.equals(MOJANG_PUBLIC_KEY))) {
-                        throw new IllegalStateException("The chain isn't signed by Mojang!");
+                        signed = false;
+                        // throw new IllegalStateException("The chain isn't signed by Mojang!");
                     }
 
                     parsedPayload = JsonUtil.parseJson(signature.getUnverifiedPayload());
                     String identityPublicKey = JsonUtils.childAsType(parsedPayload, "identityPublicKey", String.class);
                     currentKey = parseKey(identityPublicKey);
                 }
-                return new ChainValidationResult(true, parsedPayload);
+                return new ChainValidationResult(signed, parsedPayload);
             default:
                 throw new IllegalStateException("Unexpected login chain length");
         }

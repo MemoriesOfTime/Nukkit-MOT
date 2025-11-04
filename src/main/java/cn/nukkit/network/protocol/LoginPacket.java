@@ -2,7 +2,6 @@ package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
 import cn.nukkit.entity.data.Skin;
-import cn.nukkit.network.encryption.ChainValidationResult;
 import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.types.auth.AuthPayload;
 import cn.nukkit.network.protocol.types.auth.AuthType;
@@ -14,6 +13,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import lombok.ToString;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.JwtContext;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -116,10 +117,37 @@ public class LoginPacket extends DataPacket {
         this.authPayload = this.readAuthJwt(new String(this.get(size), StandardCharsets.UTF_8));
 
         try {
-            ChainValidationResult result = EncryptionUtils.validatePayload(this.authPayload);
-            this.username = result.identityClaims().extraData.displayName;
-            this.clientUUID = result.identityClaims().extraData.identity;
-            this.minecraftId = result.identityClaims().extraData.minecraftId;
+            // 不要在这里验证数据，只读取必要的字段
+            if (this.authPayload instanceof CertificateChainPayload chainPayload) {
+                List<String> chain = chainPayload.getChain();
+                if (chain == null || chain.isEmpty()) {
+                    throw new IllegalStateException("Certificate chain is empty");
+                }
+
+                for (String c : chain) {
+                    JsonObject chainMap = ClientChainData.decodeToken(c);
+                    if (chainMap == null) continue;
+                    if (chainMap.has("extraData")) {
+                        JsonObject extra = chainMap.get("extraData").getAsJsonObject();
+                        if (extra.has("displayName")) this.username = extra.get("displayName").getAsString();
+                        if (extra.has("identity")) this.clientUUID = UUID.fromString(extra.get("identity").getAsString());
+                    }
+                }
+            } else if (this.authPayload instanceof TokenPayload tokenPayload) {
+                String token = tokenPayload.getToken();
+                if (token == null || token.isEmpty()) {
+                    throw new IllegalStateException("Token is empty");
+                }
+
+                JwtContext context = EncryptionUtils.OFFLINE_CONSUMER.process(token);
+                JwtClaims claims = context.getJwtClaims();
+                String xuid = claims.getClaimValueAsString("xid");
+                this.username = claims.getClaimValueAsString("xname");
+                this.clientUUID = UUID.nameUUIDFromBytes(("pocket-auth-1-xuid:" + xuid).getBytes(StandardCharsets.UTF_8));
+                this.minecraftId = claims.getClaimValueAsString("mid");
+            } else {
+                throw new IllegalArgumentException("Unsupported AuthPayload type: " + this.authPayload.getClass().getName());
+            }
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid JWT: " + e.getMessage(), e);
         }
