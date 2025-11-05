@@ -654,17 +654,22 @@ public abstract class Entity extends Location implements Metadatable {
 
         this.temporalVector = new Vector3();
 
-        // 2^31 - 2^33 给网易uid预留使用
-        if (entityCount >= Integer.MAX_VALUE && entityCount < Integer.MAX_VALUE * 4L) {
-            entityCount = Integer.MAX_VALUE * 4L;
-        }
-        // 玩家id使用网易uid
-        if (this instanceof Player player) {
-            long uid = player.getUid();
-            this.id = uid == 0 ? entityCount : uid;
+        if (server.netEaseMode){
+            // 2^31 - 2^33 给网易uid预留使用
+            if (entityCount >= Integer.MAX_VALUE && entityCount < Integer.MAX_VALUE * 4L) {
+                entityCount = Integer.MAX_VALUE * 4L;
+            }
+            // 玩家id使用网易uid
+            if (this instanceof Player player) {
+                long uid = player.getUid();
+                this.id = uid == 0 ? entityCount : uid;
+            } else {
+                this.id = entityCount;
+            }
         } else {
             this.id = entityCount;
         }
+
         entityCount++;
 
         this.justCreated = true;
