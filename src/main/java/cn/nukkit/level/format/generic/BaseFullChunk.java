@@ -4,6 +4,7 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.PersistentDataContainerBlockEntity;
 import cn.nukkit.entity.Entity;
@@ -426,7 +427,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             cache = false;
         }
         for (int y = maxY; y >= minY; --y) {
-            if (getBlockId(x, y, z) != 0x00) {
+            if (getBlockId(x, y, z) != BlockID.AIR) {
                 if (cache) {
                     this.setHeightMap(x, z, y);
                 }

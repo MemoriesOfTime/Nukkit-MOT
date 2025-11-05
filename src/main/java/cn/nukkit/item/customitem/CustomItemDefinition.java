@@ -34,6 +34,27 @@ import java.util.function.Consumer;
  */
 @Log4j2
 public class CustomItemDefinition {
+    /**
+     * 物品注册模式
+     * <p>
+     * Item registration mode
+     */
+    public enum ItemRegistrationMode {
+        /**
+         * Legacy模式 (version=0): 服务端只注册物品标识符，贴图和组件由客户端资源包提供
+         * <p>
+         * Legacy mode (version=0): Server only registers item identifier, textures and components are provided by client resource pack
+         */
+        LEGACY,
+
+        /**
+         * Component-based模式 (version=1): 服务端通过NBT完全定义物品的属性和行为
+         * <p>
+         * Component-based mode (version=1): Server fully defines item properties and behavior through NBT
+         */
+        COMPONENT_BASED
+    }
+
     private static final ConcurrentHashMap<String, Integer> INTERNAL_ALLOCATION_ID_MAP = new ConcurrentHashMap<>();
     private static final AtomicInteger nextRuntimeId = new AtomicInteger(10000);
 
@@ -41,6 +62,14 @@ public class CustomItemDefinition {
     private final CompoundTag nbt; //649
     private final CompoundTag nbt465;
     private final CompoundTag nbt419;
+
+    /**
+     * 物品注册模式
+     * <p>
+     * Item registration mode
+     */
+    @Getter
+    private final ItemRegistrationMode registrationMode;
 
     /**
      * Creative inventory page where the item is put into
@@ -55,43 +84,76 @@ public class CustomItemDefinition {
     private final String creativeGroup;
 
     private CustomItemDefinition(String identifier, CompoundTag nbt) {
+        this(identifier, nbt, ItemRegistrationMode.COMPONENT_BASED);
+    }
+
+    private CustomItemDefinition(String identifier, CompoundTag nbt, ItemRegistrationMode registrationMode) {
         this.identifier = identifier;
         this.nbt = nbt;
+        this.registrationMode = registrationMode;
 
-        this.nbt465  = nbt.clone();
-        CompoundTag components465 = this.nbt465.getCompound("components");
-        components465
-                .getCompound("item_properties")
-                .getCompound("minecraft:icon")
-                .remove("textures")
-                .putString("texture", this.getTexture());
-        if (this.nbt465.getCompound("item_properties").getInt("damage") > 0
-                && !components465.containsCompound("minecraft:weapon")) {
-            components465.putCompound(new CompoundTag("minecraft:weapon"));
-        }
-        if (components465.contains("minecraft:wearable")) {
-            CompoundTag wearable465 = components465.getCompound("minecraft:wearable");
-            this.nbt465.putCompound("minecraft:armor", new CompoundTag()
-                    .putInt("protection", wearable465.getInt("protection")));
-            wearable465.remove("protection");
-        }
+        if (registrationMode == ItemRegistrationMode.COMPONENT_BASED) {
+            this.nbt465  = nbt.clone();
+            CompoundTag components465 = this.nbt465.getCompound("components");
+            components465
+                    .getCompound("item_properties")
+                    .getCompound("minecraft:icon")
+                    .remove("textures")
+                    .putString("texture", this.getTexture());
+            if (this.nbt465.getCompound("item_properties").getInt("damage") > 0
+                    && !components465.containsCompound("minecraft:weapon")) {
+                components465.putCompound(new CompoundTag("minecraft:weapon"));
+            }
+            if (components465.contains("minecraft:wearable")) {
+                CompoundTag wearable465 = components465.getCompound("minecraft:wearable");
+                this.nbt465.putCompound("minecraft:armor", new CompoundTag()
+                        .putInt("protection", wearable465.getInt("protection")));
+                wearable465.remove("protection");
+            }
 
-        this.nbt419 = this.nbt465.clone();
-        this.nbt419.getCompound("components").getCompound("item_properties").remove("minecraft:icon");
-        this.nbt419.getCompound("components").putCompound("minecraft:icon", new CompoundTag().putString("texture", this.getTexture()));
+            this.nbt419 = this.nbt465.clone();
+            this.nbt419.getCompound("components").getCompound("item_properties").remove("minecraft:icon");
+            this.nbt419.getCompound("components").putCompound("minecraft:icon", new CompoundTag().putString("texture", this.getTexture()));
 
-
-        CompoundTag compound = this.nbt.getCompound("components").getCompound("item_properties");
-        if (compound.containsInt("creative_category")) {
-            this.creativeCategory = CreativeItemCategory.values()[compound.getInt("creative_category")];
+            CompoundTag compound = this.nbt.getCompound("components").getCompound("item_properties");
+            if (compound.containsInt("creative_category")) {
+                this.creativeCategory = CreativeItemCategory.values()[compound.getInt("creative_category")];
+            } else {
+                this.creativeCategory = CreativeItemCategory.UNDEFINED;
+            }
+            this.creativeGroup = compound.getString("creative_group");
         } else {
+            this.nbt465 = nbt;
+            this.nbt419 = nbt;
             this.creativeCategory = CreativeItemCategory.UNDEFINED;
+            this.creativeGroup = "";
         }
-        this.creativeGroup = compound.getString("creative_group");
     }
 
     public String identifier() {
         return identifier;
+    }
+
+    /**
+     * 获取物品注册版本号
+     * <p>
+     * Get item registration version number
+     *
+     * @return 0 for legacy mode, 1 for component-based mode
+     */
+    public int getVersion() {
+        return registrationMode == ItemRegistrationMode.LEGACY ? 0 : 1;
+    }
+
+    /**
+     * 是否为Component-based模式
+     * <p>
+     * Whether this is component-based mode
+     *
+     * @return true if component-based, false if legacy
+     */
+    public boolean isComponentBased() {
+        return registrationMode == ItemRegistrationMode.COMPONENT_BASED;
     }
 
     public CompoundTag getNbt() {
@@ -191,6 +253,30 @@ public class CustomItemDefinition {
      */
     public static CustomItemDefinition.EdibleBuilder edibleBuilder(ItemCustomEdible item, CreativeItemCategory creativeCategory) {
         return new CustomItemDefinition.EdibleBuilder(item, creativeCategory);
+    }
+
+    /**
+     * Legacy模式物品的定义构造器
+     * <p>
+     * Definition builder for legacy mode items
+     *
+     * @param item the item
+     * @return the legacy item builder
+     */
+    public static CustomItemDefinition.LegacyItemBuilder legacyBuilder(CustomItem item) {
+        return new CustomItemDefinition.LegacyItemBuilder(item);
+    }
+
+    /**
+     * Legacy模式食物的定义构造器
+     * <p>
+     * Definition builder for legacy mode food items
+     *
+     * @param item the item
+     * @return the legacy food builder
+     */
+    public static CustomItemDefinition.LegacyFoodBuilder legacyFoodBuilder(CustomItem item) {
+        return new CustomItemDefinition.LegacyFoodBuilder(item);
     }
 
     @Nullable
@@ -852,6 +938,157 @@ public class CustomItemDefinition {
                     .putInt("use_duration", eatingtick)
                     .putInt("use_animation", item.isDrink() ? 2 : 1)
                     .putBoolean("can_destroy_in_creative", true);
+        }
+
+        @Override
+        public CustomItemDefinition build() {
+            return calculateID();
+        }
+    }
+
+    /**
+     * Legacy模式物品构建器
+     * <p>
+     * Builder for legacy mode items
+     */
+    public static class LegacyItemBuilder {
+        protected final String identifier;
+        protected final CompoundTag nbt = new CompoundTag();
+        private final Item item;
+
+        protected LegacyItemBuilder(CustomItem customItem) {
+            this.item = (Item) customItem;
+            this.identifier = customItem.getNamespaceId();
+        }
+
+        /**
+         * 设置物品最大堆叠数量
+         * <p>
+         * Set max stack size
+         *
+         * @param size max stack size
+         * @return this builder
+         */
+        public LegacyItemBuilder maxStackSize(int size) {
+            this.nbt.putCompound("minecraft:max_stack_size",
+                new CompoundTag().putByte("value", (byte)size));
+            return this;
+        }
+
+        /**
+         * 添加自定义NBT组件
+         * <p>
+         * Add custom NBT component
+         *
+         * @param componentName component name (e.g., "minecraft:fuel")
+         * @param componentData component data
+         * @return this builder
+         */
+        public LegacyItemBuilder component(String componentName, CompoundTag componentData) {
+            this.nbt.putCompound(componentName, componentData);
+            return this;
+        }
+
+        /**
+         * 直接对NBT进行自定义处理
+         * <p>
+         * Custom processing of NBT
+         *
+         * @param nbtConsumer NBT consumer
+         * @return this builder
+         */
+        public LegacyItemBuilder customNBT(Consumer<CompoundTag> nbtConsumer) {
+            nbtConsumer.accept(this.nbt);
+            return this;
+        }
+
+        public CustomItemDefinition build() {
+            return calculateID();
+        }
+
+        protected CustomItemDefinition calculateID() {
+            var result = new CustomItemDefinition(identifier, nbt, ItemRegistrationMode.LEGACY);
+            if (!INTERNAL_ALLOCATION_ID_MAP.containsKey(result.identifier())) {
+                while (RuntimeItems.getMapping(GameVersion.getLastVersion()).getNamespacedIdByNetworkId(nextRuntimeId.incrementAndGet()) != null)
+                    ;
+                INTERNAL_ALLOCATION_ID_MAP.put(result.identifier(), nextRuntimeId.get());
+                result.nbt.putString("name", result.identifier());
+                result.nbt.putInt("id", nextRuntimeId.get());
+            }
+            return result;
+        }
+    }
+
+    /**
+     * Legacy模式食物构建器
+     * <p>
+     * Builder for legacy mode food items
+     */
+    public static class LegacyFoodBuilder extends LegacyItemBuilder {
+
+        protected LegacyFoodBuilder(CustomItem customItem) {
+            super(customItem);
+        }
+
+        /**
+         * 设置食物属性
+         * <p>
+         * Set food properties
+         *
+         * @param foodData food component data
+         * @return this builder
+         */
+        public LegacyFoodBuilder food(CompoundTag foodData) {
+            this.nbt.putCompound("minecraft:food", foodData);
+            return this;
+        }
+
+        /**
+         * 设置使用持续时间
+         * <p>
+         * Set use duration
+         *
+         * @param duration duration in ticks
+         * @return this builder
+         */
+        public LegacyFoodBuilder useDuration(int duration) {
+            this.nbt.putInt("minecraft:use_duration", duration);
+            return this;
+        }
+
+        /**
+         * 快速创建食物属性
+         * <p>
+         * Quick setup for food properties
+         *
+         * @param nutrition nutrition value
+         * @param saturationModifier saturation modifier
+         * @param canAlwaysEat can always eat
+         * @return this builder
+         */
+        public LegacyFoodBuilder foodProperties(int nutrition, float saturationModifier, boolean canAlwaysEat) {
+            CompoundTag foodData = new CompoundTag()
+                .putBoolean("can_always_eat", canAlwaysEat)
+                .putInt("nutrition", nutrition)
+                .putFloat("saturation_modifier", saturationModifier);
+            return food(foodData);
+        }
+
+        /**
+         * 设置食用后转换的物品
+         * <p>
+         * Set item to convert to after eating
+         *
+         * @param itemName item name (e.g., "glass_bottle")
+         * @return this builder
+         */
+        public LegacyFoodBuilder usingConvertsTo(String itemName) {
+            if (!this.nbt.containsCompound("minecraft:food")) {
+                this.nbt.putCompound("minecraft:food", new CompoundTag());
+            }
+            this.nbt.getCompound("minecraft:food")
+                .putString("using_converts_to", itemName);
+            return this;
         }
 
         @Override

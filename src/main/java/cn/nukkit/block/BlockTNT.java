@@ -16,7 +16,8 @@ import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.BlockColor;
-import cn.nukkit.utils.Utils;
+
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Created on 2015/12/8 by xtypr.
@@ -69,7 +70,7 @@ public class BlockTNT extends BlockSolid {
 
     public void prime(int fuse, Entity source) {
         this.getLevel().setBlock(this, Block.get(BlockID.AIR), true);
-        double mot = Utils.nukkitRandom.nextSignedFloat() * 6.283185307179586;
+        double mot = (ThreadLocalRandom.current().nextFloat() * 2 - 1) * 6.283185307179586;
         CompoundTag nbt = new CompoundTag()
                 .putList(new ListTag<DoubleTag>("Pos")
                         .add(new DoubleTag("", this.x + 0.5))

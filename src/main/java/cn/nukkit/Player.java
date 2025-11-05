@@ -3046,12 +3046,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 for (Entry<String, CustomItemDefinition> entry : itemDefinitions) {
                                     try {
                                         Item item = Item.fromString(entry.getKey());
+                                        CustomItemDefinition def = entry.getValue();
                                         entries.add(new ItemComponentPacket.ItemDefinition(
                                                 entry.getKey(),
                                                 item.getNetworkId(this.protocol),
-                                                true,
-                                                1,
-                                                entry.getValue().getNbt(this.protocol)
+                                                def.isComponentBased(),
+                                                def.getVersion(),
+                                                def.getNbt(this.protocol)
                                         ));
                                     } catch (Exception e) {
                                         log.error("ItemComponentPacket encoding error", e);
@@ -3067,12 +3068,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 for (var entry : itemDefinition.entrySet()) {
                                     try {
                                         Item item = Item.fromString(entry.getKey());
+                                        CustomItemDefinition def = entry.getValue();
                                         entries.add(new ItemComponentPacket.ItemDefinition(
                                                 entry.getKey(),
                                                 item.getNetworkId(this.protocol),
-                                                true,
-                                                1,
-                                                entry.getValue().getNbt(this.protocol).putShort("minecraft:identifier", i)
+                                                def.isComponentBased(),
+                                                def.getVersion(),
+                                                def.getNbt(this.protocol).putShort("minecraft:identifier", i)
                                         ));
                                         i++;
                                     } catch (Exception e) {
@@ -3240,8 +3242,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     case 2:
                         if (protocol >= ProtocolInfo.v1_16_0) {
-                            this.unverifiedUsername = TextFormat.clean(loginPacket.username)
-                                    .replace(" ", "_");
+                            this.unverifiedUsername = Optional.ofNullable(TextFormat.clean(loginPacket.username))
+                                    .map(s -> s.replace(" ", "_"))
+                                    .orElse(null);
                         } else {
                             // There are compatibility issues in <1.16, ignore
                             this.unverifiedUsername = TextFormat.clean(loginPacket.username);
@@ -3316,7 +3319,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.username = this.unverifiedUsername;
                 this.unverifiedUsername = null;
                 this.displayName = this.username;
-                this.iusername = this.username.toLowerCase(Locale.ROOT);
+                this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
                 this.setDataProperty(new StringEntityData(DATA_NAMETAG, this.username), false);
 
                 this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
@@ -3325,6 +3328,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.uuid = loginPacket.clientUUID;
                 this.rawUUID = Binary.writeUUID(this.uuid);
+                this.minecraftId = loginPacket.minecraftId;
 
                 boolean valid = true;
                 int len = loginPacket.username.length();

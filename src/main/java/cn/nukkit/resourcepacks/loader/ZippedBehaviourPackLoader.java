@@ -18,6 +18,14 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
         super(path);
     }
 
+    public ZippedBehaviourPackLoader(File path, ResourcePack.SupportType supportType) {
+        super(path, supportType);
+    }
+
+    /**
+     * @deprecated Use {@link #ZippedBehaviourPackLoader(File, ResourcePack.SupportType)} instead
+     */
+    @Deprecated
     public ZippedBehaviourPackLoader(File path, boolean isNetEase) {
         super(path, isNetEase);
     }
@@ -33,15 +41,15 @@ public class ZippedBehaviourPackLoader extends ZippedResourcePackLoader {
                 if (pack.isDirectory()) {
                     File file = loadDirectoryPack(pack);
                     if (file != null)
-                        resourcePack = new ZippedBehaviourPack(file, this.isNetEase);
+                        resourcePack = new ZippedBehaviourPack(file, this.supportType);
                 } else if (!fileExt.equals("key")) {
                     switch (fileExt) {
                         case "zip":
                         case "mcpack":
-                            resourcePack = new ZippedBehaviourPack(pack, this.isNetEase);
+                            resourcePack = new ZippedBehaviourPack(pack, this.supportType);
                             break;
                         default:
-                            log.warn(baseLang.translateString("nukkit.resources.unknown-format", new String[] { pack.getName() }));
+                            log.warn(baseLang.translateString("nukkit.resources.unknown-format", pack.getName()));
                             break;
                     }
                 }
