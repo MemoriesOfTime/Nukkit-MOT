@@ -3,17 +3,19 @@ package cn.nukkit.item;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.level.Level;
+import cn.nukkit.nbt.stream.FastByteArrayOutputStream;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ClientboundMapItemDataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.utils.MainLogger;
+import cn.nukkit.utils.ThreadCache;
+import org.jetbrains.annotations.Nullable;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 
@@ -59,19 +61,21 @@ public class ItemMap extends Item {
                 this.image = image;
             }
 
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            FastByteArrayOutputStream baos = ThreadCache.fbaos.get().reset();
             ImageIO.write(this.image, "png", baos);
 
             this.setNamedTag(this.getNamedTag().putByteArray("Colors", baos.toByteArray()));
-            baos.close();
         } catch (IOException e) {
             MainLogger.getLogger().logException(e);
         }
     }
 
+    @Nullable
     protected BufferedImage loadImageFromNBT() {
         try {
-            byte[] data = getNamedTag().getByteArray("Colors");
+            CompoundTag tag = this.getNamedTag();
+            if (tag == null) return null;
+            byte[] data = tag.getByteArray("Colors");
             image = ImageIO.read(new ByteArrayInputStream(data));
             return image;
         } catch (IOException e) {
@@ -85,27 +89,12 @@ public class ItemMap extends Item {
         return getNamedTag().getLong("map_uuid");
     }
 
+    /**
+     * @deprecated Use {@link #trySendImage(Player)} instead
+     */
+    @Deprecated
     public void sendImage(Player p) {
-        // Don't load the image from NBT if it has been done before
-        BufferedImage image = this.image != null ? this.image : loadImageFromNBT();
-
-        ClientboundMapItemDataPacket pk = new ClientboundMapItemDataPacket();
-        pk.mapId = getMapId();
-        pk.scale = 0;
-        pk.width = 128;
-        pk.height = 128;
-        pk.offsetX = 0;
-        pk.offsetZ = 0;
-        pk.image = image;
-        if (p.protocol >= ProtocolInfo.v1_19_50_20) {
-            pk.eids = new long[]{pk.mapId};
-        }
-
-        p.dataPacket(pk);
-
-        if (p.protocol >= ProtocolInfo.v1_19_20 && p.protocol < ProtocolInfo.v1_19_50) {
-            Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> p.dataPacket(pk), 20);
-        }
+        this.trySendImage(p);
     }
 
     public void renderMap(Level level, int centerX, int centerZ) {
@@ -132,9 +121,30 @@ public class ItemMap extends Item {
     }
 
     public boolean trySendImage(Player p) {
+        // Don't load the image from NBT if it has been done before
         BufferedImage image = this.image != null ? this.image : loadImageFromNBT();
-        if (image == null) return false;
-        this.sendImage(p);
+        if (image == null) {
+            return false;
+        }
+
+        ClientboundMapItemDataPacket pk = new ClientboundMapItemDataPacket();
+        pk.mapId = getMapId();
+        pk.scale = 0;
+        pk.width = 128;
+        pk.height = 128;
+        pk.offsetX = 0;
+        pk.offsetZ = 0;
+        pk.image = image;
+        if (p.protocol >= ProtocolInfo.v1_19_50_20) {
+            pk.eids = new long[]{pk.mapId};
+        }
+
+        p.dataPacket(pk);
+
+        if (p.protocol >= ProtocolInfo.v1_19_20 && p.protocol < ProtocolInfo.v1_19_50) {
+            Server.getInstance().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> p.dataPacket(pk), 20);
+        }
+
         return true;
     }
 

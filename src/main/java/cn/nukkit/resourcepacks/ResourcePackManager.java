@@ -50,16 +50,14 @@ public class ResourcePackManager {
     public ResourcePack[] getResourceStack(GameVersion gameVersion) {
         return this.resourcePacks.stream()
                 .filter(pack -> pack.getPackProtocol() <= gameVersion.getProtocol())
-                .filter(pack -> (gameVersion.isNetEase() && pack.isNetEase())
-                        || (!gameVersion.isNetEase() && !pack.isNetEase()))
+                .filter(pack -> pack.getSupportType().isCompatibleWith(gameVersion))
                 .toArray(ResourcePack[]::new);
     }
 
     public ResourcePack[] getBehaviorStack(GameVersion gameVersion) {
         return this.behaviorPacks.stream()
                 .filter(pack -> pack.getPackProtocol() <= gameVersion.getProtocol())
-                .filter(pack -> (gameVersion.isNetEase() && pack.isNetEase())
-                        || (!gameVersion.isNetEase() && !pack.isNetEase()))
+                .filter(pack -> pack.getSupportType().isCompatibleWith(gameVersion))
                 .toArray(ResourcePack[]::new);
     }
 

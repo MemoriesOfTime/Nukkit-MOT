@@ -71,6 +71,7 @@ import cn.nukkit.plugin.service.NKServiceManager;
 import cn.nukkit.plugin.service.ServiceManager;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
+import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.resourcepacks.ResourcePackManager;
 import cn.nukkit.resourcepacks.loader.JarPluginResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ResourcePackLoader;
@@ -767,8 +768,8 @@ public class Server {
         packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")));
         packLoaders.add(new JarPluginResourcePackLoader(new File(this.pluginPath)));
         if (this.netEaseMode) {
-            packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs_netease"), true));
-            packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs_netease"), true));
+            packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs_netease"), ResourcePack.SupportType.NETEASE));
+            packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs_netease"), ResourcePack.SupportType.NETEASE));
         }
         this.resourcePackManager = new ResourcePackManager(packLoaders);
 
