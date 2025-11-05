@@ -1,5 +1,7 @@
 package cn.nukkit.network.encryption;
 
+import cn.nukkit.Server;
+import lombok.extern.log4j.Log4j2;
 import org.checkerframework.checker.nullness.qual.Nullable;
 import org.jose4j.json.JsonUtil;
 import org.jose4j.jwt.JwtClaims;
@@ -17,6 +19,7 @@ import java.util.UUID;
 
 import static cn.nukkit.network.encryption.JsonUtils.childAsType;
 
+@Log4j2
 public final class ChainValidationResult {
     private final boolean signed;
     private final Map<String, Object> parsedPayload;
@@ -79,8 +82,34 @@ public final class ChainValidationResult {
             throw new IllegalStateException("identity node is an invalid UUID");
         }
 
+        Long neteaseUid = null;
+        String neteaseSid = null;
+        String neteasePlatform = null;
+        String neteaseClientOsName = null;
+        String neteaseClientOsVersion = null;
+        String neteaseEnv = null;
+        String neteaseClientEngineVersion = null;
+        String neteaseClientPatchVersion = null;
+        String neteaseClientBit = null;
+        if (Server.getInstance().netEaseMode) {
+            try {
+                neteaseUid = childAsType(extraData, "uid", Long.class);
+                neteaseSid = childAsType(extraData, "netease_sid", String.class);
+                neteasePlatform = childAsType(extraData, "platform", String.class);
+                neteaseClientOsName = childAsType(extraData, "os_name", String.class);
+                neteaseEnv = childAsType(extraData, "env", String.class);
+                neteaseClientEngineVersion = childAsType(extraData, "engineVersion", String.class);
+                neteaseClientPatchVersion = childAsType(extraData, "patchVersion", String.class);
+                neteaseClientBit = childAsType(extraData, "bit", String.class);
+            } catch (Exception exception) {
+                log.debug("Failed to parse netease data from extraData", exception);
+            }
+        }
+
         return new IdentityClaims(
-                new IdentityData(displayName, identity, xuid, (String) titleId, null),
+                new IdentityData(displayName, identity, xuid, (String) titleId, null,
+                        neteaseUid, neteaseSid, neteasePlatform, neteaseClientOsName, neteaseEnv,
+                        neteaseClientEngineVersion, neteaseClientPatchVersion, neteaseClientBit),
                 identityPublicKey
         );
     }
@@ -95,7 +124,9 @@ public final class ChainValidationResult {
         UUID identity = UUID.nameUUIDFromBytes(("pocket-auth-1-xuid:" + xuid).getBytes(StandardCharsets.UTF_8));
 
         return new IdentityClaims(
-                new IdentityData(displayName, identity, xuid, null, minecraftId),
+                new IdentityData(displayName, identity, xuid, null, minecraftId,
+                        null, null, null, null,
+                        null,null, null, null),
                 identityPublicKey
         );
     }
@@ -135,12 +166,40 @@ public final class ChainValidationResult {
         @Nullable
         public final String minecraftId;
 
-        private IdentityData(String displayName, @Nullable UUID identity, String xuid, @Nullable String titleId, @Nullable String minecraftId) {
+        @Nullable
+        public Long neteaseUid;
+        @Nullable
+        public String neteaseSid;
+        @Nullable
+        public String neteasePlatform;
+        @Nullable
+        public String neteaseClientOsName;
+        @Nullable
+        public String neteaseEnv;
+        @Nullable
+        public String neteaseClientEngineVersion;
+        @Nullable
+        public String neteaseClientPatchVersion;
+        @Nullable
+        public String neteaseClientBit;
+
+        private IdentityData(String displayName, @Nullable UUID identity, String xuid, @Nullable String titleId, @Nullable String minecraftId,
+                             @Nullable Long neteaseUid, @Nullable String neteaseSid, @Nullable String neteasePlatform, @Nullable String neteaseClientOsName,
+                             @Nullable String neteaseEnv, @Nullable String neteaseClientEngineVersion, @Nullable String neteaseClientPatchVersion, @Nullable String neteaseClientBit) {
             this.displayName = displayName;
             this.identity = identity;
             this.xuid = xuid;
             this.titleId = titleId;
             this.minecraftId = minecraftId;
+
+            this.neteaseUid = neteaseUid;
+            this.neteaseSid = neteaseSid;
+            this.neteasePlatform = neteasePlatform;
+            this.neteaseClientOsName = neteaseClientOsName;
+            this.neteaseEnv = neteaseEnv;
+            this.neteaseClientEngineVersion = neteaseClientEngineVersion;
+            this.neteaseClientPatchVersion = neteaseClientPatchVersion;
+            this.neteaseClientBit = neteaseClientBit;
         }
     }
 }

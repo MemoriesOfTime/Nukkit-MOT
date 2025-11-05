@@ -66,4 +66,36 @@ public interface LoginChainData {
     JsonObject getRawData();
 
     String getTitleId();
+
+    default Long getNetEaseUID() {
+        return -1L;
+    }
+
+    default String getNetEaseSid() {
+        return "";
+    }
+
+    default String getNetEasePlatform() {
+        return "";
+    }
+
+    default String getNetEaseClientOsName() {
+        return "";
+    }
+
+    default String getNetEaseClientBit() {
+        return "";
+    }
+
+    default String getNetEaseClientEngineVersion() {
+        return "";
+    }
+
+    default String getNetEaseClientPatchVersion() {
+        return "";
+    }
+
+    default String getNetEaseEnv() {
+        return "";
+    }
 }

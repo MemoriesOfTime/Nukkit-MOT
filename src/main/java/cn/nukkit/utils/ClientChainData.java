@@ -170,6 +170,46 @@ public final class ClientChainData implements LoginChainData {
         return Server.getInstance().isWaterdogCapable();
     }
 
+    @Override
+    public Long getNetEaseUID() {
+        return neteaseUid;
+    }
+
+    @Override
+    public String getNetEaseSid() {
+        return neteaseSid;
+    }
+
+    @Override
+    public String getNetEasePlatform() {
+        return neteasePlatform;
+    }
+
+    @Override
+    public String getNetEaseClientOsName() {
+        return neteaseClientOsName;
+    }
+
+    @Override
+    public String getNetEaseClientBit() {
+        return neteaseClientBit;
+    }
+
+    @Override
+    public String getNetEaseClientEngineVersion() {
+        return neteaseClientEngineVersion;
+    }
+
+    @Override
+    public String getNetEaseClientPatchVersion() {
+        return neteaseClientPatchVersion;
+    }
+
+    @Override
+    public String getNetEaseEnv() {
+        return neteaseEnv;
+    }
+
     ///////////////////////////////////////////////////////////////////////////
     // Override
     ///////////////////////////////////////////////////////////////////////////
@@ -216,6 +256,15 @@ public final class ClientChainData implements LoginChainData {
     private int UIProfile;
     private String capeData;
     private String titleId;
+
+    private Long neteaseUid;
+    private String neteaseSid;
+    private String neteasePlatform;
+    private String neteaseClientOsName;
+    private String neteaseEnv;
+    private String neteaseClientEngineVersion;
+    private String neteaseClientPatchVersion;
+    private String neteaseClientBit;
 
     private JsonObject rawData;
 
@@ -318,6 +367,15 @@ public final class ClientChainData implements LoginChainData {
             this.titleId = extraData.titleId;
 
             this.identityPublicKey = result.identityClaims().identityPublicKey;
+
+            this.neteaseUid = extraData.neteaseUid;
+            this.neteaseSid = extraData.neteaseSid;
+            this.neteasePlatform = extraData.neteasePlatform;
+            this.neteaseClientOsName = extraData.neteaseClientOsName;
+            this.neteaseEnv = extraData.neteaseEnv;
+            this.neteaseClientEngineVersion = extraData.neteaseClientEngineVersion;
+            this.neteaseClientPatchVersion = extraData.neteaseClientPatchVersion;
+            this.neteaseClientBit = extraData.neteaseClientBit;
 
             if (!xboxAuthed) {
                 xuid = null;
