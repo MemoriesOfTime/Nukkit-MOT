@@ -13,7 +13,9 @@ import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemArmor;
 import cn.nukkit.item.ItemTurtleShell;
+import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Sound;
@@ -148,7 +150,6 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                 if (damager.isOnFire() && !(damager instanceof Player)) {
                     this.setOnFire(this.server.getDifficulty() << 1);
                 }
-
                 double deltaX = this.x - damager.x;
                 double deltaZ = this.z - damager.z;
                 this.knockBack(damager, source.getDamage(), deltaX, deltaZ, ((EntityDamageByEntityEvent) source).getKnockBack());
@@ -210,35 +211,45 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public void knockBack(Entity attacker, double damage, double x, double z) {
-        this.knockBack(attacker, damage, x, z, 0.3);
+        this.knockBack(attacker, damage, x, z, server.knockbackParam.getHorizontal());
     }
 
+    // 此处base保留原始签名，但实际含义已更改为水平击退力度
     public void knockBack(Entity attacker, double damage, double x, double z, double base) {
-        double f = Math.sqrt(x * x + z * z);
-        if (f <= 0) {
-            return;
+        this.knockback(attacker, damage, x, z, base, server.knockbackParam.getInterval());
+    }
+
+    public void knockback(Entity attacker, double damage, double x, double z, double base, int interval) {
+        double knockbackResistance = 0d;
+        if (this instanceof EntityHumanType victimPlayer) {
+            var inventory = victimPlayer.getInventory();
+            for (int i = 36; i <= 39; i++) {
+                Item itemFast = inventory.getItemFast(i);
+                if (itemFast != null && itemFast.getTier() == (ItemArmor.TIER_NETHERITE)) {
+                    knockbackResistance += 0.10;
+                }
+            }
         }
 
-        f = 1 / f;
+        double f = Math.sqrt(x * x + z * z);
+        if (f <= 0) return;
+
+        x /= f;
+        z /= f;
 
         Vector3 motion = new Vector3(this.motionX, this.motionY, this.motionZ);
-
         motion.x /= 2d;
         motion.y /= 2d;
         motion.z /= 2d;
-        motion.x += x * f * base;
-        motion.y += base;
-        motion.z += z * f * base;
 
-        if (motion.y > base) {
-            motion.y = base;
-        }
+        motion.x += x * base * (1 - knockbackResistance);
+        motion.y += server.knockbackParam.getVertical() + (base > server.knockbackParam.getHorizontal() ? server.knockbackParam.getVerticalIncrementWhenHasEnchant() : 0);
+        motion.z += z * base * (1 - knockbackResistance);
 
+//        System.out.println("KnockBack Motion: " + motion + ", Resistance: " + knockbackResistance + ", Base: " + base);
         this.resetFallDistance();
-
         this.setMotion(motion);
-
-        this.knockBackTime = 10;
+        this.knockBackTime = interval;
     }
 
     @Override
@@ -445,7 +456,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
      * Get an array of blocks within the entity's line of sight.
      *
      * @param maxDistance 视线的最大距离，超过 120 会被限制为 120 / The maximum distance of the line of sight. If it exceeds 120, it will be limited to 120.
-     * @param maxLength  返回的方块列表的最大长度，若不为 0，列表长度超过该值时会移除最早添加的方块 / The maximum length of the returned block list. If it is not 0, the earliest added block will be removed when the list length exceeds this value.
+     * @param maxLength   返回的方块列表的最大长度，若不为 0，列表长度超过该值时会移除最早添加的方块 / The maximum length of the returned block list. If it is not 0, the earliest added block will be removed when the list length exceeds this value.
      * @param transparent 透明方块 ID 的集合，若方块 ID 在该集合中，会停止遍历 / A set of transparent block IDs. If a block ID is in this set, the traversal will stop.
      * @return 视线范围内的方块数组 / An array of blocks within the line of sight.
      */
@@ -510,7 +521,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
                     return block;
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         return null;
     }
@@ -522,7 +534,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     public float getMovementSpeed() {
         return this.movementSpeed;
     }
-    
+
     public int getAirTicks() {
         return this.airTicks;
     }
