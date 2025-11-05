@@ -16,6 +16,11 @@ public interface LoginChainData {
 
     UUID getClientUUID();
 
+    /**
+     * @return the player's Minecraft PlayFab ID
+     */
+    String getMinecraftId();
+
     String getIdentityPublicKey();
 
     long getClientId();

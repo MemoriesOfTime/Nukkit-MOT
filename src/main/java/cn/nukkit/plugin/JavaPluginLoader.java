@@ -32,6 +32,10 @@ public class JavaPluginLoader implements PluginLoader {
 
     @Override
     public Plugin loadPlugin(File file) throws Exception {
+        if (!this.server.isPrimaryThread()) {
+            this.server.getLogger().warning("Plugin loaded asynchronously: " + file.getName());
+        }
+
         PluginDescription description = this.getPluginDescription(file);
         if (description != null) {
             this.server.getLogger().info(this.server.getLanguage().translateString("nukkit.plugin.load", description.getFullName()));

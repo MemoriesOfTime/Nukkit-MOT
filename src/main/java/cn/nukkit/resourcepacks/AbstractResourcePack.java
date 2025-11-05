@@ -12,12 +12,12 @@ public abstract class AbstractResourcePack implements ResourcePack {
     private UUID id = null;
 
     private int protocol = 0;
-    private boolean isNetEase = false;
+    private SupportType supportType = SupportType.UNIVERSAL;
 
     protected boolean verifyManifest() {
         if (this.manifest.has("format_version") && this.manifest.has("header") && this.manifest.has("modules")) {
             JsonObject header = this.manifest.getAsJsonObject("header");
-            return (this.isNetEase || (header.has("description") && header.has("name"))) &&
+            return (supportType == SupportType.NETEASE || (header.has("description") && header.has("name"))) &&
                     header.has("uuid") &&
                     header.has("version") &&
                     header.getAsJsonArray("version").size() == 3;
@@ -62,13 +62,25 @@ public abstract class AbstractResourcePack implements ResourcePack {
     }
 
     @Override
-    public void setNetEase(boolean isNetEase) {
-        this.isNetEase = isNetEase;
+    public void setSupportType(SupportType type) {
+        this.supportType = type;
     }
 
     @Override
+    public SupportType getSupportType() {
+        return this.supportType;
+    }
+
+    @Override
+    @Deprecated
+    public void setNetEase(boolean isNetEase) {
+        this.supportType = isNetEase ? SupportType.NETEASE : SupportType.MICROSOFT;
+    }
+
+    @Override
+    @Deprecated
     public boolean isNetEase() {
-        return this.isNetEase;
+        return this.supportType == SupportType.NETEASE;
     }
 
     @Override
