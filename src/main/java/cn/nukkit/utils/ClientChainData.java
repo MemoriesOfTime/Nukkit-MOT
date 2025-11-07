@@ -172,6 +172,9 @@ public final class ClientChainData implements LoginChainData {
 
     @Override
     public Long getNetEaseUID() {
+        if (neteaseUid == null) {
+            return -1L;
+        }
         return neteaseUid;
     }
 
