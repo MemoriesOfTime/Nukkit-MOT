@@ -44,11 +44,11 @@ import static cn.nukkit.utils.Utils.dynamic;
 @Log4j2
 public abstract class Block extends Position implements Metadatable, Cloneable, AxisAlignedBB, BlockID {
 
-    public static final int MAX_BLOCK_ID = dynamic(2048);
-    public static final int DATA_BITS = dynamic(6);
-    public static final int ID_MASK = 0xfff; //max 4095
-    public static final int DATA_SIZE = dynamic(1 << DATA_BITS);
-    public static final int DATA_MASK = dynamic(DATA_SIZE - 1);
+    public static int MAX_BLOCK_ID = dynamic(2048);
+    public static int DATA_BITS = dynamic(6);
+    public static int ID_MASK = 0xfff; //max 4095
+    public static int DATA_SIZE = dynamic(1 << DATA_BITS);
+    public static int DATA_MASK = dynamic(DATA_SIZE - 1);
 
     @SuppressWarnings("rawtypes")
     public static Class[] list = null;

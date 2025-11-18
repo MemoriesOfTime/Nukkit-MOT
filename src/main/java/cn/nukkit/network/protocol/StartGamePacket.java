@@ -56,7 +56,7 @@ public class StartGamePacket extends DataPacket {
     public float yaw;
     public float pitch;
     public int seed;
-    public byte dimension;
+    public int dimension;
     /**
      * generator is the generator used for the world. It is a value from 0-4, with 0 being old limited worlds,
      * 1 being infinite worlds, 2 being flat worlds, 3 being nether worlds and 4 being end worlds. A value of

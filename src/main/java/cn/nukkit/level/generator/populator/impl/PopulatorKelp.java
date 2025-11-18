@@ -22,7 +22,7 @@ public class PopulatorKelp extends PopulatorOceanFloorSurfaceBlock {
 
     @Override
     protected void placeBlock(int x, int y, int z, int id, FullChunk chunk, NukkitRandom random) {
-        int height = Utils.rand(1, 25);
+        int height = Utils.rand(1, 16);
         int lastTop = y;
 
         for (int part = 0; part < height; part++) {
@@ -38,6 +38,6 @@ public class PopulatorKelp extends PopulatorOceanFloorSurfaceBlock {
         }
 
         // Stop top part growing
-        chunk.setBlockData(x, lastTop, z, 24);
+        chunk.setBlockData(x, lastTop, z, 15);
     }
 }
