@@ -54,13 +54,13 @@ public class BlockKelp extends BlockFlowable {
                 this.getLevel().setBlock(this, 1, new BlockWater(), true, false);
             }
             
-            if (down.getId() == BLOCK_KELP && down.getDamage() != 15) {
-                down.setDamage(15);
+            if (down.getId() == BLOCK_KELP && down.getDamage() != 24) {
+                down.setDamage(24);
                 this.getLevel().setBlock(down, down, true, true);
             }
             
             //Placing it by hand gives it a random age value between 0 and 15.
-            this.setDamage(ThreadLocalRandom.current().nextInt(16));
+            this.setDamage(ThreadLocalRandom.current().nextInt(25));
             this.getLevel().setBlock(this, this, true, true);
             return true;
         } else {
@@ -99,8 +99,8 @@ public class BlockKelp extends BlockFlowable {
     }
     
     public boolean grow() {
-        int age = MathHelper.clamp(this.getDamage(), 0, 15);
-        if (age < 16) {
+        int age = MathHelper.clamp(this.getDamage(), 0, 25);
+        if (age < 25) {
             Block up = this.up();
             if (up instanceof BlockWater && (up.getDamage() == 0 || up.getDamage() == 8)) {
                 BlockKelp grown = new BlockKelp(age + 1);
@@ -108,7 +108,7 @@ public class BlockKelp extends BlockFlowable {
                 Server.getInstance().getPluginManager().callEvent(ev);
 
                 if (!ev.isCancelled()) {
-                    this.setDamage(15);
+                    this.setDamage(25);
                     this.getLevel().setBlock(this, 0, this, true, true);
                     this.getLevel().setBlock(up, 1, new BlockWater(), true, false);
                     this.getLevel().setBlock(up, 0, ev.getNewState(), true, true);
@@ -123,7 +123,7 @@ public class BlockKelp extends BlockFlowable {
     public boolean onBreak(Item item) {
         Block down = this.down();
         if (down.getId() == BLOCK_KELP) {
-            this.getLevel().setBlock(down, new BlockKelp(ThreadLocalRandom.current().nextInt(16)), true, true);
+            this.getLevel().setBlock(down, new BlockKelp(ThreadLocalRandom.current().nextInt(25)), true, true);
         }
         this.getLevel().setBlock(this, new BlockAir(), true, true);
         return true;
