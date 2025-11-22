@@ -910,6 +910,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             case V1_21_110:
                 return Item.creative844;
             case V1_21_120:
+            case V1_21_124:
                 return Item.creative859;
             // NetEase
             case V1_20_50_NETEASE:

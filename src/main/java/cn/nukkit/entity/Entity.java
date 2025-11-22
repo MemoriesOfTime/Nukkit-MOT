@@ -81,7 +81,9 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FLAGS = 0;
     public static final int DATA_HEALTH = 1; //int (minecart/boat)
     public static final int DATA_VARIANT = 2; //int
-    public static final int DATA_COLOR = 3, DATA_COLOUR = DATA_COLOR; //byte
+    public static final int DATA_COLOR = 3; //byte
+    @Deprecated
+    public static final int DATA_COLOUR = DATA_COLOR;
     public static final int DATA_NAMETAG = 4; //string
     public static final int DATA_OWNER_EID = 5; //long
     public static final int DATA_TARGET_EID = 6; //long
@@ -252,7 +254,8 @@ public abstract class Entity extends Location implements Metadatable {
     public static final int DATA_FLAG_CRITICAL = 13;
     public static final int DATA_FLAG_CAN_SHOW_NAMETAG = 14;
     public static final int DATA_FLAG_ALWAYS_SHOW_NAMETAG = 15;
-    public static final int DATA_FLAG_IMMOBILE = 16, DATA_FLAG_NO_AI = DATA_FLAG_IMMOBILE;
+    public static final int DATA_FLAG_IMMOBILE = 16;
+    public static final int DATA_FLAG_NO_AI = DATA_FLAG_IMMOBILE;
     public static final int DATA_FLAG_SILENT = 17;
     public static final int DATA_FLAG_WALLCLIMBING = 18;
     public static final int DATA_FLAG_CAN_CLIMB = 19;
@@ -1537,6 +1540,17 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
+    /**
+     * Check if player's hit should be critical
+     * @param player player
+     * @return can make a critical hit
+     */
+    private static boolean canCriticalHit(Player player) {
+        if (player.isOnGround() || player.riding != null || player.speed == null || player.speed.y <= 0 || player.hasEffect(Effect.BLINDNESS)) return false;
+        int b = player.getLevel().getBlockIdAt(player.chunk, player.getFloorX(), player.getFloorY(), player.getFloorZ());
+        return b != Block.LADDER && b != Block.VINES && !Block.isWater(b);
+    }
+
     public boolean attack(EntityDamageEvent source) {
         if (hasEffect(Effect.FIRE_RESISTANCE)
                 && (source.getCause() == DamageCause.FIRE
@@ -1545,9 +1559,26 @@ public abstract class Entity extends Location implements Metadatable {
             return false;
         }
 
+        if (this instanceof EntityLiving && source instanceof EntityDamageByEntityEvent && !(source instanceof EntityDamageByChildEntityEvent)) {
+            Entity damager = ((EntityDamageByEntityEvent) source).getDamager();
+            if (damager instanceof Player && canCriticalHit((Player) damager)) {
+                source.setDamage(source.getFinalDamage() * 0.5f, EntityDamageEvent.DamageModifier.CRITICAL);
+            }
+        }
+
         server.getPluginManager().callEvent(source);
         if (source.isCancelled()) {
             return false;
+        }
+
+        if (source.isApplicable(EntityDamageEvent.DamageModifier.CRITICAL)) {
+            AnimatePacket animate = new AnimatePacket();
+            animate.action = AnimatePacket.Action.CRITICAL_HIT;
+            animate.eid = this.getId();
+            animate.data = 55f;
+
+            this.getLevel().addChunkPacket(this.getChunkX(), this.getChunkZ(), animate);
+            this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_ATTACK_STRONG);
         }
 
         if (source instanceof EntityDamageByEntityEvent damageByEntityEvent) {

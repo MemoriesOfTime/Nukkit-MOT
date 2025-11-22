@@ -69,6 +69,16 @@ public abstract class Fuel {
         duration.put(Item.WOOD_SLAB, (short) 300);
         duration.put(Item.DOUBLE_WOOD_SLAB, (short) 300);
         duration.put(Item.BOAT, (short) 1200);
+        duration.put(Item.ACACIA_CHEST_BOAT, (short) 1200);
+        duration.put(Item.BIRCH_CHEST_BOAT, (short) 1200);
+        duration.put(Item.JUNGLE_CHEST_BOAT, (short) 1200);
+        duration.put(Item.DARK_OAK_CHEST_BOAT, (short) 1200);
+        duration.put(Item.MANGROVE_CHEST_BOAT, (short) 1200);
+        duration.put(Item.OAK_CHEST_BOAT, (short) 1200);
+        duration.put(Item.SPRUCE_CHEST_BOAT, (short) 1200);
+        duration.put(Item.CHERRY_CHEST_BOAT, (short) 1200);
+        duration.put(Item.PALE_OAK_CHEST_BOAT, (short) 1200);
+        duration.put(Item.BAMBOO_CHEST_RAFT, (short) 1200);
         duration.put(Item.BLAZE_ROD, (short) 2400);
         duration.put(Item.BROWN_MUSHROOM_BLOCK, (short) 300);
         duration.put(Item.RED_MUSHROOM_BLOCK, (short) 300);
@@ -80,9 +90,22 @@ public abstract class Fuel {
         duration.put(Item.JUNGLE_DOOR, (short) 200);
         duration.put(Item.ACACIA_DOOR, (short) 200);
         duration.put(Item.DARK_OAK_DOOR, (short) 200);
+        duration.put(Item.BAMBOO_DOOR, (short) 200);
         duration.put(Item.BANNER, (short) 300);
         duration.put(Item.CROSSBOW, (short) 200);
         duration.put(Item.DEAD_BUSH, (short) 100);
         duration.put(Item.SIGN, (short) 200);
+        duration.put(Item.ACACIA_SIGN, (short) 200);
+        duration.put(Item.BIRCH_SIGN, (short) 200);
+        duration.put(Item.SPRUCE_SIGN, (short) 200);
+        duration.put(Item.DARKOAK_SIGN, (short) 200);
+        duration.put(Item.JUNGLE_SIGN, (short) 200);
+        duration.put(Item.MANGROVE_SIGN, (short) 200);
+        duration.put(Item.BAMBOO_SIGN, (short) 200);
+        duration.put(Item.CHERRY_SIGN, (short) 200);
+
+        //TODO
+//        duration.put(Item.MANGROVE_DOOR, (short) 200);
+//        duration.put(Item.CHERRY_DOOR, (short) 200);
     }
 }

@@ -36,7 +36,7 @@ public class WeatherCommand extends VanillaCommand {
         if (list.hasResult(1)) {
             seconds = list.getResult(1);
         } else {
-            seconds = 600 * 20;
+            seconds = 600;
         }
         switch (weather) {
             case "clear" -> {

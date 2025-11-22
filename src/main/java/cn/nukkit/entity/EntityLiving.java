@@ -479,7 +479,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     }
 
     public Block getTargetBlock(int maxDistance) {
-        return getTargetBlock(maxDistance, new Integer[]{});
+        return getTargetBlock(maxDistance, new Integer[0]);
     }
 
     public Block getTargetBlock(int maxDistance, Map<Integer, Object> transparent) {

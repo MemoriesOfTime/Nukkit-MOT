@@ -85,7 +85,7 @@ public class BaseLang {
     }
 
     public String translateString(String str) {
-        return this.translateString(str, new String[]{}, null);
+        return this.translateString(str, new String[0], null);
     }
 
     public String translateString(String str, String... params) {
