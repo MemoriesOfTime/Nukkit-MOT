@@ -56,7 +56,7 @@ public class BlockIce extends BlockTransparent {
         if (type == Level.BLOCK_UPDATE_RANDOM) {
             if (level.getBlockLightAt((int) this.x, (int) this.y, (int) this.z) >= 12) {
                 BlockFadeEvent event = new BlockFadeEvent(this, level.getDimension() == Level.DIMENSION_NETHER ? get(AIR) : get(WATER));
-                level.getServer().getPluginManager().callEvent(event);
+                event.call();
                 if (!event.isCancelled()) {
                     level.setBlock(this, event.getNewState(), true);
                 }
