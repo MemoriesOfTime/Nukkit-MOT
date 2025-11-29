@@ -81,6 +81,7 @@ import cn.nukkit.scheduler.Task;
 import cn.nukkit.scoreboard.manager.IScoreboardManager;
 import cn.nukkit.scoreboard.manager.ScoreboardManager;
 import cn.nukkit.scoreboard.storage.JSONScoreboardStorage;
+import cn.nukkit.team.TeamManager;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.bugreport.ExceptionHandler;
 import com.google.common.base.Preconditions;
@@ -94,6 +95,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
+import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.raknet.RakConstants;
 import org.iq80.leveldb.CompressionType;
@@ -158,6 +160,8 @@ public class Server {
     private final CraftingManager craftingManager;
     private final ResourcePackManager resourcePackManager;
     private final ConsoleCommandSender consoleSender;
+    @Getter
+    private final TeamManager teamManager;
     private final IScoreboardManager scoreboardManager;
 
     private final TickingAreaManager tickingAreaManager;
@@ -689,6 +693,7 @@ public class Server {
         this.entityMetadata = new EntityMetadataStore();
         this.playerMetadata = new PlayerMetadataStore();
         this.levelMetadata = new LevelMetadataStore();
+        this.teamManager = new TeamManager();
         this.scoreboardManager = new ScoreboardManager(new JSONScoreboardStorage(this.dataPath + "scoreboard.json"));
         this.tickingAreaManager = new SimpleTickingAreaManager(new JSONTickingAreaStorage(this.dataPath + "worlds/"));
 

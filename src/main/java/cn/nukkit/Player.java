@@ -80,6 +80,8 @@ import cn.nukkit.scoreboard.displayer.IScoreboardViewer;
 import cn.nukkit.scoreboard.scoreboard.IScoreboard;
 import cn.nukkit.scoreboard.scoreboard.IScoreboardLine;
 import cn.nukkit.scoreboard.scorer.PlayerScorer;
+import cn.nukkit.team.Team;
+import cn.nukkit.team.TeamManager;
 import cn.nukkit.utils.*;
 import com.google.common.base.Strings;
 import com.google.common.cache.Cache;
@@ -238,6 +240,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     protected String unverifiedUsername = "";
     protected String iusername;
     protected String displayName;
+
 
     /**
      * Client protocol version
@@ -440,6 +443,355 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      * 上一次被甜浆果丛伤害的tick
      */
     protected int lastSweetBerryBushDamageTick;
+
+    // 队伍相关字段
+    private String teamName;
+    private Team team;
+
+    /**
+     * 设置玩家队伍（内部使用）
+     * @param teamName 队伍名称
+     */
+    public void setTeam(String teamName) {
+        this.teamName = teamName;
+        // 通过TeamManager获取队伍对象
+        TeamManager teamManager = getTeamManager();
+        if (teamManager != null && teamName != null) {
+            this.team = teamManager.getPlayerTeam(this);
+        } else {
+            this.team = null;
+        }
+    }
+
+    /**
+     * 设置玩家队伍（内部使用）
+     * @param team 队伍对象
+     */
+    public void setTeam(Team team) {
+        if (team != null) {
+            this.team = team;
+            this.teamName = team.getName();
+        } else {
+            this.team = null;
+            this.teamName = null;
+        }
+    }
+
+    /**
+     * 清除玩家队伍（内部使用）
+     */
+    public void clearTeam() {
+        this.team = null;
+        this.teamName = null;
+        // 重置显示名称
+        this.setDisplayName(this.getName());
+        this.setNameTag(this.getName());
+    }
+
+    /**
+     * 获取玩家所在的队伍名称
+     * @return 队伍名称，如果不在任何队伍中返回null
+     */
+    public String getTeam() {
+        return this.teamName;
+    }
+
+    /**
+     * 获取玩家所在的队伍对象
+     * @return 队伍对象，如果不在任何队伍中返回null
+     */
+    public Team getTeamObject() {
+        if (this.team == null && this.teamName != null) {
+            // 尝试从TeamManager重新获取
+            TeamManager teamManager = getTeamManager();
+            if (teamManager != null) {
+                this.team = teamManager.getPlayerTeam(this);
+            }
+        }
+        return this.team;
+    }
+
+    /**
+     * 检查玩家是否在某个队伍中
+     * @return 如果在队伍中返回true，否则返回false
+     */
+    public boolean isInTeam() {
+        return this.teamName != null && this.getTeamObject() != null;
+    }
+
+    /**
+     * 获取玩家所在队伍的显示名称
+     * @return 队伍显示名称，如果不在队伍中返回null
+     */
+    public String getTeamDisplayName() {
+        Team team = getTeamObject();
+        return team != null ? team.getDisplayName() : null;
+    }
+
+    /**
+     * 获取玩家所在队伍的颜色
+     * @return 队伍颜色，如果不在队伍中返回TextFormat.WHITE
+     */
+    public TextFormat getTeamColor() {
+        Team team = getTeamObject();
+        return team != null ? team.getColor() : TextFormat.WHITE;
+    }
+
+    /**
+     * 获取玩家的所有队友（不包括自己）
+     * @return 队友列表，如果不在队伍中返回空列表
+     */
+    public List<Player> getTeammates() {
+        List<Player> teammates = new ArrayList<>();
+        if (isInTeam()) {
+            TeamManager teamManager = getTeamManager();
+            if (teamManager != null) {
+                Set<Player> teammatesSet = teamManager.getTeammates(this);
+                for (Player teammate : teammatesSet) {
+                    if (!teammate.equals(this)) {
+                        teammates.add(teammate);
+                    }
+                }
+            }
+        }
+        return teammates;
+    }
+
+    /**
+     * 获取队伍中的所有玩家（包括自己）
+     * @return 队伍所有玩家列表，如果不在队伍中返回空列表
+     */
+    public List<Player> getAllTeamPlayers() {
+        List<Player> teamPlayers = new ArrayList<>();
+        if (isInTeam()) {
+            TeamManager teamManager = getTeamManager();
+            if (teamManager != null) {
+                Set<Player> players = teamManager.getTeamPlayers(this.teamName);
+                teamPlayers.addAll(players);
+            }
+        }
+        return teamPlayers;
+    }
+
+    /**
+     * 检查玩家是否与另一个玩家在同一队伍
+     * @param otherPlayer 另一个玩家
+     * @return 如果在同一队伍返回true，否则返回false
+     */
+    public boolean isTeammate(Player otherPlayer) {
+        if (otherPlayer == null || !this.isInTeam()) {
+            return false;
+        }
+
+        TeamManager teamManager = getTeamManager();
+        if (teamManager != null) {
+            return teamManager.areTeammates(this, otherPlayer);
+        }
+
+        // 备用检查方法
+        return this.isInTeam() && otherPlayer.isInTeam() &&
+                this.teamName.equals(otherPlayer.getTeam());
+    }
+
+    /**
+     * 获取队伍人数
+     * @return 队伍人数，如果不在队伍中返回0
+     */
+    public int getTeamSize() {
+        if (isInTeam()) {
+            TeamManager teamManager = getTeamManager();
+            if (teamManager != null) {
+                Set<Player> players = teamManager.getTeamPlayers(this.teamName);
+                return players != null ? players.size() : 0;
+            }
+        }
+        return 0;
+    }
+
+    /**
+     * 获取队伍在线人数
+     * @return 队伍在线人数，如果不在队伍中返回0
+     */
+    public int getTeamOnlineCount() {
+        Team team = getTeamObject();
+        return team != null ? team.getOnlinePlayerCount() : 0;
+    }
+
+    /**
+     * 获取队伍存活人数
+     * @return 队伍存活人数，如果不在队伍中返回0
+     */
+    public int getTeamAliveCount() {
+        Team team = getTeamObject();
+        return team != null ? team.getAlivePlayerCount() : 0;
+    }
+
+    /**
+     * 检查队伍是否存活（至少有一名在线且存活的玩家）
+     * @return 队伍是否存活，如果不在队伍中返回false
+     */
+    public boolean isTeamAlive() {
+        Team team = getTeamObject();
+        return team != null && team.isAlive();
+    }
+
+    /**
+     * 向队伍中所有玩家发送消息
+     * @param message 消息内容
+     */
+    public void broadcastToTeam(String message) {
+        if (isInTeam()) {
+            Team team = getTeamObject();
+            if (team != null) {
+                team.broadcastMessage(message);
+            }
+        } else {
+            this.sendMessage(message);
+        }
+    }
+
+    /**
+     * 向队伍中所有玩家发送标题
+     * @param title 标题
+     * @param subtitle 副标题
+     */
+    public void broadcastTitleToTeam(String title, String subtitle) {
+        if (isInTeam()) {
+            Team team = getTeamObject();
+            if (team != null) {
+                team.broadcastTitle(title, subtitle);
+            }
+        } else {
+            this.sendTitle(title, subtitle);
+        }
+    }
+
+    /**
+     * 获取格式化后的玩家名称（带队伍颜色）
+     * @return 格式化后的名称
+     */
+    public String getFormattedName() {
+        Team team = getTeamObject();
+        if (team != null) {
+            return team.getFormattedPlayerName(this);
+        }
+        return this.getName();
+    }
+
+    /**
+     * 检查是否可以攻击目标玩家（基于友军伤害设置）
+     * @param target 目标玩家
+     * @return 是否可以攻击
+     */
+    public boolean canAttackTeammate(Player target) {
+        if (target == null || !this.isInTeam() || !target.isInTeam()) {
+            return true;
+        }
+
+        Team team = getTeamObject();
+        if (team != null) {
+            return team.canAttackTeammate(this, target);
+        }
+
+        return true;
+    }
+
+    /**
+     * 离开当前队伍
+     * @return 是否成功离开队伍
+     */
+    public boolean leaveTeam() {
+        if (!this.isInTeam()) {
+            return false;
+        }
+
+        TeamManager teamManager = getTeamManager();
+        if (teamManager != null) {
+            return teamManager.removePlayerFromTeam(this, this.teamName);
+        }
+
+        return false;
+    }
+
+    /**
+     * 加入指定队伍
+     * @param teamName 队伍名称
+     * @return 是否成功加入队伍
+     */
+    public boolean joinTeam(String teamName) {
+        TeamManager teamManager = getTeamManager();
+        if (teamManager != null) {
+            return teamManager.addPlayerToTeam(this, teamName);
+        }
+        return false;
+    }
+
+    /**
+     * 获取队伍统计信息
+     * @return 队伍统计信息字符串
+     */
+    public String getTeamStats() {
+        if (!this.isInTeam()) {
+            return TextFormat.YELLOW + "你不在任何队伍中";
+        }
+
+        Team team = getTeamObject();
+        if (team != null) {
+            StringBuilder stats = new StringBuilder();
+            stats.append(team.getColor()).append("=== 队伍信息 ===\n")
+                    .append(TextFormat.WHITE).append("名称: ").append(team.getColor()).append(team.getDisplayName()).append("\n")
+                    .append(TextFormat.WHITE).append("人数: ").append(TextFormat.GREEN).append(team.getPlayerCount()).append("/").append(team.getMaxPlayers()).append("\n")
+                    .append(TextFormat.WHITE).append("在线: ").append(TextFormat.AQUA).append(team.getOnlinePlayerCount()).append("\n")
+                    .append(TextFormat.WHITE).append("存活: ").append(team.isAlive() ? TextFormat.GREEN + "是" : TextFormat.RED + "否").append("\n")
+                    .append(TextFormat.WHITE).append("友伤: ").append(team.isAllowFriendlyFire() ? TextFormat.RED + "开启" : TextFormat.GREEN + "关闭");
+
+            return stats.toString();
+        }
+
+        return TextFormat.RED + "无法获取队伍信息";
+    }
+
+    /**
+     * 获取队友列表信息
+     * @return 队友列表信息字符串
+     */
+    public String getTeammatesInfo() {
+        if (!this.isInTeam()) {
+            return TextFormat.YELLOW + "你不在任何队伍中";
+        }
+
+        List<Player> teammates = getTeammates();
+        if (teammates.isEmpty()) {
+            return TextFormat.YELLOW + "你是队伍中唯一的玩家";
+        }
+
+        StringBuilder info = new StringBuilder();
+        info.append(TextFormat.GREEN).append("=== 队友列表 ===\n");
+
+        for (Player teammate : teammates) {
+            String status = teammate.isOnline() ?
+                    (teammate.isAlive() ? TextFormat.GREEN + "存活" : TextFormat.RED + "死亡") :
+                    TextFormat.GRAY + "离线";
+            info.append(TextFormat.WHITE).append("- ").append(teammate.getName())
+                    .append(" ").append(status).append("\n");
+        }
+
+        return info.toString();
+    }
+
+    /**
+     * 获取TeamManager实例
+     *
+     * @return TeamManager实例
+     */
+    private TeamManager getTeamManager() {
+        try {
+            return server.getTeamManager();
+        } catch (Exception e) {
+            this.server.getLogger().warning("无法获取TeamManager实例: " + e.getMessage());
+            return null;
+        }
+    }
 
     public int getStartActionTick() {
         return startAction;
@@ -5623,6 +5975,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(TextContainer message, String reason, boolean notify) {
+        // 清理队伍相关数据
+        if (this.isInTeam()) {
+            // TODO: 可以选择在玩家退出时从队伍中移除，或者保持队伍成员关系
+            this.leaveTeam();
+        }
         if (this.connected && !this.closed) {
             if (notify && !reason.isEmpty()) {
                 DisconnectPacket pk = new DisconnectPacket();
@@ -6028,6 +6385,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     protected void respawn() {
+        // 重生时更新队伍显示
+        if (this.isInTeam()) {
+            Team team = getTeamObject();
+            if (team != null) {
+                String displayName = team.getColor() + this.getName() + TextFormat.RESET;
+                this.setDisplayName(displayName);
+                this.setNameTag(team.getColor() + this.getName());
+            }
+        }
         if (this.server.isHardcore()) {
             this.setBanned(true);
             return;
@@ -6225,6 +6591,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return false;
         }
 
+        // 在攻击处理前检查友军伤害
+        if (source instanceof EntityDamageByEntityEvent) {
+            EntityDamageByEntityEvent entityDamageEvent = (EntityDamageByEntityEvent) source;
+            Entity damager = entityDamageEvent.getDamager();
+
+            // 检查是否为玩家之间的攻击
+            Player attacker = getPlayerFromDamager(damager);
+            if (attacker != null && this instanceof Player) {
+                Player victim = (Player) this;
+
+                // 检查是否为队友且不允许友伤
+                if (isFriendlyFireBlocked(attacker, victim)) {
+                    // 直接返回false，不执行后续任何攻击逻辑
+                    server.getLogger().debug("阻止友军伤害: " + attacker.getName() + " -> " + victim.getName());
+                    return false;
+                }
+            }
+        }
+
         if (this.isSpectator() || (this.isCreative() && source.getCause() != DamageCause.SUICIDE)) {
             source.setCancelled();
             return false;
@@ -6260,6 +6645,45 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         } else {
             return false;
         }
+    }
+
+    /**
+     * 从伤害实体获取玩家对象
+     */
+    private Player getPlayerFromDamager(Entity damager) {
+        if (damager instanceof Player) {
+            return (Player) damager;
+        }
+
+        // 处理投射物（弓箭等）
+        if (damager instanceof EntityProjectile) {
+            EntityProjectile projectile = (EntityProjectile) damager;
+            Entity shootingEntity = projectile.shootingEntity;
+            if (shootingEntity instanceof Player) {
+                return (Player) shootingEntity;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 检查友军伤害是否被阻止
+     */
+    private boolean isFriendlyFireBlocked(Player attacker, Player victim) {
+        // 检查是否为队友
+        if (!attacker.isTeammate(victim)) {
+            return false; // 不是队友，不阻止
+        }
+
+        // 获取攻击者的队伍
+        Team attackerTeam = attacker.getTeamObject();
+        if (attackerTeam == null) {
+            return false; // 没有队伍，不阻止
+        }
+
+        // 检查队伍是否允许友军伤害
+        return !attackerTeam.isAllowFriendlyFire();
     }
 
     /**
