@@ -39,7 +39,7 @@ public class BlockOreRedstoneGlowing extends BlockOreRedstone {
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_SCHEDULED || type == Level.BLOCK_UPDATE_RANDOM) {
             BlockFadeEvent event = new BlockFadeEvent(this, get(getTypeId()));
-            level.getServer().getPluginManager().callEvent(event);
+            event.call();
             if (!event.isCancelled()) {
                 level.setBlock(this, event.getNewState(), false, true);
             }

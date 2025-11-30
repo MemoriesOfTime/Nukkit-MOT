@@ -225,6 +225,7 @@ public class BlockBubbleColumn extends BlockTransparentMeta {
 
     private void fadeOut(Block water) {
         BlockFadeEvent event = new BlockFadeEvent(this, water.clone());
+        event.call();
         if (!event.isCancelled()) {
             this.getLevel().setBlock(this, 1, Block.get(AIR), true, false);
             this.getLevel().setBlock(this, 0, event.getNewState(), true, true);

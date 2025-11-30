@@ -72,7 +72,7 @@ public class BlockFire extends BlockFlowable {
         if (entity instanceof EntityPotion) {
             if (((EntityPotion) entity).potionId == Potion.WATER) {
                 BlockFadeEvent event = new BlockFadeEvent(this, Block.get(AIR));
-                this.level.getServer().getPluginManager().callEvent(event);
+                event.call();
                 if (!event.isCancelled()) {
                     this.level.setBlock(this, event.getNewState(), true);
                 }
