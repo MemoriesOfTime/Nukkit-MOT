@@ -6,6 +6,10 @@ import cn.nukkit.entity.item.EntityVehicle;
 import cn.nukkit.event.Cancellable;
 import cn.nukkit.event.HandlerList;
 
+/**
+ * @deprecated use {@link cn.nukkit.event.entity.EntityVehicleEnterEvent} instead
+ */
+@Deprecated
 public class EntityEnterVehicleEvent extends VehicleEvent implements Cancellable {
 
     private static final HandlerList handlers = new HandlerList();
