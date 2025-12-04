@@ -9,6 +9,7 @@ import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.data.*;
 import cn.nukkit.entity.data.property.*;
+import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityMinecartEmpty;
 import cn.nukkit.entity.item.EntityVehicle;
 import cn.nukkit.entity.mob.EntityCreeper;
@@ -1997,6 +1998,15 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void updateMovement() {
+        // Reset motion when it approaches 0 to avoid unnecessary processing of move()
+        if (Math.abs(this.motionX) < 0.00001) {
+            this.motionX = 0;
+        }
+
+        if (Math.abs(this.motionZ) < 0.00001) {
+            this.motionZ = 0;
+        }
+
         double diffPosition = (this.x - this.lastX) * (this.x - this.lastX) + (this.y - this.lastY) * (this.y - this.lastY) + (this.z - this.lastZ) * (this.z - this.lastZ);
         double diffRotation = (this.yaw - this.lastYaw) * (this.yaw - this.lastYaw) + (this.pitch - this.lastPitch) * (this.pitch - this.lastPitch);
 
@@ -2014,7 +2024,7 @@ public abstract class Entity extends Location implements Metadatable {
             this.lastHeadYaw = this.headYaw;
 
             this.positionChanged = true;
-        }else {
+        } else {
             this.positionChanged = false;
         }
 
@@ -2032,6 +2042,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void addMotion(double motionX, double motionY, double motionZ) {
+        if (this instanceof EntityItem) return; // Seems to be unnecessary
         SetEntityMotionPacket pk = new SetEntityMotionPacket();
         pk.eid = this.id;
         pk.motionX = (float) motionX;

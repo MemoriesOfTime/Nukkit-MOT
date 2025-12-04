@@ -4,9 +4,11 @@ import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntityWalking;
+import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
 import lombok.Getter;
@@ -85,8 +87,10 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
     public boolean attack(EntityDamageEvent ev) {
         boolean result = super.attack(ev);
 
-        if (result && !ev.isCancelled()) {
-            this.doPanic(true);
+        if (result && !ev.isCancelled() && ev instanceof EntityDamageByEntityEvent entityDamageByEntityEvent) {
+            if (entityDamageByEntityEvent.getDamager() instanceof Player) {
+                this.doPanic(true);
+            }
         }
 
         return result;
@@ -109,6 +113,26 @@ public abstract class EntityWalkingAnimal extends EntityWalking implements Entit
 
     public boolean isFeedItem(Item item) {
         return false;
+    }
+
+    @Override
+    public boolean isFriendly() {
+        return true;
+    }
+
+    @Override
+    public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
+        if (!this.isLeashed()) {
+            if (item.getId() == Item.LEAD) {
+                this.leash(player);
+                return true; // onInteract: true = decrease count
+            }
+        } else {
+            this.unleash();
+            return false;
+        }
+
+        return super.onInteract(player, item, clickedPos);
     }
 
 }

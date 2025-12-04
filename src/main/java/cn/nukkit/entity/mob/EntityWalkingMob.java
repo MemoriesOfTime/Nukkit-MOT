@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.entity.EntityWalking;
+import cn.nukkit.entity.route.WalkerRouteFinder;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -28,6 +29,7 @@ public abstract class EntityWalkingMob extends EntityWalking implements EntityMo
 
     public EntityWalkingMob(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+        this.route = new WalkerRouteFinder(this);
     }
 
     @Override

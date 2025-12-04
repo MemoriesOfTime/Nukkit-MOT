@@ -4,9 +4,11 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.entity.data.LongEntityData;
 import cn.nukkit.entity.mob.EntityFlyingMob;
 import cn.nukkit.entity.mob.EntityMob;
 import cn.nukkit.entity.mob.EntityRavager;
+import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.passive.EntityAnimal;
 import cn.nukkit.entity.passive.EntityCow;
 import cn.nukkit.entity.projectile.EntityProjectile;
@@ -14,6 +16,7 @@ import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.inventory.PlayerInventory;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.HeartParticle;
 import cn.nukkit.math.AxisAlignedBB;
@@ -23,6 +26,8 @@ import cn.nukkit.network.protocol.EntityEventPacket;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.math3.util.FastMath;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -70,19 +75,25 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     public int stayTime = 0;
     protected int moveTime = 0;
+    protected int noRotateTicks;
 
     protected float moveMultiplier = 1.0f;
 
     protected Vector3 target = null;
     protected Entity followTarget = null;
+    protected boolean lookupForTarget = true;
     protected int attackDelay = 0;
+    private long leadHolder = -1L;
     protected Player lastInteract;
     private short inLoveTicks = 0;
     private short inLoveCooldown = 0;
 
     private boolean baby = false;
-    private boolean movement = true;
     private boolean friendly = false;
+    private int lastDamageTick;
+    @Setter
+    @Getter
+    private boolean persistent;
 
     public Item[] armor;
 
@@ -105,20 +116,47 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         return this.friendly;
     }
 
+    @Deprecated
     public boolean isMovement() {
-        return this.movement;
+        return !this.isImmobile();
     }
 
     public boolean isKnockback() {
         return this.knockBackTime > 0;
     }
 
-    public void setFriendly(boolean bool) {
-        this.friendly = bool;
+    public boolean isLeashed() {
+        return this.leadHolder != -1L;
     }
 
-    public void setMovement(boolean value) {
-        this.movement = value;
+    public void leash(Entity leadHolder) {
+        this.leadHolder = leadHolder.getId();
+        this.setDataProperty(new LongEntityData(DATA_LEAD_HOLDER_EID, this.leadHolder));
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_LEASHED, true);
+    }
+
+    public void unleash() {
+        this.leadHolder = -1L;
+        this.setDataProperty(new LongEntityData(DATA_LEAD_HOLDER_EID, this.leadHolder));
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_LEASHED, false);
+        this.level.dropItem(this.add(0, 0.5, 0), Item.get(ItemID.LEAD));
+
+        EntityEventPacket pk = new EntityEventPacket();
+        pk.eid = this.getId();
+        pk.event = EntityEventPacket.REMOVE_LEASH;
+        Server.broadcastPacket(this.hasSpawned.values(), pk);
+    }
+
+    public boolean isLookupForTarget() {
+        return this.lookupForTarget;
+    }
+
+    public void setLookupForTarget(boolean lookupForTarget) {
+        this.lookupForTarget = lookupForTarget;
+    }
+
+    public void setFriendly(boolean bool) {
+        this.friendly = bool;
     }
 
     public double getSpeed() {
@@ -164,8 +202,10 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     protected void initEntity() {
         super.initEntity();
 
-        if (this.namedTag.contains("Movement")) {
-            this.setMovement(this.namedTag.getBoolean("Movement"));
+        this.persistent = this.namedTag.getBoolean("Persistent");
+
+        if (this.namedTag.getBoolean("Immobile")) {
+            this.setImmobile();
         }
 
         if (this.namedTag.contains("Age")) {
@@ -190,7 +230,8 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         super.saveNBT();
 
         this.namedTag.putBoolean("Baby", this.baby);
-        this.namedTag.putBoolean("Movement", this.isMovement());
+        this.namedTag.putBoolean("Persistent", this.isPersistent());
+        this.namedTag.putBoolean("Immobile", this.isImmobile());
         this.namedTag.putShort("Age", this.age);
         this.namedTag.putShort("InLoveTicks", this.inLoveTicks);
         this.namedTag.putShort("InLoveCooldown", this.inLoveCooldown);
@@ -223,6 +264,10 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
         if (this.moveTime > 0) {
             this.moveTime -= tickDiff;
+        }
+
+        if (this.noRotateTicks > 0) {
+            this.noRotateTicks -= tickDiff;
         }
 
         if (this.isBaby() && this.age > 0) {
@@ -279,8 +324,9 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
             }
         }
 
-        BaseEntity baby = (BaseEntity) Entity.createEntity(getNetworkId(), this, new Object[0]);
+        BaseEntity baby = (BaseEntity) Entity.createEntity(this.getNetworkId(), this);
         baby.setBaby(true);
+        baby.setPersistent(true); // TODO: different flag for this?
         baby.spawnToAll();
         if (baby instanceof EntityCow) {
             if (player != null) {
@@ -315,6 +361,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         if (!source.isCancelled()) {
             this.target = null;
             this.stayTime = 0;
+            this.lastDamageTick = server.getTick();
         }
 
         return true;
@@ -327,6 +374,31 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                 this.kill();
             }
             return false;
+        }
+
+        if (this.leadHolder != -1L) {
+            Entity leadHolder = level.getEntity(this.leadHolder);
+
+            if (leadHolder == null) {
+                this.unleash();
+            } else {
+                double distance = this.distanceSquared(leadHolder);
+
+                if (distance > 100) {
+                    this.unleash();
+                } else if (distance > 49) {
+                    Vector3 toTarget = leadHolder.subtract(this).normalize();
+                    toTarget.x *= 0.5;
+                    toTarget.y *= 0.5;
+                    toTarget.z *= 0.5;
+
+                    this.setMotion(toTarget);
+
+                    dx = toTarget.x;
+                    dy = toTarget.y;
+                    dz = toTarget.z;
+                }
+            }
         }
 
         if (dx == 0 && dz == 0 && dy == 0) {
@@ -385,9 +457,12 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     public void setInLove(boolean inLove) {
-        if (inLove && !this.isBaby()) {
-            this.inLoveTicks = 600;
-            this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, true);
+        if (inLove) {
+            if (!this.isBaby() && (this instanceof EntityAnimal || this instanceof EntityWolf)) {
+                this.inLoveTicks = 600;
+                this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, true);
+            }
+            this.setPersistent(true); // TODO: different flag for this?
         } else {
             this.inLoveTicks = 0;
             this.setDataFlag(DATA_FLAGS, DATA_FLAG_INLOVE, false);
@@ -604,7 +679,16 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
      * @return can despawn
      */
     public boolean canDespawn() {
-        return Server.getInstance().despawnMobs;
+        return this.y < -128 || (this.server.despawnMobs &&
+                !this.persistent && this.age % 100 == 0 && this.riding == null && this.inLoveTicks <= 0 && this.inLoveCooldown <= 0 &&
+                !this.isLeashed() && !this.hasCustomName() && server.getTick() - this.lastDamageTick > 600 && // no damage in 30 seconds
+                !this.isInTickingRange(9216) // 96 blocks
+        );
+    }
+
+
+    protected boolean canSetTemporalTarget() {
+        return this.followTarget == null;
     }
 
     /**
@@ -708,8 +792,13 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
     }
 
     protected boolean isInTickingRange() {
+        return this.isInTickingRange(6400); // 80 blocks
+    }
+
+    protected boolean isInTickingRange(double rangeSquared) {
         for (Player player : this.level.getPlayers().values()) {
-            if (player.distanceSquared(this) < 6400) { // 80 blocks
+            // Ignore y so mobs won't stop falling into void unless movement behavior is tweaked for this
+            if (Math.pow(player.x - this.x, 2.0) + Math.pow(player.z - this.z, 2.0) < rangeSquared) {
                 return true;
             }
         }
