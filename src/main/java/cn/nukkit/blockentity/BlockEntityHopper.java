@@ -2,6 +2,7 @@ package cn.nukkit.blockentity;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockComposter;
 import cn.nukkit.block.BlockHopper;
 import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.*;
@@ -129,14 +130,15 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                 return true;
             }
 
-            boolean changed = pushItems() || pushItemsIntoMinecart();
+            boolean changed = !this.inventory.slots.isEmpty() && (pushItems() || pushItemsIntoMinecart());
 
-            if (!changed) {
+            if (!changed && !this.inventory.isFull()) {
                 BlockEntity blockEntity = this.level.getBlockEntity(this.up());
-                if (!(blockEntity instanceof BlockEntityContainer)) {
-                    changed = pickupItems() || pullItemsFromMinecart();
+                Block block = null;
+                if (blockEntity instanceof BlockEntityContainer || (block = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() + 1, this.getFloorZ(), false)) instanceof BlockComposter) {
+                    changed = pullItems(blockEntity, block);
                 } else {
-                    changed = pullItems();
+                    changed = pickupItems() || pullItemsFromMinecart();
                 }
             }
 
@@ -246,14 +248,37 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
         }
 
         int blockData = this.level.getBlockDataAt(this.getFloorX(), this.getFloorY(), this.getFloorZ()) & 0x7;
+        Position side = this.getSide(BlockFace.fromIndex(blockData));
+        Block block = this.level.getBlock(side);
+        BlockEntity be = this.level.getBlockEntity(side);
 
-        BlockEntity be = this.level.getBlockEntity(this.getSide(BlockFace.fromIndex(blockData)));
-
-        if (be instanceof BlockEntityHopper && blockData == 0 || !(be instanceof InventoryHolder)) {
+        if (be instanceof BlockEntityHopper && blockData == 0 || (!(be instanceof InventoryHolder) && !(block instanceof BlockComposter))) {
             return false;
         }
 
         InventoryMoveItemEvent event;
+
+        if (block instanceof BlockComposter composter) {
+            if (composter.isFull()) {
+                return false;
+            }
+            for (int i = 0; i < this.inventory.getSize(); i++) {
+                Item item = this.inventory.getItem(i);
+                if (!item.isNull()) {
+                    Item itemToAdd = item.clone();
+                    itemToAdd.setCount(1);
+
+                    int chance = BlockComposter.getChance(itemToAdd);
+                    if (chance > 0 && composter.addItem(itemToAdd, null, chance)) {
+                        item.count--;
+                        this.inventory.setItem(i, item);
+                        setDirty();
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
 
         if (be instanceof BlockEntityFurnace furnace) {
             FurnaceInventory targetInv = furnace.getInventory();

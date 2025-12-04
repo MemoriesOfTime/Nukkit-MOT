@@ -2,6 +2,7 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockComposter;
 import cn.nukkit.block.BlockHopper;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntityContainer;
@@ -170,6 +171,27 @@ public class EntityMinecartHopper extends EntityMinecartAbstract implements Inve
 
         if (be instanceof BlockEntityHopper // 漏斗会主动从漏斗矿车中拉取
                 || !(be instanceof InventoryHolder)) {
+            return false;
+        }
+
+        if (bottomBlock instanceof BlockComposter composter) {
+            if (composter.isFull()) {
+                return false;
+            }
+            for (int i = 0; i < this.inventory.getSize(); i++) {
+                Item item = this.inventory.getItem(i);
+                if (!item.isNull()) {
+                    Item itemToAdd = item.clone();
+                    itemToAdd.setCount(1);
+
+                    int chance = BlockComposter.getChance(itemToAdd);
+                    if (chance > 0 && composter.addItem(itemToAdd, null, chance)) {
+                        item.count--;
+                        this.inventory.setItem(i, item);
+                        return true;
+                    }
+                }
+            }
             return false;
         }
 
