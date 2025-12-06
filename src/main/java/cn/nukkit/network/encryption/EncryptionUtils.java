@@ -5,6 +5,7 @@ import cn.nukkit.network.protocol.types.auth.AuthType;
 import cn.nukkit.network.protocol.types.auth.CertificateChainPayload;
 import cn.nukkit.network.protocol.types.auth.TokenPayload;
 import lombok.experimental.UtilityClass;
+import lombok.extern.log4j.Log4j2;
 import org.jose4j.json.JsonUtil;
 import org.jose4j.json.internal.json_simple.parser.JSONParser;
 import org.jose4j.json.internal.json_simple.parser.ParseException;
@@ -46,6 +47,7 @@ import java.util.Map;
 /**
  * <a href="https://github.com/CloudburstMC/Protocol/blob/6b48673067d5c0e60f5e0a5a7e889dbf2aafa1a1/bedrock/bedrock-common/src/main/java/com/nukkitx/protocol/bedrock/util/EncryptionUtils.java">...</a>
  */
+@Log4j2
 @UtilityClass
 public class EncryptionUtils {
     public static final ECPublicKey MOJANG_PUBLIC_KEY;
@@ -119,10 +121,10 @@ public class EncryptionUtils {
                         }
                     } catch (ParseException | IOException e) {
                         if (attempt < maxRetries) {
-                            System.err.println("Failed to fetch discovery data (attempt " + attempt + "/" + maxRetries + "): " + e.getMessage() + ". Retrying in " + retryDelay + "ms...");
+                            log.error("Failed to fetch discovery data (attempt {}/{}): {}. Retrying in {}ms...", attempt, maxRetries, e.getMessage(), retryDelay);
                             try {
                                 Thread.sleep(retryDelay);
-                                retryDelay *= 2; // Exponential backoff
+                                retryDelay *= 2;
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                                 throw new AssertionError("Interrupted while retrying discovery data fetch", ie);
@@ -181,6 +183,8 @@ public class EncryptionUtils {
                 String openIdConfigUrl = serviceUri + "/.well-known/openid-configuration";
 
                 int maxRetries = 3;
+                long retryDelay = 1000; // 1 second
+
                 for (int attempt = 1; attempt <= maxRetries; attempt++) {
                     try {
                         URL url = new URL(openIdConfigUrl);
@@ -202,9 +206,10 @@ public class EncryptionUtils {
                         }
                     } catch (ParseException | IOException e) {
                         if (attempt < maxRetries) {
-                            System.err.println("Failed to fetch OpenID configuration (attempt " + attempt + "/" + maxRetries + "): " + e.getMessage() + ". Retrying in 1 s...");
+                            log.error("Failed to fetch OpenID configuration (attempt {}/{}): {}. Retrying in {}ms...", attempt, maxRetries, e.getMessage(), retryDelay);
                             try {
-                                Thread.sleep(1000);
+                                Thread.sleep(retryDelay);
+                                retryDelay *= 2;
                             } catch (InterruptedException ie) {
                                 Thread.currentThread().interrupt();
                                 throw new AssertionError("Interrupted while retrying OpenID configuration fetch", ie);
