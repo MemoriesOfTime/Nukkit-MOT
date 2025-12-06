@@ -104,8 +104,8 @@ public class EncryptionUtils {
                         HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
                         connection.setRequestMethod("GET");
                         connection.setRequestProperty("Accept", "application/json");
-                        connection.setConnectTimeout(10000); // Increased to 10 seconds
-                        connection.setReadTimeout(10000); // Increased to 10 seconds
+                        connection.setConnectTimeout(5000);
+                        connection.setReadTimeout(5000);
                         connection.connect();
                         if (connection.getResponseCode() != 200) {
                             throw new IOException("Failed to fetch discovery data: " + connection.getResponseMessage());
