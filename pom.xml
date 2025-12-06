@@ -56,6 +56,10 @@
             <id>repo-lanink-cn</id>
             <url>https://repo.lanink.cn/repository/maven-public/</url>
         </repository>
+        <repository>
+            <id>okaeri-releases</id>
+            <url>https://repo.okaeri.cloud/releases</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -150,6 +154,12 @@
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-toml</artifactId>
             <version>2.18.2</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>eu.okaeri</groupId>
+            <artifactId>okaeri-configs-toml-jackson</artifactId>
+            <version>6.0.0-beta.23</version>
             <scope>compile</scope>
         </dependency>
         <dependency>

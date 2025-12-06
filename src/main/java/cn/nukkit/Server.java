@@ -86,6 +86,8 @@ import cn.nukkit.utils.bugreport.ExceptionHandler;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonParser;
+import eu.okaeri.configs.ConfigManager;
+import eu.okaeri.configs.toml.TomlJacksonConfigurer;
 import io.netty.buffer.ByteBuf;
 import io.sentry.Sentry;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -95,7 +97,6 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import lombok.extern.log4j.Log4j2;
-import org.cloudburstmc.netty.channel.raknet.RakConstants;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
@@ -200,7 +201,7 @@ public class Server {
     private QueryHandler queryHandler;
     private QueryRegenerateEvent queryRegenerateEvent;
     private final UUID serverID;
-    private final Config properties;
+    private ServerConfig serverConfig;
 
     private final Map<InetSocketAddress, Player> players = new HashMap<>();
     final Map<UUID, Player> playerList = new HashMap<>();
@@ -626,14 +627,15 @@ public class Server {
         this.consoleThread.start();
         this.console.setExecutingCommands(true);
 
-        log.info("Loading server properties...");
-        this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ServerProperties());
+        // Load server configuration using OkaeriConfig (TOML format)
+        log.info("Loading server configuration (TOML)...");
+        this.loadServerConfig();
 
-        if (!this.getPropertyBoolean("ansi-title", true)) {
+        if (!this.serverConfig.isAnsiTitle()) {
             Nukkit.TITLE = false;
         }
 
-        int debugLvl = NukkitMath.clamp(this.getPropertyInt("debug-level", 1), 1, 3);
+        int debugLvl = NukkitMath.clamp(this.serverConfig.getDebugLevel(), 1, 3);
         if (debug && debugLvl < 2) {
             debugLvl = 2;
         }
@@ -641,7 +643,7 @@ public class Server {
 
         this.loadSettings();
 
-        this.automaticBugReport = this.getPropertyBoolean("automatic-bug-report", false);
+        this.automaticBugReport = this.serverConfig.isAutomaticBugReport();
         if (this.automaticBugReport) {
             ExceptionHandler.registerExceptionHandler();
             Sentry.init(options -> {
@@ -657,30 +659,33 @@ public class Server {
             new File(dataPath + "players/").mkdirs();
         }
 
-        this.baseLang = new BaseLang(this.getPropertyString("language", BaseLang.FALLBACK_LANGUAGE));
+        this.baseLang = new BaseLang(this.serverConfig.getLanguage());
 
         computeThreadPool = new ForkJoinPool(Math.min(0x7fff, Runtime.getRuntime().availableProcessors()), new ComputeThreadPoolThreadFactory(), null, false);
 
-        Object poolSize = this.getProperty("async-workers", "auto");
-        if (!(poolSize instanceof Integer)) {
+        String asyncWorkers = this.serverConfig.getAsyncWorkers();
+        int poolSize;
+        if ("auto".equals(asyncWorkers)) {
+            poolSize = Math.max(Runtime.getRuntime().availableProcessors() + 1, 4);
+        } else {
             try {
-                poolSize = Integer.valueOf((String) poolSize);
-            } catch (Exception e) {
+                poolSize = Integer.parseInt(asyncWorkers);
+            } catch (NumberFormatException e) {
                 poolSize = Math.max(Runtime.getRuntime().availableProcessors() + 1, 4);
             }
         }
 
-        ServerScheduler.WORKERS = (int) poolSize;
+        ServerScheduler.WORKERS = poolSize;
 
-        Zlib.setProvider(this.getPropertyInt("zlib-provider", 2));
+        Zlib.setProvider(this.serverConfig.getZlibProvider());
 
         this.scheduler = new ServerScheduler();
 
         this.batchingHelper = new BatchingHelper();
 
-        if (this.getPropertyBoolean("enable-rcon", false)) {
+        if (this.serverConfig.isEnableRcon()) {
             try {
-                this.rcon = new RCON(this, this.getPropertyString("rcon.password", ""), (!this.getIp().isEmpty()) ? this.getIp() : "0.0.0.0", this.getPropertyInt("rcon.port", this.getPort()));
+                this.rcon = new RCON(this, this.serverConfig.getRconPassword(), (!this.getIp().isEmpty()) ? this.getIp() : "0.0.0.0", this.serverConfig.getRconPort());
             } catch (IllegalArgumentException e) {
                 log.error(baseLang.translateString(e.getMessage(), e.getCause().getMessage()));
             }
@@ -699,16 +704,16 @@ public class Server {
         this.banByIP = new BanList(this.dataPath + "banned-ips.json");
         this.banByIP.load();
 
-        this.maxPlayers = this.getPropertyInt("max-players", 50);
-        this.setAutoSave(this.getPropertyBoolean("auto-save", true));
+        this.maxPlayers = this.serverConfig.getMaxPlayers();
+        this.setAutoSave(this.serverConfig.isAutoSave());
 
-        this.autoCompaction = this.getPropertyBoolean("level-auto-compaction", true);
-        this.autoCompactionTicks = Math.max(60 * 20, this.getPropertyInt("level-auto-compaction-ticks", 60 * 30 * 20));
+        this.autoCompaction = this.serverConfig.isLevelAutoCompaction();
+        this.autoCompactionTicks = Math.max(60 * 20, this.serverConfig.getLevelAutoCompactionTicks());
 
         if (this.isHardcore && this.difficulty < 3) {
             this.setDifficulty(3);
         } else {
-            this.setDifficulty(getDifficultyFromString(this.getPropertyString("difficulty", "2")));
+            this.setDifficulty(this.serverConfig.getDifficulty());
         }
 
         org.apache.logging.log4j.Level currentLevel = Nukkit.getLogLevel();
@@ -816,16 +821,18 @@ public class Server {
         Generator.addGenerator(cn.nukkit.level.generator.Void.class, "void", Generator.TYPE_VOID);
 
         if (this.defaultLevel == null) {
-            String defaultName = this.getPropertyString("level-name", "world");
+            String defaultName = this.serverConfig.getLevelName();
             if (defaultName == null || defaultName.trim().isEmpty()) {
                 this.getLogger().warning("level-name cannot be null, using default");
                 defaultName = "world";
-                this.setPropertyString("level-name", defaultName);
             }
 
             if (!this.loadLevel(defaultName)) {
                 long seed;
-                String seedString = String.valueOf(this.getProperty("level-seed", System.currentTimeMillis()));
+                String seedString = this.serverConfig.getLevelSeed();
+                if (seedString.isEmpty()) {
+                    seedString = String.valueOf(System.currentTimeMillis());
+                }
                 try {
                     seed = Long.parseLong(seedString);
                 } catch (NumberFormatException e) {
@@ -837,7 +844,8 @@ public class Server {
             this.setDefaultLevel(this.getLevelByName(defaultName));
         }
 
-        this.properties.save(true);
+        // Save server configuration
+        this.saveServerConfig();
 
         if (this.defaultLevel == null) {
             this.getLogger().emergency(this.baseLang.translateString("nukkit.level.defaultError"));
@@ -853,7 +861,7 @@ public class Server {
         }
 
         // Load levels
-        if (this.getPropertyBoolean("load-all-worlds", true)) {
+        if (this.serverConfig.isLoadAllWorlds()) {
             try {
                 for (File fs : new File(new File("").getCanonicalPath() + "/worlds/").listFiles()) {
                     if ((fs.isDirectory() && !this.isLevelLoaded(fs.getName()))) {
@@ -874,12 +882,12 @@ public class Server {
         EntityProperty.buildPacket();
         EntityProperty.buildPlayerProperty();
 
-        if (this.getPropertyBoolean("thread-watchdog", true)) {
-            this.watchdog = new Watchdog(this, this.getPropertyInt("thread-watchdog-tick", 60000));
+        if (this.serverConfig.isThreadWatchdog()) {
+            this.watchdog = new Watchdog(this, this.serverConfig.getThreadWatchdogTick());
             this.watchdog.start();
         }
 
-        String worlds1 = Server.getInstance().getPropertyString("worlds-entity-spawning-disabled");
+        String worlds1 = Server.getInstance().getServerConfig().getWorldsEntitySpawningDisabled();
         if (!worlds1.trim().isEmpty()) {
             StringTokenizer tokenizer = new StringTokenizer(worlds1, ", ");
             while (tokenizer.hasMoreTokens()) {
@@ -887,7 +895,7 @@ public class Server {
             }
         }
 
-        String worlds2 = Server.getInstance().getPropertyString("worlds-level-auto-save-disabled");
+        String worlds2 = Server.getInstance().getServerConfig().getWorldsLevelAutoSaveDisabled();
         if (!worlds2.trim().isEmpty()) {
             StringTokenizer tokenizer = new StringTokenizer(worlds2, ", ");
             while (tokenizer.hasMoreTokens()) {
@@ -895,13 +903,13 @@ public class Server {
             }
         }
 
-        if (this.getPropertyBoolean("entity-auto-spawn-task", true)) {
+        if (this.serverConfig.isEntityAutoSpawnTask()) {
             this.spawnerTask = new SpawnerTask();
-            int spawnerTicks = Math.max(this.getPropertyInt("ticks-per-entity-spawns", 200), 2) >> 1; // Run the spawner on 2x speed but spawn only either monsters or animals
+            int spawnerTicks = Math.max(this.serverConfig.getTicksPerEntitySpawns(), 2) >> 1; // Run the spawner on 2x speed but spawn only either monsters or animals
             this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask, spawnerTicks, spawnerTicks);
         }
 
-        if (this.getPropertyBoolean("bstats-metrics", true)) {
+        if (this.serverConfig.isBstatsMetrics()) {
             new NukkitMetrics(this);
         }
 
@@ -1080,9 +1088,11 @@ public class Server {
         this.pluginManager.clearPlugins();
         this.commandMap.clearCommands();
 
-        log.info("Reloading properties...");
-        this.properties.reload();
-        this.maxPlayers = this.getPropertyInt("max-players", 50);
+        // Reload server configuration (TOML)
+        log.info("Reloading server configuration (TOML)...");
+        this.loadServerConfig();
+
+        this.maxPlayers = this.serverConfig.getMaxPlayers();
 
         if (this.isHardcore && this.difficulty < 3) {
             this.setDifficulty(3);
@@ -1115,7 +1125,7 @@ public class Server {
     }
 
     public void forceShutdown() {
-        this.forceShutdown(this.getPropertyString("shutdown-message", "§cServer closed").replace("§n", "\n"));
+        this.forceShutdown(this.serverConfig.getShutdownMessage().replace("§n", "\n"));
     }
 
     public void forceShutdown(String reason) {
@@ -1191,7 +1201,7 @@ public class Server {
     }
 
     public void start() {
-        if (this.getPropertyBoolean("enable-query", true)) {
+        if (this.serverConfig.isEnableQuery()) {
             this.queryHandler = new QueryHandler();
         }
 
@@ -1665,7 +1675,7 @@ public class Server {
     }
 
     public String getLevelType() {
-        return this.getPropertyString("level-type", "default");
+        return this.serverConfig.getLevelType();
     }
 
     public int getGamemode() {
@@ -1723,7 +1733,7 @@ public class Server {
         if (value < 0) value = 0;
         if (value > 3) value = 3;
         this.difficulty = value;
-        this.setPropertyInt("difficulty", value);
+        this.serverConfig.setDifficulty(difficulty);
     }
 
     public boolean hasWhitelist() {
@@ -1754,7 +1764,7 @@ public class Server {
     }
 
     public String getSubMotd() {
-        String sub = this.getPropertyString("sub-motd", "Powered by Nukkit");
+        String sub = this.serverConfig.getSubMotd();
         if (sub.isEmpty()) sub = "Powered by Nukkit";
         return sub;
     }
@@ -2402,7 +2412,7 @@ public class Server {
         }
 
         if (!options.containsKey("preset")) {
-            options.put("preset", this.getPropertyString("generator-settings", ""));
+            options.put("preset", this.serverConfig.getGeneratorSettings());
         }
 
         if (generator == null) {
@@ -2495,147 +2505,560 @@ public class Server {
     }
 
     /**
-     * Get server.properties
-     *
-     * @return server.properties as a Config
+     * Load server configuration using OkaeriConfig (TOML format)
      */
-    public Config getProperties() {
-        return this.properties;
-    }
+    private void loadServerConfig() {
+        // Try to convert old server.properties to server.toml if needed
+        //this.convertOldConfig();
 
-    /**
-     * Get a value from server.properties
-     *
-     * @param variable key
-     * @return value
-     */
-    public Object getProperty(String variable) {
-        return this.getProperty(variable, null);
-    }
+        try {
+            File configFile = new File(this.dataPath, "server.toml");
 
-    /**
-     * Get a value from server.properties
-     *
-     * @param variable key
-     * @param defaultValue default value
-     * @return value
-     */
-    public Object getProperty(String variable, Object defaultValue) {
-        return this.properties.exists(variable) ? this.properties.get(variable) : defaultValue;
-    }
-
-    /**
-     * Set a string value in server.properties
-     *
-     * @param variable key
-     * @param value value
-     */
-    public void setPropertyString(String variable, String value) {
-        this.properties.set(variable, value);
-        this.properties.save();
-    }
-
-    /**
-     * Get a string value from server.properties
-     *
-     * @param key key
-     * @return value
-     */
-    public String getPropertyString(String key) {
-        return this.getPropertyString(key, null);
-    }
-
-    /**
-     * Get a string value from server.properties
-     *
-     * @param key key
-     * @param defaultValue default value
-     * @return value
-     */
-    public String getPropertyString(String key, String defaultValue) {
-        return this.properties.exists(key) ? this.properties.get(key).toString() : defaultValue;
-    }
-
-    /**
-     * Get an int value from server.properties
-     *
-     * @param variable key
-     * @return value
-     */
-    public int getPropertyInt(String variable) {
-        return this.getPropertyInt(variable, null);
-    }
-
-    /**
-     * Get an int value from server.properties
-     *
-     * @param variable key
-     * @param defaultValue default value
-     * @return value
-     */
-    public int getPropertyInt(String variable, Integer defaultValue) {
-        Object value = this.properties.get(variable);
-        if (value == null) {
-            value = defaultValue;
+            // If conversion just happened, serverConfig is already set
+            if (this.serverConfig == null) {
+                this.serverConfig = ConfigManager.create(ServerConfig.class, (it) -> {
+                    it.withConfigurer(new TomlJacksonConfigurer());
+                    it.withBindFile(configFile);
+                    it.saveDefaults();
+                    it.load(true);
+                });
+                log.info("Server configuration loaded from server.toml");
+            } else {
+                // Reload the converted config from file
+                this.serverConfig = ConfigManager.create(ServerConfig.class, (it) -> {
+                    it.withConfigurer(new TomlJacksonConfigurer());
+                    it.withBindFile(configFile);
+                    it.load(true);
+                });
+            }
+        } catch (Exception e) {
+            log.error("Failed to load server.toml, using default configuration", e);
+            if (this.serverConfig == null) {
+                this.serverConfig = new ServerConfig();
+            }
         }
-        if (value instanceof Integer) {
-            return (Integer) value;
+    }
+
+    /**
+     * Get the server configuration (OkaeriConfig)
+     *
+     * @return ServerConfig instance
+     */
+    public ServerConfig getServerConfig() {
+        return this.serverConfig;
+    }
+
+    /**
+     * Save server configuration to server.toml
+     */
+    public void saveServerConfig() {
+        if (this.serverConfig != null) {
+            try {
+                this.serverConfig.save();
+                log.info("Server configuration saved to server.toml");
+            } catch (Exception e) {
+                log.error("Failed to save server.toml", e);
+            }
         }
-        String trimmed = String.valueOf(value).trim();
-        if (trimmed.isEmpty()) {
-            return defaultValue;
+    }
+
+    /**
+     * Convert old server.properties to new server.toml format
+     * This method will automatically migrate configuration from the old format to the new one
+     */
+    private void convertOldConfig() {
+        File oldConfigFile = new File(this.dataPath, "server.properties");
+        File newConfigFile = new File(this.dataPath, "server.toml");
+        File backupFile = new File(this.dataPath, "server.properties.backup");
+
+        // Only convert if old config exists and new config doesn't exist
+        if (!oldConfigFile.exists()) {
+            return;
         }
-        return Integer.parseInt(trimmed);
-    }
 
-    /**
-     * Set an int value in server.properties
-     *
-     * @param variable key
-     * @param value value
-     */
-    public void setPropertyInt(String variable, int value) {
-        this.properties.set(variable, value);
-        this.properties.save();
-    }
-
-    /**
-     * Get a boolean value from server.properties
-     *
-     * @param variable key
-     * @return value
-     */
-    public boolean getPropertyBoolean(String variable) {
-        return this.getPropertyBoolean(variable, null);
-    }
-
-    /**
-     * Get a boolean value from server.properties
-     *
-     * @param variable key
-     * @param defaultValue default value
-     * @return value
-     */
-    public boolean getPropertyBoolean(String variable, Object defaultValue) {
-        Object value = this.properties.exists(variable) ? this.properties.get(variable) : defaultValue;
-        if (value instanceof Boolean) {
-            return (Boolean) value;
+        if (newConfigFile.exists()) {
+            log.info("server.toml already exists, skipping conversion. Old server.properties can be safely deleted.");
+            return;
         }
-        return switch (String.valueOf(value).trim().toLowerCase(Locale.ROOT)) {
-            case "on", "true", "1", "yes" -> true;
-            default -> false;
-        };
-    }
 
-    /**
-     * Set a boolean value in server.properties
-     *
-     * @param variable key
-     * @param value value
-     */
-    public void setPropertyBoolean(String variable, boolean value) {
-        this.properties.set(variable, value);
-        this.properties.save();
+        log.info("Converting server.properties to server.toml...");
+
+        try {
+            // Load old configuration
+            Config oldConfig = new Config(oldConfigFile.getAbsolutePath(), Config.PROPERTIES);
+
+            // Create new ServerConfig instance with default values
+            this.serverConfig = new ServerConfig();
+
+            // Map all properties from old config to new config
+            // Basic Server Settings
+            if (oldConfig.exists("motd")) {
+                this.serverConfig.setMotd(oldConfig.getString("motd"));
+            }
+            if (oldConfig.exists("sub-motd")) {
+                this.serverConfig.setSubMotd(oldConfig.getString("sub-motd"));
+            }
+            if (oldConfig.exists("server-port")) {
+                this.serverConfig.setServerPort(oldConfig.getInt("server-port"));
+            }
+            if (oldConfig.exists("server-ip")) {
+                this.serverConfig.setServerIp(oldConfig.getString("server-ip"));
+            }
+            if (oldConfig.exists("view-distance")) {
+                this.serverConfig.setViewDistance(oldConfig.getInt("view-distance"));
+            }
+            if (oldConfig.exists("max-players")) {
+                this.serverConfig.setMaxPlayers(oldConfig.getInt("max-players"));
+            }
+            if (oldConfig.exists("language")) {
+                this.serverConfig.setLanguage(oldConfig.getString("language"));
+            }
+            if (oldConfig.exists("force-language")) {
+                this.serverConfig.setForceLanguage(oldConfig.getBoolean("force-language"));
+            }
+
+            // Game Mode & Difficulty
+            if (oldConfig.exists("gamemode")) {
+                this.serverConfig.setGamemode(oldConfig.getInt("gamemode"));
+            }
+            if (oldConfig.exists("force-gamemode")) {
+                this.serverConfig.setForceGamemode(oldConfig.getBoolean("force-gamemode"));
+            }
+            if (oldConfig.exists("difficulty")) {
+                this.serverConfig.setDifficulty(oldConfig.getInt("difficulty"));
+            }
+            if (oldConfig.exists("hardcore")) {
+                this.serverConfig.setHardcore(oldConfig.getBoolean("hardcore"));
+            }
+            if (oldConfig.exists("pvp")) {
+                this.serverConfig.setPvp(oldConfig.getBoolean("pvp"));
+            }
+
+            // World Settings
+            if (oldConfig.exists("level-name")) {
+                this.serverConfig.setLevelName(oldConfig.getString("level-name"));
+            }
+            if (oldConfig.exists("level-seed")) {
+                this.serverConfig.setLevelSeed(oldConfig.getString("level-seed"));
+            }
+            if (oldConfig.exists("level-type")) {
+                this.serverConfig.setLevelType(oldConfig.getString("level-type"));
+            }
+            if (oldConfig.exists("generator-settings")) {
+                this.serverConfig.setGeneratorSettings(oldConfig.getString("generator-settings"));
+            }
+            if (oldConfig.exists("spawn-protection")) {
+                this.serverConfig.setSpawnProtection(oldConfig.getInt("spawn-protection"));
+            }
+
+            // Mob & Entity Spawning
+            if (oldConfig.exists("spawn-animals")) {
+                this.serverConfig.setSpawnAnimals(oldConfig.getBoolean("spawn-animals"));
+            }
+            if (oldConfig.exists("spawn-mobs")) {
+                this.serverConfig.setSpawnMobs(oldConfig.getBoolean("spawn-mobs"));
+            }
+            if (oldConfig.exists("spawn-eggs")) {
+                this.serverConfig.setSpawnEggs(oldConfig.getBoolean("spawn-eggs"));
+            }
+            if (oldConfig.exists("mob-ai")) {
+                this.serverConfig.setMobAi(oldConfig.getBoolean("mob-ai"));
+            }
+            if (oldConfig.exists("entity-auto-spawn-task")) {
+                this.serverConfig.setEntityAutoSpawnTask(oldConfig.getBoolean("entity-auto-spawn-task"));
+            }
+            if (oldConfig.exists("entity-despawn-task")) {
+                this.serverConfig.setEntityDespawnTask(oldConfig.getBoolean("entity-despawn-task"));
+            }
+            if (oldConfig.exists("ticks-per-entity-spawns")) {
+                this.serverConfig.setTicksPerEntitySpawns(oldConfig.getInt("ticks-per-entity-spawns"));
+            }
+            if (oldConfig.exists("ticks-per-entity-despawns")) {
+                this.serverConfig.setTicksPerEntityDespawns(oldConfig.getInt("ticks-per-entity-despawns"));
+            }
+
+            // Game Features
+            if (oldConfig.exists("achievements")) {
+                this.serverConfig.setAchievements(oldConfig.getBoolean("achievements"));
+            }
+            if (oldConfig.exists("announce-player-achievements")) {
+                this.serverConfig.setAnnouncePlayerAchievements(oldConfig.getBoolean("announce-player-achievements"));
+            }
+            if (oldConfig.exists("bed-spawnpoints")) {
+                this.serverConfig.setBedSpawnpoints(oldConfig.getBoolean("bed-spawnpoints"));
+            }
+            if (oldConfig.exists("explosion-break-blocks")) {
+                this.serverConfig.setExplosionBreakBlocks(oldConfig.getBoolean("explosion-break-blocks"));
+            }
+            if (oldConfig.exists("allow-flight")) {
+                this.serverConfig.setAllowFlight(oldConfig.getBoolean("allow-flight"));
+            }
+            if (oldConfig.exists("drop-spawners")) {
+                this.serverConfig.setDropSpawners(oldConfig.getBoolean("drop-spawners"));
+            }
+            if (oldConfig.exists("anvils-enabled")) {
+                this.serverConfig.setAnvilsEnabled(oldConfig.getBoolean("anvils-enabled"));
+            }
+
+            // Whitelist & Security
+            if (oldConfig.exists("white-list")) {
+                this.serverConfig.setWhiteList(oldConfig.getBoolean("white-list"));
+            }
+            if (oldConfig.exists("whitelist-reason")) {
+                this.serverConfig.setWhitelistReason(oldConfig.getString("whitelist-reason"));
+            }
+            if (oldConfig.exists("xbox-auth")) {
+                this.serverConfig.setXboxAuth(oldConfig.getBoolean("xbox-auth"));
+            }
+            if (oldConfig.exists("encryption")) {
+                this.serverConfig.setEncryption(oldConfig.getBoolean("encryption"));
+            }
+            if (oldConfig.exists("strong-ip-bans")) {
+                this.serverConfig.setStrongIpBans(oldConfig.getBoolean("strong-ip-bans"));
+            }
+            if (oldConfig.exists("temp-ip-ban-failed-xbox-auth")) {
+                this.serverConfig.setTempIpBanFailedXboxAuth(oldConfig.getBoolean("temp-ip-ban-failed-xbox-auth"));
+            }
+
+            // RCON Settings
+            if (oldConfig.exists("enable-rcon")) {
+                this.serverConfig.setEnableRcon(oldConfig.getBoolean("enable-rcon"));
+            }
+            if (oldConfig.exists("rcon.password")) {
+                this.serverConfig.setRconPassword(oldConfig.getString("rcon.password"));
+            }
+            if (oldConfig.exists("rcon.port")) {
+                this.serverConfig.setRconPort(oldConfig.getInt("rcon.port"));
+            }
+
+            // Query Settings
+            if (oldConfig.exists("enable-query")) {
+                this.serverConfig.setEnableQuery(oldConfig.getBoolean("enable-query"));
+            }
+            if (oldConfig.exists("query-plugins")) {
+                this.serverConfig.setQueryPlugins(oldConfig.getBoolean("query-plugins"));
+            }
+
+            // Resource Packs
+            if (oldConfig.exists("force-resources")) {
+                this.serverConfig.setForceResources(oldConfig.getBoolean("force-resources"));
+            }
+            if (oldConfig.exists("force-resources-allow-client-packs")) {
+                this.serverConfig.setForceResourcesAllowClientPacks(oldConfig.getBoolean("force-resources-allow-client-packs"));
+            }
+
+            // Auto-Save & Compaction
+            if (oldConfig.exists("auto-save")) {
+                this.serverConfig.setAutoSave(oldConfig.getBoolean("auto-save"));
+            }
+            if (oldConfig.exists("ticks-per-autosave")) {
+                this.serverConfig.setTicksPerAutosave(oldConfig.getInt("ticks-per-autosave"));
+            }
+            if (oldConfig.exists("level-auto-compaction")) {
+                this.serverConfig.setLevelAutoCompaction(oldConfig.getBoolean("level-auto-compaction"));
+            }
+            if (oldConfig.exists("level-auto-compaction-ticks")) {
+                this.serverConfig.setLevelAutoCompactionTicks(oldConfig.getInt("level-auto-compaction-ticks"));
+            }
+
+            // Network & Compression
+            if (oldConfig.exists("zlib-provider")) {
+                this.serverConfig.setZlibProvider(oldConfig.getInt("zlib-provider"));
+            }
+            if (oldConfig.exists("compression-level")) {
+                this.serverConfig.setCompressionLevel(oldConfig.getInt("compression-level"));
+            }
+            if (oldConfig.exists("compression-threshold")) {
+                this.serverConfig.setCompressionThreshold(oldConfig.getString("compression-threshold"));
+            }
+            if (oldConfig.exists("use-snappy-compression")) {
+                this.serverConfig.setUseSnappyCompression(oldConfig.getBoolean("use-snappy-compression"));
+            }
+            if (oldConfig.exists("rak-packet-limit")) {
+                this.serverConfig.setRakPacketLimit(oldConfig.getInt("rak-packet-limit"));
+            }
+            if (oldConfig.exists("enable-rak-send-cookie")) {
+                this.serverConfig.setEnableRakSendCookie(oldConfig.getBoolean("enable-rak-send-cookie"));
+            }
+            if (oldConfig.exists("timeout-milliseconds")) {
+                this.serverConfig.setTimeoutMilliseconds(oldConfig.getInt("timeout-milliseconds"));
+            }
+
+            // Tick Performance
+            if (oldConfig.exists("auto-tick-rate")) {
+                this.serverConfig.setAutoTickRate(oldConfig.getBoolean("auto-tick-rate"));
+            }
+            if (oldConfig.exists("auto-tick-rate-limit")) {
+                this.serverConfig.setAutoTickRateLimit(oldConfig.getInt("auto-tick-rate-limit"));
+            }
+            if (oldConfig.exists("base-tick-rate")) {
+                this.serverConfig.setBaseTickRate(oldConfig.getInt("base-tick-rate"));
+            }
+            if (oldConfig.exists("always-tick-players")) {
+                this.serverConfig.setAlwaysTickPlayers(oldConfig.getBoolean("always-tick-players"));
+            }
+            if (oldConfig.exists("chunk-sending-per-tick")) {
+                this.serverConfig.setChunkSendingPerTick(oldConfig.getInt("chunk-sending-per-tick"));
+            }
+            if (oldConfig.exists("chunk-ticking-per-tick")) {
+                this.serverConfig.setChunkTickingPerTick(oldConfig.getInt("chunk-ticking-per-tick"));
+            }
+            if (oldConfig.exists("chunk-ticking-radius")) {
+                this.serverConfig.setChunkTickingRadius(oldConfig.getInt("chunk-ticking-radius"));
+            }
+            if (oldConfig.exists("chunk-generation-queue-size")) {
+                this.serverConfig.setChunkGenerationQueueSize(oldConfig.getInt("chunk-generation-queue-size"));
+            }
+            if (oldConfig.exists("chunk-generation-population-queue-size")) {
+                this.serverConfig.setChunkGenerationPopulationQueueSize(oldConfig.getInt("chunk-generation-population-queue-size"));
+            }
+
+            // Dimensions
+            if (oldConfig.exists("nether")) {
+                this.serverConfig.setNether(oldConfig.getBoolean("nether"));
+            }
+            if (oldConfig.exists("end")) {
+                this.serverConfig.setEnd(oldConfig.getBoolean("end"));
+            }
+            if (oldConfig.exists("vanilla-portals")) {
+                this.serverConfig.setVanillaPortals(oldConfig.getBoolean("vanilla-portals"));
+            }
+            if (oldConfig.exists("portal-ticks")) {
+                this.serverConfig.setPortalTicks(oldConfig.getInt("portal-ticks"));
+            }
+            if (oldConfig.exists("multi-nether-worlds")) {
+                this.serverConfig.setMultiNetherWorlds(oldConfig.getString("multi-nether-worlds"));
+            }
+
+            // Anti-Cheat
+            if (oldConfig.exists("anti-xray-worlds")) {
+                this.serverConfig.setAntiXrayWorlds(oldConfig.getString("anti-xray-worlds"));
+            }
+            if (oldConfig.exists("check-op-movement")) {
+                this.serverConfig.setCheckOpMovement(oldConfig.getBoolean("check-op-movement"));
+            }
+            if (oldConfig.exists("server-authoritative-movement")) {
+                this.serverConfig.setServerAuthoritativeMovement(oldConfig.getString("server-authoritative-movement"));
+            }
+            if (oldConfig.exists("server-authoritative-block-breaking")) {
+                this.serverConfig.setServerAuthoritativeBlockBreaking(oldConfig.getBoolean("server-authoritative-block-breaking"));
+            }
+
+            // World Management
+            if (oldConfig.exists("do-not-tick-worlds")) {
+                this.serverConfig.setDoNotTickWorlds(oldConfig.getString("do-not-tick-worlds"));
+            }
+            if (oldConfig.exists("worlds-entity-spawning-disabled")) {
+                this.serverConfig.setWorldsEntitySpawningDisabled(oldConfig.getString("worlds-entity-spawning-disabled"));
+            }
+            if (oldConfig.exists("load-all-worlds")) {
+                this.serverConfig.setLoadAllWorlds(oldConfig.getBoolean("load-all-worlds"));
+            }
+            if (oldConfig.exists("worlds-level-auto-save-disabled")) {
+                this.serverConfig.setWorldsLevelAutoSaveDisabled(oldConfig.getString("worlds-level-auto-save-disabled"));
+            }
+
+            // Async & Threading
+            if (oldConfig.exists("async-workers")) {
+                this.serverConfig.setAsyncWorkers(oldConfig.getString("async-workers"));
+            }
+            if (oldConfig.exists("cache-chunks")) {
+                this.serverConfig.setCacheChunks(oldConfig.getBoolean("cache-chunks"));
+            }
+            if (oldConfig.exists("async-chunks")) {
+                this.serverConfig.setAsyncChunks(oldConfig.getBoolean("async-chunks"));
+            }
+            if (oldConfig.exists("thread-watchdog")) {
+                this.serverConfig.setThreadWatchdog(oldConfig.getBoolean("thread-watchdog"));
+            }
+            if (oldConfig.exists("thread-watchdog-tick")) {
+                this.serverConfig.setThreadWatchdogTick(oldConfig.getInt("thread-watchdog-tick"));
+            }
+
+            // Debug & Logging
+            if (oldConfig.exists("debug-level")) {
+                this.serverConfig.setDebugLevel(oldConfig.getInt("debug-level"));
+            }
+            if (oldConfig.exists("ansi-title")) {
+                this.serverConfig.setAnsiTitle(oldConfig.getBoolean("ansi-title"));
+            }
+            if (oldConfig.exists("deprecated-verbose")) {
+                this.serverConfig.setDeprecatedVerbose(oldConfig.getBoolean("deprecated-verbose"));
+            }
+
+            // Lighting & Updates
+            if (oldConfig.exists("light-updates")) {
+                this.serverConfig.setLightUpdates(oldConfig.getBoolean("light-updates"));
+            }
+            if (oldConfig.exists("clear-chunk-tick-list")) {
+                this.serverConfig.setClearChunkTickList(oldConfig.getBoolean("clear-chunk-tick-list"));
+            }
+            if (oldConfig.exists("spawn-threshold")) {
+                this.serverConfig.setSpawnThreshold(oldConfig.getInt("spawn-threshold"));
+            }
+
+            // Player Data
+            if (oldConfig.exists("save-player-data")) {
+                this.serverConfig.setSavePlayerData(oldConfig.getBoolean("save-player-data"));
+            }
+            if (oldConfig.exists("save-player-data-by-uuid")) {
+                this.serverConfig.setSavePlayerDataByUuid(oldConfig.getBoolean("save-player-data-by-uuid"));
+            }
+            if (oldConfig.exists("persona-skins")) {
+                this.serverConfig.setPersonaSkins(oldConfig.getBoolean("persona-skins"));
+            }
+            if (oldConfig.exists("skin-change-cooldown")) {
+                this.serverConfig.setSkinChangeCooldown(oldConfig.getInt("skin-change-cooldown"));
+            }
+
+            // In-Game Controls
+            if (oldConfig.exists("stop-in-game")) {
+                this.serverConfig.setStopInGame(oldConfig.getBoolean("stop-in-game"));
+            }
+            if (oldConfig.exists("op-in-game")) {
+                this.serverConfig.setOpInGame(oldConfig.getBoolean("op-in-game"));
+            }
+            if (oldConfig.exists("space-name-mode")) {
+                this.serverConfig.setSpaceNameMode(oldConfig.getString("space-name-mode"));
+            }
+            if (oldConfig.exists("xp-bottles-on-creative")) {
+                this.serverConfig.setXpBottlesOnCreative(oldConfig.getBoolean("xp-bottles-on-creative"));
+            }
+
+            // Event Calling
+            if (oldConfig.exists("call-data-pk-send-event")) {
+                this.serverConfig.setCallDataPkSendEvent(oldConfig.getBoolean("call-data-pk-send-event"));
+            }
+            if (oldConfig.exists("call-batch-pk-send-event")) {
+                this.serverConfig.setCallBatchPkSendEvent(oldConfig.getBoolean("call-batch-pk-send-event"));
+            }
+            if (oldConfig.exists("call-entity-motion-event")) {
+                this.serverConfig.setCallEntityMotionEvent(oldConfig.getBoolean("call-entity-motion-event"));
+            }
+            if (oldConfig.exists("block-listener")) {
+                this.serverConfig.setBlockListener(oldConfig.getBoolean("block-listener"));
+            }
+
+            // Garbage Collection
+            if (oldConfig.exists("do-level-gc")) {
+                this.serverConfig.setDoLevelGc(oldConfig.getBoolean("do-level-gc"));
+            }
+
+            // Interaction Limits
+            if (oldConfig.exists("do-not-limit-interactions")) {
+                this.serverConfig.setDoNotLimitInteractions(oldConfig.getBoolean("do-not-limit-interactions"));
+            }
+            if (oldConfig.exists("do-not-limit-skin-geometry")) {
+                this.serverConfig.setDoNotLimitSkinGeometry(oldConfig.getBoolean("do-not-limit-skin-geometry"));
+            }
+
+            // Monitoring & Metrics
+            if (oldConfig.exists("automatic-bug-report")) {
+                this.serverConfig.setAutomaticBugReport(oldConfig.getBoolean("automatic-bug-report"));
+            }
+            if (oldConfig.exists("update-notifications")) {
+                this.serverConfig.setUpdateNotifications(oldConfig.getBoolean("update-notifications"));
+            }
+            if (oldConfig.exists("bstats-metrics")) {
+                this.serverConfig.setBstatsMetrics(oldConfig.getBoolean("bstats-metrics"));
+            }
+
+            // Game Version Features
+            if (oldConfig.exists("vanilla-bossbars")) {
+                this.serverConfig.setVanillaBossbars(oldConfig.getBoolean("vanilla-bossbars"));
+            }
+            if (oldConfig.exists("use-client-spectator")) {
+                this.serverConfig.setUseClientSpectator(oldConfig.getBoolean("use-client-spectator"));
+            }
+            if (oldConfig.exists("enable-experiment-mode")) {
+                this.serverConfig.setEnableExperimentMode(oldConfig.getBoolean("enable-experiment-mode"));
+            }
+
+            // Multi-Version Support
+            if (oldConfig.exists("multiversion-min-protocol")) {
+                this.serverConfig.setMultiversionMinProtocol(oldConfig.getInt("multiversion-min-protocol"));
+            }
+            if (oldConfig.exists("multiversion-max-protocol")) {
+                this.serverConfig.setMultiversionMaxProtocol(oldConfig.getInt("multiversion-max-protocol"));
+            }
+
+            // Proxy
+            if (oldConfig.exists("use-waterdog")) {
+                this.serverConfig.setUseWaterdog(oldConfig.getBoolean("use-waterdog"));
+            }
+
+            // Performance Tools
+            if (oldConfig.exists("enable-spark")) {
+                this.serverConfig.setEnableSpark(oldConfig.getBoolean("enable-spark"));
+            }
+            if (oldConfig.exists("hastebin-token")) {
+                this.serverConfig.setHastebinToken(oldConfig.getString("hastebin-token"));
+            }
+
+            // Database
+            if (oldConfig.exists("leveldb-cache-mb")) {
+                this.serverConfig.setLeveldbCacheMb(oldConfig.getInt("leveldb-cache-mb"));
+            }
+            if (oldConfig.exists("use-native-leveldb")) {
+                this.serverConfig.setUseNativeLeveldb(oldConfig.getBoolean("use-native-leveldb"));
+            }
+
+            // Experimental Features
+            if (oldConfig.exists("enable-raw-ores")) {
+                this.serverConfig.setEnableRawOres(oldConfig.getBoolean("enable-raw-ores"));
+            }
+            if (oldConfig.exists("enable-new-paintings")) {
+                this.serverConfig.setEnableNewPaintings(oldConfig.getBoolean("enable-new-paintings"));
+            }
+            if (oldConfig.exists("enable-new-chicken-eggs-laying")) {
+                this.serverConfig.setEnableNewChickenEggsLaying(oldConfig.getBoolean("enable-new-chicken-eggs-laying"));
+            }
+            if (oldConfig.exists("forced-safety-enchant")) {
+                this.serverConfig.setForcedSafetyEnchant(oldConfig.getBoolean("forced-safety-enchant"));
+            }
+            if (oldConfig.exists("enable-vibrant-visuals")) {
+                this.serverConfig.setEnableVibrantVisuals(oldConfig.getBoolean("enable-vibrant-visuals"));
+            }
+            if (oldConfig.exists("enable-raytracing")) {
+                this.serverConfig.setEnableRaytracing(oldConfig.getBoolean("enable-raytracing"));
+            }
+
+            // NetEase Client Support
+            if (oldConfig.exists("netease-client-support")) {
+                this.serverConfig.setNeteaseClientSupport(oldConfig.getBoolean("netease-client-support"));
+            }
+            if (oldConfig.exists("only-allow-netease-client")) {
+                this.serverConfig.setOnlyAllowNeteaseClient(oldConfig.getBoolean("only-allow-netease-client"));
+            }
+
+            // Shutdown
+            if (oldConfig.exists("shutdown-message")) {
+                this.serverConfig.setShutdownMessage(oldConfig.getString("shutdown-message"));
+            }
+
+            // Save the converted configuration to TOML
+            File tomlFile = new File(this.dataPath, "server.toml");
+            ConfigManager.create(ServerConfig.class, (it) -> {
+                it.withConfigurer(new TomlJacksonConfigurer());
+                it.withBindFile(tomlFile);
+                it.load(this.serverConfig);
+                it.save();
+            });
+
+            // Backup the old configuration file
+            if (oldConfigFile.renameTo(backupFile)) {
+                log.info("Successfully converted server.properties to server.toml");
+                log.info("Old configuration backed up to server.properties.backup");
+                log.info("You can safely delete server.properties.backup after verifying the new configuration");
+            } else {
+                log.warn("Conversion successful but failed to backup old configuration file");
+                log.warn("Please manually backup or delete server.properties");
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to convert old configuration", e);
+            log.error("Please manually create server.toml or check server.properties for errors");
+        }
     }
 
     /**
@@ -3140,26 +3563,28 @@ public class Server {
     }
 
     /**
-     * Load some settings from server.properties
+     * Load settings from ServerConfig (TOML)
      */
     private void loadSettings() {
-        this.forceLanguage = this.getPropertyBoolean("force-language", false);
-        this.networkCompressionLevel = Math.max(Math.min(this.getPropertyInt("compression-level", 5), 9), 0);
-        this.chunkCompressionLevel = Math.max(Math.min(this.getPropertyInt("chunk-compression-level", 7), 9), 1);
-        this.autoTickRate = this.getPropertyBoolean("auto-tick-rate", true);
-        this.autoTickRateLimit = this.getPropertyInt("auto-tick-rate-limit", 20);
-        this.alwaysTickPlayers = this.getPropertyBoolean("always-tick-players", false);
-        this.baseTickRate = this.getPropertyInt("base-tick-rate", 1);
-        this.callDataPkSendEv = this.getPropertyBoolean("call-data-pk-send-event", true);
-        this.callBatchPkEv = this.getPropertyBoolean("call-batch-pk-send-event", true);
-        this.doLevelGC = this.getPropertyBoolean("do-level-gc", true);
-        this.mobAiEnabled = this.getPropertyBoolean("mob-ai", true);
+        ServerConfig config = this.serverConfig;
 
-        this.netherEnabled = this.getPropertyBoolean("nether", true);
-        this.endEnabled = this.getPropertyBoolean("end", false);
+        this.forceLanguage = config.isForceLanguage();
+        this.networkCompressionLevel = Math.max(Math.min(config.getCompressionLevel(), 9), 0);
+        this.chunkCompressionLevel = 7; // No config field, using default
+        this.autoTickRate = config.isAutoTickRate();
+        this.autoTickRateLimit = config.getAutoTickRateLimit();
+        this.alwaysTickPlayers = config.isAlwaysTickPlayers();
+        this.baseTickRate = config.getBaseTickRate();
+        this.callDataPkSendEv = config.isCallDataPkSendEvent();
+        this.callBatchPkEv = config.isCallBatchPkSendEvent();
+        this.doLevelGC = config.isDoLevelGc();
+        this.mobAiEnabled = config.isMobAi();
+
+        this.netherEnabled = config.isNether();
+        this.endEnabled = config.isEnd();
 
         antiXrayWorlds.clear();
-        String antiXrayWorldsString = this.getPropertyString("anti-xray-worlds");
+        String antiXrayWorldsString = config.getAntiXrayWorlds();
         if (!antiXrayWorldsString.trim().isEmpty()) {
             StringTokenizer tokenizer = new StringTokenizer(antiXrayWorldsString, ", ");
             while (tokenizer.hasMoreTokens()) {
@@ -3167,91 +3592,95 @@ public class Server {
             }
         }
 
-        this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
-        this.bedSpawnpoints = this.getPropertyBoolean("bed-spawnpoints", true);
-        this.achievementsEnabled = this.getPropertyBoolean("achievements", true);
-        this.banXBAuthFailed = this.getPropertyBoolean("temp-ip-ban-failed-xbox-auth", false);
-        this.pvpEnabled = this.getPropertyBoolean("pvp", true);
-        this.announceAchievements = this.getPropertyBoolean("announce-player-achievements", false);
-        this.spawnEggsEnabled = this.getPropertyBoolean("spawn-eggs", true);
-        this.xpBottlesOnCreative = this.getPropertyBoolean("xp-bottles-on-creative", false);
-        this.shouldSavePlayerData = this.getPropertyBoolean("save-player-data", true);
-        this.mobsFromBlocks = this.getPropertyBoolean("block-listener", true);
-        this.explosionBreakBlocks = this.getPropertyBoolean("explosion-break-blocks", true);
-        this.vanillaBossBar = this.getPropertyBoolean("vanilla-bossbars", false);
-        this.stopInGame = this.getPropertyBoolean("stop-in-game", false);
-        this.opInGame = this.getPropertyBoolean("op-in-game", false);
+        this.xboxAuth = config.isXboxAuth();
+        this.bedSpawnpoints = config.isBedSpawnpoints();
+        this.achievementsEnabled = config.isAchievements();
+        this.banXBAuthFailed = config.isTempIpBanFailedXboxAuth();
+        this.pvpEnabled = config.isPvp();
+        this.announceAchievements = config.isAnnouncePlayerAchievements();
+        this.spawnEggsEnabled = config.isSpawnEggs();
+        this.xpBottlesOnCreative = config.isXpBottlesOnCreative();
+        this.shouldSavePlayerData = config.isSavePlayerData();
+        this.mobsFromBlocks = config.isBlockListener();
+        this.explosionBreakBlocks = config.isExplosionBreakBlocks();
+        this.vanillaBossBar = config.isVanillaBossbars();
+        this.stopInGame = config.isStopInGame();
+        this.opInGame = config.isOpInGame();
 
-        switch (this.getPropertyString("space-name-mode")) {
-            case "disabled" -> this.spaceMode = 0;
-            case "replacing" -> this.spaceMode = 2;
-            default -> this.spaceMode = 1;
+        switch (config.getSpaceNameMode()) {
+            case "deny" -> this.spaceMode = 0;
+            case "replace" -> this.spaceMode = 2;
+            default -> this.spaceMode = 1; // ignore
         }
 
-        this.lightUpdates = this.getPropertyBoolean("light-updates", false);
-        this.queryPlugins = this.getPropertyBoolean("query-plugins", false);
-        this.flyChecks = this.getPropertyBoolean("allow-flight", false);
-        this.isHardcore = this.getPropertyBoolean("hardcore", false);
-        this.despawnMobs = this.getPropertyBoolean("entity-despawn-task", true);
-        this.forceResources = this.getPropertyBoolean("force-resources", false);
-        this.forceResourcesAllowOwnPacks = this.getPropertyBoolean("force-resources-allow-client-packs", false);
-        this.whitelistEnabled = this.getPropertyBoolean("white-list", false);
-        this.checkOpMovement = this.getPropertyBoolean("check-op-movement", false);
-        this.forceGamemode = this.getPropertyBoolean("force-gamemode", true);
-        this.doNotLimitInteractions = this.getPropertyBoolean("do-not-limit-interactions", false);
-        this.motd = this.getPropertyString("motd", "Minecraft Server");
-        this.viewDistance = Math.max(1, this.getPropertyInt("view-distance", 8));
-        this.mobDespawnTicks = this.getPropertyInt("ticks-per-entity-despawns", 12000);
-        this.port = this.getPropertyInt("server-port", 19132);
-        this.ip = this.getPropertyString("server-ip", "0.0.0.0");
-        this.skinChangeCooldown = this.getPropertyInt("skin-change-cooldown", 30);
-        this.strongIPBans = this.getPropertyBoolean("strong-ip-bans", false);
-        this.spawnRadius = this.getPropertyInt("spawn-protection", 10);
-        this.dropSpawners = this.getPropertyBoolean("drop-spawners", true);
-        this.spawnAnimals = this.getPropertyBoolean("spawn-animals", true);
-        this.spawnMonsters = this.getPropertyBoolean("spawn-mobs", true);
-        this.autoSaveTicks = this.getPropertyInt("ticks-per-autosave", 6000);
-        this.doNotLimitSkinGeometry = this.getPropertyBoolean("do-not-limit-skin-geometry", true);
-        this.anvilsEnabled = this.getPropertyBoolean("anvils-enabled", true);
-        this.chunksPerTick = this.getPropertyInt("chunk-sending-per-tick", 4);
-        this.spawnThreshold = this.getPropertyInt("spawn-threshold", 56);
-        this.savePlayerDataByUuid = this.getPropertyBoolean("save-player-data-by-uuid", true);
+        this.lightUpdates = config.isLightUpdates();
+        this.queryPlugins = config.isQueryPlugins();
+        this.flyChecks = config.isAllowFlight();
+        this.isHardcore = config.isHardcore();
+        this.despawnMobs = config.isEntityDespawnTask();
+        this.forceResources = config.isForceResources();
+        this.forceResourcesAllowOwnPacks = config.isForceResourcesAllowClientPacks();
+        this.whitelistEnabled = config.isWhiteList();
+        this.checkOpMovement = config.isCheckOpMovement();
+        this.forceGamemode = config.isForceGamemode();
+        this.doNotLimitInteractions = config.isDoNotLimitInteractions();
+        this.motd = config.getMotd();
+        this.viewDistance = Math.max(1, config.getViewDistance());
+        this.mobDespawnTicks = config.getTicksPerEntityDespawns();
+        this.port = config.getServerPort();
+        this.ip = config.getServerIp();
+        this.skinChangeCooldown = config.getSkinChangeCooldown();
+        this.strongIPBans = config.isStrongIpBans();
+        this.spawnRadius = config.getSpawnProtection();
+        this.dropSpawners = config.isDropSpawners();
+        this.spawnAnimals = config.isSpawnAnimals();
+        this.spawnMonsters = config.isSpawnMobs();
+        this.autoSaveTicks = config.getTicksPerAutosave();
+        this.doNotLimitSkinGeometry = config.isDoNotLimitSkinGeometry();
+        this.anvilsEnabled = config.isAnvilsEnabled();
+        this.chunksPerTick = config.getChunkSendingPerTick();
+        this.spawnThreshold = config.getSpawnThreshold();
+        this.savePlayerDataByUuid = config.isSavePlayerDataByUuid();
 
-        this.vanillaPortals = this.getPropertyBoolean("vanilla-portals", true);
-        this.portalTicks = this.getPropertyInt("portal-ticks", 80);
+        this.vanillaPortals = config.isVanillaPortals();
+        this.portalTicks = config.getPortalTicks();
 
-        this.personaSkins = this.getPropertyBoolean("persona-skins", true);
-        this.cacheChunks = this.getPropertyBoolean("cache-chunks", false);
-        this.callEntityMotionEv = this.getPropertyBoolean("call-entity-motion-event", true);
-        this.updateChecks = this.getPropertyBoolean("update-notifications", false);
-        this.minimumProtocol = this.getPropertyInt("multiversion-min-protocol", 0);
-        this.maximumProtocol = this.getPropertyInt("multiversion-max-protocol", ProtocolInfo.CURRENT_PROTOCOL);
-        this.whitelistReason = this.getPropertyString("whitelist-reason", "§cServer is white-listed").replace("§n", "\n");
-        this.enableExperimentMode = this.getPropertyBoolean("enable-experiment-mode", true);
-        this.asyncChunkSending = this.getPropertyBoolean("async-chunks", true);
-        this.deprecatedVerbose = this.getPropertyBoolean("deprecated-verbose", true);
-        switch (this.getPropertyString("server-authoritative-movement")) {
+        this.personaSkins = config.isPersonaSkins();
+        this.cacheChunks = config.isCacheChunks();
+        this.callEntityMotionEv = config.isCallEntityMotionEvent();
+        this.updateChecks = config.isUpdateNotifications();
+        this.minimumProtocol = config.getMultiversionMinProtocol();
+        int maxProto = config.getMultiversionMaxProtocol();
+        this.maximumProtocol = maxProto == -1 ? ProtocolInfo.CURRENT_PROTOCOL : maxProto;
+        this.whitelistReason = config.getWhitelistReason().replace("§n", "\n");
+        this.enableExperimentMode = config.isEnableExperimentMode();
+        this.asyncChunkSending = config.isAsyncChunks();
+        this.deprecatedVerbose = config.isDeprecatedVerbose();
+
+        switch (config.getServerAuthoritativeMovement()) {
             case "client-auth" -> this.serverAuthoritativeMovementMode = 0;
             case "server-auth-with-rewind" -> this.serverAuthoritativeMovementMode = 2;
-            default -> this.serverAuthoritativeMovementMode = 1;
+            default -> this.serverAuthoritativeMovementMode = 1; // server-auth
         }
-        this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
-        this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
+
+        this.serverAuthoritativeBlockBreaking = config.isServerAuthoritativeBlockBreaking();
+        this.encryptionEnabled = config.isEncryption();
         if (!this.encryptionEnabled) {
             log.warn("Encryption is not enabled. For better security, it's recommended to enable it if you don't use a proxy software.");
         }
-        this.useWaterdog = this.getPropertyBoolean("use-waterdog", false);
-        this.useSnappy = this.getPropertyBoolean("use-snappy-compression", false);
-        this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);
-        this.networkCompressionThreshold = this.getPropertyInt("compression-threshold", 256);
-        this.enableSpark = this.getPropertyBoolean("enable-spark", false);
-        this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
+        this.useWaterdog = config.isUseWaterdog();
+        this.useSnappy = config.isUseSnappyCompression();
+        this.useClientSpectator = config.isUseClientSpectator();
         try {
-            this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
-        } catch (NumberFormatException exception) {
-            this.gamemode = getGamemodeFromString(this.getPropertyString("gamemode")) & 0b11;
+            this.networkCompressionThreshold = Integer.parseInt(config.getCompressionThreshold());
+        } catch (NumberFormatException e) {
+            this.networkCompressionThreshold = 256;
         }
-        String list = this.getPropertyString("do-not-tick-worlds");
+        this.enableSpark = config.isEnableSpark();
+        this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
+        this.gamemode = config.getGamemode() & 0b11;
+
+        String list = config.getDoNotTickWorlds();
         if (!list.trim().isEmpty()) {
             StringTokenizer tokenizer = new StringTokenizer(list, ", ");
             while (tokenizer.hasMoreTokens()) {
@@ -3259,19 +3688,19 @@ public class Server {
             }
         }
 
-        this.levelDbCache = this.getPropertyInt("leveldb-cache-mb", 80);
-        this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
-        this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
-        this.enableNewPaintings = this.getPropertyBoolean("enable-new-paintings", true);
-        this.enableNewChickenEggsLaying = this.getPropertyBoolean("enable-new-chicken-eggs-laying", true);
-        this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
-        this.enableRakSendCookie = this.getPropertyBoolean("enable-rak-send-cookie", true);
-        this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
-        this.enableVibrantVisuals = this.getPropertyBoolean("enable-vibrant-visuals", true);
-        this.enableRaytracing = this.getPropertyBoolean("enable-raytracing", true);
+        this.levelDbCache = config.getLeveldbCacheMb();
+        this.useNativeLevelDB = config.isUseNativeLeveldb();
+        this.enableRawOres = config.isEnableRawOres();
+        this.enableNewPaintings = config.isEnableNewPaintings();
+        this.enableNewChickenEggsLaying = config.isEnableNewChickenEggsLaying();
+        this.rakPacketLimit = config.getRakPacketLimit();
+        this.enableRakSendCookie = config.isEnableRakSendCookie();
+        this.forcedSafetyEnchant = config.isForcedSafetyEnchant();
+        this.enableVibrantVisuals = config.isEnableVibrantVisuals();
+        this.enableRaytracing = config.isEnableRaytracing();
 
-        this.netEaseMode = this.getPropertyBoolean("netease-client-support", false);
-        this.onlyNetEaseMode = this.getPropertyBoolean("only-allow-netease-client", false);
+        this.netEaseMode = config.isNeteaseClientSupport();
+        this.onlyNetEaseMode = config.isOnlyAllowNeteaseClient();
     }
 
     /**
@@ -3284,152 +3713,6 @@ public class Server {
             } else {
                 getInstance().getLogger().warning("Default " + action + " used by a plugin. This can cause instability with the multiversion.");
             }
-        }
-    }
-
-    /**
-     * This class contains all default server.properties values.
-     */
-    private static class ServerProperties extends ConfigSection {
-        {
-            put("motd", "Minecraft Server");
-            put("sub-motd", "Powered by Nukkit-MOT");
-            put("server-port", 19132);
-            put("server-ip", "0.0.0.0");
-            put("view-distance", 8);
-            put("achievements", true);
-            put("announce-player-achievements", true);
-            put("spawn-protection", 10);
-            put("max-players", 50);
-            put("drop-spawners", true); //TODO 考虑弃用
-            put("spawn-animals", true);
-            put("spawn-mobs", true);
-            put("gamemode", 0);
-            put("force-gamemode", true);
-            put("difficulty", 2);
-            put("hardcore", false);
-            put("pvp", true);
-
-            put("white-list", false);
-            put("whitelist-reason", "§cServer is white-listed");
-
-            put("generator-settings", "");
-            put("level-name", "world");
-            put("level-seed", "");
-            put("level-type", "default");
-
-            put("enable-rcon", false);
-            put("rcon.password", Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13));
-            put("rcon.port", 25575);
-
-            put("auto-save", true);
-            put("level-auto-compaction", true);
-            put("level-auto-compaction-ticks", 60 * 30 * 20);
-
-            put("force-resources", false);
-            put("force-resources-allow-client-packs", false);
-            put("xbox-auth", true);
-            put("encryption", true);
-            put("bed-spawnpoints", true);
-            put("explosion-break-blocks", true);
-            put("stop-in-game", false);
-            put("op-in-game", true);
-            put("space-name-mode", "ignore");
-            put("xp-bottles-on-creative", true);
-            put("spawn-eggs", true);
-            put("mob-ai", true);
-            put("entity-auto-spawn-task", true);
-            put("entity-despawn-task", true);
-            put("language", "eng");
-            put("force-language", false);
-            put("shutdown-message", "§cServer closed");
-            put("save-player-data", true);
-            put("enable-query", true);
-            put("query-plugins", false);
-            put("debug-level", 1);
-            put("async-workers", "auto");
-
-            put("zlib-provider", 2);
-            put("compression-level", 5);
-            put("compression-threshold", "256");
-            put("use-snappy-compression", false);
-            put("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
-            put("enable-rak-send-cookie", true);
-            put("timeout-milliseconds", 25000);
-
-            put("auto-tick-rate", true);
-            put("auto-tick-rate-limit", 20);
-            put("base-tick-rate", 1);
-            put("always-tick-players", false);
-            put("light-updates", false);
-            put("clear-chunk-tick-list", true);
-            put("spawn-threshold", 56);
-            put("chunk-sending-per-tick", 4);
-            put("chunk-ticking-per-tick", 40);
-            put("chunk-ticking-radius", 3);
-            put("chunk-generation-queue-size", 8);
-            put("chunk-generation-population-queue-size", 8);
-            put("ticks-per-autosave", 6000);
-            put("ticks-per-entity-spawns", 200);
-            put("ticks-per-entity-despawns", 12000);
-            put("thread-watchdog", true);
-            put("thread-watchdog-tick", 60000);
-
-            put("nether", true);
-            put("end", true);
-            put("vanilla-portals", true);
-            put("portal-ticks", 80);
-            put("multi-nether-worlds", "");
-            put("anti-xray-worlds", "");
-
-            put("do-not-tick-worlds", "");
-            put("worlds-entity-spawning-disabled", "");
-            put("load-all-worlds", true);
-            put("ansi-title", false);
-            put("block-listener", true);
-            put("allow-flight", false);
-            put("multiversion-min-protocol", 0);
-            put("multiversion-max-protocol", -1);
-            put("vanilla-bossbars", false);
-            put("strong-ip-bans", false);
-            put("worlds-level-auto-save-disabled", "");
-            put("temp-ip-ban-failed-xbox-auth", false);
-            put("call-data-pk-send-event", true);
-            put("call-batch-pk-send-event", true);
-            put("do-level-gc", true);
-            put("skin-change-cooldown", 15);
-            put("check-op-movement", false);
-            put("do-not-limit-interactions", false);
-            put("do-not-limit-skin-geometry", true);
-            put("automatic-bug-report", true);
-            put("anvils-enabled", true);
-            put("save-player-data-by-uuid", true);
-            put("persona-skins", true);
-            put("call-entity-motion-event", true);
-            put("update-notifications", true);
-            put("bstats-metrics", true);
-            put("cache-chunks", false);
-            put("async-chunks", true);
-            put("deprecated-verbose", true);
-            put("server-authoritative-movement", "server-auth");
-            put("server-authoritative-block-breaking", true);
-            put("use-client-spectator", true);
-            put("enable-experiment-mode", true);
-            put("use-waterdog", false);
-            put("enable-spark", false);
-            put("hastebin-token", "");
-
-            put("leveldb-cache-mb", 80);
-            put("use-native-leveldb", false);
-            put("enable-raw-ores", true);
-            put("enable-new-paintings", true);
-            put("enable-new-chicken-eggs-laying", true);
-            put("forced-safety-enchant", true);
-            put("enable-vibrant-visuals", true);
-            put("enable-raytracing", true);
-
-            put("netease-client-support", false);
-            put("only-allow-netease-client", false);
         }
     }
 

@@ -46,7 +46,7 @@ public class DefaultGamemodeCommand extends VanillaCommand {
 
         boolean valid = gameMode >= 0 && gameMode <= 3;
         if (valid) {
-            sender.getServer().setPropertyInt("gamemode", gameMode);
+            sender.getServer().getServerConfig().setGamemode(gameMode);
             log.addSuccess("commands.defaultgamemode.success", Server.getGamemodeString(gameMode)).output();
             return 1;
         } else {

@@ -79,6 +79,7 @@ junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "jun
 junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
 
 jackson-dataformat-toml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-toml", version.ref = "jackson_dataformat_toml" }
+okaeri-configs-toml-jackson = { module = "eu.okaeri:okaeri-configs-toml-jackson", version.ref = "okaeri_configs" }
 
 [bundles]
 snakeyaml = [ "snakeyaml", "snakeyaml-engine" ]

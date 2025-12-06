@@ -38,7 +38,7 @@ public enum EnumLevel {
                 server.loadLevel("nether");
             }
             NETHER.level = server.getLevelByName("nether");
-            String list = server.getPropertyString("multi-nether-worlds");
+            String list = server.getServerConfig().getMultiNetherWorlds();
             if (!list.trim().isEmpty()) {
                 StringTokenizer tokenizer = new StringTokenizer(list, ", ");
                 while (tokenizer.hasMoreTokens()) {
