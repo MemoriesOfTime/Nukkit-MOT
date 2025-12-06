@@ -27,6 +27,7 @@ repositories {
     maven("https://repo.opencollab.dev/maven-releases/")
     maven("https://repo.opencollab.dev/maven-snapshots/")
     maven("https://repo.lanink.cn/repository/maven-public/")
+    maven("https://repo.okaeri.cloud/releases")
 }
 
 dependencies {
@@ -49,7 +50,7 @@ dependencies {
         exclude("com.google.errorprone", "error_prone_annotations")
     }
     api(libs.bundles.snakeyaml)
-    api(libs.tomlj)
+    api(libs.jackson.dataformat.toml)
     api(libs.nimbus.jose.jwt)
     api(libs.asm)
     api(libs.bundles.leveldb)
