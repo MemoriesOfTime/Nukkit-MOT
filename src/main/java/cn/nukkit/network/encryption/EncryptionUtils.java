@@ -78,51 +78,71 @@ public class EncryptionUtils {
      * These are only needed for v1.21.90+ authentication.
      */
     private static class JwtConsumerHolder {
-        private static final Map<String, Object> DISCOVERY_DATA = getDiscoveryData();
-        private static final Map<String, Object> OPENID_CONFIGURATION = getOpenIdConfiguration();
-        private static final String JWKS_URL = getJwksUrl();
-        private static final String ISSUER = getIssuer();
-        private static final HttpsJwks JWKS = new HttpsJwks(JWKS_URL);
-        private static final HttpsJwksVerificationKeyResolver RESOLVER = new HttpsJwksVerificationKeyResolver(JWKS);
-
-        private static final JwtConsumer MOJANG_CONSUMER = new JwtConsumerBuilder()
-                .setVerificationKeyResolver(RESOLVER)
-                .setRequireExpirationTime()
-                .setRequireSubject()
-                .setExpectedAudience(true, "api://auth-minecraft-services/multiplayer")
-                .setExpectedIssuer(ISSUER)
-                .build();
+        private static volatile Map<String, Object> DISCOVERY_DATA = null;
+        private static volatile Map<String, Object> OPENID_CONFIGURATION = null;
+        private static volatile JwtConsumer MOJANG_CONSUMER = null;
+        private static final Object LOCK = new Object();
 
         private static final JwtConsumer OFFLINE_CONSUMER = EncryptionUtils.OFFLINE_CONSUMER;
 
         private static Map<String, Object> getDiscoveryData() {
-            try {
-                URL url = new URL(DISCOVERY_ENDPOINT);
-                HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setRequestProperty("Accept", "application/json");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-                connection.connect();
-                if (connection.getResponseCode() != 200) {
-                    throw new IOException("Failed to fetch discovery data: " + connection.getResponseMessage());
+            if (DISCOVERY_DATA != null) {
+                return DISCOVERY_DATA;
+            }
+
+            synchronized (LOCK) {
+                if (DISCOVERY_DATA != null) {
+                    return DISCOVERY_DATA;
                 }
-                try(InputStream stream = connection.getInputStream();
-                    InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-                    //noinspection unchecked
-                    return (Map<String, Object>) JSON_PARSER.parse(reader);
+
+                int maxRetries = 3;
+                long retryDelay = 1000; // 1 second
+
+                for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        URL url = new URL(DISCOVERY_ENDPOINT);
+                        HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+                        connection.setRequestMethod("GET");
+                        connection.setRequestProperty("Accept", "application/json");
+                        connection.setConnectTimeout(10000); // Increased to 10 seconds
+                        connection.setReadTimeout(10000); // Increased to 10 seconds
+                        connection.connect();
+                        if (connection.getResponseCode() != 200) {
+                            throw new IOException("Failed to fetch discovery data: " + connection.getResponseMessage());
+                        }
+                        try(InputStream stream = connection.getInputStream();
+                            InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+                            //noinspection unchecked
+                            Map<String, Object> data = (Map<String, Object>) JSON_PARSER.parse(reader);
+                            DISCOVERY_DATA = data;
+                            return data;
+                        }
+                    } catch (ParseException | IOException e) {
+                        if (attempt < maxRetries) {
+                            System.err.println("Failed to fetch discovery data (attempt " + attempt + "/" + maxRetries + "): " + e.getMessage() + ". Retrying in " + retryDelay + "ms...");
+                            try {
+                                Thread.sleep(retryDelay);
+                                retryDelay *= 2; // Exponential backoff
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                throw new AssertionError("Interrupted while retrying discovery data fetch", ie);
+                            }
+                        } else {
+                            throw new AssertionError("Unable to fetch discovery data from " + DISCOVERY_ENDPOINT + " after " + maxRetries + " attempts", e);
+                        }
+                    }
                 }
-            } catch (ParseException | IOException e) {
-                throw new AssertionError("Unable to fetch discovery data from " + DISCOVERY_ENDPOINT, e);
+                throw new AssertionError("Failed to fetch discovery data after all retries");
             }
         }
 
         @SuppressWarnings("unchecked")
         private static Map<String, Object> getAuthEnvironment() {
-            Map<String, Object> result = (Map<String, Object>) DISCOVERY_DATA.get("result");
+            Map<String, Object> discoveryData = getDiscoveryData();
+            Map<String, Object> result = (Map<String, Object>) discoveryData.get("result");
 
             if (result == null) {
-                throw new AssertionError("Discovery data does not contain 'result' key" + DISCOVERY_DATA);
+                throw new AssertionError("Discovery data does not contain 'result' key" + discoveryData);
             }
             Map<String, Object> environments = (Map<String, Object>) result.get("serviceEnvironments");
             if (environments == null) {
@@ -148,44 +168,101 @@ public class EncryptionUtils {
         }
 
         private static Map<String, Object> getOpenIdConfiguration() {
-            String serviceUri = getServiceUri();
+            if (OPENID_CONFIGURATION != null) {
+                return OPENID_CONFIGURATION;
+            }
 
-            String openIdConfigUrl = serviceUri + "/.well-known/openid-configuration";
-            try {
-                URL url = new URL(openIdConfigUrl);
-                HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setRequestProperty("Accept", "application/json");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-                connection.connect();
-                if (connection.getResponseCode() != 200) {
-                    throw new IOException("Failed to fetch OpenID configuration: " + connection.getResponseMessage());
+            synchronized (LOCK) {
+                if (OPENID_CONFIGURATION != null) {
+                    return OPENID_CONFIGURATION;
                 }
-                try (InputStream stream = connection.getInputStream();
-                     InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-                    //noinspection unchecked
-                    return (Map<String, Object>) JSON_PARSER.parse(reader);
+
+                String serviceUri = getServiceUri();
+                String openIdConfigUrl = serviceUri + "/.well-known/openid-configuration";
+
+                int maxRetries = 3;
+                for (int attempt = 1; attempt <= maxRetries; attempt++) {
+                    try {
+                        URL url = new URL(openIdConfigUrl);
+                        HttpsURLConnection connection = (HttpsURLConnection) url.openConnection();
+                        connection.setRequestMethod("GET");
+                        connection.setRequestProperty("Accept", "application/json");
+                        connection.setConnectTimeout(5000);
+                        connection.setReadTimeout(5000);
+                        connection.connect();
+                        if (connection.getResponseCode() != 200) {
+                            throw new IOException("Failed to fetch OpenID configuration: " + connection.getResponseMessage());
+                        }
+                        try (InputStream stream = connection.getInputStream();
+                             InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+                            //noinspection unchecked
+                            Map<String, Object> config = (Map<String, Object>) JSON_PARSER.parse(reader);
+                            OPENID_CONFIGURATION = config;
+                            return config;
+                        }
+                    } catch (ParseException | IOException e) {
+                        if (attempt < maxRetries) {
+                            System.err.println("Failed to fetch OpenID configuration (attempt " + attempt + "/" + maxRetries + "): " + e.getMessage() + ". Retrying in 1 s...");
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                                throw new AssertionError("Interrupted while retrying OpenID configuration fetch", ie);
+                            }
+                        } else {
+                            throw new AssertionError("Unable to fetch OpenID configuration from " + openIdConfigUrl + " after " + maxRetries + " attempts", e);
+                        }
+                    }
                 }
-            } catch (ParseException | IOException e) {
-                throw new AssertionError("Unable to fetch OpenID configuration from " + openIdConfigUrl, e);
+                throw new AssertionError("Failed to fetch OpenID configuration after all retries");
             }
         }
 
         private static String getJwksUrl() {
-            String jwksUrl = (String) OPENID_CONFIGURATION.get("jwks_uri");
+            Map<String, Object> openIdConfiguration = getOpenIdConfiguration();
+            String jwksUrl = (String) openIdConfiguration.get("jwks_uri");
             if (jwksUrl == null || jwksUrl.isEmpty()) {
-                throw new AssertionError("OpenID configuration does not contain 'jwks_uri' key: " + OPENID_CONFIGURATION);
+                throw new AssertionError("OpenID configuration does not contain 'jwks_uri' key: " + openIdConfiguration);
             }
             return jwksUrl;
         }
 
         private static String getIssuer() {
-            String issuer = (String) OPENID_CONFIGURATION.get("issuer");
+            Map<String, Object> openIdConfiguration = getOpenIdConfiguration();
+            String issuer = (String) openIdConfiguration.get("issuer");
             if (issuer == null || issuer.isEmpty()) {
-                throw new AssertionError("OpenID configuration does not contain 'issuer' key: " + OPENID_CONFIGURATION);
+                throw new AssertionError("OpenID configuration does not contain 'issuer' key: " + openIdConfiguration);
             }
             return issuer;
+        }
+
+        private static JwtConsumer getMojangConsumer() {
+            if (MOJANG_CONSUMER != null) {
+                return MOJANG_CONSUMER;
+            }
+
+            synchronized (LOCK) {
+                if (MOJANG_CONSUMER != null) {
+                    return MOJANG_CONSUMER;
+                }
+
+                String jwksUrl = getJwksUrl();
+                String issuer = getIssuer();
+
+                HttpsJwks jwks = new HttpsJwks(jwksUrl);
+                HttpsJwksVerificationKeyResolver resolver = new HttpsJwksVerificationKeyResolver(jwks);
+
+                JwtConsumer consumer = new JwtConsumerBuilder()
+                        .setVerificationKeyResolver(resolver)
+                        .setRequireExpirationTime()
+                        .setRequireSubject()
+                        .setExpectedAudience(true, "api://auth-minecraft-services/multiplayer")
+                        .setExpectedIssuer(issuer)
+                        .build();
+
+                MOJANG_CONSUMER = consumer;
+                return consumer;
+            }
         }
     }
 
@@ -318,7 +395,7 @@ public class EncryptionUtils {
                 throw new JoseException("Unsupported AuthType: " + type);
             }
         } else {
-            context = JwtConsumerHolder.MOJANG_CONSUMER.process(token);
+            context = JwtConsumerHolder.getMojangConsumer().process(token);
             return new ChainValidationResult(true, context);
         }
     }

@@ -58,7 +58,9 @@ import cn.nukkit.network.BatchingHelper;
 import cn.nukkit.network.Network;
 import cn.nukkit.network.RakNetInterface;
 import cn.nukkit.network.SourceInterface;
+import cn.nukkit.network.encryption.EncryptionUtils;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.protocol.types.auth.AuthType;
 import cn.nukkit.network.query.QueryHandler;
 import cn.nukkit.network.rcon.RCON;
 import cn.nukkit.permission.BanEntry;
@@ -101,6 +103,7 @@ import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
 import org.iq80.leveldb.impl.Iq80DBFactory;
 import org.jetbrains.annotations.NotNull;
+import org.jose4j.jwt.consumer.InvalidJwtException;
 
 import java.awt.*;
 import java.io.*;
@@ -903,6 +906,17 @@ public class Server {
 
         if (this.getPropertyBoolean("bstats-metrics", true)) {
             new NukkitMetrics(this);
+        }
+
+        // 触发一次，加载JwtConsumerHolder
+        if (this.xboxAuth) {
+            try {
+                EncryptionUtils.validateToken(AuthType.FULL, "");
+            } catch (InvalidJwtException ignored) {
+
+            } catch (Exception e) {
+                this.getLogger().error("EncryptionUtils initialization error, xbox verification will not work!", e);
+            }
         }
 
         // Check for updates
