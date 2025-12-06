@@ -11,10 +11,18 @@ import org.snakeyaml.engine.v2.api.DumpSettings;
 import org.snakeyaml.engine.v2.api.Load;
 import org.snakeyaml.engine.v2.api.LoadSettings;
 import org.snakeyaml.engine.v2.common.FlowStyle;
+import org.tomlj.Toml;
+import org.tomlj.TomlArray;
+import org.tomlj.TomlParseResult;
+import org.tomlj.TomlTable;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
 
@@ -35,6 +43,7 @@ public class Config {
     public static final int SERIALIZED = 4; // .sl
     public static final int ENUM = 5; // .txt, .list, .enum
     public static final int ENUMERATION = Config.ENUM;
+    public static final int TOML = 6; // .toml
 
     private ConfigSection config = new ConfigSection();
     private File file;
@@ -60,6 +69,7 @@ public class Config {
         format.put("txt", Config.ENUM);
         format.put("list", Config.ENUM);
         format.put("enum", Config.ENUM);
+        format.put("toml", Config.TOML);
     }
 
     /**
@@ -312,6 +322,9 @@ public class Config {
                             .build();
                     Dump yaml = new Dump(dumperOptions);
                     content = new StringBuilder(yaml.dumpToString(this.config));
+                    break;
+                case Config.TOML:
+                    content = new StringBuilder(this.writeToml());
                     break;
                 case Config.ENUM:
                     for (Object o : this.config.entrySet()) {
@@ -595,6 +608,168 @@ public class Config {
         }
     }
 
+    private void parseToml(String content) {
+        try {
+            TomlParseResult result = Toml.parse(content);
+            if (result.hasErrors()) {
+                for (var error : result.errors()) {
+                    MainLogger.getLogger().error("[Config] TOML parse error: " + error.toString());
+                }
+                this.correct = false;
+                return;
+            }
+            this.config = new ConfigSection(tomlTableToMap(result));
+        } catch (Exception e) {
+            MainLogger.getLogger().error("[Config] Failed to parse TOML", e);
+            this.correct = false;
+        }
+    }
+
+    /**
+     * Unified conversion method for TOML values
+     */
+    private Object convertTomlValue(Object value) {
+        if (value == null || value instanceof String ||
+            value instanceof Number || value instanceof Boolean) {
+            return value;
+        }
+
+        if (value instanceof TomlTable) {
+            return tomlTableToMap((TomlTable) value);
+        }
+        if (value instanceof TomlArray) {
+            return convertTomlArray((TomlArray) value);
+        }
+        if (value instanceof List) {
+            return convertTomlList((List<?>) value);
+        }
+
+        if (value instanceof LocalDate || value instanceof LocalDateTime ||
+            value instanceof LocalTime || value instanceof OffsetDateTime) {
+            return value.toString();
+        }
+
+        return value;
+    }
+
+    private LinkedHashMap<String, Object> tomlTableToMap(TomlTable table) {
+        LinkedHashMap<String, Object> map = new LinkedHashMap<>(table.size());
+        for (String key : table.keySet()) {
+            map.put(key, convertTomlValue(table.get(key)));
+        }
+        return map;
+    }
+
+    private List<Object> convertTomlArray(TomlArray array) {
+        List<Object> result = new ArrayList<>(array.size());
+        for (int i = 0; i < array.size(); i++) {
+            result.add(convertTomlValue(array.get(i)));
+        }
+        return result;
+    }
+
+    private List<Object> convertTomlList(List<?> list) {
+        List<Object> result = new ArrayList<>(list.size());
+        for (Object item : list) {
+            result.add(convertTomlValue(item));
+        }
+        return result;
+    }
+
+    private String writeToml() {
+        StringBuilder sb = new StringBuilder(1024);
+        sb.append("#TOML Config File\r\n");
+        writeTomlSection(sb, "", this.config.getAllMap());
+        return sb.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void writeTomlSection(StringBuilder sb, String prefix, Map<String, Object> map) {
+        // First pass: write simple key-value pairs
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            Object value = entry.getValue();
+            if (!(value instanceof Map)) {
+                writeTomlValue(sb, entry.getKey(), value);
+            }
+        }
+
+        // Second pass: write tables/sections
+        for (Map.Entry<String, Object> entry : map.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (value instanceof ConfigSection) {
+                value = ((ConfigSection) value).getAllMap();
+            }
+
+            if (value instanceof Map) {
+                String fullKey = prefix.isEmpty() ? key : prefix + "." + key;
+                sb.append("\r\n[").append(fullKey).append("]\r\n");
+                writeTomlSection(sb, fullKey, (Map<String, Object>) value);
+            }
+        }
+    }
+
+    /**
+     * Escape string for TOML format
+     */
+    private String escapeTomlString(String str) {
+        return str.replace("\\", "\\\\").replace("\"", "\\\"");
+    }
+
+    private void writeTomlValue(StringBuilder sb, String key, Object value) {
+        sb.append(key).append(" = ");
+
+        if (value == null) {
+            sb.append("\"\"");
+        } else if (value instanceof String) {
+            sb.append('"').append(escapeTomlString((String) value)).append('"');
+        } else if (value instanceof Boolean || value instanceof Number) {
+            sb.append(value);
+        } else if (value instanceof List) {
+            writeTomlArray(sb, (List<?>) value);
+        } else {
+            sb.append('"').append(escapeTomlString(value.toString())).append('"');
+        }
+
+        sb.append("\r\n");
+    }
+
+    /**
+     * Write TOML array format
+     */
+    private void writeTomlArray(StringBuilder sb, List<?> list) {
+        sb.append('[');
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            Object item = list.get(i);
+            if (item instanceof String) {
+                sb.append('"').append(escapeTomlString((String) item)).append('"');
+            } else if (item instanceof Map) {
+                sb.append('{');
+                Map<?, ?> map = (Map<?, ?>) item;
+                int j = 0;
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (j > 0) sb.append(", ");
+                    sb.append(entry.getKey()).append(" = ");
+                    Object val = entry.getValue();
+                    if (val instanceof String) {
+                        sb.append('"').append(escapeTomlString((String) val)).append('"');
+                    } else {
+                        sb.append(val);
+                    }
+                    j++;
+                }
+                sb.append('}');
+            } else {
+                sb.append(item);
+            }
+        }
+        sb.append(']');
+    }
+
     public Object getNested(String key) {
         return get(key);
     }
@@ -629,6 +804,9 @@ public class Config {
                         .build();
                 Load yaml = new Load(settings);
                 this.config = new ConfigSection((LinkedHashMap<String, Object>) yaml.loadFromString(content));
+                break;
+            case Config.TOML:
+                this.parseToml(content);
                 break;
             case Config.ENUM:
                 this.parseList(content);

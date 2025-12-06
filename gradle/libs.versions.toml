@@ -28,6 +28,7 @@ junit = "5.10.2"
 nukkitx_natives = "1.0.3"
 raknet = "1.0.0.CR3-SNAPSHOT"
 cloudburst_common = "3.0.0.Beta7-SNAPSHOT"
+tomlj = "1.1.1"
 
 [libraries]
 raknet = { module = "org.cloudburstmc.netty:netty-transport-raknet", version.ref = "raknet" }
@@ -75,6 +76,8 @@ terminal-console = { module = "net.minecrell:terminalconsoleappender", version.r
 
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+
+tomlj = { module = "org.tomlj:tomlj", version.ref = "tomlj" }
 
 [bundles]
 snakeyaml = [ "snakeyaml", "snakeyaml-engine" ]
