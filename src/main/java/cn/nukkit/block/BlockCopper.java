@@ -8,10 +8,6 @@ import org.jetbrains.annotations.NotNull;
  * @since 2024/2/23
  */
 public class BlockCopper extends BlockCopperBase {
-    public BlockCopper() {
-        // Does nothing
-    }
-
     @Override
     public String getName() {
         return "Block of Copper";
