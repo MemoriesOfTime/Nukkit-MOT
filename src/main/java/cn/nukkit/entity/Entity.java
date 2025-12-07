@@ -2751,7 +2751,8 @@ public abstract class Entity extends Location implements Metadatable {
                     }
                 }
             } catch (NullPointerException e) {
-                this.blocksAround.clear();
+                // 异步传送导致空指针 忽略结果
+                return new ArrayList<>();
             }
         }
         return this.blocksAround;
