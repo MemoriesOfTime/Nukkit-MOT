@@ -2736,7 +2736,15 @@ public abstract class Entity extends Location implements Metadatable {
             int maxY = Math.min(NukkitMath.ceilDouble(bb.getMaxY()), this.level.getMaxBlockY());
             int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
 
-            this.blocksAround = new ArrayList<>((maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1));
+            int sizeX = maxX - minX + 1;
+            int sizeY = maxY - minY + 1;
+            int sizeZ = maxZ - minZ + 1;
+
+            if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) {
+                return new ArrayList<>();
+            }
+
+            this.blocksAround = new ArrayList<>(sizeX * sizeY * sizeZ);
 
             try {
                 if (!this.level.isYInRange(minY) && !this.level.isYInRange(maxY)) {
@@ -2798,7 +2806,15 @@ public abstract class Entity extends Location implements Metadatable {
         int maxY = Math.min(NukkitMath.ceilDouble(bb.getMaxY()), this.level.getMaxBlockY());
         int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
 
-        List<Block> blocks = new ArrayList<>((maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1));
+        int sizeX = maxX - minX + 1;
+        int sizeY = maxY - minY + 1;
+        int sizeZ = maxZ - minZ + 1;
+
+        if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) {
+            return new ArrayList<>();
+        }
+
+        List<Block> blocks = new ArrayList<>(sizeX * sizeY * sizeZ);
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = minZ; z <= maxZ; z++) {
