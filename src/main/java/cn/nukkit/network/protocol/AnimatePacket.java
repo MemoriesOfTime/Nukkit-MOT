@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.network.protocol.types.SwingSource;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import lombok.ToString;
@@ -16,29 +17,57 @@ public class AnimatePacket extends DataPacket {
     public Action action;
     public float data;
     public float rowingTime;
+    /**
+     * @since 1.21.130
+     */
+    public SwingSource swingSource = SwingSource.NONE;
 
     @Override
     public void decode() {
-        this.action = Action.fromId(this.getVarInt());
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+            this.action = Action.fromId(this.getByte());
+            if (this.action == null) {
+                this.action = Action.NO_ACTION;
+            }
+        } else {
+            this.action = Action.fromId(this.getVarInt());
+        }
         this.eid = getEntityRuntimeId();
         if (this.protocol >= ProtocolInfo.v1_21_120) {
             this.data = this.getLFloat();
         }
-        if (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT) {
-            this.rowingTime = this.getLFloat();
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+            if (this.getBoolean()) {
+                this.swingSource = SwingSource.from(this.getString()); // Swing source
+            }
+        } else {
+            if (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT) {
+                this.rowingTime = this.getLFloat();
+            }
         }
     }
 
     @Override
     public void encode() {
         this.reset();
-        this.putVarInt(this.action.getId());
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+            this.putByte((byte) this.action.getId());
+        } else {
+            this.putVarInt(this.action.getId());
+        }
         this.putEntityRuntimeId(this.eid);
         if (this.protocol >= ProtocolInfo.v1_21_120) {
             this.putLFloat(this.data);
         }
-        if (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT) {
-            this.putLFloat(this.rowingTime);
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+            this.putBoolean(this.swingSource != SwingSource.NONE); // Swing source (optional)
+            if (this.swingSource != SwingSource.NONE) {
+                this.putString(this.swingSource.getName());
+            }
+        } else {
+            if (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT) {
+                this.putLFloat(this.rowingTime);
+            }
         }
     }
 

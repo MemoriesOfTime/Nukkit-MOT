@@ -30,6 +30,10 @@ public class MobEffectPacket extends DataPacket {
      * @since v662 1.20.70
      */
     public long tick;
+    /**
+     * @since v698 1.21.130
+     */
+    public boolean ambient;
 
     @Override
     public void decode() {
@@ -48,6 +52,9 @@ public class MobEffectPacket extends DataPacket {
             this.putUnsignedVarLong(this.tick);
         } else if (this.protocol >= ProtocolInfo.v1_20_70) {
             this.putLLong(this.tick);
+        }
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+            this.putBoolean(this.ambient);
         }
     }
 }

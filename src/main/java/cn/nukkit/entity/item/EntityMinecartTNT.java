@@ -51,10 +51,10 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     public void initEntity() {
         super.initEntity();
 
-        if (namedTag.contains("TNTFuse")) {
-            fuse = namedTag.getByte("TNTFuse");
+        if (namedTag.contains("fuse")) {
+            fuse = namedTag.getByte("fuse");
         } else {
-            fuse = 80;
+            fuse = -1;
         }
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CHARGED, false);
     }
@@ -63,7 +63,7 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     public boolean entityBaseTick(int tickDiff) {
         boolean hasUpdate = super.entityBaseTick(tickDiff);
 
-        if (!this.closed && this.isAlive() && this.fuse < 80) {
+        if (!this.closed && this.isAlive() && this.fuse < 80 && this.fuse != -1) {
             if (fuse % 5 == 0) {
                 setDataProperty(new IntEntityData(DATA_FUSE_LENGTH, fuse));
             }
@@ -138,14 +138,14 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     public void saveNBT() {
         super.saveNBT();
 
-        super.namedTag.putInt("TNTFuse", this.fuse);
+        super.namedTag.putInt("fuse", this.fuse);
     }
     
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
         if (item.getId() == Item.FLINT_AND_STEEL || item.getId() == Item.FIRE_CHARGE) {
             level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_IGNITE);
-            this.fuse = 79;
+            this.fuse = 80;
             return true;
         }
 

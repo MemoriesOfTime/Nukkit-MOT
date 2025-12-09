@@ -495,7 +495,11 @@ public class AvailableCommandsPacket extends DataPacket {
                     throw new IllegalStateException("Enum value '" + val + "' not found");
                 }
 
-                indexWriter.accept(this, i);
+                if (protocol < ProtocolInfo.v1_21_130_28) {
+                    indexWriter.accept(this, i);
+                } else {
+                    this.putLInt(i);
+                }
             }
         });
 
@@ -533,7 +537,11 @@ public class AvailableCommandsPacket extends DataPacket {
                 this.putByte((byte) data.flags);
             }
             // Commands\PermissionLevel
-            this.putByte((byte) data.permission);
+            if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+                this.putString(data.permission.getName());
+            } else {
+                this.putByte((byte) data.permission.ordinal());
+            }
 
             // Commands\AliasesOffset
             this.putLInt(data.aliases == null ? -1 : enums.indexOf(data.aliases));

@@ -32,6 +32,7 @@ import javax.net.ssl.HttpsURLConnection;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
@@ -88,6 +89,12 @@ public class EncryptionUtils {
         private static final JwtConsumer OFFLINE_CONSUMER = EncryptionUtils.OFFLINE_CONSUMER;
 
         private static Map<String, Object> getDiscoveryData() {
+            try (StringReader reader = new StringReader("{\"result\":{\"serviceEnvironments\":{\"persona\":{\"prod\":{\"serviceUri\":\"https://persona-secondary.franchise.minecraft-services.net\",\"playfabTitleId\":\"20CA2\"}},\"store\":{\"prod\":{\"serviceUri\":\"https://store.mktpl.minecraft-services.net\",\"playfabTitleId\":\"20CA2\",\"eduPlayFabTitleId\":\"6955F\"}},\"auth\":{\"prod\":{\"serviceUri\":\"https://authorization.franchise.minecraft-services.net\",\"issuer\":\"https://authorization.franchise.minecraft-services.net\",\"playfabTitleId\":\"20CA2\",\"eduPlayFabTitleId\":\"6955F\"}},\"signaling\":{\"prod\":{\"serviceUri\":\"wss://signal.franchise.minecraft-services.net\",\"stunUri\":\"stun:turn.azure.com:3478\",\"turnUri\":\"turn:turn.azure.com:3478\"}},\"filetocloud\":{\"prod\":{\"serviceUri\":\"https://client.support-files.minecraft-services.net\"}},\"safety\":{\"prod\":{\"serviceUri\":\"https://safety-secondary.franchise.minecraft-services.net\"}},\"mpsas\":{\"prod\":{\"serviceUri\":\"https://secondary.allocation.multiplayer.minecraft-services.net\"}},\"gatherings\":{\"prod\":{\"serviceUri\":\"https://gatherings-secondary.franchise.minecraft-services.net\"}},\"messaging\":{\"prod\":{\"serviceUri\":\"https://messaging.mktpl.minecraft-services.net\"}},\"entitlements\":{\"prod\":{\"serviceUri\":\"https://entitlements.mktpl.minecraft-services.net\",\"playfabTitleId\":\"20CA2\"}},\"frontend\":{\"prod\":{\"serviceUri\":\"https://client.allocation.multiplayer.minecraft-services.net\"}},\"multiplayer\":{\"prod\":{\"serviceUri\":\"https://secondary.multiplayer.minecraft-services.net\"}},\"cdn\":{\"prod\":{\"serviceUri\":\"https://cdn.gatherings.franchise.minecraft-services.net/public/\"}},\"realmsfrontend\":{\"prod\":{\"serviceUri\":\"https://frontend.realms.minecraft-services.net\",\"playfabTitleId\":\"20CA2\"}},\"net\":{\"prod\":{\"serviceUri\":\"https://net-secondary.web.minecraft-services.net\"}},\"client_features\":{\"prod\":{\"nxAccountLink\":\"false\",\"signInHeroMessage\":\"0.5\",\"signInIncentiveMessage\":\"0.5\"}},\"legacyrealms-frontend\":{\"prod\":{\"serviceUri\":\"https://bedrock.frontendlegacy.realms.minecraft-services.net/\"}},\"legacyrealms-payments\":{\"prod\":{\"serviceUri\":\"https://paymentslegacy.realms.minecraft-services.net\"}}},\"supportedEnvironments\":{\"1.0.0.0\":[\"prod\"]}}}")) {
+                return (Map<String, Object>) JSON_PARSER.parse(reader);
+            } catch (IOException | ParseException e) {
+
+            }
+
             if (DISCOVERY_DATA != null) {
                 return DISCOVERY_DATA;
             }

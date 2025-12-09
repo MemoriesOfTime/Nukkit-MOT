@@ -6,6 +6,7 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityCreature;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemNamespaceId;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelEventPacket;
@@ -67,6 +68,11 @@ public class EntityElderGuardian extends EntitySwimmingMob {
             if (((EntityDamageByEntityEvent) this.lastDamageCause).getDamager() instanceof Player) {
                 drops.add(Item.get(Item.SPONGE, BlockSponge.WET, 1));
             }
+        }
+
+        if (Utils.rand(1, 100) <= 20) {
+            Item item = Item.fromString(ItemNamespaceId.TIDE_ARMOR_TRIM_SMITHING_TEMPLATE);
+            drops.add(item);
         }
 
         return drops.toArray(Item.EMPTY_ARRAY);

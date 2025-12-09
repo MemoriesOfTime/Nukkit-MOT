@@ -42,43 +42,89 @@ public class TextPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.type = (byte) getByte();
-        if (protocol >= ProtocolInfo.v1_2_0) {
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
             this.isLocalized = this.getBoolean() || type == TYPE_TRANSLATION;
-        }
-        switch (type) {
-            case TYPE_CHAT:
-            case TYPE_WHISPER:
-            case TYPE_ANNOUNCEMENT:
-                this.source = this.getString();
-                if (protocol > 201 && protocol <= 282) {
-                    this.getString();
-                    this.getVarInt();
-                }
-            case TYPE_RAW:
-            case TYPE_TIP:
-            case TYPE_SYSTEM:
-            case TYPE_OBJECT:
-            case TYPE_OBJECT_WHISPER:
-            case TYPE_OBJECT_ANNOUNCEMENT:
-                this.message = this.getString();
-                break;
 
-            case TYPE_TRANSLATION:
-            case TYPE_POPUP:
-            case TYPE_JUKEBOX_POPUP:
-                this.message = this.getString();
-                int count = (int) this.getUnsignedVarInt();
-                this.parameters = new String[Math.min(count, 128)];
-                for (int i = 0; i < this.parameters.length; i++) {
-                    this.parameters[i] = this.getString();
-                }
-        }
-        if (protocol >= 223) {
+            switch (this.getByte()) {
+                case 0: // MessageOnly
+                    for (int i = 0; i < 6; i++) {
+                        this.getString();
+                    }
+                    this.type = (byte) getByte();
+                    this.message = this.getString();
+                    break;
+                case 1: // AuthorAndMessage
+                    for (int i = 0; i < 3; i++) {
+                        this.getString();
+                    }
+                    this.type = (byte) getByte();
+                    this.source = this.getString();
+                    this.message = this.getString();
+                    break;
+                case 2: // MessageAndParams
+                    for (int i = 0; i < 3; i++) {
+                        this.getString();
+                    }
+                    this.type = (byte) getByte();
+                    this.message = this.getString();
+                    int paramCount = (int) this.getUnsignedVarInt();
+                    if (paramCount > 4) {
+                        throw new IllegalArgumentException("Parameter List maxItems is 4");
+                    }
+                    this.parameters = new String[paramCount];
+                    for (int i = 0; i < this.parameters.length; i++) {
+                        this.parameters[i] = this.getString();
+                    }
+                    break;
+                default:
+                    throw new IllegalArgumentException("Not oneOf<MessageOnly, AuthorAndMessage, MessageAndParams>");
+            }
+
             this.xboxUserId = this.getString();
             this.platformChatId = this.getString();
-            if (protocol >= ProtocolInfo.v1_21_0) {
+
+            if (this.getBoolean()) {
                 this.filteredMessage = this.getString();
+            }
+        } else {
+            this.type = (byte) getByte();
+            if (protocol >= ProtocolInfo.v1_2_0) {
+                this.isLocalized = this.getBoolean() || type == TYPE_TRANSLATION;
+            }
+            switch (type) {
+                case TYPE_CHAT:
+                case TYPE_WHISPER:
+                case TYPE_ANNOUNCEMENT:
+                    this.source = this.getString();
+                    if (protocol > 201 && protocol <= 282) {
+                        this.getString();
+                        this.getVarInt();
+                    }
+                case TYPE_RAW:
+                case TYPE_TIP:
+                case TYPE_SYSTEM:
+                case TYPE_OBJECT:
+                case TYPE_OBJECT_WHISPER:
+                case TYPE_OBJECT_ANNOUNCEMENT:
+                    this.message = this.getString();
+                    break;
+
+                case TYPE_TRANSLATION:
+                case TYPE_POPUP:
+                case TYPE_JUKEBOX_POPUP:
+                    this.message = this.getString();
+                    int count = (int) this.getUnsignedVarInt();
+                    this.parameters = new String[Math.min(count, 128)];
+                    for (int i = 0; i < this.parameters.length; i++) {
+                        this.parameters[i] = this.getString();
+                    }
+            }
+            if (protocol >= 223) {
+                this.xboxUserId = this.getString();
+                this.platformChatId = this.getString();
+                if (protocol >= ProtocolInfo.v1_21_0) {
+                    this.filteredMessage = this.getString();
+                }
             }
         }
     }
@@ -86,50 +132,107 @@ public class TextPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (this.protocol < ProtocolInfo.v1_2_0 && this.type > 4) {
-            this.putByte((byte) (this.type - 1));
-        } else {
-            this.putByte(this.type);
-        }
-        if (protocol >= ProtocolInfo.v1_2_0) {
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
             this.putBoolean(this.isLocalized || type == TYPE_TRANSLATION);
-        }
-        switch (this.type) {
-            case TYPE_CHAT:
-            case TYPE_WHISPER:
-            case TYPE_ANNOUNCEMENT:
-                this.putString(this.source);
-                if (protocol > 201 && protocol <= 282) {
-                    this.putString("");
-                    this.putVarInt(0);
-                }
-            case TYPE_RAW:
-            case TYPE_TIP:
-            case TYPE_SYSTEM:
-            case TYPE_OBJECT:
-            case TYPE_OBJECT_WHISPER:
-            case TYPE_OBJECT_ANNOUNCEMENT:
-                this.putString(this.message);
-                break;
 
-            case TYPE_TRANSLATION:
-            case TYPE_POPUP:
-            case TYPE_JUKEBOX_POPUP:
-                this.putString(this.message);
-                this.putUnsignedVarInt(this.parameters.length);
-                for (String parameter : this.parameters) {
-                    this.putString(parameter);
-                }
-        }
-        if (protocol >= 223) {
+            switch (this.type) {
+                case TYPE_RAW:
+                case TYPE_TIP:
+                case TYPE_SYSTEM:
+                case TYPE_OBJECT:
+                case TYPE_OBJECT_WHISPER:
+                case TYPE_OBJECT_ANNOUNCEMENT:
+                    this.putByte((byte) 0); // MessageOnly
+                    this.putString("raw");
+                    this.putString("tip");
+                    this.putString("systemMessage");
+                    this.putString("textObjectWhisper");
+                    this.putString("textObjectAnnouncement");
+                    this.putString("textObject");
+                    this.putByte(this.type);
+                    this.putString(this.message);
+                    break;
+
+                case TYPE_CHAT:
+                case TYPE_WHISPER:
+                case TYPE_ANNOUNCEMENT:
+                    this.putByte((byte) 1); // AuthorAndMessage
+                    this.putString("chat");
+                    this.putString("whisper");
+                    this.putString("announcement");
+                    this.putByte(this.type);
+                    this.putString(this.source);
+                    this.putString(this.message);
+                    break;
+
+                case TYPE_TRANSLATION:
+                case TYPE_POPUP:
+                case TYPE_JUKEBOX_POPUP:
+                    this.putByte((byte) 2); // MessageAndParams
+                    this.putString("translate");
+                    this.putString("popup");
+                    this.putString("jukeboxPopup");
+                    this.putByte(this.type);
+                    this.putString(this.message);
+                    this.putUnsignedVarInt(this.parameters.length);
+                    for (String parameter : this.parameters) {
+                        this.putString(parameter);
+                    }
+            }
+
             this.putString(this.xboxUserId);
             this.putString(this.platformChatId);
-            if (protocol >= ProtocolInfo.v1_21_0) {
-                this.putString(this.filteredMessage);
 
-                if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_16_100_51) {
-                    if (this.type == TYPE_CHAT || this.type == TYPE_POPUP) {
+            this.putBoolean(!this.filteredMessage.isEmpty());
+            if (!this.filteredMessage.isEmpty()) {
+                this.putString(this.filteredMessage);
+            }
+        } else {
+            if (this.protocol < ProtocolInfo.v1_2_0 && this.type > 4) {
+                this.putByte((byte) (this.type - 1));
+            } else {
+                this.putByte(this.type);
+            }
+            if (protocol >= ProtocolInfo.v1_2_0) {
+                this.putBoolean(this.isLocalized || type == TYPE_TRANSLATION);
+            }
+            switch (this.type) {
+                case TYPE_CHAT:
+                case TYPE_WHISPER:
+                case TYPE_ANNOUNCEMENT:
+                    this.putString(this.source);
+                    if (protocol > 201 && protocol <= 282) {
                         this.putString("");
+                        this.putVarInt(0);
+                    }
+                case TYPE_RAW:
+                case TYPE_TIP:
+                case TYPE_SYSTEM:
+                case TYPE_OBJECT:
+                case TYPE_OBJECT_WHISPER:
+                case TYPE_OBJECT_ANNOUNCEMENT:
+                    this.putString(this.message);
+                    break;
+
+                case TYPE_TRANSLATION:
+                case TYPE_POPUP:
+                case TYPE_JUKEBOX_POPUP:
+                    this.putString(this.message);
+                    this.putUnsignedVarInt(this.parameters.length);
+                    for (String parameter : this.parameters) {
+                        this.putString(parameter);
+                    }
+            }
+            if (protocol >= 223) {
+                this.putString(this.xboxUserId);
+                this.putString(this.platformChatId);
+                if (protocol >= ProtocolInfo.v1_21_0) {
+                    this.putString(this.filteredMessage);
+
+                    if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_16_100_51) {
+                        if (this.type == TYPE_CHAT || this.type == TYPE_POPUP) {
+                            this.putString("");
+                        }
                     }
                 }
             }

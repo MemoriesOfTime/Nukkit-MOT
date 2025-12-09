@@ -14,6 +14,7 @@ public class CameraAimAssistPresetDefinition {
     @SuppressWarnings("dep-ann")
     public String categories;
     public final List<String> exclusionList = new ObjectArrayList<>();
+    public final List<String> blockTagExclusionList = new ObjectArrayList<>();
     public final List<String> liquidTargetingList = new ObjectArrayList<>();
     private final List<CameraAimAssistItemSettings> itemSettings = new ObjectArrayList<>();
     private String defaultItemSettings;

@@ -303,7 +303,9 @@ public class EntityBoat extends EntityVehicle {
             entity.setDataProperty(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 1), !entity.isPlayer);
             if (entity.isPlayer) {
                 entity.setDataProperty(new FloatEntityData(DATA_RIDER_MAX_ROTATION, 90), false);
-                entity.setDataProperty(new FloatEntityData(DATA_RIDER_MIN_ROTATION, 1), false);
+                if (((Player) entity).protocol >= ProtocolInfo.v1_21_130_28) {
+                    entity.setDataProperty(new FloatEntityData(DATA_RIDER_MIN_ROTATION, 1), false);
+                }
                 if (((Player) entity).protocol >= ProtocolInfo.v1_16_210) {
                     entity.setDataProperty(new FloatEntityData(DATA_RIDER_ROTATION_OFFSET, -90), false);
                 }
