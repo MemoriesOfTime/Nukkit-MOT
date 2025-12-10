@@ -469,6 +469,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.ADD_PLAYER_PACKET, AddPlayerPacket.class)
                 .registerPacket(ProtocolInfo.ADVENTURE_SETTINGS_PACKET, AdventureSettingsPacket.class)
                 .registerPacket(ProtocolInfo.ANIMATE_PACKET, AnimatePacket.class)
+                .registerPacket(ProtocolInfo.SETTINGS_COMMAND_PACKET, SettingsCommandPacket.class)
                 .registerPacket(ProtocolInfo.ANVIL_DAMAGE_PACKET, AnvilDamagePacket.class)
                 .registerPacket(ProtocolInfo.AVAILABLE_COMMANDS_PACKET, AvailableCommandsPacket.class)
                 .registerPacket(ProtocolInfo.BATCH_PACKET, BatchPacket.class)

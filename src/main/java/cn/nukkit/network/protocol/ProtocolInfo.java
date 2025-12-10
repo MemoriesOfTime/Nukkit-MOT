@@ -367,9 +367,37 @@ public interface ProtocolInfo {
      */
     int CAMERA_AIM_ASSIST_PRESETS_PACKET = 320;
     /**
+     * @since v776
+     */
+    int CLIENT_CAMERA_AIM_ASSIST_PACKET = 321;
+    /**
+     * @since v776
+     */
+    int CLIENT_MOVEMENT_PREDICTION_SYNC_PACKET = 322;
+    /**
+     * @since v785
+     */
+    int UPDATE_CLIENT_OPTIONS_PACKET = 323;
+    /**
+     * @since v785
+     */
+    int PLAYER_VIDEO_CAPTURE_PACKET = 324;
+    /**
+     * @since v785
+     */
+    int PLAYER_UPDATE_ENTITY_OVERRIDES_PACKET = 325;
+    /**
      * @since v800
      */
     int PLAYER_LOCATIONS_PACKET = 326;
+    /**
+     * @since v800
+     */
+    int CLIENTBOUND_CONTROL_SCHEME_SET_PACKET = 327;
+    /**
+     * @since v818
+     */
+    int SERVER_SCRIPT_DEBUG_DRAWER_PACKET = 328;
 
     @OnlyNetEase
     int PACKET_CONFIRM_SKIN = 0xe4;
