@@ -4226,7 +4226,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     case ROW_RIGHT:
                     case ROW_LEFT:
                         if (this.riding instanceof EntityBoat) {
-                            ((EntityBoat) this.riding).onPaddle(animation, ((AnimatePacket) packet).rowingTime);
+                            if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+                                ((EntityBoat) this.riding).onPaddle(animation, 1); // Paddle time got removed from packet. Needs debugging!!
+                            } else {
+                                ((EntityBoat) this.riding).onPaddle(animation, ((AnimatePacket) packet).rowingTime);
+                            }
                         }
                         break;
                 }
