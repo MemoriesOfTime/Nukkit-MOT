@@ -7,6 +7,8 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.ToString;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Predicate;
 
 @ToString
 public class CommandOutputPacket extends DataPacket {
@@ -68,10 +70,7 @@ public class CommandOutputPacket extends DataPacket {
             }
         }
         if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-            this.putBoolean(this.data != null);
-            if (this.data != null) {
-                this.putString(this.data);
-            }
+            this.putOptional(Objects::nonNull, this.data, this::putString);
         } else {
             if (this.type == CommandOutputType.DATA_SET) {
                 putString(this.data);
