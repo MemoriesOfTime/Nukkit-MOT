@@ -14,7 +14,6 @@ public class InteractPacket extends DataPacket {
 
     public int action;
     public long target;
-
     public float x;
     public float y;
     public float z;
@@ -23,13 +22,8 @@ public class InteractPacket extends DataPacket {
     public void decode() {
         this.action = this.getByte();
         this.target = this.getEntityRuntimeId();
-        boolean b;
-        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-            b = this.getBoolean();
-        } else {
-            b = this.action == ACTION_MOUSEOVER || this.action == ACTION_VEHICLE_EXIT;
-        }
-        if (b) {
+        if ((protocol >= ProtocolInfo.v1_21_130_28 && this.getBoolean()) ||
+                (protocol < ProtocolInfo.v1_21_130_28 && (this.action == ACTION_MOUSEOVER || (protocol >= ProtocolInfo.v1_13_0 && this.action == ACTION_VEHICLE_EXIT)))) {
             this.x = this.getFloat();
             this.y = this.getFloat();
             this.z = this.getFloat();
@@ -38,13 +32,7 @@ public class InteractPacket extends DataPacket {
 
     @Override
     public void encode() {
-        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-            this.encodeUnsupported();
-        } else {
-            this.reset();
-            this.putByte((byte) this.action);
-            this.putEntityRuntimeId(this.target);
-        }
+        this.encodeUnsupported();
     }
 
     @Override

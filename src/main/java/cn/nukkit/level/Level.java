@@ -119,7 +119,7 @@ public class Level implements ChunkManager, Metadatable {
     public static final int DIMENSION_THE_END = 2;
 
     // Lower values use less memory
-    public static final int MAX_BLOCK_CACHE = 512;
+    public static final int MAX_BLOCK_CACHE = 1024;
 
     // The blocks that can randomly tick
     private static final boolean[] randomTickBlocks = new boolean[Block.MAX_BLOCK_ID];

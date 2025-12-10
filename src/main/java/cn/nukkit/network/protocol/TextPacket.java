@@ -42,9 +42,44 @@ public class TextPacket extends DataPacket {
 
     @Override
     public void decode() {
-        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-            this.isLocalized = this.getBoolean() || type == TYPE_TRANSLATION;
+        if (this.protocol < ProtocolInfo.v1_21_130_28) {
+            this.type = (byte) getByte();
+        }
 
+        if (this.protocol >= ProtocolInfo.v1_2_0) {
+            this.isLocalized = this.getBoolean() || type == TYPE_TRANSLATION;
+        }
+
+        if (this.protocol < ProtocolInfo.v1_21_130_28) {
+            switch (type) {
+                case TYPE_CHAT:
+                case TYPE_WHISPER:
+                case TYPE_ANNOUNCEMENT:
+                    this.source = this.getString();
+                    if (protocol > 201 && protocol <= 282) {
+                        this.getString();
+                        this.getVarInt();
+                    }
+                case TYPE_RAW:
+                case TYPE_TIP:
+                case TYPE_SYSTEM:
+                case TYPE_OBJECT:
+                case TYPE_OBJECT_WHISPER:
+                case TYPE_OBJECT_ANNOUNCEMENT:
+                    this.message = this.getString();
+                    break;
+
+                case TYPE_TRANSLATION:
+                case TYPE_POPUP:
+                case TYPE_JUKEBOX_POPUP:
+                    this.message = this.getString();
+                    int count = (int) this.getUnsignedVarInt();
+                    this.parameters = new String[Math.min(count, 128)];
+                    for (int i = 0; i < this.parameters.length; i++) {
+                        this.parameters[i] = this.getString();
+                    }
+            }
+        } else {
             switch (this.getByte()) {
                 case 0: // MessageOnly
                     for (int i = 0; i < 6; i++) {
@@ -79,52 +114,13 @@ public class TextPacket extends DataPacket {
                 default:
                     throw new IllegalArgumentException("Not oneOf<MessageOnly, AuthorAndMessage, MessageAndParams>");
             }
+        }
 
+        if (protocol >= 223) {
             this.xboxUserId = this.getString();
             this.platformChatId = this.getString();
-
-            if (this.getBoolean()) {
+            if (protocol >= ProtocolInfo.v1_21_0) {
                 this.filteredMessage = this.getString();
-            }
-        } else {
-            this.type = (byte) getByte();
-            if (protocol >= ProtocolInfo.v1_2_0) {
-                this.isLocalized = this.getBoolean() || type == TYPE_TRANSLATION;
-            }
-            switch (type) {
-                case TYPE_CHAT:
-                case TYPE_WHISPER:
-                case TYPE_ANNOUNCEMENT:
-                    this.source = this.getString();
-                    if (protocol > 201 && protocol <= 282) {
-                        this.getString();
-                        this.getVarInt();
-                    }
-                case TYPE_RAW:
-                case TYPE_TIP:
-                case TYPE_SYSTEM:
-                case TYPE_OBJECT:
-                case TYPE_OBJECT_WHISPER:
-                case TYPE_OBJECT_ANNOUNCEMENT:
-                    this.message = this.getString();
-                    break;
-
-                case TYPE_TRANSLATION:
-                case TYPE_POPUP:
-                case TYPE_JUKEBOX_POPUP:
-                    this.message = this.getString();
-                    int count = (int) this.getUnsignedVarInt();
-                    this.parameters = new String[Math.min(count, 128)];
-                    for (int i = 0; i < this.parameters.length; i++) {
-                        this.parameters[i] = this.getString();
-                    }
-            }
-            if (protocol >= 223) {
-                this.xboxUserId = this.getString();
-                this.platformChatId = this.getString();
-                if (protocol >= ProtocolInfo.v1_21_0) {
-                    this.filteredMessage = this.getString();
-                }
             }
         }
     }
@@ -132,9 +128,44 @@ public class TextPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-            this.putBoolean(this.isLocalized || type == TYPE_TRANSLATION);
 
+        if (this.protocol < ProtocolInfo.v1_21_130_28) {
+            this.putByte(this.type);
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_2_0) {
+            this.putBoolean(this.isLocalized || type == TYPE_TRANSLATION);
+        }
+
+        if (this.protocol < ProtocolInfo.v1_21_130_28) {
+            switch (this.type) {
+                case TYPE_CHAT:
+                case TYPE_WHISPER:
+                case TYPE_ANNOUNCEMENT:
+                    this.putString(this.source);
+                    if (protocol > 201 && protocol <= 282) {
+                        this.putString("");
+                        this.putVarInt(0);
+                    }
+                case TYPE_RAW:
+                case TYPE_TIP:
+                case TYPE_SYSTEM:
+                case TYPE_OBJECT:
+                case TYPE_OBJECT_WHISPER:
+                case TYPE_OBJECT_ANNOUNCEMENT:
+                    this.putString(this.message);
+                    break;
+
+                case TYPE_TRANSLATION:
+                case TYPE_POPUP:
+                case TYPE_JUKEBOX_POPUP:
+                    this.putString(this.message);
+                    this.putUnsignedVarInt(this.parameters.length);
+                    for (String parameter : this.parameters) {
+                        this.putString(parameter);
+                    }
+            }
+        } else {
             switch (this.type) {
                 case TYPE_RAW:
                 case TYPE_TIP:
@@ -179,61 +210,18 @@ public class TextPacket extends DataPacket {
                         this.putString(parameter);
                     }
             }
+        }
 
+        if (this.protocol >= 223) {
             this.putString(this.xboxUserId);
             this.putString(this.platformChatId);
 
-            this.putBoolean(!this.filteredMessage.isEmpty());
-            if (!this.filteredMessage.isEmpty()) {
-                this.putString(this.filteredMessage);
-            }
-        } else {
-            if (this.protocol < ProtocolInfo.v1_2_0 && this.type > 4) {
-                this.putByte((byte) (this.type - 1));
-            } else {
-                this.putByte(this.type);
-            }
-            if (protocol >= ProtocolInfo.v1_2_0) {
-                this.putBoolean(this.isLocalized || type == TYPE_TRANSLATION);
-            }
-            switch (this.type) {
-                case TYPE_CHAT:
-                case TYPE_WHISPER:
-                case TYPE_ANNOUNCEMENT:
-                    this.putString(this.source);
-                    if (protocol > 201 && protocol <= 282) {
-                        this.putString("");
-                        this.putVarInt(0);
-                    }
-                case TYPE_RAW:
-                case TYPE_TIP:
-                case TYPE_SYSTEM:
-                case TYPE_OBJECT:
-                case TYPE_OBJECT_WHISPER:
-                case TYPE_OBJECT_ANNOUNCEMENT:
-                    this.putString(this.message);
-                    break;
-
-                case TYPE_TRANSLATION:
-                case TYPE_POPUP:
-                case TYPE_JUKEBOX_POPUP:
-                    this.putString(this.message);
-                    this.putUnsignedVarInt(this.parameters.length);
-                    for (String parameter : this.parameters) {
-                        this.putString(parameter);
-                    }
-            }
-            if (protocol >= 223) {
-                this.putString(this.xboxUserId);
-                this.putString(this.platformChatId);
-                if (protocol >= ProtocolInfo.v1_21_0) {
+            if (protocol >= ProtocolInfo.v1_21_0) {
+                if (protocol >= ProtocolInfo.v1_21_130_28) {
+                    this.putBoolean(!this.filteredMessage.isEmpty());
+                }
+                if (protocol < ProtocolInfo.v1_21_130_28 || !this.filteredMessage.isEmpty()) {
                     this.putString(this.filteredMessage);
-
-                    if (gameVersion.isNetEase() && protocol >= ProtocolInfo.v1_16_100_51) {
-                        if (this.type == TYPE_CHAT || this.type == TYPE_POPUP) {
-                            this.putString("");
-                        }
-                    }
                 }
             }
         }

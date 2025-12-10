@@ -609,8 +609,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCreativeItemsNew(GameVersion.V1_21_93, GameVersion.V1_21_93, creative819);
         registerCreativeItemsNew(GameVersion.V1_21_100, GameVersion.V1_21_100, creative827);
         registerCreativeItemsNew(GameVersion.V1_21_110, GameVersion.V1_21_110, creative844);
-        registerCreativeItemsNew(GameVersion.V1_21_120, GameVersion.V1_21_120, creative859);
-        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_130, creative898);
+        registerCreativeItemsNew(GameVersion.V1_21_120, GameVersion.V1_21_110, creative859);
+        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_110, creative898);
 
         registerCreativeItemsNew(GameVersion.V1_20_50_NETEASE, GameVersion.V1_20_50_NETEASE, creative_netease_630);
         registerCreativeItemsNew(GameVersion.V1_21_2_NETEASE, GameVersion.V1_21_2_NETEASE, creative_netease_686);
@@ -747,6 +747,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         Item.creative827.clear();
         Item.creative844.clear();
         Item.creative859.clear();
+        Item.creative898.clear();
 
         Item.creative_netease_630.clear();
         Item.creative_netease_686.clear();

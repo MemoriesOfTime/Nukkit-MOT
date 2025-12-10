@@ -1,9 +1,11 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.network.protocol.types.SwingSource;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import lombok.Getter;
 import lombok.ToString;
+
+import java.util.HashMap;
 
 /**
  * @author Nukkit Project Team
@@ -18,39 +20,36 @@ public class AnimatePacket extends DataPacket {
     public float data;
     public float rowingTime;
     /**
-     * @since 1.21.130
+     * @since v897
      */
     public SwingSource swingSource = SwingSource.NONE;
 
     @Override
     public void decode() {
-        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+        if (protocol >= ProtocolInfo.v1_21_130_28) {
             this.action = Action.fromId(this.getByte());
-            if (this.action == null) {
-                this.action = Action.NO_ACTION;
-            }
         } else {
             this.action = Action.fromId(this.getVarInt());
+        }
+        if (this.action == null) {
+            this.action = Action.NO_ACTION;
         }
         this.eid = getEntityRuntimeId();
         if (this.protocol >= ProtocolInfo.v1_21_120) {
             this.data = this.getLFloat();
         }
-        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-            if (this.getBoolean()) {
-                this.swingSource = SwingSource.from(this.getString()); // Swing source
-            }
-        } else {
-            if (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT) {
-                this.rowingTime = this.getLFloat();
-            }
+        if (protocol < ProtocolInfo.v1_21_130_28 && (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT)) {
+            this.rowingTime = this.getLFloat();
+        }
+        if (protocol >= ProtocolInfo.v1_21_130_28 && this.getBoolean()) {
+            this.swingSource = this.getOptional(SwingSource.NONE, stream -> SwingSource.from(stream.getString()));
         }
     }
 
     @Override
     public void encode() {
         this.reset();
-        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+        if (protocol >= ProtocolInfo.v1_21_130_28) {
             this.putByte((byte) this.action.getId());
         } else {
             this.putVarInt(this.action.getId());
@@ -59,15 +58,11 @@ public class AnimatePacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_120) {
             this.putLFloat(this.data);
         }
-        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-            this.putBoolean(this.swingSource != SwingSource.NONE); // Swing source (optional)
-            if (this.swingSource != SwingSource.NONE) {
-                this.putString(this.swingSource.getName());
-            }
-        } else {
-            if (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT) {
-                this.putLFloat(this.rowingTime);
-            }
+        if (protocol < ProtocolInfo.v1_21_130_28 && (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT)) {
+            this.putLFloat(this.rowingTime);
+        }
+        if (protocol >= ProtocolInfo.v1_21_130_28) {
+            this.putOptional(o -> o != SwingSource.NONE, this.swingSource, o -> this.putString(o.getName()));
         }
     }
 
@@ -105,6 +100,37 @@ public class AnimatePacket extends DataPacket {
 
         public static Action fromId(int id) {
             return ID_LOOKUP.get(id);
+        }
+    }
+
+    public enum SwingSource {
+        NONE("none"),
+        BUILD("build"),
+        MINE("mine"),
+        INTERACT("interact"),
+        ATTACK("attack"),
+        USE_ITEM("useitem"),
+        THROW_ITEM("throwitem"),
+        DROP_ITEM("dropitem"),
+        EVENT("event");
+
+        private static final HashMap<String, SwingSource> BY_NAME = new HashMap<>();
+
+        static {
+            for (SwingSource value : values()) {
+                BY_NAME.put(value.name, value);
+            }
+        }
+
+        @Getter
+        private final String name;
+
+        SwingSource(String name) {
+            this.name = name;
+        }
+
+        public static SwingSource from(String name) {
+            return BY_NAME.get(name);
         }
     }
 }

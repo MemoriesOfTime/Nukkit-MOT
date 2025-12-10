@@ -4,10 +4,8 @@ import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockWater;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.EntityLiving;
 import cn.nukkit.entity.data.ByteEntityData;
 import cn.nukkit.entity.data.FloatEntityData;
-import cn.nukkit.entity.passive.EntityWaterAnimal;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.vehicle.VehicleMoveEvent;
@@ -301,15 +299,15 @@ public class EntityBoat extends EntityVehicle {
             updatePassengers(true);
 
             entity.setDataProperty(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 1), !entity.isPlayer);
-            if (entity.isPlayer) {
+            if (entity instanceof Player playerEntity) {
                 entity.setDataProperty(new FloatEntityData(DATA_RIDER_MAX_ROTATION, 90), false);
-                if (((Player) entity).protocol >= ProtocolInfo.v1_21_130_28) {
+                if (playerEntity.protocol < ProtocolInfo.v1_21_130_28) {
                     entity.setDataProperty(new FloatEntityData(DATA_RIDER_MIN_ROTATION, 1), false);
                 }
-                if (((Player) entity).protocol >= ProtocolInfo.v1_16_210) {
+                if (playerEntity.protocol >= ProtocolInfo.v1_16_210) {
                     entity.setDataProperty(new FloatEntityData(DATA_RIDER_ROTATION_OFFSET, -90), false);
                 }
-                entity.sendData(((Player) entity));
+                entity.sendData(playerEntity);
             }
         }
 

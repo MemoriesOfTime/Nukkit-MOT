@@ -63,7 +63,7 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     public boolean entityBaseTick(int tickDiff) {
         boolean hasUpdate = super.entityBaseTick(tickDiff);
 
-        if (!this.closed && this.isAlive() && this.fuse < 80 && this.fuse != -1) {
+        if (!this.closed && this.isAlive() && fuse > 0) {
             if (fuse % 5 == 0) {
                 setDataProperty(new IntEntityData(DATA_FUSE_LENGTH, fuse));
             }
@@ -85,7 +85,7 @@ public class EntityMinecartTNT extends EntityMinecartAbstract implements EntityE
     @Override
     public void activate(int x, int y, int z, boolean flag) {
         level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_IGNITE);
-        this.fuse = 79;
+        this.fuse = 80;
     }
 
     @Override

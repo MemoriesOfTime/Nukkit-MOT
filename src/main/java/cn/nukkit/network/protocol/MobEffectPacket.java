@@ -31,12 +31,13 @@ public class MobEffectPacket extends DataPacket {
      */
     public long tick;
     /**
-     * @since v698 1.21.130
+     * @since v897
      */
     public boolean ambient;
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -53,7 +54,7 @@ public class MobEffectPacket extends DataPacket {
         } else if (this.protocol >= ProtocolInfo.v1_20_70) {
             this.putLLong(this.tick);
         }
-        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+        if (protocol >= ProtocolInfo.v1_21_130_28) {
             this.putBoolean(this.ambient);
         }
     }
