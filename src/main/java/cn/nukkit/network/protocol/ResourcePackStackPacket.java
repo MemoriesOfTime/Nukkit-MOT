@@ -43,12 +43,14 @@ public class ResourcePackStackPacket extends DataPacket {
     public void encode() {
         this.reset();
         this.putBoolean(this.mustAccept);
-        this.putUnsignedVarInt(this.behaviourPackStack.length);
-        for (ResourcePack entry : this.behaviourPackStack) {
-            this.putString(entry.getPackId().toString());
-            this.putString(entry.getPackVersion());
-            if (this.protocol >= 313) {
-                this.putString("");
+        if (this.protocol < ProtocolInfo.v1_21_130_28) {
+            this.putUnsignedVarInt(this.behaviourPackStack.length);
+            for (ResourcePack entry : this.behaviourPackStack) {
+                this.putString(entry.getPackId().toString());
+                this.putString(entry.getPackVersion());
+                if (this.protocol >= 313) {
+                    this.putString("");
+                }
             }
         }
         this.putUnsignedVarInt(this.resourcePackStack.length);

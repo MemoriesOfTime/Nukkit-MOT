@@ -103,8 +103,10 @@ public interface ProtocolInfo {
     int v1_21_110 = 844;
     int v1_21_120 = 859;
     int v1_21_124 = 860;
+    int v1_21_130_28 = 897;
+    int v1_21_130 = 898;
 
-    int CURRENT_PROTOCOL = Utils.dynamic(v1_21_124);
+    int CURRENT_PROTOCOL = Utils.dynamic(v1_21_130);
 
     List<Integer> SUPPORTED_PROTOCOLS = Ints.asList(
             /*v1_1_0, */v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
@@ -114,7 +116,7 @@ public interface ProtocolInfo {
             v1_19_10, v1_19_20, v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50_20, v1_19_50, v1_19_60, v1_19_63, v1_19_70_24, v1_19_70,
             v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40, v1_20_50, v1_20_60, v1_20_70, v1_20_80,
             v1_21_0, v1_21_2, v1_21_20, v1_21_30, v1_21_40, v1_21_50_26, v1_21_50, v1_21_60, v1_21_70_24, v1_21_70, v1_21_80, v1_21_90, v1_21_93,
-            v1_21_100, v1_21_110_26, v1_21_110, v1_21_120, v1_21_124
+            v1_21_100, v1_21_110_26, v1_21_110, v1_21_120, v1_21_124, v1_21_130_28, v1_21_130
     );
 
     String MINECRAFT_VERSION_NETWORK = Utils.getVersionByProtocol(CURRENT_PROTOCOL);
@@ -365,9 +367,37 @@ public interface ProtocolInfo {
      */
     int CAMERA_AIM_ASSIST_PRESETS_PACKET = 320;
     /**
+     * @since v776
+     */
+    int CLIENT_CAMERA_AIM_ASSIST_PACKET = 321;
+    /**
+     * @since v776
+     */
+    int CLIENT_MOVEMENT_PREDICTION_SYNC_PACKET = 322;
+    /**
+     * @since v785
+     */
+    int UPDATE_CLIENT_OPTIONS_PACKET = 323;
+    /**
+     * @since v785
+     */
+    int PLAYER_VIDEO_CAPTURE_PACKET = 324;
+    /**
+     * @since v785
+     */
+    int PLAYER_UPDATE_ENTITY_OVERRIDES_PACKET = 325;
+    /**
      * @since v800
      */
     int PLAYER_LOCATIONS_PACKET = 326;
+    /**
+     * @since v800
+     */
+    int CLIENTBOUND_CONTROL_SCHEME_SET_PACKET = 327;
+    /**
+     * @since v818
+     */
+    int SERVER_SCRIPT_DEBUG_DRAWER_PACKET = 328;
 
     @OnlyNetEase
     int PACKET_CONFIRM_SKIN = 0xe4;

@@ -119,7 +119,7 @@ public class Level implements ChunkManager, Metadatable {
     public static final int DIMENSION_THE_END = 2;
 
     // Lower values use less memory
-    public static final int MAX_BLOCK_CACHE = 512;
+    public static final int MAX_BLOCK_CACHE = 1024;
 
     // The blocks that can randomly tick
     private static final boolean[] randomTickBlocks = new boolean[Block.MAX_BLOCK_ID];
@@ -2646,7 +2646,9 @@ public class Level implements ChunkManager, Metadatable {
 
     public void dropExpOrb(Vector3 source, int exp, Vector3 motion, int delay) {
         Random rand = ThreadLocalRandom.current();
-        for (int split : EntityXPOrb.splitIntoOrbSizes(exp)) {
+        while (exp > 0) {
+            int split = EntityXPOrb.getMaxOrbSize(exp);
+            exp -= split;
             CompoundTag nbt = Entity.getDefaultNBT(source, motion == null ? new Vector3(
                             (rand.nextDouble() * 0.2 - 0.1) * 2,
                             rand.nextDouble() * 0.4,
