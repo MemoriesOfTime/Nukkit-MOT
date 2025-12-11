@@ -53,7 +53,7 @@ public class CommandOutputPacket extends DataPacket {
             putUnsignedVarInt(this.successCount);
         }
         if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-            this.putInt(this.successCount);
+            this.putLInt(this.successCount);
         }
         this.putUnsignedVarInt(messages.size());
         for (var msg : messages) {
