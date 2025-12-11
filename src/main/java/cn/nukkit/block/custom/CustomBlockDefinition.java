@@ -292,6 +292,23 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
          * @param size   碰撞箱的大小 The size of the collision box
          */
         public Builder collisionBox(@NotNull Vector3f origin, @NotNull Vector3f size) {
+
+            float minX = origin.x + 8f;
+            float minY = origin.y;
+            float minZ = origin.z + 8f;
+
+            float maxX = minX + size.x;
+            float maxY = minY + size.y;
+            float maxZ = minZ + size.z;
+            ListTag<CompoundTag> boxes = new ListTag<>();
+            boxes.add(new CompoundTag()
+                    .putFloat("minX", minX)
+                    .putFloat("minY", minY)
+                    .putFloat("minZ", minZ)
+                    .putFloat("maxX", maxX)
+                    .putFloat("maxY", maxY)
+                    .putFloat("maxZ", maxZ));
+
             this.nbt.getCompound("components")
                     .putCompound("minecraft:collision_box", new CompoundTag()
                             .putBoolean("enabled", true)
@@ -302,7 +319,8 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
                             .putList("size", new ListTag<FloatTag>()
                                     .add(new FloatTag(size.x))
                                     .add(new FloatTag(size.y))
-                                    .add(new FloatTag(size.z))));
+                                    .add(new FloatTag(size.z)))
+                            .putList("boxes", boxes));
             return this;
         }
 
