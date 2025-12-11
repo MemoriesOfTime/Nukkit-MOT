@@ -444,13 +444,13 @@ public class AvailableCommandsPacket extends DataPacket {
 
             // Commands\ChainedSubcommandOffsets
             if (this.protocol >= ProtocolInfo.v1_20_10_21) {
-                if (this.protocol >= ProtocolInfo.v1_21_130_28) { // todo: unknown error in sub commands
-                    this.putUnsignedVarInt(0);
-                } else {
-                    this.putUnsignedVarInt(data.subcommands.size());
-                    for (ChainedSubCommandData subcommand : data.subcommands) {
-                        int index = subCommandData.indexOf(subcommand);
-                        checkArgument(index > -1, "Invalid subcommand index: " + subcommand);
+                this.putUnsignedVarInt(data.subcommands.size());
+                for (ChainedSubCommandData subcommand : data.subcommands) {
+                    int index = subCommandData.indexOf(subcommand);
+                    checkArgument(index > -1, "Invalid subcommand index: " + subcommand);
+                    if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+                        this.putLInt(index);
+                    } else {
                         this.putLShort(index);
                     }
                 }
