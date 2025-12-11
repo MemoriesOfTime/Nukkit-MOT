@@ -407,13 +407,8 @@ public class AvailableCommandsPacket extends DataPacket {
                     int second = subCommandValues.indexOf(value.getSecond());
                     checkArgument(second > -1, "Invalid enum value detected: " + value.getSecond());
 
-                    if (this.protocol < ProtocolInfo.v1_21_130_28) {
-                        this.putLShort(first);
-                        this.putLShort(second);
-                    } else {
-                        this.putUnsignedVarInt(first);
-                        this.putUnsignedVarInt(second);
-                    }
+                    this.putUnsignedVarInt(first);
+                    this.putUnsignedVarInt(second);
                 }
             }
         }
