@@ -24,6 +24,7 @@ public final class CommandOriginData {
         this.playerId = playerId;
     }
 
+    @Deprecated
     public OptionalLong getVarLong() {
         if (playerId == null) {
             return OptionalLong.empty();
