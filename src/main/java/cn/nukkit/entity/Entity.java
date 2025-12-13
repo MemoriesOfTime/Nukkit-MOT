@@ -442,6 +442,8 @@ public abstract class Entity extends Location implements Metadatable {
 
     protected EntityDamageEvent lastDamageCause = null;
 
+    private EntityCollisionCache collisionCache;
+
     public List<Block> blocksAround = new ArrayList<>();
     public List<Block> collisionBlocks = new ArrayList<>();
 
@@ -656,6 +658,7 @@ public abstract class Entity extends Location implements Metadatable {
 
         this.init = true;
 
+        this.collisionCache = new EntityCollisionCache(this);
         this.temporalVector = new Vector3();
 
         if (Server.getInstance().netEaseMode) {
@@ -1873,8 +1876,11 @@ public abstract class Entity extends Location implements Metadatable {
      */
     public boolean entityBaseTick(int tickDiff) {
         if (!this.isPlayer) {
-            //this.blocksAround = null; // Use only when entity moves for better performance
-            this.collisionBlocks = null;
+            if ((ticksLived & 1) == 0) {
+                this.collisionBlocks = null;
+
+                collisionCache.cleanupOldCache();
+            }
         }
 
         this.justCreated = false;
@@ -2527,13 +2533,8 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfLava() {
-        for (Block block : this.getCollisionBlocks()) {
-            if (block instanceof BlockLava) {
-                return true;
-            }
-        }
-
-        return false;
+        if (collisionCache == null) collisionCache = new EntityCollisionCache(this);
+        return collisionCache.isInsideSpecialBlock(boundingBox, Block.LAVA);
     }
 
     public boolean isInsideOfSolid() {
@@ -2551,13 +2552,8 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfFire() {
-        for (Block block : this.getCollisionBlocks()) {
-            if (block instanceof BlockFire) {
-                return true;
-            }
-        }
-
-        return false;
+        if (collisionCache == null) collisionCache = new EntityCollisionCache(this);
+        return collisionCache.isInsideSpecialBlock(boundingBox, Block.FIRE);
     }
 
     public boolean fastMove(double dx, double dy, double dz) {
@@ -2727,103 +2723,32 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public List<Block> getBlocksAround() {
-        if (this.blocksAround == null) {
-            AxisAlignedBB bb = this.boundingBox;
-            int minX = NukkitMath.floorDouble(bb.getMinX());
-            int minY = Math.max(NukkitMath.floorDouble(bb.getMinY()), this.level.getMinBlockY());
-            int minZ = NukkitMath.floorDouble(bb.getMinZ());
-            int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-            int maxY = Math.min(NukkitMath.ceilDouble(bb.getMaxY()), this.level.getMaxBlockY());
-            int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
+        List<Block> blocksAround = collisionCache.getBlocksInBoundingBox(this.boundingBox);
 
-            int sizeX = maxX - minX + 1;
-            int sizeY = maxY - minY + 1;
-            int sizeZ = maxZ - minZ + 1;
-
-            if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) {
-                return new ArrayList<>();
-            }
-
-            this.blocksAround = new ArrayList<>(sizeX * sizeY * sizeZ);
-
-            try {
-                if (!this.level.isYInRange(minY) && !this.level.isYInRange(maxY)) {
-                    return this.blocksAround;
-                }
-                for (int x = minX; x <= maxX; x++) {
-                    for (int z = minZ; z <= maxZ; z++) {
-                        for (int y = minY; y <= maxY; y++) {
-                            Block block = this.level.getBlock(x, y, z, false);
-                            this.blocksAround.add(block);
-                        }
-                    }
-                }
-            } catch (NullPointerException e) {
-                // 异步传送导致空指针 忽略结果
-                return new ArrayList<>();
-            }
-        }
-        return this.blocksAround;
-    }
-
-    public List<Block> getCollisionBlocks() {
-        if (this.collisionBlocks == null) {
-            this.collisionBlocks = new ArrayList<>();
-
-            AxisAlignedBB bb = this.boundingBox.clone();
-            double speed = this.motionX * this.motionX + this.motionY * this.motionY + this.motionZ * this.motionZ;
-            double expand = Math.max(0.5, Math.sqrt(speed) * 1.5);
-
-            AxisAlignedBB expandedBB = bb.grow(expand, expand, expand);
-            List<Block> blocks = getBlocksInBoundingBox(expandedBB);
-
-            for (Block block : blocks) {
-                if (block.getId() == Block.NETHER_PORTAL) {
-                    AxisAlignedBB portalBB = new SimpleAxisAlignedBB(
-                            block.x, block.y, block.z,
-                            block.x + 1, block.y + 1, block.z + 1
-                    );
-
-                    double motionAbsX = Math.abs(this.motionX), motionAbsY = Math.abs(this.motionY), motionAbsZ = Math.abs(this.motionZ);
-                    AxisAlignedBB trajectoryBB = bb.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3);
-
-                    if (trajectoryBB.intersectsWith(portalBB)) {
-                        this.collisionBlocks.add(block);
-                    }
-                } else if (block.collidesWithBB(bb, true)) {
-                    this.collisionBlocks.add(block);
-                }
-            }
-        }
-        return this.collisionBlocks;
-    }
-
-    private List<Block> getBlocksInBoundingBox(AxisAlignedBB bb) {
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = Math.max(NukkitMath.floorDouble(bb.getMinY()), this.level.getMinBlockY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = Math.min(NukkitMath.ceilDouble(bb.getMaxY()), this.level.getMaxBlockY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
-
-        int sizeX = maxX - minX + 1;
-        int sizeY = maxY - minY + 1;
-        int sizeZ = maxZ - minZ + 1;
-
-        if (sizeX <= 0 || sizeY <= 0 || sizeZ <= 0) {
+        if (!blocksAround.isEmpty()) {
+            this.blocksAround = blocksAround;
+        } else {
             return new ArrayList<>();
         }
 
-        List<Block> blocks = new ArrayList<>(sizeX * sizeY * sizeZ);
-        for (int x = minX; x <= maxX; x++) {
-            for (int y = minY; y <= maxY; y++) {
-                for (int z = minZ; z <= maxZ; z++) {
-                    Block block = this.level.getBlock(x, y, z, false);
-                    if (block != null) blocks.add(block);
-                }
-            }
+        return blocksAround;
+    }
+
+    public List<Block> getCollisionBlocks() {
+        List<Block> collisionBlocks = collisionCache.getCollisionBlocks(
+                this.boundingBox,
+                this.motionX,
+                this.motionY,
+                this.motionZ
+        );
+
+        if (!collisionBlocks.isEmpty()) {
+            this.collisionBlocks = collisionBlocks;
+        } else {
+            return new ArrayList<>();
         }
-        return blocks;
+
+        return collisionBlocks;
     }
 
     /**

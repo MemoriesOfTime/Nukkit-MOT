@@ -3,6 +3,7 @@ package cn.nukkit.entity;
 import cn.nukkit.block.Block;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
@@ -29,30 +30,40 @@ public abstract class EntitySwimming extends BaseEntity {
         }
 
         Vector3 target = this.target;
-        if (!(target instanceof EntityCreature) || (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) || !((Entity) target).canBeFollowed()) {
-            double near = Integer.MAX_VALUE;
-            for (Entity entity : this.getLevel().getEntities()) {
-                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
-                    continue;
-                }
-
-                if (creature instanceof BaseEntity && ((BaseEntity) creature).isFriendly() == this.isFriendly()) {
-                    continue;
-                }
-
-                double distance = this.distanceSquared(creature);
-                if (distance > near || !this.targetOption(creature, distance)) {
-                    continue;
-                }
-                near = distance;
-
-                this.stayTime = 0;
-                this.moveTime = 0;
-                this.target = creature;
-            }
+        if (target instanceof EntityCreature creature &&
+                !creature.closed &&
+                creature.isAlive() &&
+                creature.canBeFollowed() &&
+                this.targetOption(creature, this.distanceSquared(target))) {
+            return;
         }
 
-        if (this.target instanceof EntityCreature && !((EntityCreature) this.target).closed && ((EntityCreature) this.target).isAlive() && this.targetOption((EntityCreature) this.target, this.distanceSquared(this.target))) {
+        double near = Integer.MAX_VALUE;
+
+        AxisAlignedBB searchBox = this.boundingBox.clone().grow(16, 8, 16);
+        for (Entity entity : this.getLevel().getNearbyEntities(searchBox, this)) {
+            if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
+                continue;
+            }
+
+            if (creature instanceof BaseEntity base && base.isFriendly() == this.isFriendly()) {
+                continue;
+            }
+
+            double distance = this.distanceSquared(creature);
+            if (distance > near || !this.targetOption(creature, distance)) {
+                continue;
+            }
+            near = distance;
+            this.stayTime = 0;
+            this.moveTime = 0;
+            this.target = creature;
+        }
+
+        if (this.target instanceof EntityCreature &&
+                !((EntityCreature) this.target).closed &&
+                ((EntityCreature) this.target).isAlive() &&
+                this.targetOption((EntityCreature) this.target, this.distanceSquared(this.target))) {
             return;
         }
 

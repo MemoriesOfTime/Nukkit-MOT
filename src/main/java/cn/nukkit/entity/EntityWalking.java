@@ -11,6 +11,7 @@ import cn.nukkit.entity.route.RouteFinderSearchTask;
 import cn.nukkit.entity.route.RouteFinderThreadPool;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.BubbleParticle;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
@@ -48,12 +49,13 @@ public abstract class EntityWalking extends BaseEntity {
         }
 
         double near = Integer.MAX_VALUE;
-        for (Entity entity : this.getLevel().getEntities()) {
+        AxisAlignedBB searchBox = this.boundingBox.clone().grow(24, 8, 24);
+        for (Entity entity : this.getLevel().getNearbyEntities(searchBox, this)) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }
 
-            if (creature instanceof BaseEntity baseEntity && baseEntity.isFriendly() == this.isFriendly() && !this.isInLove()) {
+            if (creature instanceof BaseEntity base && base.isFriendly() == this.isFriendly() && !this.isInLove()) {
                 continue;
             }
 
@@ -62,7 +64,6 @@ public abstract class EntityWalking extends BaseEntity {
                 continue;
             }
             near = distance;
-
             this.stayTime = 0;
             this.moveTime = 0;
             this.followTarget = creature;
