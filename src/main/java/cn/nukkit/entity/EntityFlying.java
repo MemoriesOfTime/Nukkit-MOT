@@ -121,11 +121,12 @@ public abstract class EntityFlying extends BaseEntity {
                 }
 
                 Vector3 before = this.target;
+                // It should not be called every tick
                 if (checkTargetCooldown-- <= 0) {
                     if (this.isLookupForTarget()) {
                         checkTarget();
                     }
-                    checkTargetCooldown = 10;
+                    checkTargetCooldown = this.getServer().mobFollowTicks;
                 }
                 if (this.target instanceof EntityCreature || before != this.target) {
                     double x = this.target.x - this.x;

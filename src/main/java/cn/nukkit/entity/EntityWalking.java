@@ -220,11 +220,12 @@ public abstract class EntityWalking extends BaseEntity {
                     }
                 }
 
+                // It should not be called every tick
                 if (checkTargetCooldown-- <= 0) {
                     if (this.isLookupForTarget()) {
                         checkTarget();
                     }
-                    checkTargetCooldown = 10;
+                    checkTargetCooldown = this.getServer().mobFollowTicks;
                 }
                 if (this.target != null || !this.isLookupForTarget()) {
                     double x = this.target.x - this.x;
