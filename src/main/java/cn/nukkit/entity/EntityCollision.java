@@ -8,7 +8,7 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 
 import java.util.*;
 
-public class EntityCollisionCache {
+public class EntityCollision {
     private static final int BLOCK_CACHE_SIZE = 512;
     private static final int BLOCK_CACHE_MASK = BLOCK_CACHE_SIZE - 1;
     private static final int CHUNK_CACHE_SIZE = 64;
@@ -32,7 +32,7 @@ public class EntityCollisionCache {
     private long lastCheckTick = 0;
     private byte insideCache = 0;
 
-    public EntityCollisionCache(Entity entity) {
+    public EntityCollision(Entity entity) {
         this.entity = entity;
     }
 

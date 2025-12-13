@@ -2,17 +2,23 @@ package cn.nukkit.entity;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
+
 import org.apache.commons.math3.util.FastMath;
 
 public abstract class EntityFlying extends BaseEntity {
 
+    private final AxisAlignedBB searchBox;
+    private int checkTargetCooldown = 0;
+
     public EntityFlying(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
         this.noFallDamage = true;
+        this.searchBox = EntityRanges.createTargetSearchBox(this);
     }
 
     protected void checkTarget() {
@@ -25,14 +31,17 @@ public abstract class EntityFlying extends BaseEntity {
         }
 
         Vector3 target = this.target;
-        if (!(target instanceof EntityCreature) || (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) || !((Entity) target).canBeFollowed()) {
+        if (!(target instanceof EntityCreature) ||
+                (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) ||
+                !((Entity) target).canBeFollowed()) {
+
             double near = Integer.MAX_VALUE;
-            for (Entity entity : this.getLevel().getEntities()) {
-                if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
+            for (Entity entity : this.getLevel().getNearbyEntities(this.searchBox, this)) {
+                if (!(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }
 
-                if (creature instanceof BaseEntity && ((BaseEntity) creature).isFriendly() == this.isFriendly()) {
+                if (creature instanceof BaseEntity base && base.isFriendly() == this.isFriendly()) {
                     continue;
                 }
 
@@ -40,15 +49,17 @@ public abstract class EntityFlying extends BaseEntity {
                 if (distance > near || !this.targetOption(creature, distance)) {
                     continue;
                 }
-                near = distance;
 
+                near = distance;
                 this.stayTime = 0;
                 this.moveTime = 0;
                 this.target = creature;
             }
         }
 
-        if (this.target instanceof EntityCreature && !((EntityCreature) this.target).closed && ((EntityCreature) this.target).isAlive() && this.targetOption((EntityCreature) this.target, this.distanceSquared(this.target))) {
+        if (this.target instanceof EntityCreature creature &&
+                !creature.closed && creature.isAlive() &&
+                this.targetOption(creature, this.distanceSquared(this.target))) {
             return;
         }
 
@@ -57,7 +68,6 @@ public abstract class EntityFlying extends BaseEntity {
             if (Utils.rand(1, 100) > 5) {
                 return;
             }
-
             x = Utils.rand(10, 30);
             z = Utils.rand(10, 30);
             this.target = this.add(Utils.rand() ? x : -x, 0, Utils.rand() ? z : -z);
@@ -111,7 +121,12 @@ public abstract class EntityFlying extends BaseEntity {
                 }
 
                 Vector3 before = this.target;
-                this.checkTarget();
+                if (checkTargetCooldown-- <= 0) {
+                    if (this.isLookupForTarget()) {
+                        checkTarget();
+                    }
+                    checkTargetCooldown = 10;
+                }
                 if (this.target instanceof EntityCreature || before != this.target) {
                     double x = this.target.x - this.x;
                     double y = this.target.y - this.y;

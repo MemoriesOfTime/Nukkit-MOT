@@ -442,7 +442,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     protected EntityDamageEvent lastDamageCause = null;
 
-    private EntityCollisionCache collisionCache;
+    private EntityCollision collisionCache;
 
     public List<Block> blocksAround = new ArrayList<>();
     public List<Block> collisionBlocks = new ArrayList<>();
@@ -658,7 +658,7 @@ public abstract class Entity extends Location implements Metadatable {
 
         this.init = true;
 
-        this.collisionCache = new EntityCollisionCache(this);
+        this.collisionCache = new EntityCollision(this);
         this.temporalVector = new Vector3();
 
         if (Server.getInstance().netEaseMode) {
@@ -2533,7 +2533,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfLava() {
-        if (collisionCache == null) collisionCache = new EntityCollisionCache(this);
+        if (collisionCache == null) collisionCache = new EntityCollision(this);
         return collisionCache.isInsideSpecialBlock(boundingBox, Block.LAVA);
     }
 
@@ -2552,7 +2552,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfFire() {
-        if (collisionCache == null) collisionCache = new EntityCollisionCache(this);
+        if (collisionCache == null) collisionCache = new EntityCollision(this);
         return collisionCache.isInsideSpecialBlock(boundingBox, Block.FIRE);
     }
 

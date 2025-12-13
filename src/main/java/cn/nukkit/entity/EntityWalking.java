@@ -25,12 +25,16 @@ public abstract class EntityWalking extends BaseEntity {
 
     private static final double FLOW_MULTIPLIER = 0.1;
 
+    private final AxisAlignedBB searchBox;
+    private int checkTargetCooldown = 0;
+
     @Getter
     @Setter
     protected RouteFinder route;
 
     public EntityWalking(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+        this.searchBox = EntityRanges.createTargetSearchBox(this);
     }
 
     protected void checkTarget() {
@@ -49,8 +53,7 @@ public abstract class EntityWalking extends BaseEntity {
         }
 
         double near = Integer.MAX_VALUE;
-        AxisAlignedBB searchBox = this.boundingBox.clone().grow(24, 8, 24);
-        for (Entity entity : this.getLevel().getNearbyEntities(searchBox, this)) {
+        for (Entity entity : this.getLevel().getNearbyEntities(this.searchBox, this)) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }
@@ -63,6 +66,7 @@ public abstract class EntityWalking extends BaseEntity {
             if (distance > near || !this.targetOption(creature, distance)) {
                 continue;
             }
+
             near = distance;
             this.stayTime = 0;
             this.moveTime = 0;
@@ -216,8 +220,11 @@ public abstract class EntityWalking extends BaseEntity {
                     }
                 }
 
-                if (this.isLookupForTarget()) {
-                    this.checkTarget();
+                if (checkTargetCooldown-- <= 0) {
+                    if (this.isLookupForTarget()) {
+                        checkTarget();
+                    }
+                    checkTargetCooldown = 10;
                 }
                 if (this.target != null || !this.isLookupForTarget()) {
                     double x = this.target.x - this.x;
