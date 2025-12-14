@@ -640,7 +640,7 @@ public class Server {
         this.consoleThread.start();
         this.console.setExecutingCommands(true);
 
-        log.info("Loading server properties...");
+        log.info("Loading server settings...");
         this.settingsLoader = new SettingsLoader(Path.of(this.dataPath));
         this.settings = this.settingsLoader.load();
 
@@ -671,8 +671,8 @@ public class Server {
         }
         this.baseLang = new BaseLang(this.settings.server().language());
         computeThreadPool = new ForkJoinPool(Math.min(0x7fff, Runtime.getRuntime().availableProcessors()), new ComputeThreadPoolThreadFactory(), null, false);
-        Object poolSize = "auto";
 
+        Object poolSize = this.settings.network().asyncWorkers();
         try {
             poolSize = Integer.valueOf((String) poolSize);
         } catch (Exception e) {
@@ -1092,7 +1092,9 @@ public class Server {
         this.pluginManager.clearPlugins();
         this.commandMap.clearCommands();
 
-        log.info("Reloading properties...");
+        log.info("Reloading settings...");
+
+        this.settings = this.settingsLoader.load();
 
         this.maxPlayers = this.settings.players().maxPlayers();
         if (this.isHardcore && this.difficulty < 3) {
@@ -2518,14 +2520,14 @@ public class Server {
     }
 
     /**
-     * Get a string value from server.properties
+     * Get a string value from server settings
      *
-     * @param key key
+     * @param variable variable
      * @param defaultValue default value
      * @return value
      */
-    public String getPropertyString(String key, String defaultValue) {
-        return switch (key) {
+    public String getPropertyString(String variable, String defaultValue) {
+        return switch (variable) {
             case "motd" -> settings.server().motd();
             case "sub-motd" -> settings.server().subMotd();
             case "server-ip" -> settings.network().ip();
@@ -2556,6 +2558,13 @@ public class Server {
         return getPropertyInt(variable, 0);
     }
 
+    /**
+     * Get a int value from server settings
+     *
+     * @param variable variable
+     * @param defaultValue default value
+     * @return value
+     */
     public int getPropertyInt(String variable, Integer defaultValue) {
         try {
             return switch (variable) {
@@ -2604,6 +2613,13 @@ public class Server {
         return getPropertyBoolean(variable, false);
     }
 
+    /**
+     * Get a boolean value from server settings
+     *
+     * @param variable variable
+     * @param defaultValue default value
+     * @return value
+     */
     public boolean getPropertyBoolean(String variable, Object defaultValue) {
         return switch (variable) {
             case "white-list" -> settings.players().whitelist();
