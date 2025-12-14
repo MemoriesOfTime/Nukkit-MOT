@@ -63,7 +63,7 @@ public abstract class EntityWalking extends BaseEntity {
             }
 
             double distance = this.distanceSquared(creature);
-            if (distance > near || !this.targetOption(creature, distance)) {
+            if (distance > near || !this.targetOption(creature, distance) || !this.canSee(creature)) {
                 continue;
             }
 
@@ -104,6 +104,37 @@ public abstract class EntityWalking extends BaseEntity {
             }
             this.target = new Vector3(tx, this.y + Utils.rand(-20.0, 20.0) / 10, tz);
         }
+    }
+
+    protected boolean canSee(Entity target) {
+        Vector3 eyes = this.getPosition().add(0, this.getEyeHeight(), 0);
+        Vector3 targetEyes = target.getPosition().add(0, target.getEyeHeight(), 0);
+
+        Vector3 direction = targetEyes.subtract(eyes);
+        double distance = direction.length();
+        if (distance == 0) return true;
+
+        direction = direction.normalize();
+        int steps = (int) Math.ceil(distance * 2);
+        Vector3 step = direction.multiply(0.5);
+
+        Vector3 current = eyes.clone();
+        for (int i = 0; i < steps; i++) {
+            current = current.add(step);
+            int blockId = this.level.getBlockIdAt(NukkitMath.floorDouble(current.x), NukkitMath.floorDouble(current.y), NukkitMath.floorDouble(current.z));
+
+            if (blockId == 0) continue;
+
+            Block block = Block.get(blockId);
+            if (block instanceof BlockSlab || block instanceof BlockStairs || block instanceof BlockFence || block instanceof BlockFenceGate) {
+                continue;
+            }
+
+            if (!block.canPassThrough()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     protected boolean checkJump(double dx, double dz) {
