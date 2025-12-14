@@ -4,6 +4,8 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.blockentity.*;
 import cn.nukkit.command.*;
+import cn.nukkit.config.Settings;
+import cn.nukkit.config.SettingsLoader;
 import cn.nukkit.console.NukkitConsole;
 import cn.nukkit.dispenser.DispenseBehaviorRegister;
 import cn.nukkit.entity.Attribute;
@@ -111,6 +113,7 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.*;
 import java.util.List;
 import java.util.*;
@@ -203,7 +206,9 @@ public class Server {
     private QueryHandler queryHandler;
     private QueryRegenerateEvent queryRegenerateEvent;
     private final UUID serverID;
-    private final Config properties;
+
+    private Settings settings;
+    private final SettingsLoader settingsLoader;
 
     private final Map<InetSocketAddress, Player> players = new HashMap<>();
     final Map<UUID, Player> playerList = new HashMap<>();
@@ -361,6 +366,12 @@ public class Server {
      * Disable player interaction spam limiter.
      */
     public boolean doNotLimitInteractions;
+    /**
+     * Delay between determining the mob's target.
+     * Low value - low performance, fast target detection
+     * High value - high performance, long target detection
+     */
+    public int mobFollowTicks;
     /**
      * After how many ticks mobs are despawned.
      */
@@ -630,19 +641,19 @@ public class Server {
         this.console.setExecutingCommands(true);
 
         log.info("Loading server properties...");
-        this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ServerProperties());
+        this.settingsLoader = new SettingsLoader(Path.of(this.dataPath));
+        this.settings = this.settingsLoader.load();
 
-        if (!this.getPropertyBoolean("ansi-title", true)) {
+        initFieldsFromSettings();
+
+        if (!this.settings.server().ansiTitle()) {
             Nukkit.TITLE = false;
         }
-
-        int debugLvl = NukkitMath.clamp(this.getPropertyInt("debug-level", 1), 1, 3);
+        int debugLvl = NukkitMath.clamp(this.settings.debug().debugLevel(), 1, 3);
         if (debug && debugLvl < 2) {
             debugLvl = 2;
         }
         Nukkit.DEBUG = debugLvl;
-
-        this.loadSettings();
 
         this.automaticBugReport = this.getPropertyBoolean("automatic-bug-report", false);
         if (this.automaticBugReport) {
@@ -655,22 +666,17 @@ public class Server {
                 options.setTag("branch", Nukkit.getBranch());
             });
         }
-
-        if (!new File(dataPath + "players/").exists() && this.shouldSavePlayerData) {
+        if (!new File(dataPath + "players/").exists() && this.settings.players().savePlayerData()) {
             new File(dataPath + "players/").mkdirs();
         }
-
-        this.baseLang = new BaseLang(this.getPropertyString("language", BaseLang.FALLBACK_LANGUAGE));
-
+        this.baseLang = new BaseLang(this.settings.server().language());
         computeThreadPool = new ForkJoinPool(Math.min(0x7fff, Runtime.getRuntime().availableProcessors()), new ComputeThreadPoolThreadFactory(), null, false);
+        Object poolSize = "auto";
 
-        Object poolSize = this.getProperty("async-workers", "auto");
-        if (!(poolSize instanceof Integer)) {
-            try {
-                poolSize = Integer.valueOf((String) poolSize);
-            } catch (Exception e) {
-                poolSize = Math.max(Runtime.getRuntime().availableProcessors() + 1, 4);
-            }
+        try {
+            poolSize = Integer.valueOf((String) poolSize);
+        } catch (Exception e) {
+            poolSize = Math.max(Runtime.getRuntime().availableProcessors() + 1, 4);
         }
 
         ServerScheduler.WORKERS = (int) poolSize;
@@ -680,10 +686,9 @@ public class Server {
         this.scheduler = new ServerScheduler();
 
         this.batchingHelper = new BatchingHelper();
-
-        if (this.getPropertyBoolean("enable-rcon", false)) {
+        if (this.settings.network().enableRcon()) {
             try {
-                this.rcon = new RCON(this, this.getPropertyString("rcon.password", ""), (!this.getIp().isEmpty()) ? this.getIp() : "0.0.0.0", this.getPropertyInt("rcon.port", this.getPort()));
+                this.rcon = new RCON(this, this.settings.network().rconPassword(), (!this.settings.network().ip().isEmpty()) ? this.settings.network().ip() : "0.0.0.0", this.settings.network().rconPort());
             } catch (IllegalArgumentException e) {
                 log.error(baseLang.translateString(e.getMessage(), e.getCause().getMessage()));
             }
@@ -702,16 +707,17 @@ public class Server {
         this.banByIP = new BanList(this.dataPath + "banned-ips.json");
         this.banByIP.load();
 
-        this.maxPlayers = this.getPropertyInt("max-players", 50);
-        this.setAutoSave(this.getPropertyBoolean("auto-save", true));
+        this.maxPlayers = this.settings.players().maxPlayers();
+        this.setAutoSave(this.settings.performance().ticksPerAutosave() > 0);
 
-        this.autoCompaction = this.getPropertyBoolean("level-auto-compaction", true);
-        this.autoCompactionTicks = Math.max(60 * 20, this.getPropertyInt("level-auto-compaction-ticks", 60 * 30 * 20));
+        this.autoCompaction = this.settings.world().levelAutoCompaction();
+        this.autoCompactionTicks = Math.max(60 * 20, this.settings.world().levelAutoCompactionTicks());
 
+        this.isHardcore = this.settings.features().hardcore();
         if (this.isHardcore && this.difficulty < 3) {
             this.setDifficulty(3);
         } else {
-            this.setDifficulty(getDifficultyFromString(this.getPropertyString("difficulty", "2")));
+            this.setDifficulty(getDifficultyFromString(this.settings.features().difficulty()));
         }
 
         org.apache.logging.log4j.Level currentLevel = Nukkit.getLogLevel();
@@ -756,8 +762,7 @@ public class Server {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-        if (this.savePlayerDataByUuid) {
+        if (this.settings.players().savePlayerDataByUuid()) {
             convertLegacyPlayerData();
         }
 
@@ -767,7 +772,7 @@ public class Server {
         HashSet<ResourcePackLoader> packLoaders = new HashSet<>();
         packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")));
         packLoaders.add(new JarPluginResourcePackLoader(new File(this.pluginPath)));
-        if (this.netEaseMode) {
+        if (this.settings.integration().neteaseClientSupport()) {
             packLoaders.add(new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs_netease"), ResourcePack.SupportType.NETEASE));
             packLoaders.add(new ZippedBehaviourPackLoader(new File(Nukkit.DATA_PATH, "behaviour_packs_netease"), ResourcePack.SupportType.NETEASE));
         }
@@ -782,14 +787,14 @@ public class Server {
 
         log.info(this.baseLang.translateString("nukkit.server.networkStart", new String[]{this.getIp().isEmpty() ? "*" : this.getIp(), String.valueOf(this.getPort())}));
         this.network = new Network(this);
-        this.network.setName(this.getMotd());
-        this.network.setSubName(this.getSubMotd());
+        this.network.setName(this.settings.server().motd());
+        this.network.setSubName(this.settings.server().subMotd());
         this.network.registerInterface(new RakNetInterface(this));
 
         this.pluginManager.loadInternalPlugin();
         if (loadPlugins) {
             this.pluginManager.loadPlugins(this.pluginPath);
-            if (this.enableSpark) {
+            if (this.settings.integration().enableSpark()) {
                 SparkInstaller.initSpark(this);
             }
             this.enablePlugins(PluginLoadOrder.STARTUP);
@@ -819,7 +824,7 @@ public class Server {
         Generator.addGenerator(cn.nukkit.level.generator.Void.class, "void", Generator.TYPE_VOID);
 
         if (this.defaultLevel == null) {
-            String defaultName = this.getPropertyString("level-name", "world");
+            String defaultName = this.settings.world().levelName();
             if (defaultName == null || defaultName.trim().isEmpty()) {
                 this.getLogger().warning("level-name cannot be null, using default");
                 defaultName = "world";
@@ -828,7 +833,7 @@ public class Server {
 
             if (!this.loadLevel(defaultName)) {
                 long seed;
-                String seedString = String.valueOf(this.getProperty("level-seed", System.currentTimeMillis()));
+                String seedString = String.valueOf(System.currentTimeMillis());
                 try {
                     seed = Long.parseLong(seedString);
                 } catch (NumberFormatException e) {
@@ -839,9 +844,6 @@ public class Server {
 
             this.setDefaultLevel(this.getLevelByName(defaultName));
         }
-
-        this.properties.save(true);
-
         if (this.defaultLevel == null) {
             this.getLogger().emergency(this.baseLang.translateString("nukkit.level.defaultError"));
             this.forceShutdown();
@@ -854,9 +856,7 @@ public class Server {
             Position spawn = level.getSpawnLocation();
             level.populateChunk(spawn.getChunkX(), spawn.getChunkZ(), true);
         }
-
-        // Load levels
-        if (this.getPropertyBoolean("load-all-worlds", true)) {
+        if (this.settings.world().loadAllWorlds()) {
             try {
                 for (File fs : new File(new File("").getCanonicalPath() + "/worlds/").listFiles()) {
                     if ((fs.isDirectory() && !this.isLevelLoaded(fs.getName()))) {
@@ -877,12 +877,12 @@ public class Server {
         EntityProperty.buildPacket();
         EntityProperty.buildPlayerProperty();
 
-        if (this.getPropertyBoolean("thread-watchdog", true)) {
-            this.watchdog = new Watchdog(this, this.getPropertyInt("thread-watchdog-tick", 60000));
+        if (this.settings.debug().debugLevel() >= 1) {
+            this.watchdog = new Watchdog(this, 60000);
             this.watchdog.start();
         }
 
-        String worlds1 = Server.getInstance().getPropertyString("worlds-entity-spawning-disabled");
+        String worlds1 = this.settings.world().disabledSpawnWorlds();
         if (!worlds1.trim().isEmpty()) {
             StringTokenizer tokenizer = new StringTokenizer(worlds1, ", ");
             while (tokenizer.hasMoreTokens()) {
@@ -890,7 +890,7 @@ public class Server {
             }
         }
 
-        String worlds2 = Server.getInstance().getPropertyString("worlds-level-auto-save-disabled");
+        String worlds2 = this.settings.world().nonAutoSaveWorlds();
         if (!worlds2.trim().isEmpty()) {
             StringTokenizer tokenizer = new StringTokenizer(worlds2, ", ");
             while (tokenizer.hasMoreTokens()) {
@@ -898,18 +898,16 @@ public class Server {
             }
         }
 
-        if (this.getPropertyBoolean("entity-auto-spawn-task", true)) {
+        if (this.settings.performance().entityAutoSpawnTask()) {
             this.spawnerTask = new SpawnerTask();
-            int spawnerTicks = Math.max(this.getPropertyInt("ticks-per-entity-spawns", 200), 2) >> 1; // Run the spawner on 2x speed but spawn only either monsters or animals
+            int spawnerTicks = Math.max(this.settings.performance().ticksPerAutosave() / 10, 2) >> 1;
             this.scheduler.scheduleDelayedRepeatingTask(InternalPlugin.INSTANCE, this.spawnerTask, spawnerTicks, spawnerTicks);
         }
 
-        if (this.getPropertyBoolean("bstats-metrics", true)) {
+        if (this.settings.debug().bstatsMetrics()) {
             new NukkitMetrics(this);
         }
-
-        // 触发一次，加载JwtConsumerHolder
-        if (this.xboxAuth) {
+        if (this.settings.security().xboxAuth()) {
             try {
                 EncryptionUtils.validateToken(AuthType.FULL, "");
             } catch (InvalidJwtException ignored) {
@@ -1095,14 +1093,11 @@ public class Server {
         this.commandMap.clearCommands();
 
         log.info("Reloading properties...");
-        this.properties.reload();
-        this.maxPlayers = this.getPropertyInt("max-players", 50);
 
+        this.maxPlayers = this.settings.players().maxPlayers();
         if (this.isHardcore && this.difficulty < 3) {
             this.setDifficulty(3);
         }
-
-        this.loadSettings();
 
         this.banByIP.load();
         this.banByName.load();
@@ -1117,7 +1112,7 @@ public class Server {
 
         this.pluginManager.registerInterface(JavaPluginLoader.class);
         this.pluginManager.loadPlugins(this.pluginPath);
-        if (this.enableSpark) {
+        if (this.settings.integration().enableSpark()) {
             SparkInstaller.initSpark(this);
         }
         this.enablePlugins(PluginLoadOrder.STARTUP);
@@ -1129,7 +1124,7 @@ public class Server {
     }
 
     public void forceShutdown() {
-        this.forceShutdown(this.getPropertyString("shutdown-message", "§cServer closed").replace("§n", "\n"));
+        this.forceShutdown(this.settings.server().shutdownMessage().replace("§n", "\n"));
     }
 
     public void forceShutdown(String reason) {
@@ -1205,7 +1200,7 @@ public class Server {
     }
 
     public void start() {
-        if (this.getPropertyBoolean("enable-query", true)) {
+        if (this.settings.network().enableQuery()) {
             this.queryHandler = new QueryHandler();
         }
 
@@ -1584,8 +1579,6 @@ public class Server {
         System.out.print((char) 0x1b + "]0;" + Nukkit.NUKKIT +
                 " | Online " + this.players.size() + '/' + this.maxPlayers +
                 " | Memory " + Math.round(used / max * 100) + '%' +
-                /*" | U " + NukkitMath.round((this.network.getUpload() / 1024 * 1000), 2) +
-                " D " + NukkitMath.round((this.network.getDownload() / 1024 * 1000), 2) + " kB/s" +*/
                 " | TPS " + this.getTicksPerSecond() +
                 " | Load " + this.getTickUsage() + '%' + (char) 0x07);
     }
@@ -1679,7 +1672,7 @@ public class Server {
     }
 
     public String getLevelType() {
-        return this.getPropertyString("level-type", "default");
+        return this.settings.world().levelType();
     }
 
     public int getGamemode() {
@@ -1737,7 +1730,6 @@ public class Server {
         if (value < 0) value = 0;
         if (value > 3) value = 3;
         this.difficulty = value;
-        this.setPropertyInt("difficulty", value);
     }
 
     public boolean hasWhitelist() {
@@ -1768,9 +1760,7 @@ public class Server {
     }
 
     public String getSubMotd() {
-        String sub = this.getPropertyString("sub-motd", "Powered by Nukkit");
-        if (sub.isEmpty()) sub = "Powered by Nukkit";
-        return sub;
+        return this.settings.server().subMotd();
     }
 
     public boolean getForceResources() {
@@ -1938,7 +1928,7 @@ public class Server {
     }
 
     public CompoundTag getOfflinePlayerData(String name, boolean create) {
-        if (this.savePlayerDataByUuid) {
+        if (this.settings.players().savePlayerDataByUuid()) {
             Optional<UUID> uuid = lookupName(name);
             return getOfflinePlayerDataInternal(uuid.map(UUID::toString).orElse(name), true, create);
         } else {
@@ -2416,7 +2406,7 @@ public class Server {
         }
 
         if (!options.containsKey("preset")) {
-            options.put("preset", this.getPropertyString("generator-settings", ""));
+            options.put("preset", this.settings.world().generatorSettings());
         }
 
         if (generator == null) {
@@ -2508,55 +2498,23 @@ public class Server {
         return network;
     }
 
-    /**
-     * Get server.properties
-     *
-     * @return server.properties as a Config
-     */
-    public Config getProperties() {
-        return this.properties;
+    public void setPropertyString(String key, String value) {
+        settingsLoader.setProperty(settings, key, value);
+        this.settings = settingsLoader.load();
     }
 
-    /**
-     * Get a value from server.properties
-     *
-     * @param variable key
-     * @return value
-     */
-    public Object getProperty(String variable) {
-        return this.getProperty(variable, null);
+    public void setPropertyInt(String key, int value) {
+        settingsLoader.setProperty(settings, key, value);
+        this.settings = settingsLoader.load();
     }
 
-    /**
-     * Get a value from server.properties
-     *
-     * @param variable key
-     * @param defaultValue default value
-     * @return value
-     */
-    public Object getProperty(String variable, Object defaultValue) {
-        return this.properties.exists(variable) ? this.properties.get(variable) : defaultValue;
+    public void setPropertyBoolean(String key, boolean value) {
+        settingsLoader.setProperty(settings, key, value);
+        this.settings = settingsLoader.load();
     }
 
-    /**
-     * Set a string value in server.properties
-     *
-     * @param variable key
-     * @param value value
-     */
-    public void setPropertyString(String variable, String value) {
-        this.properties.set(variable, value);
-        this.properties.save();
-    }
-
-    /**
-     * Get a string value from server.properties
-     *
-     * @param key key
-     * @return value
-     */
     public String getPropertyString(String key) {
-        return this.getPropertyString(key, null);
+        return getPropertyString(key, null);
     }
 
     /**
@@ -2567,89 +2525,157 @@ public class Server {
      * @return value
      */
     public String getPropertyString(String key, String defaultValue) {
-        return this.properties.exists(key) ? this.properties.get(key).toString() : defaultValue;
-    }
-
-    /**
-     * Get an int value from server.properties
-     *
-     * @param variable key
-     * @return value
-     */
-    public int getPropertyInt(String variable) {
-        return this.getPropertyInt(variable, null);
-    }
-
-    /**
-     * Get an int value from server.properties
-     *
-     * @param variable key
-     * @param defaultValue default value
-     * @return value
-     */
-    public int getPropertyInt(String variable, Integer defaultValue) {
-        Object value = this.properties.get(variable);
-        if (value == null) {
-            value = defaultValue;
-        }
-        if (value instanceof Integer) {
-            return (Integer) value;
-        }
-        String trimmed = String.valueOf(value).trim();
-        if (trimmed.isEmpty()) {
-            return defaultValue;
-        }
-        return Integer.parseInt(trimmed);
-    }
-
-    /**
-     * Set an int value in server.properties
-     *
-     * @param variable key
-     * @param value value
-     */
-    public void setPropertyInt(String variable, int value) {
-        this.properties.set(variable, value);
-        this.properties.save();
-    }
-
-    /**
-     * Get a boolean value from server.properties
-     *
-     * @param variable key
-     * @return value
-     */
-    public boolean getPropertyBoolean(String variable) {
-        return this.getPropertyBoolean(variable, null);
-    }
-
-    /**
-     * Get a boolean value from server.properties
-     *
-     * @param variable key
-     * @param defaultValue default value
-     * @return value
-     */
-    public boolean getPropertyBoolean(String variable, Object defaultValue) {
-        Object value = this.properties.exists(variable) ? this.properties.get(variable) : defaultValue;
-        if (value instanceof Boolean) {
-            return (Boolean) value;
-        }
-        return switch (String.valueOf(value).trim().toLowerCase(Locale.ROOT)) {
-            case "on", "true", "1", "yes" -> true;
-            default -> false;
+        return switch (key) {
+            case "motd" -> settings.server().motd();
+            case "sub-motd" -> settings.server().subMotd();
+            case "server-ip" -> settings.network().ip();
+            case "server-port" -> String.valueOf(settings.network().port());
+            case "view-distance" -> String.valueOf(settings.performance().viewDistance());
+            case "language" -> settings.server().language();
+            case "shutdown-message" -> settings.server().shutdownMessage();
+            case "level-name" -> settings.world().levelName();
+            case "level-seed" -> settings.world().levelSeed();
+            case "level-type" -> settings.world().levelType();
+            case "generator-settings" -> settings.world().generatorSettings();
+            case "rcon.password" -> settings.network().rconPassword();
+            case "whitelist-reason" -> settings.players().whitelistReason();
+            case "multi-nether-worlds" -> settings.world().multiNetherWorlds();
+            case "anti-xray-worlds" -> settings.world().antiXrayWorlds();
+            case "do-not-tick-worlds" -> settings.world().noTickingWorlds();
+            case "worlds-entity-spawning-disabled" -> settings.world().disabledSpawnWorlds();
+            case "worlds-level-auto-save-disabled" -> settings.world().nonAutoSaveWorlds();
+            case "space-name-mode" -> settings.players().spaceNameMode();
+            case "hastebin-token" -> settings.integration().hastebinToken();
+            case "server-authoritative-movement" -> settings.experimental().serverAuthoritativeMovement();
+            case "difficulty" -> settings.features().difficulty();
+            default -> defaultValue;
         };
     }
 
-    /**
-     * Set a boolean value in server.properties
-     *
-     * @param variable key
-     * @param value value
-     */
-    public void setPropertyBoolean(String variable, boolean value) {
-        this.properties.set(variable, value);
-        this.properties.save();
+    public int getPropertyInt(String variable) {
+        return getPropertyInt(variable, 0);
+    }
+
+    public int getPropertyInt(String variable, Integer defaultValue) {
+        try {
+            return switch (variable) {
+                case "server-port" -> settings.network().port();
+                case "view-distance" -> settings.performance().viewDistance();
+                case "max-players" -> settings.players().maxPlayers();
+                case "spawn-protection" -> settings.features().spawnProtection();
+                case "gamemode" -> settings.features().gamemode();
+                case "difficulty" -> {
+                    String diff = settings.features().difficulty();
+                    yield diff.equals("peaceful") ? 0 : diff.equals("easy") ? 1 : diff.equals("normal") ? 2 : diff.equals("hard") ? 3 : 2;
+                }
+                case "ticks-per-autosave" -> settings.performance().ticksPerAutosave();
+                case "rcon.port" -> settings.network().rconPort();
+                case "debug-level" -> settings.debug().debugLevel();
+                case "spawn-threshold" -> settings.performance().spawnThreshold();
+                case "chunk-sending-per-tick" -> settings.performance().chunkSendingPerTick();
+                case "skin-change-cooldown" -> settings.players().skinChangeCooldown();
+                case "portal-ticks" -> settings.world().portalTicks();
+                case "leveldb-cache-mb" -> 80;
+                case "level-auto-compaction-ticks" -> settings.world().levelAutoCompactionTicks();
+                case "timeout-milliseconds" -> settings.network().timeoutMilliseconds();
+                case "rak-packet-limit" -> settings.network().rakPacketLimit();
+                case "compression-threshold" -> settings.network().compressionThreshold();
+                case "compression-level" -> settings.network().compressionLevel();
+                case "zlib-provider" -> settings.network().zlibProvider();
+                case "chunk-ticking-per-tick" -> settings.performance().chunkTickingPerTick();
+                case "chunk-ticking-radius" -> settings.performance().chunkTickingRadius();
+                case "chunk-generation-queue-size" -> settings.performance().chunkGenerationQueueSize();
+                case "chunk-generation-population-queue-size" -> settings.performance().chunkGenerationPopulationQueueSize();
+                case "ticks-per-entity-follow" -> settings.performance().ticksPerEntityFollow();
+                case "ticks-per-entity-spawns" -> settings.performance().ticksPerEntitySpawns();
+                case "ticks-per-entity-despawns" -> settings.performance().ticksPerEntityDespawns();
+                case "auto-tick-rate-limit" -> settings.performance().autoTickRateLimit();
+                case "base-tick-rate" -> settings.performance().baseTickRate();
+                case "multiversion-min-protocol" -> settings.network().minProtocol();
+                case "multiversion-max-protocol" -> settings.network().maxProtocol();
+                default -> defaultValue;
+            };
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
+    public boolean getPropertyBoolean(String variable) {
+        return getPropertyBoolean(variable, false);
+    }
+
+    public boolean getPropertyBoolean(String variable, Object defaultValue) {
+        return switch (variable) {
+            case "white-list" -> settings.players().whitelist();
+            case "achievements" -> settings.players().achievements();
+            case "announce-player-achievements" -> settings.players().announceAchievements();
+            case "spawn-animals" -> settings.features().spawnAnimals();
+            case "spawn-mobs" -> settings.features().spawnMobs();
+            case "force-gamemode" -> settings.features().forceGamemode();
+            case "hardcore" -> settings.features().hardcore();
+            case "pvp" -> settings.features().pvp();
+            case "auto-save" -> settings.performance().ticksPerAutosave() > 0;
+            case "level-auto-compaction" -> settings.world().levelAutoCompaction();
+            case "xbox-auth" -> settings.security().xboxAuth();
+            case "encryption" -> settings.security().encryption();
+            case "bed-spawnpoints" -> settings.features().bedSpawnpoints();
+            case "explosion-break-blocks" -> settings.features().explosionBreakBlocks();
+            case "stop-in-game" -> settings.features().stopInGame();
+            case "op-in-game" -> settings.features().opInGame();
+            case "mob-ai" -> settings.features().mobAi();
+            case "save-player-data" -> settings.players().savePlayerData();
+            case "enable-query" -> settings.network().enableQuery();
+            case "enable-rcon" -> settings.network().enableRcon();
+            case "ansi-title" -> settings.server().ansiTitle();
+            case "force-language" -> settings.server().forceLanguage();
+            case "update-notifications" -> settings.server().updateNotifications();
+            case "bstats-metrics" -> settings.debug().bstatsMetrics();
+            case "enable-spark" -> settings.integration().enableSpark();
+            case "use-waterdog" -> settings.network().useWaterdog();
+            case "netease-client-support" -> settings.integration().neteaseClientSupport();
+            case "only-allow-netease-client" -> settings.integration().onlyAllowNeteaseClient();
+            case "query-plugins" -> settings.network().queryPlugins();
+            case "enable-rak-send-cookie" -> settings.network().enableRakSendCookie();
+            case "use-snappy-compression" -> settings.network().useSnappyCompression();
+            case "nether" -> settings.world().nether();
+            case "end" -> settings.world().end();
+            case "vanilla-portals" -> settings.world().vanillaPortals();
+            case "load-all-worlds" -> settings.world().loadAllWorlds();
+            case "async-chunks" -> settings.world().asyncChunks();
+            case "cache-chunks" -> settings.world().cacheChunks();
+            case "clear-chunk-tick-list" -> settings.world().clearChunkTickList();
+            case "save-player-data-by-uuid" -> settings.players().savePlayerDataByUuid();
+            case "allow-flight" -> settings.players().allowFlight();
+            case "spawn-eggs" -> settings.players().spawnEggs();
+            case "xp-bottles-on-creative" -> settings.players().xpBottlesOnCreative();
+            case "persona-skins" -> settings.players().personaSkins();
+            case "do-not-limit-skin-geometry" -> settings.players().doNotLimitSkinGeometry();
+            case "do-not-limit-interactions" -> settings.players().doNotLimitInteractions();
+            case "anvils-enabled" -> settings.features().anvilsEnabled();
+            case "drop-spawners" -> settings.features().dropSpawners();
+            case "block-listener" -> settings.features().blockListener();
+            case "enable-raw-ores" -> settings.features().enableRawOres();
+            case "enable-new-paintings" -> settings.features().enableNewPaintings();
+            case "enable-new-chicken-eggs-laying" -> settings.features().enableNewChickenEggsLaying();
+            case "forced-safety-enchant" -> settings.features().forcedSafetyEnchant();
+            case "auto-tick-rate" -> settings.performance().autoTickRate();
+            case "always-tick-players" -> settings.performance().alwaysTickPlayers();
+            case "light-updates" -> settings.performance().lightUpdates();
+            case "entity-auto-spawn-task" -> settings.performance().entityAutoSpawnTask();
+            case "entity-despawn-task" -> settings.performance().entityDespawnTask();
+            case "do-level-gc" -> settings.performance().doLevelGc();
+            case "temp-ip-ban-failed-xbox-auth" -> settings.security().tempIpBanFailedXboxAuth();
+            case "strong-ip-bans" -> settings.security().strongIpBans();
+            case "check-op-movement" -> settings.security().checkOpMovement();
+            case "deprecated-verbose" -> settings.debug().deprecatedVerbose();
+            case "automatic-bug-report" -> settings.debug().automaticBugReport();
+            case "enable-experiment-mode" -> settings.experimental().enableExperimentMode();
+            case "server-authoritative-block-breaking" -> settings.experimental().serverAuthoritativeBlockBreaking();
+            case "use-client-spectator" -> settings.experimental().useClientSpectator();
+            case "enable-vibrant-visuals" -> settings.experimental().enableVibrantVisuals();
+            case "enable-raytracing" -> settings.experimental().enableRaytracing();
+            default -> (Boolean) defaultValue;
+        };
     }
 
     /**
@@ -2974,8 +3000,6 @@ public class Server {
         Entity.registerEntity("Piglin", EntityPiglin.class);
         Entity.registerEntity("Zoglin", EntityZoglin.class);
         Entity.registerEntity("PiglinBrute", EntityPiglinBrute.class);
-        //Entity.registerEntity("Breeze", EntityBreeze.class);
-        //Entity.registerEntity("Bogged", EntityBogged.class);
         Entity.registerEntity("Creaking", EntityCreaking.class);
         //Passive
         Entity.registerEntity("Bat", EntityBat.class);
@@ -3153,139 +3177,124 @@ public class Server {
         return this.spawnerTask;
     }
 
-    /**
-     * Load some settings from server.properties
-     */
-    private void loadSettings() {
-        this.forceLanguage = this.getPropertyBoolean("force-language", false);
-        this.networkCompressionLevel = Math.max(Math.min(this.getPropertyInt("compression-level", 5), 9), 0);
-        this.chunkCompressionLevel = Math.max(Math.min(this.getPropertyInt("chunk-compression-level", 7), 9), 1);
-        this.autoTickRate = this.getPropertyBoolean("auto-tick-rate", true);
-        this.autoTickRateLimit = this.getPropertyInt("auto-tick-rate-limit", 20);
-        this.alwaysTickPlayers = this.getPropertyBoolean("always-tick-players", false);
-        this.baseTickRate = this.getPropertyInt("base-tick-rate", 1);
-        this.callDataPkSendEv = this.getPropertyBoolean("call-data-pk-send-event", true);
-        this.callBatchPkEv = this.getPropertyBoolean("call-batch-pk-send-event", true);
-        this.doLevelGC = this.getPropertyBoolean("do-level-gc", true);
-        this.mobAiEnabled = this.getPropertyBoolean("mob-ai", true);
-
-        this.netherEnabled = this.getPropertyBoolean("nether", true);
-        this.endEnabled = this.getPropertyBoolean("end", false);
-
+    private void initFieldsFromSettings() {
+        this.forceLanguage = this.settings.server().forceLanguage();
+        this.networkCompressionLevel = Math.max(Math.min(5, 9), 0);
+        this.chunkCompressionLevel = Math.max(Math.min(7, 9), 1);
+        this.autoTickRate = this.settings.performance().autoTickRate();
+        this.autoTickRateLimit = this.settings.performance().autoTickRateLimit();
+        this.alwaysTickPlayers = this.settings.performance().alwaysTickPlayers();
+        this.baseTickRate = this.settings.performance().baseTickRate();
+        this.callDataPkSendEv = true;
+        this.callBatchPkEv = true;
+        this.doLevelGC = this.settings.debug().automaticBugReport();
+        this.mobAiEnabled = this.settings.features().mobAi();
+        this.netherEnabled = this.settings.world().nether();
+        this.endEnabled = this.settings.world().end();
         antiXrayWorlds.clear();
-        String antiXrayWorldsString = this.getPropertyString("anti-xray-worlds");
+        String antiXrayWorldsString = this.settings.world().antiXrayWorlds();
         if (!antiXrayWorldsString.trim().isEmpty()) {
             StringTokenizer tokenizer = new StringTokenizer(antiXrayWorldsString, ", ");
             while (tokenizer.hasMoreTokens()) {
                 antiXrayWorlds.add(tokenizer.nextToken());
             }
         }
-
-        this.xboxAuth = this.getPropertyBoolean("xbox-auth", true);
-        this.bedSpawnpoints = this.getPropertyBoolean("bed-spawnpoints", true);
-        this.achievementsEnabled = this.getPropertyBoolean("achievements", true);
-        this.banXBAuthFailed = this.getPropertyBoolean("temp-ip-ban-failed-xbox-auth", false);
-        this.pvpEnabled = this.getPropertyBoolean("pvp", true);
-        this.announceAchievements = this.getPropertyBoolean("announce-player-achievements", false);
-        this.spawnEggsEnabled = this.getPropertyBoolean("spawn-eggs", true);
-        this.xpBottlesOnCreative = this.getPropertyBoolean("xp-bottles-on-creative", false);
-        this.shouldSavePlayerData = this.getPropertyBoolean("save-player-data", true);
-        this.mobsFromBlocks = this.getPropertyBoolean("block-listener", true);
-        this.explosionBreakBlocks = this.getPropertyBoolean("explosion-break-blocks", true);
-        this.vanillaBossBar = this.getPropertyBoolean("vanilla-bossbars", false);
-        this.stopInGame = this.getPropertyBoolean("stop-in-game", false);
-        this.opInGame = this.getPropertyBoolean("op-in-game", false);
-
-        switch (this.getPropertyString("space-name-mode")) {
+        this.xboxAuth = this.settings.security().xboxAuth();
+        this.bedSpawnpoints = this.settings.features().bedSpawnpoints();
+        this.achievementsEnabled = this.settings.players().achievements();
+        this.banXBAuthFailed = this.settings.security().tempIpBanFailedXboxAuth();
+        this.pvpEnabled = this.settings.features().pvp();
+        this.announceAchievements = this.settings.players().announceAchievements();
+        this.spawnEggsEnabled = this.settings.players().spawnEggs();
+        this.xpBottlesOnCreative = this.settings.players().xpBottlesOnCreative();
+        this.shouldSavePlayerData = this.settings.players().savePlayerData();
+        this.mobsFromBlocks = true;
+        this.explosionBreakBlocks = this.settings.features().explosionBreakBlocks();
+        this.vanillaBossBar = false;
+        this.stopInGame = false;
+        this.opInGame = false;
+        switch (this.settings.players().spaceNameMode()) {
             case "disabled" -> this.spaceMode = 0;
             case "replacing" -> this.spaceMode = 2;
             default -> this.spaceMode = 1;
         }
-
-        this.lightUpdates = this.getPropertyBoolean("light-updates", false);
-        this.queryPlugins = this.getPropertyBoolean("query-plugins", false);
-        this.flyChecks = this.getPropertyBoolean("allow-flight", false);
-        this.isHardcore = this.getPropertyBoolean("hardcore", false);
-        this.despawnMobs = this.getPropertyBoolean("entity-despawn-task", true);
-        this.forceResources = this.getPropertyBoolean("force-resources", false);
-        this.forceResourcesAllowOwnPacks = this.getPropertyBoolean("force-resources-allow-client-packs", false);
-        this.whitelistEnabled = this.getPropertyBoolean("white-list", false);
-        this.checkOpMovement = this.getPropertyBoolean("check-op-movement", false);
-        this.forceGamemode = this.getPropertyBoolean("force-gamemode", true);
-        this.doNotLimitInteractions = this.getPropertyBoolean("do-not-limit-interactions", false);
-        this.motd = this.getPropertyString("motd", "Minecraft Server");
-        this.viewDistance = Math.max(1, this.getPropertyInt("view-distance", 8));
-        this.mobDespawnTicks = this.getPropertyInt("ticks-per-entity-despawns", 12000);
-        this.port = this.getPropertyInt("server-port", 19132);
-        this.ip = this.getPropertyString("server-ip", "0.0.0.0");
-        this.skinChangeCooldown = this.getPropertyInt("skin-change-cooldown", 30);
-        this.strongIPBans = this.getPropertyBoolean("strong-ip-bans", false);
-        this.spawnRadius = this.getPropertyInt("spawn-protection", 10);
-        this.dropSpawners = this.getPropertyBoolean("drop-spawners", true);
-        this.spawnAnimals = this.getPropertyBoolean("spawn-animals", true);
-        this.spawnMonsters = this.getPropertyBoolean("spawn-mobs", true);
-        this.autoSaveTicks = this.getPropertyInt("ticks-per-autosave", 6000);
-        this.doNotLimitSkinGeometry = this.getPropertyBoolean("do-not-limit-skin-geometry", true);
-        this.anvilsEnabled = this.getPropertyBoolean("anvils-enabled", true);
-        this.chunksPerTick = this.getPropertyInt("chunk-sending-per-tick", 4);
-        this.spawnThreshold = this.getPropertyInt("spawn-threshold", 56);
-        this.savePlayerDataByUuid = this.getPropertyBoolean("save-player-data-by-uuid", true);
-
-        this.vanillaPortals = this.getPropertyBoolean("vanilla-portals", true);
-        this.portalTicks = this.getPropertyInt("portal-ticks", 80);
-
-        this.personaSkins = this.getPropertyBoolean("persona-skins", true);
-        this.cacheChunks = this.getPropertyBoolean("cache-chunks", false);
-        this.callEntityMotionEv = this.getPropertyBoolean("call-entity-motion-event", true);
-        this.updateChecks = this.getPropertyBoolean("update-notifications", false);
-        this.minimumProtocol = this.getPropertyInt("multiversion-min-protocol", 0);
-        this.maximumProtocol = this.getPropertyInt("multiversion-max-protocol", ProtocolInfo.CURRENT_PROTOCOL);
-        this.whitelistReason = this.getPropertyString("whitelist-reason", "§cServer is white-listed").replace("§n", "\n");
-        this.enableExperimentMode = this.getPropertyBoolean("enable-experiment-mode", true);
-        this.asyncChunkSending = this.getPropertyBoolean("async-chunks", true);
-        this.deprecatedVerbose = this.getPropertyBoolean("deprecated-verbose", true);
-        switch (this.getPropertyString("server-authoritative-movement")) {
+        this.lightUpdates = this.settings.performance().lightUpdates();
+        this.queryPlugins = this.settings.network().queryPlugins();
+        this.flyChecks = false;
+        this.isHardcore = this.settings.features().hardcore();
+        this.despawnMobs = true;
+        this.forceResources = this.settings.features().forcedSafetyEnchant();
+        this.forceResourcesAllowOwnPacks = this.settings.features().forcedSafetyEnchant();
+        this.whitelistEnabled = this.settings.players().whitelist();
+        this.checkOpMovement = this.settings.security().checkOpMovement();
+        this.forceGamemode = this.settings.features().forceGamemode();
+        this.doNotLimitInteractions = this.settings.features().forcedSafetyEnchant();
+        this.motd = this.settings.server().motd();
+        this.viewDistance = Math.max(1, this.settings.performance().viewDistance());
+        this.mobFollowTicks = this.settings.performance().ticksPerEntityFollow();
+        this.mobDespawnTicks = this.settings.performance().ticksPerEntityDespawns();
+        this.port = this.settings.network().port();
+        this.ip = this.settings.network().ip();
+        this.skinChangeCooldown = this.settings.players().skinChangeCooldown();
+        this.strongIPBans = this.settings.security().strongIpBans();
+        this.spawnRadius = this.settings.features().spawnProtection();
+        this.dropSpawners = true;
+        this.spawnAnimals = this.settings.features().spawnAnimals();
+        this.spawnMonsters = this.settings.features().spawnMobs();
+        this.autoSaveTicks = this.settings.performance().ticksPerAutosave();
+        this.doNotLimitSkinGeometry = this.settings.players().doNotLimitSkinGeometry();
+        this.anvilsEnabled = this.settings.features().anvilsEnabled();
+        this.chunksPerTick = this.settings.performance().chunkSendingPerTick();
+        this.spawnThreshold = this.settings.performance().spawnThreshold();
+        this.savePlayerDataByUuid = this.settings.players().savePlayerDataByUuid();
+        this.vanillaPortals = this.settings.world().vanillaPortals();
+        this.portalTicks = this.settings.world().portalTicks();
+        this.personaSkins = this.settings.players().personaSkins();
+        this.cacheChunks = this.settings.world().cacheChunks();
+        this.callEntityMotionEv = this.settings.experimental().enableExperimentMode();
+        this.updateChecks = this.settings.server().updateNotifications();
+        this.minimumProtocol = this.settings.network().minProtocol();
+        this.maximumProtocol = this.settings.network().maxProtocol();
+        this.whitelistReason = this.settings.players().whitelistReason().replace("§n", "\n");
+        this.enableExperimentMode = this.settings.experimental().enableExperimentMode();
+        this.asyncChunkSending = this.settings.world().asyncChunks();
+        this.deprecatedVerbose = this.settings.debug().deprecatedVerbose();
+        switch (this.settings.experimental().serverAuthoritativeMovement()) {
             case "client-auth" -> this.serverAuthoritativeMovementMode = 0;
             case "server-auth-with-rewind" -> this.serverAuthoritativeMovementMode = 2;
             default -> this.serverAuthoritativeMovementMode = 1;
         }
-        this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
-        this.encryptionEnabled = this.getPropertyBoolean("encryption", true);
+        this.serverAuthoritativeBlockBreaking = this.settings.experimental().serverAuthoritativeBlockBreaking();
+        this.encryptionEnabled = this.settings.security().encryption();
         if (!this.encryptionEnabled) {
             log.warn("Encryption is not enabled. For better security, it's recommended to enable it if you don't use a proxy software.");
         }
-        this.useWaterdog = this.getPropertyBoolean("use-waterdog", false);
-        this.useSnappy = this.getPropertyBoolean("use-snappy-compression", false);
-        this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);
-        this.networkCompressionThreshold = this.getPropertyInt("compression-threshold", 256);
-        this.enableSpark = this.getPropertyBoolean("enable-spark", false);
+        this.useWaterdog = this.settings.network().useWaterdog();
+        this.useSnappy = false;
+        this.useClientSpectator = this.settings.experimental().useClientSpectator();
+        this.networkCompressionThreshold = 256;
+        this.enableSpark = this.settings.integration().enableSpark();
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
-        try {
-            this.gamemode = this.getPropertyInt("gamemode", 0) & 0b11;
-        } catch (NumberFormatException exception) {
-            this.gamemode = getGamemodeFromString(this.getPropertyString("gamemode")) & 0b11;
-        }
-        String list = this.getPropertyString("do-not-tick-worlds");
+        this.gamemode = this.settings.features().gamemode() & 0b11;
+        String list = this.settings.world().noTickingWorlds();
         if (!list.trim().isEmpty()) {
             StringTokenizer tokenizer = new StringTokenizer(list, ", ");
             while (tokenizer.hasMoreTokens()) {
                 noTickingWorlds.add(tokenizer.nextToken());
             }
         }
-
-        this.levelDbCache = this.getPropertyInt("leveldb-cache-mb", 80);
-        this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
-        this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
-        this.enableNewPaintings = this.getPropertyBoolean("enable-new-paintings", true);
-        this.enableNewChickenEggsLaying = this.getPropertyBoolean("enable-new-chicken-eggs-laying", true);
-        this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
-        this.enableRakSendCookie = this.getPropertyBoolean("enable-rak-send-cookie", true);
-        this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
-        this.enableVibrantVisuals = this.getPropertyBoolean("enable-vibrant-visuals", true);
-        this.enableRaytracing = this.getPropertyBoolean("enable-raytracing", true);
-
-        this.netEaseMode = this.getPropertyBoolean("netease-client-support", false);
-        this.onlyNetEaseMode = this.getPropertyBoolean("only-allow-netease-client", false);
+        this.levelDbCache = 80;
+        this.useNativeLevelDB = this.settings.integration().onlyAllowNeteaseClient();
+        this.enableRawOres = this.settings.features().enableRawOres();
+        this.enableNewPaintings = this.settings.features().enableNewPaintings();
+        this.enableNewChickenEggsLaying = this.settings.features().enableNewChickenEggsLaying();
+        this.rakPacketLimit = RakConstants.DEFAULT_PACKET_LIMIT;
+        this.enableRakSendCookie = this.settings.network().useWaterdog();
+        this.forcedSafetyEnchant = this.settings.features().forcedSafetyEnchant();
+        this.enableVibrantVisuals = this.settings.experimental().enableVibrantVisuals();
+        this.enableRaytracing = this.settings.experimental().enableRaytracing();
+        this.netEaseMode = this.settings.integration().neteaseClientSupport();
+        this.onlyNetEaseMode = this.settings.integration().onlyAllowNeteaseClient();
     }
 
     /**
@@ -3298,152 +3307,6 @@ public class Server {
             } else {
                 getInstance().getLogger().warning("Default " + action + " used by a plugin. This can cause instability with the multiversion.");
             }
-        }
-    }
-
-    /**
-     * This class contains all default server.properties values.
-     */
-    private static class ServerProperties extends ConfigSection {
-        {
-            put("motd", "Minecraft Server");
-            put("sub-motd", "Powered by Nukkit-MOT");
-            put("server-port", 19132);
-            put("server-ip", "0.0.0.0");
-            put("view-distance", 8);
-            put("achievements", true);
-            put("announce-player-achievements", true);
-            put("spawn-protection", 10);
-            put("max-players", 50);
-            put("drop-spawners", true); //TODO 考虑弃用
-            put("spawn-animals", true);
-            put("spawn-mobs", true);
-            put("gamemode", 0);
-            put("force-gamemode", true);
-            put("difficulty", 2);
-            put("hardcore", false);
-            put("pvp", true);
-
-            put("white-list", false);
-            put("whitelist-reason", "§cServer is white-listed");
-
-            put("generator-settings", "");
-            put("level-name", "world");
-            put("level-seed", "");
-            put("level-type", "default");
-
-            put("enable-rcon", false);
-            put("rcon.password", Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13));
-            put("rcon.port", 25575);
-
-            put("auto-save", true);
-            put("level-auto-compaction", true);
-            put("level-auto-compaction-ticks", 60 * 30 * 20);
-
-            put("force-resources", false);
-            put("force-resources-allow-client-packs", false);
-            put("xbox-auth", true);
-            put("encryption", true);
-            put("bed-spawnpoints", true);
-            put("explosion-break-blocks", true);
-            put("stop-in-game", false);
-            put("op-in-game", true);
-            put("space-name-mode", "ignore");
-            put("xp-bottles-on-creative", true);
-            put("spawn-eggs", true);
-            put("mob-ai", true);
-            put("entity-auto-spawn-task", true);
-            put("entity-despawn-task", true);
-            put("language", "eng");
-            put("force-language", false);
-            put("shutdown-message", "§cServer closed");
-            put("save-player-data", true);
-            put("enable-query", true);
-            put("query-plugins", false);
-            put("debug-level", 1);
-            put("async-workers", "auto");
-
-            put("zlib-provider", 2);
-            put("compression-level", 5);
-            put("compression-threshold", "256");
-            put("use-snappy-compression", false);
-            put("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
-            put("enable-rak-send-cookie", true);
-            put("timeout-milliseconds", 25000);
-
-            put("auto-tick-rate", true);
-            put("auto-tick-rate-limit", 20);
-            put("base-tick-rate", 1);
-            put("always-tick-players", false);
-            put("light-updates", false);
-            put("clear-chunk-tick-list", true);
-            put("spawn-threshold", 56);
-            put("chunk-sending-per-tick", 4);
-            put("chunk-ticking-per-tick", 40);
-            put("chunk-ticking-radius", 3);
-            put("chunk-generation-queue-size", 8);
-            put("chunk-generation-population-queue-size", 8);
-            put("ticks-per-autosave", 6000);
-            put("ticks-per-entity-spawns", 200);
-            put("ticks-per-entity-despawns", 12000);
-            put("thread-watchdog", true);
-            put("thread-watchdog-tick", 60000);
-
-            put("nether", true);
-            put("end", true);
-            put("vanilla-portals", true);
-            put("portal-ticks", 80);
-            put("multi-nether-worlds", "");
-            put("anti-xray-worlds", "");
-
-            put("do-not-tick-worlds", "");
-            put("worlds-entity-spawning-disabled", "");
-            put("load-all-worlds", true);
-            put("ansi-title", false);
-            put("block-listener", true);
-            put("allow-flight", false);
-            put("multiversion-min-protocol", 0);
-            put("multiversion-max-protocol", -1);
-            put("vanilla-bossbars", false);
-            put("strong-ip-bans", false);
-            put("worlds-level-auto-save-disabled", "");
-            put("temp-ip-ban-failed-xbox-auth", false);
-            put("call-data-pk-send-event", true);
-            put("call-batch-pk-send-event", true);
-            put("do-level-gc", true);
-            put("skin-change-cooldown", 15);
-            put("check-op-movement", false);
-            put("do-not-limit-interactions", false);
-            put("do-not-limit-skin-geometry", true);
-            put("automatic-bug-report", true);
-            put("anvils-enabled", true);
-            put("save-player-data-by-uuid", true);
-            put("persona-skins", true);
-            put("call-entity-motion-event", true);
-            put("update-notifications", true);
-            put("bstats-metrics", true);
-            put("cache-chunks", false);
-            put("async-chunks", true);
-            put("deprecated-verbose", true);
-            put("server-authoritative-movement", "server-auth");
-            put("server-authoritative-block-breaking", true);
-            put("use-client-spectator", true);
-            put("enable-experiment-mode", true);
-            put("use-waterdog", false);
-            put("enable-spark", false);
-            put("hastebin-token", "");
-
-            put("leveldb-cache-mb", 80);
-            put("use-native-leveldb", false);
-            put("enable-raw-ores", true);
-            put("enable-new-paintings", true);
-            put("enable-new-chicken-eggs-laying", true);
-            put("forced-safety-enchant", true);
-            put("enable-vibrant-visuals", true);
-            put("enable-raytracing", true);
-
-            put("netease-client-support", false);
-            put("only-allow-netease-client", false);
         }
     }
 
