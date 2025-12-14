@@ -68,14 +68,14 @@ public class EntityRanges {
     private static int getAttribute(Entity entity) {
         Class<?> entityClass = entity.getClass();
 
-        Integer value = EntityRanges.FOLLOW_RANGES.get(entityClass);
+        Integer value = FOLLOW_RANGES.get(entityClass);
         if (value != null) {
             return value;
         }
 
         Class<?> currentClass = entityClass.getSuperclass();
         while (currentClass != null && currentClass != Object.class) {
-            value = EntityRanges.FOLLOW_RANGES.get(currentClass);
+            value = FOLLOW_RANGES.get(currentClass);
             if (value != null) {
                 return value;
             }
