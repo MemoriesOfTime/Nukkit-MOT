@@ -13,12 +13,10 @@ import org.apache.commons.math3.util.FastMath;
 
 public abstract class EntityJumping extends BaseEntity {
 
-    private final AxisAlignedBB searchBox;
     private int checkTargetCooldown = 0;
 
     public EntityJumping(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
-        this.searchBox = EntityRanges.createTargetSearchBox(this);
     }
 
     protected void checkTarget() {
@@ -40,7 +38,7 @@ public abstract class EntityJumping extends BaseEntity {
         }
 
         double near = Integer.MAX_VALUE;
-        for (Entity entity : this.getLevel().getNearbyEntities(this.searchBox, this)) {
+        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this)) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }

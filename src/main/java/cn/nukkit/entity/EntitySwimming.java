@@ -16,12 +16,10 @@ public abstract class EntitySwimming extends BaseEntity {
     private boolean inWaterCached = true;
     private boolean inBubbleColumnCached = false;
 
-    private final AxisAlignedBB searchBox;
     private int checkTargetCooldown = 0;
 
     public EntitySwimming(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
-        this.searchBox = EntityRanges.createTargetSearchBox(this);
     }
 
     protected void checkTarget() {
@@ -43,7 +41,7 @@ public abstract class EntitySwimming extends BaseEntity {
         }
 
         double near = Integer.MAX_VALUE;
-        for (Entity entity : this.getLevel().getNearbyEntities(this.searchBox, this)) {
+        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this)) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }

@@ -12,13 +12,11 @@ import org.apache.commons.math3.util.FastMath;
 
 public abstract class EntityFlying extends BaseEntity {
 
-    private final AxisAlignedBB searchBox;
     private int checkTargetCooldown = 0;
 
     public EntityFlying(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
         this.noFallDamage = true;
-        this.searchBox = EntityRanges.createTargetSearchBox(this);
     }
 
     protected void checkTarget() {
@@ -36,7 +34,7 @@ public abstract class EntityFlying extends BaseEntity {
                 !((Entity) target).canBeFollowed()) {
 
             double near = Integer.MAX_VALUE;
-            for (Entity entity : this.getLevel().getNearbyEntities(this.searchBox, this)) {
+            for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this)) {
                 if (!(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }
