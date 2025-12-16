@@ -1878,8 +1878,6 @@ public abstract class Entity extends Location implements Metadatable {
         if (!this.isPlayer) {
             if ((ticksLived & 1) == 0) {
                 this.collisionBlocks = null;
-
-                collisionCache.cleanupOldCache();
             }
         }
 
