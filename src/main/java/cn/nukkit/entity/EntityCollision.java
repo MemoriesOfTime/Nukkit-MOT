@@ -21,7 +21,7 @@ public class EntityCollision implements ChunkLoader {
 
     @Override
     public void onBlockChanged(Vector3 pos) {
-        long key = ((long) pos.getFloorX() << 32) | ((long) pos.getFloorZ() << 16) | (pos.getFloorY() & 0xFFFFL);
+        long key = ((long) pos.getFloorX() << 32) | (pos.getFloorZ() & 0xFFFFFFFFL) | ((long) pos.getFloorY() << 32);
         recentBlockChanges.add(key);
     }
 
@@ -39,7 +39,7 @@ public class EntityCollision implements ChunkLoader {
         }
     };
 
-    private final Map<Long, List<Block> > collisionCache = new LinkedHashMap<>(32, 0.75f, true) {
+    private final Map<Long, List<Block>> collisionCache = new LinkedHashMap<>(32, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<Long, List<Block>> eldest) {
             return size() > COLLISION_CACHE_MAX_SIZE;
@@ -152,7 +152,7 @@ public class EntityCollision implements ChunkLoader {
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
 
-                    long blockKey = ((long) x << 32) | ((long) z << 16) | (y & 0xFFFFL);
+                    long blockKey = ((long) x << 32) | (z & 0xFFFFFFFFL) | ((long) y << 32);
                     boolean recentlyChanged = recentBlockChanges.contains(blockKey);
 
                     Block block = recentlyChanged ? null : blockCache.get(blockKey);
@@ -209,9 +209,9 @@ public class EntityCollision implements ChunkLoader {
         int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
 
         for (long key : recentBlockChanges) {
-            int x = (int) (key >>> 32);
-            int z = (int) ((key >>> 16) & 0xFFFF);
-            int y = (int) (key & 0xFFFF);
+            int x = (int) (key >> 32);
+            int z = (int) (key & 0xFFFFFFFFL);
+            int y = (int) (key >> 32);
             if (x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ) {
                 return true;
             }
@@ -327,10 +327,10 @@ public class EntityCollision implements ChunkLoader {
 
     @Override public int getLoaderId() { return 0; }
     @Override public boolean isLoaderActive() { return false; }
-    @Override public Position getPosition() { return null; }
-    @Override public double getX() { return 0; }
-    @Override public double getZ() { return 0; }
-    @Override public Level getLevel() { return null; }
+    @Override public Position getPosition() { return entity.getPosition(); }
+    @Override public double getX() { return entity.getChunkX(); }
+    @Override public double getZ() { return entity.getChunkZ(); }
+    @Override public Level getLevel() { return entity.getLevel(); }
     @Override public void onChunkChanged(FullChunk chunk) {}
     @Override public void onChunkLoaded(FullChunk chunk) {}
     @Override public void onChunkUnloaded(FullChunk chunk) {}
