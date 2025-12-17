@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Server;
 import lombok.ToString;
 
 @ToString
@@ -181,6 +182,9 @@ public class TextPacket extends DataPacket {
                     this.putString("textObjectAnnouncement");
                     this.putString("textObject");
                     this.putByte(this.type);
+                    if (this.message.isEmpty()) {
+                        this.message = " ";
+                    }
                     this.putString(this.message);
                     break;
 
