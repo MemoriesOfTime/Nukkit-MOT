@@ -1,6 +1,5 @@
 package cn.nukkit.network.protocol;
 
-import cn.nukkit.Server;
 import lombok.ToString;
 
 @ToString
@@ -31,7 +30,7 @@ public class TextPacket extends DataPacket {
 
     public byte type;
     public String source = "";
-    public String message = "";
+    public String message = " ";
     public String[] parameters = new String[0];
     public boolean isLocalized = false;
     public String xboxUserId = "";
