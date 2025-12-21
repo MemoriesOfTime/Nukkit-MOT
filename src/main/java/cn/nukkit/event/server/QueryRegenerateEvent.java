@@ -57,7 +57,7 @@ public class QueryRegenerateEvent extends ServerEvent {
         this.maxPlayers = server.getMaxPlayers();
         this.whitelist = server.hasWhitelist() ? "on" : "off";
         this.port = server.getPort();
-        this.ip = server.getIp();
+        this.ip = server.getIp().isBlank() ? "0.0.0.0" : server.getIp();
     }
 
     public int getTimeout() {
