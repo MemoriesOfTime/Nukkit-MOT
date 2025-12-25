@@ -6215,8 +6215,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.dataPacket(pk);
     }
 
-    public void sendMovementSpeed(float speed) {
-        Attribute attribute = Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speed);
+    public void sendMovementSpeed() {
+        Attribute attribute = Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(speedToSend);
         this.setAttribute(attribute);
     }
 
