@@ -3,6 +3,7 @@ package cn.nukkit.entity;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.*;
+import cn.nukkit.entity.data.EntityMovementSpeedModifier;
 import cn.nukkit.entity.mob.EntityDrowned;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.passive.EntityIronGolem;
@@ -62,6 +63,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     private boolean blocking = false;
 
     protected final boolean isDrowned = this instanceof EntityDrowned;
+
+    private final Map<String, EntityMovementSpeedModifier> movementSpeedModifiers = new HashMap<>();
 
     @Override
     protected void initEntity() {
@@ -621,4 +624,44 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         return human;
     }
 
+    public Map<String, EntityMovementSpeedModifier> getMovementSpeedModifiers() {
+        return movementSpeedModifiers;
+    }
+
+    public void addMovementSpeedModifier(EntityMovementSpeedModifier modifier) {
+        this.movementSpeedModifiers.put(modifier.getIdentifier(), modifier);
+        this.recalculateMovementSpeed();
+    }
+
+    public void removeMovementSpeedModifier(EntityMovementSpeedModifier modifier) {
+        this.removeMovementSpeedModifier(modifier.getIdentifier());
+    }
+
+    public boolean removeMovementSpeedModifier(String identifier) {
+        Object result = this.movementSpeedModifiers.remove(identifier);
+
+        if (result != null) {
+            this.recalculateMovementSpeed();
+            return true;
+        }
+
+        return false;
+    }
+
+    public void recalculateMovementSpeed() {
+        float newMovementSpeed = Player.DEFAULT_SPEED;
+        for (EntityMovementSpeedModifier modifier : this.movementSpeedModifiers.values()) {
+            float value = modifier.getValue();
+            if (modifier.isSend()) {
+                if (modifier.getOperation() == EntityMovementSpeedModifier.Operation.MULTIPLY) {
+                    if (value != 0) {
+                        newMovementSpeed *= value;
+                    }
+                } else {
+                    newMovementSpeed += value;
+                }
+            }
+        }
+        this.setMovementSpeed(newMovementSpeed);
+    }
 }

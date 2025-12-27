@@ -6,6 +6,7 @@ import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityBoss;
 import cn.nukkit.entity.EntityLiving;
+import cn.nukkit.entity.data.EntityMovementSpeedModifier;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
 import cn.nukkit.event.entity.EntityEffectRemoveEvent;
@@ -299,7 +300,7 @@ public class Effect implements Cloneable {
                     player.setMovementSpeed(player.getMovementSpeed() / (1 + 0.2f * (oldEffect.amplifier + 1)), false);
                 }
                 player.setMovementSpeed(player.getMovementSpeed() * (1 + 0.2f * (this.amplifier + 1)));*/
-                entityLiving.setMovementSpeed(Player.DEFAULT_SPEED * (1 + 0.2f * (this.amplifier + 1)));
+                entityLiving.addMovementSpeedModifier(new EntityMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED, 1 + 0.2f * this.amplifier, EntityMovementSpeedModifier.Operation.MULTIPLY));
             }
 
             if (this.id == Effect.SLOWNESS) {
@@ -307,7 +308,7 @@ public class Effect implements Cloneable {
                     player.setMovementSpeed(player.getMovementSpeed() / (1 - 0.15f * (oldEffect.amplifier + 1)), false);
                 }
                 player.setMovementSpeed(player.getMovementSpeed() * (1 - 0.15f * (this.amplifier + 1)));*/
-                entityLiving.setMovementSpeed(Player.DEFAULT_SPEED * (1 - 0.15f * (this.amplifier + 1)));
+                entityLiving.addMovementSpeedModifier(new EntityMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SLOWNESS, 1 - 0.15f * this.amplifier, EntityMovementSpeedModifier.Operation.MULTIPLY));
             }
         }
 
@@ -339,19 +340,19 @@ public class Effect implements Cloneable {
                 player.dataPacket(pk);
 
                 if (this.id == Effect.SPEED) {
-                    player.setMovementSpeed(player.isSprinting() ? Player.DEFAULT_SPEED * 1.3f : Player.DEFAULT_SPEED, false);
+                    entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED);
                     player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
                 }
                 if (this.id == Effect.SLOWNESS) {
-                    player.setMovementSpeed(player.isSprinting() ? Player.DEFAULT_SPEED * 1.3f : Player.DEFAULT_SPEED, false);
+                    entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SLOWNESS);
                     player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
                 }
             } else {
                 if (this.id == Effect.SPEED) {
-                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 + 0.2f * (this.amplifier + 1)));
+                    entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED);
                 }
                 if (this.id == Effect.SLOWNESS) {
-                    entityLiving.setMovementSpeed(entityLiving.getMovementSpeed() / (1 - 0.15f * (this.amplifier + 1)));
+                    entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SLOWNESS);
                 }
             }
             if (this.id == Effect.HEALTH_BOOST) {
