@@ -40,8 +40,8 @@ import cn.nukkit.level.format.LevelProvider;
 import cn.nukkit.level.format.LevelProviderManager;
 import cn.nukkit.level.format.anvil.Anvil;
 import cn.nukkit.level.format.leveldb.LevelDBProvider;
-import cn.nukkit.level.generator.Void;
 import cn.nukkit.level.generator.*;
+import cn.nukkit.level.generator.Void;
 import cn.nukkit.level.tickingarea.manager.SimpleTickingAreaManager;
 import cn.nukkit.level.tickingarea.manager.TickingAreaManager;
 import cn.nukkit.level.tickingarea.storage.JSONTickingAreaStorage;
@@ -113,8 +113,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
@@ -3276,7 +3276,7 @@ public class Server {
             }
         }
 
-        this.levelDbCache = this.getPropertyInt("leveldb-cache-mb", 80);
+        this.levelDbCache = this.getPropertyInt("leveldb-cache-mb", 64);
         this.useNativeLevelDB = this.getPropertyBoolean("use-native-leveldb", false);
         this.enableRawOres = this.getPropertyBoolean("enable-raw-ores", true);
         this.enableNewPaintings = this.getPropertyBoolean("enable-new-paintings", true);
@@ -3436,7 +3436,7 @@ public class Server {
             put("enable-spark", false);
             put("hastebin-token", "");
 
-            put("leveldb-cache-mb", 80);
+            put("leveldb-cache-mb", 64);
             put("use-native-leveldb", false);
             put("enable-raw-ores", true);
             put("enable-new-paintings", true);
