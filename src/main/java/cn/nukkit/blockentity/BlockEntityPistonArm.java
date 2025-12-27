@@ -50,7 +50,7 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
         }
 
         if (namedTag.contains("LastProgress")) {
-            this.lastProgress = (float) namedTag.getInt("LastProgress");
+            this.lastProgress = namedTag.getFloat("LastProgress");
         }
 
         this.sticky = namedTag.getBoolean("Sticky");
@@ -79,7 +79,7 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
                     this.attachedBlocks.add(new BlockVector3(
                             blocks.get(i).data,
                             blocks.get(i + 1).data,
-                            blocks.get(i + 1).data
+                            blocks.get(i + 2).data
                     ));
                 }
             }
@@ -88,6 +88,24 @@ public class BlockEntityPistonArm extends BlockEntitySpawnable {
         }
 
         super.initBlockEntity();
+
+        // Fix for issue #410: If the piston is in the middle of moving when the chunk/server was unloaded,
+        // we need to ensure the movement completes properly to prevent invisible bedrock
+        boolean needsUpdate = !this.attachedBlocks.isEmpty() || (this.state == 1 || this.state == 3);
+
+        if (needsUpdate) {
+            // Reset lastProgress to ensure onUpdate continues moving and doesn't immediately think it's done
+            // This prevents the edge case where progress == lastProgress after loading from NBT
+            if (this.extending) {
+                // When extending, ensure lastProgress is behind progress
+                this.lastProgress = Math.max(0, this.progress - MOVE_STEP);
+            } else {
+                // When retracting, ensure lastProgress is ahead of progress
+                this.lastProgress = Math.min(1, this.progress + MOVE_STEP);
+            }
+
+            this.scheduleUpdate();
+        }
     }
 
     private void moveCollidedEntities() {

@@ -28,6 +28,7 @@ public class BlockEntityMovingBlock extends BlockEntitySpawnable {
             this.block = Block.get(blockData.getInt("id"), blockData.getInt("meta"));
         } else {
             this.close();
+            return;
         }
 
         if (namedTag.contains("pistonPosX") && namedTag.contains("pistonPosY") && namedTag.contains("pistonPosZ")) {
@@ -37,6 +38,58 @@ public class BlockEntityMovingBlock extends BlockEntitySpawnable {
         }
 
         super.initBlockEntity();
+
+        // Fix for issue #410: Schedule a delayed check to verify the piston exists and will complete the movement
+        // We delay this check to ensure the piston's chunk has time to load and initialize
+        this.level.scheduleUpdate(this.getLevelBlock(), 2);
+    }
+
+    @Override
+    public boolean onUpdate() {
+        // Fix for issue #410: Verify the piston still exists and is properly moving this block
+        if (this.level != null) {
+            if (!this.level.isChunkLoaded(this.piston.x >> 4, this.piston.z >> 4)) {
+                // Piston chunk not loaded, convert to actual block to prevent orphaned moving blocks
+                this.close();
+                if (this.block != null) {
+                    this.level.setBlock(this, this.block, true, true);
+                }
+                return false;
+            }
+
+            BlockEntity pistonEntity = this.level.getBlockEntity(this.piston);
+            if (!(pistonEntity instanceof BlockEntityPistonArm)) {
+                // Piston is missing, convert moving block to actual block
+                this.close();
+                if (this.block != null) {
+                    this.level.setBlock(this, this.block, true, true);
+                }
+                return false;
+            }
+
+            BlockEntityPistonArm piston = (BlockEntityPistonArm) pistonEntity;
+            // Check if this block is actually in the piston's attached blocks list
+            boolean isAttached = false;
+            BlockFace pushDir = piston.extending ? piston.facing : piston.facing.getOpposite();
+            BlockVector3 thisPos = new BlockVector3(this.getFloorX(), this.getFloorY(), this.getFloorZ());
+            for (BlockVector3 attachedPos : piston.attachedBlocks) {
+                if (attachedPos.getSide(pushDir).equals(thisPos)) {
+                    isAttached = true;
+                    break;
+                }
+            }
+
+            if (!isAttached) {
+                // This moving block is not tracked by the piston, convert to actual block
+                this.close();
+                if (this.block != null) {
+                    this.level.setBlock(this, this.block, true, true);
+                }
+                return false;
+            }
+        }
+
+        return super.onUpdate();
     }
 
     public CompoundTag getBlockEntity() {

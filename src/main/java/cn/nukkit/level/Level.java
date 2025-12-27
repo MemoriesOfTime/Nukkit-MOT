@@ -586,9 +586,18 @@ public class Level implements ChunkManager, Metadatable {
             LevelProvider levelProvider = this.provider;
             if (levelProvider != null) {
                 if (this.autoSave) {
-                    this.save(true);
+                    try {
+                        this.save(true);
+                    } catch (Exception e) {
+                        this.server.getLogger().error("Error saving level before close: " + this.getName(), e);
+                    }
                 }
-                levelProvider.close();
+                try {
+                    levelProvider.close();
+                } catch (Exception e) {
+                    // Log error but don't propagate exception to ensure cleanup continues
+                    this.server.getLogger().error("Error closing level provider for: " + this.getName() + ", some resources may leak", e);
+                }
             }
 
             this.provider = null;

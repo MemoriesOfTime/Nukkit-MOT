@@ -167,10 +167,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
     }
 
+    @NotNull
     public static Block get(int id) {
         return get(id, null);
     }
 
+    @NotNull
     public static Block get(int id, Integer meta) {
         if (id < 0) {
             id = 255 - id;
@@ -212,10 +214,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
     }
 
+    @NotNull
     public static Block get(int id, Integer meta, Position pos) {
         return get(id, meta, pos, 0);
     }
 
+    @NotNull
     public static Block get(int id, Integer meta, Position pos, int layer) {
         if (id < 0) {
             id = 255 - id;
@@ -258,6 +262,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return block;
     }
 
+    @NotNull
     public static Block get(int id, int data) {
         if (id < 0) {
             id = 255 - id;
@@ -288,10 +293,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
     }
 
+    @NotNull
     public static Block get(int fullId, Level level, int x, int y, int z) {
         return get(fullId, level, x, y, z, 0);
     }
 
+    @NotNull
     public static Block get(int fullId, Level level, int x, int y, int z, int layer) {
         int id = fullId << DATA_BITS;
 
@@ -316,10 +323,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         return block;
     }
 
+    @NotNull
     public static Block get(int id, int meta, Level level, int x, int y, int z) {
         return get(id, meta, level, x, y, z, 0);
     }
 
+    @NotNull
     public static Block get(int id, int meta, Level level, int x, int y, int z, int layer) {
         Block block;
         if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {

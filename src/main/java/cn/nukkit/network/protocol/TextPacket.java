@@ -30,7 +30,7 @@ public class TextPacket extends DataPacket {
 
     public byte type;
     public String source = "";
-    public String message = "";
+    public String message = " ";
     public String[] parameters = new String[0];
     public boolean isLocalized = false;
     public String xboxUserId = "";
@@ -181,6 +181,9 @@ public class TextPacket extends DataPacket {
                     this.putString("textObjectAnnouncement");
                     this.putString("textObject");
                     this.putByte(this.type);
+                    if (this.message.isEmpty()) {
+                        this.message = " ";
+                    }
                     this.putString(this.message);
                     break;
 

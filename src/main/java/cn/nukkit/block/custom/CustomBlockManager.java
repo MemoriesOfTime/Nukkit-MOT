@@ -4,6 +4,7 @@ import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockUnknown;
 import cn.nukkit.block.custom.comparator.AlphabetPaletteComparator;
 import cn.nukkit.block.custom.comparator.HashedPaletteComparator;
 import cn.nukkit.block.custom.container.BlockContainer;
@@ -399,7 +400,7 @@ public class CustomBlockManager {
         if (block instanceof Block) {
             return (Block) block;
         }
-        return null;
+        return new BlockUnknown(id, meta);
     }
 
     public Class<?> getClassType(int blockId) {
