@@ -2,7 +2,6 @@ package cn.nukkit.entity;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -11,8 +10,6 @@ import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
 public abstract class EntityFlying extends BaseEntity {
-
-    private int checkTargetCooldown = 0;
 
     public EntityFlying(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -34,7 +31,7 @@ public abstract class EntityFlying extends BaseEntity {
                 !((Entity) target).canBeFollowed()) {
 
             double near = Integer.MAX_VALUE;
-            for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this)) {
+            for (Entity entity : this.getLevel().getSharedNearbyEntities(this, EntityRanges.createTargetSearchBox(this))) {
                 if (!(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }
@@ -119,13 +116,7 @@ public abstract class EntityFlying extends BaseEntity {
                 }
 
                 Vector3 before = this.target;
-                // It should not be called every tick
-                if (checkTargetCooldown-- <= 0) {
-                    if (this.isLookupForTarget()) {
-                        checkTarget();
-                    }
-                    checkTargetCooldown = this.getServer().mobFollowTicks;
-                }
+                this.checkTarget();
                 if (this.target instanceof EntityCreature || before != this.target) {
                     double x = this.target.x - this.x;
                     double y = this.target.y - this.y;

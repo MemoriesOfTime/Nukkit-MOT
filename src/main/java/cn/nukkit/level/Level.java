@@ -284,6 +284,10 @@ public class Level implements ChunkManager, Metadatable {
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
 
+    private static final int ENTITY_NEARBY_CACHE_TICKS = 5;
+    private final Long2ObjectOpenHashMap<List<Entity>> entityNearbyCache = new Long2ObjectOpenHashMap<>();
+    private final Long2LongOpenHashMap entityNearbyCacheTime = new Long2LongOpenHashMap();
+
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkGenerationQueue = new Long2ObjectOpenHashMap<>();
@@ -2962,6 +2966,24 @@ public class Level implements ChunkManager, Metadatable {
         }
 
         return nearby.toArray(new Entity[0]);
+    }
+
+    public List<Entity> getSharedNearbyEntities(Entity requester, AxisAlignedBB searchBox) {
+        if (requester == null || requester.getLevel() != this) {
+            return Collections.emptyList();
+        }
+
+        long chunkKey = chunkHash(((int) requester.x) >> 4, ((int) requester.z) >> 4);
+        long currentTick = this.levelCurrentTick;
+
+        long lastUpdate = entityNearbyCacheTime.get(chunkKey);
+        if (lastUpdate == 0 || currentTick - lastUpdate > ENTITY_NEARBY_CACHE_TICKS) {
+            List<Entity> entities = new ArrayList<>(List.of(this.getNearbyEntities(searchBox, requester)));
+            entityNearbyCache.put(chunkKey, entities);
+            entityNearbyCacheTime.put(chunkKey, currentTick);
+        }
+
+        return entityNearbyCache.get(chunkKey);
     }
 
     public Entity[] getNearbyEntities(AxisAlignedBB bb) {

@@ -362,12 +362,6 @@ public class Server {
      */
     public boolean doNotLimitInteractions;
     /**
-     * Delay between determining the mob's target.
-     * Low value - low performance, fast target detection
-     * High value - high performance, long target detection
-     */
-    public int mobFollowTicks;
-    /**
      * After how many ticks mobs are despawned.
      */
     public int mobDespawnTicks;
@@ -3221,7 +3215,6 @@ public class Server {
         this.doNotLimitInteractions = this.getPropertyBoolean("do-not-limit-interactions", false);
         this.motd = this.getPropertyString("motd", "Minecraft Server");
         this.viewDistance = Math.max(1, this.getPropertyInt("view-distance", 8));
-        this.mobFollowTicks = this.getPropertyInt("ticks-per-entity-follow", 5);
         this.mobDespawnTicks = this.getPropertyInt("ticks-per-entity-despawns", 12000);
         this.port = this.getPropertyInt("server-port", 19132);
         this.ip = this.getPropertyString("server-ip", "0.0.0.0");
@@ -3391,7 +3384,6 @@ public class Server {
             put("chunk-generation-queue-size", 8);
             put("chunk-generation-population-queue-size", 8);
             put("ticks-per-autosave", 6000);
-            put("ticks-per-entity-follow", 5);
             put("ticks-per-entity-spawns", 200);
             put("ticks-per-entity-despawns", 12000);
             put("thread-watchdog", true);

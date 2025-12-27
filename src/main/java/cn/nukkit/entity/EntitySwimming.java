@@ -3,7 +3,6 @@ package cn.nukkit.entity;
 import cn.nukkit.block.Block;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
@@ -15,8 +14,6 @@ public abstract class EntitySwimming extends BaseEntity {
 
     private boolean inWaterCached = true;
     private boolean inBubbleColumnCached = false;
-
-    private int checkTargetCooldown = 0;
 
     public EntitySwimming(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -41,7 +38,7 @@ public abstract class EntitySwimming extends BaseEntity {
         }
 
         double near = Integer.MAX_VALUE;
-        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this)) {
+        for (Entity entity : this.getLevel().getSharedNearbyEntities(this, EntityRanges.createTargetSearchBox(this))) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }
@@ -123,13 +120,7 @@ public abstract class EntitySwimming extends BaseEntity {
                 }
 
                 Vector3 before = this.target;
-                // It should not be called every tick
-                if (checkTargetCooldown-- <= 0) {
-                    if (this.isLookupForTarget()) {
-                        checkTarget();
-                    }
-                    checkTargetCooldown = this.getServer().mobFollowTicks;
-                }
+                this.checkTarget();
                 if (this.target instanceof EntityCreature || before != this.target) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;

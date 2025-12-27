@@ -10,9 +10,7 @@ import cn.nukkit.entity.route.RouteFinder;
 import cn.nukkit.entity.route.RouteFinderSearchTask;
 import cn.nukkit.entity.route.RouteFinderThreadPool;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.generator.math.BoundingBox;
 import cn.nukkit.level.particle.BubbleParticle;
-import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
@@ -25,8 +23,6 @@ import org.apache.commons.math3.util.FastMath;
 public abstract class EntityWalking extends BaseEntity {
 
     private static final double FLOW_MULTIPLIER = 0.1;
-
-    private int checkTargetCooldown = 0;
 
     @Getter
     @Setter
@@ -52,7 +48,7 @@ public abstract class EntityWalking extends BaseEntity {
         }
 
         double near = Integer.MAX_VALUE;
-        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this)) {
+        for (Entity entity : this.getLevel().getSharedNearbyEntities(this, EntityRanges.createTargetSearchBox(this))) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }
@@ -250,12 +246,8 @@ public abstract class EntityWalking extends BaseEntity {
                     }
                 }
 
-                // It should not be called every tick
-                if (checkTargetCooldown-- <= 0) {
-                    if (this.isLookupForTarget()) {
-                        checkTarget();
-                    }
-                    checkTargetCooldown = this.getServer().mobFollowTicks;
+                if (this.isLookupForTarget()) {
+                    this.checkTarget();
                 }
                 if (this.target != null || !this.isLookupForTarget()) {
                     double x = this.target.x - this.x;
