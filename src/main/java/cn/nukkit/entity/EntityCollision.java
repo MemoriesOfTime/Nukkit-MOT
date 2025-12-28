@@ -58,7 +58,7 @@ public class EntityCollision implements ChunkLoader {
         double speedSq = motionX * motionX + motionY * motionY + motionZ * motionZ;
 
         updateAdaptiveCheckInterval(speedSq, currentTick);
-        long cacheKey = calculateCacheKey(bb, motionX, motionY, motionZ);
+        long cacheKey = cacheCollision(bb, motionX, motionY, motionZ);
 
         if (!hasBlockChangesInArea(bb) && collisionCache.containsKey(cacheKey)) {
             return collisionCache.get(cacheKey);
@@ -174,7 +174,7 @@ public class EntityCollision implements ChunkLoader {
         if (speedSq > 0.001) lastMovementTick = currentTick;
     }
 
-    private long calculateCacheKey(AxisAlignedBB bb, double motionX, double motionY, double motionZ) {
+    private long cacheCollision(AxisAlignedBB bb, double motionX, double motionY, double motionZ) {
         long x = (long) (bb.getMinX() * 1000);
         long y = (long) (bb.getMinY() * 1000);
         long z = (long) (bb.getMinZ() * 1000);
