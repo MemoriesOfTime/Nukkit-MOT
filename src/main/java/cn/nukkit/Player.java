@@ -2027,9 +2027,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.addMovementSpeedModifier(EntityMovementSpeedModifier.of(EntityMovementSpeedModifier.FREEZING, getFreezingTicks() * (float) -3.58e-4, EntityMovementSpeedModifier.Operation.ADD));
             }
         }
-        if (!powderSnow && this.getFreezingTicks() > 0) {
-            this.addFreezingTicks(-1);
-            this.addMovementSpeedModifier(EntityMovementSpeedModifier.of(EntityMovementSpeedModifier.FREEZING, getFreezingTicks() * (float) -3.58e-4, EntityMovementSpeedModifier.Operation.ADD));
+        if (!powderSnow) {
+            if (this.getFreezingTicks() > 0) {
+                this.addFreezingTicks(-1);
+                this.addMovementSpeedModifier(EntityMovementSpeedModifier.of(EntityMovementSpeedModifier.FREEZING, getFreezingTicks() * (float) -3.58e-4, EntityMovementSpeedModifier.Operation.ADD));
+            } else {
+                this.removeMovementSpeedModifier(EntityMovementSpeedModifier.FREEZING);
+            }
         }
 
         if (this.getFreezingTicks() == 140 && this.getServer().getTick() % 40 == 0) {
@@ -7905,6 +7909,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void addMovementSpeedModifier(EntityMovementSpeedModifier modifier) {
         super.addMovementSpeedModifier(modifier);
         this.speedToSend = this.recalculateMovementSpeedToSend();
+        System.out.println(speedToSend);
         this.sendMovementSpeed();
     }
 

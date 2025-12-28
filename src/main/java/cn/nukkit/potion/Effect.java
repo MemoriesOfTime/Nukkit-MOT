@@ -339,21 +339,12 @@ public class Effect implements Cloneable {
 
                 player.dataPacket(pk);
 
-                if (this.id == Effect.SPEED) {
-                    entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED);
-                    player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
-                }
-                if (this.id == Effect.SLOWNESS) {
-                    entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SLOWNESS);
-                    player.setAttribute(Attribute.getAttribute(Attribute.MOVEMENT_SPEED).setValue(Player.DEFAULT_SPEED).setDefaultValue(Player.DEFAULT_SPEED));
-                }
-            } else {
-                if (this.id == Effect.SPEED) {
-                    entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED);
-                }
-                if (this.id == Effect.SLOWNESS) {
-                    entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SLOWNESS);
-                }
+            }
+            if (this.id == Effect.SPEED) {
+                entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED);
+            }
+            if (this.id == Effect.SLOWNESS) {
+                entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SLOWNESS);
             }
             if (this.id == Effect.HEALTH_BOOST) {
                 float max = entity.getMaxHealth();
