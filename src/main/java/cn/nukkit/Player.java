@@ -7909,7 +7909,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public void addMovementSpeedModifier(EntityMovementSpeedModifier modifier) {
         super.addMovementSpeedModifier(modifier);
         this.speedToSend = this.recalculateMovementSpeedToSend();
-        System.out.println(speedToSend);
         this.sendMovementSpeed();
     }
 
@@ -7941,4 +7940,5 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         return Math.max(newMovementSpeed, 0.00f);
     }
+
 }
