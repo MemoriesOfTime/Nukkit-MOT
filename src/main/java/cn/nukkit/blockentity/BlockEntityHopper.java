@@ -123,10 +123,6 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             return false;
         }
 
-        if (!this.level.isChunkInUse(this.getChunkX(), this.getChunkZ())) {
-            return false;
-        }
-
         this.transferCooldown--;
 
         if (!this.isOnTransferCooldown()) {
