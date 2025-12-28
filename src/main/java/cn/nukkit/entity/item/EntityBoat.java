@@ -243,7 +243,6 @@ public class EntityBoat extends EntityVehicle {
             }
 
             ent.setSeatPosition(getMountedOffset(ent).add(RIDER_PASSENGER_OFFSET));
-            // super.updatePassengerPosition(ent);
             if (sendLinks) {
                 broadcastLinkPacket(ent, SetEntityLinkPacket.TYPE_RIDE);
             }
