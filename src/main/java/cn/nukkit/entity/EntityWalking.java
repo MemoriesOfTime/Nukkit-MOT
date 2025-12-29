@@ -160,19 +160,17 @@ public abstract class EntityWalking extends BaseEntity {
 
     private boolean isVisionBlockingBlock(Block block) {
         if (block == null) return false;
-        int id = block.getId();
+
         if (block instanceof BlockSlab ||
                 block instanceof BlockFence ||
                 block instanceof BlockFenceGate ||
                 block instanceof BlockTrapdoor ||
-                id == Block.AIR ||
-                id == Block.WATER ||
-                id == Block.STILL_WATER ||
-                id == Block.TALL_GRASS ||
-                id == Block.DEAD_BUSH ||
-                id == Block.FLOWER) {
+                block instanceof BlockDoor ||
+                block instanceof BlockFlowable ||
+                block.isAir()) {
             return false;
         }
+
         return !block.isTransparent() && !block.canPassThrough();
     }
 
@@ -218,13 +216,19 @@ public abstract class EntityWalking extends BaseEntity {
         int id = block.getId();
         if (id == Block.STONE ||
                 id == Block.COBBLESTONE ||
-                id == Block.DIRT ||
                 id == Block.GRAVEL ||
                 id == Block.SAND ||
                 id == Block.GRASS ||
                 id == Block.MYCELIUM ||
-                block instanceof BlockSlab ||
-                block instanceof BlockStairs) {
+                id == Block.DEEPSLATE ||
+                id == Block.COBBLED_DEEPSLATE ||
+                id == Block.POLISHED_DEEPSLATE ||
+                id == Block.TUFF ||
+                id == Block.DRIPSTONE_BLOCK ||
+                id == Block.MOSS_BLOCK ||
+                id == Block.ROOTED_DIRT ||
+                id == Block.SANDSTONE ||
+                id == Block.RED_SANDSTONE) {
             return true;
         }
         return !block.canPassThrough() && !Block.isWater(id) && !Block.isLava(id);
@@ -232,22 +236,15 @@ public abstract class EntityWalking extends BaseEntity {
 
     private boolean canPassThroughInCave(Block block) {
         if (block == null) return true;
+
         int id = block.getId();
-        if (block instanceof BlockSlab ||
-                block instanceof BlockStairs ||
-                block instanceof BlockFence ||
-                block instanceof BlockFenceGate ||
-                block instanceof BlockTrapdoor ||
-                block instanceof BlockFlowable ||
+        if (block instanceof BlockFlowable ||
                 id == Block.AIR ||
-                id == Block.TALL_GRASS ||
-                id == Block.DEAD_BUSH ||
                 id == Block.FLOWER) {
             return true;
         }
-        return block.canPassThrough() ||
-                id == Block.WATER ||
-                id == Block.STILL_WATER;
+
+        return block.canPassThrough() || Block.isWater(id);
     }
 
     private Vector3 exploreCaveArea() {
@@ -289,7 +286,7 @@ public abstract class EntityWalking extends BaseEntity {
         Block block = that.getSide(this.getHorizontalFacing());
         if (this.followTarget == null && this.passengers.isEmpty()) {
             Block down = block.down();
-            if (!isSolidGroundInCave(down) && !isSolidGroundInCave(block) && !isSolidGroundInCave(down.down())) {
+            if (!isSolidGround(down) && !isSolidGround(block) && !isSolidGround(down.down())) {
                 this.stayTime = 10;
             }
         }
@@ -320,22 +317,17 @@ public abstract class EntityWalking extends BaseEntity {
         return false;
     }
 
-    private boolean isSolidGroundInCave(Block block) {
+    private boolean isSolidGround(Block block) {
         if (block == null) return false;
         if (block.getFloorY() < level.getMinBlockY()) {
             return false;
         }
+
         int id = block.getId();
-        if (block instanceof BlockSlab ||
-                block instanceof BlockFence ||
-                block instanceof BlockFenceGate ||
-                block instanceof BlockTrapdoor ||
-                block instanceof BlockStairs ||
-                id == Block.TALL_GRASS ||
-                id == Block.DEAD_BUSH ||
-                id == Block.FLOWER) {
+        if (block instanceof BlockFlowable || id == Block.FLOWER) {
             return false;
         }
+
         return !block.canPassThrough() && id != Block.AIR && !Block.isWater(id) && !Block.isLava(id);
     }
 
@@ -394,6 +386,8 @@ public abstract class EntityWalking extends BaseEntity {
             }
 
             if (this.getServer().getMobAiEnabled()) {
+                this.checkTarget();
+
                 if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed() && this.target != null) {
                     if (this.noPathFoundTimer > 60) {
                         attemptCaveNavigation();
@@ -429,13 +423,13 @@ public abstract class EntityWalking extends BaseEntity {
                     }
                 }
 
-                this.checkTarget();
-                if (this.target != null || !this.isLookupForTarget()) {
+                boolean shouldActivelyMoveToTarget = true;
+
+                if (this.target != null && shouldActivelyMoveToTarget) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;
 
                     double diff = Math.abs(x) + Math.abs(z);
-                    boolean distance = false;
                     if (this.riding != null || diff <= 0.001 || !inWater && (this.stayTime > 0 || (this.distance(this.target) <= (this.getWidth() / 2 + 0.3) * nearbyDistanceMultiplier()))) {
                         if (!this.isInsideOfWater()) {
                             this.motionX = 0;
@@ -462,7 +456,7 @@ public abstract class EntityWalking extends BaseEntity {
                         }
                     }
 
-                    if (this.noRotateTicks <= 0 && !distance && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && (this.stayTime <= 0 || Utils.rand()) && diff > 0.001) {
+                    if (this.noRotateTicks <= 0 && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && (this.stayTime <= 0 || Utils.rand()) && diff > 0.001) {
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                 }
@@ -497,7 +491,7 @@ public abstract class EntityWalking extends BaseEntity {
                 Vector2 af = new Vector2(this.x, this.z);
                 if ((be.x != af.x || be.y != af.y) && !isJump) {
                     Block collisionBlock = getFrontCollisionBlock();
-                    if (isSolidGroundInCave(collisionBlock)) {
+                    if (isSolidGround(collisionBlock)) {
                         this.moveTime -= 60;
                     }
                 }
@@ -575,7 +569,12 @@ public abstract class EntityWalking extends BaseEntity {
             this.stayTime = 0;
             this.moveTime = Utils.rand(30, 80);
             this.caveNavigationMode = 1;
-            Vector3 escapePos = findCaveEscape();
+            Vector3 escapePos = null;
+
+            if (isInCave()) {
+                escapePos = findCaveEscape();
+            }
+
             if (escapePos != null) {
                 this.target = escapePos;
             } else {
@@ -646,5 +645,25 @@ public abstract class EntityWalking extends BaseEntity {
             return null;
         }
         return level.getBlock(chunk, checkX, checkY, checkZ, false);
+    }
+
+    private boolean isInCave() {
+        int skyLight = this.level.getBlockSkyLightAt(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(this.y + 1), NukkitMath.floorDouble(this.z));
+        boolean hasDirectSky = skyLight == 15;
+        if (hasDirectSky) {
+            return false;
+        }
+
+        int x = NukkitMath.floorDouble(this.x);
+        int z = NukkitMath.floorDouble(this.z);
+        int y = NukkitMath.floorDouble(this.y) + 2;
+        while (y <= this.level.getMaxBlockY()) {
+            Block block = this.level.getBlock(x, y, z, false);
+            if (!block.canPassThrough()) {
+                return true;
+            }
+            y++;
+        }
+        return false;
     }
 }

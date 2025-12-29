@@ -88,7 +88,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-
 /**
  * @author MagicDroidX Nukkit Project
  */
@@ -285,7 +284,6 @@ public class Level implements ChunkManager, Metadatable {
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
 
     // Cache for fast entity processing for checkTarget()
-    private static final long ENTITY_NEARBY_CACHE_TICKS = 5;
     private final Long2ObjectOpenHashMap<List<Entity>> entityNearbyCache = new Long2ObjectOpenHashMap<>();
     private final Long2LongOpenHashMap entityNearbyCacheTime = new Long2LongOpenHashMap();
     private final LongSet entityNearbyCacheDirty = new LongOpenHashSet();
@@ -2991,18 +2989,37 @@ public class Level implements ChunkManager, Metadatable {
         if (requester == null || requester.getLevel() != this) {
             return Collections.emptyList();
         }
+
         long chunkKey = chunkHash(((int) requester.x) >> 4, ((int) requester.z) >> 4);
         long currentTick = this.levelCurrentTick;
         long lastUpdate = entityNearbyCacheTime.get(chunkKey);
         boolean isDirty = entityNearbyCacheDirty.contains(chunkKey);
 
-        if (isDirty || lastUpdate == 0 || currentTick - lastUpdate > ENTITY_NEARBY_CACHE_TICKS) {
-            List<Entity> entities = new ArrayList<>(List.of(this.getNearbyEntities(searchBox, requester)));
-            entityNearbyCache.put(chunkKey, entities);
+        if (isDirty || lastUpdate == 0 || (currentTick - lastUpdate) > 5) {
+            Entity[] rawEntities = this.getNearbyEntities(searchBox, null);
+            List<Entity> validEntities = new ArrayList<>(rawEntities.length);
+            for (Entity e : rawEntities) {
+                if (e != null && e.isValid() && !e.closed) {
+                    validEntities.add(e);
+                }
+            }
+            entityNearbyCache.put(chunkKey, validEntities);
             entityNearbyCacheTime.put(chunkKey, currentTick);
             entityNearbyCacheDirty.remove(chunkKey);
         }
-        return entityNearbyCache.get(chunkKey);
+
+        List<Entity> cached = entityNearbyCache.get(chunkKey);
+        if (cached == null) {
+            return Collections.emptyList();
+        }
+
+        List<Entity> result = new ArrayList<>(cached.size());
+        for (Entity e : cached) {
+            if (e != requester && e.isValid() && !e.closed && searchBox.intersectsWith(e.boundingBox)) {
+                result.add(e);
+            }
+        }
+        return result;
     }
 
     public void setDirtyNearby(Entity entity) {
