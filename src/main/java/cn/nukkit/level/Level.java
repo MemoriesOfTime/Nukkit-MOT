@@ -2989,37 +2989,18 @@ public class Level implements ChunkManager, Metadatable {
         if (requester == null || requester.getLevel() != this) {
             return Collections.emptyList();
         }
-
         long chunkKey = chunkHash(((int) requester.x) >> 4, ((int) requester.z) >> 4);
         long currentTick = this.levelCurrentTick;
         long lastUpdate = entityNearbyCacheTime.get(chunkKey);
         boolean isDirty = entityNearbyCacheDirty.contains(chunkKey);
 
-        if (isDirty || lastUpdate == 0 || (currentTick - lastUpdate) > 5) {
-            Entity[] rawEntities = this.getNearbyEntities(searchBox, null);
-            List<Entity> validEntities = new ArrayList<>(rawEntities.length);
-            for (Entity e : rawEntities) {
-                if (e != null && e.isValid() && !e.closed) {
-                    validEntities.add(e);
-                }
-            }
-            entityNearbyCache.put(chunkKey, validEntities);
+        if (isDirty || lastUpdate == 0 || currentTick - lastUpdate > 5) {
+            List<Entity> entities = new ArrayList<>(List.of(this.getNearbyEntities(searchBox, requester)));
+            entityNearbyCache.put(chunkKey, entities);
             entityNearbyCacheTime.put(chunkKey, currentTick);
             entityNearbyCacheDirty.remove(chunkKey);
         }
-
-        List<Entity> cached = entityNearbyCache.get(chunkKey);
-        if (cached == null) {
-            return Collections.emptyList();
-        }
-
-        List<Entity> result = new ArrayList<>(cached.size());
-        for (Entity e : cached) {
-            if (e != requester && e.isValid() && !e.closed && searchBox.intersectsWith(e.boundingBox)) {
-                result.add(e);
-            }
-        }
-        return result;
+        return entityNearbyCache.get(chunkKey);
     }
 
     public void setDirtyNearby(Entity entity) {
