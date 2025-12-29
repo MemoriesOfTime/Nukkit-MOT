@@ -131,13 +131,8 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             }
 
             boolean changed = false;
-            HopperInventory inv = this.getInventory();
 
-            if (!this.inventory.isEmpty()) {
-                changed = this.pushItemsIntoMinecart() || this.pushItems();
-            }
-
-            if (!changed && !this.inventory.isFull()) {
+            if (!this.inventory.isFull()) {
                 BlockEntity blockEntity = this.level.getBlockEntity(this.up());
                 Block block = null;
                 if (blockEntity instanceof BlockEntityContainer ||
@@ -146,6 +141,10 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                 } else {
                     changed = this.pullItemsFromMinecart() || this.pickupItems();
                 }
+            }
+
+            if (!changed && !this.inventory.isEmpty()) {
+                changed = this.pushItemsIntoMinecart() || this.pushItems();
             }
 
             if (changed) {

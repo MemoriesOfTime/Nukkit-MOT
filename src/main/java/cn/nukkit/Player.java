@@ -1975,7 +1975,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.inPortalTicks == this.server.portalTicks || (this.server.vanillaPortals && this.inPortalTicks == 25 && this.gamemode == CREATIVE)) {
                 EntityPortalEnterEvent ev = new EntityPortalEnterEvent(this, EntityPortalEnterEvent.PortalType.NETHER);
 
-                if (this.portalPos == null) {
+                if (this.portalPos == null && this.server.portalTicks >= 80) {
                     ev.setCancelled();
                 }
 
@@ -7940,5 +7940,4 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
         return Math.max(newMovementSpeed, 0.00f);
     }
-
 }

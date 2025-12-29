@@ -20,16 +20,26 @@ import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.math3.util.FastMath;
 
-public abstract class EntityWalking extends BaseEntity {
+import java.util.Objects;
 
+public abstract class EntityWalking extends BaseEntity {
     private static final double FLOW_MULTIPLIER = 0.1;
 
     @Getter
     @Setter
     protected RouteFinder route;
 
+    private int stuckTimer = 0;
+    private Vector3 lastPosition;
+    private int noPathFoundTimer = 0;
+    private int alternativePathAttempts = 0;
+    private int caveNavigationMode = 0;
+    private int lastTargetCheck = 0;
+    private Vector3 lastTargetPos = null;
+
     public EntityWalking(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
+        this.lastPosition = new Vector3(this.x, this.y, this.z);
     }
 
     protected void checkTarget() {
@@ -37,68 +47,226 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
-        if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed() && targetOption((EntityCreature) this.followTarget, this.distanceSquared(this.followTarget)) && this.target != null) {
+        if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() &&
+                this.followTarget.canBeFollowed() &&
+                targetOption((EntityCreature) this.followTarget, this.distanceSquared(this.followTarget)) &&
+                this.target != null) {
+            this.lastTargetCheck = 0;
             return;
         }
 
         this.followTarget = null;
-
         if (!this.passengers.isEmpty() && !(this instanceof EntityLlama) && !(this instanceof EntityPig)) {
             return;
         }
 
         double near = Integer.MAX_VALUE;
+        Entity closestTarget = null;
         for (Entity entity : this.getLevel().getSharedNearbyEntities(this, EntityRanges.createTargetSearchBox(this))) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }
-
             if (creature instanceof BaseEntity base && base.isFriendly() == this.isFriendly() && !this.isInLove()) {
                 continue;
             }
-
+            if (!canSeeEntity(creature)) {
+                continue;
+            }
             double distance = this.distanceSquared(creature);
             if (distance > near || !this.targetOption(creature, distance)) {
                 continue;
             }
-
             near = distance;
+            closestTarget = creature;
+        }
+
+        if (closestTarget != null) {
             this.stayTime = 0;
             this.moveTime = 0;
-            this.followTarget = creature;
+            this.followTarget = closestTarget;
             if (this.route == null && this.passengers.isEmpty()) {
-                this.target = creature;
+                this.target = closestTarget;
             }
-        }
+            this.noPathFoundTimer = 0;
+            this.alternativePathAttempts = 0;
+            this.caveNavigationMode = 0;
+            this.lastTargetPos = new Vector3(closestTarget.x, closestTarget.y, closestTarget.z);
+        } else if (this.canSetTemporalTarget()) {
+            this.lastTargetCheck++;
+            if (this.lastTargetCheck > 40) {
+                this.lastTargetCheck = 0;
+                this.caveNavigationMode = 1;
+            }
 
-        if (!this.canSetTemporalTarget()) {
-            return;
+            if (this.stayTime > 0) {
+                if (Utils.rand(1, 100) > 5) {
+                    return;
+                }
+                Vector3 newTarget = findCavePosition(20);
+                this.target = Objects.requireNonNullElseGet(newTarget, () -> new Vector3(this.x, this.y, this.z));
+            } else if (Utils.rand(1, 100) == 1) {
+                this.stayTime = Utils.rand(40, 120);
+                Vector3 newTarget = findCavePosition(15);
+                this.target = Objects.requireNonNullElseGet(newTarget, () -> new Vector3(this.x, this.y, this.z));
+            } else if (this.moveTime <= 0 || this.target == null) {
+                this.stayTime = 0;
+                this.moveTime = Utils.rand(60, 180);
+                if (this.caveNavigationMode > 0 && Utils.rand(1, 100) > 50) {
+                    Vector3 newTarget = exploreCaveArea();
+                    this.target = Objects.requireNonNullElseGet(newTarget, () -> new Vector3(
+                            this.x + Utils.rand(-12, 12),
+                            this.y,
+                            this.z + Utils.rand(-12, 12)
+                    ));
+                } else {
+                    Vector3 newTarget = findCavePosition(20);
+                    this.target = Objects.requireNonNullElseGet(newTarget, () -> new Vector3(
+                            this.x + Utils.rand(-10, 10),
+                            this.y,
+                            this.z + Utils.rand(-10, 10)
+                    ));
+                }
+            }
         }
+    }
 
-        if (this.stayTime > 0) {
-            if (Utils.rand(1, 100) > 5) {
-                return;
-            }
-            this.target = this.add(Utils.rand(-30, 30), Utils.rand(-20.0, 20.0) / 10, Utils.rand(-30, 30));
-        } else if (Utils.rand(1, 100) == 1) {
-            this.stayTime = Utils.rand(80, 200);
-            this.target = this.add(Utils.rand(-30, 30), Utils.rand(-20.0, 20.0) / 10, Utils.rand(-30, 30));
-        } else if (this.moveTime <= 0 || this.target == null) {
-            this.stayTime = 0;
-            this.moveTime = Utils.rand(80, 200);
-            double tx = this.x;
-            double tz = this.z;
-            int attempts = 0;
-            boolean inWater = true;
-            while (attempts++ < 10 && inWater) {
-                tx = this.x + Utils.rand(-30, 30);
-                tz = this.z + Utils.rand(-30, 30);
-                int txFloor = NukkitMath.floorDouble(tx);
-                int tzFloor = NukkitMath.floorDouble(tz);
-                inWater = Block.isWater(level.getBlockIdAt(chunk, txFloor, level.getHighestBlockAt(txFloor, tzFloor), tzFloor));
-            }
-            this.target = new Vector3(tx, this.y + Utils.rand(-20.0, 20.0) / 10, tz);
+    private boolean canSeeEntity(Entity target) {
+        double distance = this.distance(target);
+        if (distance < 1.5) {
+            return true;
         }
+        Vector3 from = new Vector3(this.x, this.y + this.getEyeHeight(), this.z);
+        Vector3 to = new Vector3(target.x, target.y + target.getHeight() / 2, target.z);
+        return !hasVisionObstacle(from, to);
+    }
+
+    private boolean hasVisionObstacle(Vector3 from, Vector3 to) {
+        double distance = from.distance(to);
+        if (distance > 16) return true;
+        Vector3 direction = to.subtract(from).normalize();
+        int steps = (int) Math.ceil(distance * 2);
+        for (int i = 1; i < steps; i++) {
+            Vector3 point = from.add(direction.multiply(i * 0.5));
+            int x = NukkitMath.floorDouble(point.x);
+            int y = NukkitMath.floorDouble(point.y);
+            int z = NukkitMath.floorDouble(point.z);
+            Block block = level.getBlock(x, y, z, false);
+            if (isVisionBlockingBlock(block)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isVisionBlockingBlock(Block block) {
+        if (block == null) return false;
+        int id = block.getId();
+        if (block instanceof BlockSlab ||
+                block instanceof BlockFence ||
+                block instanceof BlockFenceGate ||
+                block instanceof BlockTrapdoor ||
+                id == Block.AIR ||
+                id == Block.WATER ||
+                id == Block.STILL_WATER ||
+                id == Block.TALL_GRASS ||
+                id == Block.DEAD_BUSH ||
+                id == Block.FLOWER) {
+            return false;
+        }
+        return !block.isTransparent() && !block.canPassThrough();
+    }
+
+    private Vector3 findCavePosition(int radius) {
+        for (int attempt = 0; attempt < 12; attempt++) {
+            double tx = this.x + Utils.rand(-radius, radius);
+            double tz = this.z + Utils.rand(-radius, radius);
+            int txFloor = NukkitMath.floorDouble(tx);
+            int tzFloor = NukkitMath.floorDouble(tz);
+            int currentY = Math.max(level.getMinBlockY(), NukkitMath.floorDouble(this.y));
+            int checkRange = 6;
+            for (int yOffset = -checkRange; yOffset <= checkRange; yOffset++) {
+                int checkY = currentY + yOffset;
+                if (checkY < level.getMinBlockY() || checkY > level.getMaxBlockY()) {
+                    continue;
+                }
+                if (isCavePositionWalkable(txFloor, checkY, tzFloor)) {
+                    return new Vector3(tx, checkY + 1, tz);
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean isCavePositionWalkable(int x, int y, int z) {
+        if (y < level.getMinBlockY() || y > level.getMaxBlockY()) {
+            return false;
+        }
+        Block floor = level.getBlock(x, y, z, false);
+        if (!isCaveWalkableSurface(floor)) {
+            return false;
+        }
+        Block body = level.getBlock(x, y + 1, z, false);
+        if (body != null && !canPassThroughInCave(body)) {
+            return false;
+        }
+        Block head = level.getBlock(x, y + 2, z, false);
+        return head == null || canPassThroughInCave(head);
+    }
+
+    private boolean isCaveWalkableSurface(Block block) {
+        if (block == null) return false;
+        int id = block.getId();
+        if (id == Block.STONE ||
+                id == Block.COBBLESTONE ||
+                id == Block.DIRT ||
+                id == Block.GRAVEL ||
+                id == Block.SAND ||
+                id == Block.GRASS ||
+                id == Block.MYCELIUM ||
+                block instanceof BlockSlab ||
+                block instanceof BlockStairs) {
+            return true;
+        }
+        return !block.canPassThrough() && !Block.isWater(id) && !Block.isLava(id);
+    }
+
+    private boolean canPassThroughInCave(Block block) {
+        if (block == null) return true;
+        int id = block.getId();
+        if (block instanceof BlockSlab ||
+                block instanceof BlockStairs ||
+                block instanceof BlockFence ||
+                block instanceof BlockFenceGate ||
+                block instanceof BlockTrapdoor ||
+                block instanceof BlockFlowable ||
+                id == Block.AIR ||
+                id == Block.TALL_GRASS ||
+                id == Block.DEAD_BUSH ||
+                id == Block.FLOWER) {
+            return true;
+        }
+        return block.canPassThrough() ||
+                id == Block.WATER ||
+                id == Block.STILL_WATER;
+    }
+
+    private Vector3 exploreCaveArea() {
+        if (this.lastTargetPos != null) {
+            double angle = Utils.rand(0, 360) * Math.PI / 180.0;
+            double distance = Utils.rand(5, 25);
+            double tx = this.lastTargetPos.x + Math.cos(angle) * distance;
+            double tz = this.lastTargetPos.z + Math.sin(angle) * distance;
+            int txFloor = NukkitMath.floorDouble(tx);
+            int tzFloor = NukkitMath.floorDouble(tz);
+            int highestY = Math.max(level.getMinBlockY(), level.getHighestBlockAt(txFloor, tzFloor));
+            for (int yOffset = -3; yOffset <= 3; yOffset++) {
+                int checkY = highestY + yOffset;
+                if (isCavePositionWalkable(txFloor, checkY, tzFloor)) {
+                    return new Vector3(tx, checkY + 1, tz);
+                }
+            }
+        }
+        return findCavePosition(25);
     }
 
     protected boolean checkJump(double dx, double dz) {
@@ -118,18 +286,26 @@ public abstract class EntityWalking extends BaseEntity {
         }
 
         Block that = this.getLevel().getBlock(new Vector3(NukkitMath.floorDouble(this.x + dx), (int) this.y, NukkitMath.floorDouble(this.z + dz)));
-        /*if (this.getDirection() == null) {
-            return false;
-        }*/
-
         Block block = that.getSide(this.getHorizontalFacing());
-        Block down;
-        if (this.followTarget == null && this.passengers.isEmpty() && !(down = block.down()).isSolid() && !block.isSolid() && !down.down().isSolid()) {
-            // "hack": try to make mobs not to be so suicidal
-            this.stayTime = 10;
-        } else if (!block.canPassThrough() && !(block instanceof BlockFlowable || block.getId() == BlockID.SOUL_SAND) && block.up().canPassThrough() && that.up(2).canPassThrough()) {
+        if (this.followTarget == null && this.passengers.isEmpty()) {
+            Block down = block.down();
+            if (!isSolidGroundInCave(down) && !isSolidGroundInCave(block) && !isSolidGroundInCave(down.down())) {
+                this.stayTime = 10;
+            }
+        }
+
+        if (!canPassThroughInCave(block) && !(block instanceof BlockFlowable || block.getId() == BlockID.SOUL_SAND) &&
+                canPassThroughInCave(block.up()) && canPassThroughInCave(that.up(2))) {
             if (block instanceof BlockFence || block instanceof BlockFenceGate) {
-                this.motionY = this.getGravity();
+                this.motionY = this.getGravity() * 2;
+            } else if (block instanceof BlockSlab) {
+                this.motionY = this.getGravity() * 3;
+            } else if (block instanceof BlockTrapdoor trapdoor) {
+                if (trapdoor.isOpen()) {
+                    return false;
+                } else {
+                    this.motionY = this.getGravity() * 3;
+                }
             } else if (this.motionY <= this.getGravity() * 4) {
                 this.motionY = this.getGravity() * 4;
             } else if (block instanceof BlockStairs) {
@@ -144,11 +320,32 @@ public abstract class EntityWalking extends BaseEntity {
         return false;
     }
 
+    private boolean isSolidGroundInCave(Block block) {
+        if (block == null) return false;
+        if (block.getFloorY() < level.getMinBlockY()) {
+            return false;
+        }
+        int id = block.getId();
+        if (block instanceof BlockSlab ||
+                block instanceof BlockFence ||
+                block instanceof BlockFenceGate ||
+                block instanceof BlockTrapdoor ||
+                block instanceof BlockStairs ||
+                id == Block.TALL_GRASS ||
+                id == Block.DEAD_BUSH ||
+                id == Block.FLOWER) {
+            return false;
+        }
+        return !block.canPassThrough() && id != Block.AIR && !Block.isWater(id) && !Block.isLava(id);
+    }
+
     @Override
     public Vector3 updateMove(int tickDiff) {
         if (!this.isInTickingRange()) {
             return null;
         }
+
+        updateStuckDetection(tickDiff);
 
         if (!isImmobile()) {
             if (this.age % 10 == 0 && this.route != null && !this.route.isSearching()) {
@@ -171,22 +368,38 @@ public abstract class EntityWalking extends BaseEntity {
                 return this.followTarget != null ? this.followTarget : this.target;
             }
 
+            if (this.target == null) {
+                this.target = new Vector3(this.x, this.y, this.z);
+            }
+
+            if (this.target.y < this.level.getMinBlockY()) {
+                this.target = new Vector3(this.target.x, this.level.getMinBlockY(), this.target.z);
+            }
+
             Block levelBlock = getLevelBlock();
             boolean inWater = levelBlock.getId() == 8 || levelBlock.getId() == 9;
-            Block down = level.getBlock(chunk, getFloorX(), getFloorY() - 1, getFloorZ(), false);
-            int downId = down.getId();
-            if (inWater && (downId == 0 || downId == 8 || downId == 9 || downId == BlockID.LAVA || downId == BlockID.STILL_LAVA || downId == BlockID.SIGN_POST || downId == BlockID.WALL_SIGN)) {
-                onGround = false;
-            }
-            if (downId == 0 || downId == BlockID.SIGN_POST || downId == BlockID.WALL_SIGN) {
+            int floorY = getFloorY() - 1;
+
+            if (floorY >= level.getMinBlockY()) {
+                Block down = level.getBlock(chunk, getFloorX(), floorY, getFloorZ(), false);
+                int downId = down.getId();
+                if (inWater && (downId == 0 || downId == 8 || downId == 9 || downId == BlockID.LAVA || downId == BlockID.STILL_LAVA)) {
+                    onGround = false;
+                }
+                if (downId == 0) {
+                    onGround = false;
+                }
+            } else {
                 onGround = false;
             }
 
             if (this.getServer().getMobAiEnabled()) {
-                if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.target != null && this.followTarget.canBeFollowed()) {
+                if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed() && this.target != null) {
+                    if (this.noPathFoundTimer > 60) {
+                        attemptCaveNavigation();
+                    }
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;
-
                     double diff = Math.abs(x) + Math.abs(z);
                     if (this.riding != null || diff <= 0.001 || !inWater && (this.stayTime > 0 || this.distance(this.followTarget) <= (this.getWidth() / 2 + 0.3) * nearbyDistanceMultiplier())) {
                         if (!this.isInsideOfWater()) {
@@ -210,14 +423,13 @@ public abstract class EntityWalking extends BaseEntity {
                             this.motionZ = this.getSpeed() * moveMultiplier * 0.1 * (z / diff);
                         }
                     }
+
                     if (this.noRotateTicks <= 0 && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && (this.stayTime <= 0 || Utils.rand()) && diff != 0) {
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                 }
 
-                if (this.isLookupForTarget()) {
-                    this.checkTarget();
-                }
+                this.checkTarget();
                 if (this.target != null || !this.isLookupForTarget()) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;
@@ -249,6 +461,7 @@ public abstract class EntityWalking extends BaseEntity {
                             this.motionZ = this.getSpeed() * moveMultiplier * 0.15 * (z / diff);
                         }
                     }
+
                     if (this.noRotateTicks <= 0 && !distance && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && (this.stayTime <= 0 || Utils.rand()) && diff > 0.001) {
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
@@ -258,21 +471,35 @@ public abstract class EntityWalking extends BaseEntity {
             double dx = this.motionX;
             double dz = this.motionZ;
             boolean isJump = this.checkJump(dx, dz);
+
             if (this.stayTime > 0 && !inWater) {
                 this.stayTime -= tickDiff;
                 this.move(0, this.motionY, 0);
             } else {
                 if (this.onGround) {
-                    double friction = (1 - this.getDrag()) * down.getFrictionFactor();
+                    double friction = (1 - this.getDrag()) * 0.6;
                     this.motionX *= friction;
                     this.motionZ *= friction;
                 }
-                Vector2 be = new Vector2(this.x + this.motionX, this.z + this.motionZ);
-                this.move(this.motionX, this.motionY, this.motionZ);
-                Vector2 af = new Vector2(this.x, this.z);
 
+                double newX = this.x + this.motionX;
+                double newY = this.y + this.motionY;
+                double newZ = this.z + this.motionZ;
+
+                if (newY >= level.getMinBlockY() && newY <= level.getMaxBlockY()) {
+                    this.move(this.motionX, this.motionY, this.motionZ);
+                } else {
+                    newY = Math.max(level.getMinBlockY(), Math.min(newY, level.getMaxBlockY()));
+                    this.setPosition(new Vector3(newX, newY, newZ));
+                }
+
+                Vector2 be = new Vector2(this.x + this.motionX, this.z + this.motionZ);
+                Vector2 af = new Vector2(this.x, this.z);
                 if ((be.x != af.x || be.y != af.y) && !isJump) {
-                    this.moveTime -= 90;
+                    Block collisionBlock = getFrontCollisionBlock();
+                    if (isSolidGroundInCave(collisionBlock)) {
+                        this.moveTime -= 60;
+                    }
                 }
             }
 
@@ -302,8 +529,122 @@ public abstract class EntityWalking extends BaseEntity {
                     }
                 }
             }
+
             return this.followTarget != null ? this.followTarget : this.target;
         }
         return null;
+    }
+
+    private void updateStuckDetection(int tickDiff) {
+        Vector3 currentPos = new Vector3(this.x, this.y, this.z);
+        double distanceMoved = currentPos.distance(lastPosition);
+        if (distanceMoved < 0.05) {
+            stuckTimer += tickDiff;
+        } else {
+            stuckTimer = 0;
+        }
+
+        if (this.target != null && !(this.target instanceof Entity)) {
+            double distanceToTarget = this.distance(this.target);
+            if (distanceToTarget > 1.5) {
+                noPathFoundTimer += tickDiff;
+            } else {
+                noPathFoundTimer = 0;
+            }
+        }
+
+        lastPosition = currentPos;
+
+        if (stuckTimer > 80) {
+            handleCaveStuckSituation();
+            stuckTimer = 0;
+        }
+
+        if (noPathFoundTimer > 50) {
+            noPathFoundTimer = 0;
+            if (this.followTarget != null) {
+                this.target = this.followTarget;
+            }
+        }
+    }
+
+    private void handleCaveStuckSituation() {
+        if (this.followTarget != null) {
+            attemptCaveNavigation();
+        } else {
+            this.stayTime = 0;
+            this.moveTime = Utils.rand(30, 80);
+            this.caveNavigationMode = 1;
+            Vector3 escapePos = findCaveEscape();
+            if (escapePos != null) {
+                this.target = escapePos;
+            } else {
+                double angle = Utils.rand(0, 360) * Math.PI / 180.0;
+                double distance = Utils.rand(3, 8);
+                this.target = new Vector3(
+                        this.x + Math.cos(angle) * distance,
+                        this.y,
+                        this.z + Math.sin(angle) * distance
+                );
+            }
+        }
+    }
+
+    private void attemptCaveNavigation() {
+        alternativePathAttempts++;
+        if (alternativePathAttempts > 2) {
+            alternativePathAttempts = 0;
+            this.caveNavigationMode = 2;
+            if (Utils.rand(1, 100) > 70) {
+                this.followTarget = null;
+                return;
+            }
+        }
+
+        if (this.followTarget != null) {
+            double angle = Utils.rand(0, 360) * Math.PI / 180.0;
+            double offsetDistance = Utils.rand(2, 6);
+            double offsetX = Math.cos(angle) * offsetDistance;
+            double offsetZ = Math.sin(angle) * offsetDistance;
+            this.target = new Vector3(
+                    this.followTarget.x + offsetX,
+                    this.followTarget.y,
+                    this.followTarget.z + offsetZ
+            );
+        }
+    }
+
+    private Vector3 findCaveEscape() {
+        for (int i = 0; i < 12; i++) {
+            double angle = i * 30 * Math.PI / 180.0;
+            double distance = Utils.rand(3, 10);
+            double checkX = this.x + Math.cos(angle) * distance;
+            double checkZ = this.z + Math.sin(angle) * distance;
+            int floorX = NukkitMath.floorDouble(checkX);
+            int floorZ = NukkitMath.floorDouble(checkZ);
+            int highestY = Math.max(level.getMinBlockY(), level.getHighestBlockAt(floorX, floorZ));
+            for (int yOffset = -4; yOffset <= 4; yOffset++) {
+                int checkY = highestY + yOffset;
+                if (isCavePositionWalkable(floorX, checkY, floorZ)) {
+                    return new Vector3(checkX, checkY + 1, checkZ);
+                }
+            }
+        }
+        return null;
+    }
+
+    private Block getFrontCollisionBlock() {
+        Vector3 direction = new Vector3(
+                Math.cos(Math.toRadians(this.yaw + 90)),
+                0,
+                Math.sin(Math.toRadians(this.yaw + 90))
+        ).normalize();
+        int checkX = NukkitMath.floorDouble(this.x + direction.x);
+        int checkY = Math.max(level.getMinBlockY(), NukkitMath.floorDouble(this.y));
+        int checkZ = NukkitMath.floorDouble(this.z + direction.z);
+        if (checkY < level.getMinBlockY() || checkY > level.getMaxBlockY()) {
+            return null;
+        }
+        return level.getBlock(chunk, checkX, checkY, checkZ, false);
     }
 }

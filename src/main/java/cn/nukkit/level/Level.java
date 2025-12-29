@@ -284,9 +284,11 @@ public class Level implements ChunkManager, Metadatable {
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
 
-    private static final int ENTITY_NEARBY_CACHE_TICKS = 5;
+    // Cache for fast entity processing for checkTarget()
+    private static final long ENTITY_NEARBY_CACHE_TICKS = 5;
     private final Long2ObjectOpenHashMap<List<Entity>> entityNearbyCache = new Long2ObjectOpenHashMap<>();
     private final Long2LongOpenHashMap entityNearbyCacheTime = new Long2LongOpenHashMap();
+    private final LongSet entityNearbyCacheDirty = new LongOpenHashSet();
 
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
@@ -2989,18 +2991,24 @@ public class Level implements ChunkManager, Metadatable {
         if (requester == null || requester.getLevel() != this) {
             return Collections.emptyList();
         }
-
         long chunkKey = chunkHash(((int) requester.x) >> 4, ((int) requester.z) >> 4);
         long currentTick = this.levelCurrentTick;
-
         long lastUpdate = entityNearbyCacheTime.get(chunkKey);
-        if (lastUpdate == 0 || currentTick - lastUpdate > ENTITY_NEARBY_CACHE_TICKS) {
+        boolean isDirty = entityNearbyCacheDirty.contains(chunkKey);
+
+        if (isDirty || lastUpdate == 0 || currentTick - lastUpdate > ENTITY_NEARBY_CACHE_TICKS) {
             List<Entity> entities = new ArrayList<>(List.of(this.getNearbyEntities(searchBox, requester)));
             entityNearbyCache.put(chunkKey, entities);
             entityNearbyCacheTime.put(chunkKey, currentTick);
+            entityNearbyCacheDirty.remove(chunkKey);
         }
-
         return entityNearbyCache.get(chunkKey);
+    }
+
+    public void setDirtyNearby(Entity entity) {
+        if (entity == null || entity.getLevel() != this) return;
+        long chunkKey = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
+        entityNearbyCacheDirty.add(chunkKey);
     }
 
     public Entity[] getNearbyEntities(AxisAlignedBB bb) {

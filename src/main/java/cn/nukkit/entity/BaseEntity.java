@@ -30,6 +30,8 @@ import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.ArrayList;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -435,6 +437,42 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.updateFallState(this.onGround);
 
         return true;
+    }
+
+    @Override
+    protected void checkChunks() {
+        if (this.level != null) {
+            int cx = (int) this.x >> 4;
+            int cz = (int) this.z >> 4;
+            if (this.chunk == null || (this.chunk.getX() != cx) || this.chunk.getZ() != cz) {
+                if (this.chunk != null) {
+                    this.chunk.removeEntity(this);
+                    this.level.setDirtyNearby(this);
+                }
+                this.chunk = this.level.getChunk(cx, cz, true);
+
+                if (!this.justCreated) {
+                    Map<Integer, Player> newChunk = this.level.getChunkPlayers(cx, cz);
+                    for (Player player : new ArrayList<>(this.hasSpawned.values())) {
+                        if (!newChunk.containsKey(player.getLoaderId())) {
+                            this.despawnFrom(player);
+                        } else {
+                            newChunk.remove(player.getLoaderId());
+                        }
+                    }
+
+                    for (Player player : newChunk.values()) {
+                        this.spawnTo(player);
+                    }
+                }
+
+                if (this.chunk == null) {
+                    return;
+                }
+
+                this.chunk.addEntity(this);
+            }
+        }
     }
 
     @Override

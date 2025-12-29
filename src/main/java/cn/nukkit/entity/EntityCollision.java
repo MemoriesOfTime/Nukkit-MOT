@@ -91,24 +91,13 @@ public class EntityCollision implements ChunkLoader {
             int id = block.getId();
             if (id == Block.AIR) continue;
 
-            if (id == Block.CAMPFIRE_BLOCK || id == Block.SOUL_CAMPFIRE_BLOCK) {
-                collisionBlocks.add(block);
-                continue;
-            }
-
-            if (id == Block.NETHER_PORTAL || id == Block.END_PORTAL) {
+            if (id == Block.NETHER_PORTAL) {
                 AxisAlignedBB portalBB = new SimpleAxisAlignedBB(block.x, block.y, block.z, block.x + 1, block.y + 1, block.z + 1);
                 if (trajectoryBB.intersectsWith(portalBB)) {
                     collisionBlocks.add(block);
                 }
-            } else {
-                AxisAlignedBB blockBB = block.getBoundingBox();
-                if (blockBB == null) {
-                    blockBB = new SimpleAxisAlignedBB(block.x, block.y, block.z, block.x + 1, block.y + 1, block.z + 1);
-                }
-                if (trajectoryBB.intersectsWith(blockBB)) {
-                    collisionBlocks.add(block);
-                }
+            } else if (block.collidesWithBB(bb, true)) {
+                collisionBlocks.add(block);
             }
         }
 
@@ -209,12 +198,10 @@ public class EntityCollision implements ChunkLoader {
     }
 
     private boolean isNearDangerousBlocks(AxisAlignedBB bb) {
-        AxisAlignedBB safetyBB = bb.grow(2, 2, 2);
+        AxisAlignedBB safetyBB = bb.grow(0.3, 0.3, 0.3);
         return isInsideSpecialBlock(safetyBB, Block.LAVA) ||
                 isInsideSpecialBlock(safetyBB, Block.FIRE) ||
-                isInsideSpecialBlock(safetyBB, Block.CACTUS) ||
-                isInsideSpecialBlock(safetyBB, Block.CAMPFIRE_BLOCK) ||
-                isInsideSpecialBlock(safetyBB, Block.SOUL_CAMPFIRE_BLOCK);
+                isInsideSpecialBlock(safetyBB, Block.CACTUS);
     }
 
     private boolean isNearPortal(AxisAlignedBB bb) {
@@ -232,7 +219,7 @@ public class EntityCollision implements ChunkLoader {
             for (int x = minX; x <= maxX; x++) {
                 for (int z = minZ; z <= maxZ; z++) {
                     int id = level.getBlockIdAt(x, y, z);
-                    if (id == Block.NETHER_PORTAL || id == Block.END_PORTAL) {
+                    if (id == Block.NETHER_PORTAL) {
                         return true;
                     }
                 }
