@@ -423,9 +423,7 @@ public abstract class EntityWalking extends BaseEntity {
                     }
                 }
 
-                boolean shouldActivelyMoveToTarget = true;
-
-                if (this.target != null && shouldActivelyMoveToTarget) {
+                if (this.target != null) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;
 
