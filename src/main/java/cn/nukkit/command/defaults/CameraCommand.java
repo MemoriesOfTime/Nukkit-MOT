@@ -1,11 +1,15 @@
 package cn.nukkit.command.defaults;
 
 import cn.nukkit.Player;
-import cn.nukkit.Server;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.command.data.CommandEnum;
 import cn.nukkit.command.data.CommandParamType;
 import cn.nukkit.command.data.CommandParameter;
+import cn.nukkit.command.tree.ParamList;
+import cn.nukkit.command.tree.node.FloatNode;
+import cn.nukkit.command.tree.node.PlayersNode;
+import cn.nukkit.command.tree.node.RelativeFloatNode;
+import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.lang.TranslationContainer;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.Vector2f;
@@ -19,8 +23,8 @@ import cn.nukkit.utils.CameraPresetManager;
 import org.cloudburstmc.protocol.common.util.OptionalBoolean;
 
 import java.awt.*;
-import java.util.Arrays;
-import java.util.Locale;
+import java.util.*;
+import java.util.List;
 
 /**
  * @author daoge_cmd <br>
@@ -28,6 +32,8 @@ import java.util.Locale;
  * PowerNukkitX Project <br>
  * TODO: 此命令的多语言文本似乎不能正常工作
  */
+
+
 public class CameraCommand extends VanillaCommand {
 
     public static final String[] EASE_TYPES = Arrays.stream(CameraEase.values()).map(CameraEase::getSerializeName).toArray(String[]::new);
@@ -37,15 +43,15 @@ public class CameraCommand extends VanillaCommand {
         this.setPermission("nukkit.command.camera");
         this.commandParameters.clear();
         this.commandParameters.put("clear", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("clear", false, new String[]{"clear"})
         });
         this.commandParameters.put("fade", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("fade", false, new String[]{"fade"})
         });
         this.commandParameters.put("fade-color", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("fade", false, new String[]{"fade"}),
                 CommandParameter.newEnum("color", false, new String[]{"color"}),
                 CommandParameter.newType("red", false, CommandParamType.FLOAT),
@@ -53,7 +59,7 @@ public class CameraCommand extends VanillaCommand {
                 CommandParameter.newType("blue", false, CommandParamType.FLOAT)
         });
         this.commandParameters.put("fade-time-color", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("fade", false, new String[]{"fade"}),
                 CommandParameter.newEnum("time", false, new String[]{"time"}),
                 CommandParameter.newType("fadeInSeconds", false, CommandParamType.FLOAT),
@@ -65,93 +71,99 @@ public class CameraCommand extends VanillaCommand {
                 CommandParameter.newType("blue", false, CommandParamType.FLOAT)
         });
         this.commandParameters.put("set-default", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("set", false, new String[]{"set"}),
                 CommandParameter.newEnum("preset", false, CommandEnum.CAMERA_PRESETS),
                 CommandParameter.newEnum("default", true, new String[]{"default"})
         });
         this.commandParameters.put("set-rot", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("set", false, new String[]{"set"}),
                 CommandParameter.newEnum("preset", false, CommandEnum.CAMERA_PRESETS),
                 CommandParameter.newEnum("rot", false, new String[]{"rot"}),
-                CommandParameter.newType("xRot", false, CommandParamType.VALUE),
-                CommandParameter.newType("yRot", false, CommandParamType.VALUE)
+                CommandParameter.newType("xRot", false, CommandParamType.VALUE, new RelativeFloatNode()),
+                CommandParameter.newType("yRot", false, CommandParamType.VALUE, new RelativeFloatNode())
         });
         this.commandParameters.put("set-pos", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("set", false, new String[]{"set"}),
                 CommandParameter.newEnum("preset", false, CommandEnum.CAMERA_PRESETS),
                 CommandParameter.newEnum("pos", false, new String[]{"pos"}),
                 CommandParameter.newType("position", false, CommandParamType.POSITION),
         });
         this.commandParameters.put("set-pos-rot", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("set", false, new String[]{"set"}),
                 CommandParameter.newEnum("preset", false, CommandEnum.CAMERA_PRESETS),
                 CommandParameter.newEnum("pos", false, new String[]{"pos"}),
                 CommandParameter.newType("position", false, CommandParamType.POSITION),
                 CommandParameter.newEnum("rot", false, new String[]{"rot"}),
-                CommandParameter.newType("xRot", false, CommandParamType.VALUE),
-                CommandParameter.newType("yRot", false, CommandParamType.VALUE)
+                CommandParameter.newType("xRot", false, CommandParamType.VALUE, new RelativeFloatNode()),
+                CommandParameter.newType("yRot", false, CommandParamType.VALUE, new RelativeFloatNode())
         });
         this.commandParameters.put("set-ease-default", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("set", false, new String[]{"set"}),
                 CommandParameter.newEnum("preset", false, CommandEnum.CAMERA_PRESETS),
                 CommandParameter.newEnum("ease", false, new String[]{"ease"}),
-                CommandParameter.newType("easeTime", false, CommandParamType.FLOAT),
+                CommandParameter.newType("easeTime", false, CommandParamType.FLOAT, new FloatNode()),
                 CommandParameter.newEnum("easeType", false, EASE_TYPES),
                 CommandParameter.newEnum("default", true, new String[]{"default"})
         });
         this.commandParameters.put("set-ease-rot", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("set", false, new String[]{"set"}),
                 CommandParameter.newEnum("preset", false, CommandEnum.CAMERA_PRESETS),
                 CommandParameter.newEnum("ease", false, new String[]{"ease"}),
-                CommandParameter.newType("easeTime", false, CommandParamType.FLOAT),
+                CommandParameter.newType("easeTime", false, CommandParamType.FLOAT, new FloatNode()),
                 CommandParameter.newEnum("easeType", false, EASE_TYPES),
                 CommandParameter.newEnum("rot", false, new String[]{"rot"}),
-                CommandParameter.newType("xRot", false, CommandParamType.VALUE),
-                CommandParameter.newType("yRot", false, CommandParamType.VALUE)
+                CommandParameter.newType("xRot", false, CommandParamType.VALUE, new RelativeFloatNode()),
+                CommandParameter.newType("yRot", false, CommandParamType.VALUE, new RelativeFloatNode())
         });
         this.commandParameters.put("set-ease-pos", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("set", false, new String[]{"set"}),
                 CommandParameter.newEnum("preset", false, CommandEnum.CAMERA_PRESETS),
                 CommandParameter.newEnum("ease", false, new String[]{"ease"}),
-                CommandParameter.newType("easeTime", false, CommandParamType.FLOAT),
+                CommandParameter.newType("easeTime", false, CommandParamType.FLOAT, new FloatNode()),
                 CommandParameter.newEnum("easeType", false, EASE_TYPES),
                 CommandParameter.newEnum("pos", false, new String[]{"pos"}),
                 CommandParameter.newType("position", false, CommandParamType.POSITION),
         });
         this.commandParameters.put("set-ease-pos-rot", new CommandParameter[]{
-                CommandParameter.newType("players", false, CommandParamType.TARGET),
+                CommandParameter.newType("players", false, CommandParamType.TARGET, new PlayersNode()),
                 CommandParameter.newEnum("set", false, new String[]{"set"}),
                 CommandParameter.newEnum("preset", false, CommandEnum.CAMERA_PRESETS),
                 CommandParameter.newEnum("ease", false, new String[]{"ease"}),
-                CommandParameter.newType("easeTime", false, CommandParamType.FLOAT),
+                CommandParameter.newType("easeTime", false, CommandParamType.FLOAT, new FloatNode()),
                 CommandParameter.newEnum("easeType", false, EASE_TYPES),
                 CommandParameter.newEnum("pos", false, new String[]{"pos"}),
                 CommandParameter.newType("position", false, CommandParamType.POSITION),
                 CommandParameter.newEnum("rot", false, new String[]{"rot"}),
-                CommandParameter.newType("xRot", false, CommandParamType.VALUE),
-                CommandParameter.newType("yRot", false, CommandParamType.VALUE)
+                CommandParameter.newType("xRot", false, CommandParamType.VALUE, new RelativeFloatNode()),
+                CommandParameter.newType("yRot", false, CommandParamType.VALUE, new RelativeFloatNode())
         });
+        this.enableParamTree();
+    }
+
+    private static float getFloat(ParamList list, int index) {
+        return list.get(index).get();
     }
 
     @Override
-    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
-        if (!this.testPermission(sender)) {
-            return true;
+    public int execute(CommandSender sender, String commandLabel, Map.Entry<String, ParamList> result, CommandLogger log) {
+        var list = result.getValue();
+        List<Player> players = list.getResult(0);
+        players = players.stream().filter(Objects::nonNull).toList();
+        if (players.isEmpty()) {
+            log.addNoTargetMatch().output();
+            return 0;
         }
-        CameraInstructionPacket pk = new CameraInstructionPacket();
-        Player player = Server.getInstance().getPlayer(args[0]);
-        if (player == null) {
-            sender.sendMessage(new TranslationContainer("nukkit.camera.unknownPlayer"));
-            return false;
-        }
-        switch (args[1]) {
+        var playerNames = players.stream().map(Player::getName).reduce((a, b) -> a + " " + b).orElse("");
+        var pk = new CameraInstructionPacket();
+        var senderLocation = sender.getLocation();
+        switch (result.getKey()) {
             case "clear" -> {
                 pk.setClear(OptionalBoolean.of(true));
             }
@@ -159,111 +171,127 @@ public class CameraCommand extends VanillaCommand {
                 pk.setFadeInstruction(new CameraFadeInstruction());
             }
             case "fade-color" -> {
-                pk.setFadeInstruction(new CameraFadeInstruction());
-                pk.getFadeInstruction().setColor(new Color(Float.parseFloat(args[3]), Float.parseFloat(args[4]), Float.parseFloat(args[5])));
+                pk.setFadeInstruction(new CameraFadeInstruction(
+                        new CameraFadeInstruction.TimeData(1, 1, 1),
+                        new Color(getFloat(list, 3), getFloat(list, 4), getFloat(list, 5))));
             }
             case "fade-time-color" -> {
-                pk.setFadeInstruction(new CameraFadeInstruction());
-                pk.getFadeInstruction().setColor(new Color(Float.parseFloat(args[3]), Float.parseFloat(args[4]), Float.parseFloat(args[5])));
-                pk.getFadeInstruction().setTimeData(new CameraFadeInstruction.TimeData(Float.parseFloat(args[7]), Float.parseFloat(args[8]), Float.parseFloat(args[9])));
+                pk.setFadeInstruction(new CameraFadeInstruction(
+                        new CameraFadeInstruction.TimeData(list.get(3).get(), list.get(4).get(), list.get(5).get()),
+                        new Color(getFloat(list, 7), getFloat(list, 8), getFloat(list, 9))));
             }
             case "set-default" -> {
-                CameraPreset preset = CameraPresetManager.getPreset(args[2]);
+                CameraPreset preset = CameraPresetManager.getPreset(list.get(2).get());
                 if (preset == null) {
-                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
-                    return false;
+                    log.addError("commands.camera.invalid-preset").output();
+                    return 0;
                 }
-                pk.setSetInstruction(new CameraSetInstruction());
+                CameraSetInstruction cameraSetInstruction = new CameraSetInstruction();
+                cameraSetInstruction.setPreset(preset);
+                pk.setSetInstruction(cameraSetInstruction);
             }
             case "set-rot" -> {
-                CameraPreset preset = CameraPresetManager.getPreset(args[2]);
+                CameraPreset preset = CameraPresetManager.getPreset(list.get(2).get());
                 if (preset == null) {
-                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
-                    return false;
+                    log.addError("commands.camera.invalid-preset").output();
+                    return 0;
                 }
-                pk.setSetInstruction(new CameraSetInstruction());
-                pk.getSetInstruction().setPreset(preset);
-                pk.getSetInstruction().setRot(new Vector2f(0, 0));
+                CameraSetInstruction cameraSetInstruction = new CameraSetInstruction();
+                cameraSetInstruction.setPreset(preset);
+                cameraSetInstruction.setRot(new Vector2f(((RelativeFloatNode) list.get(4)).get((float) senderLocation.getPitch()), ((RelativeFloatNode) list.get(5)).get((float) senderLocation.getYaw())));
+                pk.setSetInstruction(cameraSetInstruction);
             }
             case "set-pos" -> {
-                CameraPreset preset = CameraPresetManager.getPreset(args[2]);
+                CameraPreset preset = CameraPresetManager.getPreset(list.get(2).get());
                 if (preset == null) {
-                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
-                    return false;
+                    log.addError("commands.camera.invalid-preset").output();
+                    return 0;
                 }
-                Position position = new Position(Double.parseDouble(args[3]), Double.parseDouble(args[4]), Double.parseDouble(args[5]));
-                pk.setSetInstruction(new CameraSetInstruction());
-                pk.getSetInstruction().setPreset(preset);
-                pk.getSetInstruction().setPos(new Vector3f((float) position.getX(), (float) position.getY(), (float) position.getZ()));
+                Position position = list.get(4).get();
+                CameraSetInstruction cameraSetInstruction = new CameraSetInstruction();
+                cameraSetInstruction.setPreset(preset);
+                cameraSetInstruction.setPos(new Vector3f((float) position.getX(), (float) position.getY(), (float) position.getZ()));
+                pk.setSetInstruction(cameraSetInstruction);
             }
             case "set-pos-rot" -> {
-                CameraPreset preset = CameraPresetManager.getPreset(args[2]);
+                CameraPreset preset = CameraPresetManager.getPreset(list.get(2).get());
                 if (preset == null) {
-                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
-                    return false;
+                    log.addError("commands.camera.invalid-preset").output();
+                    return 0;
                 }
-                Position position = new Position(Double.parseDouble(args[3]), Double.parseDouble(args[4]), Double.parseDouble(args[5]));
-                pk.setSetInstruction(new CameraSetInstruction());
-                pk.getSetInstruction().setPreset(preset);
-                pk.getSetInstruction().setPos(new Vector3f((float) position.getX(), (float) position.getY(), (float) position.getZ()));
-                pk.getSetInstruction().setRot(new Vector2f(Float.parseFloat(args[6]), Float.parseFloat(args[7])));
+                Position position = list.get(4).get();
+                CameraSetInstruction cameraSetInstruction = new CameraSetInstruction();
+                cameraSetInstruction.setPreset(preset);
+                cameraSetInstruction.setPos(new Vector3f((float) position.getX(), (float) position.getY(), (float) position.getZ()));
+                cameraSetInstruction.setRot(new Vector2f(((RelativeFloatNode) list.get(6)).get((float) senderLocation.getPitch()), ((RelativeFloatNode) list.get(7)).get((float) senderLocation.getYaw())));
+                pk.setSetInstruction(cameraSetInstruction);
             }
             case "set-ease-default" -> {
-                CameraPreset preset = CameraPresetManager.getPreset(args[2]);
+                CameraPreset preset = CameraPresetManager.getPreset(list.get(2).get());
                 if (preset == null) {
-                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
-                    return false;
+                    log.addError("commands.camera.invalid-preset").output();
+                    return 0;
                 }
-                float easeTime = Float.parseFloat(args[4]);
-                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase(Locale.ROOT));
-                pk.setSetInstruction(new CameraSetInstruction());
-                pk.getSetInstruction().setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
+                float easeTime = list.get(4).get();
+                CameraEase easeType = CameraEase.fromName(((String) list.get(5).get()).toLowerCase(Locale.ROOT));
+                CameraSetInstruction cameraSetInstruction = new CameraSetInstruction();
+                cameraSetInstruction.setPreset(preset);
+                cameraSetInstruction.setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
+                pk.setSetInstruction(cameraSetInstruction);
             }
             case "set-ease-rot" -> {
-                CameraPreset preset = CameraPresetManager.getPreset(args[2]);
+                CameraPreset preset = CameraPresetManager.getPreset(list.get(2).get());
                 if (preset == null) {
-                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
-                    return false;
+                    log.addError("commands.camera.invalid-preset").output();
+                    return 0;
                 }
-                float easeTime = Float.parseFloat(args[4]);
-                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase(Locale.ROOT));
-                pk.setSetInstruction(new CameraSetInstruction());
-                pk.getSetInstruction().setPreset(preset);
-                pk.getSetInstruction().setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
-                pk.getSetInstruction().setRot(new Vector2f(Float.parseFloat(args[7]), Float.parseFloat(args[8])));
+                float easeTime = list.get(4).get();
+                CameraEase easeType = CameraEase.fromName(((String) list.get(5).get()).toLowerCase(Locale.ROOT));
+                CameraSetInstruction cameraSetInstruction = new CameraSetInstruction();
+                cameraSetInstruction.setPreset(preset);
+                cameraSetInstruction.setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
+                cameraSetInstruction.setRot(new Vector2f(((RelativeFloatNode) list.get(7)).get((float) senderLocation.getPitch()), ((RelativeFloatNode) list.get(8)).get((float) senderLocation.getYaw())));
+                pk.setSetInstruction(cameraSetInstruction);
             }
             case "set-ease-pos" -> {
-                CameraPreset preset = CameraPresetManager.getPreset(args[2]);
+                CameraPreset preset = CameraPresetManager.getPreset(list.get(2).get());
                 if (preset == null) {
-                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
-                    return false;
+                    log.addError("commands.camera.invalid-preset").output();
+                    return 0;
                 }
-                float easeTime = Float.parseFloat(args[4]);
-                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase(Locale.ROOT));
-                Vector3f position = new Vector3f(Float.parseFloat(args[6]), Float.parseFloat(args[7]), Float.parseFloat(args[8]));
-                pk.setSetInstruction(new CameraSetInstruction());
-                pk.getSetInstruction().setPreset(preset);
-                pk.getSetInstruction().setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
-                pk.getSetInstruction().setPos(position);
+                float easeTime = list.get(4).get();
+                CameraEase easeType = CameraEase.fromName(((String) list.get(5).get()).toLowerCase(Locale.ROOT));
+                CameraSetInstruction cameraSetInstruction = new CameraSetInstruction();
+                cameraSetInstruction.setPreset(preset);
+                cameraSetInstruction.setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
+                Position position = list.get(7).get();
+                cameraSetInstruction.setPos(new Vector3f((float) position.getX(), (float) position.getY(), (float) position.getZ()));
+                pk.setSetInstruction(cameraSetInstruction);
             }
             case "set-ease-pos-rot" -> {
-                CameraPreset preset = CameraPresetManager.getPreset(args[2]);
+                CameraPreset preset = CameraPresetManager.getPreset(list.get(2).get());
                 if (preset == null) {
-                    sender.sendMessage(new TranslationContainer("nukkit.camera.unknown.preset"));
-                    return false;
+                    log.addError("commands.camera.invalid-preset").output();
+                    return 0;
                 }
-                float easeTime = Float.parseFloat(args[4]);
-                CameraEase easeType = CameraEase.valueOf(args[5].toUpperCase(Locale.ROOT));
-                Vector3f position = new Vector3f(Float.parseFloat(args[6]), Float.parseFloat(args[7]), Float.parseFloat(args[8]));
-                pk.setSetInstruction(new CameraSetInstruction());
-                pk.getSetInstruction().setPreset(preset);
-                pk.getSetInstruction().setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
-                pk.getSetInstruction().setPos(position);
-                pk.getSetInstruction().setRot(new Vector2f(Float.parseFloat(args[9]), Float.parseFloat(args[10])));
+                float easeTime = list.get(4).get();
+                CameraEase easeType = CameraEase.fromName(((String) list.get(5).get()).toLowerCase(Locale.ROOT));
+                CameraSetInstruction cameraSetInstruction = new CameraSetInstruction();
+                cameraSetInstruction.setPreset(preset);
+                cameraSetInstruction.setEase(new CameraSetInstruction.EaseData(easeType, easeTime));
+                Position position = list.get(7).get();
+                cameraSetInstruction.setPos(new Vector3f((float) position.getX(), (float) position.getY(), (float) position.getZ()));
+                cameraSetInstruction.setRot(new Vector2f(((RelativeFloatNode) list.get(9)).get((float) senderLocation.getPitch()), ((RelativeFloatNode) list.get(10)).get((float) senderLocation.getYaw())));
+                pk.setSetInstruction(cameraSetInstruction);
+            }
+            default -> {
+                return 0;
             }
         }
-        player.dataPacket(pk);
-        player.sendMessage(new TranslationContainer("nukkit.camera.success", commandLabel));
-        return true;
+        for (Player player : players) {
+            player.dataPacket(pk);
+        }
+        sender.sendMessage(new TranslationContainer("nukkit.camera.success", playerNames));
+        return 1;
     }
 }
