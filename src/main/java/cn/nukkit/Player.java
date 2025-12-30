@@ -3435,6 +3435,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
+                if (!this.isSpectator() && !this.isCreative()) {
+                    this.level.setDirtyNearby(this);
+                }
+
                 MovePlayerPacket movePlayerPacket = (MovePlayerPacket) packet;
                 Vector3 newPos = new Vector3(movePlayerPacket.x, movePlayerPacket.y - this.getBaseOffset(), movePlayerPacket.z);
                 double dis = newPos.distanceSquared(this);
@@ -3489,6 +3493,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (!this.isMovementServerAuthoritative()) {
                     return;
                 }
+
+                if (!this.isSpectator() && !this.isCreative()) {
+                    this.level.setDirtyNearby(this);
+                }
+
                 PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;
 
                 if (!authPacket.getBlockActionData().isEmpty()) {

@@ -436,8 +436,6 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         this.checkGroundState(movX, movY, movZ, dx, dy, dz);
         this.updateFallState(this.onGround);
 
-        this.level.setDirtyNearby(this);
-
         return true;
     }
 

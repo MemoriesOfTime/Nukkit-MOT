@@ -2994,7 +2994,7 @@ public class Level implements ChunkManager, Metadatable {
         long lastUpdate = entityNearbyCacheTime.get(chunkKey);
         boolean isDirty = entityNearbyCacheDirty.contains(chunkKey);
 
-        if (isDirty || lastUpdate == 0 || currentTick - lastUpdate > 5) {
+        if (isDirty || lastUpdate == 0 || currentTick - lastUpdate > 10) {
             List<Entity> entities = new ArrayList<>(List.of(this.getNearbyEntities(searchBox, requester)));
             entityNearbyCache.put(chunkKey, entities);
             entityNearbyCacheTime.put(chunkKey, currentTick);
