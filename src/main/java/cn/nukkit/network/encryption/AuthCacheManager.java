@@ -128,7 +128,7 @@ public class AuthCacheManager {
             cacheWrapper.put("timestamp", System.currentTimeMillis());
             cacheWrapper.put("data", data);
 
-            String json = new JSONObject(cacheWrapper).toJSONString();
+            String json = JSONObject.toJSONString(cacheWrapper);
 
             try (BufferedWriter writer = Files.newBufferedWriter(cacheFile, StandardCharsets.UTF_8)) {
                 writer.write(json);

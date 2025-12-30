@@ -1,5 +1,6 @@
 package cn.nukkit.network.encryption;
 
+import cn.nukkit.Nukkit;
 import cn.nukkit.network.protocol.types.auth.AuthPayload;
 import cn.nukkit.network.protocol.types.auth.AuthType;
 import cn.nukkit.network.protocol.types.auth.CertificateChainPayload;
@@ -99,7 +100,7 @@ public class EncryptionUtils {
                 }
 
                 // Initialize cache manager with data path from Nukkit
-                String dataPath = cn.nukkit.Nukkit.DATA_PATH;
+                String dataPath = Nukkit.DATA_PATH;
                 CACHE_MANAGER = new AuthCacheManager(dataPath);
                 return CACHE_MANAGER;
             }
