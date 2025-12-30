@@ -32,8 +32,6 @@ import java.util.List;
  * PowerNukkitX Project <br>
  * TODO: 此命令的多语言文本似乎不能正常工作
  */
-
-
 public class CameraCommand extends VanillaCommand {
 
     public static final String[] EASE_TYPES = Arrays.stream(CameraEase.values()).map(CameraEase::getSerializeName).toArray(String[]::new);
