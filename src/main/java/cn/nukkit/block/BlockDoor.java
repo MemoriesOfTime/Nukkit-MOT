@@ -29,6 +29,9 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
     @Deprecated
     public static final int DOOR_POWERED_BIT = 0x02;
 
+    private static final int MAX_HEALTH = 7;
+    private int health = MAX_HEALTH;
+
     private static final int[] faces = {1, 2, 3, 0};
 
     protected BlockDoor(int meta) {
@@ -298,6 +301,8 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
             this.getLevel().setBlock(block, this, true, true); //Bottom
             this.getLevel().setBlock(blockUp, Block.get(this.getId(), metaUp), true); //Top
 
+            this.setHealth(MAX_HEALTH);
+
             if (!this.isOpen() && this.level.isBlockPowered(this.getLocation())) {
                 this.toggle(null);
                 metaUp |= DOOR_POWERED_BIT;
@@ -415,9 +420,25 @@ public abstract class BlockDoor extends BlockTransparentMeta implements Faceable
 
     public boolean isRightHinged() {
         if (isTop()) {
-            return (this.getDamage() & DOOR_HINGE_BIT ) > 0;
+            return (this.getDamage() & DOOR_HINGE_BIT) > 0;
         }
         return (this.up().getDamage() & DOOR_HINGE_BIT) > 0;
+    }
+
+    public int getHealth() {
+        return this.health;
+    }
+
+    public void setHealth(int health) {
+        this.health = Math.max(0, Math.min(MAX_HEALTH, health));
+    }
+
+    public int getMaxHealth() {
+        return MAX_HEALTH;
+    }
+
+    public void damage(int amount) {
+        this.health = Math.max(0, this.health - amount);
     }
 
     @Override
