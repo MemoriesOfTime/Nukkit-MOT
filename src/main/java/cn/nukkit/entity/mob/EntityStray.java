@@ -16,6 +16,7 @@ import cn.nukkit.item.ItemBow;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector2;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
@@ -25,6 +26,7 @@ import org.apache.commons.math3.util.FastMath;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class EntityStray extends EntityWalkingMob implements EntitySmite {
 
@@ -92,16 +94,80 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
         if (this.attackDelay > 23 && Utils.rand(1, 32) < 4 && this.distanceSquared(player) <= 55) {
             this.attackDelay = 0;
 
+            for (Block block : this.getLineOfSight(7, 7)) {
+                if (!block.canPassThrough()) {
+                    return;
+                }
+            }
+
             double f = 1.3;
-            double yawR = FastMath.toRadians(yaw);
-            double pitchR = FastMath.toRadians(pitch);
-            Location pos = new Location(this.x - Math.sin(yawR) * Math.cos(pitchR) * 0.5, this.y + this.getHeight() - 0.18,
-                    this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
+
+            double dx = player.x - this.x;
+            double dz = player.z - this.z;
+
+            double targetHeight = player.getHeight() * 0.85;
+            double targetY = player.y + targetHeight;
+
+            double myY = this.y + this.getEyeHeight();
+            double dy = targetY - myY;
+
+            double distanceXZ = Math.sqrt(dx * dx + dz * dz);
+
+            double yaw = Math.toDegrees(Math.atan2(dz, dx)) - 90;
+            if (yaw < 0) yaw += 360;
+
+            double basePitch = -Math.toDegrees(Math.atan2(dy, distanceXZ));
+
+            double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            double pitchCorrection = 0;
+
+            if (distance > 3) {
+                pitchCorrection = Math.min(15, distance * 0.8);
+            }
+
+            double pitch = basePitch + pitchCorrection;
+
+            pitch = Math.max(-30, Math.min(30, pitch));
+
+            double yawR = Math.toRadians(yaw);
+            double pitchR = Math.toRadians(pitch);
+
+            double shootY = this.y + this.getEyeHeight();
+            if (pitch > -5) {
+                shootY += 0.15;
+            }
+
+            Location pos = new Location(
+                    this.x - Math.sin(yawR) * Math.cos(pitchR) * 0.5,
+                    shootY,
+                    this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5,
+                    yaw, pitch, this.level
+            );
+
             if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) == Block.AIR) {
-                EntityArrow arrow = (EntityArrow) Entity.createEntity("Arrow", pos, this);
-                arrow.getMobEffects().put(Effect.SLOWNESS, Effect.getEffect(Effect.SLOWNESS).setDuration(600));
+                Entity k = Entity.createEntity("Arrow", pos, this);
+                if (!(k instanceof EntityArrow arrow)) {
+                    return;
+                }
+
+                arrow.getMobEffects().put(Effect.SLOWNESS, Objects.requireNonNull(Effect.getEffect(Effect.SLOWNESS)).setDuration(600));
                 arrow.setFullEffect(true);
-                setProjectileMotion(arrow, pitch, yawR, pitchR, f);
+
+                double motionX = -Math.sin(yawR) * Math.cos(pitchR);
+                double motionY = -Math.sin(pitchR);
+                double motionZ = Math.cos(yawR) * Math.cos(pitchR);
+
+                if (pitch > -20) {
+                    motionY += 0.08;
+                }
+
+                Vector3 motion = new Vector3(motionX, motionY, motionZ).multiply(f);
+
+                if (distance < 4) {
+                    motion.y *= 0.7;
+                }
+
+                arrow.setMotion(motion);
 
                 EntityShootBowEvent ev = new EntityShootBowEvent(this, Item.get(Item.ARROW, 0, 1), arrow, f);
                 this.server.getPluginManager().callEvent(ev);

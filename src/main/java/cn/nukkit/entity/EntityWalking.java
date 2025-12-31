@@ -2,7 +2,7 @@ package cn.nukkit.entity;
 
 import cn.nukkit.block.*;
 import cn.nukkit.entity.mob.EntityDrowned;
-import cn.nukkit.entity.mob.EntityPillager;
+import cn.nukkit.entity.mob.EntityVindicator;
 import cn.nukkit.entity.mob.EntityZombie;
 import cn.nukkit.entity.passive.EntityIronGolem;
 import cn.nukkit.entity.passive.EntityLlama;
@@ -40,7 +40,6 @@ public abstract class EntityWalking extends BaseEntity {
     private int lastTargetCheck = 0;
     private Vector3 lastTargetPos = null;
 
-    private int doorBreakingProgress = 0;
     private BlockDoor doorBreakingTarget = null;
     private int doorBreakCooldown = 0;
 
@@ -69,7 +68,7 @@ public abstract class EntityWalking extends BaseEntity {
 
         double near = Integer.MAX_VALUE;
         Entity closestTarget = null;
-        for (Entity entity : this.getLevel().getSharedNearbyEntities(this, EntityRanges.createTargetSearchBox(this))) {
+        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, true)) {
 
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
@@ -378,7 +377,7 @@ public abstract class EntityWalking extends BaseEntity {
 
         updateStuckDetection(tickDiff);
 
-        if (this.server.isHardcore || this.server.getDifficulty() >= 3) handleDoorBreaking(tickDiff);
+        handleDoorBreaking(tickDiff);
 
         if (!isImmobile()) {
             if (this.age % 10 == 0 && this.route != null && !this.route.isSearching()) {
@@ -696,14 +695,14 @@ public abstract class EntityWalking extends BaseEntity {
         int currentY = NukkitMath.floorDouble(this.y);
         int currentZ = NukkitMath.floorDouble(this.z);
 
-        if (lastCaveCheckTick + 10 > this.age) {
-            return lastCave;
+        if (this.lastCaveCheckTick + 10 > this.age) {
+            return this.lastCave;
         }
 
         int skyLight = this.level.getBlockSkyLightAt(currentX, NukkitMath.floorDouble(this.y + 1), currentZ);
         if (skyLight == 15) {
-            lastCave = false;
-            lastCaveCheckTick = this.age;
+            this.lastCave = false;
+            this.lastCaveCheckTick = this.age;
             return false;
         }
 
@@ -723,81 +722,91 @@ public abstract class EntityWalking extends BaseEntity {
 
             Block block = this.level.getBlock(currentX, y, currentZ, false);
             if (block != null && !block.canPassThrough()) {
-                lastCave = true;
-                lastCaveCheckTick = this.age;
+                this.lastCave = true;
+                this.lastCaveCheckTick = this.age;
                 return true;
             }
         }
 
-        lastCave = false;
-        lastCaveCheckTick = this.age;
+        this.lastCave = false;
+        this.lastCaveCheckTick = this.age;
         return false;
     }
 
     private void handleDoorBreaking(int tickDiff) {
         boolean isZombie = this instanceof EntityZombie;
-        boolean isPillager = this instanceof EntityPillager;
+        boolean isVindicator = this instanceof EntityVindicator;
 
-        if (!isZombie && !isPillager) {
-            if (doorBreakingProgress > 0) {
-                doorBreakingProgress = 0;
-                doorBreakingTarget = null;
+        if (isZombie && !(this.server.isHardcore || this.server.getDifficulty() == 3)) {
+            return;
+        }
+
+        if (isVindicator && !(this.server.getDifficulty() == 2 || this.server.getDifficulty() == 3)) {
+            return;
+        }
+
+        if (!isZombie && !isVindicator) {
+            if (this.doorBreakingTarget != null) {
+                this.resetDoorState();
             }
             return;
         }
 
-        if (doorBreakCooldown > 0) {
-            doorBreakCooldown -= tickDiff;
+        if (this.doorBreakCooldown > 0) {
+            this.doorBreakCooldown -= tickDiff;
             return;
         }
 
         Vector3 frontPos = getFrontBlockPosition();
         if (frontPos == null) {
-            if (doorBreakingProgress > 0) {
-                doorBreakingProgress = 0;
-                doorBreakingTarget = null;
+            if (this.doorBreakingTarget != null) {
+                this.resetDoorState();
             }
             return;
         }
 
-        if (Block.isDoor(this.level.getBlockIdAt((int) frontPos.x, (int) frontPos.y, (int) frontPos.z))) {
+        int blockId = this.level.getBlockIdAt((int) frontPos.x, (int) frontPos.y, (int) frontPos.z);
 
+        if (Block.isDoor(blockId) && blockId != Block.IRON_DOOR_BLOCK) {
             Block block = this.level.getBlock(frontPos, false);
 
             if (block instanceof BlockDoor door) {
                 if (!door.isOpen()) {
-                    if (doorBreakingTarget == null || !doorBreakingTarget.equals(door)) {
-                        doorBreakingProgress = 0;
-                        doorBreakingTarget = door;
+                    if (this.doorBreakingTarget == null || !this.doorBreakingTarget.equals(door)) {
+                        this.doorBreakingTarget = door;
                     }
 
-                    doorBreakingProgress += calculateDoorDamage();
+                    int doorDamage = calculateDoorDamage();
+                    this.doorBreakCooldown = 32;
 
-                    doorBreakCooldown = 32;
+                    if (doorDamage > 0) {
+                        this.doorBreakingTarget.damage(doorDamage);
 
-                    if (doorBreakingProgress > 0 && doorBreakingProgress < door.getMaxHealth()) {
-                        door.damage(doorBreakingProgress);
+                        this.level.setBlock(this.doorBreakingTarget, this.doorBreakingTarget, true, true);
 
                         this.level.addSound(frontPos, Sound.MOB_ZOMBIE_WOODBREAK);
-                    }
 
-                    if (doorBreakingProgress >= door.getMaxHealth()) {
-                        this.level.useBreakOn(frontPos, null, null, true);
-                        doorBreakingProgress = 0;
-                        doorBreakingTarget = null;
+                        if (this.doorBreakingTarget.getHealth() <= 0) {
+                            this.level.useBreakOn(frontPos, null, null, true);
+                            this.resetDoorState();
+                        }
                     }
                 } else {
-                    if (doorBreakingProgress > 0) {
-                        doorBreakingProgress = 0;
-                        doorBreakingTarget = null;
-                    }
+                    this.resetDoorState();
                 }
             }
         } else {
-            if (doorBreakingProgress > 0) {
-                doorBreakingProgress = 0;
-                doorBreakingTarget = null;
+            this.resetDoorState();
+        }
+    }
+
+    private void resetDoorState() {
+        if (this.doorBreakingTarget != null) {
+            if (this.doorBreakingTarget.getHealth() > 0 &&
+                    this.doorBreakingTarget.getHealth() < this.doorBreakingTarget.getMaxHealth()) {
+                this.doorBreakingTarget.setHealth(this.doorBreakingTarget.getMaxHealth());
             }
+            this.doorBreakingTarget = null;
         }
     }
 
@@ -817,7 +826,7 @@ public abstract class EntityWalking extends BaseEntity {
     private int calculateDoorDamage() {
         if (this instanceof EntityZombie) {
             return Utils.rand(2, 3);
-        } else if (this instanceof EntityPillager) {
+        } else if (this instanceof EntityVindicator) {
             return Utils.rand(1, 2);
         }
         return 0;
@@ -825,13 +834,12 @@ public abstract class EntityWalking extends BaseEntity {
 
     @Override
     public void close() {
-        if (doorBreakingProgress > 0 && doorBreakingTarget != null) {
-            if (doorBreakingProgress < 7) {
-                doorBreakingTarget.setDamage(0);
-            }
+        if (this.doorBreakingTarget != null &&
+                this.doorBreakingTarget.getHealth() > 0 &&
+                this.doorBreakingTarget.getHealth() < this.doorBreakingTarget.getMaxHealth()) {
+            this.doorBreakingTarget.setHealth(this.doorBreakingTarget.getMaxHealth());
         }
-        doorBreakingProgress = 0;
-        doorBreakingTarget = null;
+        this.doorBreakingTarget = null;
 
         super.close();
     }

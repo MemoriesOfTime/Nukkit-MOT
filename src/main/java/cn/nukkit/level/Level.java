@@ -284,7 +284,7 @@ public class Level implements ChunkManager, Metadatable {
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
 
     // Cache for fast entity processing for checkTarget()
-    private final Long2ObjectOpenHashMap<List<Entity>> entityNearbyCache = new Long2ObjectOpenHashMap<>();
+    private final Long2ObjectOpenHashMap<Entity[]> entityNearbyCache = new Long2ObjectOpenHashMap<>();
     private final Long2LongOpenHashMap entityNearbyCacheTime = new Long2LongOpenHashMap();
     private final LongSet entityNearbyCacheDirty = new LongOpenHashSet();
 
@@ -2985,24 +2985,80 @@ public class Level implements ChunkManager, Metadatable {
         return nearby.toArray(new Entity[0]);
     }
 
-    public List<Entity> getSharedNearbyEntities(Entity requester, AxisAlignedBB searchBox) {
-        if (requester == null || requester.getLevel() != this) {
-            return Collections.emptyList();
+    public Entity[] getNearbyEntities(AxisAlignedBB bb) {
+        return this.getNearbyEntities(bb, null);
+    }
+
+    private static final Entity[] EMPTY_ENTITY_ARR = new Entity[0];
+    private static final Entity[] ENTITY_BUFFER = new Entity[512];
+
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean isAiMob) {
+        return getNearbyEntities(bb, entity, isAiMob, false);
+    }
+
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity) {
+        return getNearbyEntities(bb, entity, false, false);
+    }
+
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean isAiMob, boolean loadChunks) {
+        if (!isAiMob) {
+            int index = 0;
+
+            int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
+            int maxX = NukkitMath.ceilDouble((bb.getMaxX() + 2) * 0.0625);
+            int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
+            int maxZ = NukkitMath.ceilDouble((bb.getMaxZ() + 2) * 0.0625);
+
+            ArrayList<Entity> overflow = null;
+
+            for (int x = minX; x <= maxX; ++x) {
+                for (int z = minZ; z <= maxZ; ++z) {
+                    for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
+                        if (ent != entity && ent.boundingBox.intersectsWith(bb)) {
+                            if (index < ENTITY_BUFFER.length) {
+                                ENTITY_BUFFER[index] = ent;
+                            } else {
+                                if (overflow == null) overflow = new ArrayList<>(1024);
+                                overflow.add(ent);
+                            }
+                            index++;
+                        }
+                    }
+                }
+            }
+
+            if (index == 0) return EMPTY_ENTITY_ARR;
+            Entity[] copy;
+            if (overflow == null) {
+                copy = Arrays.copyOfRange(ENTITY_BUFFER, 0, index);
+                Arrays.fill(ENTITY_BUFFER, 0, index, null);
+            } else {
+                copy = new Entity[ENTITY_BUFFER.length + overflow.size()];
+                System.arraycopy(ENTITY_BUFFER, 0, copy, 0, ENTITY_BUFFER.length);
+                for (int i = 0; i < overflow.size(); i++) {
+                    copy[ENTITY_BUFFER.length + i] = overflow.get(i);
+                }
+            }
+            return copy;
+        } else {
+            if (entity == null || entity.getLevel() != this) {
+                return new Entity[]{};
+            }
+
+            long boxHash = hashSearchBox(bb);
+            long currentTick = this.levelCurrentTick;
+            long lastUpdate = entityNearbyCacheTime.get(boxHash);
+            boolean isDirty = entityNearbyCacheDirty.contains(boxHash);
+
+            if (isDirty || lastUpdate == 0) {
+                Entity[] entities = this.getNearbyEntities(bb, entity);
+                entityNearbyCache.put(boxHash, entities);
+                entityNearbyCacheTime.put(boxHash, currentTick);
+                entityNearbyCacheDirty.remove(boxHash);
+            }
+
+            return entityNearbyCache.get(boxHash);
         }
-
-        long boxHash = hashSearchBox(searchBox);
-        long currentTick = this.levelCurrentTick;
-        long lastUpdate = entityNearbyCacheTime.get(boxHash);
-        boolean isDirty = entityNearbyCacheDirty.contains(boxHash);
-
-        if (isDirty || lastUpdate == 0) {
-            List<Entity> entities = new ArrayList<>(List.of(this.getNearbyEntities(searchBox, requester)));
-            entityNearbyCache.put(boxHash, entities);
-            entityNearbyCacheTime.put(boxHash, currentTick);
-            entityNearbyCacheDirty.remove(boxHash);
-        }
-
-        return entityNearbyCache.get(boxHash);
     }
 
     private static long hashSearchBox(AxisAlignedBB box) {
@@ -3019,58 +3075,6 @@ public class Level implements ChunkManager, Metadatable {
         if (entity == null || entity.getLevel() != this) return;
         long chunkKey = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
         entityNearbyCacheDirty.add(chunkKey);
-    }
-
-    public Entity[] getNearbyEntities(AxisAlignedBB bb) {
-        return this.getNearbyEntities(bb, null);
-    }
-
-    private static final Entity[] EMPTY_ENTITY_ARR = new Entity[0];
-    private static final Entity[] ENTITY_BUFFER = new Entity[512];
-
-    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity) {
-        return getNearbyEntities(bb, entity, false);
-    }
-
-    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean loadChunks) {
-        int index = 0;
-
-        int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
-        int maxX = NukkitMath.ceilDouble((bb.getMaxX() + 2) * 0.0625);
-        int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
-        int maxZ = NukkitMath.ceilDouble((bb.getMaxZ() + 2) * 0.0625);
-
-        ArrayList<Entity> overflow = null;
-
-        for (int x = minX; x <= maxX; ++x) {
-            for (int z = minZ; z <= maxZ; ++z) {
-                for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
-                    if (ent != entity && ent.boundingBox.intersectsWith(bb)) {
-                        if (index < ENTITY_BUFFER.length) {
-                            ENTITY_BUFFER[index] = ent;
-                        } else {
-                            if (overflow == null) overflow = new ArrayList<>(1024);
-                            overflow.add(ent);
-                        }
-                        index++;
-                    }
-                }
-            }
-        }
-
-        if (index == 0) return EMPTY_ENTITY_ARR;
-        Entity[] copy;
-        if (overflow == null) {
-            copy = Arrays.copyOfRange(ENTITY_BUFFER, 0, index);
-            Arrays.fill(ENTITY_BUFFER, 0, index, null);
-        } else {
-            copy = new Entity[ENTITY_BUFFER.length + overflow.size()];
-            System.arraycopy(ENTITY_BUFFER, 0, copy, 0, ENTITY_BUFFER.length);
-            for (int i = 0; i < overflow.size(); i++) {
-                copy[ENTITY_BUFFER.length + i] = overflow.get(i);
-            }
-        }
-        return copy;
     }
 
     @NonComputationAtomic

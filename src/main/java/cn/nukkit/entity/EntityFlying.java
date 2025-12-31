@@ -31,7 +31,7 @@ public abstract class EntityFlying extends BaseEntity {
                 !((Entity) target).canBeFollowed()) {
 
             double near = Integer.MAX_VALUE;
-            for (Entity entity : this.getLevel().getSharedNearbyEntities(this, EntityRanges.createTargetSearchBox(this))) {
+            for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, true)) {
                 if (!(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }
