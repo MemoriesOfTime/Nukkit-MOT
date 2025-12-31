@@ -158,25 +158,27 @@ public abstract class EntityWalking extends BaseEntity {
             int x = NukkitMath.floorDouble(point.x);
             int y = NukkitMath.floorDouble(point.y);
             int z = NukkitMath.floorDouble(point.z);
-            Block block = level.getBlock(x, y, z, false);
-            if (isVisionBlockingBlock(block)) {
+
+            if (this.isCanSeeThrough(this.level.getBlockIdAt(x, y, z))) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean isVisionBlockingBlock(Block block) {
-        if (block == null) return false;
-        int id = block.getId();
-        if (block instanceof BlockSlab ||
-                block instanceof BlockFence ||
-                block instanceof BlockFenceGate ||
-                block instanceof BlockTrapdoor ||
-                block instanceof BlockDoor) {
-            return false;
+    private boolean isCanSeeThrough(int blockId) {
+        if (Block.isSlab(blockId) ||
+                Block.isFence(blockId) ||
+                Block.isFenceGate(blockId) ||
+                Block.isTrapdoor(blockId) ||
+                Block.isDoor(blockId) ||
+                blockId == Block.AIR) {
+            return true;
         }
-        return !block.isTransparent() && !block.canPassThrough();
+
+        Block block = Block.get(blockId);
+
+        return block.isTransparent() && block.canPassThrough();
     }
 
     private Vector3 findPosition(int radius) {
@@ -439,8 +441,7 @@ public abstract class EntityWalking extends BaseEntity {
                             this.motionZ = 0;
                         }
                     } else {
-                        if (levelBlock.getId() == BlockID.WATER) {
-                            BlockWater blockWater = (BlockWater) levelBlock;
+                        if (levelBlock instanceof BlockWater blockWater) {
                             Vector3 flowVector = blockWater.getFlowVector();
                             motionX = flowVector.getX() * FLOW_MULTIPLIER;
                             motionZ = flowVector.getZ() * FLOW_MULTIPLIER;
