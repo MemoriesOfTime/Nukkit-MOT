@@ -63,9 +63,11 @@ public abstract class EntityWalking extends BaseEntity {
         double near = Integer.MAX_VALUE;
         Entity closestTarget = null;
         for (Entity entity : this.getLevel().getSharedNearbyEntities(this, EntityRanges.createTargetSearchBox(this))) {
+
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }
+
             if (creature instanceof BaseEntity base && base.isFriendly() == this.isFriendly() && !this.isInLove()) {
                 continue;
             }
@@ -449,10 +451,9 @@ public abstract class EntityWalking extends BaseEntity {
                     }
                 }
 
-                this.checkTarget();
-
                 boolean shouldActivelyMoveToTarget = !this.isFriendly() || this.followTarget != null;
 
+                this.checkTarget();
                 if (this.target != null && shouldActivelyMoveToTarget) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;

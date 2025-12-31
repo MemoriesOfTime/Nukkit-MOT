@@ -3447,6 +3447,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
+                // When the player moves, set dirty nearby entities to check the target
+                if (!this.isSpectator() && !this.isCreative()) {
+                    if (newPos.distanceSquared(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) > 1.0) {
+                        this.level.setDirtyNearby(this);
+                    }
+                }
+
                 // 传送玩家后，可能会由于网络延迟接收错误数据包
                 // 在这种情况下为了避免错误调整玩家视角，直接忽略移动数据包
                 if (this.lastTeleportTick + 20 > this.server.getTick()
@@ -3492,10 +3499,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             case ProtocolInfo.PLAYER_AUTH_INPUT_PACKET:
                 if (!this.isMovementServerAuthoritative()) {
                     return;
-                }
-
-                if (!this.isSpectator() && !this.isCreative()) {
-                    this.level.setDirtyNearby(this);
                 }
 
                 PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;

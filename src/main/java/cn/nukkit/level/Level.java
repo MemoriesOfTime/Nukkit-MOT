@@ -2989,18 +2989,30 @@ public class Level implements ChunkManager, Metadatable {
         if (requester == null || requester.getLevel() != this) {
             return Collections.emptyList();
         }
-        long chunkKey = chunkHash(((int) requester.x) >> 4, ((int) requester.z) >> 4);
-        long currentTick = this.levelCurrentTick;
-        long lastUpdate = entityNearbyCacheTime.get(chunkKey);
-        boolean isDirty = entityNearbyCacheDirty.contains(chunkKey);
 
-        if (isDirty || lastUpdate == 0 || currentTick - lastUpdate > 10) {
+        long boxHash = hashSearchBox(searchBox);
+        long currentTick = this.levelCurrentTick;
+        long lastUpdate = entityNearbyCacheTime.get(boxHash);
+        boolean isDirty = entityNearbyCacheDirty.contains(boxHash);
+
+        if (isDirty || lastUpdate == 0) {
             List<Entity> entities = new ArrayList<>(List.of(this.getNearbyEntities(searchBox, requester)));
-            entityNearbyCache.put(chunkKey, entities);
-            entityNearbyCacheTime.put(chunkKey, currentTick);
-            entityNearbyCacheDirty.remove(chunkKey);
+            entityNearbyCache.put(boxHash, entities);
+            entityNearbyCacheTime.put(boxHash, currentTick);
+            entityNearbyCacheDirty.remove(boxHash);
         }
-        return entityNearbyCache.get(chunkKey);
+
+        return entityNearbyCache.get(boxHash);
+    }
+
+    private static long hashSearchBox(AxisAlignedBB box) {
+        long x1 = (long) (box.getMinX() * 10);
+        long y1 = (long) (box.getMinY() * 10);
+        long z1 = (long) (box.getMinZ() * 10);
+        long x2 = (long) (box.getMaxX() * 10);
+        long y2 = (long) (box.getMaxY() * 10);
+        long z2 = (long) (box.getMaxZ() * 10);
+        return (x1 ^ (z1 << 11) ^ (y1 << 22)) + (x2 ^ (z2 << 11) ^ (y2 << 22) << 32);
     }
 
     public void setDirtyNearby(Entity entity) {
