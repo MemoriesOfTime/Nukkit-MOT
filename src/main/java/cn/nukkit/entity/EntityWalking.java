@@ -264,9 +264,7 @@ public abstract class EntityWalking extends BaseEntity {
                 id == Block.FLOWER) {
             return true;
         }
-        return block.canPassThrough() ||
-                id == Block.WATER ||
-                id == Block.STILL_WATER;
+        return block.canPassThrough() || Block.isWater(id);
     }
 
     private Vector3 exploreArea() {
@@ -677,23 +675,50 @@ public abstract class EntityWalking extends BaseEntity {
         return level.getBlock(chunk, checkX, checkY, checkZ, false);
     }
 
+    private boolean lastCaveResult;
+    private int lastCaveCheckTick = 0;
+
     private boolean isInCave() {
-        int skyLight = this.level.getBlockSkyLightAt(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(this.y + 1), NukkitMath.floorDouble(this.z));
-        boolean hasDirectSky = skyLight == 15;
-        if (hasDirectSky) {
+        int currentX = NukkitMath.floorDouble(this.x);
+        int currentY = NukkitMath.floorDouble(this.y);
+        int currentZ = NukkitMath.floorDouble(this.z);
+
+        if (lastCaveCheckTick + 10 > this.age) {
+            return lastCaveResult;
+        }
+
+        int skyLight = this.level.getBlockSkyLightAt(currentX, NukkitMath.floorDouble(this.y + 1), currentZ);
+        if (skyLight == 15) {
+            lastCaveResult = false;
+            lastCaveCheckTick = this.age;
             return false;
         }
 
-        int x = NukkitMath.floorDouble(this.x);
-        int z = NukkitMath.floorDouble(this.z);
-        int y = NukkitMath.floorDouble(this.y) + 2;
-        while (y <= this.level.getMaxBlockY()) {
-            Block block = this.level.getBlock(x, y, z, false);
-            if (!block.canPassThrough()) {
+        int startY = currentY + 2;
+        int maxCheckHeight = Math.min(startY + 64, this.level.getMaxBlockY());
+
+        for (int y = startY; y <= maxCheckHeight; y++) {
+            int blockId = this.level.getBlockIdAt(currentX, y, currentZ);
+
+            if (blockId == Block.AIR ||
+                    blockId == Block.LEAVES ||
+                    blockId == Block.LEAVES2 ||
+                    blockId == Block.FLOWER ||
+                    blockId == Block.NETHERRACK ||
+                    Block.isWater(blockId)) {
+                continue;
+            }
+
+            Block block = this.level.getBlock(currentX, y, currentZ, false);
+            if (block != null && !block.canPassThrough()) {
+                lastCaveResult = true;
+                lastCaveCheckTick = this.age;
                 return true;
             }
-            y++;
         }
+
+        lastCaveResult = false;
+        lastCaveCheckTick = this.age;
         return false;
     }
 }
