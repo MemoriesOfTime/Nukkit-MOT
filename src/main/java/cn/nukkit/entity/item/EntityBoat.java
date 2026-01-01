@@ -147,7 +147,7 @@ public class EntityBoat extends EntityVehicle {
             this.rotateVehicle();
         }
 
-        boolean simulateWaves = (!(getPassenger().isPlayer) || isPlayerOfNewerVersion) && !getDataFlag(DATA_FLAGS, DATA_FLAG_OUT_OF_CONTROL);
+        boolean simulateWaves = (!(getPassenger() instanceof Player) || isPlayerOfNewerVersion) && !getDataFlag(DATA_FLAGS, DATA_FLAG_OUT_OF_CONTROL);
 
         if (simulateWaves) {
             if (waterDiff > SINKING_DEPTH && !sinking) {
@@ -308,7 +308,7 @@ public class EntityBoat extends EntityVehicle {
         if (entity.riding != null) {
             updatePassengers(true);
 
-            entity.setDataProperty(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 1), !entity.isPlayer);
+            entity.setDataProperty(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 1), !(entity instanceof Player));
             if (entity instanceof Player playerEntity) {
                 entity.setDataProperty(new FloatEntityData(DATA_RIDER_MAX_ROTATION, 90), false);
                 if (playerEntity.protocol < ProtocolInfo.v1_21_130_28) {
@@ -335,7 +335,7 @@ public class EntityBoat extends EntityVehicle {
 
         if (r) {
             updatePassengers();
-            if (entity.isPlayer) {
+            if (entity instanceof Player) {
                 entity.setDataPropertyAndSendOnlyToSelf(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 0));
             } else {
                 entity.setDataProperty(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 0), true);
