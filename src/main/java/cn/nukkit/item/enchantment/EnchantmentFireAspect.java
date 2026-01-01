@@ -32,7 +32,7 @@ public class EnchantmentFireAspect extends Enchantment {
 
     @Override
     public void doAttack(Entity attacker, Entity entity) {
-        if ((!entity.isPlayer || !((Player) entity).isCreative())) {
+        if ((!(entity instanceof Player player) || !player.isCreative())) {
             int duration = Math.max(entity.fireTicks / 20, getLevel() << 2);
 
             EntityCombustByEntityEvent ev = new EntityCombustByEntityEvent(attacker, entity, duration);

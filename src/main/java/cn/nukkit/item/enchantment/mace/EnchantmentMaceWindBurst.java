@@ -25,7 +25,7 @@ public class EnchantmentMaceWindBurst extends EnchantmentMace {
         if (fallDistance < 2 || attacker.isOnGround()) {
             return;
         }
-        if (attacker.isPlayer && ((Player) attacker).getAdventureSettings().get(AdventureSettings.Type.FLYING)) {
+        if (attacker instanceof Player player && player.getAdventureSettings().get(AdventureSettings.Type.FLYING)) {
             return;
         }
         float knockbackScaling = (getLevel() + 1) * 0.25f;
