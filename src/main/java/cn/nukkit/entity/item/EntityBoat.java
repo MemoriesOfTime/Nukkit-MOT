@@ -567,24 +567,6 @@ public class EntityBoat extends EntityVehicle {
     }
 
     public float getGroundFriction() {
-        boolean inWater = false;
-        int minX = (int) Math.floor(this.boundingBox.getMinX());
-        int maxX = (int) Math.floor(this.boundingBox.getMaxX());
-        int minZ = (int) Math.floor(this.boundingBox.getMinZ());
-        int maxZ = (int) Math.floor(this.boundingBox.getMaxZ());
-        int minY = (int) Math.floor(this.boundingBox.getMinY() + 0.05);
-
-        for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                if (this.level.getBlock(x, minY, z).isWater()) {
-                    inWater = true;
-                }
-            }
-        }
-        this.inWater = inWater;
-        if (inWater) {
-            return 0.9f;
-        }
         AxisAlignedBB boatShape = getBoundingBox().clone();
         // 0.001 high box extending downwards from the boat
         double middleY = boatShape.getMinY() - 0.0005;
@@ -612,9 +594,14 @@ public class EntityBoat extends EntityVehicle {
                     if (edges > 0 && !(y != y0 && y != y1 - 1)) {
                         continue;
                     }
+
                     final Block state = this.getLevel().getBlock(x, y, z);
+
                     if (state.getId() == BlockID.LILY_PAD) {
                         continue;
+                    } else if (state.isWater()) {
+                        this.inWater = true;
+                        return 0.9f;
                     }
 
                     if (state.getBoundingBox() == null) {
