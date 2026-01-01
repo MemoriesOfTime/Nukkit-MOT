@@ -2,6 +2,7 @@ package cn.nukkit.entity.item;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockWater;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.ByteEntityData;
@@ -53,6 +54,12 @@ public class EntityBoat extends EntityVehicle {
     protected boolean sinking = true;
     public int woodID;
     private boolean inWater;
+
+    public double paddleMotionX = 0d;
+    public double paddleMotionY = 0d;
+
+    public float paddleTimeLeft = 0f;
+    public float paddleTimeRight = 0f;
 
     public EntityBoat(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -135,7 +142,13 @@ public class EntityBoat extends EntityVehicle {
 
         double waterDiff = getWaterLevel();
 
-        boolean simulateWaves = (!(getPassenger() instanceof Player player) || player.protocol >= ProtocolInfo.v1_21_130_28) && !getDataFlag(DATA_FLAGS, DATA_FLAG_OUT_OF_CONTROL);
+        boolean isPlayerOfNewerVersion = getPassenger() instanceof Player player && player.protocol >= ProtocolInfo.v1_21_130_28;
+        if (isPlayerOfNewerVersion) {
+            this.rotateVehicle();
+        }
+
+        boolean simulateWaves = (!(getPassenger() instanceof Player) || isPlayerOfNewerVersion) && !getDataFlag(DATA_FLAGS, DATA_FLAG_OUT_OF_CONTROL);
+
         if (simulateWaves) {
             if (waterDiff > SINKING_DEPTH && !sinking) {
                 sinking = true;
@@ -154,59 +167,16 @@ public class EntityBoat extends EntityVehicle {
             hasUpdate = true;
         }
 
-        double friction = 1 - this.getDrag();
+        double groundFriction = this.getGroundFriction();
+        this.motionX *= groundFriction;
+        this.motionZ *= groundFriction;
 
-        if (this.onGround && (Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionZ) > 0.00001)) {
-            friction *= this.getLevel().getBlock(this.chunk, getFloorX(), getFloorY() - 1, getFloorZ(), false).getFrictionFactor();
-        }
-
-        float invFriction = 0.05f;
-
-        if (this.onGround && (Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionZ) > 0.00001)) {
-            float factor = 0;
-            int count = 0;
-
-            int y = getFloorY() - 1;
-            if (y <= level.getMaxBlockY()) {
-                for (int x = (int) boundingBox.getMinX(); x <= (int) boundingBox.getMaxX(); x++) {
-                    for (int z = (int) boundingBox.getMinZ(); z <= (int) boundingBox.getMaxZ(); z++) {
-                        Block block =  this.level.getBlock(x, y, z, false);
-                        if (block.isAir() || !block.collidesWithBB(boundingBox)) {
-                            continue;
-                        }
-
-                        factor += (float) block.getFrictionFactor();
-                        count++;
-                    }
-                }
-            }
-
-            if (count != 0) {
-                factor /= count;
-            } else {
-                factor = 0.6f;
-            }
-            friction *= factor;
-            invFriction = factor * 0.5f;
-        }
-
-        for (Block block : getCollisionBlocks()) {
-            if (block.isWater()) {
-                invFriction = 0.9f;
-            }
-        }
-
-        this.deltaRotation *= invFriction;
-
-        this.motionX *= friction;
 
         if (simulateWaves) {
             if (waterDiff > SINKING_DEPTH || sinking) {
                 this.motionY = waterDiff > 0.5 ? this.motionY - this.getGravity() : (this.motionY - SINKING_SPEED < -0.005 ? this.motionY : this.motionY - SINKING_SPEED);
             }
         }
-
-        this.motionZ *= friction;
 
         Location from = new Location(lastX, lastY, lastZ, lastYaw, lastPitch, level);
         Location to = new Location(this.x, this.y, this.z, this.yaw, this.pitch, level);
@@ -273,7 +243,6 @@ public class EntityBoat extends EntityVehicle {
             }
 
             ent.setSeatPosition(getMountedOffset(ent).add(RIDER_PASSENGER_OFFSET));
-            super.updatePassengerPosition(ent);
             if (sendLinks) {
                 broadcastLinkPacket(ent, SetEntityLinkPacket.TYPE_RIDE);
             }
@@ -298,7 +267,7 @@ public class EntityBoat extends EntityVehicle {
 
     public double getWaterLevel() {
         double maxY = this.boundingBox.getMinY() + getBaseOffset();
-        AxisAlignedBB.BBConsumer<Double> consumer = new AxisAlignedBB.BBConsumer<Double>() {
+        AxisAlignedBB.BBConsumer<Double> consumer = new AxisAlignedBB.BBConsumer<>() {
 
             private double diffY = Double.MAX_VALUE;
 
@@ -327,7 +296,7 @@ public class EntityBoat extends EntityVehicle {
 
     @Override
     public boolean mountEntity(Entity entity) {
-        boolean player = this.passengers.size() >= 1 && this.passengers.get(0) instanceof Player;
+        boolean player = !this.passengers.isEmpty() && this.passengers.get(0) instanceof Player;
         byte mode = SetEntityLinkPacket.TYPE_PASSENGER;
 
         if (!player && (entity instanceof Player || this.passengers.isEmpty())) {
@@ -339,7 +308,7 @@ public class EntityBoat extends EntityVehicle {
         if (entity.riding != null) {
             updatePassengers(true);
 
-            entity.setDataProperty(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 1), !entity.isPlayer);
+            entity.setDataProperty(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 1), !(entity instanceof Player));
             if (entity instanceof Player playerEntity) {
                 entity.setDataProperty(new FloatEntityData(DATA_RIDER_MAX_ROTATION, 90), false);
                 if (playerEntity.protocol < ProtocolInfo.v1_21_130_28) {
@@ -366,7 +335,7 @@ public class EntityBoat extends EntityVehicle {
 
         if (r) {
             updatePassengers();
-            if (entity.isPlayer) {
+            if (entity instanceof Player) {
                 entity.setDataPropertyAndSendOnlyToSelf(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 0));
             } else {
                 entity.setDataProperty(new ByteEntityData(DATA_RIDER_ROTATION_LOCKED, 0), true);
@@ -500,39 +469,6 @@ public class EntityBoat extends EntityVehicle {
         return !this.isFull() ? "action.interact.ride.boat" : "";
     }
 
-    public void onPlayerInput(Player player, double motionX, double motionY) {
-        if (player.protocol < ProtocolInfo.v1_21_130_28) {
-            return;
-        }
-
-        boolean inputLeft = motionX > 0;
-        boolean inputRight = motionX < 0;
-        boolean inputUp = motionY > 0;
-        boolean inputDown = motionY < 0;
-
-        float delta = inputDown ? 0.1f : 1;
-        if (inputLeft) {
-            this.deltaRotation -= delta;
-        } else if (inputRight) {
-            this.deltaRotation += delta;
-        }
-        this.deltaRotation = NukkitMath.clamp(this.deltaRotation, -5, 5);
-        this.yaw += this.deltaRotation;
-
-        float acceleration = 0;
-        if (inputRight != inputLeft && !inputUp && !inputDown) {
-            acceleration += 0.005f;
-        }
-        if (inputUp) {
-            acceleration += 0.04f;
-        } else if (inputDown) {
-            acceleration -= 0.005f;
-        }
-        float rad = ((float) yaw - 90) * (NukkitMath.DEG_TO_RAD);
-        this.motionX += NukkitMath.sin(-rad) * acceleration;
-        this.motionZ += NukkitMath.cos(rad) * acceleration;
-    }
-
     @Override
     public void addMotion(double motionX, double motionY, double motionZ) {
         SetEntityMotionPacket pk = new SetEntityMotionPacket();
@@ -546,5 +482,138 @@ public class EntityBoat extends EntityVehicle {
             }
             player.dataPacket(pk);
         }
+    }
+
+    /**
+     * Since 1.21.130, boat movement turns server-controlled
+     */
+    public void onPlayerInput(Player player, double motionX, double motionY) {
+        if (player.protocol < ProtocolInfo.v1_21_130_28) {
+            return;
+        }
+        this.paddleMotionX = motionX;
+        this.paddleMotionY = motionY;
+        this.moveVehicle(motionX, motionY);
+    }
+
+    public void rotateVehicle() {
+        boolean simulateMove = ((getPassenger() instanceof Player player)
+                && player.protocol >= ProtocolInfo.v1_21_130_28);
+        if (simulateMove) {
+            boolean inputLeft = this.paddleMotionX > 0.35;
+            boolean inputRight = this.paddleMotionX < -0.35;
+            boolean inputDown = this.paddleMotionY < -0.35;
+
+            float delta = inputDown ? 0.1f : 1;
+            if (inputLeft) {
+                this.deltaRotation -= delta;
+            } else if (inputRight) {
+                this.deltaRotation += delta;
+            }
+            this.deltaRotation *= this.getGroundFriction();
+            this.deltaRotation = NukkitMath.clamp(this.deltaRotation, -5, 5);
+            this.yaw += this.deltaRotation;
+            this.setHeadYaw(this.getYaw());
+
+            this.paddleMotionX = 0;
+            this.paddleMotionY = 0;
+        }
+    }
+
+    public void moveVehicle(double mx, double my) {
+        boolean simulateMove = ((getPassenger() instanceof Player player)
+                && player.protocol >= ProtocolInfo.v1_21_130_28);
+        if (simulateMove) {
+            boolean inputLeft = mx > 0.35;
+            boolean inputRight = mx < -0.35;
+            boolean inputUp = my > 0.35;
+            boolean inputDown = my < -0.35;
+
+            float animationSpeed = (float) Math.max(0.01,
+                    Math.min(0.08, Math.sqrt(this.motionX * this.motionX + this.motionZ * this.motionZ) * 0.05));
+            if (inputUp) {
+                this.paddleTimeLeft += animationSpeed;
+                this.paddleTimeRight += animationSpeed;
+            } else if (inputDown) {
+                this.paddleTimeLeft -= animationSpeed;
+                this.paddleTimeRight -= animationSpeed;
+            } else {
+                if (!inputLeft) {
+                    this.paddleTimeLeft = 0;
+                }
+                if (!inputRight) {
+                    this.paddleTimeRight = 0;
+                }
+            }
+
+            this.setDataProperty(new FloatEntityData(Entity.DATA_PADDLE_TIME_LEFT, this.paddleTimeLeft));
+            this.setDataProperty(new FloatEntityData(Entity.DATA_PADDLE_TIME_RIGHT, this.paddleTimeRight));
+
+            this.sendData(this.getViewers().values().toArray(Player.EMPTY_ARRAY));
+
+            float acceleration = 0;
+            if (inputRight != inputLeft && !inputUp && !inputDown) {
+                acceleration += 0.005f;
+            }
+            if (inputUp) {
+                acceleration += 0.04f;
+            } else if (inputDown) {
+                acceleration -= 0.005f;
+            }
+            float rad = ((float) yaw - 90) * (NukkitMath.DEG_TO_RAD);
+            this.motionX += NukkitMath.sin(-rad) * acceleration;
+            this.motionZ += NukkitMath.cos(rad) * acceleration;
+        }
+    }
+
+    public float getGroundFriction() {
+        AxisAlignedBB boatShape = getBoundingBox().clone();
+        // 0.001 high box extending downwards from the boat
+        double middleY = boatShape.getMinY() - 0.0005;
+        boatShape.setMaxY(middleY + 0.0001);
+        boatShape.setMinY(middleY);
+
+        int x0 = (int) Math.floor(boatShape.getMinX()) - 1;
+        int x1 = (int) Math.ceil(boatShape.getMaxX()) + 1;
+        int y0 = (int) Math.floor(boatShape.getMinY()) - 1;
+        int y1 = (int) Math.ceil(boatShape.getMaxY()) + 1;
+        int z0 = (int) Math.floor(boatShape.getMinZ()) - 1;
+        int z1 = (int) Math.ceil(boatShape.getMaxZ())+ 1;
+
+        float friction = 0.0F;
+        int count = 0;
+
+        for (int x = x0; x < x1; x++) {
+            for (int z = z0; z < z1; z++) {
+                int edges = ((x == x0 || x == x1 - 1) ? 1 : 0) + ((z == z0 || z == z1 - 1) ? 1 : 0);
+                if (edges == 2) {
+                    continue;
+                }
+
+                for (int y = y0; y < y1; y++) {
+                    if (edges > 0 && !(y != y0 && y != y1 - 1)) {
+                        continue;
+                    }
+                    final Block state = this.getLevel().getBlock(x, y, z);
+                    if (state.getId() == BlockID.LILY_PAD) {
+                        continue;
+                    }
+
+                    if (state.getBoundingBox() == null) {
+                        continue;
+                    }
+
+                    if (state.collidesWithBB(boatShape)) {
+                        friction += (float) state.getFrictionFactor();
+                        count++;
+                    }
+                }
+            }
+        }
+
+        if (friction < 0.001f) {
+            return 0f;
+        }
+        return friction / count;
     }
 }

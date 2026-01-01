@@ -3553,14 +3553,25 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (inputY >= -1.001 && inputY <= 1.001) {
                         ((EntityMinecartAbstract) riding).setCurrentSpeed(inputY);
                     }
-                } else if (this.riding instanceof EntityBoat) {
+                } else if (this.riding instanceof EntityBoat boat) {
                     if (this.protocol >= ProtocolInfo.v1_21_130_28) {
-                        if (this.riding.isControlling(this)) {
-                            if (this.temporalVector.setComponents(authPacket.getPosition().getX(), authPacket.getPosition().getY(), authPacket.getPosition().getZ()).distanceSquared(this.riding) < 100) {
-                                ((EntityBoat) this.riding).onPlayerInput(this, authPacket.getMotion().getX(), authPacket.getMotion().getY());
-                                ignoreCoordinateMove = true;
+                        double moveVecX = authPacket.getMotion().getX();
+                        double moveVecY = authPacket.getMotion().getY();
+                        moveVecX = NukkitMath.clamp(moveVecX, -1, 1);
+                        moveVecY = NukkitMath.clamp(moveVecY, -1, 1);
+                        boolean isMobileAndClassicMovement = authPacket.getInputMode() == InputMode.TOUCH && authPacket.getInteractionModel() == AuthInteractionModel.CLASSIC;
+                        if (isMobileAndClassicMovement) {
+                            // Press both left and right to move forward and press 1 to turn the boat.
+                            boolean left = authPacket.getInputData().contains(AuthInputAction.PADDLE_LEFT), right = authPacket.getInputData().contains(AuthInputAction.PADDLE_RIGHT);
+                            if (left && right) {
+                                boat.onPlayerInput(this, 0, 1);
+                            } else {
+                                boat.onPlayerInput(this, left? 1: right? -1: 0, 0);
                             }
+                        } else {
+                            boat.onPlayerInput(this, moveVecX, moveVecY);
                         }
+                        ignoreCoordinateMove = true;
                     } else {
                         if (authPacket.getInputData().contains(AuthInputAction.IN_CLIENT_PREDICTED_IN_VEHICLE)) {
                             if (this.riding.getId() == authPacket.getPredictedVehicle() && this.riding.isControlling(this)) {
@@ -4266,7 +4277,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 animatePacket.eid = this.getId();
                 animatePacket.action = animationEvent.getAnimationType();
-                Server.broadcastPacket(this.getViewers().values(), animatePacket);
+                for (Player player : this.getViewers().values()) {
+                    if (player.protocol >= ProtocolInfo.v1_21_130_28 && this.protocol < ProtocolInfo.v1_21_130_28) {
+                        // todo: when players of lower version rides on it, their row actions leads to unknown error for players of higher version
+                        continue;
+                    } else {
+                        player.dataPacket(packet);
+                    }
+                }
                 break;
             case ProtocolInfo.ENTITY_EVENT_PACKET:
                 if (!this.spawned || !this.isAlive()) {

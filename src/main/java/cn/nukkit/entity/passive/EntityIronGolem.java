@@ -118,7 +118,7 @@ public class EntityIronGolem extends EntityWalkingMob {
         if (super.attack(ev)) {
             if (ev instanceof EntityDamageByEntityEvent) {
                 Entity damager = ((EntityDamageByEntityEvent) ev).getDamager();
-                if (!damager.isPlayer || ((Player) damager).isSurvival() || ((Player) damager).isAdventure()) {
+                if (!(damager instanceof Player player) || (player.isSurvival() || player.isAdventure())) {
                     this.isAngryTo = damager.getId();
                 }
             }

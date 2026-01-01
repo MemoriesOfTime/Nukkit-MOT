@@ -361,7 +361,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
                         if (airTicks <= -20) {
                             airTicks = 0;
-                            if (!this.isPlayer || level.getGameRules().getBoolean(GameRule.DROWNING_DAMAGE)) {
+                            if (!(this instanceof Player) || level.getGameRules().getBoolean(GameRule.DROWNING_DAMAGE)) {
                                 this.attack(new EntityDamageEvent(this, DamageCause.DROWNING, 2));
                             }
                         }
@@ -389,7 +389,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             // Check collisions with blocks
-            if ((this.isPlayer || this instanceof BaseEntity) && this.riding == null && this.age % (this instanceof Player ? 2 : 10) == 0) {
+            if ((this instanceof Player || this instanceof BaseEntity) && this.riding == null && this.age % (this instanceof Player ? 2 : 10) == 0) {
                 int floorY = NukkitMath.floorDouble(this.y - 0.25);
                 if (floorY != getFloorY()) {
                     Block block = this.level.getBlock(this.chunk, getFloorX(), floorY, getFloorZ(), false);

@@ -155,7 +155,7 @@ public abstract class EntityProjectile extends Entity {
             Entity nearEntity = null;
 
             for (Entity entity : list) {
-                if (/*!entity.canCollideWith(this) || */(entity == this.shootingEntity && this.age < 5) || (entity.isPlayer && ((Player) entity).getGamemode() == Player.SPECTATOR)) {
+                if (/*!entity.canCollideWith(this) || */(entity == this.shootingEntity && this.age < 5) || (entity instanceof Player player && player.getGamemode() == Player.SPECTATOR)) {
                     continue;
                 }
 
