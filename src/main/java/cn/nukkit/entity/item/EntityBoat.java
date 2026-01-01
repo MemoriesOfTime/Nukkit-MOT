@@ -201,7 +201,7 @@ public class EntityBoat extends EntityVehicle {
             }
         }
 
-        // We call super here after movement code so block collision checks use up to date position
+        // We call super here after movement code so block collision checks use up-to-date position
         return super.entityBaseTick(tickDiff) || hasUpdate || !this.onGround || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001;
     }
 
@@ -567,7 +567,20 @@ public class EntityBoat extends EntityVehicle {
     }
 
     public float getGroundFriction() {
-        boolean inWater = isBoatInWater();
+        boolean inWater = false;
+        int minX = (int) Math.floor(this.boundingBox.getMinX());
+        int maxX = (int) Math.floor(this.boundingBox.getMaxX());
+        int minZ = (int) Math.floor(this.boundingBox.getMinZ());
+        int maxZ = (int) Math.floor(this.boundingBox.getMaxZ());
+        int minY = (int) Math.floor(this.boundingBox.getMinY() + 0.05);
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                if (this.level.getBlock(x, minY, z).isWater()) {
+                    inWater = true;
+                }
+            }
+        }
         this.inWater = inWater;
         if (inWater) {
             return 0.9f;
@@ -620,22 +633,5 @@ public class EntityBoat extends EntityVehicle {
             return 0f;
         }
         return friction / count;
-    }
-
-    private boolean isBoatInWater() {
-        int minX = (int) Math.floor(this.boundingBox.getMinX());
-        int maxX = (int) Math.floor(this.boundingBox.getMaxX());
-        int minZ = (int) Math.floor(this.boundingBox.getMinZ());
-        int maxZ = (int) Math.floor(this.boundingBox.getMaxZ());
-        int y = (int) Math.floor(this.boundingBox.getMinY() + 0.05);
-
-        for (int x = minX; x <= maxX; x++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                if (this.level.getBlock(x, y, z).isWater()) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 }
