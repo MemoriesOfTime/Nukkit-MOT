@@ -635,18 +635,39 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         JsonObject root;
         JsonArray itemsArray;
         String file;
+        boolean useNetEaseConversion = false;
+
         if (gameVersion.isNetEase()) {
-            file = "CreativeItems/creative_items_netease_" + protocol + ".json";
+            String neteaseFile = "CreativeItems/creative_items_netease_" + protocol + ".json";
+            InputStream neteaseStream = Server.class.getClassLoader().getResourceAsStream(neteaseFile);
+            if (neteaseStream != null) {
+                file = neteaseFile;
+                try {
+                    neteaseStream.close();
+                } catch (Exception ignored) {
+                }
+            } else {
+                log.debug("NetEase creative items file not found: {}, will convert from standard version", neteaseFile);
+                file = protocol >= ProtocolInfo.v1_21_0 ? "CreativeItems/creative_items_" + protocol + ".json" : "creativeitems" + protocol + ".json";
+                useNetEaseConversion = true;
+            }
         } else if (protocol >= ProtocolInfo.v1_21_0) {
             file = "CreativeItems/creative_items_" + protocol + ".json";
         } else {
             file = "creativeitems" + protocol + ".json";
         }
+
         try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(file)) {
             root = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject();
             itemsArray = root.getAsJsonArray("items");
             if (itemsArray.isEmpty()) {
                 throw new IllegalStateException("Empty items");
+            }
+
+            if (useNetEaseConversion) {
+                itemsArray = cn.nukkit.utils.NetEaseConverter.convertCreativeItems(itemsArray);
+                root.add("items", itemsArray);
+                log.info("Converted {} creative items to NetEase version", itemsArray.size());
             }
         } catch (Exception e) {
             throw new AssertionError("Error while loading creative items for protocol " + protocol, e);

@@ -8,6 +8,7 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Config;
+import cn.nukkit.utils.NetEaseConverter;
 import cn.nukkit.utils.Utils;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -58,15 +59,33 @@ public class BlockPalette {
     private ListTag<CompoundTag> paletteFor(int protocol) {
         ListTag<CompoundTag> tag;
         String name = "runtime_block_states_" + protocol + ".dat";
+        boolean useNetEaseConversion = false;
+
         if (gameVersion.isNetEase()) {
-            name = "runtime_block_states_netease_" + protocol + ".dat";
+            String neteaseName = "runtime_block_states_netease_" + protocol + ".dat";
+            InputStream neteaseStream = Server.class.getClassLoader().getResourceAsStream(neteaseName);
+            if (neteaseStream != null) {
+                name = neteaseName;
+                try {
+                    neteaseStream.close();
+                } catch (IOException ignored) {
+                }
+            } else {
+                log.debug("NetEase resource file not found: {}, will convert from standard version", neteaseName);
+                useNetEaseConversion = true;
+            }
         }
+
         try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(name)) {
             if (stream == null) {
                 throw new AssertionError("Unable to locate block state nbt " + protocol);
             }
             //noinspection unchecked
             tag = (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
+
+            if (useNetEaseConversion) {
+                tag = NetEaseConverter.convertBlockStates(tag, true);
+            }
         } catch (IOException e) {
             throw new AssertionError("Unable to load block palette " + protocol, e);
         }
