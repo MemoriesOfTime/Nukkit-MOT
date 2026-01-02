@@ -150,15 +150,15 @@ public class EntityBoat extends EntityVehicle {
         boolean simulateWaves = (!(getPassenger() instanceof Player) || isPlayerOfNewerVersion) && !getDataFlag(DATA_FLAGS, DATA_FLAG_OUT_OF_CONTROL);
 
         if (simulateWaves) {
-            if (waterDiff > SINKING_DEPTH && !sinking) {
-                sinking = true;
-            } else if (waterDiff < -0.07 && sinking) {
-                sinking = false;
+            if (waterDiff > SINKING_DEPTH && !this.sinking) {
+                this.sinking = true;
+            } else if (waterDiff < -0.07 && this.sinking) {
+                this.sinking = false;
             }
 
             if (waterDiff < -0.07) {
                 this.motionY = Math.min(0.05, this.motionY + 0.005);
-            } else if (waterDiff < 0 || !sinking) {
+            } else if (waterDiff < 0 || !this.sinking) {
                 this.motionY = this.motionY > SINKING_MAX_SPEED ? Math.max(this.motionY - 0.02, SINKING_MAX_SPEED) : this.motionY + SINKING_SPEED;
             }
         }
@@ -173,7 +173,7 @@ public class EntityBoat extends EntityVehicle {
 
 
         if (simulateWaves) {
-            if (waterDiff > SINKING_DEPTH || sinking) {
+            if (waterDiff > SINKING_DEPTH || this.sinking) {
                 this.motionY = waterDiff > 0.5 ? this.motionY - this.getGravity() : (this.motionY - SINKING_SPEED < -0.005 ? this.motionY : this.motionY - SINKING_SPEED);
             }
         }
@@ -201,7 +201,7 @@ public class EntityBoat extends EntityVehicle {
             }
         }
 
-        // We call super here after movement code so block collision checks use up to date position
+        // We call super here after movement code so block collision checks use up-to-date position
         return super.entityBaseTick(tickDiff) || hasUpdate || !this.onGround || Math.abs(this.motionX) > 0.00001 || Math.abs(this.motionY) > 0.00001 || Math.abs(this.motionZ) > 0.00001;
     }
 
@@ -567,6 +567,20 @@ public class EntityBoat extends EntityVehicle {
     }
 
     public float getGroundFriction() {
+        int minX = (int) Math.floor(this.boundingBox.getMinX());
+        int maxX = (int) Math.floor(this.boundingBox.getMaxX());
+        int minZ = (int) Math.floor(this.boundingBox.getMinZ());
+        int maxZ = (int) Math.floor(this.boundingBox.getMaxZ());
+        int minY = (int) Math.floor(this.boundingBox.getMinY() + 0.05);
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                if (this.level.getBlock(x, minY, z).isWater()) {
+                    this.inWater = true;
+                    return 0.9f;
+                }
+            }
+        }
         AxisAlignedBB boatShape = getBoundingBox().clone();
         // 0.001 high box extending downwards from the boat
         double middleY = boatShape.getMinY() - 0.0005;
