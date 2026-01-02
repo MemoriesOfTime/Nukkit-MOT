@@ -263,9 +263,9 @@ public class RuntimeItems {
     }
 
     private static RuntimeItemMapping getMappingNetEase(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_21_50) {
+        if (protocolId >= GameVersion.V1_21_50_NETEASE.getProtocol()) {
             return mapping_netease_766;
-        } else if (protocolId >= ProtocolInfo.v1_21_2) {
+        } else if (protocolId >= GameVersion.V1_21_2_NETEASE.getProtocol()) {
             return mapping_netease_686;
         }
         return mapping_netease_630;

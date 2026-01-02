@@ -1,12 +1,19 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.block.custom.comparator.HashedPaletteComparator;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import lombok.experimental.UtilityClass;
 import lombok.extern.log4j.Log4j2;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 网易版本资源转换工具
@@ -21,13 +28,6 @@ public class NetEaseConverter {
         "minecraft:chalkboard"
     };
 
-    // 需要修改的方块（设置自定义外观）
-    private static final String[] CUSTOM_APPEARANCE_BLOCKS = {
-        "minecraft:crafting_table",
-        "minecraft:furnace",
-        "minecraft:lit_furnace"
-    };
-
     // NetEase特有方块
     private static final int MICRO_BLOCK_ID = 9990;
     private static final String MICRO_BLOCK_NAME = "minecraft:micro_block";
@@ -35,45 +35,54 @@ public class NetEaseConverter {
     /**
      * 转换方块状态列表为网易版本
      * @param blockStates 标准版本的方块状态列表
-     * @param customAppearance 是否启用自定义外观
+     * @param customAppearance 是否启用自定义外观（当前未使用，保留以备将来扩展）
      * @return 转换后的网易版本方块状态列表
      */
     public static ListTag<CompoundTag> convertBlockStates(ListTag<CompoundTag> blockStates, boolean customAppearance) {
-        ListTag<CompoundTag> result = new ListTag<>();
+        List<CompoundTag> filteredStates = new ObjectArrayList<>();
+        int removedCount = 0;
+        int addedCount = 0;
 
-        // 遍历所有方块状态
         for (CompoundTag state : blockStates.getAll()) {
-            CompoundTag blockTag = state.getCompound("block");
-            if (blockTag == null) {
-                // 没有block字段，直接添加
-                result.add(state);
-                continue;
-            }
+            String name = state.getString("name");
 
-            String name = blockTag.getString("name");
-
-            // 检查是否需要移除
             if (shouldRemoveBlock(name)) {
-                log.debug("Removing block for NetEase: {}", name);
+                log.debug("Removing {} for NetEase", name);
+                removedCount++;
                 continue;
             }
 
-            // 检查是否需要设置自定义外观
-            if (customAppearance && shouldSetCustomAppearance(name)) {
-                log.debug("Setting custom appearance for NetEase block: {}", name);
-                CompoundTag states = blockTag.getCompound("states");
-                if (states != null) {
-                    states.putByte("custom_appearance", (byte) 1);
-                }
+            filteredStates.add(state);
+        }
+
+        CompoundTag microBlock = createMicroBlockState();
+        filteredStates.add(microBlock);
+        addedCount++;
+        log.debug("Added micro_block for NetEase");
+
+
+        Map<String, List<CompoundTag>> groupedByName = new LinkedHashMap<>();
+        for (CompoundTag state : filteredStates) {
+            String name = state.getString("name");
+            groupedByName.computeIfAbsent(name, k -> new ArrayList<>()).add(state);
+        }
+
+        List<String> sortedNames = new ArrayList<>(groupedByName.keySet());
+        sortedNames.sort(HashedPaletteComparator.INSTANCE);
+
+        ListTag<CompoundTag> result = new ListTag<>();
+        int runtimeId = 0;
+        for (String name : sortedNames) {
+            List<CompoundTag> blocks = groupedByName.get(name);
+            for (CompoundTag state : blocks) {
+                CompoundTag newState = state.copy();
+                newState.putInt("runtimeId", runtimeId++);
+                result.add(newState);
             }
-
-            result.add(state);
         }
 
-        // 添加网易特有方块（micro_block）
-        if (customAppearance) {
-            result.add(createMicroBlockState());
-        }
+        log.info("NetEase conversion: {} blocks total, {} removed, {} added, sorted by hash",
+                 result.size(), removedCount, addedCount);
 
         return result;
     }
@@ -86,7 +95,6 @@ public class NetEaseConverter {
     public static JsonArray convertItemStates(JsonArray itemStates) {
         JsonArray result = new JsonArray();
 
-        // 遍历所有物品
         for (JsonElement element : itemStates) {
             if (!element.isJsonObject()) {
                 result.add(element);
@@ -96,7 +104,6 @@ public class NetEaseConverter {
             JsonObject item = element.getAsJsonObject();
             String name = item.has("name") ? item.get("name").getAsString() : "";
 
-            // 检查是否需要移除
             if (shouldRemoveBlock(name)) {
                 log.debug("Removing item for NetEase: {}", name);
                 continue;
@@ -104,9 +111,6 @@ public class NetEaseConverter {
 
             result.add(item);
         }
-
-        // 可以在这里添加网易特有物品
-        // result.add(createMicroBlockItem());
 
         return result;
     }
@@ -119,7 +123,6 @@ public class NetEaseConverter {
     public static JsonArray convertCreativeItems(JsonArray creativeItems) {
         JsonArray result = new JsonArray();
 
-        // 遍历所有创造模式物品
         for (JsonElement element : creativeItems) {
             if (!element.isJsonObject()) {
                 result.add(element);
@@ -128,11 +131,8 @@ public class NetEaseConverter {
 
             JsonObject item = element.getAsJsonObject();
 
-            // 检查是否有id字段
             if (item.has("id")) {
                 String id = item.get("id").getAsString();
-
-                // 检查是否需要移除
                 if (shouldRemoveBlock(id)) {
                     log.debug("Removing creative item for NetEase: {}", id);
                     continue;
@@ -162,43 +162,20 @@ public class NetEaseConverter {
     }
 
     /**
-     * 检查方块是否需要设置自定义外观
-     */
-    private static boolean shouldSetCustomAppearance(String blockName) {
-        if (blockName == null || blockName.isEmpty()) {
-            return false;
-        }
-
-        for (String block : CUSTOM_APPEARANCE_BLOCKS) {
-            if (block.equals(blockName)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * 创建微方块（micro_block）的方块状态
+     * 使用1.21.50的直接格式（name直接在state层级）
+     * 注意：runtimeId会在后续步骤中统一重新分配
      */
     private static CompoundTag createMicroBlockState() {
         CompoundTag state = new CompoundTag();
 
-        // 设置runtimeId（需要使用一个不冲突的ID）
-        // 这里使用一个较大的数值，具体值可能需要调整
-        state.putInt("runtimeId", 10000);
+        state.putString("name", MICRO_BLOCK_NAME);
         state.putInt("id", MICRO_BLOCK_ID);
         state.putShort("data", 0);
-
-        // 创建block标签
-        CompoundTag blockTag = new CompoundTag();
-        blockTag.putString("name", MICRO_BLOCK_NAME);
-        blockTag.putInt("version", 18090528); // 使用常见的版本号
-
-        // 创建states标签（空的状态）
-        CompoundTag statesTag = new CompoundTag();
-        blockTag.putCompound("states", statesTag);
-
-        state.putCompound("block", blockTag);
+        state.putInt("runtimeId", 0);
+        state.putInt("version", 18163713); // 使用1.21.50的版本号
+        state.putBoolean("stateOverload", false);
+        state.putCompound("states", new CompoundTag());
 
         return state;
     }
