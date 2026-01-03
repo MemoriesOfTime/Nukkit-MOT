@@ -14,6 +14,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ItemComponentPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
+import cn.nukkit.utils.NetEaseConverter;
 import cn.nukkit.utils.Utils;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -65,14 +66,33 @@ public class RuntimeItemMapping {
         this.protocolId = gameVersion.getProtocol();
         this.gameVersion = gameVersion;
         String itemStatesFile = "runtime_item_states_" + protocolId + ".json";
+        boolean useNetEaseConversion = false;
+
         if (gameVersion.isNetEase()) {
-            itemStatesFile = "runtime_item_states_netease_" + protocolId + ".json";
+            String neteaseFile = "runtime_item_states_netease_" + protocolId + ".json";
+            InputStream neteaseStream = Server.class.getClassLoader().getResourceAsStream(neteaseFile);
+            if (neteaseStream != null) {
+                itemStatesFile = neteaseFile;
+                try {
+                    neteaseStream.close();
+                } catch (Exception ignored) {
+                }
+            } else {
+                log.debug("NetEase resource file not found: {}, will convert from standard version", neteaseFile);
+                useNetEaseConversion = true;
+            }
         }
+
         InputStream stream = Server.class.getClassLoader().getResourceAsStream(itemStatesFile);
         if (stream == null) {
             throw new AssertionError("Unable to load " + itemStatesFile);
         }
         JsonArray json = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonArray();
+
+        if (useNetEaseConversion) {
+            json = NetEaseConverter.convertItemStates(json);
+            log.info("Converted {} item states to NetEase version", json.size());
+        }
 
         CompoundTag itemComponents = null;
         if (protocolId >= ProtocolInfo.v1_21_60) {
