@@ -68,7 +68,6 @@ public abstract class EntityWalking extends BaseEntity {
             if (this.route == null && this.passengers.isEmpty()) {
                 this.target = creature;
             }
-            break;
         }
 
         if (!this.canSetTemporalTarget()) {
