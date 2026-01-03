@@ -88,7 +88,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-
 /**
  * @author MagicDroidX Nukkit Project
  */
@@ -283,6 +282,11 @@ public class Level implements ChunkManager, Metadatable {
 
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
+
+    // Cache for fast entity processing for checkTarget()
+    private final Long2ObjectOpenHashMap<Entity[]> entityNearbyCache = new Long2ObjectOpenHashMap<>();
+    private final Long2LongOpenHashMap entityNearbyCacheTime = new Long2LongOpenHashMap();
+    private final LongSet entityNearbyCacheDirty = new LongOpenHashSet();
 
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
@@ -1111,7 +1115,15 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
-        this.updateBlockEntities.removeIf(blockEntity -> !blockEntity.isValid() || !blockEntity.onUpdate());
+        var updateBlockEntities = this.updateBlockEntities.iterator();
+        while (updateBlockEntities.hasNext()) {
+            BlockEntity be = updateBlockEntities.next();
+            if (!be.isValid()) {
+                updateBlockEntities.remove();
+            } else if (!be.onUpdate()) {
+                updateBlockEntities.remove();
+            }
+        }
 
         this.tickChunks();
 
@@ -2980,49 +2992,89 @@ public class Level implements ChunkManager, Metadatable {
     private static final Entity[] EMPTY_ENTITY_ARR = new Entity[0];
     private static final Entity[] ENTITY_BUFFER = new Entity[512];
 
-    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity) {
-        return getNearbyEntities(bb, entity, false);
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean isAiMob) {
+        return getNearbyEntities(bb, entity, isAiMob, false);
     }
 
-    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean loadChunks) {
-        int index = 0;
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity) {
+        return getNearbyEntities(bb, entity, false, false);
+    }
 
-        int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
-        int maxX = NukkitMath.ceilDouble((bb.getMaxX() + 2) * 0.0625);
-        int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
-        int maxZ = NukkitMath.ceilDouble((bb.getMaxZ() + 2) * 0.0625);
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean isAiMob, boolean loadChunks) {
+        if (!isAiMob) {
+            int index = 0;
 
-        ArrayList<Entity> overflow = null;
+            int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
+            int maxX = NukkitMath.ceilDouble((bb.getMaxX() + 2) * 0.0625);
+            int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
+            int maxZ = NukkitMath.ceilDouble((bb.getMaxZ() + 2) * 0.0625);
 
-        for (int x = minX; x <= maxX; ++x) {
-            for (int z = minZ; z <= maxZ; ++z) {
-                for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
-                    if (ent != entity && ent.boundingBox.intersectsWith(bb)) {
-                        if (index < ENTITY_BUFFER.length) {
-                            ENTITY_BUFFER[index] = ent;
-                        } else {
-                            if (overflow == null) overflow = new ArrayList<>(1024);
-                            overflow.add(ent);
+            ArrayList<Entity> overflow = null;
+
+            for (int x = minX; x <= maxX; ++x) {
+                for (int z = minZ; z <= maxZ; ++z) {
+                    for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
+                        if (ent != entity && ent.boundingBox.intersectsWith(bb)) {
+                            if (index < ENTITY_BUFFER.length) {
+                                ENTITY_BUFFER[index] = ent;
+                            } else {
+                                if (overflow == null) overflow = new ArrayList<>(1024);
+                                overflow.add(ent);
+                            }
+                            index++;
                         }
-                        index++;
                     }
                 }
             }
-        }
 
-        if (index == 0) return EMPTY_ENTITY_ARR;
-        Entity[] copy;
-        if (overflow == null) {
-            copy = Arrays.copyOfRange(ENTITY_BUFFER, 0, index);
-            Arrays.fill(ENTITY_BUFFER, 0, index, null);
-        } else {
-            copy = new Entity[ENTITY_BUFFER.length + overflow.size()];
-            System.arraycopy(ENTITY_BUFFER, 0, copy, 0, ENTITY_BUFFER.length);
-            for (int i = 0; i < overflow.size(); i++) {
-                copy[ENTITY_BUFFER.length + i] = overflow.get(i);
+            if (index == 0) return EMPTY_ENTITY_ARR;
+            Entity[] copy;
+            if (overflow == null) {
+                copy = Arrays.copyOfRange(ENTITY_BUFFER, 0, index);
+                Arrays.fill(ENTITY_BUFFER, 0, index, null);
+            } else {
+                copy = new Entity[ENTITY_BUFFER.length + overflow.size()];
+                System.arraycopy(ENTITY_BUFFER, 0, copy, 0, ENTITY_BUFFER.length);
+                for (int i = 0; i < overflow.size(); i++) {
+                    copy[ENTITY_BUFFER.length + i] = overflow.get(i);
+                }
             }
+            return copy;
+        } else {
+            if (entity == null || entity.getLevel() != this) {
+                return new Entity[]{};
+            }
+
+            long boxHash = hashSearchBox(bb);
+            long currentTick = this.levelCurrentTick;
+            long lastUpdate = entityNearbyCacheTime.get(boxHash);
+            boolean isDirty = entityNearbyCacheDirty.contains(boxHash);
+
+            if (isDirty || lastUpdate == 0) {
+                Entity[] entities = this.getNearbyEntities(bb, entity);
+                entityNearbyCache.put(boxHash, entities);
+                entityNearbyCacheTime.put(boxHash, currentTick);
+                entityNearbyCacheDirty.remove(boxHash);
+            }
+
+            return entityNearbyCache.get(boxHash);
         }
-        return copy;
+    }
+
+    private static long hashSearchBox(AxisAlignedBB box) {
+        long x1 = (long) (box.getMinX() * 10);
+        long y1 = (long) (box.getMinY() * 10);
+        long z1 = (long) (box.getMinZ() * 10);
+        long x2 = (long) (box.getMaxX() * 10);
+        long y2 = (long) (box.getMaxY() * 10);
+        long z2 = (long) (box.getMaxZ() * 10);
+        return (x1 ^ (z1 << 11) ^ (y1 << 22)) + (x2 ^ (z2 << 11) ^ (y2 << 22) << 32);
+    }
+
+    public void setDirtyNearby(Entity entity) {
+        if (entity == null || entity.getLevel() != this) return;
+        long chunkKey = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
+        entityNearbyCacheDirty.add(chunkKey);
     }
 
     @NonComputationAtomic

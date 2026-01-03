@@ -135,8 +135,8 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
                     // Mobs shouldn't spawn in walls, and they shouldn't retry to
                     if (
                             block.getId() != 0 && block.getId() != BlockID.SIGN_POST && block.getId() != BlockID.WALL_SIGN &&
-                                    block.getId() != BlockID.STILL_WATER && block.getId() != BlockID.WATER &&
-                                    block.getId() != BlockID.LAVA && block.getId() != BlockID.STILL_LAVA
+                            !Block.isWater(block.getId()) &&
+                            !Block.isLava(block.getId())
                     ) {
                         continue;
                     }

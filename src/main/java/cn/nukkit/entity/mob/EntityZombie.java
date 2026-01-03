@@ -1,6 +1,8 @@
 package cn.nukkit.entity.mob;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockDoor;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntitySmite;
 import cn.nukkit.event.entity.CreatureSpawnEvent;
@@ -9,7 +11,11 @@ import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemShovelIron;
 import cn.nukkit.item.ItemSwordIron;
+import cn.nukkit.level.Location;
+import cn.nukkit.level.Sound;
 import cn.nukkit.level.format.FullChunk;
+import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
@@ -20,10 +26,22 @@ import cn.nukkit.utils.Utils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
     public static final int NETWORK_ID = 32;
+
+    private BlockDoor doorBreakingTarget = null;
+    private int doorBreakCooldown = 0;
+
+    private int accumulatedDamage = 0;
+    private static final int MAX_DOOR_DAMAGE = 1250;
+
+    private static final int BREAK_DAMAGE_PER_HIT = 200;
+    private static final int HIT_COOLDOWN = 20;
+
+    private static final Map<String, Integer> doorDamageMap = new HashMap<>();
 
     private Item tool;
 
@@ -54,7 +72,7 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
     @Override
     protected void initEntity() {
         this.setMaxHealth(20);
-        
+
         super.initEntity();
 
         this.setDamage(new int[] { 0, 2, 3, 4 });
@@ -118,14 +136,12 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
     @Override
     public boolean entityBaseTick(int tickDiff) {
-        boolean hasUpdate;
+        boolean hasUpdate = super.entityBaseTick(tickDiff);
 
         if (getServer().getDifficulty() == 0) {
             this.close();
             return true;
         }
-
-        hasUpdate = super.entityBaseTick(tickDiff);
 
         if (!this.closed && level.shouldMobBurn(this)) {
             if (this.armor[0] == null) {
@@ -214,6 +230,142 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
     }
 
     @Override
+    public Vector3 updateMove(int tickDiff) {
+        if (!this.isInTickingRange()) {
+            return null;
+        }
+
+        this.handleDoorBreaking(tickDiff);
+
+        return super.updateMove(tickDiff);
+    }
+
+    private Vector3 getFrontBlockPosition() {
+        if (this.level == null) return null;
+
+        double dx = Math.cos(Math.toRadians(this.yaw + 90));
+        double dz = Math.sin(Math.toRadians(this.yaw + 90));
+
+        int checkX = NukkitMath.floorDouble(this.x + dx * 0.5);
+        int checkY = NukkitMath.floorDouble(this.y + 1);
+        int checkZ = NukkitMath.floorDouble(this.z + dz * 0.5);
+
+        return new Vector3(checkX, checkY, checkZ);
+    }
+
+    private Vector3 getStandingBlockPosition() {
+        if (this.level == null) return null;
+        return new Vector3(NukkitMath.floorDouble(this.x), NukkitMath.floorDouble(this.y), NukkitMath.floorDouble(this.z));
+    }
+
+    private void handleDoorBreaking(int tickDiff) {
+        if (this.server.getDifficulty() != 3) {
+            if (this.doorBreakingTarget != null) {
+                this.resetDoorState();
+            }
+            return;
+        }
+
+        if (this.doorBreakCooldown > 0) {
+            this.doorBreakCooldown -= tickDiff;
+            return;
+        }
+
+        Vector3 frontPos = getFrontBlockPosition();
+        Vector3 standingPos = getStandingBlockPosition();
+
+        if (frontPos == null || standingPos == null) {
+            if (this.doorBreakingTarget != null) {
+                this.resetDoorState();
+            }
+            return;
+        }
+
+        Block frontBlock = this.level.getBlock(frontPos, false);
+        Block standingBlock = this.level.getBlock(standingPos, false);
+
+        BlockDoor targetDoor = null;
+
+        if (frontBlock instanceof BlockDoor door && door.getId() == Block.WOOD_DOOR_BLOCK && !door.isOpen()) {
+            targetDoor = door;
+        } else if (standingBlock instanceof BlockDoor door && door.getId() == Block.WOOD_DOOR_BLOCK && !door.isOpen()) {
+            targetDoor = door;
+        }
+
+        if (targetDoor != null) {
+            if (this.doorBreakingTarget == null || !this.doorBreakingTarget.getLocation().equals(targetDoor.getLocation())) {
+                this.doorBreakingTarget = targetDoor;
+                this.accumulatedDamage = this.getDoorDamage(targetDoor);
+            }
+
+            this.applyDoorDamage(targetDoor);
+            this.doorBreakCooldown = HIT_COOLDOWN;
+        } else {
+            this.resetDoorState();
+        }
+    }
+
+    private void applyDoorDamage(BlockDoor door) {
+        if (door == null || door.isOpen()) return;
+
+        this.accumulatedDamage += BREAK_DAMAGE_PER_HIT;
+
+        if (this.accumulatedDamage > MAX_DOOR_DAMAGE) {
+            this.accumulatedDamage = MAX_DOOR_DAMAGE;
+        }
+
+        this.saveDoorDamage(door, this.accumulatedDamage);
+
+        Location doorPos = door.getLocation();
+        this.level.addSound(doorPos, Sound.MOB_ZOMBIE_WOOD);
+
+        if (this.accumulatedDamage >= MAX_DOOR_DAMAGE) {
+            this.finishDoorBreak(door);
+        }
+    }
+
+    private void finishDoorBreak(BlockDoor door) {
+        if (door == null) return;
+
+        Location doorPos = door.getLocation();
+
+        removeDoorDamage(door);
+
+        this.level.useBreakOn(doorPos, null, null, true);
+
+        this.level.addSound(doorPos, Sound.MOB_ZOMBIE_WOODBREAK);
+
+        this.resetDoorState();
+    }
+
+    private String getDoorKey(BlockDoor door) {
+        Location loc = door.getLocation();
+        return loc.getFloorX() + ":" + loc.getFloorY() + ":" + loc.getFloorZ();
+    }
+
+    private void saveDoorDamage(BlockDoor door, int damage) {
+        String key = getDoorKey(door);
+        doorDamageMap.put(key, damage);
+    }
+
+    private int getDoorDamage(BlockDoor door) {
+        String key = getDoorKey(door);
+        return doorDamageMap.getOrDefault(key, 0);
+    }
+
+    private void removeDoorDamage(BlockDoor door) {
+        String key = getDoorKey(door);
+        doorDamageMap.remove(key);
+    }
+
+    private void resetDoorState() {
+        if (this.doorBreakingTarget != null) {
+            this.doorBreakingTarget = null;
+            this.accumulatedDamage = 0;
+        }
+    }
+
+    @Override
     public boolean attack(EntityDamageEvent ev) {
         super.attack(ev);
 
@@ -243,6 +395,15 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
         this.saveArmor();
     }
 
+    @Override
+    public void close() {
+        if (this.doorBreakingTarget != null) {
+            this.resetDoorState();
+        }
+
+        super.close();
+    }
+
     private void saveTool() {
         if (tool != null) {
             this.namedTag.put("Item", NBTIO.putItemHelper(tool));
@@ -259,11 +420,21 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
         }
     }
 
-    /**
-     * Get held tool
-     * @return the tool this zombie has in hand or null
-     */
     public Item getTool() {
         return this.tool;
+    }
+
+    public boolean isBreakingDoor() {
+        return this.doorBreakingTarget != null;
+    }
+
+    public int getDoorBreakProgress() {
+        if (this.accumulatedDamage <= 0) return 0;
+        if (this.accumulatedDamage >= MAX_DOOR_DAMAGE) return 10;
+        return (int)((float)this.accumulatedDamage / MAX_DOOR_DAMAGE * 10);
+    }
+
+    public static void clearAllDoorDamage() {
+        doorDamageMap.clear();
     }
 }

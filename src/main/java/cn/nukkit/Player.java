@@ -1975,7 +1975,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.inPortalTicks == this.server.portalTicks || (this.server.vanillaPortals && this.inPortalTicks == 25 && this.gamemode == CREATIVE)) {
                 EntityPortalEnterEvent ev = new EntityPortalEnterEvent(this, EntityPortalEnterEvent.PortalType.NETHER);
 
-                if (this.portalPos == null) {
+                if (this.portalPos == null && this.inPortalTicks >= 80) {
                     ev.setCancelled();
                 }
 
@@ -3443,6 +3443,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
+                // When the player moves, set dirty nearby entities to check the target
+                if (!this.isSpectator() && !this.isCreative()) {
+                    if (newPos.distanceSquared(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) > 1.0) {
+                        this.level.setDirtyNearby(this);
+                    }
+                }
+
                 // 传送玩家后，可能会由于网络延迟接收错误数据包
                 // 在这种情况下为了避免错误调整玩家视角，直接忽略移动数据包
                 if (this.lastTeleportTick + 20 > this.server.getTick()
@@ -3489,6 +3496,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 if (!this.isMovementServerAuthoritative()) {
                     return;
                 }
+
                 PlayerAuthInputPacket authPacket = (PlayerAuthInputPacket) packet;
 
                 if (!authPacket.getBlockActionData().isEmpty()) {
