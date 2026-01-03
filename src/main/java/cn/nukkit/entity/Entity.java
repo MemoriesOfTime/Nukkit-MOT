@@ -40,7 +40,6 @@ import cn.nukkit.utils.Identifier;
 import cn.nukkit.utils.MainLogger;
 import cn.nukkit.utils.Utils;
 import com.google.common.collect.Iterables;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import org.apache.commons.math3.util.FastMath;
 import org.jetbrains.annotations.NotNull;
 
