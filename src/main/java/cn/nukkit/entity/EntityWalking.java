@@ -9,11 +9,9 @@ import cn.nukkit.entity.passive.EntitySkeletonHorse;
 import cn.nukkit.entity.route.RouteFinder;
 import cn.nukkit.entity.route.RouteFinderSearchTask;
 import cn.nukkit.entity.route.RouteFinderThreadPool;
-import cn.nukkit.entity.route.WalkerRouteFinder;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.BubbleParticle;
 
-import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
@@ -23,9 +21,6 @@ import lombok.Getter;
 import lombok.Setter;
 
 import org.apache.commons.math3.util.FastMath;
-
-import java.util.ArrayList;
-import java.util.List;
 
 public abstract class EntityWalking extends BaseEntity {
     private static final double FLOW_MULTIPLIER = 0.1;
@@ -43,7 +38,7 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
-        if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed() && targetOption((EntityCreature) this.followTarget, this.distanceSquared(this.followTarget))) {
+        if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed() && targetOption((EntityCreature) this.followTarget, this.distanceSquared(this.followTarget)) && this.target != null) {
             return;
         }
 
@@ -53,7 +48,6 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
-        Entity targetFound = null;
         for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, true)) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
@@ -68,18 +62,13 @@ public abstract class EntityWalking extends BaseEntity {
                 continue;
             }
 
-            targetFound = creature;
-            break;
-        }
-
-        if (targetFound != null) {
             this.stayTime = 0;
             this.moveTime = 0;
-            this.followTarget = targetFound;
-
+            this.followTarget = creature;
             if (this.route == null && this.passengers.isEmpty()) {
-                this.route = new WalkerRouteFinder(this, this, targetFound);
+                this.target = creature;
             }
+            break;
         }
 
         if (!this.canSetTemporalTarget()) {
@@ -199,7 +188,7 @@ public abstract class EntityWalking extends BaseEntity {
                     double z = this.target.z - this.z;
 
                     double diff = Math.abs(x) + Math.abs(z);
-                    if (this.riding != null || diff <= 0.001 || !inWater && (this.stayTime > 0 || (this.distance(this.followTarget) <= 0.5 && this.followTarget.distance(this) <= 1.5))) {
+                    if (this.riding != null || diff <= 0.001 || !inWater && (this.stayTime > 0 || this.distance(this.followTarget) <= (this.getWidth() / 2 + 0.3) * nearbyDistanceMultiplier())) {
                         if (!this.isInsideOfWater()) {
                             this.motionX = 0;
                             this.motionZ = 0;
@@ -227,16 +216,13 @@ public abstract class EntityWalking extends BaseEntity {
                 }
 
                 this.checkTarget();
-                if (this.route != null && this.route.isFinished() && this.route.hasNext()) {
-                    this.target = this.route.next();
-                }
                 if (this.target != null) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;
 
                     double diff = Math.abs(x) + Math.abs(z);
                     boolean distance = false;
-                    if (this.riding != null || diff <= 0.001 || !inWater && this.stayTime > 0) {
+                    if (this.riding != null || diff <= 0.001 || !inWater && (this.stayTime > 0 || (this.distance(this.target) <= (this.getWidth() / 2 + 0.3) * nearbyDistanceMultiplier()))) {
                         if (!this.isInsideOfWater()) {
                             this.motionX = 0;
                             this.motionZ = 0;
