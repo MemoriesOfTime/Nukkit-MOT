@@ -117,6 +117,10 @@ public class EntityCollision implements ChunkLoader {
         if (minY > maxY) return Collections.emptyList();
         if (!level.isYInRange(minY) || !level.isYInRange(maxY)) return Collections.emptyList();
 
+        minY = Math.max(minY, level.getMinBlockY());
+        maxY = Math.min(maxY, level.getMaxBlockY());
+        if (minY > maxY) return Collections.emptyList();
+
         int totalBlocks = (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
         if (totalBlocks > maxBlocks) {
             return sampleBlocksInArea(minX, minY, minZ, maxX, maxY, maxZ, maxBlocks);
@@ -136,6 +140,8 @@ public class EntityCollision implements ChunkLoader {
 
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
+
+                    if (y < level.getMinBlockY() || y >= level.getMaxBlockY()) continue;
 
                     int blockId = chunk.getBlockId(localX, y, localZ);
                     if (blockId == Block.AIR) continue;
@@ -182,6 +188,9 @@ public class EntityCollision implements ChunkLoader {
         int maxY = Math.min(NukkitMath.ceilDouble(bb.getMaxY()), level.getMaxBlockY());
         int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
 
+        minY = Math.max(minY, level.getMinBlockY());
+        maxY = Math.min(maxY, level.getMaxBlockY());
+
         for (long key : recentBlockChanges) {
             int x = (int) (key & 0xFFFFF);
             if (x >= 0x80000) x -= 0x100000;
@@ -214,6 +223,9 @@ public class EntityCollision implements ChunkLoader {
         int maxY = Math.min(NukkitMath.ceilDouble(checkBB.getMaxY()), level.getMaxBlockY());
         int maxZ = NukkitMath.ceilDouble(checkBB.getMaxZ());
 
+        minY = Math.max(minY, level.getMinBlockY());
+        maxY = Math.min(maxY, level.getMaxBlockY());
+
         for (int y = minY; y <= maxY; y++) {
             if (!level.isYInRange(y)) continue;
             for (int x = minX; x <= maxX; x++) {
@@ -241,6 +253,8 @@ public class EntityCollision implements ChunkLoader {
         int rangeY = maxY - minY + 1;
         int rangeZ = maxZ - minZ + 1;
         Level level = entity.getLevel();
+
+        minY = Math.max(minY, level.getMinBlockY());
 
         for (int i = 0; i < maxSamples; i++) {
             int x = minX + random.nextInt(rangeX);
@@ -276,6 +290,9 @@ public class EntityCollision implements ChunkLoader {
         int maxX = NukkitMath.ceilDouble(bb.getMaxX());
         int maxY = Math.min(NukkitMath.ceilDouble(bb.getMaxY()), level.getMaxBlockY());
         int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
+
+        minY = Math.max(minY, level.getMinBlockY());
+        maxY = Math.min(maxY, level.getMaxBlockY());
 
         boolean foundFire = false, foundLava = false, foundWater = false, foundCactus = false, foundCampfire = false;
 
