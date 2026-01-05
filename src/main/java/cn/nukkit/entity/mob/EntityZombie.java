@@ -22,14 +22,14 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.MobArmorEquipmentPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.utils.Utils;
+
+import java.util.concurrent.TimeUnit;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
@@ -44,7 +44,7 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
     private static final int BREAK_DAMAGE_PER_HIT = 200;
     private static final int HIT_COOLDOWN = 20;
 
-    private static final Cache<String, AtomicInteger> doorDamageCache = Caffeine.newBuilder()
+    private static final Cache<String, Integer> doorDamageCache = Caffeine.newBuilder()
             .maximumSize(128)
             .expireAfterAccess(15, TimeUnit.MINUTES)
             .expireAfterWrite(30, TimeUnit.MINUTES)
@@ -352,13 +352,13 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
     private void saveDoorDamage(BlockDoor door, int damage) {
         String key = getDoorKey(door);
-        doorDamageCache.get(key, k -> new AtomicInteger(damage)).set(damage);
+        doorDamageCache.put(key, damage);
     }
 
     private int getDoorDamage(BlockDoor door) {
         String key = getDoorKey(door);
-        AtomicInteger damage = doorDamageCache.getIfPresent(key);
-        return damage != null ? damage.get() : 0;
+        Integer damage = doorDamageCache.getIfPresent(key);
+        return damage != null ? damage : 0;
     }
 
     private void removeDoorDamage(BlockDoor door) {

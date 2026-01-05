@@ -90,7 +90,7 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
 
     @Override
     public void attackEntity(Entity player) {
-        if (this.attackDelay > 23 && Utils.rand(1, 32) < 4 && this.distanceSquared(player) <= 55) {
+        if (this.attackDelay > 23 && Utils.rand(1, 32) < 4) {
             this.attackDelay = 0;
 
             double distanceToTarget = Math.sqrt(this.distanceSquared(player));
