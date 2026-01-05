@@ -104,6 +104,7 @@ public class Level implements ChunkManager, Metadatable {
     public static final int BLOCK_UPDATE_WEAK = 4;
     public static final int BLOCK_UPDATE_TOUCH = 5;
     public static final int BLOCK_UPDATE_REDSTONE = 6;
+    public static final int BLOCK_UPDATE_TICK = 7;
 
     public static final int TIME_DAY = 1000;
     public static final int TIME_NOON = 6000;
