@@ -2725,7 +2725,7 @@ public abstract class Entity extends Location implements Metadatable {
         if (!blocksAround.isEmpty()) {
             this.blocksAround = blocksAround;
         } else {
-            return new ArrayList<>();
+            return Collections.emptyList();
         }
 
         return blocksAround;
