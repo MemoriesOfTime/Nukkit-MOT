@@ -2742,7 +2742,7 @@ public abstract class Entity extends Location implements Metadatable {
         if (!collisionBlocks.isEmpty()) {
             this.collisionBlocks = collisionBlocks;
         } else {
-            return new ArrayList<>();
+            return Collections.emptyList();
         }
 
         return collisionBlocks;

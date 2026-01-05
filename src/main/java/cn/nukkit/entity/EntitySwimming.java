@@ -37,8 +37,7 @@ public abstract class EntitySwimming extends BaseEntity {
             return;
         }
 
-        double near = Integer.MAX_VALUE;
-        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, true)) {
+        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }
@@ -48,10 +47,10 @@ public abstract class EntitySwimming extends BaseEntity {
             }
 
             double distance = this.distanceSquared(creature);
-            if (distance > near || !this.targetOption(creature, distance)) {
+            if (!this.targetOption(creature, distance)) {
                 continue;
             }
-            near = distance;
+
             this.stayTime = 0;
             this.moveTime = 0;
             this.target = creature;

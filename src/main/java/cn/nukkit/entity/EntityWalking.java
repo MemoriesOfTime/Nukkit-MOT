@@ -48,7 +48,7 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
-        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, true)) {
+        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }
@@ -214,8 +214,10 @@ public abstract class EntityWalking extends BaseEntity {
                     }
                 }
 
-                this.checkTarget();
-                if (this.target != null) {
+                if (this.isLookupForTarget()) {
+                    this.checkTarget();
+                }
+                if (this.target != null || !this.isLookupForTarget()) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;
 

@@ -65,12 +65,17 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
 
     @Override
     public void attackEntity(Entity player) {
-        if (this.attackDelay > 23 && Utils.rand(1, 32) < 4 && this.distanceSquared(player) <= 55) {
+        if (this.attackDelay > 23 && Utils.rand(1, 32) < 4) {
             this.attackDelay = 0;
 
-            for (Block block : this.getLineOfSight(7, 7)) {
+            double distanceToTarget = Math.sqrt(this.distanceSquared(player));
+
+            for (Block block : this.getLineOfSight(15, 15)) {
                 if (!block.canPassThrough()) {
-                    return;
+                    double blockDist = Math.sqrt(this.distanceSquared(this.temporalVector.setComponents(block.getX(), block.getY(), block.getZ())));
+                    if (blockDist < distanceToTarget - 1) {
+                        return;
+                    }
                 }
             }
 
@@ -96,12 +101,12 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
             double pitchCorrection = 0;
 
             if (distance > 3) {
-                pitchCorrection = Math.min(15, distance * 0.8);
+                pitchCorrection = Math.min(20, distance * 0.5);
             }
 
             double pitch = basePitch + pitchCorrection;
 
-            pitch = Math.max(-30, Math.min(30, pitch));
+            pitch = Math.max(-40, Math.min(40, pitch));
 
             double yawR = Math.toRadians(yaw);
             double pitchR = Math.toRadians(pitch);
@@ -136,6 +141,8 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
 
                 if (distance < 4) {
                     motion.y *= 0.7;
+                } else if (distance > 10) {
+                    motion.multiply(1.0 + (distance - 10) * 0.02);
                 }
 
                 arrow.setMotion(motion);

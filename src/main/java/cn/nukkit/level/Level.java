@@ -64,6 +64,8 @@ import cn.nukkit.scheduler.BlockUpdateScheduler;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import cn.nukkit.utils.collection.nb.LongObjectEntry;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
@@ -102,7 +104,6 @@ public class Level implements ChunkManager, Metadatable {
     public static final int BLOCK_UPDATE_WEAK = 4;
     public static final int BLOCK_UPDATE_TOUCH = 5;
     public static final int BLOCK_UPDATE_REDSTONE = 6;
-    public static final int BLOCK_UPDATE_TICK = 7;
 
     public static final int TIME_DAY = 1000;
     public static final int TIME_NOON = 6000;
@@ -283,10 +284,11 @@ public class Level implements ChunkManager, Metadatable {
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
 
-    // Cache for fast entity processing for checkTarget()
-    private final Long2ObjectOpenHashMap<Entity[]> entityNearbyCache = new Long2ObjectOpenHashMap<>();
-    private final Long2LongOpenHashMap entityNearbyCacheTime = new Long2LongOpenHashMap();
     private final LongSet entityNearbyCacheDirty = new LongOpenHashSet();
+    private final LoadingCache<Long, Entity[]> nearbyEntitiesCache = Caffeine.newBuilder()
+            .maximumSize(4096)
+            .expireAfterWrite(700, TimeUnit.MILLISECONDS)
+            .build(key -> new Entity[0]);
 
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
@@ -2992,15 +2994,15 @@ public class Level implements ChunkManager, Metadatable {
     private static final Entity[] EMPTY_ENTITY_ARR = new Entity[0];
     private static final Entity[] ENTITY_BUFFER = new Entity[512];
 
-    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean isAiMob) {
-        return getNearbyEntities(bb, entity, isAiMob, false);
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean loadChunks) {
+        return getNearbyEntities(bb, entity, loadChunks, false);
     }
 
     public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity) {
         return getNearbyEntities(bb, entity, false, false);
     }
 
-    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean isAiMob, boolean loadChunks) {
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean loadChunks, boolean isAiMob) {
         if (!isAiMob) {
             int index = 0;
 
@@ -3044,31 +3046,15 @@ public class Level implements ChunkManager, Metadatable {
             if (entity == null || entity.getLevel() != this) {
                 return new Entity[]{};
             }
-
-            long boxHash = hashSearchBox(bb);
-            long currentTick = this.levelCurrentTick;
-            long lastUpdate = entityNearbyCacheTime.get(boxHash);
-            boolean isDirty = entityNearbyCacheDirty.contains(boxHash);
-
-            if (isDirty || lastUpdate == 0) {
-                Entity[] entities = this.getNearbyEntities(bb, entity);
-                entityNearbyCache.put(boxHash, entities);
-                entityNearbyCacheTime.put(boxHash, currentTick);
-                entityNearbyCacheDirty.remove(boxHash);
+            long chunkHash = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
+            Entity[] cached = this.nearbyEntitiesCache .getIfPresent(entity.getId());
+            if (entityNearbyCacheDirty.contains(chunkHash) || cached == null) {
+                cached = this.getNearbyEntities(bb, entity, loadChunks);
+                this.nearbyEntitiesCache.put(entity.getId(), cached);
+                entityNearbyCacheDirty.remove(chunkHash);
             }
-
-            return entityNearbyCache.get(boxHash);
+            return cached;
         }
-    }
-
-    private static long hashSearchBox(AxisAlignedBB box) {
-        long x1 = (long) (box.getMinX() * 10);
-        long y1 = (long) (box.getMinY() * 10);
-        long z1 = (long) (box.getMinZ() * 10);
-        long x2 = (long) (box.getMaxX() * 10);
-        long y2 = (long) (box.getMaxY() * 10);
-        long z2 = (long) (box.getMaxZ() * 10);
-        return (x1 ^ (z1 << 11) ^ (y1 << 22)) + (x2 ^ (z2 << 11) ^ (y2 << 22) << 32);
     }
 
     public void setDirtyNearby(Entity entity) {

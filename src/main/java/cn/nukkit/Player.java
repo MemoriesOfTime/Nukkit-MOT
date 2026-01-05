@@ -2062,6 +2062,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
+        // When the player moves, set dirty nearby entities to check the target
+        if (!this.isSpectator() && !this.isCreative()) {
+            if (clientPos.distanceSquared(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) > 1.0) {
+                this.level.setDirtyNearby(this);
+            }
+        }
+
         double distanceSquared = clientPos.distanceSquared(this);
         if (distanceSquared == 0) {
             if (this.lastYaw != this.yaw || this.lastPitch != this.pitch) {
@@ -3441,13 +3448,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 if (dis == 0 && movePlayerPacket.yaw % 360 == this.yaw && movePlayerPacket.pitch % 360 == this.pitch) {
                     break;
-                }
-
-                // When the player moves, set dirty nearby entities to check the target
-                if (!this.isSpectator() && !this.isCreative()) {
-                    if (newPos.distanceSquared(this.temporalVector.setComponents(this.lastX, this.lastY, this.lastZ)) > 1.0) {
-                        this.level.setDirtyNearby(this);
-                    }
                 }
 
                 // 传送玩家后，可能会由于网络延迟接收错误数据包

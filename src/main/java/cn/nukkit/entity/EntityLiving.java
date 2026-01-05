@@ -411,7 +411,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             if (this.riding == null && this.age % 2 == 1 && !this.closed && this.isAlive()) {
-                Entity[] e = level.getNearbyEntities(this.boundingBox.grow(0.20000000298023224, 0.0D, 0.20000000298023224), this, true);
+                Entity[] e = level.getNearbyEntities(this.boundingBox.grow(0.20000000298023224, 0.0D, 0.20000000298023224), this, false, true);
                 for (Entity entity : e) {
                     if (entity instanceof EntityRideable && !entity.closed && entity.isAlive()) {
                         this.collidingWith(entity);

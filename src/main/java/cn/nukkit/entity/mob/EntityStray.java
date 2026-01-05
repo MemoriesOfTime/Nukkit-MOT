@@ -93,9 +93,14 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
         if (this.attackDelay > 23 && Utils.rand(1, 32) < 4 && this.distanceSquared(player) <= 55) {
             this.attackDelay = 0;
 
-            for (Block block : this.getLineOfSight(7, 7)) {
+            double distanceToTarget = Math.sqrt(this.distanceSquared(player));
+
+            for (Block block : this.getLineOfSight(15, 15)) {
                 if (!block.canPassThrough()) {
-                    return;
+                    double blockDist = Math.sqrt(this.distanceSquared(this.temporalVector.setComponents(block.getX(), block.getY(), block.getZ())));
+                    if (blockDist < distanceToTarget - 1) {
+                        return;
+                    }
                 }
             }
 
@@ -121,12 +126,12 @@ public class EntityStray extends EntityWalkingMob implements EntitySmite {
             double pitchCorrection = 0;
 
             if (distance > 3) {
-                pitchCorrection = Math.min(15, distance * 0.8);
+                pitchCorrection = Math.min(20, distance * 0.5);
             }
 
             double pitch = basePitch + pitchCorrection;
 
-            pitch = Math.max(-30, Math.min(30, pitch));
+            pitch = Math.max(-40, Math.min(40, pitch));
 
             double yawR = Math.toRadians(yaw);
             double pitchR = Math.toRadians(pitch);

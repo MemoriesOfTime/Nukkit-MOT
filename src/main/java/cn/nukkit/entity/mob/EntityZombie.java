@@ -22,11 +22,14 @@ import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.MobArmorEquipmentPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.utils.Utils;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
@@ -41,7 +44,11 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
     private static final int BREAK_DAMAGE_PER_HIT = 200;
     private static final int HIT_COOLDOWN = 20;
 
-    private static final Map<String, Integer> doorDamageMap = new HashMap<>();
+    private static final Cache<String, AtomicInteger> doorDamageCache = Caffeine.newBuilder()
+            .maximumSize(128)
+            .expireAfterAccess(15, TimeUnit.MINUTES)
+            .expireAfterWrite(30, TimeUnit.MINUTES)
+            .build();
 
     private Item tool;
 
@@ -329,7 +336,7 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
         Location doorPos = door.getLocation();
 
-        removeDoorDamage(door);
+        this.removeDoorDamage(door);
 
         this.level.useBreakOn(doorPos, null, null, true);
 
@@ -345,17 +352,18 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
     private void saveDoorDamage(BlockDoor door, int damage) {
         String key = getDoorKey(door);
-        doorDamageMap.put(key, damage);
+        doorDamageCache.get(key, k -> new AtomicInteger(damage)).set(damage);
     }
 
     private int getDoorDamage(BlockDoor door) {
         String key = getDoorKey(door);
-        return doorDamageMap.getOrDefault(key, 0);
+        AtomicInteger damage = doorDamageCache.getIfPresent(key);
+        return damage != null ? damage.get() : 0;
     }
 
     private void removeDoorDamage(BlockDoor door) {
         String key = getDoorKey(door);
-        doorDamageMap.remove(key);
+        doorDamageCache.invalidate(key);
     }
 
     private void resetDoorState() {
@@ -422,19 +430,5 @@ public class EntityZombie extends EntityWalkingMob implements EntitySmite {
 
     public Item getTool() {
         return this.tool;
-    }
-
-    public boolean isBreakingDoor() {
-        return this.doorBreakingTarget != null;
-    }
-
-    public int getDoorBreakProgress() {
-        if (this.accumulatedDamage <= 0) return 0;
-        if (this.accumulatedDamage >= MAX_DOOR_DAMAGE) return 10;
-        return (int)((float)this.accumulatedDamage / MAX_DOOR_DAMAGE * 10);
-    }
-
-    public static void clearAllDoorDamage() {
-        doorDamageMap.clear();
     }
 }
