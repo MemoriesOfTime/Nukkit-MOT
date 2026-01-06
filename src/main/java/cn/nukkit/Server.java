@@ -1,7 +1,6 @@
 package cn.nukkit;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.blockentity.*;
 import cn.nukkit.command.*;
 import cn.nukkit.console.NukkitConsole;
@@ -716,7 +715,6 @@ public class Server {
         Potion.init();
         Attribute.init();
         DispenseBehaviorRegister.init();
-        CustomBlockManager.init(this);
         GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, 0, 0);
 
         // Convert legacy data before plugins get the chance to mess with it
@@ -763,12 +761,6 @@ public class Server {
         }
 
         try {
-            if (CustomBlockManager.get().closeRegistry()) {
-                for (RuntimeItemMapping runtimeItemMapping : RuntimeItems.VALUES) {
-                    runtimeItemMapping.generatePalette();
-                }
-            }
-
             Item.initCreativeItems();
         } catch (Exception e) {
             throw new IllegalStateException("Failed to init custom blocks", e);

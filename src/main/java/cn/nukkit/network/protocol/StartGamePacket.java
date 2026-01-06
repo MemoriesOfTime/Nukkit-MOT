@@ -1,8 +1,6 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.Server;
-import cn.nukkit.block.custom.CustomBlockDefinition;
-import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.GameRules;
 import cn.nukkit.level.GlobalBlockPalette;
@@ -17,8 +15,6 @@ import lombok.ToString;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.IOException;
-import java.nio.ByteOrder;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -113,7 +109,6 @@ public class StartGamePacket extends DataPacket {
     public boolean isServerAuthoritativeBlockBreaking;
     public long currentTick;
     public int enchantmentSeed;
-    public Collection<CustomBlockDefinition> blockDefinitions = CustomBlockManager.get().getBlockDefinitions();
     public String multiplayerCorrelationId = "";
     public boolean isDisablingPersonas;
     public boolean isDisablingCustomSkins;
@@ -337,19 +332,7 @@ public class StartGamePacket extends DataPacket {
         }
         if (protocol > ProtocolInfo.v1_5_0) {
             if (protocol >= ProtocolInfo.v1_16_100) {
-                if (this.blockDefinitions != null && !this.blockDefinitions.isEmpty()) {
-                    this.putUnsignedVarInt(this.blockDefinitions.size());
-                    for (CustomBlockDefinition definition : this.blockDefinitions) {
-                        this.putString(definition.identifier());
-                        try {
-                            this.put(NBTIO.write(definition.nbt(), ByteOrder.LITTLE_ENDIAN, true));
-                        } catch (Exception e) {
-                             log.error("Error while encoding NBT data of CustomBlockDefinition", e);
-                        }
-                    }
-                } else {
-                    this.putUnsignedVarInt(0); // No custom blocks
-                }
+                this.putUnsignedVarInt(0); // No custom blocks
             } else {
                 this.put(GlobalBlockPalette.getCompiledTable(this.protocol));
             }

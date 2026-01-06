@@ -4,7 +4,6 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
-import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.inventory.Fuel;
 import cn.nukkit.inventory.ItemTag;
@@ -1172,12 +1171,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         try {
             Class<?> c = null;
             if (id < 0) {
-                int blockId = 255 - id;
-                if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-                    c = CustomBlockManager.get().getClassType(blockId);
-                } else {
-                    c = Block.list[blockId];
-                }
+                c = Block.list[255 - id];
             } else {
                 c = list[id];
             }
