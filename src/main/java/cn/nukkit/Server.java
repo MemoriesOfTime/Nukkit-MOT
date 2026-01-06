@@ -1175,6 +1175,7 @@ public class Server {
 
         log.info(this.baseLang.translateString("nukkit.server.startFinished", String.valueOf((double) (System.currentTimeMillis() - Nukkit.START_TIME) / 1000)));
 
+        this.network.startProcessInterfaces();
         this.tickProcessor();
         this.forceShutdown();
     }
@@ -1446,8 +1447,6 @@ public class Server {
         }
 
         ++this.tickCounter;
-
-        this.network.processInterfaces();
 
         if (this.rcon != null) {
             this.rcon.check();

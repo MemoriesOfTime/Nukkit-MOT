@@ -120,20 +120,30 @@ public class Network {
         return interfaces;
     }
 
-    public void processInterfaces() {
-        for (SourceInterface interfaz : this.interfaces) {
-            try {
-                interfaz.process();
-            } catch (Exception e) {
-                if (Nukkit.DEBUG > 1) {
-                    this.server.getLogger().logException(e);
-                }
+    public void startProcessInterfaces() {
+        new Thread(() -> {
+            while (this.getServer().isRunning()) {
+                try {
+                    for (SourceInterface interfaz : this.interfaces) {
+                        try {
+                            interfaz.process();
+                        } catch (Exception e) {
+                            if (Nukkit.DEBUG > 1) {
+                                this.server.getLogger().logException(e);
+                            }
 
-                interfaz.emergencyShutdown();
-                this.unregisterInterface(interfaz);
-                log.fatal(this.server.getLanguage().translateString("nukkit.server.networkError", new String[]{interfaz.getClass().getName(), Utils.getExceptionMessage(e)}));
+                            interfaz.emergencyShutdown();
+                            this.unregisterInterface(interfaz);
+                            log.fatal(this.server.getLanguage().translateString("nukkit.server.networkError", new String[]{interfaz.getClass().getName(), Utils.getExceptionMessage(e)}));
+                        }
+                    }
+
+                    Thread.sleep(1L);
+                } catch (InterruptedException e) {
+                    log.warn(e);
+                }
             }
-        }
+        }).start();
     }
 
     public void registerInterface(SourceInterface interfaz) {
