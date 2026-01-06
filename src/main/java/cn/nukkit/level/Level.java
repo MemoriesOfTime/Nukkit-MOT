@@ -64,8 +64,8 @@ import cn.nukkit.scheduler.BlockUpdateScheduler;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import cn.nukkit.utils.collection.nb.LongObjectEntry;
+import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
@@ -285,11 +285,15 @@ public class Level implements ChunkManager, Metadatable {
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
 
-    private final LongSet entityNearbyCacheDirty = new LongOpenHashSet();
-    private final LoadingCache<Long, Entity[]> nearbyEntitiesCache = Caffeine.newBuilder()
+    private final Cache<Object, Object> entityNearbyCacheDirty = Caffeine.newBuilder()
+            .maximumSize(4096)
+            .expireAfterWrite(5, TimeUnit.SECONDS)
+            .build();
+
+    private final Cache<Long, Entity[]> nearbyEntitiesCache = Caffeine.newBuilder()
             .maximumSize(4096)
             .expireAfterWrite(700, TimeUnit.MILLISECONDS)
-            .build(key -> new Entity[0]);
+            .build();
 
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
@@ -3006,14 +3010,11 @@ public class Level implements ChunkManager, Metadatable {
     public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean loadChunks, boolean isAiMob) {
         if (!isAiMob) {
             int index = 0;
-
             int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
             int maxX = NukkitMath.ceilDouble((bb.getMaxX() + 2) * 0.0625);
             int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
             int maxZ = NukkitMath.ceilDouble((bb.getMaxZ() + 2) * 0.0625);
-
             ArrayList<Entity> overflow = null;
-
             for (int x = minX; x <= maxX; ++x) {
                 for (int z = minZ; z <= maxZ; ++z) {
                     for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
@@ -3029,7 +3030,6 @@ public class Level implements ChunkManager, Metadatable {
                     }
                 }
             }
-
             if (index == 0) return EMPTY_ENTITY_ARR;
             Entity[] copy;
             if (overflow == null) {
@@ -3048,11 +3048,11 @@ public class Level implements ChunkManager, Metadatable {
                 return new Entity[]{};
             }
             long chunkHash = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
-            Entity[] cached = this.nearbyEntitiesCache .getIfPresent(entity.getId());
-            if (entityNearbyCacheDirty.contains(chunkHash) || cached == null) {
+            Entity[] cached = this.nearbyEntitiesCache.getIfPresent(entity.getId());
+            if (entityNearbyCacheDirty.getIfPresent(chunkHash) != null || cached == null) {
                 cached = this.getNearbyEntities(bb, entity, loadChunks);
                 this.nearbyEntitiesCache.put(entity.getId(), cached);
-                entityNearbyCacheDirty.remove(chunkHash);
+                entityNearbyCacheDirty.invalidate(chunkHash);
             }
             return cached;
         }
@@ -3061,7 +3061,7 @@ public class Level implements ChunkManager, Metadatable {
     public void setDirtyNearby(Entity entity) {
         if (entity == null || entity.getLevel() != this) return;
         long chunkKey = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
-        entityNearbyCacheDirty.add(chunkKey);
+        entityNearbyCacheDirty.put(chunkKey, Boolean.TRUE);
     }
 
     @NonComputationAtomic
