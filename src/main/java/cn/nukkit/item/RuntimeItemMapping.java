@@ -4,8 +4,6 @@ import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.item.RuntimeItems.MappingEntry;
-import cn.nukkit.item.customitem.CustomItem;
-import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -169,44 +167,6 @@ public class RuntimeItemMapping {
             this.legacy2Runtime.put(fullId, runtimeEntry);
             this.itemPaletteEntries.add(runtimeEntry);
         }
-    }
-
-    synchronized boolean registerCustomItem(CustomItem customItem) {
-        int runtimeId = CustomItemDefinition.getRuntimeId(customItem.getNamespaceId());
-        String namespaceId = customItem.getNamespaceId();
-        if (!Server.getInstance().enableExperimentMode) {
-            return false;
-        }
-        if (!this.customItems.contains(namespaceId)) { //多个版本共用一个RuntimeItemMapping时，重复不返回false
-            this.customItems.add(namespaceId);
-
-            RuntimeEntry entry = new RuntimeEntry(
-                    customItem.getNamespaceId(),
-                    runtimeId,
-                    false,
-                    true
-            );
-            this.itemPaletteEntries.add(entry);
-            this.runtimeId2Name.put(runtimeId, namespaceId);
-            this.name2RuntimeId.put(namespaceId, runtimeId);
-
-            this.generatePalette();
-        }
-        return true;
-    }
-
-    synchronized void deleteCustomItem(CustomItem customItem) {
-        String namespaceId = customItem.getNamespaceId();
-        if (!Server.getInstance().enableExperimentMode && !this.customItems.contains(namespaceId)) {
-            return;
-        }
-        this.customItems.remove(namespaceId);
-
-        this.runtimeId2Name.remove(customItem.getId());
-        this.name2RuntimeId.removeInt(customItem.getNamespaceId());
-        this.itemPaletteEntries.removeIf(next -> next.getIdentifier().equals(customItem.getNamespaceId()));
-
-        this.generatePalette();
     }
 
     public ArrayList<String> getCustomItems() {

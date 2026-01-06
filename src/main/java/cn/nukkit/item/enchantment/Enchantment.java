@@ -4,7 +4,6 @@ import cn.nukkit.Server;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.customitem.CustomItem;
 import cn.nukkit.item.enchantment.bow.EnchantmentBowFlame;
 import cn.nukkit.item.enchantment.bow.EnchantmentBowInfinity;
 import cn.nukkit.item.enchantment.bow.EnchantmentBowKnockback;
@@ -272,7 +271,7 @@ public abstract class Enchantment implements Cloneable {
         customEnchantments.put(new Identifier("minecraft", NAME_BREACH), enchantments[40]);
     }
 
-    public static OK<?> register(Enchantment enchantment, boolean registerItem) {
+    public static OK<?> register(Enchantment enchantment) {
         Objects.requireNonNull(enchantment);
         Objects.requireNonNull(enchantment.getIdentifier());
         if (customEnchantments.containsKey(enchantment.getIdentifier())) {
@@ -282,53 +281,6 @@ public abstract class Enchantment implements Cloneable {
             return new OK<>(false, "Please do not use the reserved namespace `minecraft` !");
         }
         customEnchantments.put(enchantment.getIdentifier(), enchantment);
-        if (registerItem) {
-            return registerCustomEnchantBook(enchantment);
-        }
-        return OK.TRUE;
-    }
-
-    private static int BOOK_NUMBER = 1;
-
-    private static OK<?> registerCustomEnchantBook(Enchantment enchantment) {
-        var identifier = enchantment.getIdentifier();
-        assert identifier != null;
-        for (int i = 1; i <= enchantment.getMaxLevel(); i++) {
-            var name = "§e%item.enchanted_book.name\n§7" + enchantment.getName() + " " + getLevelString(i);
-            ClassWriter classWriter = new ClassWriter(0);
-            MethodVisitor methodVisitor;
-            String className = "CustomBookEnchanted" + BOOK_NUMBER;
-            classWriter.visit(V17, ACC_PUBLIC | ACC_SUPER, "cn/nukkit/item/customitem/" + className, null, "cn/nukkit/item/customitem/ItemCustomBookEnchanted", null);
-            classWriter.visitSource(className + ".java", null);
-            {
-                methodVisitor = classWriter.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
-                methodVisitor.visitCode();
-                Label label0 = new Label();
-                methodVisitor.visitLabel(label0);
-                methodVisitor.visitLineNumber(6, label0);
-                methodVisitor.visitVarInsn(ALOAD, 0);
-                methodVisitor.visitLdcInsn(identifier.toString());
-                methodVisitor.visitLdcInsn(name);
-                methodVisitor.visitMethodInsn(INVOKESPECIAL, "cn/nukkit/item/customitem/ItemCustomBookEnchanted", "<init>", "(Ljava/lang/String;Ljava/lang/String;)V", false);
-                Label label1 = new Label();
-                methodVisitor.visitLabel(label1);
-                methodVisitor.visitLineNumber(7, label1);
-                methodVisitor.visitInsn(RETURN);
-                Label label2 = new Label();
-                methodVisitor.visitLabel(label2);
-                methodVisitor.visitLocalVariable("this", "Lcn/nukkit/item/customitem/" + className + ";", null, label0, label2, 0);
-                methodVisitor.visitMaxs(3, 1);
-                methodVisitor.visitEnd();
-            }
-            classWriter.visitEnd();
-            BOOK_NUMBER++;
-            try {
-                Class<? extends CustomItem> clazz = (Class<? extends CustomItem>) new DynamicClassLoader().defineClass("cn.nukkit.item.customitem." + className, classWriter.toByteArray());
-                Item.registerCustomItem(clazz).assertOK();
-            } catch (AssertionError e) {
-                return new OK<>(false, e);
-            }
-        }
         return OK.TRUE;
     }
 

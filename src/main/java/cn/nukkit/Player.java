@@ -43,7 +43,6 @@ import cn.nukkit.inventory.transaction.data.ReleaseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemData;
 import cn.nukkit.inventory.transaction.data.UseItemOnEntityData;
 import cn.nukkit.item.*;
-import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.item.food.Food;
 import cn.nukkit.item.trim.TrimFactory;
@@ -2909,53 +2908,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 this.dataPacket(pk);
                             }
                         }
-                        ItemComponentPacket itemComponentPacket = new ItemComponentPacket();
-                        if (this.protocol >= ProtocolInfo.v1_21_60) {
-                            Collection<ItemComponentPacket.ItemDefinition> vanillaItems = RuntimeItems.getMapping(this.protocol).getVanillaItemDefinitions();
-                            Set<Entry<String, CustomItemDefinition>> itemDefinitions = Item.getCustomItemDefinition().entrySet();
-                            List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(vanillaItems.size() + itemDefinitions.size());
-                            entries.addAll(vanillaItems);
-                            if (this.server.enableExperimentMode && !itemDefinitions.isEmpty()) {
-                                for (Entry<String, CustomItemDefinition> entry : itemDefinitions) {
-                                    try {
-                                        Item item = Item.fromString(entry.getKey());
-                                        entries.add(new ItemComponentPacket.ItemDefinition(
-                                                entry.getKey(),
-                                                item.getNetworkId(this.protocol),
-                                                true,
-                                                1,
-                                                entry.getValue().getNbt(this.protocol)
-                                        ));
-                                    } catch (Exception e) {
-                                        log.error("ItemComponentPacket encoding error", e);
-                                    }
-                                }
-                            }
-                            itemComponentPacket.setEntries(entries);
-                        } else {
-                            if (this.server.enableExperimentMode && !Item.getCustomItemDefinition().isEmpty()) {
-                                HashMap<String, CustomItemDefinition> itemDefinition = Item.getCustomItemDefinition();
-                                List<ItemComponentPacket.ItemDefinition> entries = new ArrayList<>(itemDefinition.size());
-                                int i = 0;
-                                for (var entry : itemDefinition.entrySet()) {
-                                    try {
-                                        Item item = Item.fromString(entry.getKey());
-                                        entries.add(new ItemComponentPacket.ItemDefinition(
-                                                entry.getKey(),
-                                                item.getNetworkId(this.protocol),
-                                                true,
-                                                1,
-                                                entry.getValue().getNbt(this.protocol).putShort("minecraft:identifier", i)
-                                        ));
-                                        i++;
-                                    } catch (Exception e) {
-                                        log.error("ItemComponentPacket encoding error", e);
-                                    }
-                                }
-                                itemComponentPacket.setEntries(entries);
-                            }
-                        }
-                        this.dataPacket(itemComponentPacket);
+                        this.dataPacket(new ItemComponentPacket());
                     }
                     this.dataPacket(BiomeDefinitionListPacket.getCachedPacket(this.protocol));
                 }

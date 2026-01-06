@@ -8,7 +8,6 @@ import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
-import cn.nukkit.item.customitem.ItemCustomTool;
 import cn.nukkit.item.enchantment.Enchantment;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.MovingObjectPosition;
@@ -619,9 +618,6 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     private double toolBreakTimeBonus0(Item item) {
-        if (item instanceof ItemCustomTool itemCustomTool && itemCustomTool.getSpeed() != null) {
-            return customToolBreakTimeBonus(customToolType(item), itemCustomTool.getSpeed());
-        }
         return toolBreakTimeBonus0(toolType0(item, getId()), item.getTier(), this.getId());
     }
 
