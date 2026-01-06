@@ -32,6 +32,17 @@ public class NetEaseConverter {
     private static final int MICRO_BLOCK_ID = 9990;
     private static final String MICRO_BLOCK_NAME = "minecraft:micro_block";
 
+    // NetEase特有物品
+    // 数据格式：{ {String namespaceId, int id}, ... }
+    private static final Object[][] ITEMS = {
+            {"minecraft:mod_ore", 230},
+            {"minecraft:micro_block", -9735},
+            {"minecraft:mod_armor", 1996},
+            {"minecraft:mod", 1997},
+            {"minecraft:mod_ex", 1998},
+            {"minecraft:debug_stick", 1999},
+    };
+
     /**
      * 转换方块状态列表为网易版本
      * @param blockStates 标准版本的方块状态列表
@@ -110,6 +121,16 @@ public class NetEaseConverter {
             }
 
             result.add(item);
+        }
+
+        // 添加NetEase特有物品
+        for (Object[] item : ITEMS) {
+            JsonObject itemObj = new JsonObject();
+            itemObj.addProperty("name", (String) item[0]);
+            itemObj.addProperty("id", (int) item[1]);
+            itemObj.addProperty("version", 2);
+            itemObj.addProperty("componentBased", false);
+            result.add(itemObj);
         }
 
         return result;
