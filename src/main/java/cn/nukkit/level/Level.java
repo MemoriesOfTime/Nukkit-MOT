@@ -285,9 +285,9 @@ public class Level implements ChunkManager, Metadatable {
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
 
-    private final Cache<Object, Object> entityNearbyCacheDirty = Caffeine.newBuilder()
-            .maximumSize(4096)
-            .expireAfterWrite(5, TimeUnit.SECONDS)
+    private final Cache<Long, Boolean> entityNearbyCacheDirty = Caffeine.newBuilder()
+            .maximumSize(512)
+            .expireAfterWrite(1, TimeUnit.SECONDS)
             .build();
 
     private final Cache<Long, Entity[]> nearbyEntitiesCache = Caffeine.newBuilder()
@@ -3061,7 +3061,7 @@ public class Level implements ChunkManager, Metadatable {
     public void setDirtyNearby(Entity entity) {
         if (entity == null || entity.getLevel() != this) return;
         long chunkKey = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
-        entityNearbyCacheDirty.put(chunkKey, Boolean.TRUE);
+        entityNearbyCacheDirty.put(chunkKey, true);
     }
 
     @NonComputationAtomic
