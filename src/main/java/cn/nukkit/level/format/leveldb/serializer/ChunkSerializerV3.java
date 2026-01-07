@@ -2,6 +2,7 @@ package cn.nukkit.level.format.leveldb.serializer;
 
 import cn.nukkit.level.DimensionData;
 import cn.nukkit.level.format.Chunk;
+import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.format.leveldb.LevelDBKey;
 import cn.nukkit.level.format.leveldb.structure.ChunkBuilder;
@@ -45,6 +46,16 @@ public class ChunkSerializerV3 implements ChunkSerializer {
                 byteBuf.writeByte(CURRENT_LEVEL_SUBCHUNK_VERSION);
                 ChunkSectionSerializers.serializer(byteBuf, section.getStorages(), ySection, CURRENT_LEVEL_SUBCHUNK_VERSION);
                 writeBatch.put(key, Utils.convertByteBuf2Array(byteBuf));
+            } finally {
+                byteBuf.release();
+            }
+
+            byteBuf = ByteBufAllocator.DEFAULT.ioBuffer();
+            try {
+                byte[] blockLight = section.getLightArray();
+                if (blockLight != EmptyChunkSection.EMPTY_LIGHT_ARR) {
+                    writeBatch.put(LevelDBKey.NUKKIT_BLOCK_LIGHT.getKey(chunk.getX(), chunk.getZ(), ySection, chunk.getProvider().getLevel().getDimension()), blockLight);
+                }
             } finally {
                 byteBuf.release();
             }
@@ -101,7 +112,8 @@ public class ChunkSerializerV3 implements ChunkSerializer {
                     }
                 }
 
-                sections[ySection + dimensionInfo.getSectionOffset()] = new LevelDBChunkSection(ySection, stateBlockStorageArray);
+                byte[] blockLight = db.get(LevelDBKey.NUKKIT_BLOCK_LIGHT.getKey(chunkX, chunkZ, ySection, chunkBuilder.getDimensionData().getDimensionId()));
+                sections[ySection + dimensionInfo.getSectionOffset()] = new LevelDBChunkSection(ySection, stateBlockStorageArray, blockLight);
             }
         }
         chunkBuilder.sections(sections);

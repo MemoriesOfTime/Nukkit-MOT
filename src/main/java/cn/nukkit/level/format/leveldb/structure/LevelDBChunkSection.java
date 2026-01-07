@@ -3,6 +3,7 @@ package cn.nukkit.level.format.leveldb.structure;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.custom.container.BlockStorageContainer;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
@@ -60,8 +61,8 @@ public class LevelDBChunkSection implements ChunkSection {
         this.storages = new StateBlockStorage[]{ new StateBlockStorage(), new StateBlockStorage() };
     }
 
-    public LevelDBChunkSection(int y, @Nullable StateBlockStorage[] storages) {
-        this(null, y, storages, null, null, null, false, false);
+    public LevelDBChunkSection(int y, @Nullable StateBlockStorage[] storages, byte[] blockLight) {
+        this(null, y, storages, blockLight, null, null, false, false);
     }
 
     public LevelDBChunkSection(LevelDBChunk parent, int y, @Nullable StateBlockStorage[] storages, byte[] blockLight, byte[] skyLight, byte[] compressedLight, boolean hasBlockLight, boolean hasSkyLight) {
