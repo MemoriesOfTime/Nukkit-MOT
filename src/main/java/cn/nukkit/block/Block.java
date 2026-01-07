@@ -1434,14 +1434,17 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (canConnectToFullSolid(down)) {
             return true;
         }
+
         switch (down.getId()) {
             case SCAFFOLDING:
             case HOPPER_BLOCK:
                 return true;
         }
-        if (down instanceof BlockSlab) {
-            return ((BlockSlab) down).hasTopBit();
+
+        if (down instanceof BlockSlab slab) {
+            return slab.hasTopBit();
         }
+
         return down instanceof BlockTrapdoor && ((BlockTrapdoor) down).isTop() && !((BlockTrapdoor) down).isOpen();
     }
 
@@ -1461,10 +1464,73 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     /**
-     * Returns true for WATER and STILL_WATER, false for others
+     * Returns true for WATER or STILL_WATER, false for others
      */
     public static boolean isWater(int id) {
-        return id == WATER || id == STILL_WATER;
+        return BlockTypes.isWater(id);
+    }
+
+    /**
+     * Returns true for LAVA or STILL_LAVA, false for others
+     */
+    public static boolean isLava(int id) {
+        return BlockTypes.isLava(id);
+    }
+
+    /**
+     * Returns true for SLAB, false for others
+     */
+    public static boolean isSlab(int id) {
+        return BlockTypes.isSlab(id);
+    }
+
+    /**
+     * Returns true for STAIRS, false for others
+     */
+    public static boolean isStairs(int id) {
+        return BlockTypes.isStairs(id);
+    }
+
+    /**
+     * Returns true for PRESSURE_PLATE, false for others
+     */
+    public static boolean isPressurePlate(int id) {
+        return BlockTypes.isPressurePlate(id);
+    }
+
+    /**
+     * Returns true for BUTTON, false for others
+     */
+    public static boolean isButton(int id) {
+        return BlockTypes.isButton(id);
+    }
+
+    /**
+     * Returns true for FENCE, false for others
+     */
+    public static boolean isFence(int id) {
+        return BlockTypes.isFence(id);
+    }
+
+    /**
+     * Returns true for FENCE_GATE, false for others
+     */
+    public static boolean isFenceGate(int id) {
+        return BlockTypes.isFenceGate(id);
+    }
+
+    /**
+     * Returns true for TRAPDOOR, false for others
+     */
+    public static boolean isTrapdoor(int id) {
+        return BlockTypes.isTrapdoor(id);
+    }
+
+    /**
+     * Returns true for DOOR, false for others
+     */
+    public static boolean isDoor(int id) {
+        return BlockTypes.isDoor(id);
     }
 
     public boolean isSuspiciousBlock() {

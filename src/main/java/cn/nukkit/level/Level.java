@@ -64,6 +64,8 @@ import cn.nukkit.scheduler.BlockUpdateScheduler;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import cn.nukkit.utils.collection.nb.LongObjectEntry;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
@@ -87,7 +89,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-
 
 /**
  * @author MagicDroidX Nukkit Project
@@ -283,6 +284,16 @@ public class Level implements ChunkManager, Metadatable {
 
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
+
+    private final Cache<Long, Boolean> entityNearbyCacheDirty = Caffeine.newBuilder()
+            .maximumSize(512)
+            .expireAfterWrite(1, TimeUnit.SECONDS)
+            .build();
+
+    private final Cache<Long, Entity[]> nearbyEntitiesCache = Caffeine.newBuilder()
+            .maximumSize(4096)
+            .expireAfterWrite(700, TimeUnit.MILLISECONDS)
+            .build();
 
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationQueue = new Long2ObjectOpenHashMap<>();
     private final Long2ObjectOpenHashMap<Boolean> chunkPopulationLock = new Long2ObjectOpenHashMap<>();
@@ -1111,7 +1122,15 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
-        this.updateBlockEntities.removeIf(blockEntity -> !blockEntity.isValid() || !blockEntity.onUpdate());
+        var updateBlockEntities = this.updateBlockEntities.iterator();
+        while (updateBlockEntities.hasNext()) {
+            BlockEntity be = updateBlockEntities.next();
+            if (!be.isValid()) {
+                updateBlockEntities.remove();
+            } else if (!be.onUpdate()) {
+                updateBlockEntities.remove();
+            }
+        }
 
         this.tickChunks();
 
@@ -2980,49 +2999,69 @@ public class Level implements ChunkManager, Metadatable {
     private static final Entity[] EMPTY_ENTITY_ARR = new Entity[0];
     private static final Entity[] ENTITY_BUFFER = new Entity[512];
 
-    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity) {
-        return getNearbyEntities(bb, entity, false);
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean loadChunks) {
+        return getNearbyEntities(bb, entity, loadChunks, false);
     }
 
-    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean loadChunks) {
-        int index = 0;
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity) {
+        return getNearbyEntities(bb, entity, false, false);
+    }
 
-        int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
-        int maxX = NukkitMath.ceilDouble((bb.getMaxX() + 2) * 0.0625);
-        int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
-        int maxZ = NukkitMath.ceilDouble((bb.getMaxZ() + 2) * 0.0625);
-
-        ArrayList<Entity> overflow = null;
-
-        for (int x = minX; x <= maxX; ++x) {
-            for (int z = minZ; z <= maxZ; ++z) {
-                for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
-                    if (ent != entity && ent.boundingBox.intersectsWith(bb)) {
-                        if (index < ENTITY_BUFFER.length) {
-                            ENTITY_BUFFER[index] = ent;
-                        } else {
-                            if (overflow == null) overflow = new ArrayList<>(1024);
-                            overflow.add(ent);
+    public Entity[] getNearbyEntities(AxisAlignedBB bb, Entity entity, boolean loadChunks, boolean isAiMob) {
+        if (!isAiMob) {
+            int index = 0;
+            int minX = NukkitMath.floorDouble((bb.getMinX() - 2) * 0.0625);
+            int maxX = NukkitMath.ceilDouble((bb.getMaxX() + 2) * 0.0625);
+            int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) * 0.0625);
+            int maxZ = NukkitMath.ceilDouble((bb.getMaxZ() + 2) * 0.0625);
+            ArrayList<Entity> overflow = null;
+            for (int x = minX; x <= maxX; ++x) {
+                for (int z = minZ; z <= maxZ; ++z) {
+                    for (Entity ent : this.getChunkEntities(x, z, loadChunks).values()) {
+                        if (ent != entity && ent.boundingBox.intersectsWith(bb)) {
+                            if (index < ENTITY_BUFFER.length) {
+                                ENTITY_BUFFER[index] = ent;
+                            } else {
+                                if (overflow == null) overflow = new ArrayList<>(1024);
+                                overflow.add(ent);
+                            }
+                            index++;
                         }
-                        index++;
                     }
                 }
             }
-        }
-
-        if (index == 0) return EMPTY_ENTITY_ARR;
-        Entity[] copy;
-        if (overflow == null) {
-            copy = Arrays.copyOfRange(ENTITY_BUFFER, 0, index);
-            Arrays.fill(ENTITY_BUFFER, 0, index, null);
-        } else {
-            copy = new Entity[ENTITY_BUFFER.length + overflow.size()];
-            System.arraycopy(ENTITY_BUFFER, 0, copy, 0, ENTITY_BUFFER.length);
-            for (int i = 0; i < overflow.size(); i++) {
-                copy[ENTITY_BUFFER.length + i] = overflow.get(i);
+            if (index == 0) return EMPTY_ENTITY_ARR;
+            Entity[] copy;
+            if (overflow == null) {
+                copy = Arrays.copyOfRange(ENTITY_BUFFER, 0, index);
+                Arrays.fill(ENTITY_BUFFER, 0, index, null);
+            } else {
+                copy = new Entity[ENTITY_BUFFER.length + overflow.size()];
+                System.arraycopy(ENTITY_BUFFER, 0, copy, 0, ENTITY_BUFFER.length);
+                for (int i = 0; i < overflow.size(); i++) {
+                    copy[ENTITY_BUFFER.length + i] = overflow.get(i);
+                }
             }
+            return copy;
+        } else {
+            if (entity == null || entity.getLevel() != this) {
+                return new Entity[]{};
+            }
+            long chunkHash = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
+            Entity[] cached = this.nearbyEntitiesCache.getIfPresent(entity.getId());
+            if (entityNearbyCacheDirty.getIfPresent(chunkHash) != null || cached == null) {
+                cached = this.getNearbyEntities(bb, entity, loadChunks);
+                this.nearbyEntitiesCache.put(entity.getId(), cached);
+                entityNearbyCacheDirty.invalidate(chunkHash);
+            }
+            return cached;
         }
-        return copy;
+    }
+
+    public void setDirtyNearby(Entity entity) {
+        if (entity == null || entity.getLevel() != this) return;
+        long chunkKey = chunkHash(((int) entity.x) >> 4, ((int) entity.z) >> 4);
+        entityNearbyCacheDirty.put(chunkKey, true);
     }
 
     @NonComputationAtomic
