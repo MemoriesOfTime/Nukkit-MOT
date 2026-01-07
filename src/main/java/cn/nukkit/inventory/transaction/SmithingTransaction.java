@@ -160,7 +160,15 @@ public class SmithingTransaction extends InventoryTransaction {
         return outputItem == null? null : outputItem.clone();
     }
 
-    public static boolean checkForItemPart(List<InventoryAction> actions) {
+    public static boolean isIn(List<InventoryAction> actions) {
+        for (InventoryAction action : actions) {
+            if (action instanceof SmithingItemAction) return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean checkForItemPart(List<InventoryAction> actions) {
         return actions.stream().anyMatch(it-> it instanceof SmithingItemAction);
     }
 }

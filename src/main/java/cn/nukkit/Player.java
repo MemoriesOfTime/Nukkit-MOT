@@ -4208,7 +4208,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (transactionPacket.isCraftingPart) {
-                    if (LoomTransaction.checkForItemPart(actions)) {
+                    if (LoomTransaction.isIn(actions)) {
                         if (this.loomTransaction == null) {
                             this.loomTransaction = new LoomTransaction(this, actions);
                         } else {
@@ -4237,7 +4237,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         try {
                             this.craftingTransaction.execute();
                         } catch (Exception e) {
-                            this.server.getLogger().debug("Executing crafting transaction failed");
+                            e.printStackTrace();
+                            this.server.getLogger().debug("Executing crafting transaction failed", e);
                         }
                         this.craftingTransaction = null;
                     }
@@ -4257,7 +4258,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 } else if (this.protocol >= ProtocolInfo.v1_16_0 && transactionPacket.isRepairItemPart) {
                     Sound sound = null;
-                    if (SmithingTransaction.checkForItemPart(actions)) {
+                    if (SmithingTransaction.isIn(actions)) {
                         if (this.smithingTransaction == null) {
                             this.smithingTransaction = new SmithingTransaction(this, actions);
                         } else {
@@ -4367,7 +4368,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.repairItemTransaction = null;
                     }
                 } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.smithingTransaction != null) {
-                    if (SmithingTransaction.checkForItemPart(actions)) {
+                    if (SmithingTransaction.isIn(actions)) {
                         for (InventoryAction action : actions) {
                             this.smithingTransaction.addAction(action);
                         }

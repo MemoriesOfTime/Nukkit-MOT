@@ -267,9 +267,9 @@ public class RecipeRegistry {
             }
         }
 
-        /*for (SmithingRecipe recipe : SMITHING.values()) {
+        for (SmithingRecipe recipe : SMITHING.values()) {
             pk.addShapelessRecipe(recipe);
-        }*/
+        }
 
         for (BrewingRecipe recipe : BREWING.values()) {
             pk.addBrewingRecipe(recipe);

@@ -21,7 +21,7 @@ import java.util.*;
  */
 public class InventoryTransaction {
 
-    private boolean invalid;
+    protected boolean invalid;
     protected boolean hasExecuted;
 
     protected Player source;
@@ -290,5 +290,9 @@ public class InventoryTransaction {
 
     public boolean hasExecuted() {
         return this.hasExecuted;
+    }
+
+    public boolean checkForItemPart(List<InventoryAction> actions) {
+        return false;
     }
 }

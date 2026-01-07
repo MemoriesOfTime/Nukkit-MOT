@@ -94,7 +94,15 @@ public class LoomTransaction extends InventoryTransaction {
         return this.outputItem;
     }
 
-    public static boolean checkForItemPart(List<InventoryAction> actions) {
+    @Override
+    public  boolean checkForItemPart(List<InventoryAction> actions) {
         return actions.stream().anyMatch(it-> it instanceof LoomItemAction);
+    }
+
+    public static boolean isIn(List<InventoryAction> actions) {
+        for (InventoryAction action : actions) {
+            if (action instanceof LoomItemAction) return true;
+        }
+        return false;
     }
 }

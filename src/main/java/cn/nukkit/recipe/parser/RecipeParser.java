@@ -2,11 +2,9 @@ package cn.nukkit.recipe.parser;
 
 import cn.nukkit.Server;
 import cn.nukkit.item.Item;
-import cn.nukkit.item.material.tags.ItemTags;
 import cn.nukkit.recipe.RecipeRegistry;
 import cn.nukkit.recipe.descriptor.DefaultDescriptor;
 import cn.nukkit.recipe.descriptor.ItemDescriptor;
-import cn.nukkit.recipe.descriptor.ItemTagDescriptor;
 import cn.nukkit.recipe.impl.*;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -48,14 +46,6 @@ public class RecipeParser {
         if(damage != 32767 && result.getDamage() == 0) result.setDamage(damage);
 
         return new DefaultDescriptor(result);
-    }
-
-    private static ItemDescriptor parseInput(JsonObject input) {
-        if(input.has("itemTag")) {
-            String id = input.get("itemTag").getAsString();
-            return new ItemTagDescriptor(ItemTags.getTag(id), id);
-        }
-        return parseItem(input);
     }
 
     private static DefaultDescriptor parseOutput(JsonElement output, List<DefaultDescriptor> extra) {
@@ -131,8 +121,8 @@ public class RecipeParser {
 
                         switch (block) {
                             case "crafting_table", "deprecated" -> {
-                                final String[] shape = new String[recipe.get("height").getAsInt()];
                                 final JsonArray shapeJson = recipe.get("shape").getAsJsonArray();
+                                final String[] shape = new String[shapeJson.size()];
                                 for(int i = 0; i < shape.length; i++) {
                                     shape[i] = shapeJson.get(i).getAsString();
                                 }
@@ -141,7 +131,7 @@ public class RecipeParser {
                                 final JsonObject input =  recipe.get("input").getAsJsonObject();
 
                                 input.entrySet().forEach(entry -> {
-                                   items.put(entry.getKey().charAt(0), parseInput(entry.getValue().getAsJsonObject()));
+                                   items.put(entry.getKey().charAt(0), parseItem(entry.getValue().getAsJsonObject()));
                                 });
 
                                 final List<DefaultDescriptor> extra = new ArrayList<>();
@@ -187,7 +177,7 @@ public class RecipeParser {
                                 final Collection<ItemDescriptor> inputs = new ArrayList<>();
 
                                 recipe.getAsJsonArray("input").getAsJsonArray().forEach(item -> {
-                                    inputs.add(parseInput(item.getAsJsonObject()));
+                                    inputs.add(parseItem(item.getAsJsonObject()));
                                 });
 
                                 RecipeRegistry.registerShapelessRecipe(new ShapelessRecipe(

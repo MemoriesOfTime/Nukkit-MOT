@@ -5,7 +5,9 @@ import cn.nukkit.item.RuntimeItemMapping;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.StringItem;
 import cn.nukkit.utils.BinaryStream;
+import lombok.ToString;
 
+@ToString
 public class DefaultDescriptor extends ItemDescriptor {
     private final Item item;
 

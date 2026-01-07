@@ -7,6 +7,7 @@ import cn.nukkit.event.HandlerList;
 import cn.nukkit.inventory.transaction.CraftingTransaction;
 import cn.nukkit.item.Item;
 import cn.nukkit.recipe.Recipe;
+import cn.nukkit.recipe.descriptor.DefaultDescriptor;
 
 /**
  * @author MagicDroidX
@@ -31,7 +32,7 @@ public class CraftItemEvent extends Event implements Cancellable {
     public CraftItemEvent(CraftingTransaction transaction) {
         this.transaction = transaction;
         this.player = transaction.getSource();
-        this.input = transaction.getInputList().toArray(Item.EMPTY_ARRAY);
+        this.input = transaction.getInputList().stream().map(itemDescriptor -> ((DefaultDescriptor)itemDescriptor).getItem()).toArray(Item[]::new);
         this.recipe = transaction.getRecipe();
     }
 

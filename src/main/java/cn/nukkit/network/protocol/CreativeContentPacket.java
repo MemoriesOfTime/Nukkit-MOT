@@ -57,7 +57,7 @@ public class CreativeContentPacket extends DataPacket {
 
     private void writeItem(CreativeItemData data) {
         this.putUnsignedVarInt(data.getNetId());
-        this.putSlot(this.protocol, data.getItem(), this.protocol >= ProtocolInfo.v1_16_220);
+        this.putSlot(this.protocol, data.getItem(), !data.getItem().hasCompoundTag());
         if (this.protocol >= ProtocolInfo.v1_21_60) {
             this.putUnsignedVarInt(data.getGroupId());
         }
