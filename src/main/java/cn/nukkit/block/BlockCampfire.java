@@ -7,7 +7,6 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.EntityDamageByBlockEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
 import cn.nukkit.inventory.CampfireInventory;
-import cn.nukkit.inventory.CampfireRecipe;
 import cn.nukkit.inventory.ContainerInventory;
 import cn.nukkit.item.*;
 import cn.nukkit.level.Level;
@@ -17,6 +16,8 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
+import cn.nukkit.recipe.RecipeRegistry;
+import cn.nukkit.recipe.impl.CampfireRecipe;
 import cn.nukkit.utils.Faceable;
 import org.jetbrains.annotations.NotNull;
 
@@ -195,7 +196,7 @@ public class BlockCampfire extends BlockTransparentMeta implements Faceable, Blo
         cloned.setCount(1);
         final CampfireInventory inventory = campfire.getInventory();
         if (inventory.canAddItem(cloned)) {
-            final CampfireRecipe recipe = level.getServer().getCraftingManager().matchCampfireRecipe(cloned);
+            final CampfireRecipe recipe = RecipeRegistry.matchCampfireRecipe(cloned);
             if (recipe != null) {
                 inventory.addItem(cloned);
                 item.setCount(item.getCount() - 1);

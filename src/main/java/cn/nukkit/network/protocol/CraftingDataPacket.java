@@ -1,12 +1,19 @@
 package cn.nukkit.network.protocol;
 
 import cn.nukkit.inventory.*;
-import cn.nukkit.inventory.data.RecipeUnlockingRequirement;
 import cn.nukkit.item.Item;
+import cn.nukkit.recipe.CraftingRecipe;
+import cn.nukkit.recipe.Recipe;
+import cn.nukkit.recipe.RecipeType;
+import cn.nukkit.recipe.descriptor.DefaultDescriptor;
+import cn.nukkit.recipe.descriptor.ItemDescriptor;
+import cn.nukkit.recipe.impl.*;
+import cn.nukkit.recipe.impl.data.RecipeUnlockingRequirement;
 import cn.nukkit.utils.BinaryStream;
 import lombok.ToString;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -92,14 +99,10 @@ public class CraftingDataPacket extends DataPacket {
                         if (protocol >= 361) {
                             this.putString(shapeless.getRecipeId());
                         }
-                        List<Item> ingredients = shapeless.getIngredientList();
+                        Collection<ItemDescriptor> ingredients = shapeless.getIngredientList();
                         this.putUnsignedVarInt(ingredients.size());
-                        for (Item ingredient : ingredients) {
-                            if (protocol < 361) {
-                                this.putSlot(protocol, ingredient);
-                            } else {
-                                this.putRecipeIngredient(this.protocol, ingredient);
-                            }
+                        for (ItemDescriptor ingredient : ingredients) {
+                            ingredient.putRecipe(this, protocol);
                         }
                         this.putUnsignedVarInt(1); // Results length
                         this.putSlot(protocol, shapeless.getResult(), protocol >= ProtocolInfo.v1_16_100);
@@ -120,11 +123,8 @@ public class CraftingDataPacket extends DataPacket {
                     case SMITHING_TRANSFORM:
                         SmithingRecipe smithing = (SmithingRecipe) recipe;
                         this.putString(smithing.getRecipeId());
-                        if (protocol >= ProtocolInfo.v1_19_80) {
-                            this.putRecipeIngredient(protocol, protocol >= ProtocolInfo.v1_20_0_23 ? smithing.getTemplate() : Item.AIR_ITEM); //template
-                        }
-                        this.putRecipeIngredient(protocol, smithing.getEquipment());
-                        this.putRecipeIngredient(protocol, smithing.getIngredient());
+                        new DefaultDescriptor(smithing.getEquipment()).putRecipe(this, protocol);
+                        new DefaultDescriptor(smithing.getIngredient()).putRecipe(this, protocol);
                         this.putSlot(protocol, smithing.getResult(), true);
                         this.putString(CRAFTING_TAG_SMITHING_TABLE);
                         this.putUnsignedVarInt(smithing.getNetworkId());
@@ -139,11 +139,7 @@ public class CraftingDataPacket extends DataPacket {
 
                         for (int z = 0; z < shaped.getHeight(); ++z) {
                             for (int x = 0; x < shaped.getWidth(); ++x) {
-                                if (protocol < 361) {
-                                    this.putSlot(protocol, shaped.getIngredient(x, z));
-                                } else {
-                                    this.putRecipeIngredient(this.protocol, shaped.getIngredient(x, z));
-                                }
+                                shaped.getIngredient(x, z).putRecipe(this, protocol);
                             }
                         }
                         List<Item> outputs = new ArrayList<>();
@@ -243,7 +239,7 @@ public class CraftingDataPacket extends DataPacket {
     protected void writeRequirement(CraftingRecipe recipe) {
         this.putByte((byte) recipe.getRequirement().getContext().ordinal());
         if (recipe.getRequirement().getContext().equals(RecipeUnlockingRequirement.UnlockingContext.NONE)) {
-            this.putArray(recipe.getRequirement().getIngredients(), (ingredient) -> this.putRecipeIngredient(protocol, ingredient));
+            this.putArray(recipe.getRequirement().getIngredients(), (ingredient) -> new DefaultDescriptor(ingredient).putRecipe(this, protocol));
         }
     }
 
@@ -260,8 +256,8 @@ public class CraftingDataPacket extends DataPacket {
 
     private int writeShapelessRecipeLegacy(ShapelessRecipe recipe, BinaryStream stream) {
         stream.putUnsignedVarInt(recipe.getIngredientCount());
-        for (Item item : recipe.getIngredientList()) {
-            stream.putSlot(0, item);
+        for (ItemDescriptor item : recipe.getIngredientList()) {
+            item.putRecipe(this, protocol);
         }
         stream.putUnsignedVarInt(1);
         stream.putSlot(0, recipe.getResult());
@@ -274,7 +270,7 @@ public class CraftingDataPacket extends DataPacket {
         stream.putVarInt(recipe.getHeight());
         for (int z = 0; z < recipe.getHeight(); ++z) {
             for (int x = 0; x < recipe.getWidth(); ++x) {
-                stream.putSlot(0, recipe.getIngredient(x, z));
+                recipe.getIngredient(x, z).putRecipe(this, protocol);
             }
         }
         stream.putUnsignedVarInt(1);

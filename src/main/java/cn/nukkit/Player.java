@@ -74,6 +74,8 @@ import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
+import cn.nukkit.recipe.RecipeRegistry;
+import cn.nukkit.recipe.impl.MultiRecipe;
 import cn.nukkit.resourcepacks.ResourcePack;
 import cn.nukkit.scheduler.AsyncTask;
 import cn.nukkit.scoreboard.displayer.IScoreboardViewer;
@@ -4121,16 +4123,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         && !smithingInventory.getResult().isNull()) {
                     InventoryTransactionPacket fixedPacket = new InventoryTransactionPacket();
                     fixedPacket.isRepairItemPart = true;
-                    fixedPacket.actions = new NetworkInventoryAction[8];
+                    fixedPacket.actions = new NetworkInventoryAction[7];
 
                     Item fromIngredient = smithingInventory.getIngredient().clone();
                     Item toIngredient = fromIngredient.decrement(1);
 
                     Item fromEquipment = smithingInventory.getEquipment().clone();
                     Item toEquipment = fromEquipment.decrement(1);
-
-                    Item fromTemplate = smithingInventory.getTemplate().clone();
-                    Item toTemplate = fromTemplate.decrement(1);
 
                     Item fromResult = Item.get(Item.AIR);
                     Item toResult = smithingInventory.getResult().clone();
@@ -4148,14 +4147,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     action.oldItem = fromEquipment.clone();
                     action.newItem = toEquipment.clone();
                     fixedPacket.actions[1] = action;
-
-
-                    action = new NetworkInventoryAction();
-                    action.windowId = ContainerIds.UI;
-                    action.inventorySlot = SmithingInventory.SMITHING_TEMPLATE_UI_SLOT;
-                    action.oldItem = fromTemplate.clone();
-                    action.newItem = toTemplate.clone();
-                    fixedPacket.actions[2] = action;
 
                     int emptyPlayerSlot = -1;
                     for (int slot = 0; slot < inventory.getSize(); slot++) {
@@ -4199,14 +4190,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         action.newItem = fromIngredient.clone();
                         fixedPacket.actions[6] = action;
 
-                        action = new NetworkInventoryAction();
-                        action.sourceType = NetworkInventoryAction.SOURCE_TODO;
-                        action.windowId = NetworkInventoryAction.SOURCE_TYPE_ANVIL_MATERIAL;
-                        action.inventorySlot = 3; // template
-                        action.oldItem = toTemplate.clone();
-                        action.newItem = fromTemplate.clone();
-                        fixedPacket.actions[7] = action;
-
                         transactionPacket = fixedPacket;
                     }
                 }
@@ -4225,7 +4208,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (transactionPacket.isCraftingPart) {
-                    if (LoomTransaction.checkForItemPart(actions)) {
+                    if (LoomTransaction.isIn(actions)) {
                         if (this.loomTransaction == null) {
                             this.loomTransaction = new LoomTransaction(this, actions);
                         } else {
@@ -4254,7 +4237,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         try {
                             this.craftingTransaction.execute();
                         } catch (Exception e) {
-                            this.server.getLogger().debug("Executing crafting transaction failed");
+                            e.printStackTrace();
+                            this.server.getLogger().debug("Executing crafting transaction failed", e);
                         }
                         this.craftingTransaction = null;
                     }
@@ -4274,7 +4258,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     return;
                 } else if (this.protocol >= ProtocolInfo.v1_16_0 && transactionPacket.isRepairItemPart) {
                     Sound sound = null;
-                    if (SmithingTransaction.checkForItemPart(actions)) {
+                    if (SmithingTransaction.isIn(actions)) {
                         if (this.smithingTransaction == null) {
                             this.smithingTransaction = new SmithingTransaction(this, actions);
                         } else {
@@ -4345,7 +4329,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     }
                     return;
                 } else if (this.craftingTransaction != null) {
-                    MultiRecipe multiRecipe = Server.getInstance().getCraftingManager().getMultiRecipe(this, this.craftingTransaction.getPrimaryOutput(), this.craftingTransaction.getInputList());
+                    MultiRecipe multiRecipe = RecipeRegistry.getMultiRecipe(this, this.craftingTransaction.getPrimaryOutput(), this.craftingTransaction.getInputList());
                     if (craftingTransaction.checkForCraftingPart(actions) || multiRecipe != null) {
                         for (InventoryAction action : actions) {
                             craftingTransaction.addAction(action);
@@ -4384,7 +4368,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.repairItemTransaction = null;
                     }
                 } else if (this.protocol >= ProtocolInfo.v1_16_0 && this.smithingTransaction != null) {
-                    if (SmithingTransaction.checkForItemPart(actions)) {
+                    if (SmithingTransaction.isIn(actions)) {
                         for (InventoryAction action : actions) {
                             this.smithingTransaction.addAction(action);
                         }

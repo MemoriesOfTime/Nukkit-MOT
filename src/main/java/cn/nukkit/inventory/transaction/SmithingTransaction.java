@@ -111,7 +111,6 @@ public class SmithingTransaction extends InventoryTransaction {
 
         return equipment.equals(smithingInventory.getEquipment(), true, true)
                 && ingredient.equals(smithingInventory.getIngredient(), true, true)
-                && template.equals(smithingInventory.getTemplate(), true, true)
                 && outputItem.equals(smithingInventory.getResult(), true, true);
     }
 
@@ -161,7 +160,15 @@ public class SmithingTransaction extends InventoryTransaction {
         return outputItem == null? null : outputItem.clone();
     }
 
-    public static boolean checkForItemPart(List<InventoryAction> actions) {
+    public static boolean isIn(List<InventoryAction> actions) {
+        for (InventoryAction action : actions) {
+            if (action instanceof SmithingItemAction) return true;
+        }
+        return false;
+    }
+
+    @Override
+    public boolean checkForItemPart(List<InventoryAction> actions) {
         return actions.stream().anyMatch(it-> it instanceof SmithingItemAction);
     }
 }
