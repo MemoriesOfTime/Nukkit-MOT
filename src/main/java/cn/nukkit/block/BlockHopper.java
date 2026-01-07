@@ -208,14 +208,18 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
         void setTransferCooldown(int transferCooldown);
 
         default boolean pullItems() {
+            Vector3 up = this.getPosition().up();
+            BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(up);
+            return this.pullItems(blockEntity, this.getPosition().getLevel().getBlock(up));
+        }
+
+        default boolean pullItems(BlockEntity blockEntity, Block block) {
             Inventory inventory = this.getInventory();
 
             if (inventory.isFull()) {
                 return false;
             }
 
-            Vector3 up = this.getPosition().up();
-            BlockEntity blockEntity = this.getPosition().getLevel().getBlockEntity(up);
             if (blockEntity instanceof BlockEntityFurnace) {
                 FurnaceInventory inv = ((BlockEntityFurnace) blockEntity).getInventory();
                 Item item = inv.getResult();
@@ -277,7 +281,6 @@ public class BlockHopper extends BlockTransparentMeta implements Faceable, Block
                     }
                 }
             } else {
-                Block block = this.getPosition().getLevel().getBlock(up);
                 if (block instanceof BlockComposter composter) {
                     if (!composter.isFull()) {
                         return false;
