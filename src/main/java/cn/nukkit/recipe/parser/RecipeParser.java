@@ -43,7 +43,7 @@ public class RecipeParser {
             damage = item.get("auxValue").getAsInt();
         }
 
-        if(damage != 32767 && result.getDamage() == 0) result.setDamage(damage);
+        if(damage != 32767 && result.getDamage() == 0) result.setDamage(damage == -1 ? 0x7FFF : damage);
 
         return new DefaultDescriptor(result);
     }
