@@ -25,6 +25,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -334,6 +335,19 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         }
 
         this.blocksAround = null;
+        List<Entity> collidingEntities = List.of(this.level.getCollidingEntities(this.boundingBox.addCoord(dx, dy, dz)));
+
+        for (Entity entity : collidingEntities) {
+            if (entity instanceof EntityLiving && entity != this) {
+                double edx = this.x - entity.x;
+                double edz = this.z - entity.z;
+                double distance = Math.max(0.01, Math.sqrt(edx * edx + edz * edz));
+
+                double force = 0.15;
+                dx += (edx / distance) * force;
+                dz += (edz / distance) * force;
+            }
+        }
 
         double movX = dx * moveMultiplier;
         double movY = dy;

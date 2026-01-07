@@ -41,12 +41,12 @@ public class EntityDrowned extends EntityWalkingMob implements EntitySmite {
 
     @Override
     public float getWidth() {
-        return 0.6f;
+        return this.isBaby() ? 0.3f : 0.6f;
     }
 
     @Override
     public float getHeight() {
-        return 1.95f;
+        return this.isBaby() ? 0.95f : 1.9f;
     }
 
     @Override

@@ -6,7 +6,6 @@ import cn.nukkit.entity.passive.EntityLlama;
 import cn.nukkit.entity.passive.EntityPig;
 import cn.nukkit.entity.passive.EntitySkeletonHorse;
 import cn.nukkit.level.format.FullChunk;
-import cn.nukkit.level.particle.BubbleParticle;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
@@ -14,7 +13,16 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public abstract class EntityWalking extends BaseEntity {
+
+    private int collisionTicks = 0;
+    private Vector3 lastTarget = null;
+    private List<Vector3> currentPath = new ArrayList<>();
+    private int pathIndex = 0;
+    private int repathTicks = 0;
 
     public EntityWalking(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
@@ -58,26 +66,77 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
-        int x, z;
         if (this.stayTime > 0) {
             if (Utils.rand(1, 100) > 5) {
                 return;
             }
-            x = Utils.rand(10, 30);
-            z = Utils.rand(10, 30);
-            this.target = this.add(Utils.rand() ? x : -x, Utils.rand(-20.0, 20.0) / 10, Utils.rand() ? z : -z);
+
+            for (int attempts = 0; attempts < 10; attempts++) {
+                int x = Utils.rand(5, 15);
+                int z = Utils.rand(5, 15);
+                final int fX = Utils.rand() ? x : -x;
+                final double fY = Utils.rand(-10.0, 10.0) / 10;
+                final int fZ = Utils.rand() ? z : -z;
+
+                if (canReachPosition(this.add(fX, fY, fZ))) {
+                    this.target = this.add(fX, fY, fZ);
+                    break;
+                }
+            }
         } else if (Utils.rand(1, 100) == 1) {
-            x = Utils.rand(10, 30);
-            z = Utils.rand(10, 30);
-            this.stayTime = Utils.rand(100, 200);
-            this.target = this.add(Utils.rand() ? x : -x, Utils.rand(-20.0, 20.0) / 10, Utils.rand() ? z : -z);
+            for (int attempts = 0; attempts < 10; attempts++) {
+                int x = Utils.rand(5, 15);
+                int z = Utils.rand(5, 15);
+                final int fX = Utils.rand() ? x : -x;
+                final double fY = Utils.rand(-10.0, 10.0) / 10;
+                final int fZ = Utils.rand() ? z : -z;
+
+                if (canReachPosition(this.add(fX, fY, fZ))) {
+                    this.stayTime = Utils.rand(100, 200);
+                    this.target = this.add(fX, fY, fZ);
+                    break;
+                }
+            }
         } else if (this.moveTime <= 0 || this.target == null) {
-            x = Utils.rand(20, 100);
-            z = Utils.rand(20, 100);
-            this.stayTime = 0;
-            this.moveTime = Utils.rand(100, 200);
-            this.target = this.add(Utils.rand() ? x : -x, 0, Utils.rand() ? z : -z);
+            for (int attempts = 0; attempts < 10; attempts++) {
+                int x = Utils.rand(10, 20);
+                int z = Utils.rand(10, 20);
+                final int fX = Utils.rand() ? x : -x;
+                final int fZ = Utils.rand() ? z : -z;
+
+                if (canReachPosition(this.add(fX, 0, fZ))) {
+                    this.stayTime = 0;
+                    this.moveTime = Utils.rand(100, 200);
+                    this.target = this.add(fX, 0, fZ);
+                    break;
+                }
+            }
         }
+    }
+
+    private boolean canReachPosition(Vector3 pos) {
+        int x = NukkitMath.floorDouble(pos.x);
+        int y = NukkitMath.floorDouble(pos.y);
+        int z = NukkitMath.floorDouble(pos.z);
+
+        Block block = level.getBlock(x, y, z);
+        Block below = level.getBlock(x, y - 1, z);
+        Block above = level.getBlock(x, y + 1, z);
+
+        boolean isBelowWalkable = below.isSolid() || below instanceof BlockStairs || below instanceof BlockSlab;
+        boolean isBlockPassable = block.canPassThrough() || block instanceof BlockStairs || block instanceof BlockSlab;
+
+        if (isBlockPassable && isBelowWalkable && above.canPassThrough()) {
+            return true;
+        }
+
+        if (level.getBlock(x, y + 1, z).canPassThrough() &&
+                level.getBlock(x, y + 2, z).canPassThrough() &&
+                (block.isSolid() || block instanceof BlockStairs || block instanceof BlockSlab)) {
+            return true;
+        }
+
+        return false;
     }
 
     protected boolean checkJump(double dx, double dz) {
@@ -96,22 +155,50 @@ public abstract class EntityWalking extends BaseEntity {
             return false;
         }
 
-        Block that = this.getLevel().getBlock(new Vector3(NukkitMath.floorDouble(this.x + dx), (int) this.y, NukkitMath.floorDouble(this.z + dz)));
-        /*if (this.getDirection() == null) {
-            return false;
-        }*/
+        Block frontBlock = level.getBlock(new Vector3(
+                NukkitMath.floorDouble(this.x + dx),
+                (int) this.y,
+                NukkitMath.floorDouble(this.z + dz)
+        ));
 
+        if (frontBlock instanceof BlockStairs || frontBlock instanceof BlockSlab) {
+            if (this.motionY <= this.getGravity() * 4) {
+                this.motionY = this.getGravity() * 4;
+                return true;
+            }
+        }
+
+        Block that = this.getLevel().getBlock(new Vector3(NukkitMath.floorDouble(this.x + dx), (int) this.y, NukkitMath.floorDouble(this.z + dz)));
         Block block = that.getSide(this.getHorizontalFacing());
         Block down;
-        if (this.followTarget == null && this.passengers.isEmpty() && !(down = block.down()).isSolid() && !block.isSolid() && !down.down().isSolid()) {
-            // "hack": try to make mobs not to be so suicidal
-            this.stayTime = 10;
+
+        if (block instanceof BlockStairs || block instanceof BlockSlab) {
+            if (this.motionY <= this.getGravity() * 4) {
+                this.motionY = this.getGravity() * 4;
+            }
+            return true;
+        }
+
+        if (!block.canPassThrough() && block.up().canPassThrough() && that.up(2).canPassThrough()) {
+            if (this.motionY <= this.getGravity() * 4) {
+                this.motionY = this.getGravity() * 4;
+                return true;
+            }
+        }
+
+        down = block.down();
+        if (this.followTarget == null && this.passengers.isEmpty()) {
+            if (!down.isSolid() && !block.isSolid() && down.down().isSolid()) {
+                return true;
+            }
+
+            if (!down.isSolid() && !block.isSolid() && !down.down().isSolid()) {
+                this.stayTime = 10;
+            }
         } else if (!block.canPassThrough() && !(block instanceof BlockFlowable || block.getId() == BlockID.SOUL_SAND) && block.up().canPassThrough() && that.up(2).canPassThrough()) {
             if (block instanceof BlockFence || block instanceof BlockFenceGate) {
                 this.motionY = this.getGravity();
             } else if (this.motionY <= this.getGravity() * 4) {
-                this.motionY = this.getGravity() * 4;
-            } else if (block instanceof BlockStairs) {
                 this.motionY = this.getGravity() * 4;
             } else if (this.motionY <= (this.getGravity() * 8)) {
                 this.motionY = this.getGravity() * 8;
@@ -122,6 +209,7 @@ public abstract class EntityWalking extends BaseEntity {
         }
         return false;
     }
+
 
     @Override
     public Vector3 updateMove(int tickDiff) {
@@ -152,33 +240,37 @@ public abstract class EntityWalking extends BaseEntity {
                 onGround = false;
             }
 
-            if (this.getServer().getMobAiEnabled()) {
+            if (this.getServer().mobAiEnabled) {
                 if (this.followTarget != null && !this.followTarget.closed && this.followTarget.isAlive() && this.followTarget.canBeFollowed()) {
-                    double x = this.followTarget.x - this.x;
-                    double z = this.followTarget.z - this.z;
-
-                    double diff = Math.abs(x) + Math.abs(z);
-                    if (diff == 0 || !inWater && (this.stayTime > 0 || this.distance(this.followTarget) <= (this.getWidth() / 2 + 0.05))) {
-                        this.motionX = 0;
-                        this.motionZ = 0;
-                    } else {
-                        if (levelBlock.getId() == BlockID.WATER) {
-                            BlockWater blockWater = (BlockWater) levelBlock;
-                            Vector3 flowVector = blockWater.getFlowVector();
-                            motionX = flowVector.getX() * .05;
-                            motionZ = flowVector.getZ() * .05;
-                        } else if (levelBlock.getId() == BlockID.STILL_WATER) {
-                            this.motionX = this.getSpeed() * moveMultiplier * 0.05 * (x / diff);
-                            this.motionZ = this.getSpeed() * moveMultiplier * 0.05 * (z / diff);
-                            if (!(this.isDrowned || this instanceof EntityIronGolem || this instanceof EntitySkeletonHorse)) {
-                                this.level.addParticle(new BubbleParticle(this.add(Utils.rand(-2.0, 2.0), Utils.rand(-0.5, 0), Utils.rand(-2.0, 2.0))));
+                    if (!this.currentPath.isEmpty() && this.pathIndex < this.currentPath.size()) {
+                        Vector3 nextPoint = this.currentPath.get(this.pathIndex);
+                        if (this.distance(nextPoint) < 1.0) {
+                            this.pathIndex++;
+                            if (this.pathIndex >= this.currentPath.size()) {
+                                this.currentPath.clear();
+                                this.pathIndex = 0;
                             }
                         } else {
-                            this.motionX = this.getSpeed() * moveMultiplier * 0.1 * (x / diff);
-                            this.motionZ = this.getSpeed() * moveMultiplier * 0.1 * (z / diff);
+                            double x = nextPoint.x - this.x;
+                            double z = nextPoint.z - this.z;
+                            double diff = Math.abs(x) + Math.abs(z);
+                            if (diff > 0) {
+                                this.motionX = this.getSpeed() * moveMultiplier * 0.15 * (x / diff);
+                                this.motionZ = this.getSpeed() * moveMultiplier * 0.15 * (z / diff);
+                                this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
+                            }
                         }
-                    }
-                    if ((this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && (this.stayTime <= 0 || Utils.rand()) && diff != 0) {
+                    } else {
+                        double x = this.followTarget.x - this.x;
+                        double z = this.followTarget.z - this.z;
+                        double diff = Math.abs(x) + Math.abs(z);
+                        if (diff == 0 || !inWater && (this.stayTime > 0 || this.distance(this.followTarget) <= (this.getWidth() / 2 + 0.05))) {
+                            this.motionX = 0;
+                            this.motionZ = 0;
+                        } else {
+                            this.motionX = this.getSpeed() * moveMultiplier * 0.15 * (x / diff);
+                            this.motionZ = this.getSpeed() * moveMultiplier * 0.15 * (z / diff);
+                        }
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
                     }
                     return this.followTarget;
@@ -189,31 +281,14 @@ public abstract class EntityWalking extends BaseEntity {
                 if (this.target instanceof EntityCreature || before != this.target) {
                     double x = this.target.x - this.x;
                     double z = this.target.z - this.z;
-
                     double diff = Math.abs(x) + Math.abs(z);
                     boolean distance = false;
                     if (diff == 0 || !inWater && (this.stayTime > 0 || (this.distance(this.target) <= (this.getWidth() / 2 + 0.05) * nearbyDistanceMultiplier()))) {
                         this.motionX = 0;
                         this.motionZ = 0;
                     } else {
-                        if (levelBlock.getId() == BlockID.WATER) {
-                            BlockWater blockWater = (BlockWater) levelBlock;
-                            Vector3 flowVector = blockWater.getFlowVector();
-                            motionX = flowVector.getX() * .05;
-                            motionZ = flowVector.getZ() * .05;
-                        } else if (levelBlock.getId() == BlockID.STILL_WATER) {
-                            this.motionX = this.getSpeed() * moveMultiplier * 0.05 * (x / diff);
-                            this.motionZ = this.getSpeed() * moveMultiplier * 0.05 * (z / diff);
-                            if (!(this.isDrowned || this instanceof EntityIronGolem || this instanceof EntitySkeletonHorse)) {
-                                this.level.addParticle(new BubbleParticle(this.add(Utils.rand(-2.0, 2.0), Utils.rand(-0.5, 0), Utils.rand(-2.0, 2.0))));
-                            } else if (this.followTarget != null) {
-                                double y = this.followTarget.y - this.y;
-                                this.motionY = this.getSpeed() * moveMultiplier * 0.05 * (y / (diff + Math.abs(y)));
-                            }
-                        } else {
-                            this.motionX = this.getSpeed() * moveMultiplier * 0.15 * (x / diff);
-                            this.motionZ = this.getSpeed() * moveMultiplier * 0.15 * (z / diff);
-                        }
+                        this.motionX = this.getSpeed() * moveMultiplier * 0.15 * (x / diff);
+                        this.motionZ = this.getSpeed() * moveMultiplier * 0.15 * (z / diff);
                     }
                     if (!distance && (this.passengers.isEmpty() || this instanceof EntityLlama || this instanceof EntityPig) && (this.stayTime <= 0 || Utils.rand()) && diff != 0) {
                         this.setBothYaw(FastMath.toDegrees(-FastMath.atan2(x / diff, z / diff)));
@@ -245,12 +320,7 @@ public abstract class EntityWalking extends BaseEntity {
                         this.motionY -= this.getGravity();
                     }
                 } else {
-                    if ((this.isDrowned || this instanceof EntityIronGolem || this instanceof EntitySkeletonHorse) && this.isInsideOfWater() && this.motionY < 0) {
-                        this.motionY = this.getGravity() * -0.3;
-                        this.stayTime = 40;
-                    } else {
-                        this.motionY -= this.getGravity();
-                    }
+                    this.motionY -= this.getGravity();
                 }
             }
 

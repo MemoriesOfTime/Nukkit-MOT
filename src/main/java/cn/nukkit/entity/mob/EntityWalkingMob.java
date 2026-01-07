@@ -16,14 +16,9 @@ import java.util.Optional;
 public abstract class EntityWalkingMob extends EntityWalking implements EntityMob {
 
     private int[] minDamage;
-
     private int[] maxDamage;
 
     private boolean canAttack = true;
-
-    /**
-     * For golems: entity id of the target
-     */
     public long isAngryTo = -1;
 
     public EntityWalkingMob(FullChunk chunk, CompoundTag nbt) {
@@ -155,6 +150,7 @@ public abstract class EntityWalkingMob extends EntityWalking implements EntityMo
         }
     }
 
+
     @Override
     public boolean onUpdate(int currentTick) {
         if (this.closed) {
@@ -177,6 +173,10 @@ public abstract class EntityWalkingMob extends EntityWalking implements EntityMo
         int tickDiff = currentTick - this.lastUpdate;
         this.lastUpdate = currentTick;
         this.entityBaseTick(tickDiff);
+
+        if (this.target != null) {
+            this.pushEntities();
+        }
 
         Vector3 target = this.updateMove(tickDiff);
         if (Objects.nonNull(target)) {
@@ -202,5 +202,27 @@ public abstract class EntityWalkingMob extends EntityWalking implements EntityMo
         return this.getServer().getMobAiEnabled() &&
                 target instanceof EntityCreature &&
                 (!this.isFriendly() || !(target instanceof Player) || ((Entity) target).getId() == this.isAngryTo);
+    }
+
+    protected void pushEntities() {
+        double radius = 1.5;
+
+        for (Entity entity : this.level.getNearbyEntities(this.boundingBox.grow(radius, 0.5, radius), this)) {
+            if (entity instanceof EntityWalkingMob && entity != this && entity.isAlive()) {
+                double dx = this.x - entity.x;
+                double dz = this.z - entity.z;
+                double distance = Math.sqrt(dx * dx + dz * dz);
+
+                if (distance < 0.01) continue;
+
+                double strength = 0.15;
+                double force = strength * (1.0 - (distance / radius));
+
+                dx /= distance;
+                dz /= distance;
+
+                entity.addMotion(dx * force, 0, dz * force);
+            }
+        }
     }
 }
