@@ -9,6 +9,8 @@ import cn.nukkit.inventory.Fuel;
 import cn.nukkit.inventory.ItemTag;
 import cn.nukkit.item.RuntimeItemMapping.RuntimeEntry;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.item.material.ItemType;
+import cn.nukkit.item.material.ItemTypes;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
@@ -74,6 +76,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     protected Block block = null;
     protected final int id;
+    protected ItemType type;
     protected int meta;
     protected boolean hasMeta = true;
     private byte[] tags = new byte[0];
@@ -1947,6 +1950,27 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             return ItemLockMode.values()[tag.getByte("minecraft:item_lock")];
         }
         return ItemLockMode.NONE;
+    }
+
+    public ItemType getItemType() {
+        if (this.type != null) {
+            return this.type;
+        }
+
+        if (this instanceof StringItem stringItem) {
+            this.type = ItemTypes.get(stringItem.getNamespaceId());
+        } else {
+            var mappings = RuntimeItems.getMapping(ProtocolInfo.CURRENT_PROTOCOL);
+            var entry = mappings.toRuntime(this.getId(), this.getDamage());
+            this.type = ItemTypes.get(entry.getIdentifier());
+        }
+
+        // Throw an exception if for some reason the type cannot be determined.
+        if (this.type == null) {
+            throw new IllegalStateException("Failed to initialize item type " + this.getName() + ": " + this.getId() + ":" + this.getDamage());
+        }
+
+        return this.type;
     }
 
     public enum ItemLockMode {

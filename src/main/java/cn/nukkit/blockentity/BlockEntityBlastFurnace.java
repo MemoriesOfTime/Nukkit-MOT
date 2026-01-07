@@ -2,10 +2,11 @@ package cn.nukkit.blockentity;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.inventory.InventoryType;
-import cn.nukkit.inventory.SmeltingRecipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.recipe.RecipeRegistry;
+import cn.nukkit.recipe.SmeltingRecipe;
 
 public class BlockEntityBlastFurnace extends BlockEntityFurnace {
 
@@ -40,7 +41,7 @@ public class BlockEntityBlastFurnace extends BlockEntityFurnace {
 
     @Override
     protected SmeltingRecipe matchRecipe(int protocol, Item raw) {
-        return this.server.getCraftingManager().matchBlastFurnaceRecipe(raw);
+        return RecipeRegistry.matchBlastFurnaceRecipe(raw);
     }
 
     @Override

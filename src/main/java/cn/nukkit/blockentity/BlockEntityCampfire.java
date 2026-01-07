@@ -7,7 +7,6 @@ import cn.nukkit.block.BlockCampfire;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.event.inventory.CampfireSmeltEvent;
 import cn.nukkit.inventory.CampfireInventory;
-import cn.nukkit.inventory.CampfireRecipe;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.inventory.InventoryType;
 import cn.nukkit.item.Item;
@@ -15,6 +14,8 @@ import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
+import cn.nukkit.recipe.RecipeRegistry;
+import cn.nukkit.recipe.impl.CampfireRecipe;
 
 import java.util.HashSet;
 import java.util.concurrent.ThreadLocalRandom;
@@ -64,7 +65,7 @@ public class BlockEntityCampfire extends BlockEntitySpawnable implements Invento
             } else if (!keepItem[slot]) {
                 CampfireRecipe recipe = recipes[slot];
                 if (recipe == null) {
-                    recipe = this.server.getCraftingManager().matchCampfireRecipe(item);
+                    recipe = RecipeRegistry.matchCampfireRecipe(item);
                     if (recipe == null) {
                         inventory.setItem(slot, Item.get(0));
                         ThreadLocalRandom random = ThreadLocalRandom.current();

@@ -16,6 +16,9 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.ContainerSetDataPacket;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
+import cn.nukkit.recipe.RecipeRegistry;
+import cn.nukkit.recipe.impl.ContainerRecipe;
+import cn.nukkit.recipe.impl.MixRecipe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -272,18 +275,18 @@ public class BlockEntityBrewingStand extends BlockEntitySpawnable implements Inv
     }
 
     private MixRecipe[] matchRecipes(boolean quickTest) {
-        MixRecipe[] recipes = new MixRecipe[quickTest? 1 : 3];
+        MixRecipe[] recipes = new MixRecipe[quickTest ? 1 : 3];
         Item ingredient = inventory.getIngredient();
-        CraftingManager craftingManager = getLevel().getServer().getCraftingManager();
+
         for (int i = 0; i < 3; i++) {
             Item potion = inventory.getItem(i + 1);
             if (potion.isNull()) {
                 continue;
             }
 
-            MixRecipe recipe = craftingManager.matchBrewingRecipe(ingredient, potion);
+            MixRecipe recipe = RecipeRegistry.matchBrewingRecipe(ingredient, potion);
             if (recipe == null) {
-                recipe = craftingManager.matchContainerRecipe(ingredient, potion);
+                recipe = RecipeRegistry.matchContainerRecipe(ingredient, potion);
             }
             if (recipe == null) {
                 continue;

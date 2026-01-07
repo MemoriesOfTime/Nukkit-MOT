@@ -111,7 +111,6 @@ public class SmithingTransaction extends InventoryTransaction {
 
         return equipment.equals(smithingInventory.getEquipment(), true, true)
                 && ingredient.equals(smithingInventory.getIngredient(), true, true)
-                && template.equals(smithingInventory.getTemplate(), true, true)
                 && outputItem.equals(smithingInventory.getResult(), true, true);
     }
 

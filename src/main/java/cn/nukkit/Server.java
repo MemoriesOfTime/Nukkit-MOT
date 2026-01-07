@@ -22,8 +22,6 @@ import cn.nukkit.event.level.LevelLoadEvent;
 import cn.nukkit.event.server.PlayerDataSerializeEvent;
 import cn.nukkit.event.server.QueryRegenerateEvent;
 import cn.nukkit.event.server.ServerStopEvent;
-import cn.nukkit.inventory.CraftingManager;
-import cn.nukkit.inventory.Recipe;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItemMapping;
 import cn.nukkit.item.RuntimeItems;
@@ -72,6 +70,7 @@ import cn.nukkit.plugin.service.NKServiceManager;
 import cn.nukkit.plugin.service.ServiceManager;
 import cn.nukkit.potion.Effect;
 import cn.nukkit.potion.Potion;
+import cn.nukkit.recipe.RecipeRegistry;
 import cn.nukkit.resourcepacks.ResourcePackManager;
 import cn.nukkit.resourcepacks.loader.JarPluginResourcePackLoader;
 import cn.nukkit.resourcepacks.loader.ZippedResourcePackLoader;
@@ -150,7 +149,6 @@ public class Server {
     private final ConsoleThread consoleThread;
 
     private final SimpleCommandMap commandMap;
-    private final CraftingManager craftingManager;
     private final ResourcePackManager resourcePackManager;
     private final ConsoleCommandSender consoleSender;
     private final IScoreboardManager scoreboardManager;
@@ -717,6 +715,8 @@ public class Server {
         DispenseBehaviorRegister.init();
         GlobalBlockPalette.getOrCreateRuntimeId(ProtocolInfo.CURRENT_PROTOCOL, 0, 0);
 
+        RecipeRegistry.init();
+
         // Convert legacy data before plugins get the chance to mess with it
         try {
             nameLookup = Iq80DBFactory.factory.open(new File(dataPath, "players"), new Options()
@@ -732,7 +732,6 @@ public class Server {
 
         this.serverID = UUID.randomUUID();
 
-        this.craftingManager = new CraftingManager();
         this.resourcePackManager = new ResourcePackManager(
                 new ZippedResourcePackLoader(new File(Nukkit.DATA_PATH, "resource_packs")),
                 new JarPluginResourcePackLoader(new File(this.pluginPath))
@@ -831,6 +830,8 @@ public class Server {
         if (loadPlugins) {
             this.enablePlugins(PluginLoadOrder.POSTWORLD);
         }
+
+        RecipeRegistry.buildPackets();
 
         EntityProperty.init();
         EntityProperty.buildPacket();
@@ -1343,7 +1344,7 @@ public class Server {
     }
 
     public void sendRecipeList(Player player) {
-        BatchPacket cachedPacket = this.craftingManager.getCachedPacket(player.protocol);
+        BatchPacket cachedPacket = RecipeRegistry.getPacket(player.protocol);
         if (cachedPacket != null) { // Don't send recipes if they wouldn't work anyways
             player.dataPacket(cachedPacket);
         }
@@ -1742,10 +1743,6 @@ public class Server {
         return this.pluginManager;
     }
 
-    public CraftingManager getCraftingManager() {
-        return craftingManager;
-    }
-
     public ResourcePackManager getResourcePackManager() {
         return resourcePackManager;
     }
@@ -1808,10 +1805,6 @@ public class Server {
 
     public int getOnlinePlayersCount() {
         return this.playerList.size();
-    }
-
-    public void addRecipe(Recipe recipe) {
-        this.craftingManager.registerRecipe(recipe);
     }
 
     public Optional<Player> getPlayer(UUID uuid) {

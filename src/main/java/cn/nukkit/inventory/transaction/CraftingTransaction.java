@@ -11,8 +11,14 @@ import cn.nukkit.network.protocol.ContainerClosePacket;
 import cn.nukkit.network.protocol.types.ContainerIds;
 import cn.nukkit.network.protocol.types.inventory.ContainerType;
 import cn.nukkit.plugin.InternalPlugin;
+import cn.nukkit.recipe.*;
+import cn.nukkit.recipe.descriptor.DefaultDescriptor;
+import cn.nukkit.recipe.descriptor.ItemDescriptor;
+import cn.nukkit.recipe.impl.MultiRecipe;
+import cn.nukkit.recipe.impl.SmithingRecipe;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -48,7 +54,7 @@ public class CraftingTransaction extends InventoryTransaction {
     public void setInput(Item item) {
         if (inputs.size() < gridSize * gridSize) {
             for (Item existingInput : this.inputs) {
-                if (existingInput.equals(item, item.hasMeta(), item.hasCompoundTag())) {
+                if (new DefaultDescriptor(existingInput).equals(new DefaultDescriptor(item))) {
                     existingInput.setCount(existingInput.getCount() + item.getCount());
                     return;
                 }
@@ -59,8 +65,12 @@ public class CraftingTransaction extends InventoryTransaction {
         }
     }
 
-    public List<Item> getInputList() {
-        return inputs;
+    public Collection<ItemDescriptor> getInputList() {
+        Collection<ItemDescriptor> list = new ArrayList<>();
+        for(Item item : inputs) {
+            list.add(new DefaultDescriptor(item));
+        }
+        return list;
     }
 
     public void setExtraOutput(Item item) {
@@ -98,23 +108,22 @@ public class CraftingTransaction extends InventoryTransaction {
 
     @Override
     public boolean canExecute() {
-        CraftingManager craftingManager = source.getServer().getCraftingManager();
         Inventory inventory;
         if (craftingType == Player.CRAFTING_SMITHING) {
             inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
             if (inventory instanceof SmithingInventory smithingInventory) {
                 addInventory(inventory);
                 SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
-                if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment(), smithingInventory.getTemplate()), true, true)) {
+                if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment()), true, true)) {
                     setTransactionRecipe(smithingRecipe);
                 }
             }
         } else {
-            MultiRecipe multiRecipe = craftingManager.getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
+            MultiRecipe multiRecipe = RecipeRegistry.getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
             if (multiRecipe != null) {
                 setTransactionRecipe(multiRecipe.toRecipe(this.getPrimaryOutput(), this.getInputList()));
             } else {
-                setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
+                setTransactionRecipe(RecipeRegistry.matchRecipe(inputs, this.primaryOutput, this.secondaryOutputs));
             }
         }
         return this.getTransactionRecipe() != null && super.canExecute();
@@ -142,43 +151,18 @@ public class CraftingTransaction extends InventoryTransaction {
          * So people don't whine about messy desync issues when someone cancels CraftItemEvent, or when a crafting
          * transaction goes wrong.
          */
-        ContainerClosePacket pk = new ContainerClosePacket();
-        pk.windowId = ContainerIds.NONE;
-        pk.wasServerInitiated = true;
-        pk.type = ContainerType.NONE;
-        source.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> source.dataPacket(pk), 20);
+        ContainerClosePacket packet = new ContainerClosePacket();
+        packet.windowId = ContainerIds.NONE;
+        packet.wasServerInitiated = true;
+        packet.type = ContainerType.NONE;
+        source.getServer().getScheduler().scheduleDelayedTask(InternalPlugin.INSTANCE, () -> source.dataPacket(packet), 20);
 
         this.source.resetCraftingGridType();
     }
 
-    @Override
-    public boolean execute() {
-        if (super.execute()) {
-            if (Server.getInstance().achievementsEnabled) {
-                switch (this.primaryOutput.getId()) {
-                    case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
-                    case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
-                    case Item.FURNACE -> source.awardAchievement("buildFurnace");
-                    case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
-                    case Item.BREAD -> source.awardAchievement("makeBread");
-                    case Item.CAKE -> source.awardAchievement("bakeCake");
-                    case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
-                        Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
-                    case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
-                    case Item.DIAMOND -> source.awardAchievement("diamond");
-                }
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
     public boolean checkForCraftingPart(List<InventoryAction> actions) {
         for (InventoryAction action : actions) {
-            if (action instanceof SlotChangeAction) {
-                SlotChangeAction slotChangeAction = (SlotChangeAction) action;
+            if (action instanceof SlotChangeAction slotChangeAction) {
                 if (slotChangeAction.getInventory().getType() == InventoryType.UI) {
                     if (slotChangeAction.getSlot() == 50) {
                         if (!slotChangeAction.getSourceItem().equals(slotChangeAction.getTargetItem())) {
