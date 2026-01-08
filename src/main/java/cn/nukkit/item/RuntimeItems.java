@@ -270,6 +270,14 @@ public class RuntimeItems {
         return legacyString2LegacyInt.getOrDefault(identifier, -1);
     }
 
+    /**
+     * Register a custom block's identifier to legacy ID mapping
+     * This is needed for Item.fromString() to work with custom blocks
+     */
+    public static void registerCustomBlockLegacyId(String identifier, int legacyId) {
+        legacyString2LegacyInt.put(identifier, legacyId);
+    }
+
     @Data
     public static class MappingEntry {
         private final String legacyName;

@@ -14,6 +14,7 @@ import cn.nukkit.block.custom.properties.BlockProperties;
 import cn.nukkit.block.custom.properties.BlockProperty;
 import cn.nukkit.block.custom.properties.EnumBlockProperty;
 import cn.nukkit.block.custom.properties.exception.InvalidBlockPropertyMetaException;
+import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItemMapping;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.BlockPalette;
@@ -24,11 +25,13 @@ import cn.nukkit.level.format.leveldb.NukkitLegacyMapper;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.objects.*;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.nbt.*;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.nio.ByteOrder;
@@ -148,6 +151,9 @@ public class CustomBlockManager {
 
         int itemId = 255 - nukkitId;
 
+        // Register custom block to RuntimeItems so Item.fromString() can find it
+        RuntimeItems.registerCustomBlockLegacyId(identifier, itemId);
+
         if (properties != null) {
             BlockProperties finalProperties = properties;
             variantGenerations(properties, properties.getNames().toArray(new String[0]))
@@ -244,6 +250,51 @@ public class CustomBlockManager {
 
         log.info("Custom block registry closed in {}ms", (System.currentTimeMillis() - startTime));
         return result;
+    }
+
+    /**
+     * Automatically adds all registered custom blocks to creative inventory for all game versions
+     * This should be called AFTER Item.initCreativeItems() to avoid being cleared
+     */
+    public static void addCustomBlocksToCreativeInventory() {
+        CustomBlockManager manager = CustomBlockManager.get();
+        // Collect unique custom block identifiers (only default state with meta=0)
+        Set<String> addedBlocks = new HashSet<>();
+
+        for (CustomBlockState state : manager.legacy2CustomState.values()) {
+            String identifier = state.getIdentifier();
+            int meta = state.getLegacyId() & Block.DATA_MASK;
+
+            // Only add the default state (meta=0) to creative inventory
+            if (meta == 0 && !addedBlocks.contains(identifier)) {
+                addedBlocks.add(identifier);
+
+                // Create an item for this custom block
+                int blockId = state.getLegacyId() >> Block.DATA_BITS;
+                int itemId = 255 - blockId;  // Calculate negative itemId for custom blocks
+                Item item = Item.get(itemId, 0, 1);
+
+                // Add to creative inventory for all supported game versions
+                for (GameVersion gameVersion : GameVersion.values()) {
+                    int protocol = gameVersion.getProtocol();
+                    if (protocol >= ProtocolInfo.v1_16_100 && protocol >= manager.server.minimumProtocol) {
+                        try {
+                            // Add to CONSTRUCTION or ITEMS category
+                            Item.addCreativeItem(gameVersion, item.clone(), CreativeItemCategory.CONSTRUCTION, "");
+                        } catch (Exception e) {
+                            // Ignore if this version doesn't support creative items
+                            log.debug("Failed to add custom block {} to creative inventory for protocol {}", identifier, protocol);
+                        }
+                    }
+                }
+
+                log.debug("Added custom block {} to creative inventory", identifier);
+            }
+        }
+
+        if (!addedBlocks.isEmpty()) {
+            log.info("Added {} custom blocks to creative inventory", addedBlocks.size());
+        }
     }
 
     private void recreateBlockPalette(BlockPalette palette) throws IOException {
@@ -370,6 +421,7 @@ public class CustomBlockManager {
         return this.getBinPath().resolve("vanilla_palette_" + version.getProtocol() + ".nbt");
     }
 
+    @Nullable
     public Block getBlock(int legacyId) {
         CustomBlockState state = this.legacy2CustomState.get(legacyId);
         if (state == null) {
