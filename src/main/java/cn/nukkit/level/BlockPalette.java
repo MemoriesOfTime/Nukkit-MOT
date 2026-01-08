@@ -8,6 +8,7 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Config;
+import cn.nukkit.utils.Hash;
 import cn.nukkit.utils.Utils;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -34,6 +35,8 @@ public class BlockPalette {
     private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
     private final Int2IntMap stateHashToLegacy = new Int2IntOpenHashMap();
+    private final Int2IntMap legacyToNetworkId = new Int2IntOpenHashMap();
+    private final Int2IntMap networkIdToLegacy = new Int2IntOpenHashMap();
 
     private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
@@ -50,6 +53,8 @@ public class BlockPalette {
 
         legacyToRuntimeId.defaultReturnValue(-1);
         runtimeIdToLegacy.defaultReturnValue(-1);
+        legacyToNetworkId.defaultReturnValue(-1);
+        networkIdToLegacy.defaultReturnValue(-1);
 
         loadBlockStates(paletteFor(protocol));
         loadBlockStatesExtras();
@@ -148,6 +153,8 @@ public class BlockPalette {
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
         this.stateHashToLegacy.clear();
+        this.legacyToNetworkId.clear();
+        this.networkIdToLegacy.clear();
     }
 
     public void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
@@ -158,7 +165,10 @@ public class BlockPalette {
         int legacyId = blockId << Block.DATA_BITS | data;
         this.legacyToRuntimeId.put(legacyId, runtimeId);
         this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
-        this.stateHashToLegacy.putIfAbsent(blockState.hashCode(), legacyId);
+        int stateHash = Hash.hashBlock(blockState);
+        this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
+        this.legacyToNetworkId.putIfAbsent(legacyId, stateHash);
+        this.networkIdToLegacy.putIfAbsent(stateHash, legacyId);
 
         // Hack: Map IDs for item frame up & down states
         if (blockId == BlockID.ITEM_FRAME_BLOCK || blockId == BlockID.GLOW_FRAME) {
@@ -212,8 +222,35 @@ public class BlockPalette {
         return runtimeIdToLegacy.get(runtimeId);
     }
 
+    public int getLegacyFullIdFromNetworkId(int networkId) {
+        return networkIdToLegacy.get(networkId);
+    }
+
     public int getLegacyFullId(CompoundTag compoundTag) {
-        return stateHashToLegacy.getOrDefault(compoundTag.hashCode(), -1);
+        return stateHashToLegacy.getOrDefault(Hash.hashBlock(compoundTag), -1);
+    }
+
+    public int getNetworkId(int id, int meta) {
+        int legacyId = protocol >= 388 ? ((id << Block.DATA_BITS) | meta) : ((id << 4) | meta);
+        int networkId = legacyToNetworkId.get(legacyId);
+        if (networkId == -1) {
+            networkId = legacyToNetworkId.get(id << Block.DATA_BITS);
+            if (networkId == -1) {
+                networkId = legacyToNetworkId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
+            }
+        }
+        return networkId;
+    }
+
+    public int getNetworkId(int legacyId) {
+        int networkId = legacyToNetworkId.get(legacyId);
+        if (networkId == -1) {
+            networkId = legacyToNetworkId.get(legacyId & (Block.DATA_MASK << Block.DATA_BITS));
+            if (networkId == -1) {
+                networkId = legacyToNetworkId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
+            }
+        }
+        return networkId;
     }
 
 }

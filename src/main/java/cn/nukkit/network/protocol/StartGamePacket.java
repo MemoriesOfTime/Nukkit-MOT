@@ -411,6 +411,9 @@ public class StartGamePacket extends DataPacket {
                             if (protocol >= ProtocolInfo.v1_19_20) {
                                 this.putBoolean(this.clientSideGenerationEnabled);
                                 if (protocol >= ProtocolInfo.v1_19_80) {
+                                    if (CustomBlockManager.get().hasCustomBlocks()) {
+                                        this.blockNetworkIdsHashed = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(this.gameVersion);
+                                    }
                                     this.putBoolean(this.blockNetworkIdsHashed);
                                     if (protocol >= ProtocolInfo.v1_20_0_23) {
                                         if (protocol >= ProtocolInfo.v1_21_100 && protocol < ProtocolInfo.v1_21_130_28) {

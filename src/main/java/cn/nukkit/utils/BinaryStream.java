@@ -747,7 +747,9 @@ public class BinaryStream {
         //TODO 在1.21.30会得到错误数据
         if (protocolId < ProtocolInfo.v1_19_0_31) {
             if (id != null && id < 256 && id != 166) { // ItemBlock
-                int fullId = GlobalBlockPalette.getLegacyFullId(gameVersion, blockRuntimeId);
+                int fullId = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(gameVersion)
+                        ? GlobalBlockPalette.getLegacyFullIdFromNetworkId(gameVersion, blockRuntimeId)
+                        : GlobalBlockPalette.getLegacyFullId(gameVersion, blockRuntimeId);
                 if (fullId != -1) {
                     damage = fullId & Block.DATA_MASK;
                 }

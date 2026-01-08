@@ -210,6 +210,7 @@ public class CustomBlockManager {
         if (this.legacy2CustomState.isEmpty()) {
             return false;
         }
+        GlobalBlockPalette.setUseHashedBlockNetworkIds(true);
 
         long startTime = System.currentTimeMillis();
 
@@ -417,6 +418,10 @@ public class CustomBlockManager {
 
     public Collection<CustomBlockDefinition> getBlockDefinitions() {
         return Collections.unmodifiableCollection(this.blockDefinitions.values());
+    }
+
+    public boolean hasCustomBlocks() {
+        return !this.blockDefinitions.isEmpty();
     }
 
     private static int legacyToFullId(int legacyId) {

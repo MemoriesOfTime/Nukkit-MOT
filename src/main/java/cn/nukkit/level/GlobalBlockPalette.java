@@ -29,6 +29,7 @@ public class GlobalBlockPalette {
 
     private static final Gson GSON = new Gson();
     private static boolean initialized;
+    private static volatile boolean useHashedBlockNetworkIds;
 
     private static final AtomicInteger runtimeIdAllocator282 = new AtomicInteger(0);
     private static final AtomicInteger runtimeIdAllocator291 = new AtomicInteger(0);
@@ -515,7 +516,11 @@ public class GlobalBlockPalette {
     public static int getOrCreateRuntimeId(GameVersion gameVersion, int id, int meta) {
         int protocol = gameVersion.getProtocol();
         if (protocol >= ProtocolInfo.v1_16_100) {
-            return getPaletteByProtocol(gameVersion).getRuntimeId(id, meta);
+            BlockPalette palette = getPaletteByProtocol(gameVersion);
+            if (shouldUseHashedBlockNetworkIds(gameVersion)) {
+                return palette.getNetworkId(id, meta);
+            }
+            return palette.getRuntimeId(id, meta);
         }
 
         if (protocol < 223) throw new IllegalArgumentException("Tried to get block runtime id for unsupported protocol version: " + protocol);
@@ -700,6 +705,14 @@ public class GlobalBlockPalette {
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }
 
+    public static int getLegacyFullIdFromNetworkId(GameVersion protocolId, int networkId) {
+        BlockPalette blockPalette = getPaletteByProtocol(protocolId);
+        if (blockPalette != null) {
+            return blockPalette.getLegacyFullIdFromNetworkId(networkId);
+        }
+        throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
+    }
+
     @Deprecated
     public static int getLegacyFullId(int protocolId, CompoundTag compoundTag) {
         BlockPalette blockPalette = getPaletteByProtocol(protocolId);
@@ -715,6 +728,32 @@ public class GlobalBlockPalette {
             return blockPalette.getLegacyFullId(compoundTag);
         }
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
+    }
+
+    public static int getOrCreateNetworkId(GameVersion gameVersion, int id, int meta) {
+        if (shouldUseHashedBlockNetworkIds(gameVersion)) {
+            return getPaletteByProtocol(gameVersion).getNetworkId(id, meta);
+        }
+        return getOrCreateRuntimeId(gameVersion, id, meta);
+    }
+
+    public static int getOrCreateNetworkId(GameVersion gameVersion, int legacyId) throws NoSuchElementException {
+        if (shouldUseHashedBlockNetworkIds(gameVersion)) {
+            return getPaletteByProtocol(gameVersion).getNetworkId(legacyId);
+        }
+        return getOrCreateRuntimeId(gameVersion, legacyId);
+    }
+
+    public static boolean shouldUseHashedBlockNetworkIds(GameVersion gameVersion) {
+        return useHashedBlockNetworkIds && gameVersion.getProtocol() >= ProtocolInfo.v1_19_80;
+    }
+
+    public static boolean useHashedBlockNetworkIds() {
+        return useHashedBlockNetworkIds;
+    }
+
+    public static void setUseHashedBlockNetworkIds(boolean enabled) {
+        useHashedBlockNetworkIds = enabled;
     }
 
     public static int getOrCreateRuntimeId(int legacyId) throws NoSuchElementException {
