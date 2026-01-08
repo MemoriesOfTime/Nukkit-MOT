@@ -398,6 +398,10 @@ public interface ProtocolInfo {
      * @since v818
      */
     int SERVER_SCRIPT_DEBUG_DRAWER_PACKET = 328;
+    /**
+     * @since v818
+     */
+    int DEBUG_DRAWER_PACKET = 328;
 
     @OnlyNetEase
     int PACKET_CONFIRM_SKIN = 0xe4;

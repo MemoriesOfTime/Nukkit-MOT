@@ -616,6 +616,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.SET_MOVEMENT_AUTHORITY_PACKET, SetMovementAuthorityPacket.class)
                 .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PRESETS_PACKET, CameraAimAssistPresetsPacket.class)
                 .registerPacket(ProtocolInfo.CLIENT_CAMERA_AIM_ASSIST_PACKET, ClientCameraAimAssistPacket.class)
+                .registerPacket(ProtocolInfo.DEBUG_DRAWER_PACKET, DebugDrawerPacket.class)
 
                 // NetEase
                 .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)

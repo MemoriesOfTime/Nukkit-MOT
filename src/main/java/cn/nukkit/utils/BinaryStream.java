@@ -272,6 +272,10 @@ public class BinaryStream {
         this.put(new byte[]{b});
     }
 
+    public void putByte(int b) {
+        putByte((byte) b);
+    }
+
     /**
      * Reads a list of Attributes from the stream.
      *
@@ -1651,11 +1655,11 @@ public class BinaryStream {
         }
     }
 
-    public <T> void putOptionalNull(T object, Consumer<T> consumer) {
+    public <T> void putOptionalNull(T object, Consumer<@NotNull T> consumer) {
         this.putOptional(Objects::nonNull, object, consumer);
     }
 
-    public <T> void putOptionalNull(T object, BiConsumer<BinaryStream, T> consumer) {
+    public <T> void putOptionalNull(T object, BiConsumer<BinaryStream, @NotNull T> consumer) {
         this.putOptional(Objects::nonNull, object, consumer);
     }
 
