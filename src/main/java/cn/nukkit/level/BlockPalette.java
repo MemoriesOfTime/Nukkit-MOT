@@ -35,8 +35,8 @@ public class BlockPalette {
     private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
     private final Int2IntMap stateHashToLegacy = new Int2IntOpenHashMap();
-    private final Int2IntMap legacyToNetworkId = new Int2IntOpenHashMap();
-    private final Int2IntMap networkIdToLegacy = new Int2IntOpenHashMap();
+    private final Int2IntMap legacyToHashId = new Int2IntOpenHashMap();
+    private final Int2IntMap hashIdToLegacy = new Int2IntOpenHashMap();
 
     private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
@@ -53,8 +53,8 @@ public class BlockPalette {
 
         legacyToRuntimeId.defaultReturnValue(-1);
         runtimeIdToLegacy.defaultReturnValue(-1);
-        legacyToNetworkId.defaultReturnValue(-1);
-        networkIdToLegacy.defaultReturnValue(-1);
+        legacyToHashId.defaultReturnValue(-1);
+        hashIdToLegacy.defaultReturnValue(-1);
 
         loadBlockStates(paletteFor(protocol));
         loadBlockStatesExtras();
@@ -153,8 +153,8 @@ public class BlockPalette {
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
         this.stateHashToLegacy.clear();
-        this.legacyToNetworkId.clear();
-        this.networkIdToLegacy.clear();
+        this.legacyToHashId.clear();
+        this.hashIdToLegacy.clear();
     }
 
     public void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
@@ -167,8 +167,8 @@ public class BlockPalette {
         this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
         int stateHash = Hash.hashBlock(blockState);
         this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
-        this.legacyToNetworkId.putIfAbsent(legacyId, stateHash);
-        this.networkIdToLegacy.putIfAbsent(stateHash, legacyId);
+        this.legacyToHashId.putIfAbsent(legacyId, stateHash);
+        this.hashIdToLegacy.putIfAbsent(stateHash, legacyId);
 
         // Hack: Map IDs for item frame up & down states
         if (blockId == BlockID.ITEM_FRAME_BLOCK || blockId == BlockID.GLOW_FRAME) {
@@ -222,35 +222,56 @@ public class BlockPalette {
         return runtimeIdToLegacy.get(runtimeId);
     }
 
-    public int getLegacyFullIdFromNetworkId(int networkId) {
-        return networkIdToLegacy.get(networkId);
+    /**
+     * 从哈希ID获取完整的旧方块ID
+     * Get full legacy block ID from hash ID
+     * <p>
+     * 哈希ID是通过方块状态NBT计算得出的哈希值，用于新版本的方块网络传输
+     * Hash ID is calculated from block state NBT and used for block network transmission in newer versions
+     *
+     * @param hashId 方块状态的哈希ID / hash ID of the block state
+     * @return 完整的旧方块ID (blockId << Block.DATA_BITS | meta)，如果找不到则返回-1 / full legacy block ID, returns -1 if not found
+     */
+    public int getLegacyFullIdFromHashId(int hashId) {
+        return hashIdToLegacy.get(hashId);
     }
 
     public int getLegacyFullId(CompoundTag compoundTag) {
         return stateHashToLegacy.getOrDefault(Hash.hashBlock(compoundTag), -1);
     }
 
-    public int getNetworkId(int id, int meta) {
-        int legacyId = protocol >= 388 ? ((id << Block.DATA_BITS) | meta) : ((id << 4) | meta);
-        int networkId = legacyToNetworkId.get(legacyId);
-        if (networkId == -1) {
-            networkId = legacyToNetworkId.get(id << Block.DATA_BITS);
-            if (networkId == -1) {
-                networkId = legacyToNetworkId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
-            }
-        }
-        return networkId;
+    /**
+     * 获取方块的哈希ID (使用默认meta值0)
+     * Get hash ID of a block (using default meta value 0)
+     *
+     * @param id 方块ID / block ID
+     * @return 方块的哈希ID / hash ID of the block
+     */
+    public int getHashId(int id) {
+        return this.getHashId(id, 0);
     }
 
-    public int getNetworkId(int legacyId) {
-        int networkId = legacyToNetworkId.get(legacyId);
-        if (networkId == -1) {
-            networkId = legacyToNetworkId.get(legacyId & (Block.DATA_MASK << Block.DATA_BITS));
-            if (networkId == -1) {
-                networkId = legacyToNetworkId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
+    /**
+     * 获取方块的哈希ID
+     * Get hash ID of a block
+     * <p>
+     * 哈希ID用于新版本协议(1.19.80+)的方块网络传输，基于方块状态NBT的哈希值
+     * Hash ID is used for block network transmission in newer protocols (1.19.80+), based on block state NBT hash
+     *
+     * @param id 方块ID / block ID
+     * @param meta 方块元数据值 / block metadata value
+     * @return 方块的哈希ID，如果找不到则返回INFO_UPDATE方块的哈希ID / hash ID of the block, returns INFO_UPDATE block's hash ID if not found
+     */
+    public int getHashId(int id, int meta) {
+        int legacyId = protocol >= 388 ? ((id << Block.DATA_BITS) | meta) : ((id << 4) | meta);
+        int hashId = legacyToHashId.get(legacyId);
+        if (hashId == -1) {
+            hashId = legacyToHashId.get(id << Block.DATA_BITS);
+            if (hashId == -1) {
+                hashId = legacyToHashId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
             }
         }
-        return networkId;
+        return hashId;
     }
 
 }

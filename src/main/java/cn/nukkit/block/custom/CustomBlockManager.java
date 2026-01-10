@@ -151,7 +151,6 @@ public class CustomBlockManager {
 
         int itemId = 255 - nukkitId;
 
-        // Register custom block to RuntimeItems so Item.fromString() can find it
         RuntimeItems.registerCustomBlockLegacyId(identifier, itemId);
 
         if (properties != null) {
@@ -253,7 +252,10 @@ public class CustomBlockManager {
     }
 
     /**
+     * 自动将所有已注册的自定义方块添加到创造模式物品栏
      * Automatically adds all registered custom blocks to creative inventory for all game versions
+     * <p>
+     * 此方法应该在Item.initCreativeItems()之后调用，以避免被清空
      * This should be called AFTER Item.initCreativeItems() to avoid being cleared
      */
     public static void addCustomBlocksToCreativeInventory() {
@@ -468,6 +470,12 @@ public class CustomBlockManager {
         return Collections.unmodifiableCollection(this.blockDefinitions.values());
     }
 
+    /**
+     * 检查是否已注册自定义方块
+     * Check if any custom blocks are registered
+     *
+     * @return 如果存在已注册的自定义方块则返回true / returns true if there are registered custom blocks
+     */
     public boolean hasCustomBlocks() {
         return !this.blockDefinitions.isEmpty();
     }

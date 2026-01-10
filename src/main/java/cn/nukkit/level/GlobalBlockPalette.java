@@ -518,7 +518,7 @@ public class GlobalBlockPalette {
         if (protocol >= ProtocolInfo.v1_16_100) {
             BlockPalette palette = getPaletteByProtocol(gameVersion);
             if (shouldUseHashedBlockNetworkIds(gameVersion)) {
-                return palette.getNetworkId(id, meta);
+                return palette.getHashId(id, meta);
             }
             return palette.getRuntimeId(id, meta);
         }
@@ -705,10 +705,22 @@ public class GlobalBlockPalette {
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }
 
-    public static int getLegacyFullIdFromNetworkId(GameVersion protocolId, int networkId) {
+    /**
+     * 从哈希ID获取完整的旧方块ID
+     * Get full legacy block ID from hash ID
+     * <p>
+     * 用于从新版本协议(1.19.80+)使用的哈希ID转换回内部使用的旧方块ID
+     * Used to convert hash ID used in newer protocols (1.19.80+) back to internal legacy block ID
+     *
+     * @param protocolId 游戏版本 / game version
+     * @param hashId 方块状态的哈希ID / hash ID of the block state
+     * @return 完整的旧方块ID / full legacy block ID
+     * @throws IllegalArgumentException 如果协议版本不支持 / if protocol version is not supported
+     */
+    public static int getLegacyFullIdFromHashId(GameVersion protocolId, int hashId) {
         BlockPalette blockPalette = getPaletteByProtocol(protocolId);
         if (blockPalette != null) {
-            return blockPalette.getLegacyFullIdFromNetworkId(networkId);
+            return blockPalette.getLegacyFullIdFromHashId(hashId);
         }
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }
@@ -730,28 +742,80 @@ public class GlobalBlockPalette {
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }
 
-    public static int getOrCreateNetworkId(GameVersion gameVersion, int id, int meta) {
+    /**
+     * 获取或创建方块的哈希ID
+     * Get or create hash ID of a block
+     * <p>
+     * 如果启用了哈希方块网络ID功能，则返回方块的哈希ID，否则返回-1
+     * Returns the block's hash ID if hashed block network IDs are enabled, otherwise returns -1
+     *
+     * @param gameVersion 游戏版本 / game version
+     * @param id 方块ID / block ID
+     * @param meta 方块元数据值 / block metadata value
+     * @return 方块的哈希ID，如果功能未启用则返回-1 / hash ID of the block, returns -1 if feature is not enabled
+     */
+    public static int getOrCreateHashId(GameVersion gameVersion, int id, int meta) {
         if (shouldUseHashedBlockNetworkIds(gameVersion)) {
-            return getPaletteByProtocol(gameVersion).getNetworkId(id, meta);
+            return getPaletteByProtocol(gameVersion).getHashId(id, meta);
         }
-        return getOrCreateRuntimeId(gameVersion, id, meta);
+        return -1;
     }
 
-    public static int getOrCreateNetworkId(GameVersion gameVersion, int legacyId) throws NoSuchElementException {
+    /**
+     * 从旧方块ID获取或创建哈希ID
+     * Get or create hash ID from legacy block ID
+     * <p>
+     * 如果启用了哈希方块网络ID功能，则返回方块的哈希ID，否则返回-1
+     * Returns the block's hash ID if hashed block network IDs are enabled, otherwise returns -1
+     *
+     * @param gameVersion 游戏版本 / game version
+     * @param legacyId 完整的旧方块ID (blockId << Block.DATA_BITS | meta) / full legacy block ID
+     * @return 方块的哈希ID，如果功能未启用则返回-1 / hash ID of the block, returns -1 if feature is not enabled
+     * @throws NoSuchElementException 如果找不到方块 / if block is not found
+     */
+    public static int getOrCreateHashId(GameVersion gameVersion, int legacyId) throws NoSuchElementException {
         if (shouldUseHashedBlockNetworkIds(gameVersion)) {
-            return getPaletteByProtocol(gameVersion).getNetworkId(legacyId);
+            return getPaletteByProtocol(gameVersion).getHashId(legacyId >> Block.DATA_BITS, legacyId & Block.DATA_MASK);
         }
-        return getOrCreateRuntimeId(gameVersion, legacyId);
+        return -1;
     }
 
+    /**
+     * 检查指定游戏版本是否应该使用哈希方块网络ID
+     * Check if hashed block network IDs should be used for the specified game version
+     * <p>
+     * 当启用了哈希网络ID功能且游戏版本 >= 1.19.80时返回true
+     * Returns true when hashed network IDs are enabled and game version >= 1.19.80
+     * <p>
+     * 哈希网络ID是基于方块状态NBT的哈希值，用于支持自定义方块和更灵活的方块状态传输
+     * Hashed network IDs are based on block state NBT hash and used to support custom blocks and more flexible block state transmission
+     *
+     * @param gameVersion 游戏版本 / game version
+     * @return 是否应该使用哈希方块网络ID / whether hashed block network IDs should be used
+     */
     public static boolean shouldUseHashedBlockNetworkIds(GameVersion gameVersion) {
         return useHashedBlockNetworkIds && gameVersion.getProtocol() >= ProtocolInfo.v1_19_80;
     }
 
+    /**
+     * 获取全局哈希方块网络ID功能是否启用
+     * Get whether global hashed block network IDs feature is enabled
+     *
+     * @return 是否启用哈希方块网络ID / whether hashed block network IDs are enabled
+     */
     public static boolean useHashedBlockNetworkIds() {
         return useHashedBlockNetworkIds;
     }
 
+    /**
+     * 设置全局哈希方块网络ID功能的启用状态
+     * Set the enabled state of global hashed block network IDs feature
+     * <p>
+     * 此功能主要用于支持自定义方块，启用后会使用基于NBT哈希的网络ID代替传统的运行时ID
+     * This feature is mainly used to support custom blocks, when enabled it uses NBT hash-based network IDs instead of traditional runtime IDs
+     *
+     * @param enabled 是否启用 / whether to enable
+     */
     public static void setUseHashedBlockNetworkIds(boolean enabled) {
         useHashedBlockNetworkIds = enabled;
     }

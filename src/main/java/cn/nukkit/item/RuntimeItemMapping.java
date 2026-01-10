@@ -189,10 +189,7 @@ public class RuntimeItemMapping {
 
         if (Nukkit.DEBUG > 1) {
             if (this.runtime2Legacy.containsKey(legacyId)) {
-                String existingIdentifier = this.runtimeId2Name.get(legacyId);
-                if (existingIdentifier != null && !existingIdentifier.equals(identifier)) {
-                    log.warn("RuntimeItemMapping: Registering " + identifier + " but runtime id " + legacyId + " is already used by " + existingIdentifier);
-                }
+                log.warn("RuntimeItemMapping: Registering " + identifier + " but runtime id " + legacyId + " is already used");
             }
         }
 

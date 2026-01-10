@@ -271,8 +271,14 @@ public class RuntimeItems {
     }
 
     /**
+     * 注册自定义方块的标识符到旧ID的映射
      * Register a custom block's identifier to legacy ID mapping
+     * <p>
+     * 此方法使Item.fromString()能够识别和创建自定义方块物品
      * This is needed for Item.fromString() to work with custom blocks
+     *
+     * @param identifier 自定义方块的标识符 / custom block's identifier
+     * @param legacyId 旧物品ID / legacy item ID
      */
     public static void registerCustomBlockLegacyId(String identifier, int legacyId) {
         legacyString2LegacyInt.put(identifier, legacyId);
