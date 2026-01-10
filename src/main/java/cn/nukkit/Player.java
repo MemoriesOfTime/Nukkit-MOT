@@ -7937,6 +7937,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return super.canBeDamagedBySweetBerryBush();
     }
 
+    /**
+     * Add a movement speed modifier to the player.
+     * 添加一个移动速度修改器到玩家
+     *
+     * @param modifier The movement speed modifier to add (要添加的移动速度修改器)
+     */
     @Override
     public void addMovementSpeedModifier(EntityMovementSpeedModifier modifier) {
         super.addMovementSpeedModifier(modifier);
@@ -7944,6 +7950,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.sendMovementSpeed();
     }
 
+    /**
+     * Remove a movement speed modifier from the player.
+     * 从玩家移除移动速度修改器
+     *
+     * @param identifier The identifier of the movement speed modifier to remove (要移除的移动速度修改器的标识符)
+     * @return True if the modifier was successfully removed, false otherwise (如果成功移除则返回true，否则返回false)
+     */
     @Override
     public boolean removeMovementSpeedModifier(String identifier) {
         boolean isRemoved = super.removeMovementSpeedModifier(identifier);

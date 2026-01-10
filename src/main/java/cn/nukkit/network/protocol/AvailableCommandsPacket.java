@@ -515,7 +515,11 @@ public class AvailableCommandsPacket extends DataPacket {
             type |= ARG_FLAG_VALID;
             if (parameter.enumData != null) {
                 if (parameter.enumData.isSoft()) {
-                    type = softEnums.indexOf(parameter.enumData) | ARG_FLAG_SOFT_ENUM | ARG_FLAG_VALID;
+                    int i = softEnums.indexOf(parameter.enumData);
+                    if (i < 0) {
+                        throw new IllegalStateException("Soft enum '" + parameter.enumData.getName() + "' isn't in soft enums array");
+                    }
+                    type = i | ARG_FLAG_SOFT_ENUM | ARG_FLAG_VALID;
                 } else {
                     int i = enums.indexOf(parameter.enumData);
                     if (i < 0) {
