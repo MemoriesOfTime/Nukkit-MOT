@@ -258,12 +258,11 @@ public class CustomBlockManager {
      * 此方法应该在Item.initCreativeItems()之后调用，以避免被清空
      * This should be called AFTER Item.initCreativeItems() to avoid being cleared
      */
-    public static void addCustomBlocksToCreativeInventory() {
-        CustomBlockManager manager = CustomBlockManager.get();
+    public void addCustomBlocksToCreativeInventory() {
         // Collect unique custom block identifiers (only default state with meta=0)
         Set<String> addedBlocks = new ObjectOpenHashSet<>();
 
-        for (CustomBlockState state : manager.legacy2CustomState.values()) {
+        for (CustomBlockState state : this.legacy2CustomState.values()) {
             String identifier = state.getIdentifier();
             int meta = state.getLegacyId() & Block.DATA_MASK;
 
@@ -276,7 +275,7 @@ public class CustomBlockManager {
 
                 for (GameVersion gameVersion : GameVersion.values()) {
                     int protocol = gameVersion.getProtocol();
-                    if (protocol >= ProtocolInfo.v1_16_100 && protocol >= manager.server.minimumProtocol) {
+                    if (protocol >= ProtocolInfo.v1_16_100 && protocol >= this.server.minimumProtocol) {
                         try {
                             // Add to CONSTRUCTION or ITEMS category
                             Item.addCreativeItem(gameVersion, item, CreativeItemCategory.CONSTRUCTION, "");

@@ -236,8 +236,8 @@ public class BlockPalette {
         return hashIdToLegacy.get(hashId);
     }
 
-    public int getLegacyFullId(CompoundTag compoundTag) {
-        return stateHashToLegacy.getOrDefault(Hash.hashBlock(compoundTag), -1);
+    public int getLegacyFullId(CompoundTag blockState) {
+        return stateHashToLegacy.getOrDefault(Hash.hashBlock(blockState), -1);
     }
 
     /**

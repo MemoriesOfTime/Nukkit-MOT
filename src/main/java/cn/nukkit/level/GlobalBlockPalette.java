@@ -726,18 +726,18 @@ public class GlobalBlockPalette {
     }
 
     @Deprecated
-    public static int getLegacyFullId(int protocolId, CompoundTag compoundTag) {
+    public static int getLegacyFullId(int protocolId, CompoundTag blockState) {
         BlockPalette blockPalette = getPaletteByProtocol(protocolId);
         if (blockPalette != null) {
-            return blockPalette.getLegacyFullId(compoundTag);
+            return blockPalette.getLegacyFullId(blockState);
         }
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }
 
-    public static int getLegacyFullId(GameVersion protocolId, CompoundTag compoundTag) {
+    public static int getLegacyFullId(GameVersion protocolId, CompoundTag blockState) {
         BlockPalette blockPalette = getPaletteByProtocol(protocolId);
         if (blockPalette != null) {
-            return blockPalette.getLegacyFullId(compoundTag);
+            return blockPalette.getLegacyFullId(blockState);
         }
         throw new IllegalArgumentException("Tried to get legacyFullId for unsupported protocol version: " + protocolId);
     }

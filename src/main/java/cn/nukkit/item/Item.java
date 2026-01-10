@@ -617,8 +617,9 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         //TODO Multiversion 添加新版本支持时修改这里
 
         // Add custom blocks to creative inventory after all vanilla items are loaded
-        if (CustomBlockManager.get().hasCustomBlocks()) {
-            CustomBlockManager.addCustomBlocksToCreativeInventory();
+        CustomBlockManager customBlockManager = CustomBlockManager.get();
+        if (customBlockManager.hasCustomBlocks()) {
+            customBlockManager.addCustomBlocksToCreativeInventory();
         }
     }
 

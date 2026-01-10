@@ -46,8 +46,8 @@ public class NukkitLegacyMapper implements LegacyStateMapper {
 
     @Override
     public int legacyToRuntime(int legacyId, int meta) {
-        // Always return runtime ID, not network ID
-        // Network ID should only be used for network transmission, not for internal world data loading
+        // Always return runtime ID, not hash ID
+        // Hash ID should only be used for network transmission, not for internal world data loading
         GameVersion gameVersion = GameVersion.getFeatureVersion();
         BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
         return palette.getRuntimeId(legacyId, meta);
