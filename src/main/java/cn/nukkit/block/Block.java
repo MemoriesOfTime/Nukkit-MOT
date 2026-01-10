@@ -269,7 +269,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            return CustomBlockManager.get().getBlock(id, 0);
+            return CustomBlockManager.get().getBlock(id, data);
         }
 
         int fullId = id << DATA_BITS;
@@ -300,14 +300,14 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     @NotNull
     public static Block get(int fullId, Level level, int x, int y, int z, int layer) {
-        int id = fullId << DATA_BITS;
+        int id = fullId >> DATA_BITS;
 
         Block block;
         if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            block = CustomBlockManager.get().getBlock(id, 0);
+            block = CustomBlockManager.get().getBlock(id, fullId & DATA_MASK);
         } else {
             if (fullId >= fullList.length || fullList[fullId] == null) {
-                int meta = fullId & DATA_BITS;
+                int meta = fullId & DATA_MASK;
                 log.debug("Found an unknown BlockId:Meta combination: {}:{}", id, meta);
                 BlockUnknown blockUnknown = new BlockUnknown(id, meta);
                 fullList[fullId] = blockUnknown;
@@ -332,7 +332,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     public static Block get(int id, int meta, Level level, int x, int y, int z, int layer) {
         Block block;
         if (id >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            block = CustomBlockManager.get().getBlock(id, 0);
+            block = CustomBlockManager.get().getBlock(id, meta);
         } else {
             if (meta <= DATA_SIZE) {
                 int index = id << DATA_BITS | meta;
