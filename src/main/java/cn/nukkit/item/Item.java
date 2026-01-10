@@ -673,7 +673,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             }
 
             if (useNetEaseConversion) {
-                itemsArray = cn.nukkit.utils.NetEaseConverter.convertCreativeItems(itemsArray);
+                itemsArray = NetEaseConverter.convertCreativeItems(itemsArray);
                 root.add("items", itemsArray);
                 log.info("Converted {} creative items to NetEase version", itemsArray.size());
             }
