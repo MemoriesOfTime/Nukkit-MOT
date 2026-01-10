@@ -92,6 +92,7 @@ public class GlobalBlockPalette {
 
     private static BlockPalette blockPalette_netease_630;
     private static BlockPalette blockPalette_netease_686;
+    private static BlockPalette blockPalette_netease_766;
 
     private static byte[] compiledTable282;
     private static byte[] compiledTable291;
@@ -122,7 +123,7 @@ public class GlobalBlockPalette {
         // cache current block palette
         getPaletteByProtocol(GameVersion.getLastVersion());
         if (Server.getInstance().netEaseMode) {
-            getPaletteByProtocol(GameVersion.V1_21_2_NETEASE);
+            getPaletteByProtocol(GameVersion.V1_21_50_NETEASE);
         }
     }
 
@@ -493,6 +494,12 @@ public class GlobalBlockPalette {
     }
 
     private static BlockPalette getPaletteByProtocolNetEase(int protocol) {
+        if (protocol >= GameVersion.V1_21_50_NETEASE.getProtocol()) {
+            if (blockPalette_netease_766 == null) {
+                blockPalette_netease_766 = new BlockPalette(GameVersion.V1_21_50_NETEASE);
+            }
+            return blockPalette_netease_766;
+        }
         if (protocol >= GameVersion.V1_21_2_NETEASE.getProtocol()) {
             if (blockPalette_netease_686 == null) {
                 blockPalette_netease_686 = new BlockPalette(GameVersion.V1_21_2_NETEASE);

@@ -9,6 +9,7 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.Hash;
+import cn.nukkit.utils.NetEaseConverter;
 import cn.nukkit.utils.Utils;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -63,19 +64,85 @@ public class BlockPalette {
     private ListTag<CompoundTag> paletteFor(int protocol) {
         ListTag<CompoundTag> tag;
         String name = "runtime_block_states_" + protocol + ".dat";
+        boolean useNetEaseConversion = false;
+
         if (gameVersion.isNetEase()) {
-            name = "runtime_block_states_netease_" + protocol + ".dat";
+            String neteaseName = "runtime_block_states_netease_" + protocol + ".dat";
+            InputStream neteaseStream = Server.class.getClassLoader().getResourceAsStream(neteaseName);
+            if (neteaseStream != null) {
+                name = neteaseName;
+                try {
+                    neteaseStream.close();
+                } catch (IOException ignored) {
+                }
+            } else {
+                log.debug("NetEase resource file not found: {}, will convert from standard version", neteaseName);
+                useNetEaseConversion = true;
+            }
         }
+
         try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(name)) {
             if (stream == null) {
                 throw new AssertionError("Unable to locate block state nbt " + protocol);
             }
             //noinspection unchecked
             tag = (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
-        } catch (IOException e) {
+
+            if (useNetEaseConversion) {
+                ListTag<CompoundTag> fullPalette = loadFullBlockPalette(protocol);
+                log.info("Using full block_palette_{}.nbt for NetEase conversion ({} blocks)", protocol, fullPalette.size());
+                tag = NetEaseConverter.convertBlockStates(fullPalette, true);
+            }
+        } catch (IOException | NullPointerException e) {
             throw new AssertionError("Unable to load block palette " + protocol, e);
         }
         return tag;
+    }
+
+    /**
+     * Loads the full block palette.
+     * The block_palette contains all block states, while runtime_block_states
+     * only contains a subset of them.
+     *
+     * @param protocol the protocol version
+     * @return the full block palette, or {@code null} if the file does not exist
+     */
+    private ListTag<CompoundTag> loadFullBlockPalette(int protocol) {
+        String paletteName = "BlockPaletteRaw/block_palette_" + protocol + ".nbt";
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(paletteName)) {
+            if (stream == null) {
+                return null;
+            }
+
+            Object tag = NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
+
+            if (tag instanceof ListTag) {
+                //noinspection unchecked
+                return (ListTag<CompoundTag>) tag;
+            } else if (tag instanceof CompoundTag) {
+                CompoundTag compoundTag = (CompoundTag) tag;
+                if (compoundTag.contains("")) {
+                    //noinspection unchecked
+                    return (ListTag<CompoundTag>) compoundTag.get("");
+                }
+                // 尝试其他可能的 key
+                for (String key : compoundTag.getTags().keySet()) {
+                    Object value = compoundTag.get(key);
+                    if (value instanceof ListTag) {
+                        //noinspection unchecked
+                        return (ListTag<CompoundTag>) value;
+                    }
+                }
+                log.error("Could not find ListTag in CompoundTag for palette: {}", paletteName);
+                return null;
+            } else {
+                log.error("Unexpected tag type for palette {}: {}", paletteName, tag.getClass().getName());
+                return null;
+            }
+        } catch (IOException e) {
+            log.error("Error loading full block palette: {}", paletteName, e);
+            return null;
+        }
     }
 
     private void loadBlockStates(ListTag<CompoundTag> blockStates) {

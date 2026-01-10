@@ -557,6 +557,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     private static final CreativeItems creative_netease_630 = new CreativeItems();
     private static final CreativeItems creative_netease_686 = new CreativeItems();
+    private static final CreativeItems creative_netease_766 = new CreativeItems();
 
     public static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
@@ -614,6 +615,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
         registerCreativeItemsNew(GameVersion.V1_20_50_NETEASE, GameVersion.V1_20_50_NETEASE, creative_netease_630);
         registerCreativeItemsNew(GameVersion.V1_21_2_NETEASE, GameVersion.V1_21_2_NETEASE, creative_netease_686);
+        registerCreativeItemsNew(GameVersion.V1_21_50_NETEASE, GameVersion.V1_21_50_NETEASE, creative_netease_766);
         //TODO Multiversion 添加新版本支持时修改这里
 
         // Add custom blocks to creative inventory after all vanilla items are loaded
@@ -641,18 +643,39 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         JsonObject root;
         JsonArray itemsArray;
         String file;
+        boolean useNetEaseConversion = false;
+
         if (gameVersion.isNetEase()) {
-            file = "CreativeItems/creative_items_netease_" + protocol + ".json";
+            String neteaseFile = "CreativeItems/creative_items_netease_" + protocol + ".json";
+            InputStream neteaseStream = Server.class.getClassLoader().getResourceAsStream(neteaseFile);
+            if (neteaseStream != null) {
+                file = neteaseFile;
+                try {
+                    neteaseStream.close();
+                } catch (Exception ignored) {
+                }
+            } else {
+                log.debug("NetEase creative items file not found: {}, will convert from standard version", neteaseFile);
+                file = protocol >= ProtocolInfo.v1_21_0 ? "CreativeItems/creative_items_" + protocol + ".json" : "creativeitems" + protocol + ".json";
+                useNetEaseConversion = true;
+            }
         } else if (protocol >= ProtocolInfo.v1_21_0) {
             file = "CreativeItems/creative_items_" + protocol + ".json";
         } else {
             file = "creativeitems" + protocol + ".json";
         }
+
         try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(file)) {
             root = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject();
             itemsArray = root.getAsJsonArray("items");
             if (itemsArray.isEmpty()) {
                 throw new IllegalStateException("Empty items");
+            }
+
+            if (useNetEaseConversion) {
+                itemsArray = NetEaseConverter.convertCreativeItems(itemsArray);
+                root.add("items", itemsArray);
+                log.info("Converted {} creative items to NetEase version", itemsArray.size());
             }
         } catch (Exception e) {
             throw new AssertionError("Error while loading creative items for protocol " + protocol, e);
@@ -757,6 +780,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
         Item.creative_netease_630.clear();
         Item.creative_netease_686.clear();
+        Item.creative_netease_766.clear();
         //TODO Multiversion 添加新版本支持时修改这里
     }
 
@@ -929,6 +953,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
                 return Item.creative_netease_630;
             case V1_21_2_NETEASE:
                 return Item.creative_netease_686;
+            case V1_21_50_NETEASE:
+                return Item.creative_netease_766;
             // TODO Multiversion
             default:
                 throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
@@ -1005,6 +1031,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             // NetEase
             case V1_20_50_NETEASE -> Item.creative_netease_630.add(item.clone(), category, group);
             case V1_21_2_NETEASE -> Item.creative_netease_686.add(item.clone(), category, group);
+            case V1_21_50_NETEASE -> Item.creative_netease_766.add(item.clone(), category, group);
             // TODO Multiversion
             default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
         }
@@ -1211,6 +1238,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         // NetEase
         registerCustomItem(customItem, GameVersion.V1_20_50_NETEASE, addCreativeItem, GameVersion.V1_20_50_NETEASE);
         registerCustomItem(customItem, GameVersion.V1_21_2_NETEASE, addCreativeItem, GameVersion.V1_21_2_NETEASE);
+        registerCustomItem(customItem, GameVersion.V1_21_50_NETEASE, addCreativeItem, GameVersion.V1_21_50_NETEASE);
 
         //TODO Multiversion 添加新版本支持时修改这里
 
@@ -1273,6 +1301,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             // NetEase
             deleteCustomItem(customItem, GameVersion.V1_20_50_NETEASE, GameVersion.V1_20_50_NETEASE);
             deleteCustomItem(customItem, GameVersion.V1_21_2_NETEASE, GameVersion.V1_21_2_NETEASE);
+            deleteCustomItem(customItem, GameVersion.V1_21_50_NETEASE, GameVersion.V1_21_50_NETEASE);
 
             //TODO Multiversion 添加新版本支持时修改这里
         }

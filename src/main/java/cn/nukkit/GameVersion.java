@@ -107,6 +107,7 @@ public enum GameVersion {
 
     V1_20_50_NETEASE(630, true, "1.20.50_NetEase"),
     V1_21_2_NETEASE(686, true, "1.21.2_NetEase"),
+    V1_21_50_NETEASE(766, true, "1.21.50_NetEase"),
     ;
 
     private static GameVersion FEATURE_VERSION = GameVersion.V1_21_70;
