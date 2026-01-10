@@ -46,37 +46,39 @@ public class DebugDrawerPacket extends DataPacket {
     protected void writeShape859(DebugShape shape) {
         this.putUnsignedVarLong(shape.getId());
         this.writeCommonShapeData(shape);
-        this.putInt(shape.getDimension());
+        this.putVarInt(shape.getDimension());
         this.putUnsignedVarInt(this.toPayloadType(shape.getType()));
 
-        switch (shape.getType()) {
-            case ARROW:
-                DebugArrow arrow = (DebugArrow) shape;
-                this.putOptionalNull(arrow.getArrowEndPosition(), this::putVector3f);
-                this.putOptionalNull(arrow.getArrowHeadLength(), this::putLFloat);
-                this.putOptionalNull(arrow.getArrowHeadRadius(), this::putLFloat);
-                this.putOptionalNull(arrow.getArrowHeadSegments(), this::putByte);
-                break;
-            case BOX:
-                DebugBox box = (DebugBox) shape;
-                this.putVector3f(box.getBoxBounds());
-                break;
-            case CIRCLE:
-                DebugCircle circle = (DebugCircle) shape;
-                this.putByte(circle.getSegments());
-                break;
-            case LINE:
-                DebugLine line = (DebugLine) shape;
-                this.putVector3f(line.getLineEndPosition());
-                break;
-            case SPHERE:
-                DebugSphere sphere = (DebugSphere) shape;
-                this.putByte(sphere.getSegments());
-                break;
-            case TEXT:
-                DebugText text = (DebugText) shape;
-                this.putString(text.getText());
-                break;
+        if (shape.getType() != null) {
+            switch (shape.getType()) {
+                case ARROW:
+                    DebugArrow arrow = (DebugArrow) shape;
+                    this.putOptionalNull(arrow.getArrowEndPosition(), this::putVector3f);
+                    this.putOptionalNull(arrow.getArrowHeadLength(), this::putLFloat);
+                    this.putOptionalNull(arrow.getArrowHeadRadius(), this::putLFloat);
+                    this.putOptionalNull(arrow.getArrowHeadSegments(), this::putByte);
+                    break;
+                case BOX:
+                    DebugBox box = (DebugBox) shape;
+                    this.putVector3f(box.getBoxBounds());
+                    break;
+                case CIRCLE:
+                    DebugCircle circle = (DebugCircle) shape;
+                    this.putByte(circle.getSegments());
+                    break;
+                case LINE:
+                    DebugLine line = (DebugLine) shape;
+                    this.putVector3f(line.getLineEndPosition());
+                    break;
+                case SPHERE:
+                    DebugSphere sphere = (DebugSphere) shape;
+                    this.putByte(sphere.getSegments());
+                    break;
+                case TEXT:
+                    DebugText text = (DebugText) shape;
+                    this.putString(text.getText());
+                    break;
+            }
         }
     }
 
@@ -84,61 +86,63 @@ public class DebugDrawerPacket extends DataPacket {
         this.putUnsignedVarLong(shape.getId());
         this.writeCommonShapeData(shape);
 
-        switch (shape.getType()) {
-            case ARROW:
-                DebugArrow arrow = (DebugArrow) shape;
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putOptionalNull(arrow.getArrowEndPosition(), this::putVector3f);
-                this.putOptionalNull(arrow.getArrowHeadLength(), this::putLFloat);
-                this.putOptionalNull(arrow.getArrowHeadRadius(), this::putLFloat);
-                this.putOptionalNull(arrow.getArrowHeadSegments(), this::putByte);
-                break;
-            case BOX:
-                DebugBox box = (DebugBox) shape;
-                this.putBoolean(false);
-                this.putOptionalNull(box.getBoxBounds(), this::putVector3f);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                break;
-             case CIRCLE:
-                DebugCircle circle = (DebugCircle) shape;
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putOptionalNull(circle.getSegments(), this::putByte);
-                break;
-            case LINE:
-                DebugLine line = (DebugLine) shape;
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putOptionalNull(line.getLineEndPosition(), this::putVector3f);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                break;
-            case SPHERE:
-                DebugSphere sphere = (DebugSphere) shape;
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putOptionalNull(sphere.getSegments(), this::putByte);
-                break;
-            case TEXT:
-                DebugText text = (DebugText) shape;
-                this.putOptionalNull(text.getText(), this::putString);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                this.putBoolean(false);
-                break;
+        if (shape.getType() != null) {
+            switch (shape.getType()) {
+                case ARROW:
+                    DebugArrow arrow = (DebugArrow) shape;
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putOptionalNull(arrow.getArrowEndPosition(), this::putVector3f);
+                    this.putOptionalNull(arrow.getArrowHeadLength(), this::putLFloat);
+                    this.putOptionalNull(arrow.getArrowHeadRadius(), this::putLFloat);
+                    this.putOptionalNull(arrow.getArrowHeadSegments(), this::putByte);
+                    break;
+                case BOX:
+                    DebugBox box = (DebugBox) shape;
+                    this.putBoolean(false);
+                    this.putOptionalNull(box.getBoxBounds(), this::putVector3f);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    break;
+                case CIRCLE:
+                    DebugCircle circle = (DebugCircle) shape;
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putOptionalNull(circle.getSegments(), this::putByte);
+                    break;
+                case LINE:
+                    DebugLine line = (DebugLine) shape;
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putOptionalNull(line.getLineEndPosition(), this::putVector3f);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    break;
+                case SPHERE:
+                    DebugSphere sphere = (DebugSphere) shape;
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putOptionalNull(sphere.getSegments(), this::putByte);
+                    break;
+                case TEXT:
+                    DebugText text = (DebugText) shape;
+                    this.putOptionalNull(text.getText(), this::putString);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    this.putBoolean(false);
+                    break;
+            }
         }
     }
 
