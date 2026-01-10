@@ -3,6 +3,7 @@ package cn.nukkit.level.format.leveldb;
 import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.level.BlockPalette;
 import cn.nukkit.level.GlobalBlockPalette;
 import org.cloudburstmc.nbt.NbtMap;
 import org.cloudburstmc.nbt.NbtMapBuilder;
@@ -45,7 +46,11 @@ public class NukkitLegacyMapper implements LegacyStateMapper {
 
     @Override
     public int legacyToRuntime(int legacyId, int meta) {
-        return GlobalBlockPalette.getOrCreateRuntimeId(GameVersion.getFeatureVersion(), legacyId, meta);
+        // Always return runtime ID, not hash ID
+        // Hash ID should only be used for network transmission, not for internal world data loading
+        GameVersion gameVersion = GameVersion.getFeatureVersion();
+        BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
+        return palette.getRuntimeId(legacyId, meta);
     }
 
     @Override
