@@ -63,7 +63,7 @@ public class CustomBlockManager {
     private final Server server;
 
     private final Int2ObjectMap<CustomBlockDefinition> blockDefinitions = new Int2ObjectOpenHashMap<>();
-    private final Int2ObjectMap<CustomBlockState> legacy2CustomState = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<CustomBlockState> legacy2CustomState = new Int2ObjectRBTreeMap<>();
 
     private volatile boolean closed = false;
 
@@ -222,7 +222,7 @@ public class CustomBlockManager {
 
         BlockPalette storagePalette = GlobalBlockPalette.getPaletteByProtocol(GameVersion.getFeatureVersion());
         boolean result = false;
-        ObjectSet<BlockPalette> set = new ObjectArraySet<>();
+        ObjectSet<GameVersion> completePaletteSet = new ObjectArraySet<>();
         for (GameVersion gameVersion : GameVersion.values()) {
             int protocol = gameVersion.getProtocol();
             if (protocol < ProtocolInfo.v1_16_100 || protocol < this.server.minimumProtocol) {
@@ -230,10 +230,10 @@ public class CustomBlockManager {
             }
 
             BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
-            if (set.contains(palette)) {
+            if (completePaletteSet.contains(palette.getGameVersion())) {
                 continue;
             }
-            set.add(palette);
+            completePaletteSet.add(palette.getGameVersion());
 
             if (palette.getProtocol() == storagePalette.getProtocol()) {
                 this.recreateBlockPalette(palette, new ObjectArrayList<>(NukkitLegacyMapper.loadBlockPalette()));
@@ -259,28 +259,25 @@ public class CustomBlockManager {
     public static void addCustomBlocksToCreativeInventory() {
         CustomBlockManager manager = CustomBlockManager.get();
         // Collect unique custom block identifiers (only default state with meta=0)
-        Set<String> addedBlocks = new HashSet<>();
+        Set<String> addedBlocks = new ObjectOpenHashSet<>();
 
         for (CustomBlockState state : manager.legacy2CustomState.values()) {
             String identifier = state.getIdentifier();
             int meta = state.getLegacyId() & Block.DATA_MASK;
 
-            // Only add the default state (meta=0) to creative inventory
             if (meta == 0 && !addedBlocks.contains(identifier)) {
                 addedBlocks.add(identifier);
 
-                // Create an item for this custom block
                 int blockId = state.getLegacyId() >> Block.DATA_BITS;
-                int itemId = 255 - blockId;  // Calculate negative itemId for custom blocks
+                int itemId = 255 - blockId;
                 Item item = Item.get(itemId, 0, 1);
 
-                // Add to creative inventory for all supported game versions
                 for (GameVersion gameVersion : GameVersion.values()) {
                     int protocol = gameVersion.getProtocol();
                     if (protocol >= ProtocolInfo.v1_16_100 && protocol >= manager.server.minimumProtocol) {
                         try {
                             // Add to CONSTRUCTION or ITEMS category
-                            Item.addCreativeItem(gameVersion, item.clone(), CreativeItemCategory.CONSTRUCTION, "");
+                            Item.addCreativeItem(gameVersion, item, CreativeItemCategory.CONSTRUCTION, "");
                         } catch (Exception e) {
                             // Ignore if this version doesn't support creative items
                             log.debug("Failed to add custom block {} to creative inventory for protocol {}", identifier, protocol);
@@ -386,19 +383,18 @@ public class CustomBlockManager {
         runtimeId = 0;
         for (List<NbtMap> states : vanillaPaletteList.values()) {
             for (NbtMap state : states) {
-                if(!levelDb || !BlockStateMapping.get().containsState(state)) {
-                    if (levelDb) {
-                        BlockStateMapping.get().registerState(runtimeId, state);
-                    }
+                if(levelDb && !BlockStateMapping.get().containsState(state)) {
+                    BlockStateMapping.get().registerState(runtimeId, state);
+                }
 
-                    IntSet legacyIds = state2Legacy.get(state);
-                    if (legacyIds != null) {
-                        CompoundTag nukkitState = convertNbtMap(state);
-                        for (Integer fullId : legacyIds) {
-                            palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
-                        }
+                IntSet legacyIds = state2Legacy.get(state);
+                if (legacyIds != null) {
+                    CompoundTag nukkitState = convertNbtMap(state);
+                    for (Integer fullId : legacyIds) {
+                        palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
                     }
                 }
+
                 runtimeId++;
             }
         }
