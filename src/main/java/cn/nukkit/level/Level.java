@@ -950,36 +950,36 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void registerChunkLoader(ChunkLoader loader, int chunkX, int chunkZ, boolean autoLoad) {
-        int hash = loader.getLoaderId();
-        long index = Level.chunkHash(chunkX, chunkZ);
+        int loaderId = loader.getLoaderId();
+        long chunkHash = Level.chunkHash(chunkX, chunkZ);
 
-        Map<Integer, ChunkLoader> map = this.chunkLoaders.get(index);
+        Map<Integer, ChunkLoader> map = this.chunkLoaders.get(chunkHash);
         if (map == null) {
             Map<Integer, ChunkLoader> newChunkLoader = new HashMap<>();
-            newChunkLoader.put(hash, loader);
-            this.chunkLoaders.put(index, newChunkLoader);
+            newChunkLoader.put(loaderId, loader);
+            this.chunkLoaders.put(chunkHash, newChunkLoader);
             Map<Integer, Player> newPlayerLoader = new HashMap<>();
             if (loader instanceof Player) {
-                newPlayerLoader.put(hash, (Player) loader);
+                newPlayerLoader.put(loaderId, (Player) loader);
             }
-            this.playerLoaders.put(index, newPlayerLoader);
-        } else if (map.containsKey(hash)) {
+            this.playerLoaders.put(chunkHash, newPlayerLoader);
+        } else if (map.containsKey(loaderId)) {
             return;
         } else {
-            map.put(hash, loader);
+            map.put(loaderId, loader);
             if (loader instanceof Player) {
-                this.playerLoaders.get(index).put(hash, (Player) loader);
+                this.playerLoaders.get(chunkHash).put(loaderId, (Player) loader);
             }
         }
 
-        if (!this.loaders.containsKey(hash)) {
-            this.loaderCounter.put(hash, 1);
-            this.loaders.put(hash, loader);
+        if (!this.loaders.containsKey(loaderId)) {
+            this.loaderCounter.put(loaderId, 1);
+            this.loaders.put(loaderId, loader);
         } else {
-            this.loaderCounter.put(hash, this.loaderCounter.get(hash) + 1);
+            this.loaderCounter.put(loaderId, this.loaderCounter.get(loaderId) + 1);
         }
 
-        this.cancelUnloadChunkRequest(hash);
+        this.cancelUnloadChunkRequest(chunkHash);
 
         if (autoLoad) {
             this.loadChunk(chunkX, chunkZ);
