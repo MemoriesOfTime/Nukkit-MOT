@@ -14,6 +14,7 @@ import cn.nukkit.block.custom.properties.BlockProperties;
 import cn.nukkit.block.custom.properties.BlockProperty;
 import cn.nukkit.block.custom.properties.EnumBlockProperty;
 import cn.nukkit.block.custom.properties.exception.InvalidBlockPropertyMetaException;
+import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItemMapping;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.BlockPalette;
@@ -24,11 +25,13 @@ import cn.nukkit.level.format.leveldb.NukkitLegacyMapper;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.objects.*;
 import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.nbt.*;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.nio.ByteOrder;
@@ -60,7 +63,7 @@ public class CustomBlockManager {
     private final Server server;
 
     private final Int2ObjectMap<CustomBlockDefinition> blockDefinitions = new Int2ObjectOpenHashMap<>();
-    private final Int2ObjectMap<CustomBlockState> legacy2CustomState = new Int2ObjectOpenHashMap<>();
+    private final Int2ObjectMap<CustomBlockState> legacy2CustomState = new Int2ObjectRBTreeMap<>();
 
     private volatile boolean closed = false;
 
@@ -148,6 +151,8 @@ public class CustomBlockManager {
 
         int itemId = 255 - nukkitId;
 
+        RuntimeItems.registerCustomBlockLegacyId(identifier, itemId);
+
         if (properties != null) {
             BlockProperties finalProperties = properties;
             variantGenerations(properties, properties.getNames().toArray(new String[0]))
@@ -210,12 +215,13 @@ public class CustomBlockManager {
         if (this.legacy2CustomState.isEmpty()) {
             return false;
         }
+        GlobalBlockPalette.setUseHashedBlockNetworkIds(true);
 
         long startTime = System.currentTimeMillis();
 
         BlockPalette storagePalette = GlobalBlockPalette.getPaletteByProtocol(GameVersion.getFeatureVersion());
         boolean result = false;
-        ObjectSet<BlockPalette> set = new ObjectArraySet<>();
+        ObjectSet<GameVersion> completePaletteSet = new ObjectArraySet<>();
         for (GameVersion gameVersion : GameVersion.values()) {
             int protocol = gameVersion.getProtocol();
             if (protocol < ProtocolInfo.v1_16_100 || protocol < this.server.minimumProtocol) {
@@ -223,10 +229,10 @@ public class CustomBlockManager {
             }
 
             BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
-            if (set.contains(palette)) {
+            if (completePaletteSet.contains(palette.getGameVersion())) {
                 continue;
             }
-            set.add(palette);
+            completePaletteSet.add(palette.getGameVersion());
 
             if (palette.getProtocol() == storagePalette.getProtocol()) {
                 this.recreateBlockPalette(palette, new ObjectArrayList<>(NukkitLegacyMapper.loadBlockPalette()));
@@ -243,6 +249,50 @@ public class CustomBlockManager {
 
         log.info("Custom block registry closed in {}ms", (System.currentTimeMillis() - startTime));
         return result;
+    }
+
+    /**
+     * 自动将所有已注册的自定义方块添加到创造模式物品栏
+     * Automatically adds all registered custom blocks to creative inventory for all game versions
+     * <p>
+     * 此方法应该在Item.initCreativeItems()之后调用，以避免被清空
+     * This should be called AFTER Item.initCreativeItems() to avoid being cleared
+     */
+    public void addCustomBlocksToCreativeInventory() {
+        // Collect unique custom block identifiers (only default state with meta=0)
+        Set<String> addedBlocks = new ObjectOpenHashSet<>();
+
+        for (CustomBlockState state : this.legacy2CustomState.values()) {
+            String identifier = state.getIdentifier();
+            int meta = state.getLegacyId() & Block.DATA_MASK;
+
+            if (meta == 0 && !addedBlocks.contains(identifier)) {
+                addedBlocks.add(identifier);
+
+                int blockId = state.getLegacyId() >> Block.DATA_BITS;
+                int itemId = 255 - blockId;
+                Item item = Item.get(itemId, 0, 1);
+
+                for (GameVersion gameVersion : GameVersion.values()) {
+                    int protocol = gameVersion.getProtocol();
+                    if (protocol >= ProtocolInfo.v1_16_100 && protocol >= this.server.minimumProtocol) {
+                        try {
+                            // Add to CONSTRUCTION or ITEMS category
+                            Item.addCreativeItem(gameVersion, item, CreativeItemCategory.CONSTRUCTION, "");
+                        } catch (Exception e) {
+                            // Ignore if this version doesn't support creative items
+                            log.debug("Failed to add custom block {} to creative inventory for protocol {}", identifier, protocol);
+                        }
+                    }
+                }
+
+                log.debug("Added custom block {} to creative inventory", identifier);
+            }
+        }
+
+        if (!addedBlocks.isEmpty()) {
+            log.info("Added {} custom blocks to creative inventory", addedBlocks.size());
+        }
     }
 
     private void recreateBlockPalette(BlockPalette palette) throws IOException {
@@ -334,19 +384,18 @@ public class CustomBlockManager {
         runtimeId = 0;
         for (List<NbtMap> states : vanillaPaletteList.values()) {
             for (NbtMap state : states) {
-                if(!levelDb || !BlockStateMapping.get().containsState(state)) {
-                    if (levelDb) {
-                        BlockStateMapping.get().registerState(runtimeId, state);
-                    }
+                if(levelDb && !BlockStateMapping.get().containsState(state)) {
+                    BlockStateMapping.get().registerState(runtimeId, state);
+                }
 
-                    IntSet legacyIds = state2Legacy.get(state);
-                    if (legacyIds != null) {
-                        CompoundTag nukkitState = convertNbtMap(state);
-                        for (Integer fullId : legacyIds) {
-                            palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
-                        }
+                IntSet legacyIds = state2Legacy.get(state);
+                if (legacyIds != null) {
+                    CompoundTag nukkitState = convertNbtMap(state);
+                    for (Integer fullId : legacyIds) {
+                        palette.registerState(fullId >> Block.DATA_BITS, (fullId & Block.DATA_MASK), runtimeId, nukkitState);
                     }
                 }
+
                 runtimeId++;
             }
         }
@@ -369,6 +418,7 @@ public class CustomBlockManager {
         return this.getBinPath().resolve("vanilla_palette_" + version.getProtocol() + ".nbt");
     }
 
+    @Nullable
     public Block getBlock(int legacyId) {
         CustomBlockState state = this.legacy2CustomState.get(legacyId);
         if (state == null) {
@@ -417,6 +467,16 @@ public class CustomBlockManager {
 
     public Collection<CustomBlockDefinition> getBlockDefinitions() {
         return Collections.unmodifiableCollection(this.blockDefinitions.values());
+    }
+
+    /**
+     * 检查是否已注册自定义方块
+     * Check if any custom blocks are registered
+     *
+     * @return 如果存在已注册的自定义方块则返回true / returns true if there are registered custom blocks
+     */
+    public boolean hasCustomBlocks() {
+        return !this.blockDefinitions.isEmpty();
     }
 
     private static int legacyToFullId(int legacyId) {
