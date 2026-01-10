@@ -617,6 +617,12 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCreativeItemsNew(GameVersion.V1_21_2_NETEASE, GameVersion.V1_21_2_NETEASE, creative_netease_686);
         registerCreativeItemsNew(GameVersion.V1_21_50_NETEASE, GameVersion.V1_21_50_NETEASE, creative_netease_766);
         //TODO Multiversion 添加新版本支持时修改这里
+
+        // Add custom blocks to creative inventory after all vanilla items are loaded
+        CustomBlockManager customBlockManager = CustomBlockManager.get();
+        if (customBlockManager.hasCustomBlocks()) {
+            customBlockManager.addCustomBlocksToCreativeInventory();
+        }
     }
 
     private static void registerCreativeItems(GameVersion gameVersion) {
@@ -1416,7 +1422,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
             //common item
             int id = RuntimeItems.getLegacyIdFromLegacyString(namespacedId);
-            if (id > 0) {
+            if (id != -1) { // id == -1 means not found
                 return get(id, meta.orElse(0));
             } else if (namespaceGroup != null && !namespaceGroup.equals("minecraft:")) {
                 return Item.AIR_ITEM.clone();
