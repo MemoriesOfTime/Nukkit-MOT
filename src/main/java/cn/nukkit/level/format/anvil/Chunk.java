@@ -125,10 +125,10 @@ public class Chunk extends BaseChunk {
         int[] heightMap = nbt.getIntArray("HeightMap");
         this.heightMap = new short[256];
         if (heightMap.length != 256) {
-            Arrays.fill(this.heightMap, (short) 319);
+            Arrays.fill(this.heightMap, (short) 255);
         } else {
             for (int i = 0; i < heightMap.length; i++) {
-                this.heightMap[i] = (byte) heightMap[i];
+                this.heightMap[i] = (short) heightMap[i];
             }
         }
 
