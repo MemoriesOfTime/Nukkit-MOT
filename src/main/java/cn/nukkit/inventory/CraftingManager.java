@@ -850,6 +850,7 @@ public class CraftingManager {
         packet340 = null;
         packet313 = null;
 
+        packet_netease_630 = null;
         packet_netease_686 = null;
         packet_netease_766 = null;
 

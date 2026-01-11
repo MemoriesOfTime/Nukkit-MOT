@@ -3,9 +3,7 @@ package cn.nukkit.inventory;
 import cn.nukkit.Player;
 import cn.nukkit.item.Item;
 
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class PlayerUIComponent extends BaseInventory {
 
@@ -49,6 +47,11 @@ public class PlayerUIComponent extends BaseInventory {
     }
 
     @Override
+    public Item getItemFast(int index) {
+        return this.playerUI.getItemFast(index + this.offset);
+    }
+
+    @Override
     public boolean setItem(int index, Item item, boolean send) {
         //return this.playerUI.setItem(index + this.offset, item, send);
         Item before = this.playerUI.getItem(index + this.offset);
@@ -71,11 +74,17 @@ public class PlayerUIComponent extends BaseInventory {
 
     @Override
     public Map<Integer, Item> getContents() {
-        Map<Integer, Item> contents = playerUI.getContents();
-        contents.keySet().removeIf(slot -> slot < offset || slot > offset + size);
+        // Return contents with local indices (0 to size-1) instead of playerUI indices
+        // This ensures consistency with getItem(), setItem(), clear(), etc.
+        Map<Integer, Item> contents = new HashMap<>();
+        for (int i = 0; i < this.size; i++) {
+            Item item = this.getItem(i);
+            if (item != null && !item.isNull()) {
+                contents.put(i, item);
+            }
+        }
         return contents;
     }
-
 
     @Override
     public void sendContents(Player... players) {
@@ -83,18 +92,28 @@ public class PlayerUIComponent extends BaseInventory {
     }
 
     @Override
+    public void sendSlot(int index, Player player) {
+        this.playerUI.sendSlot(index + this.offset, player);
+    }
+
+    @Override
     public void sendSlot(int index, Player... players) {
-        playerUI.sendSlot(index + this.offset, players);
+        this.playerUI.sendSlot(index + this.offset, players);
+    }
+
+    @Override
+    public void sendSlot(int index, Collection<Player> players) {
+        this.playerUI.sendSlot(index + this.offset, players);
     }
 
     @Override
     public Set<Player> getViewers() {
-        return playerUI.getViewers();
+        return this.playerUI.getViewers();
     }
 
     @Override
     public InventoryType getType() {
-        return playerUI.type;
+        return this.playerUI.type;
     }
 
     @Override
@@ -119,7 +138,6 @@ public class PlayerUIComponent extends BaseInventory {
 
     @Override
     public void onSlotChange(int index, Item before, boolean send) {
-        //this.playerUI.onSlotChange(index + this.offset, before, send);
         if (send) {
             this.playerUI.onSlotChange(index + this.offset, before, true);
         }
