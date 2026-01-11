@@ -40,22 +40,22 @@ public class Explosion {
     private Set<Block> affectedBlocks;
     private Set<Block> fireIgnitions;
 
-    private final ExplosionSource target;
+    private final ExplosionSource sourceObject;
     private boolean doesDamage = true;
 
-    public Explosion(Position center, double size, Entity target) {
-        this(center, size, new ExplosionSource.EntitySource(target));
+    public Explosion(Position center, double size, Entity sourceObject) {
+        this(center, size, new ExplosionSource.EntitySource(sourceObject));
     }
 
-    public Explosion(Position center, double size, Block target) {
-        this(center, size, new ExplosionSource.BlockSource(target));
+    public Explosion(Position center, double size, Block sourceObject) {
+        this(center, size, new ExplosionSource.BlockSource(sourceObject));
     }
 
-    protected Explosion(Position center, double size, ExplosionSource target) {
+    protected Explosion(Position center, double size, ExplosionSource sourceObject) {
         this.level = center.getLevel();
         this.source = center;
         this.size = Math.max(size, 0);
-        this.target = target;
+        this.sourceObject = sourceObject;
     }
 
     public double getFireSpawnChance() {
@@ -92,7 +92,7 @@ public class Explosion {
      * @return {@code true} if success
      */
     public boolean explodeA() {
-        if (target instanceof ExplosionSource.EntitySource entitySource) {
+        if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
             Entity entity = entitySource.entity();
             if (entity instanceof EntityExplosive) {
                 int blockLayer0 = level.getBlockIdAt(entity.getFloorX(), entity.getFloorY(), entity.getFloorZ());
@@ -187,7 +187,7 @@ public class Explosion {
             affectedBlocks = new LinkedHashSet<>();
         }
 
-        if (target instanceof ExplosionSource.EntitySource entitySource) {
+        if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
             Entity exploder = entitySource.entity();
             List<Block> affectedBlocksList = new ArrayList<>(this.affectedBlocks);
             EntityExplodeEvent ev = new EntityExplodeEvent(exploder, this.source, affectedBlocksList, yield);
@@ -198,7 +198,7 @@ public class Explosion {
             affectedBlocks.clear();
             affectedBlocks.addAll(ev.getBlockList());
             fireIgnitions = ev.getIgnitions();
-        } else if (target instanceof ExplosionSource.BlockSource blockSource) {
+        } else if (this.sourceObject instanceof ExplosionSource.BlockSource blockSource) {
             BlockExplodeEvent ev = new BlockExplodeEvent(blockSource.block(), this.source, this.affectedBlocks,
                     fireIgnitions == null ? new LinkedHashSet<>(0) : fireIgnitions, yield, this.fireSpawnChance);
             this.level.getServer().getPluginManager().callEvent(ev);
@@ -219,7 +219,7 @@ public class Explosion {
         );
 
         Entity[] nearbyEntities = this.level.getNearbyEntities(explosionBB,
-                target instanceof ExplosionSource.EntitySource es ? es.entity() : null);
+                this.sourceObject instanceof ExplosionSource.EntitySource es ? es.entity() : null);
 
         for (Entity entity : nearbyEntities) {
             double distance = entity.distance(this.source) / explosionSize;
@@ -233,9 +233,9 @@ public class Explosion {
             float damage = this.doesDamage ? (float) ((impact * impact + impact) / 2.0 * 7.0 * force + 1.0) : 0f;
 
             EntityDamageEvent damageEvent;
-            if (target instanceof ExplosionSource.EntitySource es) {
+            if (this.sourceObject instanceof ExplosionSource.EntitySource es) {
                 damageEvent = new EntityDamageByEntityEvent(es.entity(), entity, DamageCause.ENTITY_EXPLOSION, damage);
-            } else if (target instanceof ExplosionSource.BlockSource bs) {
+            } else if (this.sourceObject instanceof ExplosionSource.BlockSource bs) {
                 damageEvent = new EntityDamageByBlockEvent(bs.block(), entity, DamageCause.BLOCK_EXPLOSION, damage);
             } else {
                 damageEvent = new EntityDamageEvent(entity, DamageCause.BLOCK_EXPLOSION, damage);
@@ -261,7 +261,7 @@ public class Explosion {
             }
 
             if (currentBlock instanceof BlockTNT tnt) {
-                Entity exploder = (target instanceof ExplosionSource.EntitySource es) ? es.entity() : null;
+                Entity exploder = (this.sourceObject instanceof ExplosionSource.EntitySource es) ? es.entity() : null;
                 tnt.prime(random.nextInt(10, 31), exploder);
             } else {
                 BlockEntity container = currentBlock.getLevel().getBlockEntity(currentBlock);
