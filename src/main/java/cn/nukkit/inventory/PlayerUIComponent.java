@@ -78,7 +78,7 @@ public class PlayerUIComponent extends BaseInventory {
         // This ensures consistency with getItem(), setItem(), clear(), etc.
         Map<Integer, Item> contents = new HashMap<>();
         for (int i = 0; i < this.size; i++) {
-            Item item = this.getItem(i);
+            Item item = this.getItemFast(i);
             if (item != null && !item.isNull()) {
                 contents.put(i, item);
             }
