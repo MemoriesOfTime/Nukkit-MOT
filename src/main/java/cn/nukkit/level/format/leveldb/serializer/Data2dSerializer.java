@@ -17,8 +17,8 @@ public class Data2dSerializer {
         buffer.writerIndex(0);
         short[] heightMap = chunk.getHeightMapArray();
         byte[] biomes = chunk.getBiomeIdArray();
-        for (int i = 0; i < 256; i++) {
-            buffer.writeShortLE(heightMap[i]);
+        for (int height : heightMap) {
+            buffer.writeShortLE(height);
         }
         buffer.writeBytes(biomes);
 

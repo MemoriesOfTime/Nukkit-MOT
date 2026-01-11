@@ -20,14 +20,9 @@ public class Data3dSerializer {
         ByteBuf buffer  = ByteBufAllocator.DEFAULT.ioBuffer();
         try {
             short[] heightMap = chunk.getHeightMapArray();
-//            for (int height : heightMap) {
-//                buffer.writeShortLE(height);
-//            }
-            //TODO check
-            for (int i = 0; i < 256; i++) {
-                buffer.writeShortLE(heightMap[i]);
+            for (int height : heightMap) {
+                buffer.writeShortLE(height);
             }
-
 
             for (int i = 0; i < dimensionData.getHeight() >> 4; i++) {
                 PalettedBlockStorage storage = chunk.getBiomeStorage(i);

@@ -43,7 +43,7 @@ public class LevelDBChunk extends BaseChunk {
     private final DimensionData dimensionData;
 
     public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ) {
-        this(level, chunkX, chunkZ, new LevelDBChunkSection[0], new int[384], null, null, null, null, ChunkState.NEW);
+        this(level, chunkX, chunkZ, new LevelDBChunkSection[0], new int[SUB_CHUNK_2D_SIZE], null, null, null, null, ChunkState.NEW);
     }
 
     public LevelDBChunk(@Nullable LevelProvider provider, int chunkX, int chunkZ, @NotNull ChunkSection[] sections,
