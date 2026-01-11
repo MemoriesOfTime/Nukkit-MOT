@@ -123,8 +123,8 @@ public class Chunk extends BaseChunk {
         }
 
         int[] heightMap = nbt.getIntArray("HeightMap");
-        this.heightMap = new short[384];
-        if (heightMap.length != 384) {
+        this.heightMap = new short[256];
+        if (heightMap.length != 256) {
             Arrays.fill(this.heightMap, (short) 319);
         } else {
             for (int i = 0; i < heightMap.length; i++) {
@@ -501,7 +501,7 @@ public class Chunk extends BaseChunk {
 
             chunk.setPosition(chunkX, chunkZ);
 
-            chunk.heightMap = new short[384];
+            chunk.heightMap = new short[256];
             chunk.inhabitedTime = 0;
             chunk.terrainGenerated = false;
             chunk.terrainPopulated = false;

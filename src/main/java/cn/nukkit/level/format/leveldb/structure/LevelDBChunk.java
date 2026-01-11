@@ -67,8 +67,8 @@ public class LevelDBChunk extends BaseChunk {
             }
         }
 
-        this.heightMap = new short[384];
-        if (heightmap != null && heightmap.length == 384) {
+        this.heightMap = new short[SUB_CHUNK_2D_SIZE];
+        if (heightmap != null && heightmap.length == SUB_CHUNK_2D_SIZE) {
             for (int i=0; i<heightmap.length; i++) {
                 this.heightMap[i] = (short) heightmap[i];
             }
