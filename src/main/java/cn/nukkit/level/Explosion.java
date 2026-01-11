@@ -95,10 +95,9 @@ public class Explosion {
         if (target instanceof ExplosionSource.EntitySource entitySource) {
             Entity entity = entitySource.entity();
             if (entity instanceof EntityExplosive) {
-                Block blockLayer0 = level.getBlock(entity.floor());
-                Block blockLayer1 = level.getBlock(entity.floor(), 1);
-                if (blockLayer0.getId() == BlockID.WATER || blockLayer0.getId() == BlockID.STILL_WATER ||
-                        blockLayer1.getId() == BlockID.WATER || blockLayer1.getId() == BlockID.STILL_WATER) {
+                int blockLayer0 = level.getBlockIdAt(entity.getFloorX(), entity.getFloorY(), entity.getFloorZ());
+                int blockLayer1 = level.getBlockIdAt(entity.getFloorX(), entity.getFloorY(), entity.getFloorZ(), 1);
+                if (Block.isWater(blockLayer0) || Block.isWater(blockLayer1)) {
                     this.doesDamage = false;
                     return true;
                 }
