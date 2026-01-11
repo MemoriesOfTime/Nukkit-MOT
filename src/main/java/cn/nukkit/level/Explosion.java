@@ -254,7 +254,7 @@ public class Explosion {
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
         for (Block originalBlock : new ArrayList<>(this.affectedBlocks)) {
-            Block currentBlock = this.level.getBlock((int) originalBlock.x, (int) originalBlock.y, (int) originalBlock.z, originalBlock.layer);
+            Block currentBlock = this.level.getBlock(originalBlock.getFloorX(), originalBlock.getFloorY(), originalBlock.getFloorZ(), originalBlock.layer);
 
             if (currentBlock.getId() != originalBlock.getId()) {
                 continue;
@@ -286,13 +286,13 @@ public class Explosion {
                 smokePositions.add(currentBlock);
             }
 
-            this.level.setBlock(new Vector3((int) currentBlock.x, (int) currentBlock.y, (int) currentBlock.z), currentBlock.layer, Block.get(BlockID.AIR));
+            this.level.setBlock(new Vector3(currentBlock.getFloorX(), currentBlock.getFloorY(), currentBlock.getFloorZ()), currentBlock.layer, Block.get(BlockID.AIR));
 
             if (currentBlock.layer == 0) {
                 Vector3 pos = new Vector3(currentBlock.x, currentBlock.y, currentBlock.z);
                 for (BlockFace side : BlockFace.values()) {
                     Vector3 sideBlock = pos.getSide(side);
-                    long index = Hash.hashBlock((int) sideBlock.x, (int) sideBlock.y, (int) sideBlock.z);
+                    long index = Hash.hashBlock(sideBlock.getFloorX(), sideBlock.getFloorY(), sideBlock.getFloorZ());
                     if (!this.affectedBlocks.contains(sideBlock) && !updateBlocks.contains(index)) {
                         this.processBlockUpdate(sideBlock);
                         Block layer1 = this.level.getBlock(sideBlock, 1);
