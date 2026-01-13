@@ -144,9 +144,9 @@ public class WeakExplosion extends Explosion {
             double distance = entity.distance(this.source) / explosionSize;
             if (distance <= 1) {
                 Vector3 motion = entity.subtract(this.source).normalize();
-                float blockDensity = 1 - level.getBlockDensity(this.source, entity.boundingBox);
-                double impact = (1.0 - distance) * blockDensity;
-                float damage = this.doesDamage ? (float) (((impact * impact + impact) / 2) * 5 * explosionSize + 1) : 0f;
+                int exposure = 1;
+                double impact = (1 - distance) * exposure;
+                int damage = this.doesDamage ? (int) (((impact * impact + impact) / 2) * 5 * explosionSize + 1) : 0;
 
                 if (this.sourceObject instanceof ExplosionSource.EntitySource es) {
                     entity.attack(new EntityDamageByEntityEvent(es.entity(), entity, DamageCause.ENTITY_EXPLOSION, damage));
