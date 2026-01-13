@@ -166,11 +166,11 @@ public class WeakExplosion extends Explosion {
         BlockEntity container;
 
         for (Block block : this.affectedBlocks) {
-            if (block.getId() == Block.TNT) {
+            if (block instanceof BlockTNT tnt) {
                 Entity exploder = (this.sourceObject instanceof ExplosionSource.EntitySource es) ? es.entity() : null;
-                ((BlockTNT) block).prime(Utils.rand(10, 30), exploder);
+                tnt.prime(Utils.rand(10, 30), exploder);
             } else if (block.getId() == Block.BED_BLOCK && (block.getDamage() & 0x08) == 0x08) {
-                this.level.setBlockAt((int) block.x, (int) block.y, (int) block.z, Block.AIR);
+                this.level.setBlockAt(block.getFloorX(), block.getFloorY(), block.getFloorZ(), Block.AIR);
                 continue; // We don't want drops from both bed parts
             } else if ((container = block.getLevel().getBlockEntity(block)) instanceof InventoryHolder inventoryHolder) {
                 if (block.getLevel().getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
@@ -190,7 +190,7 @@ public class WeakExplosion extends Explosion {
                 }
             }
 
-            this.level.setBlockAt((int) block.x, (int) block.y, (int) block.z, BlockID.AIR);
+            this.level.setBlockAt(block.getFloorX(), block.getFloorY(), block.getFloorZ(), BlockID.AIR);
 
             Vector3 pos = new Vector3(block.x, block.y, block.z);
 
@@ -198,7 +198,11 @@ public class WeakExplosion extends Explosion {
                 Vector3 sideBlock = pos.getSide(side);
                 long index = Hash.hashBlock((int) sideBlock.x, (int) sideBlock.y, (int) sideBlock.z);
                 if (!this.affectedBlocks.contains(sideBlock) && !updateBlocks.contains(index)) {
-                    this.processBlockUpdate(sideBlock);
+                    BlockUpdateEvent ev = new BlockUpdateEvent(this.level.getBlock(sideBlock));
+                    this.level.getServer().getPluginManager().callEvent(ev);
+                    if (!ev.isCancelled()) {
+                        ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
+                    }
                     updateBlocks.add(index);
                     this.level.antiXrayOnBlockChange(null, block, 0);
                 }
@@ -207,14 +211,5 @@ public class WeakExplosion extends Explosion {
         this.level.addParticle(new HugeExplodeSeedParticle(this.source));
         this.level.addLevelSoundEvent(source, LevelSoundEventPacket.SOUND_EXPLODE);
         return true;
-    }
-
-    private void processBlockUpdate(Vector3 pos) {
-        Block block = this.level.getBlock(pos);
-        BlockUpdateEvent ev = new BlockUpdateEvent(block);
-        this.level.getServer().getPluginManager().callEvent(ev);
-        if (!ev.isCancelled()) {
-            ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
-        }
     }
 }
