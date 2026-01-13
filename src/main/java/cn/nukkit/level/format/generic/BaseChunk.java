@@ -347,7 +347,7 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
     }
 
     @Override
-    public byte[] getHeightMapArray() {
+    public short[] getHeightMapArray() {
         return this.heightMap;
     }
 

@@ -225,7 +225,7 @@ public interface FullChunk extends Cloneable {
 
     int[] getBiomeColorArray();
 
-    byte[] getHeightMapArray();
+    short[] getHeightMapArray();
 
     byte[] getBlockIdArray(int layer);
 
