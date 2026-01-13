@@ -9,16 +9,15 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
+import cn.nukkit.event.block.BlockExplodeEvent;
 import cn.nukkit.event.block.BlockUpdateEvent;
-import cn.nukkit.event.entity.EntityDamageByBlockEvent;
-import cn.nukkit.event.entity.EntityDamageByEntityEvent;
-import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
-import cn.nukkit.event.entity.EntityExplodeEvent;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.particle.HugeExplodeSeedParticle;
+import cn.nukkit.level.util.ExplosionSource;
 import cn.nukkit.math.*;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.Hash;
@@ -26,7 +25,9 @@ import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.longs.LongArraySet;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Explosion that can break obsidian (for wither skulls)
@@ -36,23 +37,36 @@ public class StrongExplosion extends Explosion {
     private final Level level;
     private final Position source;
     private final double size;
-    private final Object what;
+    private final ExplosionSource sourceObject;
     private boolean doesDamage = true;
     private List<Block> affectedBlocks = new ArrayList<>();
-    
-    public StrongExplosion(Position center, double size, Entity what) {
-        super(center, size, what);
+    private Set<Block> fireIgnitions;
+    private double fireSpawnChance;
+
+    public StrongExplosion(Position center, double size, Entity sourceObject) {
+        this(center, size, new ExplosionSource.EntitySource(sourceObject));
+    }
+
+    public StrongExplosion(Position center, double size, Block sourceObject) {
+        this(center, size, new ExplosionSource.BlockSource(sourceObject));
+    }
+
+    protected StrongExplosion(Position center, double size, ExplosionSource sourceObject) {
+        super(center, size, sourceObject);
         this.level = center.getLevel();
         this.source = center;
         this.size = Math.max(size, 0);
-        this.what = what;
+        this.sourceObject = sourceObject;
     }
 
     @Override
     public boolean explodeA() {
-        if (what instanceof EntityExplosive && ((Entity) what).isInsideOfWater()) {
-            this.doesDamage = false;
-            return true;
+        if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
+            Entity entity = entitySource.entity();
+            if (entity instanceof EntityExplosive && entity.isInsideOfWater()) {
+                this.doesDamage = false;
+                return true;
+            }
         }
 
         if (this.size < 0.1) return false;
@@ -112,8 +126,9 @@ public class StrongExplosion extends Explosion {
         LongArraySet updateBlocks = new LongArraySet();
         double yield = (1d / this.size) * 100d;
 
-        if (this.what instanceof Entity) {
-            EntityExplodeEvent ev = new EntityExplodeEvent((Entity) this.what, this.source, this.affectedBlocks, yield);
+        if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
+            Entity exploder = entitySource.entity();
+            EntityExplodeEvent ev = new EntityExplodeEvent(exploder, this.source, this.affectedBlocks, yield);
             this.level.getServer().getPluginManager().callEvent(ev);
             if (ev.isCancelled()) {
                 return false;
@@ -133,7 +148,9 @@ public class StrongExplosion extends Explosion {
 
         AxisAlignedBB explosionBB = new SimpleAxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);
 
-        Entity[] list = this.level.getNearbyEntities(explosionBB, this.what instanceof Entity ? (Entity) this.what : null);
+        Entity[] list = this.level.getNearbyEntities(explosionBB,
+                this.sourceObject instanceof ExplosionSource.EntitySource es ? es.entity() : null);
+
         for (Entity entity : list) {
             double distance = entity.distance(this.source) / explosionSize;
 
@@ -143,10 +160,10 @@ public class StrongExplosion extends Explosion {
                 double impact = (1 - distance) * exposure;
                 int damage = this.doesDamage ? (int) (((impact * impact + impact) / 2) * 8 * explosionSize + 1) : 0;
 
-                if (this.what instanceof Entity) {
-                    entity.attack(new EntityDamageByEntityEvent((Entity) this.what, entity, DamageCause.ENTITY_EXPLOSION, damage));
-                } else if (this.what instanceof Block) {
-                    entity.attack(new EntityDamageByBlockEvent((Block) this.what, entity, DamageCause.BLOCK_EXPLOSION, damage));
+                if (this.sourceObject instanceof ExplosionSource.EntitySource es) {
+                    entity.attack(new EntityDamageByEntityEvent(es.entity(), entity, DamageCause.ENTITY_EXPLOSION, damage));
+                } else if (this.sourceObject instanceof ExplosionSource.BlockSource bs) {
+                    entity.attack(new EntityDamageByBlockEvent(bs.block(), entity, DamageCause.BLOCK_EXPLOSION, damage));
                 } else {
                     entity.attack(new EntityDamageEvent(entity, DamageCause.BLOCK_EXPLOSION, damage));
                 }
@@ -158,29 +175,32 @@ public class StrongExplosion extends Explosion {
         }
 
         ItemBlock air = new ItemBlock(Block.get(BlockID.AIR));
-        BlockEntity container;
 
         for (Block block : this.affectedBlocks) {
             if (block.getId() == Block.TNT) {
-                ((BlockTNT) block).prime(Utils.rand(10, 30), this.what instanceof Entity ? (Entity) this.what : null);
+                Entity exploder = (this.sourceObject instanceof ExplosionSource.EntitySource es) ? es.entity() : null;
+                ((BlockTNT) block).prime(Utils.rand(10, 30), exploder);
             } else if (block.getId() == Block.BED_BLOCK && (block.getDamage() & 0x08) == 0x08) {
                 this.level.setBlockAt((int) block.x, (int) block.y, (int) block.z, Block.AIR);
                 continue; // We don't want drops from both bed parts
-            } else if ((container = block.getLevel().getBlockEntity(block)) instanceof InventoryHolder) {
-                if (block.getLevel().getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
-                    if (container instanceof BlockEntityShulkerBox) {
-                        this.level.dropItem(block.add(0.5, 0.5, 0.5), block.toItem());
-                        ((InventoryHolder) container).getInventory().clearAll();
-                    } else {
-                        for (Item drop : ((InventoryHolder) container).getInventory().getContents().values()) {
-                            this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
+            } else {
+                BlockEntity container = block.getLevel().getBlockEntity(block);
+                if (container instanceof InventoryHolder inventoryHolder) {
+                    if (block.getLevel().getGameRules().getBoolean(GameRule.DO_TILE_DROPS)) {
+                        if (container instanceof BlockEntityShulkerBox) {
+                            this.level.dropItem(block.add(0.5, 0.5, 0.5), block.toItem());
+                            inventoryHolder.getInventory().clearAll();
+                        } else {
+                            for (Item drop : inventoryHolder.getInventory().getContents().values()) {
+                                this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
+                            }
+                            inventoryHolder.getInventory().clearAll();
                         }
-                        ((InventoryHolder) container).getInventory().clearAll();
                     }
-                }
-            } else if (Math.random() * 100 < yield && block.getId() != Block.OBSIDIAN) {
-                for (Item drop : block.getDrops(air)) {
-                    this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
+                } else if (Math.random() * 100 < yield && block.getId() != Block.OBSIDIAN) {
+                    for (Item drop : block.getDrops(air)) {
+                        this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
+                    }
                 }
             }
 
@@ -192,11 +212,7 @@ public class StrongExplosion extends Explosion {
                 Vector3 sideBlock = pos.getSide(side);
                 long index = Hash.hashBlock((int) sideBlock.x, (int) sideBlock.y, (int) sideBlock.z);
                 if (!this.affectedBlocks.contains(sideBlock) && !updateBlocks.contains(index)) {
-                    BlockUpdateEvent ev = new BlockUpdateEvent(this.level.getBlock(sideBlock));
-                    this.level.getServer().getPluginManager().callEvent(ev);
-                    if (!ev.isCancelled()) {
-                        ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
-                    }
+                    this.processBlockUpdate(sideBlock);
                     updateBlocks.add(index);
                     this.level.antiXrayOnBlockChange(null, block, 0);
                 }
@@ -206,5 +222,14 @@ public class StrongExplosion extends Explosion {
         this.level.addParticle(new HugeExplodeSeedParticle(this.source));
         this.level.addLevelSoundEvent(source, LevelSoundEventPacket.SOUND_EXPLODE);
         return true;
+    }
+
+    private void processBlockUpdate(Vector3 pos) {
+        Block block = this.level.getBlock(pos);
+        BlockUpdateEvent ev = new BlockUpdateEvent(block);
+        this.level.getServer().getPluginManager().callEvent(ev);
+        if (!ev.isCancelled()) {
+            ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
+        }
     }
 }

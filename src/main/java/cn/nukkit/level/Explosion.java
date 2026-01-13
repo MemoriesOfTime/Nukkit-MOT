@@ -17,6 +17,7 @@ import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.particle.HugeExplodeSeedParticle;
+import cn.nukkit.level.util.ExplosionSource;
 import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Hash;
@@ -342,9 +343,4 @@ public class Explosion {
             ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
         }
     }
-}
-
-sealed interface ExplosionSource permits ExplosionSource.EntitySource, ExplosionSource.BlockSource {
-    record EntitySource(Entity entity) implements ExplosionSource {}
-    record BlockSource(Block block) implements ExplosionSource {}
 }
