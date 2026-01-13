@@ -9,7 +9,6 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityExplosive;
 import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
-import cn.nukkit.event.block.BlockExplodeEvent;
 import cn.nukkit.event.block.BlockUpdateEvent;
 import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -25,9 +24,7 @@ import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.longs.LongArraySet;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Explosion that can break obsidian (for wither skulls)
@@ -43,10 +40,6 @@ public class StrongExplosion extends Explosion {
 
     public StrongExplosion(Position center, double size, Entity sourceObject) {
         this(center, size, new ExplosionSource.EntitySource(sourceObject));
-    }
-
-    public StrongExplosion(Position center, double size, Block sourceObject) {
-        this(center, size, new ExplosionSource.BlockSource(sourceObject));
     }
 
     protected StrongExplosion(Position center, double size, ExplosionSource sourceObject) {
