@@ -96,8 +96,8 @@ public class NetworkChunkSerializer {
                 }
 
                 if (protocolId < ProtocolInfo.v1_12_0) {
-                    for (byte height : chunk.getHeightMapArray()) {
-                        stream.putByte(height);
+                    for (short height : chunk.getHeightMapArray()) {
+                        stream.putByte(height & 0xFF);
                     }
                     stream.put(PAD_256);
                 }
