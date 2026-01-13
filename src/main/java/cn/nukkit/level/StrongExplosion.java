@@ -40,8 +40,6 @@ public class StrongExplosion extends Explosion {
     private final ExplosionSource sourceObject;
     private boolean doesDamage = true;
     private List<Block> affectedBlocks = new ArrayList<>();
-    private Set<Block> fireIgnitions;
-    private double fireSpawnChance;
 
     public StrongExplosion(Position center, double size, Entity sourceObject) {
         this(center, size, new ExplosionSource.EntitySource(sourceObject));
