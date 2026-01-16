@@ -1,6 +1,8 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.block.Block;
 import cn.nukkit.block.custom.comparator.HashedPaletteComparator;
+import cn.nukkit.level.BlockPalette;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import com.google.gson.JsonArray;
@@ -139,10 +141,14 @@ public class NetEaseConverter {
     /**
      * 转换创造模式物品列表为网易版本
      * @param creativeItems 标准版本的创造模式物品JSON数组
+     * @param standardPalette 标准版方块调色板（用于从blockRuntimeId获取legacyFullId）
+     * @param neteasePalette 网易版方块调色板（用于从legacyFullId获取新的blockRuntimeId）
      * @return 转换后的网易版本创造模式物品JSON数组
      */
-    public static JsonArray convertCreativeItems(JsonArray creativeItems) {
+    public static JsonArray convertCreativeItems(JsonArray creativeItems, BlockPalette standardPalette, BlockPalette neteasePalette) {
         JsonArray result = new JsonArray();
+        int convertedCount = 0;
+        int skippedCount = 0;
 
         for (JsonElement element : creativeItems) {
             if (!element.isJsonObject()) {
@@ -156,6 +162,27 @@ public class NetEaseConverter {
                 String id = item.get("id").getAsString();
                 if (shouldRemoveBlock(id)) {
                     log.debug("Removing creative item for NetEase: {}", id);
+                    skippedCount++;
+                    continue;
+                }
+            }
+
+            if (item.has("blockRuntimeId")) {
+                int oldRuntimeId = item.get("blockRuntimeId").getAsInt();
+                if (oldRuntimeId != 0) {
+                    int legacyFullId = standardPalette.getLegacyFullId(oldRuntimeId);
+                    if (legacyFullId != -1) {
+                        int blockId = legacyFullId >> Block.DATA_BITS;
+                        int meta = legacyFullId & Block.DATA_MASK;
+                        int newRuntimeId = neteasePalette.getRuntimeId(blockId, meta);
+                        JsonObject newItem = item.deepCopy();
+                        newItem.addProperty("blockRuntimeId", newRuntimeId);
+                        result.add(newItem);
+                        convertedCount++;
+                        continue;
+                    }
+                    log.debug("Skipping item with unmapped blockRuntimeId: {}", oldRuntimeId);
+                    skippedCount++;
                     continue;
                 }
             }
@@ -163,6 +190,7 @@ public class NetEaseConverter {
             result.add(item);
         }
 
+        log.info("NetEase creative items conversion: {} converted, {} skipped", convertedCount, skippedCount);
         return result;
     }
 

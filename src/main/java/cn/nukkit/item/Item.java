@@ -13,6 +13,8 @@ import cn.nukkit.item.RuntimeItemMapping.RuntimeEntry;
 import cn.nukkit.item.customitem.CustomItem;
 import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.level.BlockPalette;
+import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
@@ -673,7 +675,9 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             }
 
             if (useNetEaseConversion) {
-                itemsArray = NetEaseConverter.convertCreativeItems(itemsArray);
+                BlockPalette standardPalette = GlobalBlockPalette.getPaletteByProtocol(GameVersion.byProtocol(protocol, false));
+                BlockPalette neteasePalette = GlobalBlockPalette.getPaletteByProtocol(blockPaletteVersion);
+                itemsArray = NetEaseConverter.convertCreativeItems(itemsArray, standardPalette, neteasePalette);
                 root.add("items", itemsArray);
                 log.info("Converted {} creative items to NetEase version", itemsArray.size());
             }
