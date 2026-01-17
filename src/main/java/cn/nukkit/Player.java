@@ -4426,7 +4426,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     break;
                 }
 
-                if (this.isSpectator()) {
+                // 旁观者模式检查：如果启用了客户端旁观模式，则完全阻止交互（不触发事件）
+                // 如果未启用，则允许触发事件但不允许实际操作（假旁观模式，类似创造模式）
+                // Spectator mode check: If client spectator mode is enabled, completely block interaction (no event trigger)
+                // If not enabled, allow event trigger but prevent actual operation (fake spectator mode, similar to creative mode)
+                if (this.isSpectator() && this.server.useClientSpectator) {
                     this.needSendInventory = true;
                     break;
                 }
@@ -4744,14 +4748,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 lastRightClickTime = System.currentTimeMillis();
 
                                 // Hack: Fix client spamming right clicks
-                                if (spamming && this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR) {
+                                // 假旁观模式下也需要防止重复点击，避免事件被多次触发
+                                // Fake spectator mode also needs to prevent duplicate clicks to avoid multiple event triggers
+                                if (spamming && (this.getInventory().getItemInHandFast().getBlockId() == BlockID.AIR
+                                        || (this.isSpectator() && !this.server.useClientSpectator))) {
                                     return;
                                 }
 
                                 this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
 
                                 if (!(this.distance(blockVector.asVector3()) > (this.isCreative() ? 13 : 7))) {
-                                    if (this.isCreative()) {
+                                    // 创造模式或假旁观模式（未启用客户端旁观）：允许触发事件但不消耗物品
+                                    // Creative mode or fake spectator mode (client spectator not enabled): Allow event trigger but don't consume items
+                                    if (this.isCreative() || (this.isSpectator() && !this.server.useClientSpectator)) {
                                         if (this.level.useItemOn(blockVector.asVector3(), inventory.getItemInHand(), face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this) != null) {
                                             break packetswitch;
                                         }
@@ -4841,6 +4850,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                                 break packetswitch;
                             case InventoryTransactionPacket.USE_ITEM_ACTION_CLICK_AIR:
+                                // 防止右键点击空气的重复触发
+                                // Prevent duplicate triggers of right-click on air
+                                long currentClickAirTime = System.currentTimeMillis();
+                                if (!server.doNotLimitInteractions && (currentClickAirTime - lastRightClickTime) < 100) {
+                                    return;
+                                }
+                                lastRightClickTime = currentClickAirTime;
+
                                 Vector3 directionVector = this.getDirectionVector();
 
                                 if (inventory.getHeldItemIndex() != useItemData.hotbarSlot) {
@@ -4870,6 +4887,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 }
 
                                 if (item.onClickAir(this, directionVector)) {
+                                    // 假旁观模式：不消耗物品，类似创造模式
+                                    // Fake spectator mode: Don't consume items, similar to creative mode
                                     if (this.isSurvival() || this.isAdventure()) {
                                         if (item.getId() == 0 || this.inventory.getItemInHandFast().getId() == item.getId()) {
                                             this.inventory.setItemInHand(item);
@@ -5138,6 +5157,15 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private void onBlockBreakStart(Vector3 pos, BlockFace face) {
         BlockVector3 blockPos = pos.asBlockVector3();
         long currentBreak = System.currentTimeMillis();
+
+        // 旁观者模式检查：如果启用了客户端旁观模式，则完全阻止交互（不触发事件）
+        // 如果未启用，则允许触发事件但不允许实际破坏方块（假旁观模式，类似创造模式）
+        // Spectator mode check: If client spectator mode is enabled, completely block interaction (no event trigger)
+        // If not enabled, allow event trigger but prevent actual block breaking (fake spectator mode, similar to creative mode)
+        if (this.isSpectator() && this.server.useClientSpectator) {
+            return;
+        }
+
         // HACK: Client spams multiple left clicks so we need to skip them.
         if ((this.lastBreakPosition.equals(blockPos) && (currentBreak - this.lastBreak) < 10) || pos.distanceSquared(this) > 100) {
             return;
@@ -5163,7 +5191,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        if (!this.isCreative()) {
+        // 假旁观模式：不显示破坏进度，类似创造模式
+        // Fake spectator mode: Don't show break progress, similar to creative mode
+        if (!this.isCreative() && !this.isSpectator()) {
             double breakTime = Math.ceil(target.calculateBreakTime(this.inventory.getItemInHand(), this) * 20);
             if (breakTime > 0) {
                 LevelEventPacket pk = new LevelEventPacket();
@@ -5214,7 +5244,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     private void onBlockBreakComplete(BlockVector3 blockPos, BlockFace face) {
-        if (!this.spawned || !this.isAlive()) {
+        if (!this.spawned || !this.isAlive() || this.isSpectator()) {
             return;
         }
 
