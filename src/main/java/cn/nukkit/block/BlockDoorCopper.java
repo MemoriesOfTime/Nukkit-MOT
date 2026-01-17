@@ -78,8 +78,16 @@ public class BlockDoorCopper extends BlockDoor implements Oxidizable, Waxable {
 
     @Override
     public int onUpdate(int type) {
+        int originalId = this.getId();
         int result = Oxidizable.super.onUpdate(type);
         if (result != 0) {
+            Block current = this.level.getBlock(this);
+            if (current.getId() != originalId && current instanceof BlockDoorCopper) {
+                Block other = isTop() ? this.down() : this.up();
+                if (other instanceof BlockDoorCopper && other.getId() == originalId) {
+                    this.level.setBlock(other, Block.get(current.getId(), other.getDamage()));
+                }
+            }
             return result;
         }
         return super.onUpdate(type);
@@ -110,7 +118,18 @@ public class BlockDoorCopper extends BlockDoor implements Oxidizable, Waxable {
         if (isWaxed() == waxed) {
             return true;
         }
-        return getValidLevel().setBlock(this, Block.get(getCopperId(waxed, getOxidizationLevel()), getDamage()));
+        int newId = getCopperId(waxed, getOxidizationLevel());
+        Block other;
+        if (isTop()) {
+            other = this.down();
+        } else {
+            other = this.up();
+        }
+        boolean success = getValidLevel().setBlock(this, Block.get(newId, getDamage()));
+        if (success && other instanceof BlockDoorCopper) {
+            getValidLevel().setBlock(other, Block.get(newId, other.getDamage()));
+        }
+        return success;
     }
 
     @Override
@@ -123,7 +142,18 @@ public class BlockDoorCopper extends BlockDoor implements Oxidizable, Waxable {
         if (getOxidizationLevel().equals(oxidizationLevel)) {
             return true;
         }
-        return getValidLevel().setBlock(this, Block.get(getCopperId(isWaxed(), oxidizationLevel), getDamage()));
+        int newId = getCopperId(isWaxed(), oxidizationLevel);
+        Block other;
+        if (isTop()) {
+            other = this.down();
+        } else {
+            other = this.up();
+        }
+        boolean success = getValidLevel().setBlock(this, Block.get(newId, getDamage()));
+        if (success && other instanceof BlockDoorCopper) {
+            getValidLevel().setBlock(other, Block.get(newId, other.getDamage()));
+        }
+        return success;
     }
 
     @Override
@@ -135,17 +165,12 @@ public class BlockDoorCopper extends BlockDoor implements Oxidizable, Waxable {
         if (oxidizationLevel == null) {
             return getId();
         }
-        switch (oxidizationLevel) {
-            case UNAFFECTED:
-                return waxed ? WAXED_COPPER_DOOR : COPPER_DOOR;
-            case EXPOSED:
-                return waxed ? WAXED_EXPOSED_COPPER_DOOR : EXPOSED_COPPER_DOOR;
-            case WEATHERED:
-                return waxed ? WAXED_WEATHERED_COPPER_DOOR : WEATHERED_COPPER_DOOR;
-            case OXIDIZED:
-                return waxed ? WAXED_OXIDIZED_COPPER_DOOR : OXIDIZED_COPPER_DOOR;
-            default:
-                return getId();
-        }
+        return switch (oxidizationLevel) {
+            case UNAFFECTED -> waxed ? WAXED_COPPER_DOOR : COPPER_DOOR;
+            case EXPOSED -> waxed ? WAXED_EXPOSED_COPPER_DOOR : EXPOSED_COPPER_DOOR;
+            case WEATHERED -> waxed ? WAXED_WEATHERED_COPPER_DOOR : WEATHERED_COPPER_DOOR;
+            case OXIDIZED -> waxed ? WAXED_OXIDIZED_COPPER_DOOR : OXIDIZED_COPPER_DOOR;
+            default -> getId();
+        };
     }
 }
