@@ -3,6 +3,7 @@ package cn.nukkit.item;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.item.EntityElytraFirework;
 import cn.nukkit.entity.item.EntityFirework;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
@@ -71,7 +72,7 @@ public class ItemFirework extends Item {
     @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
         if (player.getInventory().getChestplateFast() instanceof ItemElytra && player.isGliding()) {
-            this.spawnFirework(player.getLevel(), player);
+            this.spawnElytraFirework(player.getLevel(), player, player);
 
             if (!player.isCreative()) {
                 this.count--;
@@ -131,6 +132,15 @@ public class ItemFirework extends Item {
                 .putCompound("FireworkItem", NBTIO.putItemHelper(this));
 
         EntityFirework entity = new EntityFirework(level.getChunk(pos.getChunkX(), pos.getChunkZ()), nbt, projectile);
+        entity.spawnToAll();
+        return entity;
+    }
+
+    public EntityElytraFirework spawnElytraFirework(Level level, Vector3 pos, Player player) {
+        CompoundTag nbt = Entity.getDefaultNBT(pos, null, 0, 0)
+                .putCompound("FireworkItem", NBTIO.putItemHelper(this));
+
+        EntityElytraFirework entity = new EntityElytraFirework(level.getChunk(pos.getChunkX(), pos.getChunkZ()), nbt, player);
         entity.spawnToAll();
         return entity;
     }
