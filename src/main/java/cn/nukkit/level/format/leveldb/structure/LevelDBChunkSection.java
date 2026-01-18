@@ -56,17 +56,25 @@ public class LevelDBChunkSection implements ChunkSection {
     }
 
     public LevelDBChunkSection(LevelDBChunk parent, int y) {
-        this.parent = new WeakReference<>(parent);
+        this.setParent(parent);
         this.y = y;
         this.storages = new StateBlockStorage[]{ new StateBlockStorage(), new StateBlockStorage() };
     }
 
+    public LevelDBChunkSection(int y, @Nullable StateBlockStorage[] storages, boolean hasSkyLight) {
+        this(null, y, storages, null, null, null, false, hasSkyLight);
+    }
+
+    /**
+     * @deprecated Use {@link #LevelDBChunkSection(int, StateBlockStorage[], boolean)} instead
+     */
+    @Deprecated
     public LevelDBChunkSection(int y, @Nullable StateBlockStorage[] storages) {
         this(null, y, storages, null, null, null, false, false);
     }
 
     public LevelDBChunkSection(LevelDBChunk parent, int y, @Nullable StateBlockStorage[] storages, byte[] blockLight, byte[] skyLight, byte[] compressedLight, boolean hasBlockLight, boolean hasSkyLight) {
-        this.parent = new WeakReference<>(parent);
+        this.setParent(parent);
         this.y = y;
 
         if (storages == null || storages.length == 0) {
@@ -116,6 +124,11 @@ public class LevelDBChunkSection implements ChunkSection {
 
     public void setParent(LevelDBChunk parent) {
         this.parent = new WeakReference<>(parent);
+
+        // Set hasSkyLight based on dimension (Overworld = 0 has sky light)
+        if (parent != null && parent.getProvider() != null) {
+            this.hasSkyLight = parent.getProvider().getLevel().getDimensionData().getDimensionId() == 0;
+        }
     }
 
     @Override

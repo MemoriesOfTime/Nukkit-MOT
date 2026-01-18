@@ -290,7 +290,7 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         return true;
     }
 
-    private void setInternalSection(float fY, ChunkSection section) {
+    protected void setInternalSection(float fY, ChunkSection section) {
         this.sections[this.getSectionOffset() + (int) fY] = section;
         setChanged();
     }
