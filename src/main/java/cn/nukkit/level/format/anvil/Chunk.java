@@ -195,6 +195,15 @@ public class Chunk extends BaseChunk {
     }
 
     @Override
+    protected void setInternalSection(float fY, cn.nukkit.level.format.ChunkSection section) {
+        super.setInternalSection(fY, section);
+        // Fix hasSkyLight for newly created sections based on dimension
+        if (section != null && this.provider != null) {
+            ((ChunkSection) section).hasSkyLight = this.provider.getLevel().getDimensionData().getDimensionId() == 0;
+        }
+    }
+
+    @Override
     public boolean isPopulated() {
         return this.terrainPopulated;
     }
