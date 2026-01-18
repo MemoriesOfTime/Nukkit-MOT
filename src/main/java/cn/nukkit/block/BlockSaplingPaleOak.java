@@ -61,7 +61,12 @@ public class BlockSaplingPaleOak extends BlockSapling {
                     this.level.setBlock(this.add(x + 1, 0, z), air.clone(), true, false);
                     this.level.setBlock(this.add(x, 0, z + 1), air.clone(), true, false);
                     this.level.setBlock(this.add(x + 1, 0, z + 1), air.clone(), true, false);
-                    new ObjectPaleOakTree().generate(this.getLevel(), new NukkitRandom(), this.add(x, 0, z));
+                    if (!new ObjectPaleOakTree().generate(this.getLevel(), new NukkitRandom(), this.add(x, 0, z))) {
+                        this.level.setBlock(this.add(x, 0, z), this, true, false);
+                        this.level.setBlock(this.add(x + 1, 0, z), this, true, false);
+                        this.level.setBlock(this.add(x, 0, z + 1), this, true, false);
+                        this.level.setBlock(this.add(x + 1, 0, z + 1), this, true, false);
+                    }
                     return true;
                 }
             }
