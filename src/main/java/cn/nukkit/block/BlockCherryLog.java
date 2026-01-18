@@ -29,9 +29,4 @@ public class BlockCherryLog extends BlockWood {
     protected int getStrippedId() {
         return STRIPPED_CHERRY_LOG;
     }
-
-    @Override
-    protected int getStrippedDamage() {
-        return this.getDamage() & ~0x3;
-    }
 }

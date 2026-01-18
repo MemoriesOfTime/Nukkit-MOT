@@ -737,6 +737,23 @@ public class Blocks {
         list[DRAGON_HEAD] = BlockHeadDragon.class; //1224
         list[PIGLIN_HEAD] = BlockHeadPiglin.class; //1225
 
+        list[PALE_OAK_BUTTON] = BlockButtonPaleOak.class; //1244
+        list[PALE_OAK_DOOR] = BlockDoorPaleOak.class; //1245
+        list[PALE_OAK_FENCE] = BlockFencePaleOak.class; //1246
+        list[PALE_OAK_FENCE_GATE] = BlockFenceGatePaleOak.class; //1247
+        list[STRIPPED_PALE_OAK_LOG] = BlockLogStrippedPaleOak.class; //1249
+        list[PALE_OAK_LOG] = BlockLogPaleOak.class; //1250
+        list[PALE_OAK_PLANKS] = BlockPlanksPaleOak.class; //1251
+        list[PALE_OAK_PRESSURE_PLATE] = BlockPressurePlatePaleOak.class; //1252
+        list[PALE_OAK_SLAB] = BlockSlabPaleOak.class; //1253
+        list[PALE_OAK_DOUBLE_SLAB] = BlockDoubleSlabPaleOak.class; //1254
+        list[PALE_OAK_STAIRS] = BlockStairsPaleOak.class; //1255
+        list[PALE_OAK_TRAPDOOR] = BlockTrapdoorPaleOak.class; //1257
+        list[STRIPPED_PALE_OAK_WOOD] = BlockWoodStrippedPaleOak.class; //1259
+        list[PALE_OAK_WOOD] = BlockWoodPaleOak.class; //1260
+        list[PALE_OAK_SAPLING] = BlockSaplingPaleOak.class; //1261
+        list[PALE_OAK_LEAVES] = BlockLeavesPaleOak.class; //1262
+
         list[BUSH] = BlockBush.class; //1278
         list[WILDFLOWERS] = BlockWildflowers.class; //1279
         list[FIREFLY_BUSH] = BlockFireflyBush.class; //1280
