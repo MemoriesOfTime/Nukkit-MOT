@@ -748,7 +748,9 @@ public class Blocks {
         list[PALE_OAK_SLAB] = BlockSlabPaleOak.class; //1253
         list[PALE_OAK_DOUBLE_SLAB] = BlockDoubleSlabPaleOak.class; //1254
         list[PALE_OAK_STAIRS] = BlockStairsPaleOak.class; //1255
+        list[PALE_OAK_STANDING_SIGN] = BlockSignPostPaleOak.class; //1256
         list[PALE_OAK_TRAPDOOR] = BlockTrapdoorPaleOak.class; //1257
+        list[PALE_OAK_WALL_SIGN] = BlockWallSignPaleOak.class; //1258
         list[STRIPPED_PALE_OAK_WOOD] = BlockWoodStrippedPaleOak.class; //1259
         list[PALE_OAK_WOOD] = BlockWoodPaleOak.class; //1260
         list[PALE_OAK_SAPLING] = BlockSaplingPaleOak.class; //1261
