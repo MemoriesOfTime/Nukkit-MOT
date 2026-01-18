@@ -58,7 +58,7 @@ public class EntityElytraFirework extends EntityFirework {
             this.motionY = motion.y;
             this.motionZ = motion.z;
 
-            this.setPosition(this.followingPlayer.getNextPosition().add(this.motionX, this.motionY, this.motionZ));
+            this.setPosition(this.followingPlayer.getNextPosition().add(0, -0.5, 0));
 
             updateRotation();
 
