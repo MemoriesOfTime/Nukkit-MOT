@@ -177,6 +177,30 @@ public class Chunk extends BaseChunk {
         this.inhabitedTime = nbt.getLong("InhabitedTime");
         this.terrainPopulated = nbt.getBoolean("TerrainPopulated");
         this.terrainGenerated = nbt.getBoolean("TerrainGenerated");
+        this.lightPopulated = nbt.getBoolean("LightPopulated");
+    }
+
+    @Override
+    public void setProvider(LevelProvider provider) {
+        super.setProvider(provider);
+        // Set hasSkyLight for all sections based on dimension (Overworld = 0 has sky light)
+        if (provider != null) {
+            boolean hasSkyLight = provider.getLevel().getDimensionData().getDimensionId() == 0;
+            for (cn.nukkit.level.format.ChunkSection section : this.sections) {
+                if (section instanceof ChunkSection) {
+                    ((ChunkSection) section).hasSkyLight = hasSkyLight;
+                }
+            }
+        }
+    }
+
+    @Override
+    protected void setInternalSection(float fY, cn.nukkit.level.format.ChunkSection section) {
+        super.setInternalSection(fY, section);
+        // Fix hasSkyLight for newly created sections based on dimension
+        if (section != null && this.provider != null) {
+            ((ChunkSection) section).hasSkyLight = this.provider.getLevel().getDimensionData().getDimensionId() == 0;
+        }
     }
 
     @Override

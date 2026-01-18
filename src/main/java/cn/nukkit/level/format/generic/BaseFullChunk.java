@@ -76,6 +76,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected boolean isInit;
 
+    protected boolean lightPopulated;
+
     protected Map<GameVersion, BatchPacket> chunkPackets;
 
     @Override
@@ -652,7 +654,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public boolean isLightPopulated() {
-        return true;
+        return this.lightPopulated;
     }
 
     @Override
@@ -662,7 +664,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public void setLightPopulated(boolean value) {
-
+        this.lightPopulated = value;
     }
 
     @Override
