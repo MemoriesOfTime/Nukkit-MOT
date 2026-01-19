@@ -26,7 +26,6 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory;
-import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.objects.*;
 import lombok.extern.log4j.Log4j2;
@@ -239,7 +238,7 @@ public class CustomBlockManager {
             } else {
                 Path path = this.getVanillaPalettePath(palette.getGameVersion());
                 if (!Files.exists(path)) {
-                    log.warn("No vanilla palette found for {}.", Utils.getVersionByProtocol(palette.getProtocol()));
+                    log.warn("No vanilla palette found for {}.", palette.getGameVersion().toString());
                     continue;
                 }
                 this.recreateBlockPalette(palette);
@@ -415,7 +414,7 @@ public class CustomBlockManager {
     }
 
     private Path getVanillaPalettePath(GameVersion version) {
-        return this.getBinPath().resolve("vanilla_palette_" + version.getProtocol() + ".nbt");
+        return this.getBinPath().resolve("vanilla_palette_" + (version.isNetEase() ? "netease_" : "") + version.getProtocol() + ".nbt");
     }
 
     @Nullable
