@@ -708,7 +708,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         if (toolType == ItemTool.TYPE_SWORD) return blockId == Block.COBWEB ? 15.0 : 1.0;
         if (toolType == ItemTool.TYPE_SHEARS) {
             boolean isLeaves = blockId == LEAVES || blockId == LEAVES2 || blockId == AZALEA_LEAVES
-                    || blockId == AZALEA_LEAVES_FLOWERED || blockId == MANGROVE_LEAVES || blockId == CHERRY_LEAVES;
+                    || blockId == AZALEA_LEAVES_FLOWERED || blockId == MANGROVE_LEAVES || blockId == CHERRY_LEAVES || blockId == PALE_OAK_LEAVES;
             if (blockId == Block.WOOL || isLeaves) {
                 return 5.0;
             } else if (blockId == COBWEB) {
@@ -757,6 +757,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                 case AZALEA_LEAVES_FLOWERED:
                 case MANGROVE_LEAVES:
                 case CHERRY_LEAVES:
+                case PALE_OAK_LEAVES:
                     return ItemTool.TYPE_SHEARS;
             }
         }
@@ -771,7 +772,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     private static boolean correctTool0(int blockToolType, Item item, int blockId) {
         boolean isLeaves = blockId == LEAVES || blockId == LEAVES2 || blockId == AZALEA_LEAVES
-                || blockId == AZALEA_LEAVES_FLOWERED || blockId == MANGROVE_LEAVES || blockId == CHERRY_LEAVES;
+                || blockId == AZALEA_LEAVES_FLOWERED || blockId == MANGROVE_LEAVES || blockId == CHERRY_LEAVES || blockId == PALE_OAK_LEAVES;
 
         if (item.isShears() && (blockId == COBWEB || isLeaves)) {
             return true;
@@ -900,7 +901,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                 || item.isShears() && (
                         blockId == COBWEB || blockId == LEAVES || blockId == LEAVES2
                                 || blockId == AZALEA_LEAVES || blockId == AZALEA_LEAVES_FLOWERED
-                                || blockId == MANGROVE_LEAVES || blockId == CHERRY_LEAVES);
+                                || blockId == MANGROVE_LEAVES || blockId == CHERRY_LEAVES || blockId == PALE_OAK_LEAVES);
         boolean canHarvestWithHand = canHarvestWithHand();
         int itemToolType = toolType0(item, blockId);
         int itemTier = item.getTier();
