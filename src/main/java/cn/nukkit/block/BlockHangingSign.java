@@ -116,7 +116,7 @@ public abstract class BlockHangingSign extends BlockSignPost {
             return false;
         } else {
             // 从侧面放置，附着在侧面方块上
-            if (!target.isSolid()) {
+            if (!target.isSolid() && !(target instanceof BlockHangingSign)) {
                 return false;
             }
             if (player != null) {
