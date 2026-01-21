@@ -171,6 +171,10 @@ public class BlockSignPost extends BlockTransparentMeta implements Faceable, Blo
         return true;
     }
 
+    public boolean isHangingSign() {
+        return false;
+    }
+
     @Override
     public boolean onActivate(Item item, Player player) {
         if (item.getId() == Item.DYE) {
