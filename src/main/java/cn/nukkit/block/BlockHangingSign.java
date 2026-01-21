@@ -83,28 +83,19 @@ public abstract class BlockHangingSign extends BlockSignPost {
             setHanging(true);
 
             Block above = target;
-            if (above.isSolid()) {
+            if (above instanceof BlockHangingSign || above instanceof BlockFence || above instanceof BlockChain) {
+                // 上方是悬挂告示牌、栅栏或锁链，使用附着模式
+                if (player != null) {
+                    int attachedDirection = (int) Math.floor(((player.yaw + 180) * 16 / 360) + 0.5) & 0xf;
+                    setAttached(true);
+                    setAttachedDirection(attachedDirection);
+                } else {
+                    setFacingDirection(2);
+                }
+            } else if (above.isSolid()) {
                 // 上方是实心方块，使用朝向模式
                 if (player != null) {
                     setFacingDirection(player.getHorizontalFacing().getOpposite().getIndex());
-                } else {
-                    setFacingDirection(2);
-                }
-            } else if (above instanceof BlockHangingSign) {
-                // 上方是悬挂告示牌，使用附着模式
-                if (player != null) {
-                    int attachedDirection = (int) Math.floor(((player.yaw + 180) * 16 / 360) + 0.5) & 0xf;
-                    setAttached(true);
-                    setAttachedDirection(attachedDirection);
-                } else {
-                    setFacingDirection(2);
-                }
-            } else if (above instanceof BlockFence || above instanceof BlockChain) {
-                // 上方是栅栏或锁链，使用附着模式
-                if (player != null) {
-                    int attachedDirection = (int) Math.floor(((player.yaw + 180) * 16 / 360) + 0.5) & 0xf;
-                    setAttached(true);
-                    setAttachedDirection(attachedDirection);
                 } else {
                     setFacingDirection(2);
                 }
