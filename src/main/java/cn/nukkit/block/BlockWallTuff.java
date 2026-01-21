@@ -3,18 +3,28 @@ package cn.nukkit.block;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockTuff extends BlockSolid {
-    public BlockTuff() {
+public class BlockWallTuff extends BlockWallIndependentID {
+    public BlockWallTuff() {
+        this(0);
+    }
+
+    public BlockWallTuff(int meta) {
+        super(meta);
     }
 
     @Override
     public String getName() {
-        return "Tuff";
+        return "Tuff Wall";
     }
 
     @Override
     public int getId() {
-        return TUFF;
+        return TUFF_WALL;
+    }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:tuff_wall";
     }
 
     @Override
@@ -28,6 +38,11 @@ public class BlockTuff extends BlockSolid {
     }
 
     @Override
+    public boolean canHarvestWithHand() {
+        return false;
+    }
+
+    @Override
     public int getToolType() {
         return ItemTool.TYPE_PICKAXE;
     }
@@ -35,11 +50,6 @@ public class BlockTuff extends BlockSolid {
     @Override
     public int getToolTier() {
         return ItemTool.TIER_WOODEN;
-    }
-
-    @Override
-    public boolean canHarvestWithHand() {
-        return false;
     }
 
     @Override

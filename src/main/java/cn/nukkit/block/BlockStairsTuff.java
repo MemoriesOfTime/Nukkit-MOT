@@ -3,18 +3,23 @@ package cn.nukkit.block;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.utils.BlockColor;
 
-public class BlockTuff extends BlockSolid {
-    public BlockTuff() {
+public class BlockStairsTuff extends BlockStairs {
+    public BlockStairsTuff() {
+        this(0);
     }
 
-    @Override
-    public String getName() {
-        return "Tuff";
+    public BlockStairsTuff(int meta) {
+        super(meta);
     }
 
     @Override
     public int getId() {
-        return TUFF;
+        return TUFF_STAIRS;
+    }
+
+    @Override
+    public String getName() {
+        return "Tuff Stairs";
     }
 
     @Override
@@ -28,13 +33,13 @@ public class BlockTuff extends BlockSolid {
     }
 
     @Override
-    public int getToolType() {
-        return ItemTool.TYPE_PICKAXE;
+    public int getToolTier() {
+        return ItemTool.TIER_WOODEN;
     }
 
     @Override
-    public int getToolTier() {
-        return ItemTool.TIER_WOODEN;
+    public int getToolType() {
+        return ItemTool.TYPE_PICKAXE;
     }
 
     @Override
