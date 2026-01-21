@@ -23,6 +23,11 @@ public class BlockWallTuff extends BlockWallIndependentID {
     }
 
     @Override
+    public String getIdentifier() {
+        return "minecraft:tuff_wall";
+    }
+
+    @Override
     public double getHardness() {
         return 1.5;
     }

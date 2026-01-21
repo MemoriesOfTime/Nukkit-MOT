@@ -18,4 +18,9 @@ public class BlockWallTuffBrick extends BlockWallTuff {
     public int getId() {
         return TUFF_BRICK_WALL;
     }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:tuff_brick_wall";
+    }
 }

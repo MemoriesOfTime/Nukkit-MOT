@@ -18,4 +18,9 @@ public class BlockWallTuffPolished extends BlockWallTuff {
     public int getId() {
         return POLISHED_TUFF_WALL;
     }
+
+    @Override
+    public String getIdentifier() {
+        return "minecraft:polished_tuff_wall";
+    }
 }
