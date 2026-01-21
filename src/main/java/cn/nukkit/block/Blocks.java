@@ -698,6 +698,23 @@ public class Blocks {
 
         list[SNIFFER_EGG] = BlockSnifferEgg.class; //851
 
+        list[TUFF_SLAB] = BlockSlabTuff.class; //999
+        list[TUFF_DOUBLE_SLAB] = BlockDoubleSlabTuff.class; //1000
+        list[TUFF_STAIRS] = BlockStairsTuff.class; //1001
+        list[TUFF_WALL] = BlockWallTuff.class; //1002
+        list[POLISHED_TUFF] = BlockTuffPolished.class; //1003
+        list[POLISHED_TUFF_SLAB] = BlockSlabTuffPolished.class; //1004
+        list[POLISHED_TUFF_DOUBLE_SLAB] = BlockDoubleSlabTuffPolished.class; //1005
+        list[POLISHED_TUFF_STAIRS] = BlockStairsTuffPolished.class; //1006
+        list[POLISHED_TUFF_WALL] = BlockWallTuffPolished.class; //1007
+        list[CHISELED_TUFF] = BlockTuffChiseled.class; //1008
+        list[TUFF_BRICKS] = BlockTuffBricks.class; //1009
+        list[TUFF_BRICK_SLAB] = BlockSlabTuffBrick.class; //1010
+        list[TUFF_BRICK_DOUBLE_SLAB] = BlockDoubleSlabTuffBrick.class; //1011
+        list[TUFF_BRICK_STAIRS] = BlockStairsTuffBrick.class; //1012
+        list[TUFF_BRICK_WALL] = BlockWallTuffBrick.class; //1013
+        list[CHISELED_TUFF_BRICKS] = BlockTuffBricksChiseled.class; //1014
+
         list[CHISELED_COPPER] = BlockCopperChiseled.class; //1015
         list[EXPOSED_CHISELED_COPPER] = BlockCopperChiseledExposed.class; //1016
         list[WEATHERED_CHISELED_COPPER] = BlockCopperChiseledWeathered.class; //1017
