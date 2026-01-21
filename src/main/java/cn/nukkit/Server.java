@@ -3048,6 +3048,7 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.SMOKER, BlockEntitySmoker.class);
         BlockEntity.registerBlockEntity(BlockEntity.CHEST, BlockEntityChest.class);
         BlockEntity.registerBlockEntity(BlockEntity.SIGN, BlockEntitySign.class);
+        BlockEntity.registerBlockEntity(BlockEntity.HANGING_SIGN, BlockEntityHangingSign.class);
         BlockEntity.registerBlockEntity(BlockEntity.ENCHANT_TABLE, BlockEntityEnchantTable.class);
         BlockEntity.registerBlockEntity(BlockEntity.SKULL, BlockEntitySkull.class);
         BlockEntity.registerBlockEntity(BlockEntity.FLOWER_POT, BlockEntityFlowerPot.class);
