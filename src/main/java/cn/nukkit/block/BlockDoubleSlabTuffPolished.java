@@ -54,7 +54,7 @@ public class BlockDoubleSlabTuffPolished extends BlockSolidMeta {
     public Item[] getDrops(Item item) {
         if (item.isPickaxe() && item.getTier() >= ItemTool.TIER_WOODEN) {
             return new Item[]{
-                    Item.get(Item.POLISHED_TUFF_SLAB, 0, 2)
+                    new ItemBlock(Block.get(POLISHED_TUFF_SLAB), 0, 2)
             };
         } else {
             return Item.EMPTY_ARRAY;
