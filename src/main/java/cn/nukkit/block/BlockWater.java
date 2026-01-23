@@ -82,7 +82,10 @@ public class BlockWater extends BlockLiquid {
                 freezing = Utils.freezingBiomes.contains(level.getBiomeId((int) this.x, (int) this.z)) ? (byte) 2 : (byte) 1;
             }
             if (freezing == 2) {
-                if (ThreadLocalRandom.current().nextInt(10) == 0 && level.getBlockLightAt((int) this.x, (int) this.y, (int) this.z) < 12 && level.canBlockSeeSky(this)) {
+                if (ThreadLocalRandom.current().nextInt(10) == 0
+                        && level.getBlockLightAt((int) this.x, (int) this.y, (int) this.z) < 10
+                        && level.canBlockSeeSky(this)
+                        && hasAdjacentNonWaterBlock()) {
                     WaterFrostEvent ev = new WaterFrostEvent(this);
                     level.getServer().getPluginManager().callEvent(ev);
                     if (!ev.isCancelled()) {
@@ -93,6 +96,20 @@ public class BlockWater extends BlockLiquid {
             return Level.BLOCK_UPDATE_RANDOM;
         }
         return super.onUpdate(type);
+    }
+
+    /**
+     * Check if there is at least one non-water/non-waterlogged block adjacent horizontally.
+     * Required for water to freeze according to vanilla mechanics.
+     */
+    private boolean hasAdjacentNonWaterBlock() {
+        for (BlockFace face : BlockFace.Plane.HORIZONTAL) {
+            Block side = this.getSide(face);
+            if (!side.isWater() && !side.getLevelBlockAtLayer(1).isWater()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

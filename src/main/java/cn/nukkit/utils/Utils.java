@@ -8,6 +8,7 @@ import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.biome.EnumBiome;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.NukkitRandom;
@@ -63,7 +64,21 @@ public class Utils {
     /**
      * List of biomes where water can freeze
      */
-    public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(10, 11, 12, 26, 30, 31, 140, 158));
+    public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(
+            EnumBiome.FROZEN_OCEAN.id,
+            EnumBiome.FROZEN_RIVER.id,
+            EnumBiome.ICE_PLAINS.id,
+            EnumBiome.ICE_MOUNTAINS.id,
+            EnumBiome.COLD_BEACH.id,
+            EnumBiome.COLD_TAIGA.id,
+            EnumBiome.COLD_TAIGA_HILLS.id,
+            EnumBiome.COLD_OCEAN.id,
+            EnumBiome.DEEP_COLD_OCEAN.id,
+            EnumBiome.NEW_FROZEN_OCEAN.id,
+            EnumBiome.DEEP_FROZEN_OCEAN.id,
+            EnumBiome.ICE_PLAINS_SPIKES.id,
+            EnumBiome.COLD_TAIGA_M.id
+    ));
 
     /**
      * 检查物品或方块是否已在nk中实现
