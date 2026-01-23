@@ -71,8 +71,6 @@ public class Utils {
             26,  // COLD_BEACH
             30,  // COLD_TAIGA
             31,  // COLD_TAIGA_HILLS
-            44,  // COLD_OCEAN
-            45,  // DEEP_COLD_OCEAN
             46,  // NEW_FROZEN_OCEAN
             47,  // DEEP_FROZEN_OCEAN
             140, // ICE_PLAINS_SPIKES
