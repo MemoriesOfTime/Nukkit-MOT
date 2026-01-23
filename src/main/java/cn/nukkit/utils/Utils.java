@@ -8,7 +8,6 @@ import cn.nukkit.block.custom.CustomBlockManager;
 import cn.nukkit.entity.mob.*;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.biome.EnumBiome;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.NukkitRandom;
@@ -65,19 +64,19 @@ public class Utils {
      * List of biomes where water can freeze
      */
     public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(
-            EnumBiome.FROZEN_OCEAN.id,
-            EnumBiome.FROZEN_RIVER.id,
-            EnumBiome.ICE_PLAINS.id,
-            EnumBiome.ICE_MOUNTAINS.id,
-            EnumBiome.COLD_BEACH.id,
-            EnumBiome.COLD_TAIGA.id,
-            EnumBiome.COLD_TAIGA_HILLS.id,
-            EnumBiome.COLD_OCEAN.id,
-            EnumBiome.DEEP_COLD_OCEAN.id,
-            EnumBiome.NEW_FROZEN_OCEAN.id,
-            EnumBiome.DEEP_FROZEN_OCEAN.id,
-            EnumBiome.ICE_PLAINS_SPIKES.id,
-            EnumBiome.COLD_TAIGA_M.id
+            10,  // FROZEN_OCEAN
+            11,  // FROZEN_RIVER
+            12,  // ICE_PLAINS
+            13,  // ICE_MOUNTAINS
+            26,  // COLD_BEACH
+            30,  // COLD_TAIGA
+            31,  // COLD_TAIGA_HILLS
+            44,  // COLD_OCEAN
+            45,  // DEEP_COLD_OCEAN
+            46,  // NEW_FROZEN_OCEAN
+            47,  // DEEP_FROZEN_OCEAN
+            140, // ICE_PLAINS_SPIKES
+            158  // COLD_TAIGA_M
     ));
 
     /**
