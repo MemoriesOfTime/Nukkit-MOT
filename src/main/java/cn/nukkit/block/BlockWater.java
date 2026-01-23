@@ -85,7 +85,7 @@ public class BlockWater extends BlockLiquid {
                 if (ThreadLocalRandom.current().nextInt(10) == 0
                         && level.getBlockLightAt((int) this.x, (int) this.y, (int) this.z) < 10
                         && level.canBlockSeeSky(this)
-                        && hasAdjacentNonWaterBlock()) {
+                        && hasAdjacentSolidNonWaterBlock()) {
                     WaterFrostEvent ev = new WaterFrostEvent(this);
                     level.getServer().getPluginManager().callEvent(ev);
                     if (!ev.isCancelled()) {
@@ -99,13 +99,13 @@ public class BlockWater extends BlockLiquid {
     }
 
     /**
-     * Check if there is at least one non-water/non-waterlogged block adjacent horizontally.
+     * Check if there is at least one solid non-water block adjacent horizontally.
      * Required for water to freeze according to vanilla mechanics.
      */
-    private boolean hasAdjacentNonWaterBlock() {
+    private boolean hasAdjacentSolidNonWaterBlock() {
         for (BlockFace face : BlockFace.Plane.HORIZONTAL) {
             Block side = this.getSide(face);
-            if (!side.isWater() && !side.getLevelBlockAtLayer(1).isWater()) {
+            if (side.isSolid() && !side.getLevelBlockAtLayer(1).isWater()) {
                 return true;
             }
         }
