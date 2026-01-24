@@ -352,7 +352,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
             Preconditions.checkArgument(tag.length > 0);
             ListTag<StringTag> stringTagListTag = new ListTag<>();
             for (String s : tag) {
-                stringTagListTag.add(new StringTag(s));
+                stringTagListTag.add(new StringTag("", s));
             }
             this.nbt.putList("blockTags", stringTagListTag);
             return this;
