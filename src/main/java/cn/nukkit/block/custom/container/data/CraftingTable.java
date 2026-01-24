@@ -12,7 +12,7 @@ public record CraftingTable(@NotNull String tableName, @Nullable List<String> cr
     public CompoundTag toCompoundTag() {
         var listTag = new ListTag<StringTag>();
         if (craftingTags != null) {
-            craftingTags.forEach(t -> listTag.add(new StringTag(t)));
+            craftingTags.forEach(t -> listTag.add(new StringTag("", t)));
         }
         return new CompoundTag()
                 .putList("crafting_tags", listTag)
