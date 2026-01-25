@@ -123,4 +123,9 @@ public class BlockWater extends BlockLiquid {
     public boolean isWaterSource() {
         return isLiquidSource();
     }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
+    }
 }

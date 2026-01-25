@@ -312,16 +312,26 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     @Override
     public int recalculateHeightMapColumn(int x, int z) {
-        int max = getHighestBlockAt(x, z, false);
-        int y;
-        for (y = max; y >= 0; --y) {
-            if (Block.lightFilter[getBlockIdAt(x, y, z)] > 1 || Block.diffusesSkyLight[getBlockIdAt(x, y, z)]) {
-                break;
+        int minY = 0;
+        int maxY = 255;
+        LevelProvider providerTemp = this.provider;
+        if (providerTemp != null) {
+            Level levelTemp = providerTemp.getLevel();
+            if (levelTemp != null) {
+                minY = levelTemp.getMinBlockY();
+                maxY = levelTemp.getMaxBlockY();
             }
         }
 
-        setHeightMap(x, z, y + 1);
-        return y + 1;
+        for (int y = maxY; y >= minY; --y) {
+            if (getBlockId(x, y, z) != BlockID.AIR) {
+                setHeightMap(x, z, y + 1);
+                return y;
+            }
+        }
+
+        setHeightMap(x, z, minY);
+        return minY;
     }
 
     @Override
@@ -353,12 +363,13 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         // basic light calculation
         for (int z = 0; z < 16; ++z) {
             for (int x = 0; x < 16; ++x) { // iterating over all columns in chunk
-                int top = this.getHeightMap(x, z) - 1; // top-most block
+                // heightMap stores y + 1, so top-most block Y = heightMap - 1
+                int top = this.getHeightMap(x, z) - 1;
 
                 int y;
 
                 for (y = this.getProvider().getMaxBlockY(); y > top; --y) {
-                    // all the blocks above & including the top-most block in a column are exposed to sun and
+                    // all the blocks above the top-most block are exposed to sun and
                     // thus have a skylight value of 15
                     this.setBlockSkyLight(x, y, z, 15);
                 }
@@ -366,8 +377,8 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                 int nextLight = 15; // light value that will be applied starting with the next block
                 int nextDecrease = 0; // decrease that that will be applied starting with the next block
 
-                // TODO: remove nextLight & nextDecrease, use only light & decrease variables
-                for (y = top; y >= this.getProvider().getMinBlockY(); --y) { // going under the top-most block
+                // Process from top-most block downward
+                for (y = top; y >= this.getProvider().getMinBlockY(); --y) {
                     nextLight -= nextDecrease;
                     int light = nextLight; // this light value will be applied for this block. The following checks are all about the next blocks
 
@@ -403,20 +414,62 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     @Override
+    public void populateBlockLight() {
+        int minY = this.getProvider().getMinBlockY();
+        int maxY = this.getProvider().getMaxBlockY();
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    int blockId = this.getBlockId(x, y, z);
+                    int lightLevel = Block.light[blockId];
+                    if (lightLevel > 0) {
+                        this.setBlockLight(x, y, z, lightLevel);
+                    }
+                }
+            }
+        }
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    int currentLight = this.getBlockLight(x, y, z);
+                    if (currentLight > 1) {
+                        // Propagate to neighbors within chunk
+                        propagateBlockLightToNeighbor(x - 1, y, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x + 1, y, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y - 1, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y + 1, z, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y, z - 1, currentLight, minY, maxY);
+                        propagateBlockLightToNeighbor(x, y, z + 1, currentLight, minY, maxY);
+                    }
+                }
+            }
+        }
+    }
+
+    private void propagateBlockLightToNeighbor(int x, int y, int z, int sourceLight, int minY, int maxY) {
+        // Check bounds (only within chunk)
+        if (x < 0 || x >= 16 || z < 0 || z >= 16 || y < minY || y > maxY) {
+            return;
+        }
+
+        int blockId = this.getBlockId(x, y, z);
+        int lightFilter = Block.lightFilter[blockId];
+        int newLight = sourceLight - Math.max(1, lightFilter);
+
+        if (newLight > 0 && newLight > this.getBlockLight(x, y, z)) {
+            this.setBlockLight(x, y, z, newLight);
+        }
+    }
+
+    @Override
     public int getHighestBlockAt(int x, int z) {
         return this.getHighestBlockAt(x, z, true);
     }
 
     @Override
     public int getHighestBlockAt(int x, int z, boolean cache) {
-        if (cache) {
-            int h = this.getHeightMap(x, z);
-            if (h >= this.getProvider().getMinBlockY() && h < this.getProvider().getMaxBlockY()) { //maxY is default value
-                return h;
-            }
-        }
-
-        // TODO: This needs a proper fix
         int minY = 0;
         int maxY = 127; // Don't go out of bounds when nether chunk is unloading
         LevelProvider providerTemp = this.provider;
@@ -431,15 +484,30 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         } else {
             cache = false;
         }
+
+        if (cache) {
+            int h = this.getHeightMap(x, z);
+            if (h > minY && h <= maxY + 1) {
+                int highestY = h - 1;
+                // Verify cache is not stale
+                if (getBlockId(x, highestY, z) != BlockID.AIR) {
+                    return highestY;
+                }
+            }
+        }
+
         for (int y = maxY; y >= minY; --y) {
             if (getBlockId(x, y, z) != BlockID.AIR) {
                 if (cache) {
-                    this.setHeightMap(x, z, y);
+                    this.setHeightMap(x, z, y + 1);
                 }
                 return y;
             }
         }
-        return 0;
+        if (cache) {
+            this.setHeightMap(x, z, minY);
+        }
+        return minY;
     }
 
     @Override

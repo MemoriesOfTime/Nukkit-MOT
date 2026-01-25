@@ -820,4 +820,20 @@ public class LevelDBChunkSection implements ChunkSection {
     public void setDirty() {
         this.dirty = true;
     }
+
+    @Override
+    public boolean maybeHasLightSource() {
+        try {
+            this.readLock.lock();
+
+            for (StateBlockStorage storage : this.storages) {
+                if (storage != null && storage.maybeHasLightSource()) {
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            this.readLock.unlock();
+        }
+    }
 }

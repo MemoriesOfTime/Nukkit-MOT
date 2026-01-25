@@ -52,4 +52,9 @@ public class BlockSlime extends BlockSolid {
     public double getFrictionFactor() {
         return 0.8;
     }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
+    }
 }

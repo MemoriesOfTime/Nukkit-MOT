@@ -194,4 +194,9 @@ public class BlockLava extends BlockLiquid {
             super.addVelocityToEntity(entity, vector);
         }
     }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
+    }
 }
