@@ -1,5 +1,6 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Server;
 import cn.nukkit.api.OnlyNetEase;
 import lombok.ToString;
 
@@ -128,7 +129,8 @@ public class TextPacket extends DataPacket {
             }
         }
 
-        if (this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_16_100_51) {
+        if (this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_16_100_51
+                && !Server.getInstance().useWaterdog) { // 临时兼容WDPE
             if (this.type == TYPE_CHAT || this.type == TYPE_POPUP) {
                 this.unknownNE = this.getString();
             }
