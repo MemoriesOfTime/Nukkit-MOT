@@ -27,7 +27,19 @@ import java.util.function.Consumer;
  * CustomBlockDefinition is used to get the data of the block behavior_pack sent to the client. The methods provided in {@link Builder} control the data sent to the client, if you need to control some of the server-side behavior, please override the methods in {@link Block Block}.
  */
 @Log4j2
-public record CustomBlockDefinition(String identifier, CompoundTag nbt, int legacyId,  Class<? extends BlockContainer> typeOf) {
+public record CustomBlockDefinition(String identifier, CompoundTag nbt, int nukkitId,  Class<? extends BlockContainer> typeOf) {
+
+    /**
+     * 获取方块的Nukkit ID（未移位的值）
+     * Get the Nukkit ID of the block (non-shifted value)
+     *
+     * @return 方块的Nukkit ID / Nukkit ID of the block
+     * @deprecated 使用 {@link #nukkitId()} 代替 / Use {@link #nukkitId()} instead
+     */
+    @Deprecated
+    public int legacyId() {
+        return this.nukkitId;
+    }
 
     /**
      * Builder custom block definition.
