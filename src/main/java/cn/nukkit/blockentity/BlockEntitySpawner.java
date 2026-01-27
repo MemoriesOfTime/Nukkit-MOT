@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.entity.BaseEntity;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.custom.EntityManager;
 import cn.nukkit.entity.mob.EntityMob;
 import cn.nukkit.event.entity.CreatureSpawnEvent;
 import cn.nukkit.level.Position;
@@ -15,25 +16,11 @@ import cn.nukkit.utils.Utils;
 
 public class BlockEntitySpawner extends BlockEntitySpawnable {
 
-    private int entityId;
-    private int spawnRange;
-    private int maxNearbyEntities;
-    private int requiredPlayerRange;
-    private int requiredPlayerRange2;
-
-    private int delay = 0;
-
-    private int minSpawnDelay;
-    private int maxSpawnDelay;
-
-    private int minSpawnCount;
-    private int maxSpawnCount;
-
     public static final String TAG_ID = "id";
     public static final String TAG_X = "x";
     public static final String TAG_Y = "y";
     public static final String TAG_Z = "z";
-    public static final String TAG_ENTITY_ID = "EntityId";
+    public static final String TAG_ENTITY_ID = "EntityIdentifier";
     public static final String TAG_SPAWN_RANGE = "SpawnRange";
     public static final String TAG_MIN_SPAWN_DELAY = "MinSpawnDelay";
     public static final String TAG_MAX_SPAWN_DELAY = "MaxSpawnDelay";
@@ -41,18 +28,34 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
     public static final String TAG_REQUIRED_PLAYER_RANGE = "RequiredPlayerRange";
     public static final String TAG_MINIMUM_SPAWN_COUNT = "MinimumSpawnerCount";
     public static final String TAG_MAXIMUM_SPAWN_COUNT = "MaximumSpawnerCount";
-
     public static final short SPAWN_RANGE = 4;
     public static final short MIN_SPAWN_DELAY = 200;
-    public static final short MAX_SPAWN_DELAY = 5000;
+    public static final short MAX_SPAWN_DELAY = 800;
     public static final short MAX_NEARBY_ENTITIES = 16;
     public static final short REQUIRED_PLAYER_RANGE = 16;
     public static final short MINIMUM_SPAWN_COUNT = 1;
     public static final short MAXIMUM_SPAWN_COUNT = 4;
+    private String entityId;
+    private int spawnRange;
+    private int maxNearbyEntities;
+    private int requiredPlayerRange;
+    private int requiredPlayerRange2;
+    private int delay = 0;
+    private int minSpawnDelay;
+    private int maxSpawnDelay;
+    private int minSpawnCount;
+    private int maxSpawnCount;
 
     public BlockEntitySpawner(FullChunk chunk, CompoundTag nbt) {
         super(chunk, nbt);
-        this.entityId = this.namedTag.getInt(TAG_ENTITY_ID);
+        String id = this.namedTag.getString(TAG_ENTITY_ID);
+
+        if(id != null) {
+            this.entityId = id;
+            return;
+        }
+
+        this.entityId = "";
     }
 
     @Override
@@ -85,6 +88,7 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
             this.namedTag.putShort(TAG_MAXIMUM_SPAWN_COUNT, MAXIMUM_SPAWN_COUNT);
         }
 
+        this.entityId = "";
         this.spawnRange = this.namedTag.getShort(TAG_SPAWN_RANGE);
         this.minSpawnDelay = this.namedTag.getShort(TAG_MIN_SPAWN_DELAY);
         this.maxSpawnDelay = this.namedTag.getShort(TAG_MAX_SPAWN_DELAY);
@@ -102,6 +106,10 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
     public boolean onUpdate() {
         if (this.closed) {
             return false;
+        }
+
+        if(entityId.isEmpty()) {
+            return true;
         }
 
         if (this.delay++ >= Utils.rand(this.minSpawnDelay, this.maxSpawnDelay)) {
@@ -141,7 +149,7 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
                         continue;
                     }
 
-                    CreatureSpawnEvent ev = new CreatureSpawnEvent(this.entityId, pos, CreatureSpawnEvent.SpawnReason.SPAWNER, null);
+                    CreatureSpawnEvent ev = new CreatureSpawnEvent(EntityManager.get().getRuntimeId(this.entityId), pos, CreatureSpawnEvent.SpawnReason.SPAWNER, null);
                     level.getServer().getPluginManager().callEvent(ev);
 
                     if (ev.isCancelled()) {
@@ -168,7 +176,7 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
     public void saveNBT() {
         super.saveNBT();
 
-        this.namedTag.putInt(TAG_ENTITY_ID, this.entityId);
+        this.namedTag.putString(TAG_ENTITY_ID, this.entityId);
         this.namedTag.putString(TAG_ID, "MobSpawner");
         this.namedTag.putShort(TAG_SPAWN_RANGE, this.spawnRange);
         this.namedTag.putShort(TAG_MIN_SPAWN_DELAY, this.minSpawnDelay);
@@ -183,10 +191,14 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
     public CompoundTag getSpawnCompound() {
         return new CompoundTag()
                 .putString(TAG_ID, BlockEntity.MOB_SPAWNER)
-                .putInt(TAG_ENTITY_ID, this.entityId)
+                .putString(TAG_ENTITY_ID, this.entityId)
                 .putInt(TAG_X, (int) this.x)
                 .putInt(TAG_Y, (int) this.y)
                 .putInt(TAG_Z, (int) this.z);
+    }
+
+    public String getSpawnEntityType() {
+        return this.entityId;
     }
 
     @Override
@@ -194,13 +206,9 @@ public class BlockEntitySpawner extends BlockEntitySpawnable {
         return level.getBlockIdAt((int) x, (int) y, (int) z) == Block.MONSTER_SPAWNER;
     }
 
-    public void setSpawnEntityType(int entityId) {
+    public void setSpawnEntityType(String entityId) {
         this.entityId = entityId;
         this.spawnToAll();
-    }
-
-    public int getSpawnEntityType() {
-        return this.entityId;
     }
 
     public void setMinSpawnDelay(int minDelay) {

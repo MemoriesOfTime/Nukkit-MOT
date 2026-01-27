@@ -22,6 +22,7 @@ import cn.nukkit.nbt.tag.DoubleTag;
 import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.utils.Identifier;
 import cn.nukkit.utils.Utils;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -62,9 +63,9 @@ public class ItemSpawnEgg extends Item {
 
         if (target instanceof BlockMobSpawner) {
             BlockEntity blockEntity = level.getBlockEntity(target);
-            if (blockEntity instanceof BlockEntitySpawner) {
-                if (((BlockEntitySpawner) blockEntity).getSpawnEntityType() != this.getDamage()) {
-                    ((BlockEntitySpawner) blockEntity).setSpawnEntityType(this.getDamage());
+            if (blockEntity instanceof BlockEntitySpawner spawner) {
+                if (!spawner.getSpawnEntityType().equals(this.getEntityIdentifier().toString())) {
+                    spawner.setSpawnEntityType(this.getEntityIdentifier().toString());
 
                     if (!player.isCreative()) {
                         player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
@@ -143,6 +144,10 @@ public class ItemSpawnEgg extends Item {
             return true;
         }
         return false;
+    }
+
+    public Identifier getEntityIdentifier() {
+        return Entity.getIdentifier(this.getDamage());
     }
 
     @Override
