@@ -14,6 +14,8 @@ import cn.nukkit.block.custom.properties.BlockProperties;
 import cn.nukkit.block.custom.properties.BlockProperty;
 import cn.nukkit.block.custom.properties.EnumBlockProperty;
 import cn.nukkit.block.custom.properties.exception.InvalidBlockPropertyMetaException;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.RuntimeItemMapping;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.level.BlockPalette;
@@ -272,6 +274,13 @@ public class CustomBlockManager {
         } else {
             for (RuntimeItemMapping mapping : RuntimeItems.VALUES) {
                 mapping.registerCustomBlockItem(identifier, itemId, 0);
+            }
+        }
+
+        if (blockDefinition != null && blockDefinition.shouldRegisterCreativeItem()) {
+            ItemBlock itemBlock = new ItemBlock((Block) blockSample);
+            for (GameVersion version : GameVersion.values()) {
+                Item.addCreativeItem(version, itemBlock, blockDefinition.getCreativeCategory(), blockDefinition.getCreativeGroup());
             }
         }
     }
