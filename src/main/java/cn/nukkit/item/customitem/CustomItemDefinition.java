@@ -5,7 +5,6 @@ import cn.nukkit.inventory.ItemTag;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.RuntimeItems;
 import cn.nukkit.item.customitem.data.DigProperty;
-import cn.nukkit.item.customitem.data.ItemCreativeCategory;
 import cn.nukkit.item.customitem.data.ItemCreativeGroup;
 import cn.nukkit.item.customitem.data.RenderOffsets;
 import cn.nukkit.item.food.Food;
@@ -169,11 +168,6 @@ public class CustomItemDefinition {
         return this.nbt419;
     }
 
-    @Deprecated
-    public static CustomItemDefinition.SimpleBuilder customBuilder(CustomItem item, ItemCreativeCategory creativeCategory) {
-        return new CustomItemDefinition.SimpleBuilder(item, creativeCategory);
-    }
-
     /**
      * 自定义物品的定义构造器
      * <p>
@@ -184,11 +178,6 @@ public class CustomItemDefinition {
      * @return the custom item definition . simple builder
      */
     public static CustomItemDefinition.SimpleBuilder customBuilder(CustomItem item, CreativeItemCategory creativeCategory) {
-        return new CustomItemDefinition.SimpleBuilder(item, creativeCategory);
-    }
-
-    @Deprecated
-    public static CustomItemDefinition.SimpleBuilder simpleBuilder(ItemCustom item, ItemCreativeCategory creativeCategory) {
         return new CustomItemDefinition.SimpleBuilder(item, creativeCategory);
     }
 
@@ -204,11 +193,6 @@ public class CustomItemDefinition {
         return new CustomItemDefinition.SimpleBuilder(item, creativeCategory);
     }
 
-    @Deprecated
-    public static CustomItemDefinition.ToolBuilder toolBuilder(ItemCustomTool item, ItemCreativeCategory creativeCategory) {
-        return new CustomItemDefinition.ToolBuilder(item, creativeCategory);
-    }
-
     /**
      * 自定义工具的定义构造器
      * <p>
@@ -221,11 +205,6 @@ public class CustomItemDefinition {
         return new CustomItemDefinition.ToolBuilder(item, creativeCategory);
     }
 
-    @Deprecated
-    public static CustomItemDefinition.ArmorBuilder armorBuilder(ItemCustomArmor item, ItemCreativeCategory creativeCategory) {
-        return new CustomItemDefinition.ArmorBuilder(item, creativeCategory);
-    }
-
     /**
      * 自定义盔甲的定义构造器
      * <p>
@@ -236,11 +215,6 @@ public class CustomItemDefinition {
      */
     public static CustomItemDefinition.ArmorBuilder armorBuilder(ItemCustomArmor item, CreativeItemCategory creativeCategory) {
         return new CustomItemDefinition.ArmorBuilder(item, creativeCategory);
-    }
-
-    @Deprecated
-    public static CustomItemDefinition.EdibleBuilder edibleBuilder(ItemCustomEdible item, ItemCreativeCategory creativeCategory) {
-        return new CustomItemDefinition.EdibleBuilder(item, creativeCategory);
     }
 
     /**
@@ -308,11 +282,6 @@ public class CustomItemDefinition {
                         .putCompound("item_properties", new CompoundTag()
                                 .putCompound("minecraft:icon", new CompoundTag())));
         private final Item item;
-
-        @Deprecated
-        protected SimpleBuilder(CustomItem customItem, ItemCreativeCategory creativeCategory) {
-            this(customItem,  CreativeItemCategory.valueOf(creativeCategory.name()), "");
-        }
 
         protected SimpleBuilder(CustomItem customItem, CreativeItemCategory creativeCategory) {
             this(customItem,  creativeCategory, "");
@@ -581,11 +550,6 @@ public class CustomItemDefinition {
             toolBlocks.put(ItemTag.IS_SWORD, swordBlocks);
         }
 
-        @Deprecated
-        private ToolBuilder(ItemCustomTool item, ItemCreativeCategory creativeCategory) {
-            this(item, CreativeItemCategory.valueOf(creativeCategory.name()));
-        }
-
         private ToolBuilder(ItemCustomTool item, CreativeItemCategory creativeCategory) {
             super(item, creativeCategory);
             this.item = item;
@@ -846,11 +810,6 @@ public class CustomItemDefinition {
     public static class ArmorBuilder extends SimpleBuilder {
         private final ItemCustomArmor item;
 
-        @Deprecated
-        private ArmorBuilder(ItemCustomArmor item, ItemCreativeCategory creativeCategory) {
-            this(item, CreativeItemCategory.valueOf(creativeCategory.name()));
-        }
-
         private ArmorBuilder(ItemCustomArmor item, CreativeItemCategory creativeCategory) {
             super(item, creativeCategory);
             this.item = item;
@@ -917,11 +876,6 @@ public class CustomItemDefinition {
     }
 
     public static class EdibleBuilder extends SimpleBuilder {
-
-        @Deprecated
-        private EdibleBuilder(ItemCustomEdible item, ItemCreativeCategory creativeCategory) {
-            this(item, CreativeItemCategory.valueOf(creativeCategory.name()));
-        }
 
         private EdibleBuilder(ItemCustomEdible item, CreativeItemCategory creativeCategory) {
             super(item, creativeCategory);
