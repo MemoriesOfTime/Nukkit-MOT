@@ -117,7 +117,7 @@ public class CraftingTransaction extends InventoryTransaction {
                 setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
             }
         }*/
-        Recipe recipe = source.getServer().getCraftingManager().matchRecipe(source.protocol, this.inputs, this.primaryOutput, this.secondaryOutputs);
+        Recipe recipe = source.getServer().getCraftingManager().matchRecipe(this.inputs, this.primaryOutput, this.secondaryOutputs);
         if (recipe == null) {
             MultiRecipe multiRecipe = source.getServer().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
             if (multiRecipe != null) {

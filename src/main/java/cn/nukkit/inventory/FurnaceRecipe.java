@@ -33,7 +33,7 @@ public class FurnaceRecipe implements SmeltingRecipe {
 
     @Override
     public void registerToCraftingManager(CraftingManager manager) {
-        manager.registerFurnaceRecipe(340, this);
+        manager.registerFurnaceRecipe(this);
     }
 
     @Override
