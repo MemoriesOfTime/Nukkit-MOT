@@ -993,6 +993,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     public static void addCreativeItem(GameVersion protocol, Item item, CreativeItemCategory category, String group) {
         if (!isInitializingCreativeItems && !creativeItemsInitialized) {
             String identifier = item.getId() + "_" + item.getDamage();
+            //TODO 暂不考虑多版本，后续不再使用多个Item.CreativeItems实现多版本
             PENDING_CREATIVE_ITEMS.put(identifier, new PendingCreativeItem(item.clone(), category, group));
         }
 
