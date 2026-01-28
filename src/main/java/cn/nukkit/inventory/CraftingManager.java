@@ -153,10 +153,9 @@ public class CraftingManager {
             this.registerSmithingRecipe(new SmithingRecipe(recipeId, priority, sorted, item));
         }
 
-        // 加载酿造和容器配方（使用最新版本格式）
-        Config extras407 = new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("extras_407.json"));
-        List<Map> potionMixes407 = extras407.getMapList("potionMixes");
-        for (Map potionMix : potionMixes407) {
+        // 加载酿造和容器配方（从 recipes649.json）
+        List<Map> potionMixes = recipes_649_config.getMapList("potionMixes");
+        for (Map potionMix : potionMixes) {
             int fromPotionId = ((Number) potionMix.get("inputId")).intValue();
             int fromPotionMeta = ((Number) potionMix.get("inputMeta")).intValue();
             int ingredient = ((Number) potionMix.get("reagentId")).intValue();
@@ -166,8 +165,8 @@ public class CraftingManager {
             registerBrewingRecipe(new BrewingRecipe(Item.get(fromPotionId, fromPotionMeta), Item.get(ingredient, ingredientMeta), Item.get(toPotionId, toPotionMeta)));
         }
 
-        List<Map> containerMixes407 = extras407.getMapList("containerMixes");
-        for (Map containerMix : containerMixes407) {
+        List<Map> containerMixes = recipes_649_config.getMapList("containerMixes");
+        for (Map containerMix : containerMixes) {
             int fromItemId = ((Number) containerMix.get("inputId")).intValue();
             int ingredient = ((Number) containerMix.get("reagentId")).intValue();
             int toItemId = ((Number) containerMix.get("outputId")).intValue();
