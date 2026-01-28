@@ -80,7 +80,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     private static final HashMap<String, Supplier<Item>> CUSTOM_ITEMS = new HashMap<>();
     private static final HashMap<String, CustomItemDefinition> CUSTOM_ITEM_DEFINITIONS = new HashMap<>();
-    private static final HashMap<String, CustomItem> CUSTOM_ITEM_NEED_ADD_CREATIVE = new HashMap<>();
+    /**
+     * 存储需要在 initCreativeItems 后重新添加的创造物品
+     * Stores creative items that need to be re-added after initCreativeItems
+     */
+    private static final LinkedHashMap<String, PendingCreativeItem> PENDING_CREATIVE_ITEMS = new LinkedHashMap<>();
+    private static volatile boolean creativeItemsInitialized = false;
+    private static volatile boolean isInitializingCreativeItems = false;
 
     protected Block block = null;
     protected final int id;
@@ -564,6 +570,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     public static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
+        isInitializingCreativeItems = true;
         clearCreativeItems();
 
         // Creative inventory for oldest versions
@@ -621,11 +628,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCreativeItemsNew(GameVersion.V1_21_50_NETEASE, GameVersion.V1_21_50_NETEASE, creative_netease_766);
         //TODO Multiversion 添加新版本支持时修改这里
 
-        // Add custom blocks to creative inventory after all vanilla items are loaded
-        CustomBlockManager customBlockManager = CustomBlockManager.get();
-        if (customBlockManager.hasCustomBlocks()) {
-            customBlockManager.addCustomBlocksToCreativeInventory();
-        }
+        isInitializingCreativeItems = false;
+        creativeItemsInitialized = true;
     }
 
     private static void registerCreativeItems(GameVersion gameVersion) {
@@ -726,12 +730,13 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         }
 
         ArrayList<String> mappingCustomItems = mapping.getCustomItems();
-        for (CustomItem customItem : CUSTOM_ITEM_NEED_ADD_CREATIVE.values()) {
-            if (!mappingCustomItems.contains(customItem.getNamespaceId())) {
+        for (Map.Entry<String, PendingCreativeItem> entry : PENDING_CREATIVE_ITEMS.entrySet()) {
+            String identifier = entry.getKey();
+            if (identifier.contains(":") && !mappingCustomItems.contains(identifier)) {
                 continue;
             }
-            CustomItemDefinition definition = customItem.getDefinition();
-            creativeItems.add((Item) customItem, definition.getCreativeCategory(), definition.getCreativeGroup());
+            PendingCreativeItem pending = entry.getValue();
+            creativeItems.add(pending.item().clone(), pending.category(), pending.group());
         }
     }
 
@@ -986,6 +991,12 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static void addCreativeItem(GameVersion protocol, Item item, CreativeItemCategory category, String group) {
+        if (!isInitializingCreativeItems && !creativeItemsInitialized) {
+            String identifier = item.getId() + "_" + item.getDamage();
+            //TODO 暂不考虑多版本，后续不再使用多个Item.CreativeItems实现多版本
+            PENDING_CREATIVE_ITEMS.put(identifier, new PendingCreativeItem(item.clone(), category, group));
+        }
+
         switch (protocol) { // NOTE: Not all versions are supposed to be here
             case V1_1_0 -> Item.creative113.add(item.clone(), category, group);
             case V1_2_0 -> Item.creative137.add(item.clone(), category, group);
@@ -1248,7 +1259,9 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         //TODO Multiversion 添加新版本支持时修改这里
 
         if (addCreativeItem) {
-            CUSTOM_ITEM_NEED_ADD_CREATIVE.put(customItem.getNamespaceId(), customItem);
+            CustomItemDefinition definition = customItem.getDefinition();
+            PENDING_CREATIVE_ITEMS.put(customItem.getNamespaceId(),
+                    new PendingCreativeItem((Item) customItem, definition.getCreativeCategory(), definition.getCreativeGroup()));
         }
 
         return new OK<Void>(true);
@@ -1267,7 +1280,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             Item customItem = fromString(namespaceId);
             CUSTOM_ITEMS.remove(namespaceId);
             CUSTOM_ITEM_DEFINITIONS.remove(namespaceId);
-            CUSTOM_ITEM_NEED_ADD_CREATIVE.remove(namespaceId);
+            PENDING_CREATIVE_ITEMS.remove(namespaceId);
 
             deleteCustomItem(customItem, GameVersion.V1_16_100, GameVersion.V1_16_0);
             deleteCustomItem(customItem, GameVersion.V1_17_0, GameVersion.V1_17_0);
@@ -2401,4 +2414,10 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             return list;
         }
     }
+
+    /**
+     * 待添加的创造物品记录
+     * Pending creative item record
+     */
+    public record PendingCreativeItem(Item item, CreativeItemCategory category, String group) {}
 }
