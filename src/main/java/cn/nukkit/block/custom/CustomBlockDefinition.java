@@ -27,7 +27,59 @@ import java.util.function.Consumer;
  * CustomBlockDefinition is used to get the data of the block behavior_pack sent to the client. The methods provided in {@link Builder} control the data sent to the client, if you need to control some of the server-side behavior, please override the methods in {@link Block Block}.
  */
 @Log4j2
-public record CustomBlockDefinition(String identifier, CompoundTag nbt, int legacyId,  Class<? extends BlockContainer> typeOf) {
+public record CustomBlockDefinition(String identifier, CompoundTag nbt, int nukkitId, Class<? extends BlockContainer> typeOf, boolean registerCreativeItem) {
+
+    /**
+     * 兼容旧版本的构造函数，默认注册到创造背包
+     * Compatibility constructor for older versions, defaults to registering in creative inventory
+     */
+    public CustomBlockDefinition(String identifier, CompoundTag nbt, int nukkitId, Class<? extends BlockContainer> typeOf) {
+        this(identifier, nbt, nukkitId, typeOf, true);
+    }
+
+    /**
+     * 获取方块的Nukkit ID（未移位的值）
+     * Get the Nukkit ID of the block (non-shifted value)
+     *
+     * @return 方块的Nukkit ID / Nukkit ID of the block
+     * @deprecated 使用 {@link #nukkitId()} 代替 / Use {@link #nukkitId()} instead
+     */
+    @Deprecated
+    public int legacyId() {
+        return this.nukkitId;
+    }
+
+    /**
+     * 获取方块在创造栏的分类
+     * Get the creative inventory category of the block
+     */
+    public CreativeItemCategory getCreativeCategory() {
+        CompoundTag menuCategory = this.nbt.getCompound("menu_category");
+        if (menuCategory.containsString("category")) {
+            try {
+                return CreativeItemCategory.valueOf(menuCategory.getString("category").toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException e) {
+                return CreativeItemCategory.CONSTRUCTION;
+            }
+        }
+        return CreativeItemCategory.CONSTRUCTION;
+    }
+
+    /**
+     * 获取方块在创造栏的分组
+     * Get the creative inventory group of the block
+     */
+    public String getCreativeGroup() {
+        return this.nbt.getCompound("menu_category").getString("group");
+    }
+
+    /**
+     * 是否应该注册到创造物品栏
+     * Whether this block should be registered in the creative inventory
+     */
+    public boolean shouldRegisterCreativeItem() {
+        return this.registerCreativeItem;
+    }
 
     /**
      * Builder custom block definition.
@@ -42,6 +94,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
     public static class Builder {
         protected final String identifier;
         protected final BlockContainer blockContainer;
+        protected boolean registerCreativeItem = true;
 
         protected CompoundTag nbt = new CompoundTag()
                 .putCompound("components", new CompoundTag());
@@ -79,8 +132,9 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
 
             //设置方块在创造栏的分类
             this.nbt.putCompound("menu_category", new CompoundTag()
-                    .putString("category", CreativeItemCategory.NATURE.name())
-                    .putString("group", ""));
+                    .putString("category", CreativeItemCategory.CONSTRUCTION.name().toLowerCase(Locale.ROOT))
+                    .putString("group", "")
+                    .putByte("is_hidden_in_commands", (byte) 0));
             //molang版本
             this.nbt.putInt("molangVersion", 9);
 
@@ -174,7 +228,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
                 log.error("creativeGroup has an invalid value!");
                 return this;
             }
-            this.nbt.getCompound("components").getCompound("menu_category").putString("group", creativeGroup.toLowerCase(Locale.ROOT));
+            this.nbt.getCompound("menu_category").putString("group", creativeGroup.toLowerCase(Locale.ROOT));
             return this;
         }
 
@@ -187,7 +241,28 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
          */
         @Deprecated
         public Builder creativeGroup(ItemCreativeGroup creativeGroup) {
-            this.nbt.getCompound("components").getCompound("menu_category").putString("group", creativeGroup.getGroupName());
+            this.nbt.getCompound("menu_category").putString("group", creativeGroup.getGroupName());
+            return this;
+        }
+
+        /**
+         * 控制自定义方块是否在命令自动补全中隐藏。
+         * <p>
+         * Control whether the custom block is hidden in command auto-completion.
+         */
+        public Builder isHiddenInCommands(boolean hidden) {
+            this.nbt.getCompound("menu_category")
+                    .putByte("is_hidden_in_commands", (byte) (hidden ? 1 : 0));
+            return this;
+        }
+
+        /**
+         * 控制自定义方块是否自动注册到创造物品栏。默认为 true。
+         * <p>
+         * Control whether the custom block is automatically registered in the creative inventory. Default is true.
+         */
+        public Builder registerCreativeItem(boolean register) {
+            this.registerCreativeItem = register;
             return this;
         }
 
@@ -352,7 +427,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
             Preconditions.checkArgument(tag.length > 0);
             ListTag<StringTag> stringTagListTag = new ListTag<>();
             for (String s : tag) {
-                stringTagListTag.add(new StringTag(s));
+                stringTagListTag.add(new StringTag("", s));
             }
             this.nbt.putList("blockTags", stringTagListTag);
             return this;
@@ -407,7 +482,7 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int lega
         }
 
         public CustomBlockDefinition build() {
-            return new CustomBlockDefinition(this.identifier, this.nbt, this.blockContainer.getNukkitId(), this.blockContainer.getClass());
+            return new CustomBlockDefinition(this.identifier, this.nbt, this.blockContainer.getNukkitId(), this.blockContainer.getClass(), this.registerCreativeItem);
         }
     }
 }

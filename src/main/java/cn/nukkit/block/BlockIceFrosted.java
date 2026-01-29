@@ -124,4 +124,9 @@ public class BlockIceFrosted extends BlockTransparentMeta {
         }
         return neighbors;
     }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
+    }
 }

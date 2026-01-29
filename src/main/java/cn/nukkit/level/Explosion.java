@@ -11,29 +11,22 @@ import cn.nukkit.entity.item.EntityItem;
 import cn.nukkit.entity.item.EntityXPOrb;
 import cn.nukkit.event.block.BlockExplodeEvent;
 import cn.nukkit.event.block.BlockUpdateEvent;
-import cn.nukkit.event.entity.EntityDamageByBlockEvent;
-import cn.nukkit.event.entity.EntityDamageByEntityEvent;
-import cn.nukkit.event.entity.EntityDamageEvent;
+import cn.nukkit.event.entity.*;
 import cn.nukkit.event.entity.EntityDamageEvent.DamageCause;
-import cn.nukkit.event.entity.EntityExplodeEvent;
 import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.particle.HugeExplodeSeedParticle;
+import cn.nukkit.level.util.ExplosionSource;
 import cn.nukkit.math.*;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Hash;
 import it.unimi.dsi.fastutil.longs.LongArraySet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * @author Angelic47
- * Nukkit Project
- */
 public class Explosion {
 
     private static final int RAYS = 16;
@@ -47,22 +40,22 @@ public class Explosion {
     private Set<Block> affectedBlocks;
     private Set<Block> fireIgnitions;
 
-    private final Object what;
+    private final ExplosionSource sourceObject;
     private boolean doesDamage = true;
 
-    public Explosion(Position center, double size, Entity what) {
-        this(center, size, (Object) what);
+    public Explosion(Position center, double size, Entity sourceObject) {
+        this(center, size, new ExplosionSource.EntitySource(sourceObject));
     }
 
-    public Explosion(Position center, double size, Block what) {
-        this(center, size, (Object) what);
+    public Explosion(Position center, double size, Block sourceObject) {
+        this(center, size, new ExplosionSource.BlockSource(sourceObject));
     }
 
-    protected Explosion(Position center, double size, Object what) {
+    protected Explosion(Position center, double size, ExplosionSource sourceObject) {
         this.level = center.getLevel();
         this.source = center;
         this.size = Math.max(size, 0);
-        this.what = what;
+        this.sourceObject = sourceObject;
     }
 
     public double getFireSpawnChance() {
@@ -89,10 +82,7 @@ public class Explosion {
      * @return bool
      */
     public boolean explode() {
-        if (explodeA()) {
-            return explodeB();
-        }
-        return false;
+        return explodeA() && explodeB();
     }
 
     /**
@@ -102,17 +92,15 @@ public class Explosion {
      * @return {@code true} if success
      */
     public boolean explodeA() {
-        if (what instanceof EntityExplosive) {
-            Entity entity = (Entity) what;
-            Block blockLayer0 = level.getBlock(entity.floor());
-            Block blockLayer1 = level.getBlock(entity.floor(), 1);
-            if (blockLayer0.getId() == BlockID.WATER
-                    || blockLayer0.getId() == BlockID.STILL_WATER
-                    || blockLayer1.getId() == BlockID.WATER
-                    || blockLayer1.getId() == BlockID.WATER
-            ) {
-                this.doesDamage = false;
-                return true;
+        if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
+            Entity entity = entitySource.entity();
+            if (entity instanceof EntityExplosive) {
+                int blockLayer0 = level.getBlockIdAt(entity.getFloorX(), entity.getFloorY(), entity.getFloorZ());
+                int blockLayer1 = level.getBlockIdAt(entity.getFloorX(), entity.getFloorY(), entity.getFloorZ(), 1);
+                if (Block.isWater(blockLayer0) || Block.isWater(blockLayer1)) {
+                    this.doesDamage = false;
+                    return true;
+                }
             }
         }
 
@@ -130,7 +118,6 @@ public class Explosion {
         }
 
         ThreadLocalRandom random = ThreadLocalRandom.current();
-
         Vector3 vector = new Vector3(0, 0, 0);
         Vector3 vBlock = new Vector3(0, 0, 0);
 
@@ -139,29 +126,30 @@ public class Explosion {
             for (int j = 0; j < RAYS; ++j) {
                 for (int k = 0; k < RAYS; ++k) {
                     if (i == 0 || i == mRays || j == 0 || j == mRays || k == 0 || k == mRays) {
-                        vector.setComponents((double) i / (double) mRays * 2d - 1, (double) j / (double) mRays * 2d - 1, (double) k / (double) mRays * 2d - 1);
+                        vector.setComponents((double) i / mRays * 2d - 1, (double) j / mRays * 2d - 1, (double) k / mRays * 2d - 1);
                         double len = vector.length();
-                        vector.setComponents((vector.x / len) * this.STEP_LEN, (vector.y / len) * this.STEP_LEN, (vector.z / len) * this.STEP_LEN);
+                        vector.setComponents((vector.x / len) * STEP_LEN, (vector.y / len) * STEP_LEN, (vector.z / len) * STEP_LEN);
                         double pointerX = this.source.x;
                         double pointerY = this.source.y;
                         double pointerZ = this.source.z;
 
-                        for (double blastForce = this.size * (random.nextInt(700, 1301)) / 1000d; blastForce > 0; blastForce -= this.STEP_LEN * 0.75d) {
+                        for (double blastForce = this.size * random.nextDouble(0.7, 1.3); blastForce > 0; blastForce -= STEP_LEN * 0.75d) {
                             int x = (int) pointerX;
                             int y = (int) pointerY;
                             int z = (int) pointerZ;
-                            vBlock.x = pointerX >= x ? x : x - 1;
-                            vBlock.y = pointerY >= y ? y : y - 1;
-                            vBlock.z = pointerZ >= z ? z : z - 1;
+                            vBlock.setComponents(
+                                    pointerX >= x ? x : x - 1,
+                                    pointerY >= y ? y : y - 1,
+                                    pointerZ >= z ? z : z - 1
+                            );
                             if (!this.level.isYInRange((int) vBlock.y)) {
                                 break;
                             }
                             Block block = this.level.getBlock(vBlock);
-
                             if (!block.isAir()) {
                                 Block layer1 = block.getLevelBlockAtLayer(1);
                                 double resistance = Math.max(block.getResistance(), layer1.getResistance());
-                                blastForce -= (resistance / 5 + 0.3d) * this.STEP_LEN;
+                                blastForce -= (resistance / 5 + 0.3d) * STEP_LEN;
                                 if (blastForce > 0) {
                                     if (this.affectedBlocks.add(block)) {
                                         if (incendiary && random.nextDouble() <= fireSpawnChance) {
@@ -181,7 +169,6 @@ public class Explosion {
                 }
             }
         }
-
         return true;
     }
 
@@ -192,146 +179,135 @@ public class Explosion {
      * @return {@code false} if explosion was canceled, otherwise {@code true}
      */
     public boolean explodeB() {
-
         LongArraySet updateBlocks = new LongArraySet();
-        List<Vector3> send = new ArrayList<>();
-
-        Vector3 source = (new Vector3(this.source.x, this.source.y, this.source.z)).floor();
+        Vector3 sourceVec = this.source.floor();
         double yield = (1d / this.size) * 100d;
 
         if (affectedBlocks == null) {
             affectedBlocks = new LinkedHashSet<>();
         }
 
-        if (this.what instanceof Entity) {
+        if (this.sourceObject instanceof ExplosionSource.EntitySource entitySource) {
+            Entity exploder = entitySource.entity();
             List<Block> affectedBlocksList = new ArrayList<>(this.affectedBlocks);
-            EntityExplodeEvent ev = new EntityExplodeEvent((Entity) this.what, this.source, affectedBlocksList, yield);
+            EntityExplodeEvent ev = new EntityExplodeEvent(exploder, this.source, affectedBlocksList, yield);
             ev.setIgnitions(fireIgnitions == null ? new LinkedHashSet<>(0) : fireIgnitions);
             this.level.getServer().getPluginManager().callEvent(ev);
-            if (ev.isCancelled()) {
-                return false;
-            } else {
-                yield = ev.getYield();
-                affectedBlocks.clear();
-                affectedBlocks.addAll(ev.getBlockList());
-                fireIgnitions = ev.getIgnitions();
-            }
-        } else if (this.what instanceof Block) {
-            BlockExplodeEvent ev = new BlockExplodeEvent((Block) this.what, this.source, this.affectedBlocks,
+            if (ev.isCancelled()) return false;
+            yield = ev.getYield();
+            affectedBlocks.clear();
+            affectedBlocks.addAll(ev.getBlockList());
+            fireIgnitions = ev.getIgnitions();
+        } else if (this.sourceObject instanceof ExplosionSource.BlockSource blockSource) {
+            BlockExplodeEvent ev = new BlockExplodeEvent(blockSource.block(), this.source, this.affectedBlocks,
                     fireIgnitions == null ? new LinkedHashSet<>(0) : fireIgnitions, yield, this.fireSpawnChance);
             this.level.getServer().getPluginManager().callEvent(ev);
-            if (ev.isCancelled()) {
-                return false;
-            } else {
-                yield = ev.getYield();
-                affectedBlocks = ev.getAffectedBlocks();
-                fireIgnitions = ev.getIgnitions();
-            }
+            if (ev.isCancelled()) return false;
+            yield = ev.getYield();
+            affectedBlocks = ev.getAffectedBlocks();
+            fireIgnitions = ev.getIgnitions();
         }
 
         double explosionSize = this.size * 2d;
-        double minX = NukkitMath.floorDouble(this.source.x - explosionSize - 1);
-        double maxX = NukkitMath.ceilDouble(this.source.x + explosionSize + 1);
-        double minY = NukkitMath.floorDouble(this.source.y - explosionSize - 1);
-        double maxY = NukkitMath.ceilDouble(this.source.y + explosionSize + 1);
-        double minZ = NukkitMath.floorDouble(this.source.z - explosionSize - 1);
-        double maxZ = NukkitMath.ceilDouble(this.source.z + explosionSize + 1);
+        AxisAlignedBB explosionBB = new SimpleAxisAlignedBB(
+                NukkitMath.floorDouble(this.source.x - explosionSize - 1),
+                NukkitMath.floorDouble(this.source.y - explosionSize - 1),
+                NukkitMath.floorDouble(this.source.z - explosionSize - 1),
+                NukkitMath.ceilDouble(this.source.x + explosionSize + 1),
+                NukkitMath.ceilDouble(this.source.y + explosionSize + 1),
+                NukkitMath.ceilDouble(this.source.z + explosionSize + 1)
+        );
 
-        AxisAlignedBB explosionBB = new SimpleAxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);
-        Entity[] list = this.level.getNearbyEntities(explosionBB, this.what instanceof Entity ? (Entity) this.what : null);
-        for (Entity entity : list) {
+        Entity[] nearbyEntities = this.level.getNearbyEntities(explosionBB,
+                this.sourceObject instanceof ExplosionSource.EntitySource es ? es.entity() : null);
+
+        for (Entity entity : nearbyEntities) {
             double distance = entity.distance(this.source) / explosionSize;
+            if (distance > 1) continue;
 
-            if (distance <= 1) {
-                Vector3 motion = entity.subtract(this.source).normalize();
+            Vector3 motion = entity.subtract(this.source).normalize();
+            float blockDensity = 1 - level.getBlockDensity(this.source, entity.boundingBox);
+            double force = this.size * 2.0;
+            double d = entity.distance(sourceVec) / force;
+            double impact = (1.0 - d) * blockDensity;
+            float damage = this.doesDamage ? (float) ((impact * impact + impact) / 2.0 * 7.0 * force + 1.0) : 0f;
 
-                float blockDensity = 1 - level.getBlockDensity(this.source, entity.boundingBox);
-                double force = this.size * 2.0F;
-                double d = entity.distance(source) / force;
-                double impact = (1.0D - d) * blockDensity;
-                float entityDamageAmount = (float) ((float) (impact * impact + impact) / 2.0D * 7.0D * force + 1.0D);
-                float damage = this.doesDamage ? entityDamageAmount : 0f;
+            EntityDamageEvent damageEvent;
+            if (this.sourceObject instanceof ExplosionSource.EntitySource es) {
+                damageEvent = new EntityDamageByEntityEvent(es.entity(), entity, DamageCause.ENTITY_EXPLOSION, damage);
+            } else if (this.sourceObject instanceof ExplosionSource.BlockSource bs) {
+                damageEvent = new EntityDamageByBlockEvent(bs.block(), entity, DamageCause.BLOCK_EXPLOSION, damage);
+            } else {
+                damageEvent = new EntityDamageEvent(entity, DamageCause.BLOCK_EXPLOSION, damage);
+            }
+            entity.attack(damageEvent);
 
-                if (this.what instanceof Entity) {
-                    entity.attack(new EntityDamageByEntityEvent((Entity) this.what, entity, DamageCause.ENTITY_EXPLOSION, damage));
-                } else if (this.what instanceof Block) {
-                    entity.attack(new EntityDamageByBlockEvent((Block) this.what, entity, DamageCause.BLOCK_EXPLOSION, damage));
-                } else {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.BLOCK_EXPLOSION, damage));
-                }
-
-                if (!(entity instanceof EntityItem || entity instanceof EntityXPOrb)) {
-                    var multipliedMotion = motion.multiply(impact);
-                    entity.motionX += multipliedMotion.x;
-                    entity.motionY += multipliedMotion.y;
-                    entity.motionZ += multipliedMotion.z;
-                }
+            if (!(entity instanceof EntityItem || entity instanceof EntityXPOrb)) {
+                entity.motionX += motion.x * impact;
+                entity.motionY += motion.y * impact;
+                entity.motionZ += motion.z * impact;
             }
         }
 
         ItemBlock air = new ItemBlock(Block.get(BlockID.AIR));
-        BlockEntity container;
-        List<Vector3> smokePositions = this.affectedBlocks.isEmpty() ? Collections.emptyList() : new ObjectArrayList<>();
+        List<Vector3> smokePositions = new ArrayList<>();
         ThreadLocalRandom random = ThreadLocalRandom.current();
 
-        for (Block block : this.affectedBlocks) {
-            if (block instanceof BlockTNT tnt) {
-                tnt.prime(random.nextInt(10, 31), this.what instanceof Entity ? (Entity) this.what : null);
-            } else if ((container = block.getLevel().getBlockEntity(block)) instanceof InventoryHolder inventoryHolder) {
-                if (container instanceof BlockEntityShulkerBox) {
-                    this.level.dropItem(block.add(0.5, 0.5, 0.5), block.toItem());
-                    inventoryHolder.getInventory().clearAll();
-                } else {
-                    for (Item drop : inventoryHolder.getInventory().getContents().values()) {
-                        this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
+        for (Block originalBlock : new ArrayList<>(this.affectedBlocks)) {
+            Block currentBlock = this.level.getBlock(originalBlock.getFloorX(), originalBlock.getFloorY(), originalBlock.getFloorZ(), originalBlock.layer);
+
+            if (currentBlock.getId() != originalBlock.getId()) {
+                continue;
+            }
+
+            if (currentBlock instanceof BlockTNT tnt) {
+                Entity exploder = (this.sourceObject instanceof ExplosionSource.EntitySource es) ? es.entity() : null;
+                tnt.prime(random.nextInt(10, 31), exploder);
+            } else {
+                BlockEntity container = currentBlock.getLevel().getBlockEntity(currentBlock);
+                if (container instanceof InventoryHolder inventoryHolder) {
+                    if (container instanceof BlockEntityShulkerBox) {
+                        this.level.dropItem(currentBlock.add(0.5, 0.5, 0.5), currentBlock.toItem());
+                        inventoryHolder.getInventory().clearAll();
+                    } else {
+                        for (Item drop : inventoryHolder.getInventory().getContents().values()) {
+                            this.level.dropItem(currentBlock.add(0.5, 0.5, 0.5), drop);
+                        }
+                        inventoryHolder.getInventory().clearAll();
                     }
-                    inventoryHolder.getInventory().clearAll();
-                }
-            } else if (random.nextDouble() * 100 < yield) {
-                for (Item drop : block.getDrops(air)) {
-                    this.level.dropItem(block.add(0.5, 0.5, 0.5), drop);
+                } else if (random.nextDouble() * 100 < yield) {
+                    for (Item drop : currentBlock.getDrops(air)) {
+                        this.level.dropItem(currentBlock.add(0.5, 0.5, 0.5), drop);
+                    }
                 }
             }
 
             if (random.nextInt(8) == 0) {
-                smokePositions.add(block);
+                smokePositions.add(currentBlock);
             }
 
-            this.level.setBlock(new Vector3((int) block.x, (int) block.y, (int) block.z),
-                    block.layer, Block.get(BlockID.AIR));
+            this.level.setBlock(new Vector3(currentBlock.getFloorX(), currentBlock.getFloorY(), currentBlock.getFloorZ()), currentBlock.layer, Block.get(BlockID.AIR));
 
-            if (block.layer != 0) {
-                continue;
-            }
-
-            Vector3 pos = new Vector3(block.x, block.y, block.z);
-
-            for (BlockFace side : BlockFace.values()) {
-                Vector3 sideBlock = pos.getSide(side);
-                long index = Hash.hashBlock((int) sideBlock.x, (int) sideBlock.y, (int) sideBlock.z);
-                if (!this.affectedBlocks.contains(sideBlock) && !updateBlocks.contains(index)) {
-                    BlockUpdateEvent ev = new BlockUpdateEvent(this.level.getBlock(sideBlock));
-                    this.level.getServer().getPluginManager().callEvent(ev);
-                    if (!ev.isCancelled()) {
-                        ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
-                    }
-                    Block layer1 = this.level.getBlock(sideBlock, 1);
-                    if (!layer1.isAir()) {
-                        ev = new BlockUpdateEvent(layer1);
-                        this.level.getServer().getPluginManager().callEvent(ev);
-                        if (!ev.isCancelled()) {
-                            ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
+            if (currentBlock.layer == 0) {
+                Vector3 pos = new Vector3(currentBlock.x, currentBlock.y, currentBlock.z);
+                for (BlockFace side : BlockFace.values()) {
+                    Vector3 sideBlock = pos.getSide(side);
+                    long index = Hash.hashBlock(sideBlock.getFloorX(), sideBlock.getFloorY(), sideBlock.getFloorZ());
+                    if (!this.affectedBlocks.contains(sideBlock) && !updateBlocks.contains(index)) {
+                        this.processBlockUpdate(sideBlock);
+                        Block layer1 = this.level.getBlock(sideBlock, 1);
+                        if (!layer1.isAir()) {
+                            this.processBlockUpdate(layer1);
                         }
+                        updateBlocks.add(index);
                     }
-                    updateBlocks.add(index);
                 }
             }
-            send.add(new Vector3(block.x - source.x, block.y - source.y, block.z - source.z));
         }
 
-        if(fireIgnitions != null) {
-            for (Vector3 remainingPos : fireIgnitions) {
-                Block toIgnite = level.getBlock(remainingPos);
+        if (fireIgnitions != null) {
+            for (Vector3 pos : fireIgnitions) {
+                Block toIgnite = level.getBlock(pos);
                 if (toIgnite.isAir() && toIgnite.down().isSolid(BlockFace.UP)) {
                     level.setBlock(toIgnite, Block.get(BlockID.FIRE));
                 }
@@ -359,4 +335,12 @@ public class Explosion {
         return true;
     }
 
+    private void processBlockUpdate(Vector3 pos) {
+        Block block = this.level.getBlock(pos);
+        BlockUpdateEvent ev = new BlockUpdateEvent(block);
+        this.level.getServer().getPluginManager().callEvent(ev);
+        if (!ev.isCancelled()) {
+            ev.getBlock().onUpdate(Level.BLOCK_UPDATE_NORMAL);
+        }
+    }
 }

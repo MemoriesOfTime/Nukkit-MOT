@@ -31,4 +31,9 @@ public class BlockCaveVinesBerriesHead extends BlockCaveVines {
     public boolean hasBerries() {
         return true;
     }
+
+    @Override
+    public int getLightLevel() {
+        return 14;
+    }
 }

@@ -3,6 +3,7 @@ package cn.nukkit.entity;
 import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.*;
+import cn.nukkit.entity.data.EntityMovementSpeedModifier;
 import cn.nukkit.entity.mob.EntityDrowned;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.passive.EntityIronGolem;
@@ -62,6 +63,8 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
     private boolean blocking = false;
 
     protected final boolean isDrowned = this instanceof EntityDrowned;
+
+    private final Map<String, EntityMovementSpeedModifier> movementSpeedModifiers = new HashMap<>();
 
     @Override
     protected void initEntity() {
@@ -358,7 +361,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
 
                         if (airTicks <= -20) {
                             airTicks = 0;
-                            if (!this.isPlayer || level.getGameRules().getBoolean(GameRule.DROWNING_DAMAGE)) {
+                            if (!(this instanceof Player) || level.getGameRules().getBoolean(GameRule.DROWNING_DAMAGE)) {
                                 this.attack(new EntityDamageEvent(this, DamageCause.DROWNING, 2));
                             }
                         }
@@ -386,7 +389,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             // Check collisions with blocks
-            if ((this.isPlayer || this instanceof BaseEntity) && this.riding == null && this.age % (this instanceof Player ? 2 : 10) == 0) {
+            if ((this instanceof Player || this instanceof BaseEntity) && this.riding == null && this.age % (this instanceof Player ? 2 : 10) == 0) {
                 int floorY = NukkitMath.floorDouble(this.y - 0.25);
                 if (floorY != getFloorY()) {
                     Block block = this.level.getBlock(this.chunk, getFloorX(), floorY, getFloorZ(), false);
@@ -408,7 +411,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
             }
 
             if (this.riding == null && this.age % 2 == 1 && !this.closed && this.isAlive()) {
-                Entity[] e = level.getNearbyEntities(this.boundingBox.grow(0.20000000298023224, 0.0D, 0.20000000298023224), this);
+                Entity[] e = level.getNearbyEntities(this.boundingBox.grow(0.20000000298023224, 0.0D, 0.20000000298023224), this, false, true);
                 for (Entity entity : e) {
                     if (entity instanceof EntityRideable && !entity.closed && entity.isAlive()) {
                         this.collidingWith(entity);
@@ -621,4 +624,44 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         return human;
     }
 
+    public Map<String, EntityMovementSpeedModifier> getMovementSpeedModifiers() {
+        return movementSpeedModifiers;
+    }
+
+    public void addMovementSpeedModifier(EntityMovementSpeedModifier modifier) {
+        this.movementSpeedModifiers.put(modifier.getIdentifier(), modifier);
+        this.recalculateMovementSpeed();
+    }
+
+    public void removeMovementSpeedModifier(EntityMovementSpeedModifier modifier) {
+        this.removeMovementSpeedModifier(modifier.getIdentifier());
+    }
+
+    public boolean removeMovementSpeedModifier(String identifier) {
+        Object result = this.movementSpeedModifiers.remove(identifier);
+
+        if (result != null) {
+            this.recalculateMovementSpeed();
+            return true;
+        }
+
+        return false;
+    }
+
+    public void recalculateMovementSpeed() {
+        float newMovementSpeed = Player.DEFAULT_SPEED;
+        for (EntityMovementSpeedModifier modifier : this.movementSpeedModifiers.values()) {
+            float value = modifier.getValue();
+            if (modifier.isSend()) {
+                if (modifier.getOperation() == EntityMovementSpeedModifier.Operation.MULTIPLY) {
+                    if (value != 0) {
+                        newMovementSpeed *= value;
+                    }
+                } else {
+                    newMovementSpeed += value;
+                }
+            }
+        }
+        this.setMovementSpeed(newMovementSpeed);
+    }
 }

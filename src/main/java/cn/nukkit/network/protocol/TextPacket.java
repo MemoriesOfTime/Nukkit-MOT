@@ -1,5 +1,7 @@
 package cn.nukkit.network.protocol;
 
+import cn.nukkit.Server;
+import cn.nukkit.api.OnlyNetEase;
 import lombok.ToString;
 
 @ToString
@@ -39,6 +41,9 @@ public class TextPacket extends DataPacket {
      * @since v685
      */
     public String filteredMessage = "";
+
+    @OnlyNetEase
+    public String unknownNE = "";
 
     @Override
     public void decode() {
@@ -121,6 +126,13 @@ public class TextPacket extends DataPacket {
             this.platformChatId = this.getString();
             if (protocol >= ProtocolInfo.v1_21_0) {
                 this.filteredMessage = this.getString();
+            }
+        }
+
+        if (this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_16_100_51
+                && !Server.getInstance().useWaterdog) { // 临时兼容WDPE
+            if (this.type == TYPE_CHAT || this.type == TYPE_POPUP) {
+                this.unknownNE = this.getString();
             }
         }
     }
@@ -226,6 +238,12 @@ public class TextPacket extends DataPacket {
                 if (protocol < ProtocolInfo.v1_21_130_28 || !this.filteredMessage.isEmpty()) {
                     this.putString(this.filteredMessage);
                 }
+            }
+        }
+
+        if (this.gameVersion.isNetEase() && this.protocol >= ProtocolInfo.v1_16_100_51) {
+            if (this.type == TYPE_CHAT || this.type == TYPE_POPUP) {
+                this.putString(this.unknownNE);
             }
         }
     }

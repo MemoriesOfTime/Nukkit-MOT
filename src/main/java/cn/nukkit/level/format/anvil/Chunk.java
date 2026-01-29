@@ -123,12 +123,12 @@ public class Chunk extends BaseChunk {
         }
 
         int[] heightMap = nbt.getIntArray("HeightMap");
-        this.heightMap = new byte[256];
+        this.heightMap = new short[256];
         if (heightMap.length != 256) {
-            Arrays.fill(this.heightMap, (byte) 255);
+            Arrays.fill(this.heightMap, (short) 255);
         } else {
             for (int i = 0; i < heightMap.length; i++) {
-                this.heightMap[i] = (byte) heightMap[i];
+                this.heightMap[i] = (short) heightMap[i];
             }
         }
 
@@ -177,6 +177,30 @@ public class Chunk extends BaseChunk {
         this.inhabitedTime = nbt.getLong("InhabitedTime");
         this.terrainPopulated = nbt.getBoolean("TerrainPopulated");
         this.terrainGenerated = nbt.getBoolean("TerrainGenerated");
+        this.lightPopulated = nbt.getBoolean("LightPopulated");
+    }
+
+    @Override
+    public void setProvider(LevelProvider provider) {
+        super.setProvider(provider);
+        // Set hasSkyLight for all sections based on dimension (Overworld = 0 has sky light)
+        if (provider != null) {
+            boolean hasSkyLight = provider.getLevel().getDimensionData().getDimensionId() == 0;
+            for (cn.nukkit.level.format.ChunkSection section : this.sections) {
+                if (section instanceof ChunkSection) {
+                    ((ChunkSection) section).hasSkyLight = hasSkyLight;
+                }
+            }
+        }
+    }
+
+    @Override
+    protected void setInternalSection(float fY, cn.nukkit.level.format.ChunkSection section) {
+        super.setInternalSection(fY, section);
+        // Fix hasSkyLight for newly created sections based on dimension
+        if (section != null && this.provider != null) {
+            ((ChunkSection) section).hasSkyLight = this.provider.getLevel().getDimensionData().getDimensionId() == 0;
+        }
     }
 
     @Override
@@ -282,7 +306,7 @@ public class Chunk extends BaseChunk {
 
         nbt.putByteArray("Biomes", this.getBiomeIdArray());
         int[] heightInts = new int[256];
-        byte[] heightBytes = this.getHeightMapArray();
+        short[] heightBytes = this.getHeightMapArray();
         for (int i = 0; i < heightInts.length; i++) {
             heightInts[i] = heightBytes[i] & 0xFF;
         }
@@ -377,9 +401,9 @@ public class Chunk extends BaseChunk {
 
         nbt.putByteArray("Biomes", this.getBiomeIdArray());
         int[] heightInts = new int[256];
-        byte[] heightBytes = this.getHeightMapArray();
+        short[] heightBytes = this.getHeightMapArray();
         for (int i = 0; i < heightInts.length; i++) {
-            heightInts[i] = heightBytes[i] & 0xFF;
+            heightInts[i] = heightBytes[i] & 0xFF; //anvil 不支持384 继续保持限制
         }
         nbt.putIntArray("HeightMap", heightInts);
 
@@ -501,7 +525,7 @@ public class Chunk extends BaseChunk {
 
             chunk.setPosition(chunkX, chunkZ);
 
-            chunk.heightMap = new byte[256];
+            chunk.heightMap = new short[256];
             chunk.inhabitedTime = 0;
             chunk.terrainGenerated = false;
             chunk.terrainPopulated = false;

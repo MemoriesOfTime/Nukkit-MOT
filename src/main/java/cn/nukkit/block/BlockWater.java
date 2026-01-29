@@ -5,13 +5,11 @@ import cn.nukkit.entity.Entity;
 import cn.nukkit.event.block.WaterFrostEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Level;
+import cn.nukkit.level.biome.Biome;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.utils.BlockColor;
-import cn.nukkit.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * author: MagicDroidX
@@ -79,10 +77,12 @@ public class BlockWater extends BlockLiquid {
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_RANDOM && this.getDamage() == 0) {
             if (freezing < 1) {
-                freezing = Utils.freezingBiomes.contains(level.getBiomeId((int) this.x, (int) this.z)) ? (byte) 2 : (byte) 1;
+                freezing = Biome.getBiome(level.getBiomeId((int) this.x, (int) this.z)).isFreezing() ? (byte) 2 : (byte) 1;
             }
             if (freezing == 2) {
-                if (ThreadLocalRandom.current().nextInt(10) == 0 && level.getBlockLightAt((int) this.x, (int) this.y, (int) this.z) < 12 && level.canBlockSeeSky(this)) {
+                if (level.getBlockLightAt((int) this.x, (int) this.y, (int) this.z) < 10
+                        && level.canBlockSeeSky(this)
+                        && hasAdjacentNonWaterBlock()) {
                     WaterFrostEvent ev = new WaterFrostEvent(this);
                     level.getServer().getPluginManager().callEvent(ev);
                     if (!ev.isCancelled()) {
@@ -93,6 +93,20 @@ public class BlockWater extends BlockLiquid {
             return Level.BLOCK_UPDATE_RANDOM;
         }
         return super.onUpdate(type);
+    }
+
+    /**
+     * Check if there is at least one horizontally adjacent non-water block.
+     * This includes non-solid blocks like air. Required for water to freeze according to vanilla mechanics.
+     */
+    private boolean hasAdjacentNonWaterBlock() {
+        for (BlockFace face : BlockFace.Plane.HORIZONTAL) {
+            Block side = this.getSide(face);
+            if (!side.isWater() && !side.getLevelBlockAtLayer(1).isWater()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -108,5 +122,10 @@ public class BlockWater extends BlockLiquid {
     @Override
     public boolean isWaterSource() {
         return isLiquidSource();
+    }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
     }
 }

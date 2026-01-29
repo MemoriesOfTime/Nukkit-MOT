@@ -57,11 +57,9 @@ public abstract class EntityHanging extends Entity {
         }
 
         if (!this.isAlive()) {
-
             this.despawnFromAll();
-            if (!this.isPlayer) {
-                this.close();
-            }
+
+            this.close();
 
             return true;
         }

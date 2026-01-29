@@ -9,15 +9,12 @@
   <a href="/docs/README_zh.md"><img alt="中文" src="https://img.shields.io/badge/中文-d9d9d9"></a>
 </p>
 
-
-
 ------
 
 ## Introduction
-Nukkit-MOT is a special version of [Nukkit](https://github.com/CloudburstMC/Nukkit) Minecraft Bedrock Edition server software.  
-It is developed based on the last open source version of [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)
+Nukkit-MOT is a fork of [Nukkit](https://github.com/CloudburstMC/Nukkit) that provides multi-version support, compatibility with NetEase clients, and a well-established plugin ecosystem.
 
-note: if you need higher version features, please use [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX).
+Only interested in newer versions? You might want to try [Lumi](https://github.com/KoshakMineDEV/Lumi) or [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 ### What's new in Nukkit-MOT?
 1. Support for 1.2 – 1.21.130 version (you can set the minimum protocol in the config)
@@ -25,6 +22,7 @@ note: if you need higher version features, please use [PowerNukkitX](https://git
 3. Support for the nether world and The Еnd
 4. Generation of dungeons and caves
 5. Support for vanilla commands
+6. Support for NetEase clients
 
 ## How to install?
 1. Install java 17 or higher
@@ -79,6 +77,7 @@ dependencies {
 ## Credits
 [<img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="18"/>]() [Nukkit](https://github.com/CloudburstMC/Nukkit)  
 [<img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="18"/>]() [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
+[<img src="https://avatars.githubusercontent.com/u/20168691?v=4" width="18"/>]() [EaseCation](https://www.easecation.net/) [Nukkit](https://github.com/EaseCation/Nukkit) & [SynapseAPI](https://github.com/EaseCation/SynapseAPI)  
 [<img src="https://docs.powernukkitx.org/img/PNX_LOGO_sm.png" width="18"/>]() [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)  
 
 ![YourKit](https://www.yourkit.com/images/yklogo.png)  

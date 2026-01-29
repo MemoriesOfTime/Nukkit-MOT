@@ -34,11 +34,6 @@ public class BlockHeavyCore extends BlockTransparent {
     }
 
     @Override
-    public int getLightLevel() {
-        return 15;
-    }
-
-    @Override
     public BlockColor getColor() {
         return BlockColor.METAL_BLOCK_COLOR;
     }

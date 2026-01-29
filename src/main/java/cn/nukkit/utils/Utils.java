@@ -62,8 +62,22 @@ public class Utils {
     public static final IntSet monstersList = new IntOpenHashSet(Arrays.asList(EntityBlaze.NETWORK_ID, EntityCaveSpider.NETWORK_ID, EntityCreeper.NETWORK_ID, EntityDrowned.NETWORK_ID, EntityElderGuardian.NETWORK_ID, EntityEnderman.NETWORK_ID, EntityEndermite.NETWORK_ID, EntityEvoker.NETWORK_ID, EntityGhast.NETWORK_ID, EntityGuardian.NETWORK_ID, EntityHoglin.NETWORK_ID, EntityHusk.NETWORK_ID, EntityPiglinBrute.NETWORK_ID, EntityPillager.NETWORK_ID, EntityRavager.NETWORK_ID, EntityShulker.NETWORK_ID, EntitySilverfish.NETWORK_ID, EntitySkeleton.NETWORK_ID, EntitySlime.NETWORK_ID, EntitySpider.NETWORK_ID, EntityStray.NETWORK_ID, EntityVex.NETWORK_ID, EntityVindicator.NETWORK_ID, EntityWitch.NETWORK_ID, EntityWither.NETWORK_ID, EntityWitherSkeleton.NETWORK_ID, EntityZoglin.NETWORK_ID, EntityZombie.NETWORK_ID, EntityZombiePigman.NETWORK_ID, EntityZombieVillager.NETWORK_ID, EntityZombieVillagerV2.NETWORK_ID));
     /**
      * List of biomes where water can freeze
+     * @deprecated Use {@link cn.nukkit.level.biome.Biome#getBiome(int)} and {@link cn.nukkit.level.biome.Biome#isFreezing()} instead
      */
-    public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(10, 11, 12, 26, 30, 31, 140, 158));
+    @Deprecated
+    public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(
+            10,  // FROZEN_OCEAN
+            11,  // FROZEN_RIVER
+            12,  // ICE_PLAINS
+            13,  // ICE_MOUNTAINS
+            26,  // COLD_BEACH
+            30,  // COLD_TAIGA
+            31,  // COLD_TAIGA_HILLS
+            46,  // NEW_FROZEN_OCEAN
+            47,  // DEEP_FROZEN_OCEAN
+            140, // ICE_PLAINS_SPIKES
+            158  // COLD_TAIGA_M
+    ));
 
     /**
      * 检查物品或方块是否已在nk中实现

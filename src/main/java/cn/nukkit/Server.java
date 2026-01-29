@@ -3048,6 +3048,7 @@ public class Server {
         BlockEntity.registerBlockEntity(BlockEntity.SMOKER, BlockEntitySmoker.class);
         BlockEntity.registerBlockEntity(BlockEntity.CHEST, BlockEntityChest.class);
         BlockEntity.registerBlockEntity(BlockEntity.SIGN, BlockEntitySign.class);
+        BlockEntity.registerBlockEntity(BlockEntity.HANGING_SIGN, BlockEntityHangingSign.class);
         BlockEntity.registerBlockEntity(BlockEntity.ENCHANT_TABLE, BlockEntityEnchantTable.class);
         BlockEntity.registerBlockEntity(BlockEntity.SKULL, BlockEntitySkull.class);
         BlockEntity.registerBlockEntity(BlockEntity.FLOWER_POT, BlockEntityFlowerPot.class);
@@ -3205,7 +3206,7 @@ public class Server {
             default -> this.spaceMode = 1;
         }
 
-        this.lightUpdates = this.getPropertyBoolean("light-updates", false);
+         this.lightUpdates = this.getPropertyBoolean("light-updates", true);
         this.queryPlugins = this.getPropertyBoolean("query-plugins", false);
         this.flyChecks = this.getPropertyBoolean("allow-flight", false);
         this.isHardcore = this.getPropertyBoolean("hardcore", false);
@@ -3378,7 +3379,7 @@ public class Server {
             put("auto-tick-rate-limit", 20);
             put("base-tick-rate", 1);
             put("always-tick-players", false);
-            put("light-updates", false);
+            put("light-updates", true);
             put("clear-chunk-tick-list", true);
             put("spawn-threshold", 56);
             put("chunk-sending-per-tick", 4);

@@ -4,7 +4,8 @@ import cn.nukkit.AdventureSettings;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.item.enchantment.Enchantment;
-import cn.nukkit.level.particle.HugeExplodeParticle;
+import cn.nukkit.level.particle.GenericParticle;
+import cn.nukkit.level.particle.Particle;
 import cn.nukkit.math.Vector3;
 
 public class EnchantmentMaceWindBurst extends EnchantmentMace {
@@ -21,10 +22,10 @@ public class EnchantmentMaceWindBurst extends EnchantmentMace {
     @Override
     public void doAttack(Entity attacker, Entity entity) {
         double fallDistance = attacker.highestPosition - entity.y;
-        if (fallDistance <= 0 || attacker.isOnGround()) {
+        if (fallDistance < 2 || attacker.isOnGround()) {
             return;
         }
-        if (attacker.isPlayer && ((Player) attacker).getAdventureSettings().get(AdventureSettings.Type.FLYING)) {
+        if (attacker instanceof Player player && player.getAdventureSettings().get(AdventureSettings.Type.FLYING)) {
             return;
         }
         float knockbackScaling = (getLevel() + 1) * 0.25f;
@@ -40,7 +41,7 @@ public class EnchantmentMaceWindBurst extends EnchantmentMace {
         knockback.y += 2.0f * knockbackScaling;
 
         entity.setMotion(knockback);
-        entity.getLevel().addParticle(new HugeExplodeParticle(entity));
+        entity.getLevel().addParticle(new GenericParticle(entity, Particle.TYPE_WIND_EXPLOSION));
         entity.getLevel().addLevelSoundEvent(entity, 520);
         entity.getLevel().addSound(entity, "mace.heavy_smash_ground");
     }

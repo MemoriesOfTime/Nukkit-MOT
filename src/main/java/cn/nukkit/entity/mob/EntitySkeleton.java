@@ -16,12 +16,12 @@ import cn.nukkit.item.ItemBow;
 import cn.nukkit.level.Location;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.Vector2;
+import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobArmorEquipmentPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.utils.Utils;
-import org.apache.commons.math3.util.FastMath;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,45 +65,99 @@ public class EntitySkeleton extends EntityWalkingMob implements EntitySmite {
 
     @Override
     public void attackEntity(Entity player) {
-        if (this.attackDelay > 23 && Utils.rand(1, 32) < 4 && this.distanceSquared(player) <= 55) {
+        if (this.attackDelay > 23 && Utils.rand(1, 32) < 4) {
             this.attackDelay = 0;
 
-            for (Block block : this.getLineOfSight(7, 7)) {
+            double distanceToTarget = Math.sqrt(this.distanceSquared(player));
+
+            for (Block block : this.getLineOfSight(15, 15)) {
                 if (!block.canPassThrough()) {
-                    return;
+                    double blockDist = Math.sqrt(this.distanceSquared(this.temporalVector.setComponents(block.getX(), block.getY(), block.getZ())));
+                    if (blockDist < distanceToTarget - 1) {
+                        return;
+                    }
                 }
             }
 
             double f = 1.3;
-            double yaw = this.yaw;
-            double pitch = this.pitch;
-            double yawR = FastMath.toRadians(yaw);
-            double pitchR = FastMath.toRadians(pitch);
-            Location pos = new Location(this.x - Math.sin(yawR) * Math.cos(pitchR) * 0.5, this.y + this.getHeight() - 0.18,
-                    this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5, yaw, pitch, this.level);
+
+            double dx = player.x - this.x;
+            double dz = player.z - this.z;
+
+            double targetHeight = player.getHeight() * 0.85;
+            double targetY = player.y + targetHeight;
+
+            double myY = this.y + this.getEyeHeight();
+            double dy = targetY - myY;
+
+            double distanceXZ = Math.sqrt(dx * dx + dz * dz);
+
+            double yaw = Math.toDegrees(Math.atan2(dz, dx)) - 90;
+            if (yaw < 0) yaw += 360;
+
+            double basePitch = -Math.toDegrees(Math.atan2(dy, distanceXZ));
+
+            double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            double pitchCorrection = 0;
+
+            if (distance > 3) {
+                pitchCorrection = Math.min(20, distance * 0.5);
+            }
+
+            double pitch = basePitch + pitchCorrection;
+
+            pitch = Math.max(-40, Math.min(40, pitch));
+
+            double yawR = Math.toRadians(yaw);
+            double pitchR = Math.toRadians(pitch);
+
+            double shootY = this.y + this.getEyeHeight();
+            if (pitch > -5) {
+                shootY += 0.15;
+            }
+
+            Location pos = new Location(
+                    this.x - Math.sin(yawR) * Math.cos(pitchR) * 0.5,
+                    shootY,
+                    this.z + Math.cos(yawR) * Math.cos(pitchR) * 0.5,
+                    yaw, pitch, this.level
+            );
+
             if (this.getLevel().getBlockIdAt(pos.getFloorX(), pos.getFloorY(), pos.getFloorZ()) == Block.AIR) {
                 Entity k = Entity.createEntity("Arrow", pos, this);
                 if (!(k instanceof EntityArrow arrow)) {
                     return;
                 }
 
-                setProjectileMotion(arrow, pitch, yawR, pitchR, f);
+                double motionX = -Math.sin(yawR) * Math.cos(pitchR);
+                double motionY = -Math.sin(pitchR);
+                double motionZ = Math.cos(yawR) * Math.cos(pitchR);
+
+                if (pitch > -20) {
+                    motionY += 0.08;
+                }
+
+                Vector3 motion = new Vector3(motionX, motionY, motionZ).multiply(f);
+
+                if (distance < 4) {
+                    motion.y *= 0.7;
+                } else if (distance > 10) {
+                    motion.multiply(1.0 + (distance - 10) * 0.02);
+                }
+
+                arrow.setMotion(motion);
 
                 EntityShootBowEvent ev = new EntityShootBowEvent(this, Item.get(Item.ARROW, 0, 1), arrow, f);
                 this.server.getPluginManager().callEvent(ev);
 
                 EntityProjectile projectile = ev.getProjectile();
                 if (ev.isCancelled()) {
-                    if (this.stayTime > 0 || this.distance(this.target) <= ((this.getWidth()) / 2 + 0.05) * nearbyDistanceMultiplier()) {
-                        projectile.close();
-                    }
+                    projectile.close();
                 } else {
                     ProjectileLaunchEvent launch = new ProjectileLaunchEvent(projectile);
                     this.server.getPluginManager().callEvent(launch);
                     if (launch.isCancelled()) {
-                        if (this.stayTime > 0 || this.distance(this.target) <= ((this.getWidth()) / 2 + 0.05) * nearbyDistanceMultiplier()) {
-                            projectile.close();
-                        }
+                        projectile.close();
                     } else {
                         projectile.spawnToAll();
                         ((EntityArrow) projectile).setPickupMode(EntityArrow.PICKUP_NONE);

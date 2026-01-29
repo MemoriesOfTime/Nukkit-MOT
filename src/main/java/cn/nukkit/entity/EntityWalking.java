@@ -11,6 +11,7 @@ import cn.nukkit.entity.route.RouteFinderSearchTask;
 import cn.nukkit.entity.route.RouteFinderThreadPool;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.BubbleParticle;
+
 import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
@@ -18,10 +19,10 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.Utils;
 import lombok.Getter;
 import lombok.Setter;
+
 import org.apache.commons.math3.util.FastMath;
 
 public abstract class EntityWalking extends BaseEntity {
-
     private static final double FLOW_MULTIPLIER = 0.1;
 
     @Getter
@@ -47,8 +48,7 @@ public abstract class EntityWalking extends BaseEntity {
             return;
         }
 
-        double near = Integer.MAX_VALUE;
-        for (Entity entity : this.getLevel().getEntities()) {
+        for (Entity entity : this.getLevel().getNearbyEntities(EntityRanges.createTargetSearchBox(this), this, false, true)) {
             if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                 continue;
             }
@@ -58,10 +58,9 @@ public abstract class EntityWalking extends BaseEntity {
             }
 
             double distance = this.distanceSquared(creature);
-            if (distance > near || !this.targetOption(creature, distance)) {
+            if (!this.targetOption(creature, distance)) {
                 continue;
             }
-            near = distance;
 
             this.stayTime = 0;
             this.moveTime = 0;
