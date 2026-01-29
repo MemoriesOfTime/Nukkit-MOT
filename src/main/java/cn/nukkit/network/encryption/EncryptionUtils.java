@@ -1,7 +1,7 @@
 package cn.nukkit.network.encryption;
 
-import cn.nukkit.Server;
 import cn.nukkit.Nukkit;
+import cn.nukkit.Server;
 import cn.nukkit.network.protocol.types.auth.AuthPayload;
 import cn.nukkit.network.protocol.types.auth.AuthType;
 import cn.nukkit.network.protocol.types.auth.CertificateChainPayload;
@@ -71,7 +71,6 @@ public class EncryptionUtils {
 
     private static final String DISCOVERY_ENDPOINT =
             "https://client.discovery.minecraft-services.net/api/v1.0/discovery/MinecraftPE/builds/1.0.0.0";
-    private static final JSONParser JSON_PARSER = new JSONParser();
 
     public static final JwtConsumer OFFLINE_CONSUMER = new JwtConsumerBuilder()
             .setSkipAllValidators()
@@ -125,12 +124,12 @@ public class EncryptionUtils {
                 Map<String, Object> cachedData = cacheManager.loadDiscoveryData();
                 if (cachedData != null) {
                     DISCOVERY_DATA = cachedData;
-                    log.info("Using cached discovery data from disk");
+                    log.debug("Using cached discovery data from disk");
                     return cachedData;
                 }
 
                 // Cache miss or expired, fetch from remote
-                log.info("Discovery cache miss, fetching from remote: {}", DISCOVERY_ENDPOINT);
+                log.debug("Discovery cache miss, fetching from remote: {}", DISCOVERY_ENDPOINT);
 
                 int maxRetries = 3;
                 long retryDelay = 1000; // 1 second
@@ -150,7 +149,8 @@ public class EncryptionUtils {
                         try(InputStream stream = connection.getInputStream();
                             InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
                             //noinspection unchecked
-                            Map<String, Object> data = (Map<String, Object>) JSON_PARSER.parse(reader);
+                            JSONParser parser = new JSONParser();
+                            Map<String, Object> data = (Map<String, Object>) parser.parse(reader);
                             DISCOVERY_DATA = data;
                             // Save to disk cache
                             cacheManager.saveDiscoveryData(data);
@@ -221,14 +221,14 @@ public class EncryptionUtils {
                 Map<String, Object> cachedConfig = cacheManager.loadOpenIdConfiguration();
                 if (cachedConfig != null) {
                     OPENID_CONFIGURATION = cachedConfig;
-                    log.info("Using cached OpenID configuration from disk");
+                    log.debug("Using cached OpenID configuration from disk");
                     return cachedConfig;
                 }
 
                 // Cache miss or expired, fetch from remote
                 String serviceUri = getServiceUri();
                 String openIdConfigUrl = serviceUri + "/.well-known/openid-configuration";
-                log.info("OpenID configuration cache miss, fetching from remote: {}", openIdConfigUrl);
+                log.debug("OpenID configuration cache miss, fetching from remote: {}", openIdConfigUrl);
 
                 int maxRetries = 3;
                 long retryDelay = 1000; // 1 second
@@ -248,7 +248,8 @@ public class EncryptionUtils {
                         try (InputStream stream = connection.getInputStream();
                              InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
                             //noinspection unchecked
-                            Map<String, Object> config = (Map<String, Object>) JSON_PARSER.parse(reader);
+                            JSONParser parser = new JSONParser();
+                            Map<String, Object> config = (Map<String, Object>) parser.parse(reader);
                             OPENID_CONFIGURATION = config;
                             // Save to disk cache
                             cacheManager.saveOpenIdConfiguration(config);

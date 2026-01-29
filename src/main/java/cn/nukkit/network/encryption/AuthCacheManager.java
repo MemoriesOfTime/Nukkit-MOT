@@ -1,13 +1,15 @@
 package cn.nukkit.network.encryption;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.reflect.TypeToken;
 import lombok.extern.log4j.Log4j2;
-import org.jose4j.json.internal.json_simple.JSONObject;
-import org.jose4j.json.internal.json_simple.parser.JSONParser;
-import org.jose4j.json.internal.json_simple.parser.ParseException;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,7 +27,9 @@ public class AuthCacheManager {
     private static final String DISCOVERY_CACHE_FILE = "discovery.json";
     private static final String OPENID_CACHE_FILE = "openid-config.json";
     private static final long DEFAULT_CACHE_TTL_MS = 24 * 60 * 60 * 1000L; // 24 hours
-    private static final JSONParser JSON_PARSER = new JSONParser();
+
+    private static final Gson GSON = new GsonBuilder().create();
+    private static final Type MAP_TYPE = new TypeToken<Map<String, Object>>() {}.getType();
 
     private final Path cacheDirectory;
     private final long cacheTtlMs;
@@ -94,23 +98,26 @@ public class AuthCacheManager {
             long age = System.currentTimeMillis() - lastModified;
 
             if (age > cacheTtlMs) {
-                log.info("Cache file expired (age: {}ms, ttl: {}ms): {}", age, cacheTtlMs, filename);
+                log.debug("Cache file expired (age: {}ms, ttl: {}ms): {}", age, cacheTtlMs, filename);
                 return null;
             }
 
             try (BufferedReader reader = Files.newBufferedReader(cacheFile, StandardCharsets.UTF_8)) {
-                Map<String, Object> cacheWrapper = (Map<String, Object>) JSON_PARSER.parse(reader);
+                Map<String, Object> cacheWrapper = GSON.fromJson(reader, MAP_TYPE);
+                if (cacheWrapper == null) {
+                    log.warn("Cache file is empty or invalid: {}", filename);
+                    return null;
+                }
                 Map<String, Object> data = (Map<String, Object>) cacheWrapper.get("data");
-
                 if (data == null) {
                     log.warn("Cache file has invalid format: {}", filename);
                     return null;
                 }
 
-                log.info("Loaded cached data from: {} (age: {}ms)", filename, age);
+                log.debug("Loaded cached data from: {} (age: {}ms)", filename, age);
                 return data;
             }
-        } catch (IOException | ParseException e) {
+        } catch (IOException | JsonSyntaxException e) {
             log.warn("Failed to load cache file {}: {}", filename, e.getMessage());
             return null;
         }
@@ -128,13 +135,13 @@ public class AuthCacheManager {
             cacheWrapper.put("timestamp", System.currentTimeMillis());
             cacheWrapper.put("data", data);
 
-            String json = JSONObject.toJSONString(cacheWrapper);
+            String json = GSON.toJson(cacheWrapper);
 
             try (BufferedWriter writer = Files.newBufferedWriter(cacheFile, StandardCharsets.UTF_8)) {
                 writer.write(json);
             }
 
-            log.info("Saved cache to: {}", filename);
+            log.debug("Saved cache to: {}", filename);
         } catch (IOException e) {
             log.warn("Failed to save cache file {}: {}", filename, e.getMessage());
         }
@@ -147,7 +154,7 @@ public class AuthCacheManager {
         try {
             Files.deleteIfExists(cacheDirectory.resolve(DISCOVERY_CACHE_FILE));
             Files.deleteIfExists(cacheDirectory.resolve(OPENID_CACHE_FILE));
-            log.info("Cleared authentication cache");
+            log.debug("Cleared authentication cache");
         } catch (IOException e) {
             log.warn("Failed to clear cache: {}", e.getMessage());
         }
