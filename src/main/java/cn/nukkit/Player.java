@@ -4768,22 +4768,48 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         if (this.level.useItemOn(blockVector.asVector3(), inventory.getItemInHand(), face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this) != null) {
                                             break packetswitch;
                                         }
-                                    } else if (inventory.getItemInHand().equals(useItemData.itemInHand)) {
-                                        Item i = inventory.getItemInHand();
-                                        Item oldItem = i.clone();
-                                        if ((i = this.level.useItemOn(blockVector.asVector3(), i, face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this)) != null) {
-                                            if (!i.equals(oldItem) || i.getCount() != oldItem.getCount()) {
-                                                if (oldItem.getId() == i.getId() || i.getId() == 0) {
-                                                    inventory.setItemInHand(i);
-                                                } else {
-                                                    server.getLogger().debug("Tried to set item " + i.getId() + " but " + this.username + " had item " + oldItem.getId() + " in their hand slot");
-                                                }
-                                                inventory.sendHeldItem(this.getViewers().values());
-                                            }
-                                            break packetswitch;
-                                        }
                                     } else {
-                                        this.needSendHeldItem = true;
+                                        Item serverItem = inventory.getItemInHand();
+                                        Item clientItem = useItemData.itemInHand;
+
+                                        // 默认严格检查
+                                        boolean canProceed = serverItem.equals(clientItem);
+
+                                        // 特殊情况：客户端预测消耗导致的不匹配
+                                        // 条件：物品ID相同，且客户端数量 <= 服务端数量（允许预测消耗）
+                                        if (!canProceed && serverItem.getId() == clientItem.getId()
+                                                && clientItem.getCount() <= serverItem.getCount()) {
+                                            canProceed = true;
+                                        }
+
+                                        // 特殊情况：客户端预测完全消耗（变成空气）
+                                        // 条件：服务端是可激活物品且数量为1，客户端是空气
+                                        if (!canProceed && clientItem.isNull()
+                                                && serverItem.getCount() == 1
+                                                && serverItem.canBeActivated()) {
+                                            canProceed = true;
+                                        }
+
+                                        if (canProceed) {
+                                            Item i = serverItem;
+                                            Item oldItem = i.clone();
+                                            if ((i = this.level.useItemOn(blockVector.asVector3(), i, face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this)) != null) {
+                                                if (!i.equals(oldItem) || i.getCount() != oldItem.getCount()) {
+                                                    if (oldItem.getId() == i.getId() || i.getId() == 0) {
+                                                        inventory.setItemInHand(i);
+                                                    } else {
+                                                        server.getLogger().debug("Tried to set item " + i.getId() + " but " + this.username + " had item " + oldItem.getId() + " in their hand slot");
+                                                    }
+                                                    inventory.sendHeldItem(this.getViewers().values());
+                                                }
+                                                break packetswitch;
+                                            } else {
+                                                // useItemOn 返回 null（如事件被取消），需要重同步物品到客户端
+                                                this.needSendHeldItem = true;
+                                            }
+                                        } else {
+                                            this.needSendHeldItem = true;
+                                        }
                                     }
                                 }
 
