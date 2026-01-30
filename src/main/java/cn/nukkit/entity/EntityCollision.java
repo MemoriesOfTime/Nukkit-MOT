@@ -36,8 +36,6 @@ public class EntityCollision implements ChunkLoader {
             .maximumSize(64)
             .build();
 
-    private final ReentrantLock lock = new ReentrantLock();
-
     private AxisAlignedBB lastCheckedBB = null;
     private int adaptiveCheckInterval = 5;
     private double lastSpeedSq = 0;
@@ -54,14 +52,9 @@ public class EntityCollision implements ChunkLoader {
      * Clears cache at entity close
      */
     public void clearCaches() {
-        lock.lock();
-        try {
-            chunkCache.invalidateAll();
-            collisionCache.invalidateAll();
-            lastCheckedBB = null;
-        } finally {
-            lock.unlock();
-        }
+        chunkCache.invalidateAll();
+        collisionCache.invalidateAll();
+        lastCheckedBB = null;
     }
 
     @Override
@@ -105,58 +98,53 @@ public class EntityCollision implements ChunkLoader {
         updateAdaptiveCheckInterval(speedSq, currentTick);
         long cacheKey = computeCacheKey(bb, motionX, motionY, motionZ);
 
-        lock.lock();
-        try {
-            if (!hasBlockChangesInArea(bb)) {
-                List<Block> cached = collisionCache.getIfPresent(cacheKey);
-                if (cached != null) {
-                    return cached;
-                }
+        if (!this.hasBlockChangesInArea(bb)) {
+            List<Block> cached = collisionCache.getIfPresent(cacheKey);
+            if (cached != null) {
+                return cached;
             }
+        }
 
-            if (speedSq < 0.0001 && entity instanceof EntityLiving) {
-                if (currentTick % adaptiveCheckInterval != 0 && !isNearDangerousBlocks(bb) && !isNearPortal(bb)) {
-                    List<Block> empty = Collections.emptyList();
-                    collisionCache.put(cacheKey, empty);
-                    return empty;
-                }
+        if (speedSq < 0.0001 && entity instanceof EntityLiving) {
+            if (currentTick % adaptiveCheckInterval != 0 && !isNearDangerousBlocks(bb) && !isNearPortal(bb)) {
+                List<Block> empty = Collections.emptyList();
+                collisionCache.put(cacheKey, empty);
+                return empty;
             }
+        }
 
-            double expand = 0.3 + Math.min(2.0, Math.sqrt(speedSq) * 2.0);
-            AxisAlignedBB expandedBB = bb.grow(expand, expand, expand);
-            List<Block> blocks = getBlocksInBoundingBoxFast(expandedBB, calculateMaxBlocks(speedSq));
+        double expand = 0.3 + Math.min(2.0, Math.sqrt(speedSq) * 2.0);
+        AxisAlignedBB expandedBB = bb.grow(expand, expand, expand);
+        List<Block> blocks = getBlocksInBoundingBoxFast(expandedBB, calculateMaxBlocks(speedSq));
 
-            if (blocks.isEmpty()) {
-                collisionCache.put(cacheKey, Collections.emptyList());
-                return Collections.emptyList();
-            }
+        if (blocks.isEmpty()) {
+            collisionCache.put(cacheKey, Collections.emptyList());
+            return Collections.emptyList();
+        }
 
-            double motionAbsX = Math.abs(motionX);
-            double motionAbsY = Math.abs(motionY);
-            double motionAbsZ = Math.abs(motionZ);
-            AxisAlignedBB trajectoryBB = bb.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3);
+        double motionAbsX = Math.abs(motionX);
+        double motionAbsY = Math.abs(motionY);
+        double motionAbsZ = Math.abs(motionZ);
+        AxisAlignedBB trajectoryBB = bb.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3);
 
-            List<Block> collisionBlocks = new ArrayList<>(8);
-            for (Block block : blocks) {
-                int id = block.getId();
-                if (id == Block.AIR) continue;
+        List<Block> collisionBlocks = new ArrayList<>(8);
+        for (Block block : blocks) {
+            int id = block.getId();
+            if (id == Block.AIR) continue;
 
-                if (id == Block.NETHER_PORTAL) {
-                    AxisAlignedBB portalBB = new SimpleAxisAlignedBB(block.x, block.y, block.z, block.x + 1, block.y + 1, block.z + 1);
-                    if (trajectoryBB.intersectsWith(portalBB)) {
-                        collisionBlocks.add(block);
-                    }
-                } else if (block.collidesWithBB(bb, true)) {
+            if (id == Block.NETHER_PORTAL) {
+                AxisAlignedBB portalBB = new SimpleAxisAlignedBB(block.x, block.y, block.z, block.x + 1, block.y + 1, block.z + 1);
+                if (trajectoryBB.intersectsWith(portalBB)) {
                     collisionBlocks.add(block);
                 }
+            } else if (block.collidesWithBB(bb, true)) {
+                collisionBlocks.add(block);
             }
-
-            List<Block> result = collisionBlocks.isEmpty() ? Collections.emptyList() : new ArrayList<>(collisionBlocks);
-            collisionCache.put(cacheKey, result);
-            return result;
-        } finally {
-            lock.unlock();
         }
+
+        List<Block> result = collisionBlocks.isEmpty() ? Collections.emptyList() : new ArrayList<>(collisionBlocks);
+        collisionCache.put(cacheKey, result);
+        return result;
     }
 
     private List<Block> getBlocksInBoundingBoxFast(AxisAlignedBB bb, int maxBlocks) {
