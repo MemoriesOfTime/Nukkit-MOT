@@ -16,7 +16,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class EntityCollision implements ChunkLoader {
 
