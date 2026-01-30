@@ -5,7 +5,6 @@ import cn.nukkit.block.custom.container.BlockContainer;
 import cn.nukkit.block.custom.container.BlockStorageContainer;
 import cn.nukkit.block.custom.container.data.*;
 import cn.nukkit.block.custom.properties.*;
-import cn.nukkit.item.customitem.data.ItemCreativeCategory;
 import cn.nukkit.item.customitem.data.ItemCreativeGroup;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
@@ -166,14 +165,6 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int nukk
             return this;
         }
 
-        @Deprecated
-        public Builder creativeGroupAndCategory(ItemCreativeGroup creativeGroup, ItemCreativeCategory creativeCategory) {
-            this.nbt.getCompound("menu_category")
-                    .putString("category", creativeCategory.name().toLowerCase(Locale.ROOT))
-                    .putString("group", creativeGroup.getGroupName());
-            return this;
-        }
-
         public Builder creativeGroupAndCategory(CreativeItemGroup creativeGroup, CreativeItemCategory creativeCategory) {
             this.nbt.getCompound("menu_category")
                     .putString("category", creativeCategory.name().toLowerCase(Locale.ROOT))
@@ -187,32 +178,9 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int nukk
             return this;
         }
 
-        @Deprecated
-        public Builder creativeCategory(ItemCreativeCategory creativeCategory) {
-            this.nbt.getCompound("menu_category")
-                    .putString("category", creativeCategory.name().toLowerCase(Locale.ROOT));
-            return this;
-        }
-
         public Builder creativeCategory(CreativeItemCategory creativeCategory) {
             this.nbt.getCompound("menu_category")
                     .putString("category", creativeCategory.name().toLowerCase(Locale.ROOT));
-            return this;
-        }
-
-        /**
-         * 控制自定义方块客户端侧的挖掘时间(单位秒)
-         * <p>
-         * 自定义方块的挖掘时间取决于服务端侧和客户端侧中最小的一个
-         * <p>
-         * Control the digging time (in seconds) on the client side of the custom block
-         * <p>
-         * The digging time of a custom cube depends on the smallest of the server-side and client-side
-         */
-        public Builder breakTime(double second) {
-            this.nbt.getCompound("components")
-                    .putCompound("minecraft:destructible_by_mining", new CompoundTag()
-                            .putFloat("value", (float) second));
             return this;
         }
 
@@ -242,6 +210,22 @@ public record CustomBlockDefinition(String identifier, CompoundTag nbt, int nukk
         @Deprecated
         public Builder creativeGroup(ItemCreativeGroup creativeGroup) {
             this.nbt.getCompound("menu_category").putString("group", creativeGroup.getGroupName());
+            return this;
+        }
+
+        /**
+         * 控制自定义方块客户端侧的挖掘时间(单位秒)
+         * <p>
+         * 自定义方块的挖掘时间取决于服务端侧和客户端侧中最小的一个
+         * <p>
+         * Control the digging time (in seconds) on the client side of the custom block
+         * <p>
+         * The digging time of a custom cube depends on the smallest of the server-side and client-side
+         */
+        public Builder breakTime(double second) {
+            this.nbt.getCompound("components")
+                    .putCompound("minecraft:destructible_by_mining", new CompoundTag()
+                            .putFloat("value", (float) second));
             return this;
         }
 
