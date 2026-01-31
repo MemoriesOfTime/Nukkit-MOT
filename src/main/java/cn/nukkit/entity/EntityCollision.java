@@ -117,7 +117,7 @@ public class EntityCollision implements ChunkLoader {
         int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
         int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
         int maxY = Math.min(NukkitMath.floorDouble(boundingBox.getMaxY()), level.getMaxBlockY());
-        int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
+        int maxZ = NukkitMath.floorDouble(boundingBox.getMaxZ());
 
         if (minX > maxX || minY > maxY || minZ > maxZ) {
             return Collections.emptyList();
@@ -175,7 +175,7 @@ public class EntityCollision implements ChunkLoader {
         int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
         int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
         int maxY = Math.min(NukkitMath.floorDouble(boundingBox.getMaxY()), level.getMaxBlockY());
-        int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
+        int maxZ = NukkitMath.floorDouble(boundingBox.getMaxZ());
 
         if (minY > maxY || !level.isYInRange(minY) || !level.isYInRange(maxY)) {
             return false;
