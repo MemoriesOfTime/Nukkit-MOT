@@ -49,18 +49,6 @@ public class BlockLava extends BlockLiquid {
     }
 
     @Override
-    protected AxisAlignedBB recalculateCollisionBoundingBox() {
-        return new SimpleAxisAlignedBB(
-                this.x + 0.35,
-                this.y,
-                this.z + 0.35,
-                this.x + 0.65,
-                this.y + 1.0,
-                this.z + 0.65
-        );
-    }
-
-    @Override
     public void onEntityCollide(Entity entity) {
         entity.highestPosition -= (entity.highestPosition - entity.y) * 0.5;
 

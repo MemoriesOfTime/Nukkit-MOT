@@ -93,7 +93,6 @@ public class EntityCollision implements ChunkLoader {
         List<Block> collisionBlocks = new ArrayList<>(8);
         for (Block block : blocks) {
             int id = block.getId();
-            if (id == Block.AIR) continue;
             if (id == Block.NETHER_PORTAL) {
                 double motionAbsX = Math.abs(motionX);
                 double motionAbsY = Math.abs(motionY);
@@ -168,7 +167,6 @@ public class EntityCollision implements ChunkLoader {
 
     /**
      * Checks if the bounding box intersects a block of the given type.
-     * Handles liquid variants (e.g., STILL_LAVA counts as LAVA).
      *
      * @param boundingBox The bounding box to test.
      * @param targetBlockId The block ID to check (e.g., Block.FIRE).
@@ -183,8 +181,8 @@ public class EntityCollision implements ChunkLoader {
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = Math.max(NukkitMath.floorDouble(boundingBox.getMinY()), level.getMinBlockY());
         int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
-        int maxX = NukkitMath.ceilDouble(boundingBox.getMaxX());
-        int maxY = Math.min(NukkitMath.ceilDouble(boundingBox.getMaxY()), level.getMaxBlockY());
+        int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
+        int maxY = Math.min(NukkitMath.floorDouble(boundingBox.getMaxY()), level.getMaxBlockY());
         int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
 
         if (minY > maxY || !level.isYInRange(minY) || !level.isYInRange(maxY)) {
@@ -192,27 +190,12 @@ public class EntityCollision implements ChunkLoader {
         }
 
         for (int x = minX; x <= maxX; x++) {
-            int chunkX = x >> 4;
-            int localX = x & 0x0f;
             for (int z = minZ; z <= maxZ; z++) {
-                int chunkZ = z >> 4;
-                int localZ = z & 0x0f;
-                int chunkKey = chunkX * 31 + chunkZ;
-                FullChunk chunk = chunkCache.getIfPresent(chunkKey);
-                if (chunk == null) {
-                    chunk = level.getChunkIfLoaded(chunkX, chunkZ);
-                    if (chunk != null) {
-                        chunkCache.put(chunkKey, chunk);
-                    } else {
-                        continue;
-                    }
-                }
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
-                    int id = chunk.getBlockId(localX, y, localZ);
-                    if (id == targetBlockId ||
-                            (targetBlockId == Block.LAVA && (id == Block.STILL_LAVA)) ||
-                            (targetBlockId == Block.WATER && (id == Block.STILL_WATER))) {
+                    Block block = level.getBlock(x, y, z);
+                    int id = block.getId();
+                    if (id == targetBlockId && block.getBoundingBox().intersectsWith(boundingBox)) {
                         return true;
                     }
                 }

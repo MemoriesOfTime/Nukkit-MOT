@@ -2530,8 +2530,8 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfLava() {
-        if (collisionCache == null) collisionCache = new EntityCollision(this);
-        return collisionCache.isInsideSpecialBlock(boundingBox, Block.LAVA);
+        if (this.collisionCache == null) this.collisionCache = new EntityCollision(this);
+        return this.collisionCache.isInsideSpecialBlock(this.boundingBox, Block.LAVA);
     }
 
     public boolean isInsideOfSolid() {
@@ -2549,8 +2549,8 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfFire() {
-        if (collisionCache == null) collisionCache = new EntityCollision(this);
-        return collisionCache.isInsideSpecialBlock(boundingBox, Block.FIRE);
+        if (this.collisionCache == null) this.collisionCache = new EntityCollision(this);
+        return this.collisionCache.isInsideSpecialBlock(this.boundingBox, Block.FIRE);
     }
 
     public boolean fastMove(double dx, double dy, double dz) {
@@ -2722,7 +2722,7 @@ public abstract class Entity extends Location implements Metadatable {
     public List<Block> getBlocksAround() {
         if (this.collisionCache == null) return Collections.emptyList();
 
-        List<Block> blocksAround = this.collisionCache.getBlocksInBoundingBox(this.getBoundingBox());
+        List<Block> blocksAround = this.collisionCache.getBlocksInBoundingBox(this.boundingBox);
 
         if (!blocksAround.isEmpty()) {
             this.blocksAround = blocksAround;
@@ -2737,7 +2737,7 @@ public abstract class Entity extends Location implements Metadatable {
         if (this.collisionCache == null) return Collections.emptyList();
 
         List<Block> collisionBlocks = this.collisionCache.getCollisionBlocks(
-                this.getBoundingBox(),
+                this.boundingBox,
                 this.motionX,
                 this.motionY,
                 this.motionZ
