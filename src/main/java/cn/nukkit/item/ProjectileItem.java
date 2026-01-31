@@ -30,6 +30,11 @@ public abstract class ProjectileItem extends Item {
     abstract public float getThrowForce();
 
     @Override
+    public boolean canBeActivated() {
+        return true;
+    }
+
+    @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
         Vector3 motion;
 
