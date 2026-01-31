@@ -41,7 +41,7 @@ public class AnimatePacket extends DataPacket {
         if (protocol < ProtocolInfo.v1_21_130_28 && (this.action == Action.ROW_RIGHT || this.action == Action.ROW_LEFT)) {
             this.rowingTime = this.getLFloat();
         }
-        if (protocol >= ProtocolInfo.v1_21_130_28 && this.getBoolean()) {
+        if (protocol >= ProtocolInfo.v1_21_130_28) {
             this.swingSource = this.getOptional(SwingSource.NONE, stream -> SwingSource.from(stream.getString()));
         }
     }
