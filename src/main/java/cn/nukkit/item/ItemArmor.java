@@ -1,8 +1,11 @@
 package cn.nukkit.item;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
 import cn.nukkit.item.trim.ItemTrimMaterialType;
 import cn.nukkit.item.trim.ItemTrimPatternType;
+import cn.nukkit.level.Level;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
@@ -49,9 +52,29 @@ abstract public class ItemArmor extends Item implements ItemDurable {
     }
 
     @Override
+    public boolean canBeActivated() {
+        return true;
+    }
+
+    @Override
+    public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
+        return this.equipArmor(player);
+    }
+
+    @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
-        boolean equip = false;
+        this.equipArmor(player);
+        return this.getCount() == 0;
+    }
+
+    /**
+     * 尝试穿戴装备
+     * @param player 玩家
+     * @return 是否成功穿戴
+     */
+    protected boolean equipArmor(Player player) {
         Item oldSlotItem = Item.get(AIR);
+        boolean equip = false;
         if (this.isHelmet()) {
             oldSlotItem = player.getInventory().getHelmetFast();
             if (player.getInventory().setHelmet(this)) {
@@ -75,35 +98,42 @@ abstract public class ItemArmor extends Item implements ItemDurable {
         }
         if (equip) {
             player.getInventory().setItem(player.getInventory().getHeldItemIndex(), oldSlotItem);
-            switch (this.getTier()) {
-                case TIER_CHAIN:
-                    player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_CHAIN);
-                    break;
-                case TIER_DIAMOND:
-                    player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_DIAMOND);
-                    break;
-                case TIER_GOLD:
-                    player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_GOLD);
-                    break;
-                case TIER_IRON:
-                    player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_IRON);
-                    break;
-                case TIER_LEATHER:
-                    player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_LEATHER);
-                    break;
-                case TIER_NETHERITE:
-                    player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_NETHERITE);
-                    break;
-                case TIER_COPPER:
-                    player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_COPPER);
-                    break;
-                case TIER_OTHER:
-                default:
-                    player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_GENERIC);
-            }
+            this.playEquipSound(player);
         }
+        return equip;
+    }
 
-        return this.getCount() == 0;
+    /**
+     * 播放装备穿戴音效
+     * @param player 玩家
+     */
+    protected void playEquipSound(Player player) {
+        switch (this.getTier()) {
+            case TIER_CHAIN:
+                player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_CHAIN);
+                break;
+            case TIER_DIAMOND:
+                player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_DIAMOND);
+                break;
+            case TIER_GOLD:
+                player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_GOLD);
+                break;
+            case TIER_IRON:
+                player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_IRON);
+                break;
+            case TIER_LEATHER:
+                player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_LEATHER);
+                break;
+            case TIER_NETHERITE:
+                player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_NETHERITE);
+                break;
+            case TIER_COPPER:
+                player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_COPPER);
+                break;
+            case TIER_OTHER:
+            default:
+                player.getLevel().addLevelSoundEvent(player, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_GENERIC);
+        }
     }
 
     @Override
