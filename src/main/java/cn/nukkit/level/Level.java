@@ -2746,8 +2746,8 @@ public class Level implements ChunkManager, Metadatable {
                 if (item.canBeActivated() && item.onActivate(this, player, block, target, face, fx, fy, fz)) {
                     if (item.getCount() <= 0) {
                         item = new ItemBlock(Block.get(BlockID.AIR), 0, 0);
+                        return item;
                     }
-                    return item;
                 }
             } else {
                 if (item.getId() == ItemID.BUCKET && ItemBucket.getDamageByTarget(item.getDamage()) == BlockID.WATER) {
