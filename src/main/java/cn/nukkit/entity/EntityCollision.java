@@ -17,8 +17,8 @@ import java.util.*;
 public class EntityCollision implements ChunkLoader {
 
     private final Entity entity;
-    private final Cache<Integer, FullChunk> chunkCache = Caffeine.newBuilder()
-            .maximumSize(4)
+    private final Cache<Long, FullChunk> chunkCache = Caffeine.newBuilder()
+            .maximumSize(8)
             .build();
 
     public EntityCollision(Entity entity) {
@@ -52,7 +52,18 @@ public class EntityCollision implements ChunkLoader {
         int bcZ = blockZ >> 4;
 
         if (Math.abs(bcX - ecX) <= 1 && Math.abs(bcZ - ecZ) <= 1) {
-            int chunkKey = ecX * 31 + ecZ;
+            long chunkKey = ((long) bcX << 32) | (bcZ & 0xFFFFFFFFL);
+            chunkCache.invalidate(chunkKey);
+        }
+    }
+
+    /**
+     * Invalidate cache when chunk is unloaded to prevent stale references and memory leaks.
+     */
+    @Override
+    public void onChunkUnloaded(FullChunk chunk) {
+        if (chunk != null && !entity.isClosed()) {
+            long chunkKey = ((long) chunk.getX() << 32) | (chunk.getZ() & 0xFFFFFFFFL);
             chunkCache.invalidate(chunkKey);
         }
     }
@@ -134,7 +145,7 @@ public class EntityCollision implements ChunkLoader {
             for (int z = minZ; z <= maxZ; z++) {
                 int chunkZ = z >> 4;
                 int localZ = z & 0x0f;
-                int chunkKey = chunkX * 31 + chunkZ;
+                long chunkKey = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
                 FullChunk chunk = chunkCache.getIfPresent(chunkKey);
                 if (chunk == null) {
                     chunk = level.getChunkIfLoaded(chunkX, chunkZ);
@@ -159,6 +170,7 @@ public class EntityCollision implements ChunkLoader {
 
     /**
      * Checks if the bounding box intersects a block of the given type.
+     * Uses chunk caching for performance consistency.
      *
      * @param boundingBox The bounding box to test.
      * @param targetBlockId The block ID to check (e.g., Block.FIRE).
@@ -182,13 +194,27 @@ public class EntityCollision implements ChunkLoader {
         }
 
         for (int x = minX; x <= maxX; x++) {
+            int chunkX = x >> 4;
+            int localX = x & 0x0f;
             for (int z = minZ; z <= maxZ; z++) {
+                int chunkZ = z >> 4;
+                int localZ = z & 0x0f;
+                long chunkKey = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
+                FullChunk chunk = chunkCache.getIfPresent(chunkKey);
+                if (chunk == null) {
+                    chunk = level.getChunkIfLoaded(chunkX, chunkZ);
+                    if (chunk == null) {
+                        continue;
+                    }
+                    chunkCache.put(chunkKey, chunk);
+                }
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
-
-                    Block block = level.getBlock(x, y, z);
-                    int id = block.getId();
-                    if (id == targetBlockId && block.collidesWithBB(boundingBox)) {
+                    int blockId = chunk.getBlockId(localX, y, localZ);
+                    if (blockId != targetBlockId) continue;
+                    int blockData = chunk.getBlockData(localX, y, localZ);
+                    Block block = Block.get(blockId, blockData, level, x, y, z);
+                    if (block.collidesWithBB(boundingBox)) {
                         return true;
                     }
                 }
@@ -205,6 +231,5 @@ public class EntityCollision implements ChunkLoader {
     @Override public Level getLevel() { return entity.getLevel(); }
     @Override public void onChunkChanged(FullChunk chunk) {}
     @Override public void onChunkLoaded(FullChunk chunk) {}
-    @Override public void onChunkUnloaded(FullChunk chunk) {}
     @Override public void onChunkPopulated(FullChunk chunk) {}
 }
