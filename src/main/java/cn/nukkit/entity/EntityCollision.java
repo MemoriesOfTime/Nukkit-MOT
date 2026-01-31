@@ -13,18 +13,12 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 public class EntityCollision implements ChunkLoader {
 
-    private static final Cache<Long, Boolean> recentBlockChanges = Caffeine.newBuilder()
-            .maximumSize(1024)
-            .expireAfterWrite(3, TimeUnit.SECONDS)
-            .build();
-
     private final Entity entity;
     private final Cache<Integer, FullChunk> chunkCache = Caffeine.newBuilder()
-            .maximumSize(32)
+            .maximumSize(4)
             .build();
 
     public EntityCollision(Entity entity) {
@@ -36,7 +30,6 @@ public class EntityCollision implements ChunkLoader {
      */
     public void clearCaches() {
         chunkCache.invalidateAll();
-        recentBlockChanges.invalidateAll();
     }
 
     /**
@@ -50,20 +43,18 @@ public class EntityCollision implements ChunkLoader {
         }
         Level level = entity.getLevel();
         if (level == null) return;
+
         int blockX = pos.getFloorX();
         int blockZ = pos.getFloorZ();
         int ecX = entity.getChunkX();
         int ecZ = entity.getChunkZ();
         int bcX = blockX >> 4;
         int bcZ = blockZ >> 4;
-        if (Math.abs(bcX - ecX) > 1 || Math.abs(bcZ - ecZ) > 1) {
-            return;
+
+        if (Math.abs(bcX - ecX) <= 1 && Math.abs(bcZ - ecZ) <= 1) {
+            int chunkKey = ecX * 31 + ecZ;
+            chunkCache.invalidate(chunkKey);
         }
-        long x = ((long) blockX) & 0xFFFFFL;
-        long z = ((long) blockZ) & 0xFFFFFL;
-        long y = ((long) pos.getFloorY()) & 0x7FFL;
-        long key = x | (z << 20) | (y << 40);
-        recentBlockChanges.put(key, true);
     }
 
     /**
