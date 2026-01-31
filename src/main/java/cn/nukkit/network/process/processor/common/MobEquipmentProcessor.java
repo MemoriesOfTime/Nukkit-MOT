@@ -53,7 +53,7 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
             if (fixItem.equals(pk.item, false, true)) {
                 inv.setItem(pk.hotbarSlot, fixItem);
             } else {
-                player.getServer().getLogger().debug("Tried to equip " + pk.item + " but have {} in target slot " + fixItem);
+                player.getServer().getLogger().debug("Tried to equip " + pk.item + " but have " + fixItem + " in target slot");
                 inv.sendContents(player);
                 return;
             }
