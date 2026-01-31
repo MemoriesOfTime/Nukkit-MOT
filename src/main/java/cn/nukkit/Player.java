@@ -4288,12 +4288,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 animatePacket.eid = this.getId();
                 animatePacket.action = animationEvent.getAnimationType();
                 for (Player player : this.getViewers().values()) {
-                    if (player.protocol >= ProtocolInfo.v1_21_130_28 && this.protocol < ProtocolInfo.v1_21_130_28) {
-                        // todo: when players of lower version rides on it, their row actions leads to unknown error for players of higher version
+                    // Skip row actions from lower version players to higher version viewers (causes unknown error)
+                    if (player.protocol >= ProtocolInfo.v1_21_130_28 && this.protocol < ProtocolInfo.v1_21_130_28
+                            && (animation == AnimatePacket.Action.ROW_RIGHT || animation == AnimatePacket.Action.ROW_LEFT)) {
                         continue;
-                    } else {
-                        player.dataPacket(packet);
                     }
+                    player.dataPacket(packet);
                 }
                 break;
             case ProtocolInfo.ENTITY_EVENT_PACKET:
