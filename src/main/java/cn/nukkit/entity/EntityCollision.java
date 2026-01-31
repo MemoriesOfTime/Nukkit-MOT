@@ -36,6 +36,7 @@ public class EntityCollision implements ChunkLoader {
      */
     public void clearCaches() {
         chunkCache.invalidateAll();
+        recentBlockChanges.invalidateAll();
     }
 
     /**
