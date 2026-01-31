@@ -187,10 +187,8 @@ public class EntityCollision implements ChunkLoader {
                     if (!level.isYInRange(y)) continue;
 
                     Block block = level.getBlock(x, y, z);
-                    if (block.getBoundingBox() == null) continue;
-
                     int id = block.getId();
-                    if (id == targetBlockId && block.getBoundingBox().intersectsWith(boundingBox)) {
+                    if (id == targetBlockId && block.collidesWithBB(boundingBox)) {
                         return true;
                     }
                 }
