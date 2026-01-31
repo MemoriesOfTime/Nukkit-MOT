@@ -4772,15 +4772,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         Item serverItem = inventory.getItemInHand();
                                         Item clientItem = useItemData.itemInHand;
 
-                                        // 默认严格检查
+                                        // 默认严格检查（equals 不检查数量，所以客户端预测消耗减少数量的情况会自动通过）
                                         boolean canProceed = serverItem.equals(clientItem);
-
-                                        // 特殊情况：客户端预测消耗导致的不匹配
-                                        // 条件：物品ID相同，且客户端数量 <= 服务端数量（允许预测消耗）
-                                        if (!canProceed && serverItem.getId() == clientItem.getId()
-                                                && clientItem.getCount() <= serverItem.getCount()) {
-                                            canProceed = true;
-                                        }
 
                                         // 特殊情况：客户端预测完全消耗（变成空气）
                                         // 条件：服务端是可激活物品且数量为1，客户端是空气
