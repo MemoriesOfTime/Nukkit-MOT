@@ -89,7 +89,7 @@ public class EntityCollision implements ChunkLoader {
                 double motionAbsX = Math.abs(motionX);
                 double motionAbsY = Math.abs(motionY);
                 double motionAbsZ = Math.abs(motionZ);
-                if (boundingBox.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3).intersectsWith(boundingBox)) {
+                if (block.collidesWithBB(boundingBox.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3))) {
                     collisionBlocks.add(block);
                 }
             } else if (block.collidesWithBB(boundingBox, true)) {
@@ -185,7 +185,10 @@ public class EntityCollision implements ChunkLoader {
             for (int z = minZ; z <= maxZ; z++) {
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
+
                     Block block = level.getBlock(x, y, z);
+                    if (block.getBoundingBox() == null) continue;
+
                     int id = block.getId();
                     if (id == targetBlockId && block.getBoundingBox().intersectsWith(boundingBox)) {
                         return true;
