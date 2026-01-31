@@ -2722,7 +2722,7 @@ public abstract class Entity extends Location implements Metadatable {
     public List<Block> getBlocksAround() {
         if (this.collisionCache == null) return Collections.emptyList();
 
-        List<Block> blocksAround = this.collisionCache.getBlocksInBoundingBox(this.boundingBox);
+        List<Block> blocksAround = this.collisionCache.getBlocksInBoundingBox(this.getBoundingBox());
 
         if (!blocksAround.isEmpty()) {
             this.blocksAround = blocksAround;
@@ -2737,7 +2737,7 @@ public abstract class Entity extends Location implements Metadatable {
         if (this.collisionCache == null) return Collections.emptyList();
 
         List<Block> collisionBlocks = this.collisionCache.getCollisionBlocks(
-                this.boundingBox,
+                this.getBoundingBox(),
                 this.motionX,
                 this.motionY,
                 this.motionZ

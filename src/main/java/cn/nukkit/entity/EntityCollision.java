@@ -7,14 +7,12 @@ import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
-import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
 public class EntityCollision implements ChunkLoader {
@@ -29,103 +27,81 @@ public class EntityCollision implements ChunkLoader {
             .maximumSize(32)
             .build();
 
-    private AxisAlignedBB lastCheckedBB = null;
-    private int adaptiveCheckInterval = 5;
-    private double lastSpeedSq = 0;
-    private long lastMovementTick = 0;
-    private byte insideSpecialCache = 0;
-    private long lastSpecialCheckTick = 0;
-
     public EntityCollision(Entity entity) {
         this.entity = entity;
     }
 
     /**
-     * Clears cache at entity close
+     * Clears internal chunk cache to free memory when the entity is removed.
      */
     public void clearCaches() {
         chunkCache.invalidateAll();
-        lastCheckedBB = null;
     }
 
     /**
-     * Immediate update of block state in the chunk
+     * Immediately updates block in the chunk.
+     * Marks cached collision data as potentially stale.
      */
     @Override
     public void onBlockChanged(Vector3 pos) {
         if (pos == null || entity == null || entity.isClosed()) {
             return;
         }
+        Level level = entity.getLevel();
+        if (level == null) return;
         int blockX = pos.getFloorX();
         int blockZ = pos.getFloorZ();
-        if (!isChunkRelevant(blockX, blockZ)) {
+        int ecX = entity.getChunkX();
+        int ecZ = entity.getChunkZ();
+        int bcX = blockX >> 4;
+        int bcZ = blockZ >> 4;
+        if (Math.abs(bcX - ecX) > 1 || Math.abs(bcZ - ecZ) > 1) {
             return;
         }
         long x = ((long) blockX) & 0xFFFFFL;
         long z = ((long) blockZ) & 0xFFFFFL;
         long y = ((long) pos.getFloorY()) & 0x7FFL;
         long key = x | (z << 20) | (y << 40);
-        recentBlockChanges.put(key, Boolean.TRUE);
+        recentBlockChanges.put(key, true);
     }
 
     /**
-     * Checking for the existence of an entity in the same chunk
+     * Returns blocks colliding with the entity's AABB, extended by its motion vector.
+     *
+     * @param boundingBox The entity's current axis-aligned bounding box.
+     * @param motionX X component of motion.
+     * @param motionY Y component of motion.
+     * @param motionZ Z component of motion.
+     * @return Colliding blocks, or an empty list if none.
      */
-    private boolean isChunkRelevant(int blockX, int blockZ) {
-        Level level = entity.getLevel();
-        if (level == null) return false;
-        int ecX = entity.getChunkX();
-        int ecZ = entity.getChunkZ();
-        int bcX = blockX >> 4;
-        int bcZ = blockZ >> 4;
-        return Math.abs(bcX - ecX) <= 1 && Math.abs(bcZ - ecZ) <= 1;
-    }
-
-    /**
-     * Handling block collisions using cache to reduce CPU load
-     */
-    public List<Block> getCollisionBlocks(AxisAlignedBB bb, double motionX, double motionY, double motionZ) {
+    public List<Block> getCollisionBlocks(AxisAlignedBB boundingBox, double motionX, double motionY, double motionZ) {
         if (entity.isClosed()) {
             return Collections.emptyList();
         }
 
-        long currentTick = entity.getServer().getTick();
-        double speedSq = motionX * motionX + motionY * motionY + motionZ * motionZ;
-        updateAdaptiveCheckInterval(speedSq, currentTick);
-
-        if (speedSq < 0.0001 && entity instanceof EntityLiving) {
-            if (currentTick % adaptiveCheckInterval != 0 && !this.isNearDangerousBlocks(bb) && !this.isNearPortal(bb)) {
-                return Collections.emptyList();
-            }
-        }
-
-        if (!hasBlockChangesInArea(bb) && speedSq < 0.001 && currentTick % Math.max(adaptiveCheckInterval, 10) != 0) {
+        Level level = entity.getLevel();
+        if (level == null) {
             return Collections.emptyList();
         }
 
-        double expand = 0.3 + Math.min(2.0, Math.sqrt(speedSq) * 2.0);
-        AxisAlignedBB expandedBB = bb.grow(expand, expand, expand);
-        List<Block> blocks = getBlocksInBoundingBox(expandedBB, calculateMaxBlocks(speedSq));
+        List<Block> blocks = this.getBlocksInBoundingBox(boundingBox);
 
         if (blocks.isEmpty()) {
             return Collections.emptyList();
         }
-
-        double motionAbsX = Math.abs(motionX);
-        double motionAbsY = Math.abs(motionY);
-        double motionAbsZ = Math.abs(motionZ);
-        AxisAlignedBB trajectoryBB = bb.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3);
 
         List<Block> collisionBlocks = new ArrayList<>(8);
         for (Block block : blocks) {
             int id = block.getId();
             if (id == Block.AIR) continue;
             if (id == Block.NETHER_PORTAL) {
-                AxisAlignedBB portalBB = new SimpleAxisAlignedBB(block.x, block.y, block.z, block.x + 1, block.y + 1, block.z + 1);
-                if (trajectoryBB.intersectsWith(portalBB)) {
+                double motionAbsX = Math.abs(motionX);
+                double motionAbsY = Math.abs(motionY);
+                double motionAbsZ = Math.abs(motionZ);
+                if (boundingBox.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3).intersectsWith(boundingBox)) {
                     collisionBlocks.add(block);
                 }
-            } else if (block.collidesWithBB(bb, true)) {
+            } else if (block.collidesWithBB(boundingBox, true)) {
                 collisionBlocks.add(block);
             }
         }
@@ -133,25 +109,34 @@ public class EntityCollision implements ChunkLoader {
         return collisionBlocks.isEmpty() ? Collections.emptyList() : collisionBlocks;
     }
 
-    private List<Block> getBlocksInBoundingBox(AxisAlignedBB bb, int maxBlocks) {
+    /**
+     * Returns non-air blocks in the given AABB using chunk caching.
+     *
+     * @param boundingBox The bounding box to scan.
+     * @return Intersecting non-air blocks, or an empty list if none.
+     */
+    public List<Block> getBlocksInBoundingBox(AxisAlignedBB boundingBox) {
         Level level = entity.getLevel();
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = Math.max(NukkitMath.floorDouble(bb.getMinY()), level.getMinBlockY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = Math.min(NukkitMath.ceilDouble(bb.getMaxY()), level.getMaxBlockY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
-
-        if (minY > maxY || !level.isYInRange(minY) || !level.isYInRange(maxY)) {
+        if (level == null || entity.isClosed()) {
             return Collections.emptyList();
         }
 
-        int totalBlocks = (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
-        if (totalBlocks > maxBlocks) {
-            return sampleBlocksInArea(minX, minY, minZ, maxX, maxY, maxZ, maxBlocks);
+        int minX = NukkitMath.floorDouble(boundingBox.getMinX());
+        int minY = Math.max(NukkitMath.floorDouble(boundingBox.getMinY()), level.getMinBlockY());
+        int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
+        int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
+        int maxY = Math.min(NukkitMath.floorDouble(boundingBox.getMaxY()), level.getMaxBlockY());
+        int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
+
+        if (minX > maxX || minY > maxY || minZ > maxZ) {
+            return Collections.emptyList();
         }
 
-        List<Block> result = new ArrayList<>(Math.min(totalBlocks, 256));
+        if (!level.isYInRange(minY) || !level.isYInRange(maxY)) {
+            return Collections.emptyList();
+        }
+
+        List<Block> result = new ArrayList<>();
         for (int x = minX; x <= maxX; x++) {
             int chunkX = x >> 4;
             int localX = x & 0x0f;
@@ -181,154 +166,30 @@ public class EntityCollision implements ChunkLoader {
         return result;
     }
 
-    private List<Block> sampleBlocksInArea(int minX, int minY, int minZ, int maxX, int maxY, int maxZ, int maxSamples) {
-        List<Block> samples = new ArrayList<>();
-        Random random = ThreadLocalRandom.current();
-        int rangeX = maxX - minX + 1;
-        int rangeY = maxY - minY + 1;
-        int rangeZ = maxZ - minZ + 1;
-        Level level = entity.getLevel();
-        for (int i = 0; i < maxSamples; i++) {
-            int x = minX + random.nextInt(rangeX);
-            int y = minY + random.nextInt(rangeY);
-            int z = minZ + random.nextInt(rangeZ);
-            Block block = level.getBlock(x, y, z);
-            if (block.getId() != Block.AIR) {
-                samples.add(block);
-            }
-        }
-        return samples;
-    }
-
-    private void updateAdaptiveCheckInterval(double speedSq, long currentTick) {
-        if (Math.abs(speedSq - lastSpeedSq) > 0.1) {
-            lastSpeedSq = speedSq;
-            if (speedSq > 1.0) adaptiveCheckInterval = 1;
-            else if (speedSq > 0.1) adaptiveCheckInterval = 2;
-            else if (speedSq > 0.01) adaptiveCheckInterval = 3;
-            else adaptiveCheckInterval = 5;
-            if (currentTick - lastMovementTick > 20) {
-                adaptiveCheckInterval = 10;
-            }
-        }
-        if (speedSq > 0.001) {
-            lastMovementTick = currentTick;
-        }
-    }
-
     /**
-     * Checking whether the block has already been changed forcibly
+     * Checks if the bounding box intersects a block of the given type.
+     * Handles liquid variants (e.g., STILL_LAVA counts as LAVA).
+     *
+     * @param boundingBox The bounding box to test.
+     * @param targetBlockId The block ID to check (e.g., Block.FIRE).
+     * @return {@code true} if any matching block intersects the box.
      */
-    private boolean hasBlockChangesInArea(AxisAlignedBB bb) {
+    public boolean isInsideSpecialBlock(AxisAlignedBB boundingBox, int targetBlockId) {
         Level level = entity.getLevel();
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = Math.max(NukkitMath.floorDouble(bb.getMinY()), level.getMinBlockY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = Math.min(NukkitMath.ceilDouble(bb.getMaxY()), level.getMaxBlockY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
-
-        for (Long key : recentBlockChanges.asMap().keySet()) {
-            int x = (int) (key & 0xFFFFF);
-            if (x >= 0x80000) x -= 0x100000;
-            int z = (int) ((key >> 20) & 0xFFFFF);
-            if (z >= 0x80000) z -= 0x100000;
-            int y = (int) ((key >> 40) & 0x7FF);
-            if (y >= 0x400) y -= 0x800;
-            if (x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ) {
-                return true;
-            }
+        if (level == null || entity.isClosed()) {
+            return false;
         }
-        return false;
-    }
 
-    private boolean isNearDangerousBlocks(AxisAlignedBB bb) {
-        AxisAlignedBB safetyBB = bb.grow(0.3, 0.3, 0.3);
-        return isInsideSpecialBlock(safetyBB, Block.LAVA) ||
-                isInsideSpecialBlock(safetyBB, Block.FIRE) ||
-                isInsideSpecialBlock(safetyBB, Block.CACTUS);
-    }
-
-    /**
-     * Priority processing for the portal
-     */
-    private boolean isNearPortal(AxisAlignedBB bb) {
-        AxisAlignedBB checkBB = bb.grow(1, 1, 1);
-        Level level = entity.getLevel();
-        int minX = NukkitMath.floorDouble(checkBB.getMinX());
-        int minY = Math.max(NukkitMath.floorDouble(checkBB.getMinY()), level.getMinBlockY());
-        int minZ = NukkitMath.floorDouble(checkBB.getMinZ());
-        int maxX = NukkitMath.ceilDouble(checkBB.getMaxX());
-        int maxY = Math.min(NukkitMath.ceilDouble(checkBB.getMaxY()), level.getMaxBlockY());
-        int maxZ = NukkitMath.ceilDouble(checkBB.getMaxZ());
+        int minX = NukkitMath.floorDouble(boundingBox.getMinX());
+        int minY = Math.max(NukkitMath.floorDouble(boundingBox.getMinY()), level.getMinBlockY());
+        int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
+        int maxX = NukkitMath.ceilDouble(boundingBox.getMaxX());
+        int maxY = Math.min(NukkitMath.ceilDouble(boundingBox.getMaxY()), level.getMaxBlockY());
+        int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
 
         if (minY > maxY || !level.isYInRange(minY) || !level.isYInRange(maxY)) {
             return false;
         }
-
-        for (int x = minX; x <= maxX; x++) {
-            int chunkX = x >> 4;
-            int localX = x & 0x0f;
-            for (int z = minZ; z <= maxZ; z++) {
-                int chunkZ = z >> 4;
-                int localZ = z & 0x0f;
-                int chunkKey = chunkX * 31 + chunkZ;
-                FullChunk chunk = chunkCache.getIfPresent(chunkKey);
-                if (chunk == null) {
-                    chunk = level.getChunkIfLoaded(chunkX, chunkZ);
-                    if (chunk != null) {
-                        chunkCache.put(chunkKey, chunk);
-                    } else {
-                        continue;
-                    }
-                }
-                for (int y = minY; y <= maxY; y++) {
-                    if (!level.isYInRange(y)) continue;
-                    if (chunk.getBlockId(localX, y, localZ) == Block.NETHER_PORTAL) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    private int calculateMaxBlocks(double speedSq) {
-        int baseLimit = 256;
-        int speedBonus = (int) (speedSq * 500);
-        return Math.min(baseLimit + speedBonus, 1024);
-    }
-
-    public boolean isInsideSpecialBlock(AxisAlignedBB bb, int targetBlockId) {
-        long currentTick = entity.getServer().getTick();
-        if (lastCheckedBB != null && lastCheckedBB.equals(bb) && currentTick == lastSpecialCheckTick) {
-            return switch (targetBlockId) {
-                case Block.FIRE -> (insideSpecialCache & 1) != 0;
-                case Block.LAVA -> (insideSpecialCache & 2) != 0;
-                case Block.WATER -> (insideSpecialCache & 4) != 0;
-                case Block.CACTUS -> (insideSpecialCache & 8) != 0;
-                case Block.CAMPFIRE_BLOCK, Block.SOUL_CAMPFIRE_BLOCK -> (insideSpecialCache & 16) != 0;
-                default -> false;
-            };
-        }
-
-        lastCheckedBB = bb.clone();
-        lastSpecialCheckTick = currentTick;
-        insideSpecialCache = 0;
-
-        Level level = entity.getLevel();
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = Math.max(NukkitMath.floorDouble(bb.getMinY()), level.getMinBlockY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = Math.min(NukkitMath.ceilDouble(bb.getMaxY()), level.getMaxBlockY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
-
-        if (minY > maxY || !level.isYInRange(minY) || !level.isYInRange(maxY)) {
-            return false;
-        }
-
-        boolean foundFire = false, foundLava = false, foundWater = false, foundCactus = false, foundCampfire = false;
 
         for (int x = minX; x <= maxX; x++) {
             int chunkX = x >> 4;
@@ -349,42 +210,15 @@ public class EntityCollision implements ChunkLoader {
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
                     int id = chunk.getBlockId(localX, y, localZ);
-                    switch (id) {
-                        case Block.FIRE -> foundFire = true;
-                        case Block.LAVA, Block.STILL_LAVA -> foundLava = true;
-                        case Block.WATER, Block.STILL_WATER -> foundWater = true;
-                        case Block.CACTUS -> foundCactus = true;
-                        case Block.CAMPFIRE_BLOCK, Block.SOUL_CAMPFIRE_BLOCK -> foundCampfire = true;
-                    }
-                    if ((targetBlockId == Block.FIRE && foundFire) ||
-                            (targetBlockId == Block.LAVA && foundLava) ||
-                            (targetBlockId == Block.WATER && foundWater) ||
-                            (targetBlockId == Block.CACTUS && foundCactus) ||
-                            ((targetBlockId == Block.CAMPFIRE_BLOCK || targetBlockId == Block.SOUL_CAMPFIRE_BLOCK) && foundCampfire)) {
-                        break;
+                    if (id == targetBlockId ||
+                            (targetBlockId == Block.LAVA && (id == Block.STILL_LAVA)) ||
+                            (targetBlockId == Block.WATER && (id == Block.STILL_WATER))) {
+                        return true;
                     }
                 }
             }
         }
-
-        if (foundFire) insideSpecialCache |= 1;
-        if (foundLava) insideSpecialCache |= 2;
-        if (foundWater) insideSpecialCache |= 4;
-        if (foundCactus) insideSpecialCache |= 8;
-        if (foundCampfire) insideSpecialCache |= 16;
-
-        return switch (targetBlockId) {
-            case Block.FIRE -> foundFire;
-            case Block.LAVA -> foundLava;
-            case Block.WATER -> foundWater;
-            case Block.CACTUS -> foundCactus;
-            case Block.CAMPFIRE_BLOCK, Block.SOUL_CAMPFIRE_BLOCK -> foundCampfire;
-            default -> false;
-        };
-    }
-
-    public List<Block> getBlocksInBoundingBox(AxisAlignedBB bb) {
-        return getBlocksInBoundingBox(bb, 512);
+        return false;
     }
 
     @Override public int getLoaderId() { return 0; }

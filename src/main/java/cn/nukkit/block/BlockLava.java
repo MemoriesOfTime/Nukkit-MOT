@@ -9,7 +9,9 @@ import cn.nukkit.event.entity.EntityCombustByBlockEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Level;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import org.jetbrains.annotations.NotNull;
@@ -44,6 +46,18 @@ public class BlockLava extends BlockLiquid {
     @Override
     public String getName() {
         return "Lava";
+    }
+
+    @Override
+    protected AxisAlignedBB recalculateCollisionBoundingBox() {
+        return new SimpleAxisAlignedBB(
+                this.x + 0.35,
+                this.y,
+                this.z + 0.35,
+                this.x + 0.65,
+                this.y + 1.0,
+                this.z + 0.65
+        );
     }
 
     @Override
