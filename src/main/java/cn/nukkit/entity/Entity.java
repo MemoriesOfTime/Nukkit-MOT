@@ -3059,7 +3059,7 @@ public abstract class Entity extends Location implements Metadatable {
             this.closed = true;
 
             if (this.collisionCache != null) {
-                this.collisionCache.clearCaches();
+                this.collisionCache.cleanup();
                 this.collisionCache = null;
             }
 
