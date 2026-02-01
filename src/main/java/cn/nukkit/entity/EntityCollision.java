@@ -108,7 +108,7 @@ public class EntityCollision implements ChunkLoader {
                 double motionAbsX = Math.abs(motionX);
                 double motionAbsY = Math.abs(motionY);
                 double motionAbsZ = Math.abs(motionZ);
-                if (block.collidesWithBB(boundingBox.grow(motionAbsX + 0.5, motionAbsY + 0.5, motionAbsZ + 0.5))) {
+                if (block.collidesWithBB(boundingBox.grow(motionAbsX + 1, motionAbsY + 1, motionAbsZ + 1))) {
                     collisionBlocks.add(block);
                 }
             } else if (block.collidesWithBB(boundingBox, true)) {

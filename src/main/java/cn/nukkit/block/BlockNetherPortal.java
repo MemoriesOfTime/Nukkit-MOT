@@ -102,9 +102,9 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
                 this.x,
                 this.y,
                 this.z,
-                this.x + 1.0D,
-                this.y + 1.0D,
-                this.z + 1.0D
+                this.x + 0.5,
+                this.y + 0.5,
+                this.z + 0.5
         );
     }
 
