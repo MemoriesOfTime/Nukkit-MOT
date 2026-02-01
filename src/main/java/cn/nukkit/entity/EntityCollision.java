@@ -17,12 +17,15 @@ import java.util.*;
 public class EntityCollision implements ChunkLoader {
 
     private final Entity entity;
+    private final int loaderId;
+
     private final Cache<Long, FullChunk> chunkCache = Caffeine.newBuilder()
             .maximumSize(8)
             .build();
 
     public EntityCollision(Entity entity) {
         this.entity = entity;
+        this.loaderId = Level.generateChunkLoaderId(this);
     }
 
     /**
@@ -30,6 +33,10 @@ public class EntityCollision implements ChunkLoader {
      */
     public void clearCaches() {
         chunkCache.invalidateAll();
+        Level level = entity.getLevel();
+        if (level != null) {
+            level.unregisterChunkLoader(this, entity.getChunkX(), entity.getChunkZ());
+        }
     }
 
     /**
@@ -100,7 +107,7 @@ public class EntityCollision implements ChunkLoader {
                 double motionAbsX = Math.abs(motionX);
                 double motionAbsY = Math.abs(motionY);
                 double motionAbsZ = Math.abs(motionZ);
-                if (block.collidesWithBB(boundingBox.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3))) {
+                if (block.collidesWithBB(boundingBox.grow(motionAbsX + 0.5, motionAbsY + 0.5, motionAbsZ + 0.5))) {
                     collisionBlocks.add(block);
                 }
             } else if (block.collidesWithBB(boundingBox, true)) {
@@ -223,8 +230,11 @@ public class EntityCollision implements ChunkLoader {
         return false;
     }
 
-    @Override public int getLoaderId() { return 0; }
-    @Override public boolean isLoaderActive() { return false; }
+    @Override public int getLoaderId() { return this.loaderId; }
+    @Override
+    public boolean isLoaderActive() {
+        return !entity.isClosed() && entity.getLevel() != null;
+    }
     @Override public Position getPosition() { return entity.getPosition(); }
     @Override public double getX() { return entity.getChunkX(); }
     @Override public double getZ() { return entity.getChunkZ(); }
