@@ -417,6 +417,14 @@ public class StartGamePacket extends DataPacket {
                                             this.putBoolean(this.tickDeathSystemsEnabled);
                                         }
                                         this.putBoolean(this.networkPermissions.isServerAuthSounds());
+                                        if (protocol >= ProtocolInfo.v1_26_0) {
+                                            // v924: Server telemetry data
+                                            this.putBoolean(false); // containServerJoinInformation
+                                            this.putString(this.serverId); // serverIdentifier
+                                            this.putString(this.worldId); // worldIdentifier
+                                            this.putString(this.scenarioId); // scenarioIdentifier
+                                            this.putString(this.ownerIdentifier); // ownerIdentifier
+                                        }
                                     }
                                 }
                             }
