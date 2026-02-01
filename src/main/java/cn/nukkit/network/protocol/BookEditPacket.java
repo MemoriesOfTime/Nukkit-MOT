@@ -27,9 +27,9 @@ public class BookEditPacket extends DataPacket {
     @Override
     public void decode() {
         if (this.protocol >= ProtocolInfo.v1_26_0) {
-            // v924: inventorySlot moved before action, uses VarInt
+            // v924: inventorySlot moved before action, uses VarInt for slot and action
             this.inventorySlot = this.getVarInt();
-            this.action = Action.values()[this.getByte()];
+            this.action = Action.values()[(int) this.getUnsignedVarInt()];
         } else {
             this.action = Action.values()[this.getByte()];
             this.inventorySlot = this.getByte();

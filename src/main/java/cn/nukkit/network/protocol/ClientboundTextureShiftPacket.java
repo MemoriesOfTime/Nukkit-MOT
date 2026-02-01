@@ -48,8 +48,8 @@ public class ClientboundTextureShiftPacket extends DataPacket {
         for (int i = 0; i < count; i++) {
             this.allSteps[i] = this.getString();
         }
-        this.currentLengthInTicks = this.getLLong();
-        this.totalLengthInTicks = this.getLLong();
+        this.currentLengthInTicks = this.getUnsignedVarLong();
+        this.totalLengthInTicks = this.getUnsignedVarLong();
         this.enabled = this.getBoolean();
     }
 
@@ -64,8 +64,8 @@ public class ClientboundTextureShiftPacket extends DataPacket {
         for (String step : this.allSteps) {
             this.putString(step);
         }
-        this.putLLong(this.currentLengthInTicks);
-        this.putLLong(this.totalLengthInTicks);
+        this.putUnsignedVarLong(this.currentLengthInTicks);
+        this.putUnsignedVarLong(this.totalLengthInTicks);
         this.putBoolean(this.enabled);
     }
 }

@@ -1,13 +1,18 @@
 package cn.nukkit.network.protocol;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.NoArgsConstructor;
+import cn.nukkit.network.protocol.types.voxel.SerializableVoxelShape;
 import lombok.ToString;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Syncs client with server voxel shape data on world join.
  * This packet contains a copy of all behavior pack voxel shapes data.
+ * Sends the serializable voxel shapes data to the client as it's needed on both the client and server.
+ *
  * @since v924
  */
 @ToString
@@ -15,8 +20,17 @@ public class VoxelShapesPacket extends DataPacket {
 
     public static final int NETWORK_ID = ProtocolInfo.VOXEL_SHAPES_PACKET;
 
-    public VoxelShape[] shapes = new VoxelShape[0];
-    public NameMapEntry[] nameMap = new NameMapEntry[0];
+    /**
+     * List of serializable voxel shapes.
+     * Each shape contains multiple cells with their dimensional data.
+     */
+    public List<SerializableVoxelShape> shapes = new ArrayList<>();
+
+    /**
+     * Name to registry handle mapping.
+     * Maps voxel shape names to their registry handles.
+     */
+    public Map<String, Integer> nameMap = new LinkedHashMap<>();
 
     @Override
     @Deprecated
@@ -32,39 +46,66 @@ public class VoxelShapesPacket extends DataPacket {
     @Override
     public void decode() {
         int shapeCount = (int) this.getUnsignedVarInt();
-        this.shapes = new VoxelShape[shapeCount];
+        this.shapes = new ArrayList<>(shapeCount);
+
         for (int i = 0; i < shapeCount; i++) {
-            VoxelShape shape = new VoxelShape();
-            shape.xSize = this.getByte();
-            shape.ySize = this.getByte();
-            shape.zSize = this.getByte();
-            shape.storage = this.getByteArray();
+            SerializableVoxelShape shape = new SerializableVoxelShape();
 
+            // Read cells array
+            int cellCount = (int) this.getUnsignedVarInt();
+            List<SerializableVoxelShape.SerializableCells> cells = new ArrayList<>(cellCount);
+
+            for (int j = 0; j < cellCount; j++) {
+                short xSize = (short) this.getByte();
+                short ySize = (short) this.getByte();
+                short zSize = (short) this.getByte();
+
+                // Read storage array
+                int storageCount = (int) this.getUnsignedVarInt();
+                List<Short> storage = new ArrayList<>(storageCount);
+                for (int k = 0; k < storageCount; k++) {
+                    storage.add((short) this.getByte());
+                }
+
+                cells.add(new SerializableVoxelShape.SerializableCells(xSize, ySize, zSize, storage));
+            }
+
+            shape.setCells(cells);
+
+            // Read X coordinates
             int xCount = (int) this.getUnsignedVarInt();
-            shape.xCoordinates = new float[xCount];
+            List<Float> xCoordinates = new ArrayList<>(xCount);
             for (int j = 0; j < xCount; j++) {
-                shape.xCoordinates[j] = this.getLFloat();
+                xCoordinates.add(this.getLFloat());
             }
+            shape.setXCoordinates(xCoordinates);
 
+            // Read Y coordinates
             int yCount = (int) this.getUnsignedVarInt();
-            shape.yCoordinates = new float[yCount];
+            List<Float> yCoordinates = new ArrayList<>(yCount);
             for (int j = 0; j < yCount; j++) {
-                shape.yCoordinates[j] = this.getLFloat();
+                yCoordinates.add(this.getLFloat());
             }
+            shape.setYCoordinates(yCoordinates);
 
+            // Read Z coordinates
             int zCount = (int) this.getUnsignedVarInt();
-            shape.zCoordinates = new float[zCount];
+            List<Float> zCoordinates = new ArrayList<>(zCount);
             for (int j = 0; j < zCount; j++) {
-                shape.zCoordinates[j] = this.getLFloat();
+                zCoordinates.add(this.getLFloat());
             }
+            shape.setZCoordinates(zCoordinates);
 
-            this.shapes[i] = shape;
+            this.shapes.add(shape);
         }
 
+        // Read name map
         int mapCount = (int) this.getUnsignedVarInt();
-        this.nameMap = new NameMapEntry[mapCount];
+        this.nameMap = new LinkedHashMap<>(mapCount);
         for (int i = 0; i < mapCount; i++) {
-            this.nameMap[i] = new NameMapEntry(this.getString(), this.getLShort());
+            String name = this.getString();
+            int handle = this.getLShort();
+            this.nameMap.put(name, handle);
         }
     }
 
@@ -72,77 +113,47 @@ public class VoxelShapesPacket extends DataPacket {
     public void encode() {
         this.reset();
 
-        this.putUnsignedVarInt(this.shapes.length);
-        for (VoxelShape shape : this.shapes) {
-            this.putByte((byte) shape.xSize);
-            this.putByte((byte) shape.ySize);
-            this.putByte((byte) shape.zSize);
-            this.putByteArray(shape.storage);
+        // Write shapes array
+        this.putUnsignedVarInt(this.shapes.size());
+        for (SerializableVoxelShape shape : this.shapes) {
+            // Write cells array
+            this.putUnsignedVarInt(shape.getCells().size());
+            for (SerializableVoxelShape.SerializableCells cell : shape.getCells()) {
+                this.putByte((byte) cell.getXSize());
+                this.putByte((byte) cell.getYSize());
+                this.putByte((byte) cell.getZSize());
 
-            this.putUnsignedVarInt(shape.xCoordinates.length);
-            for (float value : shape.xCoordinates) {
-                this.putLFloat(value);
+                // Write storage array
+                this.putUnsignedVarInt(cell.getStorage().size());
+                for (Short value : cell.getStorage()) {
+                    this.putByte(value.byteValue());
+                }
             }
 
-            this.putUnsignedVarInt(shape.yCoordinates.length);
-            for (float value : shape.yCoordinates) {
-                this.putLFloat(value);
+            // Write X coordinates
+            this.putUnsignedVarInt(shape.getXCoordinates().size());
+            for (Float coordinate : shape.getXCoordinates()) {
+                this.putLFloat(coordinate);
             }
 
-            this.putUnsignedVarInt(shape.zCoordinates.length);
-            for (float value : shape.zCoordinates) {
-                this.putLFloat(value);
+            // Write Y coordinates
+            this.putUnsignedVarInt(shape.getYCoordinates().size());
+            for (Float coordinate : shape.getYCoordinates()) {
+                this.putLFloat(coordinate);
+            }
+
+            // Write Z coordinates
+            this.putUnsignedVarInt(shape.getZCoordinates().size());
+            for (Float coordinate : shape.getZCoordinates()) {
+                this.putLFloat(coordinate);
             }
         }
 
-        this.putUnsignedVarInt(this.nameMap.length);
-        for (NameMapEntry entry : this.nameMap) {
-            this.putString(entry.name);
-            this.putLShort(entry.registryHandle);
+        // Write name map
+        this.putUnsignedVarInt(this.nameMap.size());
+        for (Map.Entry<String, Integer> entry : this.nameMap.entrySet()) {
+            this.putString(entry.getKey());
+            this.putLShort(entry.getValue());
         }
-    }
-
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @ToString
-    public static class VoxelShape {
-        /**
-         * Number of cells along the X axis.
-         */
-        public int xSize;
-        /**
-         * Number of cells along the Y axis.
-         */
-        public int ySize;
-        /**
-         * Number of cells along the Z axis.
-         */
-        public int zSize;
-        /**
-         * Solid/empty state per cell.
-         */
-        public byte[] storage = new byte[0];
-
-        /**
-         * Cell boundaries along the X axis.
-         */
-        public float[] xCoordinates = new float[0];
-        /**
-         * Cell boundaries along the Y axis.
-         */
-        public float[] yCoordinates = new float[0];
-        /**
-         * Cell boundaries along the Z axis.
-         */
-        public float[] zCoordinates = new float[0];
-    }
-
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @ToString
-    public static class NameMapEntry {
-        public String name = "";
-        public int registryHandle;
     }
 }

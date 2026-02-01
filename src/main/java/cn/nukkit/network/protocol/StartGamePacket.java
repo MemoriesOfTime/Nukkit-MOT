@@ -332,7 +332,7 @@ public class StartGamePacket extends DataPacket {
                 if (protocol >= ProtocolInfo.v1_19_20) {
                     this.putByte(this.chatRestrictionLevel);
                     this.putBoolean(this.disablePlayerInteractions);
-                    if (protocol >= ProtocolInfo.v1_21_0) {
+                    if (protocol >= ProtocolInfo.v1_21_0 && protocol < ProtocolInfo.v1_26_0) {
                         this.putString(this.serverId);
                         this.putString(this.worldId);
                         this.putString(this.scenarioId);
@@ -421,8 +421,8 @@ public class StartGamePacket extends DataPacket {
                                             // v924: Server telemetry data
                                             this.putBoolean(false); // containServerJoinInformation
                                             this.putString(this.serverId); // serverIdentifier
-                                            this.putString(this.worldId); // worldIdentifier
                                             this.putString(this.scenarioId); // scenarioIdentifier
+                                            this.putString(this.worldId); // worldIdentifier
                                             this.putString(this.ownerIdentifier); // ownerIdentifier
                                         }
                                     }

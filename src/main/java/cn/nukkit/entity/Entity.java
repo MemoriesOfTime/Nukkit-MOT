@@ -2,7 +2,9 @@ package cn.nukkit.entity;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.block.*;
+import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockWater;
 import cn.nukkit.blockentity.BlockEntityPistonArm;
 import cn.nukkit.entity.custom.CustomEntity;
 import cn.nukkit.entity.custom.EntityDefinition;
@@ -237,6 +239,18 @@ public abstract class Entity extends Location implements Metadatable {
      * @since v800
      */
     public static final int DATA_SEAT_CAMERA_RELAX_DISTANCE_SMOOTHING = 135; //float
+    /**
+     * @since v924
+     */
+    public static final int DATA_AIM_ASSIST_PRIORITY_PRESET_ID = 136; //int
+    /**
+     * @since v924
+     */
+    public static final int DATA_AIM_ASSIST_PRIORITY_CATEGORY_ID = 137; //int
+    /**
+     * @since v924
+     */
+    public static final int DATA_AIM_ASSIST_PRIORITY_ACTOR_ID = 138; //int
 
     // Flags
     public static final int DATA_FLAG_ONFIRE = 0;
