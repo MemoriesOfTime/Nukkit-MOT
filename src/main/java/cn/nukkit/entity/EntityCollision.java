@@ -18,6 +18,9 @@ public class EntityCollision implements ChunkLoader {
 
     private final Entity entity;
     private final int loaderId;
+    private boolean registered = false;
+    private int chunkX = Integer.MIN_VALUE;
+    private int chunkZ = Integer.MIN_VALUE;
 
     private final Cache<Long, FullChunk> chunkCache = Caffeine.newBuilder()
             .maximumSize(8)
@@ -26,17 +29,15 @@ public class EntityCollision implements ChunkLoader {
     public EntityCollision(Entity entity) {
         this.entity = entity;
         this.loaderId = Level.generateChunkLoaderId(this);
+        this.registerInChunk(entity.getChunkX(), entity.getChunkZ());
     }
 
     /**
      * Clears internal chunk cache to free memory when the entity is removed.
      */
-    public void clearCaches() {
+    public void cleanup() {
         chunkCache.invalidateAll();
-        Level level = entity.getLevel();
-        if (level != null) {
-            level.unregisterChunkLoader(this, entity.getChunkX(), entity.getChunkZ());
-        }
+        this.unregisterFromChunk();
     }
 
     /**
@@ -93,6 +94,8 @@ public class EntityCollision implements ChunkLoader {
         if (level == null) {
             return Collections.emptyList();
         }
+
+        this.updateChunkRegistration();
 
         List<Block> blocks = this.getBlocksInBoundingBox(boundingBox);
 
@@ -230,16 +233,82 @@ public class EntityCollision implements ChunkLoader {
         return false;
     }
 
-    @Override public int getLoaderId() { return this.loaderId; }
+    @Override
+    public int getLoaderId() {
+        return this.loaderId;
+    }
+
     @Override
     public boolean isLoaderActive() {
-        return !entity.isClosed() && entity.getLevel() != null;
+        return !entity.isClosed() && entity.getLevel() != null && registered;
     }
-    @Override public Position getPosition() { return entity.getPosition(); }
-    @Override public double getX() { return entity.getChunkX(); }
-    @Override public double getZ() { return entity.getChunkZ(); }
-    @Override public Level getLevel() { return entity.getLevel(); }
-    @Override public void onChunkChanged(FullChunk chunk) {}
-    @Override public void onChunkLoaded(FullChunk chunk) {}
-    @Override public void onChunkPopulated(FullChunk chunk) {}
+
+    @Override
+    public Position getPosition() {
+        return entity.getPosition();
+    }
+
+    @Override
+    public double getX() {
+        return entity.getChunkX();
+    }
+
+    @Override
+    public double getZ() {
+        return entity.getChunkZ();
+    }
+
+    @Override
+    public Level getLevel() {
+        return entity.getLevel();
+    }
+
+    @Override
+    public void onChunkChanged(FullChunk chunk) {}
+
+    @Override
+    public void onChunkLoaded(FullChunk chunk) {}
+
+    @Override
+    public void onChunkPopulated(FullChunk chunk) {}
+
+    private void updateChunkRegistration() {
+        if (entity.isClosed() || entity.getLevel() == null) {
+            unregisterFromChunk();
+            return;
+        }
+
+        int currentChunkX = entity.getChunkX();
+        int currentChunkZ = entity.getChunkZ();
+
+        if (!this.registered || currentChunkX != this.chunkX || currentChunkZ != this.chunkZ) {
+            this.unregisterFromChunk();
+            this.registerInChunk(currentChunkX, currentChunkZ);
+        }
+    }
+
+    private void registerInChunk(int chunkX, int chunkZ) {
+        Level level = entity.getLevel();
+        if (level == null || this.registered) {
+            return;
+        }
+
+        level.registerChunkLoader(this, chunkX, chunkZ);
+        this.registered = true;
+        this.chunkX = chunkX;
+        this.chunkZ = chunkZ;
+    }
+
+    private void unregisterFromChunk() {
+        if (!registered || entity.getLevel() == null) {
+            return;
+        }
+
+        Level level = entity.getLevel();
+        level.unregisterChunkLoader(this, this.chunkX, this.chunkZ);
+
+        this.registered = false;
+        this.chunkX = Integer.MIN_VALUE;
+        this.chunkZ = Integer.MIN_VALUE;
+    }
 }
