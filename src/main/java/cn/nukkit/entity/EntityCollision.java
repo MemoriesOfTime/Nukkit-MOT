@@ -22,18 +22,24 @@ public class EntityCollision implements ChunkLoader {
     private int chunkX = Integer.MIN_VALUE;
     private int chunkZ = Integer.MIN_VALUE;
 
+    /**
+     * Cache for recently accessed chunks to reduce level.getChunkIfLoaded calls.
+     * Key: chunkX << 32 | chunkZ (64-bit chunk coordinates).
+     */
     private final Cache<Long, FullChunk> chunkCache = Caffeine.newBuilder()
             .maximumSize(8)
             .build();
 
     /**
-     * Cache for block data to reduce getBlock calls.
-     * Key format: (chunkKey << 16) | (localX << 12) | (y << 8) | (localZ << 4)
-     * Value: (blockId << 8) | blockData
+     * Cache for block data with versioning.
+     * Key: (chunkKey << 16) | (localX << 12) | (y << 8) | (localZ << 4)
+     * Value: (blockId << 20) | (blockData << 12) | (version & 0xFFF)
      */
     private final Cache<Long, Integer> blockDataCache = Caffeine.newBuilder()
             .maximumSize(512)
             .build();
+
+    private int cacheVersion = 0;
 
     public EntityCollision(Entity entity) {
         this.entity = entity;
@@ -42,7 +48,7 @@ public class EntityCollision implements ChunkLoader {
     }
 
     /**
-     * Clears data when the entity is removed.
+     * Cleans up when entity is removed.
      */
     public void cleanup() {
         chunkCache.invalidateAll();
@@ -69,45 +75,100 @@ public class EntityCollision implements ChunkLoader {
         int bcX = blockX >> 4;
         int bcZ = blockZ >> 4;
 
-        if (Math.abs(bcX - ecX) <= 1 && Math.abs(bcZ - ecZ) <= 1) {
-            long chunkKey = ((long) bcX << 32) | (bcZ & 0xFFFFFFFFL);
-            chunkCache.invalidate(chunkKey);
+        if (Math.abs(bcX - ecX) > 2 || Math.abs(bcZ - ecZ) > 2) {
+            return;
+        }
 
-            int localX = blockX & 0x0f;
-            int localZ = blockZ & 0x0f;
-            int y = pos.getFloorY();
+        long chunkKey = ((long) bcX << 32) | (bcZ & 0xFFFFFFFFL);
+        chunkCache.invalidate(chunkKey);
+        cacheVersion = (cacheVersion + 1) & 0xFFF;
 
-            long baseKey = (chunkKey << 16) | (localX << 12) | (localZ << 4);
+        int localX = blockX & 0x0f;
+        int localZ = blockZ & 0x0f;
+        int y = pos.getFloorY();
+        long blockKey = (chunkKey << 16) | (localX << 12) | ((long) y << 8) | (localZ << 4);
+        blockDataCache.invalidate(blockKey);
 
-            int minY = Math.max(y - 2, level.getMinBlockY());
-            int maxY = Math.min(y + 2, level.getMaxBlockY());
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue;
 
-            for (int cacheY = minY; cacheY <= maxY; cacheY++) {
-                long blockKey = baseKey | (cacheY & 0xFF);
-                blockDataCache.invalidate(blockKey);
+                    int nx = blockX + dx;
+                    int ny = y + dy;
+                    int nz = blockZ + dz;
+
+                    if (!level.isYInRange(ny)) continue;
+
+                    int nChunkX = nx >> 4;
+                    int nChunkZ = nz >> 4;
+                    long nChunkKey = ((long) nChunkX << 32) | (nChunkZ & 0xFFFFFFFFL);
+                    int nLocalX = nx & 0x0f;
+                    int nLocalZ = nz & 0x0f;
+
+                    long neighborKey = (nChunkKey << 16) | (nLocalX << 12) | ((long) ny << 8) | (nLocalZ << 4);
+                    blockDataCache.invalidate(neighborKey);
+                }
             }
         }
     }
 
     /**
-     * Invalidate cache when chunk is unloaded to prevent stale references and memory leaks.
+     * Invalidate cache when chunk is unloaded to prevent stale references.
      */
     @Override
     public void onChunkUnloaded(FullChunk chunk) {
         if (chunk != null && !entity.isClosed()) {
             long chunkKey = ((long) chunk.getX() << 32) | (chunk.getZ() & 0xFFFFFFFFL);
             chunkCache.invalidate(chunkKey);
+            blockDataCache.asMap().keySet().removeIf(key -> (key >> 16) == chunkKey);
         }
     }
 
     /**
-     * Returns blocks colliding with the entity's AABB, extended by its motion vector.
+     * Gets cached block data or loads from chunk.
+     * Returns null for invalid chunk.
      *
-     * @param boundingBox The entity's current axis-aligned bounding box.
-     * @param motionX X component of motion.
-     * @param motionY Y component of motion.
-     * @param motionZ Z component of motion.
-     * @return Colliding blocks, or an empty list if none.
+     * @param chunk Chunk containing block
+     * @param blockKey Cache key for block
+     * @param localX Local X in chunk
+     * @param y Y coordinate
+     * @param localZ Local Z in chunk
+     * @return Array [blockId, blockData] or null
+     */
+    private int[] getCachedBlockData(FullChunk chunk, long blockKey, int localX, int y, int localZ) {
+        if (chunk == null) return null;
+
+        Integer cached = blockDataCache.getIfPresent(blockKey);
+
+        if (cached != null) {
+            int cachedVersion = cached & 0xFFF;
+            int cachedBlockId = (cached >> 20) & 0xFFF;
+
+            if (cachedVersion == (cacheVersion & 0xFFF) && cachedBlockId != Block.AIR) {
+                return new int[]{cachedBlockId, (cached >> 12) & 0xFF};
+            }
+        }
+
+        int blockId = chunk.getBlockId(localX, y, localZ);
+        int blockData = chunk.getBlockData(localX, y, localZ);
+
+        if (blockId != Block.AIR) {
+            int packed = (blockId << 20) | (blockData << 12) | (cacheVersion & 0xFFF);
+            blockDataCache.put(blockKey, packed);
+        }
+
+        return new int[]{blockId, blockData};
+    }
+
+    /**
+     * Gets blocks that collide with entity's AABB.
+     *
+     * @param boundingBox The entity's AABB
+     * @param motionX X motion component
+     * @param motionY Y motion component
+     * @param motionZ Z motion component
+     * @return List of colliding blocks
      */
     public List<Block> getCollisionBlocks(AxisAlignedBB boundingBox, double motionX, double motionY, double motionZ) {
         if (entity.isClosed()) {
@@ -144,10 +205,10 @@ public class EntityCollision implements ChunkLoader {
     }
 
     /**
-     * Returns non-air blocks in the given AABB using chunk and block data caching.
+     * Gets non-air blocks in bounding box with caching.
      *
-     * @param boundingBox The bounding box to scan.
-     * @return Intersecting non-air blocks, or an empty list if none.
+     * @param boundingBox Bounding box to check
+     * @return List of non-air blocks
      */
     public List<Block> getBlocksInBoundingBox(AxisAlignedBB boundingBox) {
         Level level = entity.getLevel();
@@ -173,6 +234,7 @@ public class EntityCollision implements ChunkLoader {
         this.updateChunk();
 
         List<Block> result = new ArrayList<>();
+
         for (int x = minX; x <= maxX; x++) {
             int chunkX = x >> 4;
             int localX = x & 0x0f;
@@ -180,6 +242,7 @@ public class EntityCollision implements ChunkLoader {
                 int chunkZ = z >> 4;
                 int localZ = z & 0x0f;
                 long chunkKey = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
+
                 FullChunk chunk = chunkCache.getIfPresent(chunkKey);
                 if (chunk == null) {
                     chunk = level.getChunkIfLoaded(chunkX, chunkZ);
@@ -189,28 +252,16 @@ public class EntityCollision implements ChunkLoader {
                         continue;
                     }
                 }
+
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
 
                     long blockKey = (chunkKey << 16) | (localX << 12) | ((long) y << 8) | (localZ << 4);
-                    Integer cachedData = blockDataCache.getIfPresent(blockKey);
 
-                    int blockId;
-                    int blockData;
+                    int[] blockData = getCachedBlockData(chunk, blockKey, localX, y, localZ);
+                    if (blockData == null || blockData[0] == Block.AIR) continue;
 
-                    if (cachedData != null) {
-                        blockId = cachedData >> 8;
-                        blockData = cachedData & 0xFF;
-                    } else {
-                        blockId = chunk.getBlockId(localX, y, localZ);
-                        if (blockId == Block.AIR) continue;
-                        blockData = chunk.getBlockData(localX, y, localZ);
-                        blockDataCache.put(blockKey, (blockId << 8) | blockData);
-                    }
-
-                    if (blockId == Block.AIR) continue;
-
-                    Block block = Block.get(blockId, blockData, level, x, y, z);
+                    Block block = Block.get(blockData[0], blockData[1], level, x, y, z);
                     result.add(block);
                 }
             }
@@ -219,8 +270,7 @@ public class EntityCollision implements ChunkLoader {
     }
 
     /**
-     * Checks if the bounding box intersects a block of the given type.
-     * Uses chunk and block data caching for performance.
+     * Checks if bounding box intersects specific block type.
      *
      * @param boundingBox The bounding box to test.
      * @param targetBlockId The block ID to check (e.g., Block.FIRE).
@@ -263,25 +313,12 @@ public class EntityCollision implements ChunkLoader {
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
 
-                    long blockKey = (chunkKey << 16) | (localX << 12) | (y << 8) | (localZ << 4);
-                    Integer cachedData = blockDataCache.getIfPresent(blockKey);
+                    long blockKey = (chunkKey << 16) | (localX << 12) | ((long) y << 8) | (localZ << 4);
 
-                    int blockId;
-                    int blockData;
+                    int[] blockData = getCachedBlockData(chunk, blockKey, localX, y, localZ);
+                    if (blockData == null || blockData[0] != targetBlockId) continue;
 
-                    if (cachedData != null) {
-                        blockId = cachedData >> 8;
-                        if (blockId != targetBlockId) continue;
-                        blockData = cachedData & 0xFF;
-                    } else {
-                        blockId = chunk.getBlockId(localX, y, localZ);
-                        if (blockId != targetBlockId) continue;
-                        blockData = chunk.getBlockData(localX, y, localZ);
-
-                        blockDataCache.put(blockKey, (blockId << 8) | blockData);
-                    }
-
-                    Block block = Block.get(blockId, blockData, level, x, y, z);
+                    Block block = Block.get(blockData[0], blockData[1], level, x, y, z);
                     if (block.collidesWithBB(boundingBox)) {
                         return true;
                     }
