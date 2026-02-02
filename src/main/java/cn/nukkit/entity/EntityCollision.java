@@ -26,6 +26,15 @@ public class EntityCollision implements ChunkLoader {
             .maximumSize(8)
             .build();
 
+    /**
+     * Cache for block data to reduce getBlock calls.
+     * Key format: (chunkKey << 16) | (localX << 12) | (y << 8) | (localZ << 4)
+     * Value: (blockId << 8) | blockData
+     */
+    private final Cache<Long, Integer> blockDataCache = Caffeine.newBuilder()
+            .maximumSize(512)
+            .build();
+
     public EntityCollision(Entity entity) {
         this.entity = entity;
         this.loaderId = Level.generateChunkLoaderId(this);
@@ -37,6 +46,7 @@ public class EntityCollision implements ChunkLoader {
      */
     public void cleanup() {
         chunkCache.invalidateAll();
+        blockDataCache.invalidateAll();
         this.unregisterFromChunk();
     }
 
@@ -62,6 +72,20 @@ public class EntityCollision implements ChunkLoader {
         if (Math.abs(bcX - ecX) <= 1 && Math.abs(bcZ - ecZ) <= 1) {
             long chunkKey = ((long) bcX << 32) | (bcZ & 0xFFFFFFFFL);
             chunkCache.invalidate(chunkKey);
+
+            int localX = blockX & 0x0f;
+            int localZ = blockZ & 0x0f;
+            int y = pos.getFloorY();
+
+            long baseKey = (chunkKey << 16) | (localX << 12) | (localZ << 4);
+
+            int minY = Math.max(y - 2, level.getMinBlockY());
+            int maxY = Math.min(y + 2, level.getMaxBlockY());
+
+            for (int cacheY = minY; cacheY <= maxY; cacheY++) {
+                long blockKey = baseKey | (cacheY & 0xFF);
+                blockDataCache.invalidate(blockKey);
+            }
         }
     }
 
@@ -120,7 +144,7 @@ public class EntityCollision implements ChunkLoader {
     }
 
     /**
-     * Returns non-air blocks in the given AABB using chunk caching.
+     * Returns non-air blocks in the given AABB using chunk and block data caching.
      *
      * @param boundingBox The bounding box to scan.
      * @return Intersecting non-air blocks, or an empty list if none.
@@ -146,7 +170,7 @@ public class EntityCollision implements ChunkLoader {
             return Collections.emptyList();
         }
 
-        this.updateChunkRegistration();
+        this.updateChunk();
 
         List<Block> result = new ArrayList<>();
         for (int x = minX; x <= maxX; x++) {
@@ -167,9 +191,25 @@ public class EntityCollision implements ChunkLoader {
                 }
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
-                    int blockId = chunk.getBlockId(localX, y, localZ);
+
+                    long blockKey = (chunkKey << 16) | (localX << 12) | ((long) y << 8) | (localZ << 4);
+                    Integer cachedData = blockDataCache.getIfPresent(blockKey);
+
+                    int blockId;
+                    int blockData;
+
+                    if (cachedData != null) {
+                        blockId = cachedData >> 8;
+                        blockData = cachedData & 0xFF;
+                    } else {
+                        blockId = chunk.getBlockId(localX, y, localZ);
+                        if (blockId == Block.AIR) continue;
+                        blockData = chunk.getBlockData(localX, y, localZ);
+                        blockDataCache.put(blockKey, (blockId << 8) | blockData);
+                    }
+
                     if (blockId == Block.AIR) continue;
-                    int blockData = chunk.getBlockData(localX, y, localZ);
+
                     Block block = Block.get(blockId, blockData, level, x, y, z);
                     result.add(block);
                 }
@@ -180,7 +220,7 @@ public class EntityCollision implements ChunkLoader {
 
     /**
      * Checks if the bounding box intersects a block of the given type.
-     * Uses chunk caching for performance consistency.
+     * Uses chunk and block data caching for performance.
      *
      * @param boundingBox The bounding box to test.
      * @param targetBlockId The block ID to check (e.g., Block.FIRE).
@@ -203,7 +243,7 @@ public class EntityCollision implements ChunkLoader {
             return false;
         }
 
-        this.updateChunkRegistration();
+        this.updateChunk();
 
         for (int x = minX; x <= maxX; x++) {
             int chunkX = x >> 4;
@@ -222,9 +262,25 @@ public class EntityCollision implements ChunkLoader {
                 }
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
-                    int blockId = chunk.getBlockId(localX, y, localZ);
-                    if (blockId != targetBlockId) continue;
-                    int blockData = chunk.getBlockData(localX, y, localZ);
+
+                    long blockKey = (chunkKey << 16) | (localX << 12) | (y << 8) | (localZ << 4);
+                    Integer cachedData = blockDataCache.getIfPresent(blockKey);
+
+                    int blockId;
+                    int blockData;
+
+                    if (cachedData != null) {
+                        blockId = cachedData >> 8;
+                        if (blockId != targetBlockId) continue;
+                        blockData = cachedData & 0xFF;
+                    } else {
+                        blockId = chunk.getBlockId(localX, y, localZ);
+                        if (blockId != targetBlockId) continue;
+                        blockData = chunk.getBlockData(localX, y, localZ);
+
+                        blockDataCache.put(blockKey, (blockId << 8) | blockData);
+                    }
+
                     Block block = Block.get(blockId, blockData, level, x, y, z);
                     if (block.collidesWithBB(boundingBox)) {
                         return true;
@@ -274,9 +330,9 @@ public class EntityCollision implements ChunkLoader {
     @Override
     public void onChunkPopulated(FullChunk chunk) {}
 
-    private void updateChunkRegistration() {
+    private void updateChunk() {
         if (entity.isClosed() || entity.getLevel() == null) {
-            unregisterFromChunk();
+            this.unregisterFromChunk();
             return;
         }
 
@@ -302,7 +358,7 @@ public class EntityCollision implements ChunkLoader {
     }
 
     private void unregisterFromChunk() {
-        if (!registered || entity.getLevel() == null) {
+        if (!this.registered || entity.getLevel() == null) {
             return;
         }
 
