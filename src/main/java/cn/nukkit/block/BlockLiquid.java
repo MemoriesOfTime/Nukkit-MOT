@@ -40,6 +40,11 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
     }
 
     @Override
+    protected AxisAlignedBB recalculateBoundingBox() {
+        return null;
+    }
+
+    @Override
     public Item[] getDrops(Item item) {
         return Item.EMPTY_ARRAY;
     }
@@ -80,20 +85,18 @@ public abstract class BlockLiquid extends BlockTransparentMeta {
     }
 
     @Override
-    protected AxisAlignedBB recalculateBoundingBox() {
-        return new SimpleAxisAlignedBB(
-                this.x + 0.35,
-                this.y,
-                this.z + 0.35,
-                this.x + 0.65,
-                this.y + 1.0,
-                this.z + 0.65
-        );
+    public AxisAlignedBB getBoundingBox() {
+        return null;
     }
 
     @Override
     public double getMaxY() {
         return this.y + 1 - getFluidHeightPercent();
+    }
+
+    @Override
+    protected AxisAlignedBB recalculateCollisionBoundingBox() {
+        return new SimpleAxisAlignedBB(this.x, this.y, this.z, this.x + 1, this.y + 0.9, this.z + 1);
     }
 
     public boolean usesWaterLogging() {

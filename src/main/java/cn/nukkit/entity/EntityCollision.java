@@ -13,6 +13,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class EntityCollision implements ChunkLoader {
 
@@ -23,20 +24,15 @@ public class EntityCollision implements ChunkLoader {
     private int chunkZ = Integer.MIN_VALUE;
 
     /**
-     * Cache for recently accessed chunks to reduce level.getChunkIfLoaded calls.
-     * Key: chunkX << 32 | chunkZ (64-bit chunk coordinates).
-     */
-    private final Cache<Long, FullChunk> chunkCache = Caffeine.newBuilder()
-            .maximumSize(8)
-            .build();
-
-    /**
      * Cache for block data with versioning.
      * Key: (chunkKey << 16) | (localX << 12) | (y << 8) | (localZ << 4)
      * Value: (blockId << 20) | (blockData << 12) | (version & 0xFFF)
      */
     private final Cache<Long, Integer> blockDataCache = Caffeine.newBuilder()
-            .maximumSize(512)
+            .maximumSize(128)
+            .expireAfterWrite(2, TimeUnit.SECONDS)
+            .expireAfterAccess(3, TimeUnit.SECONDS)
+            .softValues()
             .build();
 
     private int cacheVersion = 0;
@@ -44,14 +40,12 @@ public class EntityCollision implements ChunkLoader {
     public EntityCollision(Entity entity) {
         this.entity = entity;
         this.loaderId = Level.generateChunkLoaderId(this);
-        this.registerInChunk(entity.getChunkX(), entity.getChunkZ());
     }
 
     /**
      * Cleans up when entity is removed.
      */
     public void cleanup() {
-        chunkCache.invalidateAll();
         blockDataCache.invalidateAll();
         this.unregisterFromChunk();
     }
@@ -80,7 +74,6 @@ public class EntityCollision implements ChunkLoader {
         }
 
         long chunkKey = ((long) bcX << 32) | (bcZ & 0xFFFFFFFFL);
-        chunkCache.invalidate(chunkKey);
         cacheVersion = (cacheVersion + 1) & 0xFFF;
 
         int localX = blockX & 0x0f;
@@ -88,29 +81,6 @@ public class EntityCollision implements ChunkLoader {
         int y = pos.getFloorY();
         long blockKey = (chunkKey << 16) | (localX << 12) | ((long) y << 8) | (localZ << 4);
         blockDataCache.invalidate(blockKey);
-
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    if (dx == 0 && dy == 0 && dz == 0) continue;
-
-                    int nx = blockX + dx;
-                    int ny = y + dy;
-                    int nz = blockZ + dz;
-
-                    if (!level.isYInRange(ny)) continue;
-
-                    int nChunkX = nx >> 4;
-                    int nChunkZ = nz >> 4;
-                    long nChunkKey = ((long) nChunkX << 32) | (nChunkZ & 0xFFFFFFFFL);
-                    int nLocalX = nx & 0x0f;
-                    int nLocalZ = nz & 0x0f;
-
-                    long neighborKey = (nChunkKey << 16) | (nLocalX << 12) | ((long) ny << 8) | (nLocalZ << 4);
-                    blockDataCache.invalidate(neighborKey);
-                }
-            }
-        }
     }
 
     /**
@@ -120,7 +90,6 @@ public class EntityCollision implements ChunkLoader {
     public void onChunkUnloaded(FullChunk chunk) {
         if (chunk != null && !entity.isClosed()) {
             long chunkKey = ((long) chunk.getX() << 32) | (chunk.getZ() & 0xFFFFFFFFL);
-            chunkCache.invalidate(chunkKey);
             blockDataCache.asMap().keySet().removeIf(key -> (key >> 16) == chunkKey);
         }
     }
@@ -136,7 +105,7 @@ public class EntityCollision implements ChunkLoader {
      * @param localZ Local Z in chunk
      * @return Array [blockId, blockData] or null
      */
-    private int[] getCachedBlockData(FullChunk chunk, long blockKey, int localX, int y, int localZ) {
+    private int[] getBlockData(FullChunk chunk, long blockKey, int localX, int y, int localZ) {
         if (chunk == null) return null;
 
         Integer cached = blockDataCache.getIfPresent(blockKey);
@@ -165,12 +134,9 @@ public class EntityCollision implements ChunkLoader {
      * Gets blocks that collide with entity's AABB.
      *
      * @param boundingBox The entity's AABB
-     * @param motionX X motion component
-     * @param motionY Y motion component
-     * @param motionZ Z motion component
      * @return List of colliding blocks
      */
-    public List<Block> getCollisionBlocks(AxisAlignedBB boundingBox, double motionX, double motionY, double motionZ) {
+    public List<Block> getCollisionBlocks(AxisAlignedBB boundingBox) {
         if (entity.isClosed()) {
             return Collections.emptyList();
         }
@@ -180,7 +146,8 @@ public class EntityCollision implements ChunkLoader {
             return Collections.emptyList();
         }
 
-        List<Block> blocks = this.getBlocksInBoundingBox(boundingBox);
+        // expand by 0.5 on X and Z, 'cause sometimes it lags to detect
+        List<Block> blocks = this.getBlocksInBoundingBox(boundingBox.grow(0.5, 0, 0.5));
 
         if (blocks.isEmpty()) {
             return Collections.emptyList();
@@ -188,15 +155,11 @@ public class EntityCollision implements ChunkLoader {
 
         List<Block> collisionBlocks = new ArrayList<>(8);
         for (Block block : blocks) {
-            int id = block.getId();
-            if (id == Block.NETHER_PORTAL) {
-                double motionAbsX = Math.abs(motionX);
-                double motionAbsY = Math.abs(motionY);
-                double motionAbsZ = Math.abs(motionZ);
-                if (block.collidesWithBB(boundingBox.grow(motionAbsX + 1, motionAbsY + 1, motionAbsZ + 1))) {
-                    collisionBlocks.add(block);
-                }
-            } else if (block.collidesWithBB(boundingBox, true)) {
+            // center the BB so it stops catching diagonal corner glitches
+            double shrinkAmountX = (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.25;
+            double shrinkAmountZ = (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.25;
+
+            if (block.collidesWithBB(boundingBox.shrink(shrinkAmountX, 0, shrinkAmountZ), true)) {
                 collisionBlocks.add(block);
             }
         }
@@ -217,11 +180,11 @@ public class EntityCollision implements ChunkLoader {
         }
 
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
-        int minY = Math.max(NukkitMath.floorDouble(boundingBox.getMinY()), level.getMinBlockY());
+        int minY = NukkitMath.floorDouble(boundingBox.getMinY());
         int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
-        int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
-        int maxY = Math.min(NukkitMath.floorDouble(boundingBox.getMaxY()), level.getMaxBlockY());
-        int maxZ = NukkitMath.floorDouble(boundingBox.getMaxZ());
+        int maxX = NukkitMath.ceilDouble(boundingBox.getMaxX());
+        int maxY = NukkitMath.ceilDouble(boundingBox.getMaxY());
+        int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
 
         if (minX > maxX || minY > maxY || minZ > maxZ) {
             return Collections.emptyList();
@@ -243,22 +206,14 @@ public class EntityCollision implements ChunkLoader {
                 int localZ = z & 0x0f;
                 long chunkKey = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
 
-                FullChunk chunk = chunkCache.getIfPresent(chunkKey);
-                if (chunk == null) {
-                    chunk = level.getChunkIfLoaded(chunkX, chunkZ);
-                    if (chunk != null) {
-                        chunkCache.put(chunkKey, chunk);
-                    } else {
-                        continue;
-                    }
-                }
-
+                FullChunk chunk = level.getChunkIfLoaded(chunkX, chunkZ);
+                if (chunk == null) continue;
                 for (int y = minY; y <= maxY; y++) {
                     if (!level.isYInRange(y)) continue;
 
                     long blockKey = (chunkKey << 16) | (localX << 12) | ((long) y << 8) | (localZ << 4);
 
-                    int[] blockData = getCachedBlockData(chunk, blockKey, localX, y, localZ);
+                    int[] blockData = this.getBlockData(chunk, blockKey, localX, y, localZ);
                     if (blockData == null || blockData[0] == Block.AIR) continue;
 
                     Block block = Block.get(blockData[0], blockData[1], level, x, y, z);
@@ -276,55 +231,19 @@ public class EntityCollision implements ChunkLoader {
      * @param targetBlockId The block ID to check (e.g., Block.FIRE).
      * @return {@code true} if any matching block intersects the box.
      */
-    public boolean isInsideSpecialBlock(AxisAlignedBB boundingBox, int targetBlockId) {
-        Level level = entity.getLevel();
-        if (level == null || entity.isClosed()) {
+    public boolean isInsideBlock(AxisAlignedBB boundingBox, int targetBlockId) {
+        List<Block> blocks = this.getBlocksInBoundingBox(boundingBox);
+
+        if (blocks.isEmpty()) {
             return false;
         }
 
-        int minX = NukkitMath.floorDouble(boundingBox.getMinX());
-        int minY = Math.max(NukkitMath.floorDouble(boundingBox.getMinY()), level.getMinBlockY());
-        int minZ = NukkitMath.floorDouble(boundingBox.getMinZ());
-        int maxX = NukkitMath.floorDouble(boundingBox.getMaxX());
-        int maxY = Math.min(NukkitMath.floorDouble(boundingBox.getMaxY()), level.getMaxBlockY());
-        int maxZ = NukkitMath.floorDouble(boundingBox.getMaxZ());
-
-        if (minY > maxY || !level.isYInRange(minY) || !level.isYInRange(maxY)) {
-            return false;
-        }
-
-        this.updateChunk();
-
-        for (int x = minX; x <= maxX; x++) {
-            int chunkX = x >> 4;
-            int localX = x & 0x0f;
-            for (int z = minZ; z <= maxZ; z++) {
-                int chunkZ = z >> 4;
-                int localZ = z & 0x0f;
-                long chunkKey = ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
-                FullChunk chunk = chunkCache.getIfPresent(chunkKey);
-                if (chunk == null) {
-                    chunk = level.getChunkIfLoaded(chunkX, chunkZ);
-                    if (chunk == null) {
-                        continue;
-                    }
-                    chunkCache.put(chunkKey, chunk);
-                }
-                for (int y = minY; y <= maxY; y++) {
-                    if (!level.isYInRange(y)) continue;
-
-                    long blockKey = (chunkKey << 16) | (localX << 12) | ((long) y << 8) | (localZ << 4);
-
-                    int[] blockData = getCachedBlockData(chunk, blockKey, localX, y, localZ);
-                    if (blockData == null || blockData[0] != targetBlockId) continue;
-
-                    Block block = Block.get(blockData[0], blockData[1], level, x, y, z);
-                    if (block.collidesWithBB(boundingBox)) {
-                        return true;
-                    }
-                }
+        for (Block block : blocks) {
+            if (block.getId() == targetBlockId && block.collidesWithBB(boundingBox)) {
+                return true;
             }
         }
+
         return false;
     }
 
