@@ -107,9 +107,9 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
                 this.z + 1.0D
         );
         return boundingBox.grow(
-                (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.25,
+                (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.40,
                 0,
-                (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.25
+                (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.40
         );
     }
 
