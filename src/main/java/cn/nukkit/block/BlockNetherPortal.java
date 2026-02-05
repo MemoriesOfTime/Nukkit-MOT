@@ -11,6 +11,7 @@ import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import cn.nukkit.Server;
 
 /**
  * Created on 2016/1/5 by xtypr.
@@ -106,10 +107,11 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
                 this.y + 1.0D,
                 this.z + 1.0D
         );
+        double growK = Server.getInstance().portalTicks > 20 ? 0.25 : 0.35;
         return boundingBox.grow(
-                (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.40,
+                (boundingBox.getMaxX() - boundingBox.getMinX()) * growK,
                 0,
-                (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.40
+                (boundingBox.getMaxZ() - boundingBox.getMinZ()) * growK
         );
     }
 
