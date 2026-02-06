@@ -1,6 +1,7 @@
 package cn.nukkit.network.protocol.types.inventory.itemstack.response;
 
 import cn.nukkit.network.protocol.types.inventory.ContainerSlotType;
+import cn.nukkit.network.protocol.types.inventory.FullContainerName;
 import lombok.Value;
 
 import java.util.List;
@@ -19,4 +20,9 @@ public class ItemStackResponseContainer {
      * items holds information on what item stack should be present in specific slots in the container.
      */
     List<ItemStackResponseSlot> items;
+
+    /**
+     * @since v712
+     */
+    FullContainerName containerName;
 }
