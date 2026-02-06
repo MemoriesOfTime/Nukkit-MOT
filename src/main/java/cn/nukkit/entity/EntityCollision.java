@@ -32,7 +32,6 @@ public class EntityCollision implements ChunkLoader {
             .maximumSize(128)
             .expireAfterWrite(2, TimeUnit.SECONDS)
             .expireAfterAccess(3, TimeUnit.SECONDS)
-            .softValues()
             .build();
 
     private int cacheVersion = 0;

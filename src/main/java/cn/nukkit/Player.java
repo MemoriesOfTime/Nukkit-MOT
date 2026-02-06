@@ -227,7 +227,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     protected int lastTeleportTick = -1;
 
-    protected boolean connected = true;
+    protected volatile boolean connected = true;
     protected final InetSocketAddress rawSocketAddress;
     protected InetSocketAddress socketAddress;
     protected boolean removeFormat = true;
@@ -3175,7 +3175,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void handleDataPacket(DataPacket packet) {
-        if (!connected) {
+        if (!this.connected) {
             return;
         }
 
@@ -5729,67 +5729,70 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public void close(TextContainer message, String reason, boolean notify) {
-        if (this.connected && !this.closed) {
-            if (notify && !reason.isEmpty()) {
-                DisconnectPacket pk = new DisconnectPacket();
-                pk.message = reason;
-                this.forceDataPacket(pk, null);
-            }
-
-            this.connected = false;
-            PlayerQuitEvent ev = null;
-            if (this.username != null && !this.username.isEmpty()) {
-                this.server.getPluginManager().callEvent(ev = new PlayerQuitEvent(this, message, true, reason));
-                if (this.loggedIn && ev.getAutoSave()) {
-                    this.save();
-                }
-                if (this.fishing != null) {
-                    this.stopFishing(false);
-                }
-            }
-
-            for (Player player : new ArrayList<>(this.server.playerList.values())) {
-                if (!player.canSee(this)) {
-                    player.showPlayer(this);
-                }
-            }
-
-            this.hiddenPlayers.clear();
-
-            this.removeAllWindows(true);
-
-            this.unloadChunks(false);
-
-            super.close();
-
-            this.interfaz.close(this, notify ? reason : "");
-
-            if (this.loggedIn) {
-                this.server.removeOnlinePlayer(this);
-                this.loggedIn = false;
-            }
-
-            if (ev != null && !Objects.equals(this.username, "") && this.spawned && !Objects.equals(ev.getQuitMessage().toString(), "")) {
-                this.server.broadcastMessage(ev.getQuitMessage());
-            }
-
-            this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_USERS, this);
-            this.spawned = false;
-            this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logOut",
-                    TextFormat.AQUA + (this.getName() == null ? this.unverifiedUsername : this.getName()) + TextFormat.WHITE,
-                    this.getAddress(),
-                    String.valueOf(this.getPort()),
-                    this.getServer().getLanguage().translateString(reason)));
-            this.windows.clear();
-            this.hasSpawned.clear();
-            this.spawnPosition = null;
-
-            if (this.riding instanceof EntityRideable) {
-                this.riding.passengers.remove(this);
-            }
-
-            this.riding = null;
+        if (this.closed) {
+            return;
         }
+
+        if (notify && !reason.isEmpty() && this.connected) {
+            DisconnectPacket pk = new DisconnectPacket();
+            pk.message = reason;
+            this.forceDataPacket(pk, null);
+        }
+
+        this.connected = false;
+
+        PlayerQuitEvent ev = null;
+        if (this.username != null && !this.username.isEmpty()) {
+            this.server.getPluginManager().callEvent(ev = new PlayerQuitEvent(this, message, true, reason));
+            if (this.loggedIn && ev.getAutoSave()) {
+                this.save();
+            }
+            if (this.fishing != null) {
+                this.stopFishing(false);
+            }
+        }
+
+        for (Player player : new ArrayList<>(this.server.playerList.values())) {
+            if (!player.canSee(this)) {
+                player.showPlayer(this);
+            }
+        }
+
+        this.hiddenPlayers.clear();
+        this.removeAllWindows(true);
+        this.unloadChunks(false);
+
+        // It should always be called
+        super.close();
+
+        this.interfaz.close(this, notify ? reason : "");
+
+        if (this.loggedIn) {
+            this.server.removeOnlinePlayer(this);
+            this.loggedIn = false;
+        }
+
+        if (ev != null && !Objects.equals(this.username, "") && this.spawned && !Objects.equals(ev.getQuitMessage().toString(), "")) {
+            this.server.broadcastMessage(ev.getQuitMessage());
+        }
+
+        this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_USERS, this);
+        this.spawned = false;
+
+        this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logOut",
+                TextFormat.AQUA + (this.getName() == null ? this.unverifiedUsername : this.getName()) + TextFormat.WHITE,
+                this.getAddress(),
+                String.valueOf(this.getPort()),
+                this.getServer().getLanguage().translateString(reason)));
+
+        this.windows.clear();
+        this.hasSpawned.clear();
+        this.spawnPosition = null;
+
+        if (this.riding instanceof EntityRideable) {
+            this.riding.passengers.remove(this);
+        }
+        this.riding = null;
 
         if (this.perm != null) {
             this.perm.clearPermissions();
@@ -5802,11 +5805,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.server.removePlayer(this);
 
         if (this.loggedIn) {
-            this.server.getLogger().warning("(BUG) Player still logged in");
+            this.server.getLogger().warning("(BUG) Player still logged in after close");
             this.interfaz.close(this, notify ? reason : "");
             this.server.removeOnlinePlayer(this);
             this.loggedIn = false;
         }
+
         this.clientMovements.clear();
     }
 
