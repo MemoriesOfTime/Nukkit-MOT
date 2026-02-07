@@ -164,6 +164,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     public static final int LOOM_WINDOW_ID = 2;
     public static final int GRINDSTONE_WINDOW_ID = 5;
     public static final int SMITHING_WINDOW_ID = 6;
+    public static final int STONECUTTER_WINDOW_ID = 7;
     /**
      * @since 649 1.20.60
      * 自1.20.60开始，需要发送ContainerOpenPacket给玩家才能正常打开讲台上的书
@@ -4233,7 +4234,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         }
                     }
 
-                    if (this.craftingTransaction.getPrimaryOutput() != null && this.craftingTransaction.canExecute()) {
+                    if ((this.craftingTransaction.getPrimaryOutput() != null || this.craftingType == Player.STONECUTTER_WINDOW_ID) && this.craftingTransaction.canExecute()) {
                         try {
                             this.craftingTransaction.execute();
                         } catch (Exception e) {

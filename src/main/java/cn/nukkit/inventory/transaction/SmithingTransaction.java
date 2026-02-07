@@ -39,7 +39,6 @@ public class SmithingTransaction extends InventoryTransaction {
 
     private Item equipmentItem;
     private Item ingredientItem;
-    private Item templateItem;
     private Item outputItem;
 
     private boolean isError = false;
@@ -65,6 +64,9 @@ public class SmithingTransaction extends InventoryTransaction {
     @Override
     public void addAction(InventoryAction action) {
         super.addAction(action);
+        if(action instanceof SlotChangeAction slotChangeAction && slotChangeAction.getSlot() == 1 && slotChangeAction.getInventory() instanceof SmithingInventory) {
+            this.ingredientItem = slotChangeAction.getTargetItem();
+        }
         if (action instanceof SmithingItemAction) {
             switch (((SmithingItemAction) action).getType()) {
                 case 0 -> // input
@@ -73,8 +75,6 @@ public class SmithingTransaction extends InventoryTransaction {
                     this.ingredientItem = action.getTargetItem();
                 case 2 -> // result
                     this.outputItem = action.getSourceItem();
-                case 3 -> // template
-                    this.templateItem = action.getTargetItem();
             }
         } else if (action instanceof CreativeInventoryAction creativeAction && this.source.isCreative()) {
             if (creativeAction.getActionType() == 0) {
@@ -100,18 +100,19 @@ public class SmithingTransaction extends InventoryTransaction {
         }
         SmithingInventory smithingInventory = (SmithingInventory) inventory;
         if (outputItem == null || outputItem.isNull() ||
-                ((equipmentItem == null || equipmentItem.isNull()) && (ingredientItem == null || ingredientItem.isNull()) && (templateItem == null || templateItem.isNull()))) {
+                ((equipmentItem == null || equipmentItem.isNull()) && (ingredientItem == null || ingredientItem.isNull()))) {
             return false;
         }
 
         Item air = Item.get(0);
         Item equipment = equipmentItem != null? equipmentItem : air;
         Item ingredient = ingredientItem != null? ingredientItem : air;
-        Item template = templateItem != null? templateItem : air;
 
-        return equipment.equals(smithingInventory.getEquipment(), true, true)
+        boolean has =equipment.equals(smithingInventory.getEquipment(), true, true)
                 && ingredient.equals(smithingInventory.getIngredient(), true, true)
                 && outputItem.equals(smithingInventory.getResult(), true, true);
+
+        return has;
     }
 
     @Override
@@ -125,8 +126,7 @@ public class SmithingTransaction extends InventoryTransaction {
         Item air = Item.get(0);
         Item equipment = equipmentItem != null? equipmentItem : air;
         Item ingredient = ingredientItem != null? ingredientItem : air;
-        Item template = templateItem != null? templateItem : air;
-        SmithingTableEvent event = new SmithingTableEvent(inventory, equipment, outputItem, ingredient, template, source);
+        SmithingTableEvent event = new SmithingTableEvent(inventory, equipment, outputItem, ingredient, Item.AIR_ITEM, source);
         this.source.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
             this.source.removeAllWindows(false);

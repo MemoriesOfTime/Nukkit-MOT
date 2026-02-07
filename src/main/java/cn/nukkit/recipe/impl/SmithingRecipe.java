@@ -18,7 +18,9 @@
 
 package cn.nukkit.recipe.impl;
 
+import cn.nukkit.inventory.SmithingInventory;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.recipe.Recipe;
 import cn.nukkit.recipe.RecipeType;
@@ -83,7 +85,7 @@ public class SmithingRecipe extends ShapelessRecipe {
 
     @Override
     public RecipeType getType() {
-        return RecipeType.SMITHING_TRANSFORM;
+        return RecipeType.SMITHING;
     }
 
     public Item getEquipment() {

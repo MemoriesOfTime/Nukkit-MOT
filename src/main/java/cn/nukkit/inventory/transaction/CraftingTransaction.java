@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.event.inventory.CraftItemEvent;
 import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.transaction.action.CraftingTakeResultAction;
 import cn.nukkit.inventory.transaction.action.InventoryAction;
 import cn.nukkit.inventory.transaction.action.SlotChangeAction;
 import cn.nukkit.item.Item;
@@ -16,6 +17,7 @@ import cn.nukkit.recipe.descriptor.DefaultDescriptor;
 import cn.nukkit.recipe.descriptor.ItemDescriptor;
 import cn.nukkit.recipe.impl.MultiRecipe;
 import cn.nukkit.recipe.impl.SmithingRecipe;
+import cn.nukkit.recipe.impl.StonecutterRecipe;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -44,15 +46,21 @@ public class CraftingTransaction extends InventoryTransaction {
         super(source, actions, false);
 
         this.craftingType = source.craftingType;
-        this.gridSize = (source.getCraftingGrid() instanceof BigCraftingGrid) ? 3 : 2;
-        this.inputs = new ArrayList<>();
-        this.secondaryOutputs = new ArrayList<>();
+        if(source.craftingType == Player.STONECUTTER_WINDOW_ID) {
+            this.gridSize = 1;
+            this.inputs = new ArrayList<>(1);
+            this.secondaryOutputs = new ArrayList<>(1);
+        } else {
+            this.gridSize = (source.getCraftingGrid() instanceof BigCraftingGrid) ? 3 : 2;
+            this.inputs = new ArrayList<>();
+            this.secondaryOutputs = new ArrayList<>();
+        }
 
         init(source, actions);
     }
 
     public void setInput(Item item) {
-        if (inputs.size() < gridSize * gridSize) {
+        if (inputs.size() < gridSize * gridSize || this.craftingType == Player.STONECUTTER_WINDOW_ID) {
             for (Item existingInput : this.inputs) {
                 if (new DefaultDescriptor(existingInput).equals(new DefaultDescriptor(item))) {
                     existingInput.setCount(existingInput.getCount() + item.getCount());
@@ -74,10 +82,10 @@ public class CraftingTransaction extends InventoryTransaction {
     }
 
     public void setExtraOutput(Item item) {
-        if (secondaryOutputs.size() < gridSize * gridSize) {
+        if (secondaryOutputs.size() < gridSize * gridSize || this.craftingType == Player.STONECUTTER_WINDOW_ID) {
             secondaryOutputs.add(item.clone());
         } else {
-            throw new RuntimeException("Output list is full can't add " + item);
+            throw new RuntimeException("Output list is full can't add " + item + " " + gridSize + " " + this.secondaryOutputs.size());
         }
     }
 
@@ -104,12 +112,35 @@ public class CraftingTransaction extends InventoryTransaction {
     protected void setTransactionRecipe(Recipe recipe) {
         this.transactionRecipe = recipe;
         this.recipe = recipe instanceof CraftingRecipe ? (CraftingRecipe) recipe : null;
+
+        if(recipe != null) {
+            final Item result = recipe.getResult();
+            this.setPrimaryOutput(result);
+
+            for(InventoryAction action : this.getActions()) {
+                if(action instanceof SlotChangeAction && action.getTargetItem().equals(result, true, false)) {
+                    action.getTargetItemUnsafe().setCompoundTag(result.getCompoundTag());
+                } else if(action instanceof CraftingTakeResultAction) {
+                    action.getSourceItemUnsafe().setCompoundTag(result.getCompoundTag());
+                }
+            }
+        }
     }
 
     @Override
     public boolean canExecute() {
         Inventory inventory;
-        if (craftingType == Player.CRAFTING_SMITHING) {
+        if(craftingType == Player.STONECUTTER_WINDOW_ID) {
+            inventory = source.getWindowById(Player.STONECUTTER_WINDOW_ID);
+
+            if (inventory instanceof StonecutterInventory stonecutterInventory) {
+                addInventory(stonecutterInventory);
+                StonecutterRecipe stonecutterRecipe = RecipeRegistry.matchStoneCutterRecipe(stonecutterInventory.getInput(), this.secondaryOutputs);
+                if(stonecutterRecipe != null) {
+                    setTransactionRecipe(stonecutterRecipe);
+                }
+            }
+        } else if (craftingType == Player.CRAFTING_SMITHING) {
             inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
             if (inventory instanceof SmithingInventory smithingInventory) {
                 addInventory(inventory);

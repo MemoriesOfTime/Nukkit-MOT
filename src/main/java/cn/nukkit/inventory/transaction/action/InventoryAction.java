@@ -44,6 +44,14 @@ public abstract class InventoryAction {
         return targetItem.clone();
     }
 
+    public Item getSourceItemUnsafe() {
+        return sourceItem;
+    }
+
+    public Item getTargetItemUnsafe() {
+        return targetItem;
+    }
+
     /**
      * Called by inventory transactions before any actions are processed. If this returns false, the transaction will
      * be cancelled.

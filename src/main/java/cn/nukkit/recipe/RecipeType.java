@@ -21,7 +21,11 @@ public enum RecipeType {
     SMITHING_TRIM(9),
     REPAIR(-1),
     CAMPFIRE(2),
-    CAMPFIRE_DATA(3);
+    CAMPFIRE_DATA(3),
+    BREWING(0), //custom
+    CONTAINER(0), //custom
+    STONECUTTER(0),
+    SMITHING(0);
 
     private final int networkType;
 

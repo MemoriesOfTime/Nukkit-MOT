@@ -2,6 +2,7 @@ package cn.nukkit.recipe.parser;
 
 import cn.nukkit.Server;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemID;
 import cn.nukkit.recipe.RecipeRegistry;
 import cn.nukkit.recipe.descriptor.DefaultDescriptor;
 import cn.nukkit.recipe.descriptor.ItemDescriptor;
@@ -108,7 +109,20 @@ public class RecipeParser {
                                 ), xp);
                             }
 
-                            case "stonecutter", "smoker", "soul_campfire" -> {
+                            case "stonecutter" -> {
+                                final String id = recipe.get("id").getAsString();
+                                final Collection<Item> outputs = new ArrayList<>();
+
+                                recipe.getAsJsonArray("output").getAsJsonArray().forEach(item -> {
+                                    outputs.add(parseItem(item.getAsJsonObject()).getItem());
+                                });
+
+                                for (Item output : outputs) {
+                                    RecipeRegistry.addStonecutterRecipe(new StonecutterRecipe(id, recipe.get("priority").getAsInt(), output, List.of(new DefaultDescriptor(input))));
+                                }
+                            }
+
+                            case "smoker", "soul_campfire" -> {
                             }
 
                             default -> log.warn("Not support block type: {}", block);
@@ -150,25 +164,6 @@ public class RecipeParser {
                         }
                     }
 
-                    case 8 -> {
-                        final String block = recipe.get("block").getAsString();
-                        switch (block) {
-                            case "smithing_table" -> {
-                                RecipeRegistry.registerSmithingRecipe(new SmithingRecipe(
-                                        recipe.get("id").getAsString(),
-                                        0,
-                                        List.of(
-                                                parseItem(recipe.get("base").getAsJsonObject()),
-                                                parseItem(recipe.get("addition").getAsJsonObject()),
-                                                parseItem(recipe.get("template").getAsJsonObject())
-                                        ),
-                                        parseItem(recipe.get("result").getAsJsonObject()).getItem()
-                                ));
-                            }
-                            default -> log.warn("Not support block type: {}", block);
-                        }
-                    }
-
                     case 0, 5 -> {
                         final String block = recipe.get("block").getAsString();
 
@@ -188,7 +183,27 @@ public class RecipeParser {
                                 ));
                             }
 
-                            case "stonecutter", "cartography_table" -> {
+                            case "stonecutter" -> {
+                                final String id = recipe.get("id").getAsString();
+                                final Collection<Item> inputs = new ArrayList<>();
+                                final Collection<Item> outputs = new ArrayList<>();
+
+                                recipe.getAsJsonArray("input").getAsJsonArray().forEach(item -> {
+                                    inputs.add(parseItem(item.getAsJsonObject()).getItem());
+                                });
+
+                                recipe.getAsJsonArray("output").getAsJsonArray().forEach(item -> {
+                                    outputs.add(parseItem(item.getAsJsonObject()).getItem());
+                                });
+
+                                for (Item input : inputs) {
+                                    for (Item output : outputs) {
+                                        RecipeRegistry.addStonecutterRecipe(new StonecutterRecipe(id, recipe.get("priority").getAsInt(), output, List.of(new DefaultDescriptor(input))));
+                                    }
+                                }
+                            }
+
+                            case "cartography_table" -> {
                             }
 
                             default -> log.warn("Not support block type: {}", block);
@@ -207,5 +222,27 @@ public class RecipeParser {
                 }
             }
         });
+
+        {
+            int[] ids = new int[] {
+                    ItemID.DIAMOND_HELMET, ItemID.NETHERITE_HELMET,
+                    ItemID.DIAMOND_CHESTPLATE, ItemID.NETHERITE_CHESTPLATE,
+                    ItemID.DIAMOND_LEGGINGS, ItemID.NETHERITE_LEGGINGS,
+                    ItemID.DIAMOND_BOOTS,  ItemID.NETHERITE_BOOTS,
+
+                    ItemID.DIAMOND_SWORD,  ItemID.NETHERITE_SWORD,
+                    ItemID.DIAMOND_AXE,  ItemID.NETHERITE_AXE,
+                    ItemID.DIAMOND_HOE,  ItemID.NETHERITE_HOE,
+                    ItemID.DIAMOND_SHOVEL,  ItemID.NETHERITE_SHOVEL,
+                    ItemID.DIAMOND_PICKAXE,  ItemID.NETHERITE_PICKAXE,
+            };
+
+            for(int i = 0; i < ids.length / 2; i++) {
+                RecipeRegistry.registerSmithingRecipe(new SmithingRecipe("smithing" + i, 10, List.of(
+                        new DefaultDescriptor(Item.get(ids[i * 2])),
+                        new DefaultDescriptor(Item.get(ItemID.NETHERITE_INGOT))
+                ), Item.get(ids[i * 2 + 1])));
+            }
+        }
     }
 }

@@ -30,6 +30,15 @@ public abstract class MixRecipe implements Recipe {
         return output.clone();
     }
 
+    public boolean fastCheck(Item... items  ) {
+        if(items.length == 2) {
+            if(items[1].equals(input)) {
+                return items[0].equals(getIngredient());
+            }
+        }
+        return false;
+    }
+
     @Override
     public boolean isValidRecipe(int protocol) {
         return true;
