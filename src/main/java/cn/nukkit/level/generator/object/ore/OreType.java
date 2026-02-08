@@ -7,6 +7,7 @@ import cn.nukkit.math.NukkitMath;
 import cn.nukkit.math.NukkitRandom;
 
 import static cn.nukkit.block.BlockID.STONE;
+import static cn.nukkit.block.BlockID.DEEPSLATE;
 
 public class OreType {
     public static final OreType[] EMPTY_ARRAY = new OreType[0];
@@ -19,14 +20,24 @@ public class OreType {
     public final int maxHeight;
     public final int minHeight;
     public final int replaceBlockId;
+    public final int deepslateVarientId;
 
     public OreType(final Block material, final int clusterCount, final int clusterSize, final int minHeight, final int maxHeight) {
         this(material, clusterCount, clusterSize, minHeight, maxHeight, STONE);
     }
 
+    public OreType(final Block material, final Block deepslateVarient, final int clusterCount, final int clusterSize, final int minHeight, final int maxHeight) {
+        this(material, deepslateVarient, clusterCount, clusterSize, minHeight, maxHeight, STONE);
+    }
+    
     public OreType(final Block material, final int clusterCount, final int clusterSize, final int minHeight, final int maxHeight, final int replaceBlockId) {
+        this(material, material, clusterCount, clusterSize, minHeight, maxHeight, replaceBlockId);
+    }
+    
+    public OreType(final Block material, final Block deepslateVarient, final int clusterCount, final int clusterSize, final int minHeight, final int maxHeight, final int replaceBlockId) {
         fullId = material.getFullId();
         blockId = material.getId();
+        deepslateVarientId = deepslateVarient.getId();
         blockData = material.getDamage();
         this.clusterCount = clusterCount;
         this.clusterSize = clusterSize;
@@ -73,6 +84,9 @@ public class OreType {
                                 if (xVal * xVal + yVal * yVal + zVal * zVal < 1.0D) {
                                     if (level.getBlockIdAt(xSeg, ySeg, zSeg) == replaceBlockId) {
                                         level.setBlockAt(xSeg, ySeg, zSeg, blockId, blockData);
+                                    }
+                                    else if (this.replaceBlockId == STONE && level.getBlockIdAt(xSeg, ySeg, zSeg) == DEEPSLATE) {
+                                        level.setBlockAt(xSeg, ySeg, zSeg, deepslateVarientId, blockData);
                                     }
                                 }
                             }
