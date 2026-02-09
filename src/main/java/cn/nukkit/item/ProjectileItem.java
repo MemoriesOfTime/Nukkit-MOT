@@ -83,7 +83,24 @@ public abstract class ProjectileItem extends Item {
                 projectile.close();
             } else {
                 if (!player.isCreative()) {
-                    this.count--;
+                    // client bug patch (item rollback cause pitch > 18 and this.count--)
+                    if (player.getPitch() > 18.0) {
+                        Item handItem = player.getInventory().getItemInHand();
+                        if (handItem.getId() == this.getId() && handItem.getCount() > 0) {
+                            handItem.setCount(handItem.getCount() - 1);
+
+                            if (handItem.getCount() <= 0) {
+                                player.getInventory().setItemInHand(Item.get(Item.AIR));
+                            } else {
+                                player.getInventory().setItemInHand(handItem);
+                            }
+
+                            player.getInventory().sendSlot(player.getInventory().getHeldItemIndex(), player);
+                        }
+                    } else {
+                        // but only this method works for pitch < 18
+                        this.count--;
+                    }
                 }
                 if (projectile instanceof EntityEnderPearl || projectile instanceof EntityEnderEye) {
                     player.onThrowEnderPearl();
