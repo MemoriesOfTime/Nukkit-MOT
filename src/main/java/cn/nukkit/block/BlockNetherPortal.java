@@ -1,5 +1,6 @@
 package cn.nukkit.block;
 
+import cn.nukkit.Server;
 import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.level.Level;
@@ -98,7 +99,20 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
 
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
-        return this;
+        AxisAlignedBB boundingBox = new SimpleAxisAlignedBB(
+                this.x,
+                this.y,
+                this.z,
+                this.x + 1.0D,
+                this.y + 1.0D,
+                this.z + 1.0D
+        );
+        double growK = Server.getInstance().portalTicks > 20 ? 0.25 : 0.35;
+        return boundingBox.grow(
+                (boundingBox.getMaxX() - boundingBox.getMinX()) * growK,
+                0,
+                (boundingBox.getMaxZ() - boundingBox.getMinZ()) * growK
+        );
     }
 
     public static boolean trySpawnPortal(Level level, Vector3 pos) {
