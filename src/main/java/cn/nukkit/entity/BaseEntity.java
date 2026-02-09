@@ -10,6 +10,7 @@ import cn.nukkit.entity.mob.EntityMob;
 import cn.nukkit.entity.mob.EntityRavager;
 import cn.nukkit.entity.mob.EntityWolf;
 import cn.nukkit.entity.passive.EntityAnimal;
+import cn.nukkit.entity.passive.EntityCow;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
 import cn.nukkit.event.entity.EntityDamageEvent;
@@ -328,6 +329,11 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         baby.setBaby(true);
         baby.setPersistent(true); // TODO: different flag for this?
         baby.spawnToAll();
+        if (baby instanceof EntityCow) {
+            if (player != null) {
+                player.awardAchievement("breedCow");
+            }
+        }
         this.level.dropExpOrb(this, Utils.rand(1, 7));
         return true;
     }
