@@ -9,6 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import javax.annotation.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
@@ -38,13 +39,21 @@ public record CollisionHelper(Entity entity) {
         double shrinkX = (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.25;
         double shrinkZ = (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.25;
 
-        List<Block> result = new ArrayList<>(8);
+        Block[] result = new Block[Math.min(blocks.length, 4)];
+        int count = 0;
+
         for (Block block : blocks) {
             if (block.collidesWithBB(boundingBox.shrink(shrinkX, 0, shrinkZ), true)) {
-                result.add(block);
+                if (count == result.length) {
+                    result = Arrays.copyOf(result, result.length * 2);
+                }
+                result[count++] = block;
             }
         }
-        return result.toArray(Block.EMPTY_ARRAY);
+
+        return count == 0 ? Block.EMPTY_ARRAY :
+                count == result.length ? result :
+                        Arrays.copyOf(result, count);
     }
 
     /**
@@ -70,19 +79,27 @@ public record CollisionHelper(Entity entity) {
         int clampedMaxY = Math.min(maxY, level.getMaxBlockY());
         if (clampedMinY > clampedMaxY) return Block.EMPTY_ARRAY;
 
-        List<Block> result = new ArrayList<>();
+        int estimatedCount = (maxX - minX + 1) * (maxZ - minZ + 1) * (clampedMaxY - clampedMinY + 1);
+        Block[] result = new Block[Math.min(estimatedCount, 64)];
+        int count = 0;
+
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 for (int y = clampedMinY; y <= clampedMaxY; y++) {
                     int blockId = level.getBlockIdAt(x, y, z);
                     if (blockId == Block.AIR) continue;
 
+                    if (count == result.length) {
+                        result = Arrays.copyOf(result, Math.min(result.length * 2, estimatedCount));
+                    }
+
                     int blockData = level.getBlockDataAt(x, y, z);
-                    result.add(Block.get(blockId, blockData, level, x, y, z));
+                    result[count++] = Block.get(blockId, blockData, level, x, y, z);
                 }
             }
         }
-        return result.toArray(Block.EMPTY_ARRAY);
+
+        return count == 0 ? Block.EMPTY_ARRAY : Arrays.copyOf(result, count);
     }
 
     /**
