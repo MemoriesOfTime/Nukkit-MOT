@@ -1880,7 +1880,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         boolean scaffolding = false;
         boolean powderSnow = false;
 
-        for (Block block : this.getCollisionBlocks()) {
+        for (Block block : getCollisionHelper().getCollisionBlocks()) {
             switch (block.getId()) {
                 case Block.NETHER_PORTAL:
                     netherPortal = true;
@@ -3727,7 +3727,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     playerToggleSpinAttackEvent.setCancelled(true);
                                 } else {
                                     boolean inWater = false;
-                                    for (Block block : this.getCollisionBlocks()) {
+                                    for (Block block : getCollisionHelper().getCollisionBlocks()) {
                                         if (block instanceof BlockWater || block.level.isBlockWaterloggedAt(this.chunk, (int) block.x, (int) block.y, (int) block.z)) {
                                             inWater = true;
                                             break;
