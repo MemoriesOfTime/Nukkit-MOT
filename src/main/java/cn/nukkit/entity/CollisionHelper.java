@@ -57,6 +57,15 @@ public record CollisionHelper(Entity entity) {
     }
 
     /**
+     * Gets blocks around the entity's current position.
+     *
+     * @return Array of blocks around the entity
+     */
+    public Block[] getBlocksAround() {
+        return getBlocksInBoundingBox(entity.getBoundingBox());
+    }
+
+    /**
      * Gets blocks in bounding box.
      *
      * @param boundingBox Bounding box to check
@@ -505,14 +514,5 @@ public record CollisionHelper(Entity entity) {
                 entities,
                 false
         );
-    }
-
-    /**
-     * Gets blocks around the entity's current position.
-     *
-     * @return Array of blocks around the entity
-     */
-    public Block[] getBlocksAround() {
-        return getBlocksInBoundingBox(entity.boundingBox);
     }
 }
