@@ -1,6 +1,9 @@
 package cn.nukkit.item;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
+import cn.nukkit.level.Level;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 
 public class ItemFishingRod extends ItemTool {
@@ -20,6 +23,16 @@ public class ItemFishingRod extends ItemTool {
     @Override
     public int getEnchantAbility() {
         return 1;
+    }
+
+    @Override
+    public boolean canBeActivated() {
+        return true;
+    }
+
+    @Override
+    public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
+        return this.onClickAir(player, player.getDirectionVector());
     }
 
     @Override
