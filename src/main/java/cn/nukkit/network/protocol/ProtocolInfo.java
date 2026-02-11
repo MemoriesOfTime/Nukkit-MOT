@@ -105,9 +105,6 @@ public interface ProtocolInfo {
     int v1_21_124 = 860;
     int v1_21_130_28 = 897;
     int v1_21_130 = 898;
-    /**
-     * @since 1.26.0
-     */
     int v1_26_0 = 924;
 
     int CURRENT_PROTOCOL = Utils.dynamic(v1_26_0);
