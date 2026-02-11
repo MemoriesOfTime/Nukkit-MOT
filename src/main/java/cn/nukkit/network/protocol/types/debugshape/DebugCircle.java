@@ -14,7 +14,7 @@ public class DebugCircle extends DebugShape {
     Integer segments;
 
     public DebugCircle(long id, int dimension, @Nullable Vector3f position, @Nullable Float scale, @Nullable Vector3f rotation, @Nullable Float totalTimeLeft, @Nullable Color color, Integer segments) {
-        super(id, dimension, position, scale, rotation, totalTimeLeft, color);
+        super(id, dimension, position, scale, rotation, totalTimeLeft, color, null);
         this.segments = segments;
     }
 

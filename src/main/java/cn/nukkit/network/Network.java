@@ -628,6 +628,14 @@ public class Network {
                 .deregisterPacket(ProtocolInfo.PLAYER_INPUT_PACKET)
                 .deregisterPacket(ProtocolInfo.RIDER_JUMP_PACKET)
                 .registerPacket(ProtocolInfo.PLAYER_LOCATIONS_PACKET, PlayerLocationPacket.class)
+                // v924 packets
+                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET, ClientboundDataDrivenUIShowScreenPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_ALL_SCREENS_PACKET, ClientboundDataDrivenUICloseAllScreensPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_RELOAD_PACKET, ClientboundDataDrivenUIReloadPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_TEXTURE_SHIFT_PACKET, ClientboundTextureShiftPacket.class)
+                .registerPacket(ProtocolInfo.VOXEL_SHAPES_PACKET, VoxelShapesPacket.class)
+                .registerPacket(ProtocolInfo.CAMERA_SPLINE_PACKET, CameraSplinePacket.class)
+                .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_ACTOR_PRIORITY_PACKET, CameraAimAssistActorPriorityPacket.class)
                 .build();
     }
 

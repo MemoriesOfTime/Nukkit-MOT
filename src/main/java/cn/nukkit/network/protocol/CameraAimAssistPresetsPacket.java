@@ -52,6 +52,9 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_130_28) {
             this.putArray(category.getBlockTagPriorities(), this::writePriority);
         }
+        if (this.protocol >= ProtocolInfo.v1_26_0) {
+            this.putArray(category.getEntityTypeFamiliesPriorities(), this::writePriority);
+        }
         if (this.protocol >= ProtocolInfo.v1_21_50) {
             this.putOptionalNull(category.getEntityDefaultPriorities(), this::putLInt);
             this.putOptionalNull(category.getBlockDefaultPriorities(), this::putLInt);
@@ -69,6 +72,9 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
             this.putArray(preset.getBlockExclusionList(), this::putString);
             this.putArray(preset.getEntityExclusionList(), this::putString);
             this.putArray(preset.getBlockTagExclusionList(), this::putString);
+            if (this.protocol >= ProtocolInfo.v1_26_0) {
+                this.putArray(preset.getEntityTypeFamiliesExclusionList(), this::putString);
+            }
         } else {
             if (this.protocol <= ProtocolInfo.v1_21_60) {
                 this.putString(preset.getCategories());
@@ -106,6 +112,9 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_130_28) {
             this.getArray(category.getBlockTagPriorities(), buf -> readPriority());
         }
+        if (this.protocol >= ProtocolInfo.v1_26_0) {
+            this.getArray(category.getEntityTypeFamiliesPriorities(), buf -> readPriority());
+        }
         if (this.protocol >= ProtocolInfo.v1_21_50) {
             category.setEntityDefaultPriorities(this.getOptional(null, BinaryStream::getLInt));
             category.setBlockDefaultPriorities(this.getOptional(null, BinaryStream::getLInt));
@@ -124,6 +133,9 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
             preset.getBlockExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
             preset.getEntityExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
             preset.getBlockTagExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
+            if (this.protocol >= ProtocolInfo.v1_26_0) {
+                preset.getEntityTypeFamiliesExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
+            }
         } else {
             if (this.protocol <= ProtocolInfo.v1_21_60) {
                 preset.setCategories(this.getString());

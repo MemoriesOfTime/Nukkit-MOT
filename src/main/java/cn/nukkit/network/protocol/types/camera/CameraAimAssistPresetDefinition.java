@@ -30,6 +30,10 @@ public class CameraAimAssistPresetDefinition {
      * @since v898
      */
     private final List<String> entityExclusionList = new ObjectArrayList<>();
+    /**
+     * @since v924
+     */
+    private final List<String> entityTypeFamiliesExclusionList = new ObjectArrayList<>();
     public final List<String> liquidTargetingList = new ObjectArrayList<>();
     private final List<CameraAimAssistItemSettings> itemSettings = new ObjectArrayList<>();
     private String defaultItemSettings;

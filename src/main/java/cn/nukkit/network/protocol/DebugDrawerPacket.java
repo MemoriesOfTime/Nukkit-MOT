@@ -46,7 +46,16 @@ public class DebugDrawerPacket extends DataPacket {
     protected void writeShape859(DebugShape shape) {
         this.putUnsignedVarLong(shape.getId());
         this.writeCommonShapeData(shape);
-        this.putVarInt(shape.getDimension());
+        if (this.protocol >= ProtocolInfo.v1_26_0) {
+            // v924: dimension is optional
+            this.putBoolean(true);
+            this.putVarInt(shape.getDimension());
+        } else {
+            this.putVarInt(shape.getDimension());
+        }
+        if (this.protocol >= ProtocolInfo.v1_26_0) {
+            this.putOptionalNull(shape.getAttachedToEntityId(), val -> this.putUnsignedVarLong(val));
+        }
         this.putUnsignedVarInt(this.toPayloadType(shape.getType()));
 
         if (shape.getType() != null) {

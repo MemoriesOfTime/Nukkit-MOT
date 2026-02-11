@@ -27,13 +27,18 @@ public class DebugShape {
     private final Float totalTimeLeft;
     @Nullable
     private final Color color;
+    /**
+     * @since v924
+     */
+    @Nullable
+    private final Long attachedToEntityId;
 
     public DebugShape(long id) {
-        this(id, 0, null, null, null, null, null);
+        this(id, 0, null, null, null, null, null, null);
     }
 
     public DebugShape(long id, int dimension) {
-        this(id, dimension, null, null, null, null, null);
+        this(id, dimension, null, null, null, null, null, null);
     }
 
     public Type getType() {
