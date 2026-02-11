@@ -21,7 +21,7 @@ public class DebugArrow extends DebugShape {
     Integer arrowHeadSegments;
 
     public DebugArrow(long id, int dimension, @Nullable Vector3f position, @Nullable Float scale, @Nullable Vector3f rotation, @Nullable Float totalTimeLeft, @Nullable Color color, @Nullable Vector3f arrowEndPosition, @Nullable Float arrowHeadLength, @Nullable Float arrowHeadRadius, @Nullable Integer arrowHeadSegments) {
-        super(id, dimension, position, scale, rotation, totalTimeLeft, color);
+        super(id, dimension, position, scale, rotation, totalTimeLeft, color, null);
         this.arrowEndPosition = arrowEndPosition;
         this.arrowHeadLength = arrowHeadLength;
         this.arrowHeadRadius = arrowHeadRadius;

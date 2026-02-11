@@ -17,7 +17,7 @@ Nukkit-MOT is a fork of [Nukkit](https://github.com/CloudburstMC/Nukkit) that pr
 Only interested in newer versions? You might want to try [Lumi](https://github.com/KoshakMineDEV/Lumi) or [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 ### What's new in Nukkit-MOT?
-1. Support for 1.2 – 1.21.130 version (you can set the minimum protocol in the config)
+1. Support for 1.2 – 1.26.0 version (you can set the minimum protocol in the config)
 2. Supports most entities with AI
 3. Support for the nether world and The Еnd
 4. Generation of dungeons and caves

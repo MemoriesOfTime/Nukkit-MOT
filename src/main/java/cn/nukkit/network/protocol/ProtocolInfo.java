@@ -105,8 +105,9 @@ public interface ProtocolInfo {
     int v1_21_124 = 860;
     int v1_21_130_28 = 897;
     int v1_21_130 = 898;
+    int v1_26_0 = 924;
 
-    int CURRENT_PROTOCOL = Utils.dynamic(v1_21_130);
+    int CURRENT_PROTOCOL = Utils.dynamic(v1_26_0);
 
     List<Integer> SUPPORTED_PROTOCOLS = Ints.asList(
             /*v1_1_0, */v1_2_0, v1_2_5_11, v1_2_5, v1_2_6, v1_2_7, v1_2_10, v1_2_13, v1_2_13_11, v1_4_0, v1_5_0, v1_6_0_5, v1_6_0, v1_7_0,
@@ -116,7 +117,7 @@ public interface ProtocolInfo {
             v1_19_10, v1_19_20, v1_19_21, v1_19_30_23, v1_19_30, v1_19_40, v1_19_50_20, v1_19_50, v1_19_60, v1_19_63, v1_19_70_24, v1_19_70,
             v1_19_80, v1_20_0_23, v1_20_0, v1_20_10_21, v1_20_10, v1_20_30_24, v1_20_30, v1_20_40, v1_20_50, v1_20_60, v1_20_70, v1_20_80,
             v1_21_0, v1_21_2, v1_21_20, v1_21_30, v1_21_40, v1_21_50_26, v1_21_50, v1_21_60, v1_21_70_24, v1_21_70, v1_21_80, v1_21_90, v1_21_93,
-            v1_21_100, v1_21_110_26, v1_21_110, v1_21_120, v1_21_124, v1_21_130_28, v1_21_130
+            v1_21_100, v1_21_110_26, v1_21_110, v1_21_120, v1_21_124, v1_21_130_28, v1_21_130, v1_26_0
     );
 
     String MINECRAFT_VERSION_NETWORK = Utils.getVersionByProtocol(CURRENT_PROTOCOL);
@@ -402,6 +403,34 @@ public interface ProtocolInfo {
      * @since v818
      */
     int DEBUG_DRAWER_PACKET = 328;
+    /**
+     * @since v924
+     */
+    int CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET = 333;
+    /**
+     * @since v924
+     */
+    int CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_ALL_SCREENS_PACKET = 334;
+    /**
+     * @since v924
+     */
+    int CLIENTBOUND_DATA_DRIVEN_UI_RELOAD_PACKET = 335;
+    /**
+     * @since v924
+     */
+    int CLIENTBOUND_TEXTURE_SHIFT_PACKET = 336;
+    /**
+     * @since v924
+     */
+    int VOXEL_SHAPES_PACKET = 337;
+    /**
+     * @since v924
+     */
+    int CAMERA_SPLINE_PACKET = 338;
+    /**
+     * @since v924
+     */
+    int CAMERA_AIM_ASSIST_ACTOR_PRIORITY_PACKET = 339;
 
     @OnlyNetEase
     int PACKET_CONFIRM_SKIN = 0xe4;
