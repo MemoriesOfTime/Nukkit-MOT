@@ -1251,6 +1251,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         registerCustomItem(customItem, GameVersion.V1_21_110, addCreativeItem, GameVersion.V1_21_110);
         registerCustomItem(customItem, GameVersion.V1_21_120, addCreativeItem, GameVersion.V1_21_120);
         registerCustomItem(customItem, GameVersion.V1_21_130, addCreativeItem, GameVersion.V1_21_130);
+        registerCustomItem(customItem, GameVersion.V1_26_0, addCreativeItem);
 
         // NetEase
         registerCustomItem(customItem, GameVersion.V1_20_50_NETEASE, addCreativeItem, GameVersion.V1_20_50_NETEASE);
@@ -1316,6 +1317,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             deleteCustomItem(customItem, GameVersion.V1_21_110, GameVersion.V1_21_110);
             deleteCustomItem(customItem, GameVersion.V1_21_120, GameVersion.V1_21_120);
             deleteCustomItem(customItem, GameVersion.V1_21_130, GameVersion.V1_21_130);
+            deleteCustomItem(customItem, GameVersion.V1_26_0);
 
             // NetEase
             deleteCustomItem(customItem, GameVersion.V1_20_50_NETEASE, GameVersion.V1_20_50_NETEASE);
