@@ -2984,7 +2984,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         ResourcePacksInfoPacket infoPacket = new ResourcePacksInfoPacket();
         infoPacket.resourcePackEntries = this.server.getResourcePackManager().getResourceStack(this.gameVersion);
-        infoPacket.behaviourPackEntries = this.server.getResourcePackManager().getBehaviorStack(this.gameVersion);
+        ResourcePack[] behaviorPacks = this.server.getResourcePackManager().getBehaviorStack(this.gameVersion);
+        if (this.protocol >= ProtocolInfo.v1_21_30) {
+            // Since v1.21.30, behaviour packs are merged into the resource pack list
+            ResourcePack[] resourcePacks = infoPacket.resourcePackEntries;
+            ResourcePack[] merged = new ResourcePack[resourcePacks.length + behaviorPacks.length];
+            System.arraycopy(resourcePacks, 0, merged, 0, resourcePacks.length);
+            System.arraycopy(behaviorPacks, 0, merged, resourcePacks.length, behaviorPacks.length);
+            infoPacket.resourcePackEntries = merged;
+        } else {
+            infoPacket.behaviourPackEntries = behaviorPacks;
+        }
+        if (behaviorPacks.length > 0) {
+            infoPacket.hasAddonPacks = true;
+        }
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
     }

@@ -117,12 +117,12 @@ public class ResourcePacksInfoPacket extends DataPacket {
             this.putLLong(entry.getPackSize());
             this.putString(entry.getEncryptionKey()); // encryption key
             if (protocol >= ProtocolInfo.v1_2_0) {
-                this.putString(""); // sub-pack name
+                this.putString(entry.getSubPackName()); // sub-pack name
             }
             if (protocol > ProtocolInfo.v1_5_0) {
                 this.putString(!"".equals(entry.getEncryptionKey()) ? entry.getPackId().toString() : ""); // content identity
                 if (protocol >= ProtocolInfo.v1_9_0) {
-                    this.putBoolean(false); // scripting
+                    this.putBoolean(entry.usesScripting());
                     if (protocol >= ProtocolInfo.v1_16_200) {
                         if (protocol >= ProtocolInfo.v1_21_20) {
                             this.putBoolean(entry.isAddonPack());
