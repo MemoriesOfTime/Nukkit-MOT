@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockWater;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.entity.CollisionHelper;
 import cn.nukkit.entity.data.ByteEntityData;
 import cn.nukkit.entity.data.FloatEntityData;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
@@ -27,6 +28,7 @@ import cn.nukkit.network.protocol.SetEntityLinkPacket;
 import cn.nukkit.network.protocol.SetEntityMotionPacket;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by yescallop on 2016/2/13.
@@ -191,7 +193,10 @@ public class EntityBoat extends EntityVehicle {
 
         if (this.age % 5 == 0) {
             if (!this.passengers.isEmpty() && this.passengers.get(0) instanceof Player) {
-                Block[] blocks = this.level.getCollisionBlocks(this.getBoundingBox().grow(0.1, 0.3, 0.1));
+                List<Block> blocks = CollisionHelper.getCollisionBlocks(
+                        this.level,
+                        this.getBoundingBox().grow(0.1, 0.3, 0.1)
+                );
                 for (Block b : blocks) {
                     if (b.getId() == Block.LILY_PAD) {
                         this.level.setBlockAt((int) b.x, (int) b.y, (int) b.z, 0, 0);

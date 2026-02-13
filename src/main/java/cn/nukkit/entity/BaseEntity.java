@@ -30,6 +30,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -411,15 +412,21 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         double movY = dy;
         double movZ = dz * moveMultiplier;
 
-        AxisAlignedBB[] list = this.level.getCollisionCubes(this, this.boundingBox.addCoord(dx, dy, dz), false);
+        List<AxisAlignedBB> list = CollisionHelper.getCollisionCubes(
+                this.level,
+                this,
+                this.boundingBox.addCoord(dx, dy, dz),
+                false,
+                false
+        );
 
-        for (AxisAlignedBB bb : list) {
-            dx = bb.calculateXOffset(this.boundingBox, dx);
+        for (AxisAlignedBB boundingBox : list) {
+            dx = boundingBox.calculateXOffset(this.boundingBox, dx);
         }
         this.boundingBox.offset(dx, 0, 0);
 
-        for (AxisAlignedBB bb : list) {
-            dz = bb.calculateZOffset(this.boundingBox, dz);
+        for (AxisAlignedBB boundingBox : list) {
+            dz = boundingBox.calculateZOffset(this.boundingBox, dz);
         }
         this.boundingBox.offset(0, 0, dz);
 
@@ -735,7 +742,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     @Override
     protected void checkBlockCollision() {
-        for (Block block : this.getCollisionBlocks()) {
+        for (Block block : getCollisionHelper().getCollisionBlocks()) {
             block.onEntityCollide(this);
         }
 
