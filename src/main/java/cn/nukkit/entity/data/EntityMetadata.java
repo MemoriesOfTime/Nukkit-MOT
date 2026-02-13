@@ -1,5 +1,6 @@
 package cn.nukkit.entity.data;
 
+import cn.nukkit.entity.Entity;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.math.Vector3f;
@@ -46,6 +47,15 @@ public class EntityMetadata {
     }
 
     public EntityMetadata put(EntityData data) {
+        // 确保 LongEntityData 的 dataVersions 被正确初始化
+        if (data instanceof LongEntityData longData) {
+            int id = data.getId();
+            if (id == Entity.DATA_FLAGS && (longData.dataVersions == null || longData.dataVersions.length != 3)) {
+                longData.dataVersions = convertFlagsToDataVersions(longData.getData());
+            } else if (id == Entity.DATA_FLAGS_EXTENDED && (longData.dataVersions == null || longData.dataVersions.length != 1)) {
+                longData.dataVersions = convertExtendedFlagsToDataVersions(longData.getData());
+            }
+        }
         this.map.put(data.getId(), data);
         return this;
     }
@@ -107,7 +117,59 @@ public class EntityMetadata {
     }
 
     public EntityMetadata putLong(int id, long value) {
-        return this.put(new LongEntityData(id, value));
+        LongEntityData data = new LongEntityData(id, value);
+        if (id == Entity.DATA_FLAGS) {
+            data.dataVersions = convertFlagsToDataVersions(value);
+        } else if (id == Entity.DATA_FLAGS_EXTENDED) {
+            data.dataVersions = convertExtendedFlagsToDataVersions(value);
+        }
+        return this.put(data);
+    }
+
+    /**
+     * 将当前版本的 DATA_FLAGS 值转换为多版本兼容的 dataVersions 数组
+     * @param currentFlags 当前版本的标志位值
+     * @return long[3] = {protocol < 223, protocol 223~290, protocol 291+}
+     */
+    private static long[] convertFlagsToDataVersions(long currentFlags) {
+        if (currentFlags == 0L) {
+            return new long[]{0L, 0L, 0L};
+        }
+        long data137 = 0L; // < v1_2_13 (protocol < 223)
+        long data223 = 0L; // v1_2_13 ~ v1_7_0 (protocol 223~290)
+        long data291 = 0L; // v1_7_0+ (protocol 291+)
+
+        for (int id = 0; id < 64; id++) {
+            if ((currentFlags & (1L << id)) != 0) {
+                int id291 = id > 46 ? id - 1 : id;
+                int id223 = id291 > 30 ? id291 - 1 : id291;
+                int id137 = (id223 >= 23 && id223 < 43) || id223 >= 46 ? id223 - 1 : id223;
+
+                data291 |= 1L << id291;
+                data223 |= 1L << id223;
+                data137 |= 1L << id137;
+            }
+        }
+        return new long[]{data137, data223, data291};
+    }
+
+    /**
+     * 将当前版本的 DATA_FLAGS_EXTENDED 值转换为多版本兼容的 dataVersions 数组
+     * @param currentFlags 当前版本的标志位值
+     * @return long[1] = {protocol 291+}
+     */
+    private static long[] convertExtendedFlagsToDataVersions(long currentFlags) {
+        if (currentFlags == 0L) {
+            return new long[]{0L};
+        }
+        long data291 = 0L;
+        for (int id = 0; id < 64; id++) {
+            if ((currentFlags & (1L << id)) != 0) {
+                int id291 = id > 46 ? id - 1 : id;
+                data291 |= 1L << id291;
+            }
+        }
+        return new long[]{data291};
     }
 
     public EntityMetadata putFloat(int id, float value) {

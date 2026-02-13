@@ -133,7 +133,7 @@ public class ZippedResourcePackLoader implements ResourcePackLoader {
         }
         for (File file : getFiles) {
             if (file.isDirectory()) {
-                return getDirectoryFiles(file);
+                files.addAll(getDirectoryFiles(file));
             } else {
                 files.add(file);
             }

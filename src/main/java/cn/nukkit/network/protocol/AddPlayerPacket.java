@@ -35,6 +35,7 @@ public class AddPlayerPacket extends DataPacket {
     public float speedZ;
     public float pitch;
     public float yaw;
+    public float headYaw = -1;
     public Item item;
     /**
      * v1.18.30 and above
@@ -68,7 +69,7 @@ public class AddPlayerPacket extends DataPacket {
         this.putVector3f(this.speedX, this.speedY, this.speedZ);
         this.putLFloat(this.pitch);
         this.putLFloat(this.yaw);
-        this.putLFloat(this.yaw);
+        this.putLFloat(this.headYaw == -1 ? this.yaw : this.headYaw);
         this.putSlot(gameVersion, this.item);
         if (protocol >= ProtocolInfo.v1_18_30) {
             this.putVarInt(this.gameType);

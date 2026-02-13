@@ -14,7 +14,7 @@ public class DebugText extends DebugShape {
     String text;
 
     public DebugText(long id, int dimension, @Nullable Vector3f position, @Nullable Float scale, @Nullable Vector3f rotation, @Nullable Float totalTimeLeft, @Nullable Color color, String text) {
-        super(id, dimension, position, scale, rotation, totalTimeLeft, color);
+        super(id, dimension, position, scale, rotation, totalTimeLeft, color, null);
         this.text = text;
     }
 

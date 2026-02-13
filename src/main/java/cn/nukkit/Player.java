@@ -1581,6 +1581,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     public boolean awardAchievement(String achievementId) {
+        if (!this.server.achievementsEnabled) {
+            return false;
+        }
+
         Achievement achievement = Achievement.achievements.get(achievementId);
 
         if (achievement == null || hasAchievement(achievementId)) {
@@ -2980,7 +2984,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         ResourcePacksInfoPacket infoPacket = new ResourcePacksInfoPacket();
         infoPacket.resourcePackEntries = this.server.getResourcePackManager().getResourceStack(this.gameVersion);
-        infoPacket.behaviourPackEntries = this.server.getResourcePackManager().getBehaviorStack(this.gameVersion);
+        ResourcePack[] behaviorPacks = this.server.getResourcePackManager().getBehaviorStack(this.gameVersion);
+        if (this.protocol >= ProtocolInfo.v1_21_30) {
+            // Since v1.21.30, behaviour packs are merged into the resource pack list
+            ResourcePack[] resourcePacks = infoPacket.resourcePackEntries;
+            ResourcePack[] merged = new ResourcePack[resourcePacks.length + behaviorPacks.length];
+            System.arraycopy(resourcePacks, 0, merged, 0, resourcePacks.length);
+            System.arraycopy(behaviorPacks, 0, merged, resourcePacks.length, behaviorPacks.length);
+            infoPacket.resourcePackEntries = merged;
+        } else {
+            infoPacket.behaviourPackEntries = behaviorPacks;
+        }
+        if (behaviorPacks.length > 0) {
+            infoPacket.hasAddonPacks = true;
+        }
         infoPacket.mustAccept = this.server.getForceResources();
         this.dataPacket(infoPacket);
     }
@@ -4288,12 +4305,12 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 animatePacket.eid = this.getId();
                 animatePacket.action = animationEvent.getAnimationType();
                 for (Player player : this.getViewers().values()) {
-                    if (player.protocol >= ProtocolInfo.v1_21_130_28 && this.protocol < ProtocolInfo.v1_21_130_28) {
-                        // todo: when players of lower version rides on it, their row actions leads to unknown error for players of higher version
+                    // Skip row actions from lower version players to higher version viewers (causes unknown error)
+                    if (player.protocol >= ProtocolInfo.v1_21_130_28 && this.protocol < ProtocolInfo.v1_21_130_28
+                            && (animation == AnimatePacket.Action.ROW_RIGHT || animation == AnimatePacket.Action.ROW_LEFT)) {
                         continue;
-                    } else {
-                        player.dataPacket(packet);
                     }
+                    player.dataPacket(packet);
                 }
                 break;
             case ProtocolInfo.ENTITY_EVENT_PACKET:
@@ -4768,22 +4785,41 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                         if (this.level.useItemOn(blockVector.asVector3(), inventory.getItemInHand(), face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this) != null) {
                                             break packetswitch;
                                         }
-                                    } else if (inventory.getItemInHand().equals(useItemData.itemInHand)) {
-                                        Item i = inventory.getItemInHand();
-                                        Item oldItem = i.clone();
-                                        if ((i = this.level.useItemOn(blockVector.asVector3(), i, face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this)) != null) {
-                                            if (!i.equals(oldItem) || i.getCount() != oldItem.getCount()) {
-                                                if (oldItem.getId() == i.getId() || i.getId() == 0) {
-                                                    inventory.setItemInHand(i);
-                                                } else {
-                                                    server.getLogger().debug("Tried to set item " + i.getId() + " but " + this.username + " had item " + oldItem.getId() + " in their hand slot");
-                                                }
-                                                inventory.sendHeldItem(this.getViewers().values());
-                                            }
-                                            break packetswitch;
-                                        }
                                     } else {
-                                        this.needSendHeldItem = true;
+                                        Item serverItem = inventory.getItemInHand();
+                                        Item clientItem = useItemData.itemInHand;
+
+                                        // 默认严格检查（equals 不检查数量，所以客户端预测消耗减少数量的情况会自动通过）
+                                        boolean canProceed = serverItem.equals(clientItem);
+
+                                        // 特殊情况：客户端预测完全消耗（变成空气）
+                                        // 条件：服务端是可激活物品且数量为1，客户端是空气
+                                        if (!canProceed && clientItem.isNull()
+                                                && serverItem.getCount() == 1
+                                                && serverItem.canBeActivated()) {
+                                            canProceed = true;
+                                        }
+
+                                        if (canProceed) {
+                                            Item i = serverItem;
+                                            Item oldItem = i.clone();
+                                            if ((i = this.level.useItemOn(blockVector.asVector3(), i, face, useItemData.clickPos.x, useItemData.clickPos.y, useItemData.clickPos.z, this)) != null) {
+                                                if (!i.equals(oldItem) || i.getCount() != oldItem.getCount()) {
+                                                    if (oldItem.getId() == i.getId() || i.getId() == 0) {
+                                                        inventory.setItemInHand(i);
+                                                    } else {
+                                                        server.getLogger().debug("Tried to set item " + i.getId() + " but " + this.username + " had item " + oldItem.getId() + " in their hand slot");
+                                                    }
+                                                    inventory.sendHeldItem(this.getViewers().values());
+                                                }
+                                                break packetswitch;
+                                            } else {
+                                                // useItemOn 返回 null（如事件被取消），需要重同步物品到客户端
+                                                this.needSendHeldItem = true;
+                                            }
+                                        } else {
+                                            this.needSendHeldItem = true;
+                                        }
                                     }
                                 }
 
@@ -7414,11 +7450,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             return false;
                         }
 
-                        if (server.achievementsEnabled) {
-                            switch (item.getId()) {
-                                case Item.WOOD, Item.WOOD2 -> this.awardAchievement("mineWood");
-                                case Item.DIAMOND -> this.awardAchievement("diamond");
-                            }
+                        switch (item.getId()) {
+                            case Item.WOOD, Item.WOOD2 -> this.awardAchievement("mineWood");
+                            case Item.DIAMOND -> this.awardAchievement("diamond");
                         }
 
                         TakeItemEntityPacket pk = new TakeItemEntityPacket();

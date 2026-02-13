@@ -1,13 +1,14 @@
 package cn.nukkit.item;
 
 import cn.nukkit.Player;
+import cn.nukkit.block.Block;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.item.EntityExpBottle;
 import cn.nukkit.entity.projectile.EntityEnderEye;
 import cn.nukkit.entity.projectile.EntityEnderPearl;
 import cn.nukkit.entity.projectile.EntityProjectile;
 import cn.nukkit.event.entity.ProjectileLaunchEvent;
 import cn.nukkit.level.Level;
+import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.DoubleTag;
@@ -28,6 +29,12 @@ public abstract class ProjectileItem extends Item {
 
     abstract public float getThrowForce();
 
+    @Override
+    public boolean canBeActivated() {
+        return true;
+    }
+
+    @Override
     public boolean onClickAir(Player player, Vector3 directionVector) {
         Vector3 motion;
 
@@ -87,6 +94,15 @@ public abstract class ProjectileItem extends Item {
         }
 
         return true;
+    }
+
+    /**
+     * 当对着方块右键使用投掷物品时调用
+     * 复用 onClickAir 的投掷逻辑，使投掷物品可以对着方块使用
+     */
+    @Override
+    public boolean onActivate(Level level, Player player, Block block, Block target, BlockFace face, double fx, double fy, double fz) {
+        return this.onClickAir(player, player.getDirectionVector());
     }
 
     protected void correctNBT(CompoundTag nbt) {

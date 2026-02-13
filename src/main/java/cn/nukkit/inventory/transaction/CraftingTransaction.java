@@ -117,7 +117,7 @@ public class CraftingTransaction extends InventoryTransaction {
                 setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
             }
         }*/
-        Recipe recipe = source.getServer().getCraftingManager().matchRecipe(source.protocol, this.inputs, this.primaryOutput, this.secondaryOutputs);
+        Recipe recipe = source.getServer().getCraftingManager().matchRecipe(this.inputs, this.primaryOutput, this.secondaryOutputs);
         if (recipe == null) {
             MultiRecipe multiRecipe = source.getServer().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
             if (multiRecipe != null) {
@@ -166,19 +166,17 @@ public class CraftingTransaction extends InventoryTransaction {
     @Override
     public boolean execute() {
         if (super.execute()) {
-            if (Server.getInstance().achievementsEnabled) {
-                switch (this.primaryOutput.getId()) {
-                    case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
-                    case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
-                    case Item.FURNACE -> source.awardAchievement("buildFurnace");
-                    case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
-                    case Item.BREAD -> source.awardAchievement("makeBread");
-                    case Item.CAKE -> source.awardAchievement("bakeCake");
-                    case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
-                        Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
-                    case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
-                    case Item.DIAMOND -> source.awardAchievement("diamond");
-                }
+            switch (this.primaryOutput.getId()) {
+                case Item.CRAFTING_TABLE -> source.awardAchievement("buildWorkBench");
+                case Item.WOODEN_PICKAXE -> source.awardAchievement("buildPickaxe");
+                case Item.FURNACE -> source.awardAchievement("buildFurnace");
+                case Item.WOODEN_HOE -> source.awardAchievement("buildHoe");
+                case Item.BREAD -> source.awardAchievement("makeBread");
+                case Item.CAKE -> source.awardAchievement("bakeCake");
+                case Item.STONE_PICKAXE, Item.GOLDEN_PICKAXE,
+                    Item.IRON_PICKAXE, Item.DIAMOND_PICKAXE -> source.awardAchievement("buildBetterPickaxe");
+                case Item.WOODEN_SWORD -> source.awardAchievement("buildSword");
+                case Item.DIAMOND -> source.awardAchievement("diamond");
             }
 
             return true;

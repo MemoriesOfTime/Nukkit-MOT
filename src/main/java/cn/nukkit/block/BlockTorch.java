@@ -61,7 +61,7 @@ public class BlockTorch extends BlockFlowable implements Faceable {
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_NORMAL) {
             int side = this.getDamage();
-            if ((side != 0 && !Block.canConnectToFullSolid(this.getSide(BlockFace.fromIndex(faces2[side])))) || (side == 0 && !isSupportValidBelow())) {
+            if (side < 0 || side >= faces2.length || (side != 0 && !Block.canConnectToFullSolid(this.getSide(BlockFace.fromIndex(faces2[side])))) || (side == 0 && !isSupportValidBelow())) {
                 this.getLevel().useBreakOn(this);
                 return Level.BLOCK_UPDATE_NORMAL;
             }

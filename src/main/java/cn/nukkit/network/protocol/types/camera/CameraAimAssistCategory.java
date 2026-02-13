@@ -16,6 +16,10 @@ public class CameraAimAssistCategory {
      * @since v898
      */
     private List<CameraAimAssistPriority> blockTagPriorities = new ObjectArrayList<>();
+    /**
+     * @since v924
+     */
+    private List<CameraAimAssistPriority> entityTypeFamiliesPriorities = new ObjectArrayList<>();
     private Integer entityDefaultPriorities;
     private Integer blockDefaultPriorities;
     public Map<String, Integer> blocktags = new Object2IntArrayMap<>();

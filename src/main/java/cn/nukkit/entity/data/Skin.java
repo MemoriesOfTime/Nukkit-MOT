@@ -11,8 +11,8 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.*;
+import java.util.List;
 
 /**
  * @author MagicDroidX
@@ -53,7 +53,7 @@ public class Skin {
     }
 
     private boolean noPlayFab; // Don't attempt to generate missing play fab id multiple times
-    private String fullSkinId = UUID.randomUUID().toString();
+    private String fullSkinId;
     private String skinId;
     private String playFabId = "";
     private String skinResourcePatch = GEOMETRY_CUSTOM;
@@ -92,11 +92,11 @@ public class Skin {
         String geometryData = this.getGeometryData();
         return skinId != null && !skinId.trim().isEmpty() && skinId.length() < 100 && //skinId
                 skinData != null && skinData.width >= 64 && skinData.height >= 32 &&
-                skinData.data.length >= SINGLE_SKIN_SIZE && skinData.data.length <= MAX_DATA_SIZE && //skinData
+                skinData.data.length >= SINGLE_SKIN_SIZE && (doNotLimitSkinGeometry || skinData.data.length <= MAX_DATA_SIZE) && //skinData
                 ((geometryData != null && !geometryData.isEmpty()) &&
                         (doNotLimitSkinGeometry || geometryData.getBytes(StandardCharsets.UTF_8).length <= MAX_DATA_SIZE)) && //geometryData
-                (capeData == null || capeData.data.length <= MAX_DATA_SIZE) && //capeData
-                (animationData == null || animationData.getBytes(StandardCharsets.UTF_8).length <= MAX_DATA_SIZE) && //animationData
+                (capeData == null || doNotLimitSkinGeometry || capeData.data.length <= MAX_DATA_SIZE) && //capeData
+                (animationData == null || doNotLimitSkinGeometry || animationData.getBytes(StandardCharsets.UTF_8).length <= MAX_DATA_SIZE) && //animationData
                 (playFabId == null || playFabId.length() < 100) && //playFabId
                 (capeId == null || capeId.length() < 100) && //capeId
                 (skinColor == null || skinColor.length() < 100) && //skinColor
@@ -336,7 +336,8 @@ public class Skin {
 
     public String getFullSkinId() {
         if (this.fullSkinId == null) {
-            this.fullSkinId = this.getSkinId() + this.getCapeId();
+            // 非玩家皮肤（NPC等）追加随机后缀，避免网易 ConfirmSkinPacket 导致隐形
+            this.fullSkinId = this.getSkinId() + UUID.randomUUID().toString().substring(0, 8);
             this.noPlayFab = false; // Allow another attempt to generate it using the new id
         }
         return this.fullSkinId;

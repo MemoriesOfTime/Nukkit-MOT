@@ -109,8 +109,22 @@ public class CameraInstructionPacket extends DataPacket {
                     CameraSplineType type = CameraSplineType.values()[buf.getByte()];
                     List<Vector3f> curve = new ArrayList<>();
                     buf.getArray(curve, BinaryStream::getVector3f);
-                    List<Vector2f> progressKeyFrames = new ArrayList<>();
-                    buf.getArray(progressKeyFrames, BinaryStream::getVector2f);
+                    List<CameraSplineInstruction.SplineProgressOption> progressKeyFrames = new ArrayList<>();
+                    if (this.protocol >= ProtocolInfo.v1_26_0) {
+                        // v924+: includes easing function
+                        buf.getArray(progressKeyFrames, buf2 -> {
+                            float value = buf2.getLFloat();
+                            float time = buf2.getLFloat();
+                            CameraEase easingFunc = CameraEase.values()[buf2.getLInt()];
+                            return new CameraSplineInstruction.SplineProgressOption(value, time, easingFunc);
+                        });
+                    } else {
+                        // Pre-v924: only value and time
+                        buf.getArray(progressKeyFrames, buf2 -> {
+                            Vector2f v = buf2.getVector2f();
+                            return new CameraSplineInstruction.SplineProgressOption(v.getX(), v.getY());
+                        });
+                    }
                     List<CameraSplineInstruction.SplineRotationOption> rotationOption = new ArrayList<>();
                     buf.getArray(rotationOption, buf2 -> {
                         Vector3f keyFrameValues = buf2.getVector3f();
@@ -230,7 +244,19 @@ public class CameraInstructionPacket extends DataPacket {
                     buf.putLFloat(splineInstruction.getTotalTime());
                     buf.putByte((byte) splineInstruction.getType().ordinal());
                     buf.putArray(splineInstruction.getCurve(), BinaryStream::putVector3f);
-                    buf.putArray(splineInstruction.getProgressKeyFrames(), BinaryStream::putVector2f);
+                    if (this.protocol >= ProtocolInfo.v1_26_0) {
+                        // v924+: includes easing function
+                        buf.putArray(splineInstruction.getProgressKeyFrames(), (buf2, progress) -> {
+                            buf2.putLFloat(progress.getValue());
+                            buf2.putLFloat(progress.getTime());
+                            buf2.putLInt(progress.getEasingFunc().ordinal());
+                        });
+                    } else {
+                        // Pre-v924: only value and time as Vector2f
+                        buf.putArray(splineInstruction.getProgressKeyFrames(), (buf2, progress) -> {
+                            buf2.putVector2f(progress.getValue(), progress.getTime());
+                        });
+                    }
                     buf.putArray(splineInstruction.getRotationOption(), (buf2, rotationOption) -> {
                         buf2.putVector3f(rotationOption.getKeyFrameValues());
                         buf2.putLFloat(rotationOption.getKeyFrameTimes());
