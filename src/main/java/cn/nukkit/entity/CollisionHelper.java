@@ -1,6 +1,7 @@
 package cn.nukkit.entity;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockID;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
@@ -419,7 +420,7 @@ public record CollisionHelper(Entity entity) {
      */
     public static List<AxisAlignedBB> getCollisionCubes(
             Level level,
-            @Nullable Entity entity,
+            Entity entity,
             AxisAlignedBB boundingBox,
             boolean entities,
             boolean solidEntities
@@ -449,7 +450,10 @@ public record CollisionHelper(Entity entity) {
             for (int x = minX; x <= maxX; ++x) {
                 for (int y = clampedMinY; y <= clampedMaxY; ++y) {
                     Block block = level.getBlock(x, y, z, false);
-                    if (block.getId() != Block.AIR && !block.canPassThrough() && block.collidesWithBB(boundingBox)) {
+                    if (block.getId() == BlockID.BARRIER && entity.canPassThroughBarrier()) {
+                        continue;
+                    }
+                    if (!block.canPassThrough() && block.collidesWithBB(boundingBox)) {
                         AxisAlignedBB blockBB = block.getBoundingBox();
                         if (blockBB != null) {
                             collides.add(blockBB);
