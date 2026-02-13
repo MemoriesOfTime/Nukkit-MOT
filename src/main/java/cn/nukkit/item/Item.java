@@ -13,8 +13,6 @@ import cn.nukkit.item.RuntimeItemMapping.RuntimeEntry;
 import cn.nukkit.item.customitem.CustomItem;
 import cn.nukkit.item.customitem.CustomItemDefinition;
 import cn.nukkit.item.enchantment.Enchantment;
-import cn.nukkit.level.BlockPalette;
-import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
@@ -24,7 +22,9 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemCategory;
 import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemData;
 import cn.nukkit.network.protocol.types.inventory.creative.CreativeItemGroup;
-import cn.nukkit.utils.*;
+import cn.nukkit.utils.Binary;
+import cn.nukkit.utils.OK;
+import cn.nukkit.utils.Utils;
 import com.google.common.base.Preconditions;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -517,174 +517,31 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         clearCreativeItems();
     }
 
-    private static final CreativeItems creative113 = new CreativeItems();
-    private static final CreativeItems creative137 = new CreativeItems();
-    private static final CreativeItems creative274 = new CreativeItems();
-    private static final CreativeItems creative291 = new CreativeItems();
-    private static final CreativeItems creative313 = new CreativeItems();
-    private static final CreativeItems creative332 = new CreativeItems();
-    private static final CreativeItems creative340 = new CreativeItems();
-    private static final CreativeItems creative354 = new CreativeItems();
-    private static final CreativeItems creative389 = new CreativeItems();
-    private static final CreativeItems creative407 = new CreativeItems();
-    private static final CreativeItems creative440 = new CreativeItems();
-    private static final CreativeItems creative448 = new CreativeItems();
-    private static final CreativeItems creative465 = new CreativeItems();
-    private static final CreativeItems creative471 = new CreativeItems();
-    private static final CreativeItems creative475 = new CreativeItems();
-    private static final CreativeItems creative486 = new CreativeItems();
-    private static final CreativeItems creative503 = new CreativeItems();
-    private static final CreativeItems creative527 = new CreativeItems();
-    private static final CreativeItems creative534 = new CreativeItems();
-    private static final CreativeItems creative544 = new CreativeItems();
-    private static final CreativeItems creative560 = new CreativeItems();
-    private static final CreativeItems creative567 = new CreativeItems();
-    private static final CreativeItems creative575 = new CreativeItems();
-    private static final CreativeItems creative582 = new CreativeItems();
-    private static final CreativeItems creative589 = new CreativeItems();
-    private static final CreativeItems creative594 = new CreativeItems();
-    private static final CreativeItems creative618 = new CreativeItems();
-    private static final CreativeItems creative622 = new CreativeItems();
-    private static final CreativeItems creative630 = new CreativeItems();
-    private static final CreativeItems creative649 = new CreativeItems();
-    private static final CreativeItems creative662 = new CreativeItems();
-    private static final CreativeItems creative671 = new CreativeItems();
-    private static final CreativeItems creative685 = new CreativeItems();
-    private static final CreativeItems creative712 = new CreativeItems();
-    private static final CreativeItems creative729 = new CreativeItems();
-    private static final CreativeItems creative748 = new CreativeItems();
-    private static final CreativeItems creative766 = new CreativeItems();
-    private static final CreativeItems creative776 = new CreativeItems();
-    private static final CreativeItems creative786 = new CreativeItems();
-    private static final CreativeItems creative800 = new CreativeItems();
-    private static final CreativeItems creative818 = new CreativeItems();
-    private static final CreativeItems creative819 = new CreativeItems();
-    private static final CreativeItems creative827 = new CreativeItems();
-    private static final CreativeItems creative844 = new CreativeItems();
-    private static final CreativeItems creative859 = new CreativeItems();
-    private static final CreativeItems creative898 = new CreativeItems();
-
-    private static final CreativeItems creative_netease_630 = new CreativeItems();
-    private static final CreativeItems creative_netease_686 = new CreativeItems();
-    private static final CreativeItems creative_netease_766 = new CreativeItems();
+    private static final CreativeItems CREATIVE_ITEMS = new CreativeItems();
 
     public static void initCreativeItems() {
         Server.getInstance().getLogger().debug("Loading creative items...");
         isInitializingCreativeItems = true;
         clearCreativeItems();
 
-        // Creative inventory for oldest versions
-        registerCreativeItems(GameVersion.V1_1_0);
-        registerCreativeItems(GameVersion.V1_2_0);
-        registerCreativeItems(GameVersion.V1_5_0);
-        registerCreativeItems(GameVersion.V1_7_0);
-        registerCreativeItems(GameVersion.V1_8_0);
-        registerCreativeItems(GameVersion.V1_9_0);
-        registerCreativeItems(GameVersion.V1_10_0);
-        registerCreativeItems(GameVersion.V1_11_0);
-        registerCreativeItems(GameVersion.V1_14_0);
-        registerCreativeItems(GameVersion.V1_16_0);
-
-        // New creative items mapping
-        registerCreativeItemsNew(GameVersion.V1_17_0, GameVersion.V1_17_0, creative440);
-        registerCreativeItemsNew(GameVersion.V1_17_10, GameVersion.V1_17_10, creative448);
-        registerCreativeItemsNew(GameVersion.V1_17_30, GameVersion.V1_17_30, creative465);
-        registerCreativeItemsNew(GameVersion.V1_17_30, GameVersion.V1_17_40, creative471);
-        registerCreativeItemsNew(GameVersion.V1_18_0, GameVersion.V1_18_0, creative475);
-        registerCreativeItemsNew(GameVersion.V1_18_10, GameVersion.V1_18_10, creative486);
-        registerCreativeItemsNew(GameVersion.V1_18_30, GameVersion.V1_18_30, creative503);
-        registerCreativeItemsNew(GameVersion.V1_19_0, GameVersion.V1_19_0, creative527);
-        registerCreativeItemsNew(GameVersion.V1_19_0, GameVersion.V1_19_10, creative534);
-        registerCreativeItemsNew(GameVersion.V1_19_20, GameVersion.V1_19_20, creative544);
-        registerCreativeItemsNew(GameVersion.V1_19_50, GameVersion.V1_19_50, creative560);
-        registerCreativeItemsNew(GameVersion.V1_19_60, GameVersion.V1_19_60, creative567);
-        registerCreativeItemsNew(GameVersion.V1_19_70, GameVersion.V1_19_70, creative575);
-        registerCreativeItemsNew(GameVersion.V1_19_80, GameVersion.V1_19_80, creative582);
-        registerCreativeItemsNew(GameVersion.V1_20_0, GameVersion.V1_20_0, creative589);
-        registerCreativeItemsNew(GameVersion.V1_20_10, GameVersion.V1_20_10, creative594);
-        registerCreativeItemsNew(GameVersion.V1_20_30, GameVersion.V1_20_30, creative618);
-        registerCreativeItemsNew(GameVersion.V1_20_40, GameVersion.V1_20_40, creative622);
-        registerCreativeItemsNew(GameVersion.V1_20_50, GameVersion.V1_20_50, creative630);
-        registerCreativeItemsNew(GameVersion.V1_20_60, GameVersion.V1_20_60, creative649);
-        registerCreativeItemsNew(GameVersion.V1_20_70, GameVersion.V1_20_70, creative662);
-        registerCreativeItemsNew(GameVersion.V1_20_80, GameVersion.V1_20_80, creative671);
-        registerCreativeItemsNew(GameVersion.V1_21_0, GameVersion.V1_21_0, creative685);
-        registerCreativeItemsNew(GameVersion.V1_21_20, GameVersion.V1_21_20, creative712);
-        registerCreativeItemsNew(GameVersion.V1_21_30, GameVersion.V1_21_30, creative729);
-        registerCreativeItemsNew(GameVersion.V1_21_40, GameVersion.V1_21_40, creative748);
-        registerCreativeItemsNew(GameVersion.V1_21_50, GameVersion.V1_21_50, creative766);
-        registerCreativeItemsNew(GameVersion.V1_21_60, GameVersion.V1_21_60, creative776);
-        registerCreativeItemsNew(GameVersion.V1_21_70, GameVersion.V1_21_70, creative786);
-        registerCreativeItemsNew(GameVersion.V1_21_80, GameVersion.V1_21_80, creative800);
-        registerCreativeItemsNew(GameVersion.V1_21_90, GameVersion.V1_21_90, creative818);
-        registerCreativeItemsNew(GameVersion.V1_21_93, GameVersion.V1_21_93, creative819);
-        registerCreativeItemsNew(GameVersion.V1_21_100, GameVersion.V1_21_100, creative827);
-        registerCreativeItemsNew(GameVersion.V1_21_110, GameVersion.V1_21_110, creative844);
-        registerCreativeItemsNew(GameVersion.V1_21_120, GameVersion.V1_21_110, creative859);
-        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_110, creative898);
-
-        registerCreativeItemsNew(GameVersion.V1_20_50_NETEASE, GameVersion.V1_20_50_NETEASE, creative_netease_630);
-        registerCreativeItemsNew(GameVersion.V1_21_2_NETEASE, GameVersion.V1_21_2_NETEASE, creative_netease_686);
-        registerCreativeItemsNew(GameVersion.V1_21_50_NETEASE, GameVersion.V1_21_50_NETEASE, creative_netease_766);
-        //TODO Multiversion 添加新版本支持时修改这里
+        // Only load the latest version; runtime filtering via isSupportedOn per protocol
+        registerCreativeItemsNew(GameVersion.V1_21_130, GameVersion.V1_21_110, CREATIVE_ITEMS);
 
         isInitializingCreativeItems = false;
         creativeItemsInitialized = true;
-    }
-
-    private static void registerCreativeItems(GameVersion gameVersion) {
-        for (Map map : new Config(Config.YAML).loadFromStream(Server.class.getClassLoader().getResourceAsStream("creativeitems" + gameVersion.getProtocol() + ".json")).getMapList("items")) {
-            try {
-                Item item = fromJson(map);
-                if (Utils.hasItemOrBlock(item.getId())) { //只添加nk内部已实现的物品/方块
-                    addCreativeItem(gameVersion, item);
-                }
-            } catch (Exception e) {
-                MainLogger.getLogger().logException(e);
-            }
-        }
     }
 
     private static void registerCreativeItemsNew(GameVersion gameVersion, GameVersion blockPaletteVersion, CreativeItems creativeItems) {
         int protocol = gameVersion.getProtocol();
         JsonObject root;
         JsonArray itemsArray;
-        String file;
-        boolean useNetEaseConversion = false;
-
-        if (gameVersion.isNetEase()) {
-            String neteaseFile = "CreativeItems/creative_items_netease_" + protocol + ".json";
-            InputStream neteaseStream = Server.class.getClassLoader().getResourceAsStream(neteaseFile);
-            if (neteaseStream != null) {
-                file = neteaseFile;
-                try {
-                    neteaseStream.close();
-                } catch (Exception ignored) {
-                }
-            } else {
-                log.debug("NetEase creative items file not found: {}, will convert from standard version", neteaseFile);
-                file = protocol >= ProtocolInfo.v1_21_0 ? "CreativeItems/creative_items_" + protocol + ".json" : "creativeitems" + protocol + ".json";
-                useNetEaseConversion = true;
-            }
-        } else if (protocol >= ProtocolInfo.v1_21_0) {
-            file = "CreativeItems/creative_items_" + protocol + ".json";
-        } else {
-            file = "creativeitems" + protocol + ".json";
-        }
+        String file = "CreativeItems/creative_items_" + protocol + ".json";
 
         try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(file)) {
             root = JsonParser.parseReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).getAsJsonObject();
             itemsArray = root.getAsJsonArray("items");
             if (itemsArray.isEmpty()) {
                 throw new IllegalStateException("Empty items");
-            }
-
-            if (useNetEaseConversion) {
-                BlockPalette standardPalette = GlobalBlockPalette.getPaletteByProtocol(GameVersion.byProtocol(protocol, false));
-                BlockPalette neteasePalette = GlobalBlockPalette.getPaletteByProtocol(blockPaletteVersion);
-                itemsArray = NetEaseConverter.convertCreativeItems(itemsArray, standardPalette, neteasePalette);
-                root.add("items", itemsArray);
-                log.info("Converted {} creative items to NetEase version", itemsArray.size());
             }
         } catch (Exception e) {
             throw new AssertionError("Error while loading creative items for protocol " + protocol, e);
@@ -741,57 +598,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static void clearCreativeItems() {
-        Item.creative113.clear();
-        Item.creative137.clear();
-        Item.creative274.clear();
-        Item.creative291.clear();
-        Item.creative313.clear();
-        Item.creative332.clear();
-        Item.creative340.clear();
-        Item.creative354.clear();
-        Item.creative389.clear();
-        Item.creative407.clear();
-        Item.creative440.clear();
-        Item.creative448.clear();
-        Item.creative465.clear();
-        Item.creative471.clear();
-        Item.creative475.clear();
-        Item.creative486.clear();
-        Item.creative503.clear();
-        Item.creative527.clear();
-        Item.creative534.clear();
-        Item.creative544.clear();
-        Item.creative560.clear();
-        Item.creative567.clear();
-        Item.creative575.clear();
-        Item.creative582.clear();
-        Item.creative589.clear();
-        Item.creative594.clear();
-        Item.creative618.clear();
-        Item.creative622.clear();
-        Item.creative630.clear();
-        Item.creative649.clear();
-        Item.creative662.clear();
-        Item.creative671.clear();
-        Item.creative685.clear();
-        Item.creative712.clear();
-        Item.creative729.clear();
-        Item.creative748.clear();
-        Item.creative766.clear();
-        Item.creative776.clear();
-        Item.creative786.clear();
-        Item.creative800.clear();
-        Item.creative818.clear();
-        Item.creative819.clear();
-        Item.creative827.clear();
-        Item.creative844.clear();
-        Item.creative859.clear();
-        Item.creative898.clear();
-
-        Item.creative_netease_630.clear();
-        Item.creative_netease_686.clear();
-        Item.creative_netease_766.clear();
-        //TODO Multiversion 添加新版本支持时修改这里
+        CREATIVE_ITEMS.clear();
     }
 
     public static ArrayList<Item> getCreativeItems() {
@@ -801,271 +608,77 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
 
     @Deprecated
     public static ArrayList<Item> getCreativeItems(int protocol) {
-        return new ArrayList<>(getCreativeItemsAndGroups(protocol).getItems());
+        return getCreativeItems(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
     }
 
     public static ArrayList<Item> getCreativeItems(GameVersion gameVersion) {
-        return new ArrayList<>(getCreativeItemsAndGroups(gameVersion).getItems());
+        return new ArrayList<>(getCreativeItemsAndGroups().getItems(gameVersion));
     }
 
     public static CreativeItems getCreativeItemsAndGroups() {
-        Server.mvw("Item#getCreativeItemsAndGroups()");
-        return getCreativeItemsAndGroups(GameVersion.getLastVersion());
+        return CREATIVE_ITEMS;
     }
 
+    /**
+     * @deprecated Use {@link #getCreativeItemsAndGroups()} instead, version parameter is no longer used
+     */
     @Deprecated
     public static CreativeItems getCreativeItemsAndGroups(int protocol) {
-        return getCreativeItemsAndGroups(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode));
+        return CREATIVE_ITEMS;
     }
 
+    /**
+     * @deprecated Use {@link #getCreativeItemsAndGroups()} instead, version parameter is no longer used
+     */
+    @Deprecated
     public static CreativeItems getCreativeItemsAndGroups(GameVersion protocol) {
-        switch (protocol) {
-            case V1_1_0:
-                return Item.creative113;
-            case V1_2_0:
-            case V1_2_5_11:
-            case V1_2_5:
-            case V1_2_6:
-            case V1_2_7:
-            case V1_2_10:
-            case V1_2_13:
-            case V1_2_13_11:
-            case V1_4_0:
-                return Item.creative137;
-            case V1_5_0:
-                return Item.creative274;
-            case V1_6_0_5:
-            case V1_6_0:
-            case V1_7_0:
-                return Item.creative291;
-            case V1_8_0:
-                return Item.creative313;
-            case V1_9_0:
-                return Item.creative332;
-            case V1_10_0:
-                return Item.creative340;
-            case V1_11_0:
-            case V1_12_0:
-            case V1_13_0:
-                return Item.creative354;
-            case V1_14_0:
-            case V1_14_60:
-                return Item.creative389;
-            case V1_16_0:
-            case V1_16_20:
-            case V1_16_100_0:
-            case V1_16_100_51:
-            case V1_16_100_52:
-            case V1_16_100:
-            case V1_16_200_51:
-            case V1_16_200:
-            case V1_16_210_50:
-            case V1_16_210_53:
-            case V1_16_210:
-            case V1_16_220:
-            case V1_16_230_50:
-            case V1_16_230:
-            case V1_16_230_54:
-                return Item.creative407;
-            case V1_17_0:
-                return Item.creative440;
-            case V1_17_10:
-            case V1_17_20_20:
-                return Item.creative448;
-            case V1_17_30:
-                return Item.creative465;
-            case V1_17_40:
-                return Item.creative471;
-            case V1_18_0:
-                return Item.creative475;
-            case V1_18_10_26:
-            case V1_18_10:
-                return Item.creative486;
-            case V1_18_30:
-                return Item.creative503;
-            case V1_19_0_29:
-            case V1_19_0_31:
-            case V1_19_0:
-                return Item.creative527;
-            case V1_19_10:
-                return Item.creative534;
-            case V1_19_20:
-            case V1_19_21:
-            case V1_19_30_23:
-            case V1_19_30:
-            case V1_19_40:
-                return Item.creative544;
-            case V1_19_50:
-                return Item.creative560;
-            case V1_19_60:
-            case V1_19_63:
-                return Item.creative567;
-            case V1_19_70_24:
-            case V1_19_70:
-                return Item.creative575;
-            case V1_19_80:
-                return Item.creative582;
-            case V1_20_0_23:
-            case V1_20_0:
-                return Item.creative589;
-            case V1_20_10_21:
-            case V1_20_10:
-                return Item.creative594;
-            case V1_20_30_24:
-            case V1_20_30:
-                return Item.creative618;
-            case V1_20_40:
-                return Item.creative622;
-            case V1_20_50:
-                return Item.creative630;
-            case V1_20_60:
-                return Item.creative649;
-            case V1_20_70:
-                return Item.creative662;
-            case V1_20_80:
-                return Item.creative671;
-            case V1_21_0:
-            case V1_21_2:
-                return Item.creative685;
-            case V1_21_20:
-                return Item.creative712;
-            case V1_21_30:
-                return Item.creative729;
-            case V1_21_40:
-                return Item.creative748;
-            case V1_21_50_26:
-            case V1_21_50:
-                return Item.creative766;
-            case V1_21_60:
-                return Item.creative776;
-            case V1_21_70_24:
-            case V1_21_70:
-                return Item.creative786;
-            case V1_21_80:
-                return Item.creative800;
-            case V1_21_90:
-                return Item.creative818;
-            case V1_21_93:
-                return Item.creative819;
-            case V1_21_110_26:
-            case V1_21_100:
-                return Item.creative827;
-            case V1_21_110:
-                return Item.creative844;
-            case V1_21_120:
-            case V1_21_124:
-                return Item.creative859;
-            case V1_21_130_28:
-            case V1_21_130:
-            case V1_26_0:
-                return Item.creative898;
-            // NetEase
-            case V1_20_50_NETEASE:
-                return Item.creative_netease_630;
-            case V1_21_2_NETEASE:
-                return Item.creative_netease_686;
-            case V1_21_50_NETEASE:
-                return Item.creative_netease_766;
-            // TODO Multiversion
-            default:
-                throw new IllegalArgumentException("Tried to get creative items for unsupported protocol version: " + protocol);
-        }
+        return CREATIVE_ITEMS;
     }
 
     public static void addCreativeItem(Item item) {
-        Server.mvw("Item#addCreativeItem(Item)");
-        addCreativeItem(GameVersion.V1_21_130, item);
+        addCreativeItem(item, CreativeItemCategory.ITEMS, "");
+    }
+
+    public static void addCreativeItem(Item item, CreativeItemCategory category, String group) {
+        if (!isInitializingCreativeItems && !creativeItemsInitialized) {
+            PENDING_CREATIVE_ITEMS.put(item.getId() + "_" + item.getDamage(),
+                    new PendingCreativeItem(item.clone(), category, group));
+        }
+        CREATIVE_ITEMS.add(item.clone(), category, group);
     }
 
     @Deprecated
     public static void addCreativeItem(int protocol, Item item) {
-        addCreativeItem(protocol, item, CreativeItemCategory.ITEMS, "");
+        addCreativeItem(item);
     }
 
     @Deprecated
     public static void addCreativeItem(int protocol, Item item, CreativeItemCategory category, String group) {
-        addCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item, category, group);
+        addCreativeItem(item, category, group);
     }
 
+    @Deprecated
     public static void addCreativeItem(GameVersion protocol, Item item) {
-        addCreativeItem(protocol, item, CreativeItemCategory.ITEMS, "");
+        addCreativeItem(item);
     }
 
+    @Deprecated
     public static void addCreativeItem(GameVersion protocol, Item item, CreativeItemCategory category, String group) {
-        if (!isInitializingCreativeItems && !creativeItemsInitialized) {
-            String identifier = item.getId() + "_" + item.getDamage();
-            //TODO 暂不考虑多版本，后续不再使用多个Item.CreativeItems实现多版本
-            PENDING_CREATIVE_ITEMS.put(identifier, new PendingCreativeItem(item.clone(), category, group));
-        }
-
-        switch (protocol) { // NOTE: Not all versions are supposed to be here
-            case V1_1_0 -> Item.creative113.add(item.clone(), category, group);
-            case V1_2_0 -> Item.creative137.add(item.clone(), category, group);
-            case V1_5_0 -> Item.creative274.add(item.clone(), category, group);
-            case V1_7_0 -> Item.creative291.add(item.clone(), category, group);
-            case V1_8_0 -> Item.creative313.add(item.clone(), category, group);
-            case V1_9_0 -> Item.creative332.add(item.clone(), category, group);
-            case V1_10_0 -> Item.creative340.add(item.clone(), category, group);
-            case V1_11_0 -> Item.creative354.add(item.clone(), category, group);
-            case V1_14_0 -> Item.creative389.add(item.clone(), category, group);
-            case V1_16_0 -> Item.creative407.add(item.clone(), category, group);
-            case V1_17_0 -> Item.creative440.add(item.clone(), category, group);
-            case V1_17_10 -> Item.creative448.add(item.clone(), category, group);
-            case V1_17_30 -> Item.creative465.add(item.clone(), category, group);
-            case V1_17_40 -> Item.creative471.add(item.clone(), category, group);
-            case V1_18_10 -> Item.creative486.add(item.clone(), category, group);
-            case V1_18_0 -> Item.creative475.add(item.clone(), category, group);
-            case V1_18_30 -> Item.creative503.add(item.clone(), category, group);
-            case V1_19_0 -> Item.creative527.add(item.clone(), category, group);
-            case V1_19_10 -> Item.creative534.add(item.clone(), category, group);
-            case V1_19_20 -> Item.creative544.add(item.clone(), category, group);
-            case V1_19_50 -> Item.creative560.add(item.clone(), category, group);
-            case V1_19_60 -> Item.creative567.add(item.clone(), category, group);
-            case V1_19_70 -> Item.creative575.add(item.clone(), category, group);
-            case V1_19_80 -> Item.creative582.add(item.clone(), category, group);
-            case V1_20_0 -> Item.creative589.add(item.clone(), category, group);
-            case V1_20_10 -> Item.creative594.add(item.clone(), category, group);
-            case V1_20_30 -> Item.creative618.add(item.clone(), category, group);
-            case V1_20_40 -> Item.creative622.add(item.clone(), category, group);
-            case V1_20_50 -> Item.creative630.add(item.clone(), category, group);
-            case V1_20_60 -> Item.creative649.add(item.clone(), category, group);
-            case V1_20_70 -> Item.creative662.add(item.clone(), category, group);
-            case V1_20_80 -> Item.creative671.add(item.clone(), category, group);
-            case V1_21_0 -> Item.creative685.add(item.clone(), category, group);
-            case V1_21_20 -> Item.creative712.add(item.clone(), category, group);
-            case V1_21_30 -> Item.creative729.add(item.clone(), category, group);
-            case V1_21_40 -> Item.creative748.add(item.clone(), category, group);
-            case V1_21_50 -> Item.creative766.add(item.clone(), category, group);
-            case V1_21_60 -> Item.creative776.add(item.clone(), category, group);
-            case V1_21_70 -> Item.creative786.add(item.clone(), category, group);
-            case V1_21_80 -> Item.creative800.add(item.clone(), category, group);
-            case V1_21_90 -> Item.creative818.add(item.clone(), category, group);
-            case V1_21_93 -> Item.creative819.add(item.clone(), category, group);
-            case V1_21_100 -> Item.creative827.add(item.clone(), category, group);
-            case V1_21_110 -> Item.creative844.add(item.clone(), category, group);
-            case V1_21_120 -> Item.creative859.add(item.clone(), category, group);
-            case V1_21_130 -> Item.creative898.add(item.clone(), category, group);
-            // NetEase
-            case V1_20_50_NETEASE -> Item.creative_netease_630.add(item.clone(), category, group);
-            case V1_21_2_NETEASE -> Item.creative_netease_686.add(item.clone(), category, group);
-            case V1_21_50_NETEASE -> Item.creative_netease_766.add(item.clone(), category, group);
-            // TODO Multiversion
-            default -> throw new IllegalArgumentException("Tried to register creative items for unsupported protocol version: " + protocol);
-        }
+        addCreativeItem(item, category, group);
     }
 
     public static void removeCreativeItem(Item item) {
-        Server.mvw("Item#removeCreativeItem(Item)");
-        removeCreativeItem(GameVersion.getLastVersion(), item);
+        CREATIVE_ITEMS.getContents().remove(item);
     }
 
     @Deprecated
     public static void removeCreativeItem(int protocol, Item item) {
-        removeCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item);
+        removeCreativeItem(item);
     }
 
+    @Deprecated
     public static void removeCreativeItem(GameVersion protocol, Item item) {
-        Item.getCreativeItemsAndGroups(protocol).getContents().remove(item);
+        removeCreativeItem(item);
     }
 
     public static boolean isCreativeItem(Item item) {
@@ -1079,7 +692,7 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static boolean isCreativeItem(GameVersion gameVersion, Item item) {
-        for (Item aCreative : Item.getCreativeItemsAndGroups(gameVersion).getItems()) {
+        for (Item aCreative : Item.getCreativeItemsAndGroups().getItems(gameVersion)) {
             if (item.equals(aCreative, !item.isTool())) {
                 return true;
             }
@@ -1088,38 +701,38 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     public static Item getCreativeItem(int index) {
-        Server.mvw("Item#getCreativeItemIndex(int)");
-        return Item.getCreativeItem(GameVersion.getLastVersion(), index);
+        ArrayList<Item> items = Item.getCreativeItems();
+        return (index >= 0 && index < items.size()) ? items.get(index) : null;
     }
 
     @Deprecated
     public static Item getCreativeItem(int protocol, int index) {
-        return Item.getCreativeItem(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), index);
-    }
-
-    public static Item getCreativeItem(GameVersion gameVersion, int index) {
-        ArrayList<Item> items = Item.getCreativeItems(gameVersion);
-        return (index >= 0 && index < items.size()) ? items.get(index) : null;
-    }
-
-    public static int getCreativeItemIndex(Item item) {
-        Server.mvw("Item#getCreativeItemIndex(Item)");
-        return getCreativeItemIndex(GameVersion.getLastVersion(), item);
+        return getCreativeItem(index);
     }
 
     @Deprecated
-    public static int getCreativeItemIndex(int protocol, Item item) {
-        return getCreativeItemIndex(GameVersion.byProtocol(protocol, Server.getInstance().onlyNetEaseMode), item);
+    public static Item getCreativeItem(GameVersion gameVersion, int index) {
+        return getCreativeItem(index);
     }
 
-    public static int getCreativeItemIndex(GameVersion gameVersion, Item item) {
-        ArrayList<Item> items = Item.getCreativeItems(gameVersion);
+    public static int getCreativeItemIndex(Item item) {
+        ArrayList<Item> items = Item.getCreativeItems();
         for (int i = 0; i < items.size(); i++) {
             if (item.equals(items.get(i), !item.isTool())) {
                 return i;
             }
         }
         return -1;
+    }
+
+    @Deprecated
+    public static int getCreativeItemIndex(int protocol, Item item) {
+        return getCreativeItemIndex(item);
+    }
+
+    @Deprecated
+    public static int getCreativeItemIndex(GameVersion gameVersion, Item item) {
+        return getCreativeItemIndex(item);
     }
 
     @SneakyThrows
@@ -1218,50 +831,51 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             }
         }
 
-        registerCustomItem(customItem, GameVersion.V1_16_100, addCreativeItem, GameVersion.V1_16_0);
-        registerCustomItem(customItem, GameVersion.V1_17_0, addCreativeItem, GameVersion.V1_17_0);
-        registerCustomItem(customItem, GameVersion.V1_17_10, addCreativeItem, GameVersion.V1_17_10, GameVersion.V1_17_30, GameVersion.V1_17_40);
-        registerCustomItem(customItem, GameVersion.V1_18_0, addCreativeItem, GameVersion.V1_18_0);
-        registerCustomItem(customItem, GameVersion.V1_18_10, addCreativeItem, GameVersion.V1_18_10);
-        registerCustomItem(customItem, GameVersion.V1_18_30, addCreativeItem, GameVersion.V1_18_30);
-        registerCustomItem(customItem, GameVersion.V1_19_0, addCreativeItem, GameVersion.V1_19_0);
-        registerCustomItem(customItem, GameVersion.V1_19_10, addCreativeItem, GameVersion.V1_19_10, GameVersion.V1_19_20);
-        registerCustomItem(customItem, GameVersion.V1_19_50, addCreativeItem, GameVersion.V1_19_50);
-        registerCustomItem(customItem, GameVersion.V1_19_60, addCreativeItem, GameVersion.V1_19_60);
-        registerCustomItem(customItem, GameVersion.V1_19_70, addCreativeItem, GameVersion.V1_19_70);
-        registerCustomItem(customItem, GameVersion.V1_19_80, addCreativeItem, GameVersion.V1_19_80);
-        registerCustomItem(customItem, GameVersion.V1_20_0, addCreativeItem, GameVersion.V1_20_0);
-        registerCustomItem(customItem, GameVersion.V1_20_10, addCreativeItem, GameVersion.V1_20_10);
-        registerCustomItem(customItem, GameVersion.V1_20_30, addCreativeItem, GameVersion.V1_20_30);
-        registerCustomItem(customItem, GameVersion.V1_20_40, addCreativeItem, GameVersion.V1_20_40);
-        registerCustomItem(customItem, GameVersion.V1_20_50, addCreativeItem, GameVersion.V1_20_50);
-        registerCustomItem(customItem, GameVersion.V1_20_60, addCreativeItem, GameVersion.V1_20_60);
-        registerCustomItem(customItem, GameVersion.V1_20_70, addCreativeItem, GameVersion.V1_20_70);
-        registerCustomItem(customItem, GameVersion.V1_20_80, addCreativeItem, GameVersion.V1_20_80);
-        registerCustomItem(customItem, GameVersion.V1_21_0, addCreativeItem, GameVersion.V1_21_0);
-        registerCustomItem(customItem, GameVersion.V1_21_20, addCreativeItem, GameVersion.V1_21_20);
-        registerCustomItem(customItem, GameVersion.V1_21_30, addCreativeItem, GameVersion.V1_21_30);
-        registerCustomItem(customItem, GameVersion.V1_21_40, addCreativeItem, GameVersion.V1_21_40);
-        registerCustomItem(customItem, GameVersion.V1_21_50, addCreativeItem, GameVersion.V1_21_50);
-        registerCustomItem(customItem, GameVersion.V1_21_60, addCreativeItem, GameVersion.V1_21_60);
-        registerCustomItem(customItem, GameVersion.V1_21_70, addCreativeItem, GameVersion.V1_21_70);
-        registerCustomItem(customItem, GameVersion.V1_21_80, addCreativeItem, GameVersion.V1_21_80);
-        registerCustomItem(customItem, GameVersion.V1_21_90, addCreativeItem, GameVersion.V1_21_90, GameVersion.V1_21_93);
-        registerCustomItem(customItem, GameVersion.V1_21_100, addCreativeItem, GameVersion.V1_21_100);
-        registerCustomItem(customItem, GameVersion.V1_21_110, addCreativeItem, GameVersion.V1_21_110);
-        registerCustomItem(customItem, GameVersion.V1_21_120, addCreativeItem, GameVersion.V1_21_120);
-        registerCustomItem(customItem, GameVersion.V1_21_130, addCreativeItem, GameVersion.V1_21_130);
-        registerCustomItem(customItem, GameVersion.V1_26_0, addCreativeItem);
+        // Register custom item in each version's RuntimeItemMapping
+        registerCustomItemRuntime(customItem, GameVersion.V1_16_100);
+        registerCustomItemRuntime(customItem, GameVersion.V1_17_0);
+        registerCustomItemRuntime(customItem, GameVersion.V1_17_10);
+        registerCustomItemRuntime(customItem, GameVersion.V1_18_0);
+        registerCustomItemRuntime(customItem, GameVersion.V1_18_10);
+        registerCustomItemRuntime(customItem, GameVersion.V1_18_30);
+        registerCustomItemRuntime(customItem, GameVersion.V1_19_0);
+        registerCustomItemRuntime(customItem, GameVersion.V1_19_10);
+        registerCustomItemRuntime(customItem, GameVersion.V1_19_50);
+        registerCustomItemRuntime(customItem, GameVersion.V1_19_60);
+        registerCustomItemRuntime(customItem, GameVersion.V1_19_70);
+        registerCustomItemRuntime(customItem, GameVersion.V1_19_80);
+        registerCustomItemRuntime(customItem, GameVersion.V1_20_0);
+        registerCustomItemRuntime(customItem, GameVersion.V1_20_10);
+        registerCustomItemRuntime(customItem, GameVersion.V1_20_30);
+        registerCustomItemRuntime(customItem, GameVersion.V1_20_40);
+        registerCustomItemRuntime(customItem, GameVersion.V1_20_50);
+        registerCustomItemRuntime(customItem, GameVersion.V1_20_60);
+        registerCustomItemRuntime(customItem, GameVersion.V1_20_70);
+        registerCustomItemRuntime(customItem, GameVersion.V1_20_80);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_0);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_20);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_30);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_40);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_50);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_60);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_70);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_80);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_90);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_100);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_110);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_120);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_130);
+        registerCustomItemRuntime(customItem, GameVersion.V1_26_0);
 
         // NetEase
-        registerCustomItem(customItem, GameVersion.V1_20_50_NETEASE, addCreativeItem, GameVersion.V1_20_50_NETEASE);
-        registerCustomItem(customItem, GameVersion.V1_21_2_NETEASE, addCreativeItem, GameVersion.V1_21_2_NETEASE);
-        registerCustomItem(customItem, GameVersion.V1_21_50_NETEASE, addCreativeItem, GameVersion.V1_21_50_NETEASE);
+        registerCustomItemRuntime(customItem, GameVersion.V1_20_50_NETEASE);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_2_NETEASE);
+        registerCustomItemRuntime(customItem, GameVersion.V1_21_50_NETEASE);
 
-        //TODO Multiversion 添加新版本支持时修改这里
-
+        // Only add creative item once; runtime filtering via isSupportedOn per protocol
         if (addCreativeItem) {
             CustomItemDefinition definition = customItem.getDefinition();
+            CREATIVE_ITEMS.add(((Item) customItem).clone(), definition.getCreativeCategory(), definition.getCreativeGroup());
             PENDING_CREATIVE_ITEMS.put(customItem.getNamespaceId(),
                     new PendingCreativeItem((Item) customItem, definition.getCreativeCategory(), definition.getCreativeGroup()));
         }
@@ -1269,12 +883,8 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
         return new OK<Void>(true);
     }
 
-    private static void registerCustomItem(CustomItem item, GameVersion protocol, boolean addCreativeItem, GameVersion... creativeProtocols) {
-        if (RuntimeItems.getMapping(protocol).registerCustomItem(item) && addCreativeItem) {
-            for (GameVersion creativeProtocol : creativeProtocols) {
-                addCreativeItem(creativeProtocol, (Item) item, item.getDefinition().getCreativeCategory(), item.getDefinition().getCreativeGroup());
-            }
-        }
+    private static void registerCustomItemRuntime(CustomItem item, GameVersion protocol) {
+        RuntimeItems.getMapping(protocol).registerCustomItem(item);
     }
 
     public static void deleteCustomItem(String namespaceId) {
@@ -1284,55 +894,54 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             CUSTOM_ITEM_DEFINITIONS.remove(namespaceId);
             PENDING_CREATIVE_ITEMS.remove(namespaceId);
 
-            deleteCustomItem(customItem, GameVersion.V1_16_100, GameVersion.V1_16_0);
-            deleteCustomItem(customItem, GameVersion.V1_17_0, GameVersion.V1_17_0);
-            deleteCustomItem(customItem, GameVersion.V1_17_10, GameVersion.V1_17_10, GameVersion.V1_17_30, GameVersion.V1_17_40);
-            deleteCustomItem(customItem, GameVersion.V1_18_0, GameVersion.V1_18_0);
-            deleteCustomItem(customItem, GameVersion.V1_18_10, GameVersion.V1_18_10);
-            deleteCustomItem(customItem, GameVersion.V1_18_30, GameVersion.V1_18_30);
-            deleteCustomItem(customItem, GameVersion.V1_19_0, GameVersion.V1_19_0);
-            deleteCustomItem(customItem, GameVersion.V1_19_10, GameVersion.V1_19_10, GameVersion.V1_19_20);
-            deleteCustomItem(customItem, GameVersion.V1_19_50, GameVersion.V1_19_50);
-            deleteCustomItem(customItem, GameVersion.V1_19_60, GameVersion.V1_19_60);
-            deleteCustomItem(customItem, GameVersion.V1_19_70, GameVersion.V1_19_70);
-            deleteCustomItem(customItem, GameVersion.V1_19_80, GameVersion.V1_19_80);
-            deleteCustomItem(customItem, GameVersion.V1_20_0, GameVersion.V1_20_0);
-            deleteCustomItem(customItem, GameVersion.V1_20_10, GameVersion.V1_20_10);
-            deleteCustomItem(customItem, GameVersion.V1_20_30, GameVersion.V1_20_30);
-            deleteCustomItem(customItem, GameVersion.V1_20_40, GameVersion.V1_20_40);
-            deleteCustomItem(customItem, GameVersion.V1_20_50, GameVersion.V1_20_50);
-            deleteCustomItem(customItem, GameVersion.V1_20_60, GameVersion.V1_20_60);
-            deleteCustomItem(customItem, GameVersion.V1_20_70, GameVersion.V1_20_70);
-            deleteCustomItem(customItem, GameVersion.V1_20_80, GameVersion.V1_20_80);
-            deleteCustomItem(customItem, GameVersion.V1_21_0, GameVersion.V1_21_0);
-            deleteCustomItem(customItem, GameVersion.V1_21_20, GameVersion.V1_21_20);
-            deleteCustomItem(customItem, GameVersion.V1_21_30, GameVersion.V1_21_30);
-            deleteCustomItem(customItem, GameVersion.V1_21_40, GameVersion.V1_21_40);
-            deleteCustomItem(customItem, GameVersion.V1_21_50, GameVersion.V1_21_50);
-            deleteCustomItem(customItem, GameVersion.V1_21_60, GameVersion.V1_21_60);
-            deleteCustomItem(customItem, GameVersion.V1_21_70, GameVersion.V1_21_70);
-            deleteCustomItem(customItem, GameVersion.V1_21_80, GameVersion.V1_21_80);
-            deleteCustomItem(customItem, GameVersion.V1_21_90, GameVersion.V1_21_90, GameVersion.V1_21_93);
-            deleteCustomItem(customItem, GameVersion.V1_21_100, GameVersion.V1_21_100);
-            deleteCustomItem(customItem, GameVersion.V1_21_110, GameVersion.V1_21_110);
-            deleteCustomItem(customItem, GameVersion.V1_21_120, GameVersion.V1_21_120);
-            deleteCustomItem(customItem, GameVersion.V1_21_130, GameVersion.V1_21_130);
-            deleteCustomItem(customItem, GameVersion.V1_26_0);
+            // Remove from each version's RuntimeItemMapping
+            deleteCustomItemRuntime(customItem, GameVersion.V1_16_100);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_17_0);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_17_10);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_18_0);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_18_10);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_18_30);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_19_0);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_19_10);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_19_50);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_19_60);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_19_70);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_19_80);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_20_0);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_20_10);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_20_30);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_20_40);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_20_50);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_20_60);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_20_70);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_20_80);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_0);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_20);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_30);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_40);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_50);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_60);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_70);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_80);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_90);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_100);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_110);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_120);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_130);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_26_0);
 
             // NetEase
-            deleteCustomItem(customItem, GameVersion.V1_20_50_NETEASE, GameVersion.V1_20_50_NETEASE);
-            deleteCustomItem(customItem, GameVersion.V1_21_2_NETEASE, GameVersion.V1_21_2_NETEASE);
-            deleteCustomItem(customItem, GameVersion.V1_21_50_NETEASE, GameVersion.V1_21_50_NETEASE);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_20_50_NETEASE);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_2_NETEASE);
+            deleteCustomItemRuntime(customItem, GameVersion.V1_21_50_NETEASE);
 
-            //TODO Multiversion 添加新版本支持时修改这里
+            // Remove from creative items
+            removeCreativeItem(customItem);
         }
     }
 
-    private static void deleteCustomItem(Item item, GameVersion protocol, GameVersion... creativeProtocols) {
+    private static void deleteCustomItemRuntime(Item item, GameVersion protocol) {
         RuntimeItems.getMapping(protocol).deleteCustomItem((CustomItem) item);
-        for (GameVersion creativeProtocol : creativeProtocols) {
-            removeCreativeItem(creativeProtocol, item);
-        }
     }
 
     public static HashMap<String, Supplier<? extends Item>> getCustomItems() {
@@ -2413,6 +2022,49 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             ObjectArrayList<CreativeItemData> list = new ObjectArrayList<>(this.getContents().size());
             for (Map.Entry<Item, CreativeItemGroup> entry : this.getContents().entrySet()) {
                 list.add(new CreativeItemData(entry.getKey(), creativeNetId++, entry.getValue() != null ? entry.getValue().getGroupId() : 0));
+            }
+            return list;
+        }
+
+        /**
+         * Get creative items supported by the specified protocol version
+         */
+        public Collection<Item> getItems(GameVersion protocol) {
+            ArrayList<Item> list = new ArrayList<>();
+            for (Item item : contents.keySet()) {
+                if (item.isSupportedOn(protocol)) {
+                    list.add(item);
+                }
+            }
+            return list;
+        }
+
+        /**
+         * Get item-to-group mapping supported by the specified protocol version
+         */
+        public Map<Item, CreativeItemGroup> getContents(GameVersion protocol) {
+            Map<Item, CreativeItemGroup> map = new LinkedHashMap<>();
+            for (Map.Entry<Item, CreativeItemGroup> entry : contents.entrySet()) {
+                if (entry.getKey().isSupportedOn(protocol)) {
+                    map.put(entry.getKey(), entry.getValue());
+                }
+            }
+            return map;
+        }
+
+        /**
+         * Get creative item network data for the specified protocol version
+         */
+        public List<CreativeItemData> getCreativeItemDatas(GameVersion protocol) {
+            int creativeNetId = 1;
+            ObjectArrayList<CreativeItemData> list = new ObjectArrayList<>();
+            for (Map.Entry<Item, CreativeItemGroup> entry : contents.entrySet()) {
+                if (entry.getKey().isSupportedOn(protocol)) {
+                    list.add(new CreativeItemData(
+                            entry.getKey(), creativeNetId++,
+                            entry.getValue() != null ? entry.getValue().getGroupId() : 0
+                    ));
+                }
             }
             return list;
         }

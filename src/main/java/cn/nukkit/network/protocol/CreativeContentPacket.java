@@ -46,7 +46,7 @@ public class CreativeContentPacket extends DataPacket {
         if (this.protocol >= ProtocolInfo.v1_21_60) {
             this.putArray(this.creativeItems.getGroups(), this::writeGroup);
         }
-        this.putArray(this.creativeItems.getCreativeItemDatas(), this::writeItem);
+        this.putArray(this.creativeItems.getCreativeItemDatas(this.gameVersion), this::writeItem);
     }
 
     private void writeGroup(CreativeItemGroup group) {
