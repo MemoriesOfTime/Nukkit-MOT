@@ -17,7 +17,7 @@ import java.util.Random;
  * Nukkit Project
  */
 public class PopulatorCaves extends Populator {
-    private final int bedrockLayer;
+    private int bedrockLayer = 0;
 
     public PopulatorCaves(int bedrockLayer) {
         this.bedrockLayer = bedrockLayer;
@@ -33,7 +33,7 @@ public class PopulatorCaves extends Populator {
 
     public static int caveRarity = 7;
     public static int caveFrequency = 40;
-    public static int caveMinAltitude = 8;
+    public int caveMinAltitude = bedrockLayer + 8;
     public static int caveMaxAltitude = 67;
     public static int individualCaveRarity = 25;
     public static int caveSystemFrequency = 1;
