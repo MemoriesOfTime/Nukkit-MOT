@@ -857,7 +857,21 @@ public class LevelSoundEventPacket extends DataPacket {
         this.reset();
         this.putUnsignedVarInt(this.sound);
         this.putVector3f(this.x, this.y, this.z);
-        this.putVarInt(this.extraData);
+        if (this.sound == SOUND_NOTE && this.protocol < ProtocolInfo.v1_21_50) {
+            // Pre-1.21.50 instrument ID order differs: swap 5↔6 (flute↔glockenspiel), 7↔8 (guitar↔chime)
+            int instrumentId = this.extraData >> 8;
+            int strength = this.extraData & 0xFF;
+            instrumentId = switch (instrumentId) {
+                case 5 -> 6;
+                case 6 -> 5;
+                case 7 -> 8;
+                case 8 -> 7;
+                default -> instrumentId;
+            };
+            this.putVarInt(instrumentId << 8 | strength);
+        } else {
+            this.putVarInt(this.extraData);
+        }
         this.putString(this.entityIdentifier);
         this.putBoolean(this.isBabyMob);
         this.putBoolean(this.isGlobal);

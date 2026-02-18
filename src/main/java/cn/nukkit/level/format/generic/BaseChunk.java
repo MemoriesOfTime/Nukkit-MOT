@@ -287,7 +287,7 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
                             continue;
                         }
                         int blockId = section.getBlockId(x, y, z);
-                        int lightLevel = Block.light[blockId];
+                        int lightLevel = Block.getBlockLight(blockId);
                         if (lightLevel > 0) {
                             section.setBlockLight(x, y, z, lightLevel);
                         }
@@ -321,7 +321,7 @@ public abstract class BaseChunk extends BaseFullChunk implements Chunk {
         }
 
         int blockId = this.getBlockId(x, y, z);
-        int lightFilter = Block.lightFilter[blockId];
+        int lightFilter = Block.getBlockLightFilter(blockId);
         int newLight = sourceLight - Math.max(1, lightFilter);
 
         if (newLight > 0 && newLight > this.getBlockLight(x, y, z)) {
