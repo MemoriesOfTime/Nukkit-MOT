@@ -2605,7 +2605,6 @@ public abstract class Entity extends Location implements Metadatable {
 
         if (!(this instanceof Player)) {
             this.blocksAround = null;
-            this.collisionBlocks = null;
         }
 
         if (this.keepMovement) {
@@ -3089,8 +3088,6 @@ public abstract class Entity extends Location implements Metadatable {
 
             this.server.getPluginManager().callEvent(new EntityDespawnEvent(this));
             this.despawnFromAll();
-
-            this.hasSpawned.clear();
 
             if (this.chunk != null) {
                 this.chunk.removeEntity(this);
