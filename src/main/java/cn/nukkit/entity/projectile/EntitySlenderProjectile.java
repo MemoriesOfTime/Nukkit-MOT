@@ -3,6 +3,7 @@ package cn.nukkit.entity.projectile;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
+import cn.nukkit.entity.CollisionHelper;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.event.entity.ProjectileHitEvent;
 import cn.nukkit.level.MovingObjectPosition;
@@ -13,10 +14,9 @@ import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.util.function.Predicate;
+import java.util.Optional;
 
 /**
  * @author PowerNukkitX Project Team
@@ -74,27 +74,35 @@ public abstract class EntitySlenderProjectile extends EntityProjectile {
         Entity collisionEntity = null;
         Block collisionBlock = null;
         for (int i = 0; i < SPLIT_NUMBER; ++i) {
-            Block[] collisionBlocks = this.level.getCollisionBlocks(currentAABB.offset(dirVector.x, dirVector.y, dirVector.z));
-            List<Block> filteredBlocks;
-            if (this.canPassThroughBarrier()) {
-                filteredBlocks = Arrays.stream(collisionBlocks).filter(block -> block.getId() != BlockID.BARRIER).toList();
-            } else {
-                filteredBlocks = Arrays.asList(collisionBlocks);
+            AxisAlignedBB movedAABB = currentAABB.offset(dirVector.x, dirVector.y, dirVector.z);
+
+            List<Block> collisionBlocks = CollisionHelper.getCollisionBlocks(this.level, movedAABB);
+
+            if (!collisionBlocks.isEmpty()) {
+                Optional<Block> closestBlock = collisionBlocks.stream()
+                        .filter(block -> !this.canPassThroughBarrier() || block.getId() != BlockID.BARRIER)
+                        .min(Comparator.comparingDouble(projectile::distanceSquared));
+
+                if (closestBlock.isPresent()) {
+                    collisionBlock = closestBlock.get();
+                    currentAABB = movedAABB.offset(-dirVector.x, -dirVector.y, -dirVector.z);
+                    break;
+                }
             }
-            Entity[] collisionEntities = this.getLevel().getCollidingEntities(currentAABB, this);
-            if (filteredBlocks.size() != 0) {
-                currentAABB.offset(-dirVector.x, -dirVector.y, -dirVector.z);
-                collisionBlock = filteredBlocks.stream().min(Comparator.comparingDouble(projectile::distanceSquared)).get();
-                break;
-            }
-            collisionEntity = Arrays.stream(collisionEntities)
-                    .filter(Predicate.not(entity -> (entity == shootEntity && ticks < 5) ||
-                            (entity instanceof Player && ((Player) entity).getGamemode() == Player.SPECTATOR)))
-                    .min(Comparator.comparingDouble(o -> o.distanceSquared(projectile)))
+
+            collisionEntity = CollisionHelper.getCollidingEntities(this.level, movedAABB, this)
+                    .stream()
+                    .filter(entity -> ticks >= 5 || entity != shootEntity)
+                    .filter(entity -> !(entity instanceof Player player && player.getGamemode() == Player.SPECTATOR))
+                    .min(Comparator.comparingDouble(entity -> entity.distanceSquared(projectile)))
                     .orElse(null);
+
             if (collisionEntity != null) {
+                currentAABB = movedAABB;
                 break;
             }
+
+            currentAABB = movedAABB;
         }
         Vector3 centerPoint1 = new Vector3((currentAABB.getMinX() + currentAABB.getMaxX()) / 2,
                 (currentAABB.getMinY() + currentAABB.getMaxY()) / 2,
