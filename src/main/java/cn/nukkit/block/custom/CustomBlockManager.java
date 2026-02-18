@@ -289,15 +289,7 @@ public class CustomBlockManager {
 
         if (blockDefinition != null && blockDefinition.shouldRegisterCreativeItem()) {
             ItemBlock itemBlock = new ItemBlock((Block) blockSample);
-            for (GameVersion version : GameVersion.values()) {
-                if (version.getProtocol() >= ProtocolInfo.v1_16_100) {
-                    try {
-                        Item.addCreativeItem(version, itemBlock, blockDefinition.getCreativeCategory(), blockDefinition.getCreativeGroup());
-                    } catch (IllegalArgumentException e) {
-                        // Ignore unsupported versions
-                    }
-                }
-            }
+            Item.addCreativeItem(itemBlock, blockDefinition.getCreativeCategory(), blockDefinition.getCreativeGroup());
         }
     }
 
