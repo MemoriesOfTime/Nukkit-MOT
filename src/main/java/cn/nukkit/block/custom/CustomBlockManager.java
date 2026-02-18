@@ -71,6 +71,12 @@ public class CustomBlockManager {
     private final AtomicInteger nextBlockId = new AtomicInteger(LOWEST_CUSTOM_BLOCK_ID);
     private final Map<String, Integer> identifier2Id = new ConcurrentHashMap<>();
 
+    private final Int2BooleanOpenHashMap customBlockTransparent = new Int2BooleanOpenHashMap();
+    private final Int2BooleanOpenHashMap customBlockSolid = new Int2BooleanOpenHashMap();
+    private final Int2BooleanOpenHashMap customBlockDiffusesSkyLight = new Int2BooleanOpenHashMap();
+    private final Int2IntOpenHashMap customBlockLight = new Int2IntOpenHashMap();
+    private final Int2IntOpenHashMap customBlockLightFilter = new Int2IntOpenHashMap();
+
     private volatile boolean closed = false;
 
     private CustomBlockManager(Server server) {
@@ -234,6 +240,10 @@ public class CustomBlockManager {
             log.warn("Custom block {} was registered using wrong method! Trying to use sample properties!", identifier);
         }
 
+        if (blockSample instanceof Block block) {
+            cacheBlockAttributes(nukkitId, block);
+        }
+
         if (properties != null && blockDefinition == null) {
             throw new IllegalArgumentException("Block network data can not be empty for block with more permutations: " + identifier);
         }
@@ -312,6 +322,39 @@ public class CustomBlockManager {
                 .putInt("version", LevelDBConstants.STATE_VERSION)
                 .build();
         return new CustomBlockState(identifier, legacyId, state, factory);
+    }
+
+    private void cacheBlockAttributes(int blockId, Block block) {
+        customBlockTransparent.put(blockId, block.isTransparent());
+        customBlockSolid.put(blockId, block.isSolid());
+        customBlockDiffusesSkyLight.put(blockId, block.diffusesSkyLight());
+        customBlockLight.put(blockId, block.getLightLevel());
+        customBlockLightFilter.put(blockId, Block.computeCustomBlockLightFilter(block));
+    }
+
+    public boolean getCachedTransparent(int blockId) {
+        if (customBlockTransparent.containsKey(blockId)) return customBlockTransparent.get(blockId);
+        return Block.get(blockId).isTransparent();
+    }
+
+    public boolean getCachedSolid(int blockId) {
+        if (customBlockSolid.containsKey(blockId)) return customBlockSolid.get(blockId);
+        return Block.get(blockId).isSolid();
+    }
+
+    public boolean getCachedDiffusesSkyLight(int blockId) {
+        if (customBlockDiffusesSkyLight.containsKey(blockId)) return customBlockDiffusesSkyLight.get(blockId);
+        return Block.get(blockId).diffusesSkyLight();
+    }
+
+    public int getCachedLight(int blockId) {
+        if (customBlockLight.containsKey(blockId)) return customBlockLight.get(blockId);
+        return Block.get(blockId).getLightLevel();
+    }
+
+    public int getCachedLightFilter(int blockId) {
+        if (customBlockLightFilter.containsKey(blockId)) return customBlockLightFilter.get(blockId);
+        return Block.computeCustomBlockLightFilter(Block.get(blockId));
     }
 
     public boolean closeRegistry() throws IOException {

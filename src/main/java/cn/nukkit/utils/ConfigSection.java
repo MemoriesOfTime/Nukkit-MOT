@@ -721,11 +721,10 @@ public class ConfigSection extends LinkedHashMap<String, Object> {
      */
     public void remove(String key) {
         if (key == null || key.isEmpty()) return;
-        if (super.containsKey(key)) super.remove(key);
-        else if (this.containsKey(".")) {
+        if (super.remove(key) != null) return;
+        if (key.contains(".")) {
             String[] keys = key.split("\\.", 2);
-            if (super.get(keys[0]) instanceof ConfigSection) {
-                ConfigSection section = (ConfigSection) super.get(keys[0]);
+            if (super.get(keys[0]) instanceof ConfigSection section) {
                 section.remove(keys[1]);
             }
         }
