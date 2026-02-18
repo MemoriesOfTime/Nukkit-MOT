@@ -16,8 +16,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.Utils;
 
-import java.util.List;
-
 public class EntityEnderPearl extends EntityProjectile {
 
     public static final int NETWORK_ID = 87;

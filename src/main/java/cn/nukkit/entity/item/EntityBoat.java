@@ -28,7 +28,6 @@ import cn.nukkit.network.protocol.SetEntityLinkPacket;
 import cn.nukkit.network.protocol.SetEntityMotionPacket;
 
 import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Created by yescallop on 2016/2/13.
