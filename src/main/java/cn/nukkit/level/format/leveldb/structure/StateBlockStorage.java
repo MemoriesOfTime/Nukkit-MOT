@@ -399,7 +399,7 @@ public class StateBlockStorage {
      */
     public boolean maybeHasLightSource() {
         for (BlockStateSnapshot state : this.palette) {
-            if (Block.light[state.getLegacyId()] > 0) {
+            if (Block.getBlockLight(state.getLegacyId()) > 0) {
                 return true;
             }
         }

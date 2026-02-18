@@ -396,14 +396,14 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
                     // START of checks for the next block
                     int id = this.getBlockId(x, y, z);
 
-                    if (!Block.transparent[id]) { // if we encounter an opaque block, all the blocks under it will
+                    if (!Block.isBlockTransparentById(id)) { // if we encounter an opaque block, all the blocks under it will
                                            // have a skylight value of 0 (the block itself has a value of 15, if it's a top-most block)
                         nextLight = 0;
-                    } else if (Block.diffusesSkyLight[id]) {
+                    } else if (Block.getBlockDiffusesSkyLight(id)) {
                         nextDecrease += 1; // skylight value decreases by one for each block under a block
                                            // that diffuses skylight. The block itself has a value of 15 (if it's a top-most block)
                     } else {
-                        nextDecrease -= Block.lightFilter[id]; // blocks under a light filtering block will have a skylight value
+                        nextDecrease -= Block.getBlockLightFilter(id); // blocks under a light filtering block will have a skylight value
                                                             // decreased by the lightFilter value of that block. The block itself
                                                             // has a value of 15 (if it's a top-most block)
                     }
@@ -422,7 +422,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
             for (int z = 0; z < 16; z++) {
                 for (int y = minY; y <= maxY; y++) {
                     int blockId = this.getBlockId(x, y, z);
-                    int lightLevel = Block.light[blockId];
+                    int lightLevel = Block.getBlockLight(blockId);
                     if (lightLevel > 0) {
                         this.setBlockLight(x, y, z, lightLevel);
                     }
@@ -455,7 +455,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
         }
 
         int blockId = this.getBlockId(x, y, z);
-        int lightFilter = Block.lightFilter[blockId];
+        int lightFilter = Block.getBlockLightFilter(blockId);
         int newLight = sourceLight - Math.max(1, lightFilter);
 
         if (newLight > 0 && newLight > this.getBlockLight(x, y, z)) {

@@ -483,7 +483,7 @@ public class Chunk extends BaseChunk {
                 if (height < y) {
                     return 15;
                 } else if (height == y) {
-                    return Block.transparent[getBlockId(x, y, z)] ? 15 : 0;
+                    return Block.isBlockTransparentById(getBlockId(x, y, z)) ? 15 : 0;
                 } else {
                     return section.getBlockSkyLight(x, y & 0x0f, z);
                 }
