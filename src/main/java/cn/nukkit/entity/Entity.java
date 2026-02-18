@@ -1780,13 +1780,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     protected boolean checkObstruction(double x, double y, double z) {
-        if (this.noClip || CollisionHelper.getCollisionCubes(
-                this.level,
-                this,
-                this.boundingBox,
-                false,
-                false
-        ).isEmpty()) {
+        if (this.noClip || CollisionHelper.getCollisionCubes(this.level, this, this.boundingBox, false).isEmpty()) {
             return false;
         }
 
@@ -2616,7 +2610,11 @@ public abstract class Entity extends Location implements Metadatable {
 
         if (this.keepMovement) {
             this.boundingBox.offset(dx, dy, dz);
-            this.setPosition(this.temporalVector.setComponents((this.boundingBox.getMinX() + this.boundingBox.getMaxX()) / 2, this.boundingBox.getMinY(), (this.boundingBox.getMinZ() + this.boundingBox.getMaxZ()) / 2));
+            this.setPosition(this.temporalVector.setComponents(
+                    (this.boundingBox.getMinX() + this.boundingBox.getMaxX()) / 2,
+                    this.boundingBox.getMinY(),
+                    (this.boundingBox.getMinZ() + this.boundingBox.getMaxZ()) / 2
+            ));
             this.onGround = this instanceof Player;
             return true;
         } else {
@@ -2628,7 +2626,7 @@ public abstract class Entity extends Location implements Metadatable {
 
             AxisAlignedBB axisalignedbb = this.boundingBox.clone();
 
-            List<AxisAlignedBB> list = this.noClip ? List.of(AxisAlignedBB.EMPTY_ARRAY) : CollisionHelper.getCollisionCubes(
+            List<AxisAlignedBB> collisions = this.noClip ? List.of() : CollisionHelper.getCollisionCubes(
                     this.level,
                     this,
                     this.boundingBox.addCoord(dx, dy, dz),
@@ -2636,39 +2634,31 @@ public abstract class Entity extends Location implements Metadatable {
                     false
             );
 
-            for (AxisAlignedBB bb : list) {
-                dy = bb.calculateYOffset(this.boundingBox, dy);
-            }
+            double finalDy = collisions.stream().reduce(dy, (motion, bb) -> bb.calculateYOffset(this.boundingBox, motion), Double::min);
+            double finalDx = collisions.stream().reduce(dx, (motion, bb) -> bb.calculateXOffset(this.boundingBox, motion), Double::min);
+            double finalDz = collisions.stream().reduce(dz, (motion, bb) -> bb.calculateZOffset(this.boundingBox, motion), Double::min);
 
-            this.boundingBox.offset(0, dy, 0);
+            boolean fallingFlag = (this.onGround || (finalDy != movY && movY < 0));
 
-            boolean fallingFlag = (this.onGround || (dy != movY && movY < 0));
+            this.boundingBox.offset(finalDx, finalDy, finalDz);
 
-            for (AxisAlignedBB bb : list) {
-                dx = bb.calculateXOffset(this.boundingBox, dx);
-            }
-
-            this.boundingBox.offset(dx, 0, 0);
-
-            for (AxisAlignedBB bb : list) {
-                dz = bb.calculateZOffset(this.boundingBox, dz);
-            }
-
-            this.boundingBox.offset(0, 0, dz);
+            dx = finalDx;
+            dy = finalDy;
+            dz = finalDz;
 
             if (this.getStepHeight() > 0 && fallingFlag && (movX != dx || movZ != dz)) {
                 double cx = dx;
                 double cy = dy;
                 double cz = dz;
+
                 dx = movX;
                 dy = this.getStepHeight();
                 dz = movZ;
 
                 AxisAlignedBB axisalignedbb1 = this.boundingBox.clone();
-
                 this.boundingBox.setBB(axisalignedbb);
 
-                list = CollisionHelper.getCollisionCubes(
+                collisions = CollisionHelper.getCollisionCubes(
                         this.level,
                         this,
                         this.boundingBox.addCoord(dx, dy, dz),
@@ -2676,30 +2666,22 @@ public abstract class Entity extends Location implements Metadatable {
                         false
                 );
 
-                for (AxisAlignedBB bb : list) {
-                    dy = bb.calculateYOffset(this.boundingBox, dy);
-                }
+                double stepDy = collisions.stream().reduce(dy, (motion, bb) -> bb.calculateYOffset(this.boundingBox, motion), Double::min);
+                double stepDx = collisions.stream().reduce(dx, (motion, bb) -> bb.calculateXOffset(this.boundingBox, motion), Double::min);
+                double stepDz = collisions.stream().reduce(dz, (motion, bb) -> bb.calculateZOffset(this.boundingBox, motion), Double::min);
 
-                this.boundingBox.offset(0, dy, 0);
+                this.boundingBox.offset(stepDx, stepDy, stepDz);
 
-                for (AxisAlignedBB bb : list) {
-                    dx = bb.calculateXOffset(this.boundingBox, dx);
-                }
+                double reverseDY = -stepDy;
+                reverseDY = collisions.stream().reduce(reverseDY, (motion, bb) -> bb.calculateYOffset(this.boundingBox, motion), Double::min);
 
-                this.boundingBox.offset(dx, 0, 0);
+                double totalStepDy = stepDy + reverseDY;
 
-                for (AxisAlignedBB bb : list) {
-                    dz = bb.calculateZOffset(this.boundingBox, dz);
-                }
-
-                this.boundingBox.offset(0, 0, dz);
-
-                double reverseDY = -dy;
-                for (AxisAlignedBB bb : list) {
-                    reverseDY = bb.calculateYOffset(this.boundingBox, reverseDY);
-                }
-                dy += reverseDY;
                 this.boundingBox.offset(0, reverseDY, 0);
+
+                dx = stepDx;
+                dy = totalStepDy;
+                dz = stepDz;
 
                 if ((cx * cx + cz * cz) >= (dx * dx + dz * dz)) {
                     dx = cx;
