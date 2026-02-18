@@ -2573,7 +2573,9 @@ public class Level implements ChunkManager, Metadatable {
                 breakTime = 0.15;
             }
 
-            breakTime -= 0.15;
+            if (breakTime > 0) {
+                breakTime -= 0.15; // 保留 3 tick（150ms）宽限用于网络延迟补偿
+            }
 
             Item[] eventDrops;
             if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
@@ -2581,8 +2583,8 @@ public class Level implements ChunkManager, Metadatable {
             } else {
                 eventDrops = target.getDrops(player, item);
             }
-            //TODO 直接加1000可能会影响其他判断，需要进一步改进
-            boolean fastBreak = (player.lastBreak + breakTime * 1000) > Long.sum(System.currentTimeMillis(), 1000);
+            // lastBreak < 0 表示首次挖掘（初始值 -1），直接放行；否则验证已等待足够时间
+            boolean fastBreak = player.lastBreak >= 0 && (player.lastBreak + breakTime * 1000) > System.currentTimeMillis();
             BlockBreakEvent ev = new BlockBreakEvent(player, target, face, item, eventDrops, player.isCreative(), fastBreak);
 
             if ((player.isSurvival() || player.isAdventure()) && !target.isBreakable(item)) {
@@ -2593,12 +2595,12 @@ public class Level implements ChunkManager, Metadatable {
                 ev.setCancelled();
             }
 
-            player.lastBreak = System.currentTimeMillis();
-
             this.server.getPluginManager().callEvent(ev);
             if (ev.isCancelled()) {
                 return null;
             }
+
+            player.lastBreak = System.currentTimeMillis();
 
             drops = ev.getDrops();
             dropExp = ev.getDropExp();
