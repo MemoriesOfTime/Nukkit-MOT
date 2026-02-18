@@ -39,22 +39,28 @@ public record CollisionHelper(Entity entity) {
 
         if (blocks.length == 0) return Block.EMPTY_ARRAY;
 
-        List<Block> result = new ArrayList<>(Math.min(blocks.length, 4));
+        Block[] result = new Block[Math.min(blocks.length, 4)];
+        int count = 0;
 
         for (Block block : blocks) {
             if (block.canPassThrough()) {
                 double shrinkX = (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.25;
                 double shrinkZ = (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.25;
-
                 if (block.collidesWithBB(boundingBox.shrink(shrinkX, 0, shrinkZ), true)) {
-                    result.add(block);
+                    if (count == result.length) {
+                        result = Arrays.copyOf(result, result.length << 1);
+                    }
+                    result[count++] = block;
                 }
             } else if (block.collidesWithBB(boundingBox, true)) {
-                result.add(block);
+                if (count == result.length) {
+                    result = Arrays.copyOf(result, result.length << 1);
+                }
+                result[count++] = block;
             }
         }
 
-        return result.isEmpty() ? Block.EMPTY_ARRAY : result.toArray(Block[]::new);
+        return count == 0 ? Block.EMPTY_ARRAY : Arrays.copyOf(result, count);
     }
 
     /**
