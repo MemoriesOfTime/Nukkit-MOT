@@ -99,19 +99,10 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
 
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
-        AxisAlignedBB boundingBox = new SimpleAxisAlignedBB(
-                this.x,
-                this.y,
-                this.z,
-                this.x + 1.0D,
-                this.y + 1.0D,
-                this.z + 1.0D
-        );
-        double growK = Server.getInstance().portalTicks > 20 ? 0.25 : 0.35;
-        return boundingBox.grow(
-                (boundingBox.getMaxX() - boundingBox.getMinX()) * growK,
-                0,
-                (boundingBox.getMaxZ() - boundingBox.getMinZ()) * growK
+        // Fixed 0.3 expansion prevents collision misses at low ticks
+        return new SimpleAxisAlignedBB(
+                this.x - 0.3D, this.y, this.z - 0.3D,
+                this.x + 1.3D, this.y + 1.0D, this.z + 1.3D
         );
     }
 

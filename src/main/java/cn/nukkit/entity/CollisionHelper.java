@@ -1,7 +1,8 @@
 package cn.nukkit.entity;
 
 import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockID;
+import cn.nukkit.block.BlockBarrier;
+
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
@@ -33,28 +34,27 @@ public record CollisionHelper(Entity entity) {
         if (level == null) return Block.EMPTY_ARRAY;
 
         AxisAlignedBB boundingBox = entity.getBoundingBox();
+        AxisAlignedBB expandedBB = boundingBox.grow(0.5, 0, 0.5);
+        Block[] blocks = this.getBlocksInBoundingBox(expandedBB);
 
-        Block[] blocks = getBlocksInBoundingBox(boundingBox.grow(0.5, 0, 0.5));
         if (blocks.length == 0) return Block.EMPTY_ARRAY;
 
-        double shrinkX = (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.25;
-        double shrinkZ = (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.25;
-
-        Block[] result = new Block[Math.min(blocks.length, 4)];
-        int count = 0;
+        List<Block> result = new ArrayList<>(Math.min(blocks.length, 4));
 
         for (Block block : blocks) {
-            if (block.collidesWithBB(boundingBox.shrink(shrinkX, 0, shrinkZ), true)) {
-                if (count == result.length) {
-                    result = Arrays.copyOf(result, result.length * 2);
+            if (block.canPassThrough()) {
+                double shrinkX = (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.25;
+                double shrinkZ = (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.25;
+
+                if (block.collidesWithBB(boundingBox.shrink(shrinkX, 0, shrinkZ), true)) {
+                    result.add(block);
                 }
-                result[count++] = block;
+            } else if (block.collidesWithBB(boundingBox, true)) {
+                result.add(block);
             }
         }
 
-        return count == 0 ? Block.EMPTY_ARRAY :
-                count == result.length ? result :
-                        Arrays.copyOf(result, count);
+        return result.isEmpty() ? Block.EMPTY_ARRAY : result.toArray(Block[]::new);
     }
 
     /**
@@ -450,7 +450,7 @@ public record CollisionHelper(Entity entity) {
             for (int x = minX; x <= maxX; ++x) {
                 for (int y = clampedMinY; y <= clampedMaxY; ++y) {
                     Block block = level.getBlock(x, y, z, false);
-                    if (block.getId() == BlockID.BARRIER && entity.canPassThroughBarrier()) {
+                    if (block instanceof BlockBarrier && entity.canPassThroughBarrier()) {
                         continue;
                     }
                     if (!block.canPassThrough() && block.collidesWithBB(boundingBox)) {
