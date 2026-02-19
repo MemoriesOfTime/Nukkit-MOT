@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockComposter;
 import cn.nukkit.block.BlockHopper;
+import cn.nukkit.event.blockentity.BlockEntityHopperUpdateEvent;
 import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.*;
 import cn.nukkit.item.Item;
@@ -121,6 +122,11 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
     public boolean onUpdate() {
         if (this.closed) {
             return false;
+        }
+        BlockEntityHopperUpdateEvent ev = new BlockEntityHopperUpdateEvent(this);
+        this.server.getPluginManager().callEvent(ev);
+        if (ev.isCancelled()) {
+            return true;
         }
 
         this.transferCooldown--;
