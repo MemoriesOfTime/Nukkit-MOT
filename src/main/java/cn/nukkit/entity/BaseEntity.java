@@ -23,6 +23,7 @@ import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.EntityEventPacket;
+import cn.nukkit.utils.CollisionHelper;
 import cn.nukkit.utils.Utils;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -30,6 +31,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -280,7 +282,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
                 for (int i = 0; i < 3; i++) {
                     this.level.addParticle(new HeartParticle(this.add(Utils.rand(-1.0, 1.0), this.getMountedYOffset() + Utils.rand(-1.0, 1.0), Utils.rand(-1.0, 1.0))));
                 }
-                Entity[] collidingEntities = this.level.getCollidingEntities(this.boundingBox.grow(0.5d, 0.5d, 0.5d));
+                List<Entity> collidingEntities = CollisionHelper.getCollidingEntities(this.level, this.boundingBox.grow(0.5d, 0.5d, 0.5d));
                 for (Entity entity : collidingEntities) {
                     if (this.checkSpawnBaby(entity)) {
                         break;
@@ -411,22 +413,19 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         double movY = dy;
         double movZ = dz * moveMultiplier;
 
-        AxisAlignedBB[] list = this.level.getCollisionCubes(this, this.boundingBox.addCoord(dx, dy, dz), false);
+        List<AxisAlignedBB> collisions = CollisionHelper.getCollisionCubes(
+                this.level,
+                this,
+                this.boundingBox.addCoord(dx, dy, dz),
+                false,
+                false
+        );
 
-        for (AxisAlignedBB bb : list) {
-            dx = bb.calculateXOffset(this.boundingBox, dx);
-        }
-        this.boundingBox.offset(dx, 0, 0);
+        dx = collisions.stream().reduce(dx, (motion, bb) -> bb.calculateXOffset(this.boundingBox, motion), Double::min);
+        dz = collisions.stream().reduce(dz, (motion, bb) -> bb.calculateZOffset(this.boundingBox, motion), Double::min);
+        dy = collisions.stream().reduce(dy, (motion, bb) -> bb.calculateYOffset(this.boundingBox, motion), Double::min);
 
-        for (AxisAlignedBB bb : list) {
-            dz = bb.calculateZOffset(this.boundingBox, dz);
-        }
-        this.boundingBox.offset(0, 0, dz);
-
-        for (AxisAlignedBB bb : list) {
-            dy = bb.calculateYOffset(this.boundingBox, dy);
-        }
-        this.boundingBox.offset(0, dy, 0);
+        this.boundingBox.offset(dx, dy, dz);
 
         this.setComponents(this.x + dx, this.y + dy, this.z + dz);
         this.checkChunks();
@@ -735,7 +734,7 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
 
     @Override
     protected void checkBlockCollision() {
-        for (Block block : this.getCollisionBlocks()) {
+        for (Block block : getCollisionHelper().getCollisionBlocks()) {
             block.onEntityCollide(this);
         }
 

@@ -1880,7 +1880,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         boolean scaffolding = false;
         boolean powderSnow = false;
 
-        for (Block block : this.getCollisionBlocks()) {
+        for (Block block : getCollisionHelper().getCollisionBlocks()) {
             switch (block.getId()) {
                 case Block.NETHER_PORTAL:
                     netherPortal = true;
@@ -1904,8 +1904,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         AxisAlignedBB scanBoundingBox = this.boundingBox.getOffsetBoundingBox(0, -0.125, 0);
         scanBoundingBox.setMaxY(this.boundingBox.getMinY());
-        Block[] scaffoldingUnder = this.level.getCollisionBlocks(scanBoundingBox, true, true, b -> b.getId() == BlockID.SCAFFOLDING);
-        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_OVER_SCAFFOLDING, scaffoldingUnder.length > 0);
+
+        List<Block> scaffoldingUnder = CollisionHelper.getCollisionBlocks(
+                this.level,
+                scanBoundingBox,
+                null,
+                true,
+                true,
+                block -> block.getId() == BlockID.SCAFFOLDING
+        );
+
+        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_OVER_SCAFFOLDING, !scaffoldingUnder.isEmpty());
 
         if (endPortal) {
             inEndPortalTicks++;
@@ -2163,17 +2172,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         // Replacement for this.fastMove(dx, dy, dz) start
         boolean canPass = this.isSpectator();
         if (!canPass) {
-            Block[] blocks = this.level.getCollisionBlocks(this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, this.getStepHeight(), 0.1));
-            if (blocks.length == 0) {
+            List<Block> blocks = CollisionHelper.getCollisionBlocks(
+                    this.level,
+                    this.boundingBox.getOffsetBoundingBox(dx, dy, dz).shrink(0.1, this.getStepHeight(), 0.1)
+            );
+
+            if (blocks.isEmpty()) {
                 canPass = true;
             } else {
-                canPass = true;
-                for (Block b : blocks) {
-                    if (b.getId() != Block.SCAFFOLDING) { //脚手架特殊判断，移动时可以穿过
-                        canPass = false;
-                        break;
-                    }
-                }
+                canPass = blocks.stream()
+                        .allMatch(block -> block.getId() == Block.SCAFFOLDING);
             }
         }
         if (canPass) {
@@ -2198,7 +2206,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 bb.setMaxZ(bb.getMaxZ() - 0.1);
             }
 
-            this.onGround = this.level.hasCollisionBlocks(this, bb);
+            this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
         }
 
         this.isCollided = this.onGround;
@@ -3731,7 +3739,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     playerToggleSpinAttackEvent.setCancelled(true);
                                 } else {
                                     boolean inWater = false;
-                                    for (Block block : this.getCollisionBlocks()) {
+                                    for (Block block : getCollisionHelper().getCollisionBlocks()) {
                                         if (block instanceof BlockWater || block.level.isBlockWaterloggedAt(this.chunk, (int) block.x, (int) block.y, (int) block.z)) {
                                             inWater = true;
                                             break;

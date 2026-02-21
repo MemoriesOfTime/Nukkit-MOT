@@ -16,8 +16,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.LevelEventPacket;
 import cn.nukkit.utils.Utils;
 
-import java.util.List;
-
 public class EntityEnderPearl extends EntityProjectile {
 
     public static final int NETWORK_ID = 87;
@@ -67,10 +65,10 @@ public class EntityEnderPearl extends EntityProjectile {
         }
 
         if (this.isCollided && this.shootingEntity instanceof Player) {
-            List<Block> b = this.getCollisionBlocks();
+            Block[] blocks = getCollisionHelper().getCollisionBlocks();
 
             boolean portal = false;
-            for (Block collided : b) {
+            for (Block collided : blocks) {
                 if (collided.getId() == Block.NETHER_PORTAL) {
                     portal = true;
                 }

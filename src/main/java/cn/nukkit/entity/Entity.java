@@ -37,10 +37,7 @@ import cn.nukkit.network.protocol.types.EntityLink;
 import cn.nukkit.network.protocol.types.PropertySyncData;
 import cn.nukkit.plugin.Plugin;
 import cn.nukkit.potion.Effect;
-import cn.nukkit.utils.ChunkException;
-import cn.nukkit.utils.Identifier;
-import cn.nukkit.utils.MainLogger;
-import cn.nukkit.utils.Utils;
+import cn.nukkit.utils.*;
 import com.google.common.collect.Iterables;
 import org.apache.commons.math3.util.FastMath;
 import org.jetbrains.annotations.NotNull;
@@ -456,7 +453,7 @@ public abstract class Entity extends Location implements Metadatable {
 
     protected EntityDamageEvent lastDamageCause = null;
 
-    private EntityCollision collisionCache;
+    private CollisionHelper collisionHelper;
 
     public List<Block> blocksAround = new ArrayList<>();
     public List<Block> collisionBlocks = new ArrayList<>();
@@ -673,7 +670,7 @@ public abstract class Entity extends Location implements Metadatable {
 
         this.init = true;
 
-        this.collisionCache = new EntityCollision(this);
+        this.collisionHelper = new CollisionHelper(this);
         this.temporalVector = new Vector3();
 
         if (Server.getInstance().netEaseMode) {
@@ -1780,7 +1777,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     protected boolean checkObstruction(double x, double y, double z) {
-        if (this.noClip || this.level.getCollisionCubes(this, this.boundingBox, false).length == 0) {
+        if (this.noClip || CollisionHelper.getCollisionCubes(this.level, this, this.boundingBox, false).isEmpty()) {
             return false;
         }
 
@@ -2004,7 +2001,7 @@ public abstract class Entity extends Location implements Metadatable {
                 return false;
             }
             if (!(this instanceof Player) && !positionChanged) return false;
-            List<Block> blocks = this.getBlocksAround();
+            Block[] blocks = getCollisionHelper().getBlocksAround();
             for (Block block : blocks) {
                 if (block.getId() == Block.SWEET_BERRY_BUSH && block.getDamage() >= 2) {
                     return true;
@@ -2544,8 +2541,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfLava() {
-        if (collisionCache == null) collisionCache = new EntityCollision(this);
-        return collisionCache.isInsideSpecialBlock(boundingBox, Block.LAVA);
+        return getCollisionHelper().isInsideBlock(this.boundingBox, Block.LAVA);
     }
 
     public boolean isInsideOfSolid() {
@@ -2563,8 +2559,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public boolean isInsideOfFire() {
-        if (collisionCache == null) collisionCache = new EntityCollision(this);
-        return collisionCache.isInsideSpecialBlock(boundingBox, Block.FIRE);
+        return getCollisionHelper().isInsideBlock(this.boundingBox, Block.FIRE);
     }
 
     public boolean fastMove(double dx, double dy, double dz) {
@@ -2592,7 +2587,7 @@ public abstract class Entity extends Location implements Metadatable {
             AxisAlignedBB bb = this.boundingBox.clone();
             bb.setMinY(bb.getMinY() - 0.75);
 
-            this.onGround = this.level.hasCollisionBlocks(this, bb);
+            this.onGround = CollisionHelper.hasCollisionBlocks(this.level, this, bb);
         }
         this.isCollided = this.onGround;
         this.updateFallState(this.onGround);
@@ -2611,7 +2606,11 @@ public abstract class Entity extends Location implements Metadatable {
 
         if (this.keepMovement) {
             this.boundingBox.offset(dx, dy, dz);
-            this.setPosition(this.temporalVector.setComponents((this.boundingBox.getMinX() + this.boundingBox.getMaxX()) / 2, this.boundingBox.getMinY(), (this.boundingBox.getMinZ() + this.boundingBox.getMaxZ()) / 2));
+            this.setPosition(this.temporalVector.setComponents(
+                    (this.boundingBox.getMinX() + this.boundingBox.getMaxX()) / 2,
+                    this.boundingBox.getMinY(),
+                    (this.boundingBox.getMinZ() + this.boundingBox.getMaxZ()) / 2
+            ));
             this.onGround = this instanceof Player;
             return true;
         } else {
@@ -2623,66 +2622,62 @@ public abstract class Entity extends Location implements Metadatable {
 
             AxisAlignedBB axisalignedbb = this.boundingBox.clone();
 
-            AxisAlignedBB[] list = this.noClip ? AxisAlignedBB.EMPTY_ARRAY : this.level.getCollisionCubes(this, this.boundingBox.addCoord(dx, dy, dz), false);
+            List<AxisAlignedBB> collisions = this.noClip ? List.of() : CollisionHelper.getCollisionCubes(
+                    this.level,
+                    this,
+                    this.boundingBox.addCoord(dx, dy, dz),
+                    false,
+                    false
+            );
 
-            for (AxisAlignedBB bb : list) {
-                dy = bb.calculateYOffset(this.boundingBox, dy);
-            }
+            double finalDy = collisions.stream().reduce(dy, (motion, bb) -> bb.calculateYOffset(this.boundingBox, motion), Double::min);
+            double finalDx = collisions.stream().reduce(dx, (motion, bb) -> bb.calculateXOffset(this.boundingBox, motion), Double::min);
+            double finalDz = collisions.stream().reduce(dz, (motion, bb) -> bb.calculateZOffset(this.boundingBox, motion), Double::min);
 
-            this.boundingBox.offset(0, dy, 0);
+            boolean fallingFlag = (this.onGround || (finalDy != movY && movY < 0));
 
-            boolean fallingFlag = (this.onGround || (dy != movY && movY < 0));
+            this.boundingBox.offset(finalDx, finalDy, finalDz);
 
-            for (AxisAlignedBB bb : list) {
-                dx = bb.calculateXOffset(this.boundingBox, dx);
-            }
-
-            this.boundingBox.offset(dx, 0, 0);
-
-            for (AxisAlignedBB bb : list) {
-                dz = bb.calculateZOffset(this.boundingBox, dz);
-            }
-
-            this.boundingBox.offset(0, 0, dz);
+            dx = finalDx;
+            dy = finalDy;
+            dz = finalDz;
 
             if (this.getStepHeight() > 0 && fallingFlag && (movX != dx || movZ != dz)) {
                 double cx = dx;
                 double cy = dy;
                 double cz = dz;
+
                 dx = movX;
                 dy = this.getStepHeight();
                 dz = movZ;
 
                 AxisAlignedBB axisalignedbb1 = this.boundingBox.clone();
-
                 this.boundingBox.setBB(axisalignedbb);
 
-                list = this.level.getCollisionCubes(this, this.boundingBox.addCoord(dx, dy, dz), false);
+                collisions = CollisionHelper.getCollisionCubes(
+                        this.level,
+                        this,
+                        this.boundingBox.addCoord(dx, dy, dz),
+                        false,
+                        false
+                );
 
-                for (AxisAlignedBB bb : list) {
-                    dy = bb.calculateYOffset(this.boundingBox, dy);
-                }
+                double stepDy = collisions.stream().reduce(dy, (motion, bb) -> bb.calculateYOffset(this.boundingBox, motion), Double::min);
+                double stepDx = collisions.stream().reduce(dx, (motion, bb) -> bb.calculateXOffset(this.boundingBox, motion), Double::min);
+                double stepDz = collisions.stream().reduce(dz, (motion, bb) -> bb.calculateZOffset(this.boundingBox, motion), Double::min);
 
-                this.boundingBox.offset(0, dy, 0);
+                this.boundingBox.offset(stepDx, stepDy, stepDz);
 
-                for (AxisAlignedBB bb : list) {
-                    dx = bb.calculateXOffset(this.boundingBox, dx);
-                }
+                double reverseDY = -stepDy;
+                reverseDY = collisions.stream().reduce(reverseDY, (motion, bb) -> bb.calculateYOffset(this.boundingBox, motion), Double::min);
 
-                this.boundingBox.offset(dx, 0, 0);
+                double totalStepDy = stepDy + reverseDY;
 
-                for (AxisAlignedBB bb : list) {
-                    dz = bb.calculateZOffset(this.boundingBox, dz);
-                }
-
-                this.boundingBox.offset(0, 0, dz);
-
-                double reverseDY = -dy;
-                for (AxisAlignedBB bb : list) {
-                    reverseDY = bb.calculateYOffset(this.boundingBox, reverseDY);
-                }
-                dy += reverseDY;
                 this.boundingBox.offset(0, reverseDY, 0);
+
+                dx = stepDx;
+                dy = totalStepDy;
+                dz = stepDz;
 
                 if ((cx * cx + cz * cz) >= (dx * dx + dz * dz)) {
                     dx = cx;
@@ -2733,33 +2728,39 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
-    public List<Block> getBlocksAround() {
-        List<Block> blocksAround = collisionCache.getBlocksInBoundingBox(this.boundingBox);
-
-        if (!blocksAround.isEmpty()) {
-            this.blocksAround = blocksAround;
-        } else {
-            return Collections.emptyList();
+    /**
+     * Gets the collision helper for this entity.
+     * Creates a new instance if one doesn't exist.
+     *
+     * @return CollisionHelper instance
+     */
+    public CollisionHelper getCollisionHelper() {
+        if (this.collisionHelper == null) {
+            this.collisionHelper = new CollisionHelper(this);
         }
-
-        return blocksAround;
+        return this.collisionHelper;
     }
 
-    public List<Block> getCollisionBlocks() {
-        List<Block> collisionBlocks = collisionCache.getCollisionBlocks(
-                this.boundingBox,
-                this.motionX,
-                this.motionY,
-                this.motionZ
-        );
-
-        if (!collisionBlocks.isEmpty()) {
-            this.collisionBlocks = collisionBlocks;
-        } else {
-            return Collections.emptyList();
+    /**
+     * @deprecated Use {@link #getCollisionHelper()}.getBlocksAround() instead
+     */
+    @Deprecated
+    public List<Block> getBlocksAround() {
+        if (this.blocksAround == null) {
+            this.blocksAround = List.of(getCollisionHelper().getBlocksAround());
         }
+        return this.blocksAround;
+    }
 
-        return collisionBlocks;
+    /**
+     * @deprecated Use {@link #getCollisionHelper()}.getCollisionBlocks() instead
+     */
+    @Deprecated
+    public List<Block> getCollisionBlocks() {
+        if (this.collisionBlocks == null) {
+            this.collisionBlocks = List.of(getCollisionHelper().getCollisionBlocks());
+        }
+        return this.collisionBlocks;
     }
 
     /**
@@ -2780,7 +2781,7 @@ public abstract class Entity extends Location implements Metadatable {
         boolean portal = false;
         boolean powderSnow = false;
 
-        for (Block block : this.getCollisionBlocks()) {
+        for (Block block : getCollisionHelper().getCollisionBlocks()) {
             if (block.getId() == Block.NETHER_PORTAL) {
                 portal = true;
                 continue;
@@ -3067,8 +3068,24 @@ public abstract class Entity extends Location implements Metadatable {
     public void close() {
         if (!this.closed) {
             this.closed = true;
+
+            this.collisionHelper = null;
+            this.blocksAround = null;
+            this.collisionBlocks = null;
+
+            this.effects.clear();
+            this.passengers.clear();
+
+            if (this.intProperties != null) {
+                this.intProperties.clear();
+            }
+            if (this.floatProperties != null) {
+                this.floatProperties.clear();
+            }
+
             this.server.getPluginManager().callEvent(new EntityDespawnEvent(this));
             this.despawnFromAll();
+
             if (this.chunk != null) {
                 this.chunk.removeEntity(this);
             }
