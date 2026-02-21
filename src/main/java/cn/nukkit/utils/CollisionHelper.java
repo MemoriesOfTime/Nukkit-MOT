@@ -1,8 +1,9 @@
-package cn.nukkit.entity;
+package cn.nukkit.utils;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockBarrier;
 
+import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
@@ -102,15 +103,14 @@ public record CollisionHelper(Entity entity) {
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 for (int y = clampedMinY; y <= clampedMaxY; y++) {
-                    int blockId = level.getBlockIdAt(x, y, z);
-                    if (blockId == Block.AIR) continue;
+                    Block block = level.getBlock(x, y, z);
+                    if (block.isAir()) continue;
 
                     if (count == result.length) {
                         result = Arrays.copyOf(result, Math.min(result.length * 2, estimatedCount));
                     }
 
-                    int blockData = level.getBlockDataAt(x, y, z);
-                    result[count++] = Block.get(blockId, blockData, level, x, y, z);
+                    result[count++] = block.clone();
                 }
             }
         }

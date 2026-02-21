@@ -5,7 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockWater;
 import cn.nukkit.entity.Entity;
-import cn.nukkit.entity.CollisionHelper;
+import cn.nukkit.utils.CollisionHelper;
 import cn.nukkit.entity.data.ByteEntityData;
 import cn.nukkit.entity.data.FloatEntityData;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
