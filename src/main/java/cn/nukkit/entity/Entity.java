@@ -2747,7 +2747,7 @@ public abstract class Entity extends Location implements Metadatable {
     @Deprecated
     public List<Block> getBlocksAround() {
         if (this.blocksAround == null) {
-            this.blocksAround = List.of(getCollisionHelper().getBlocksAround());
+            this.blocksAround = Arrays.asList(getCollisionHelper().getBlocksAround());
         }
         return this.blocksAround;
     }
@@ -2758,7 +2758,7 @@ public abstract class Entity extends Location implements Metadatable {
     @Deprecated
     public List<Block> getCollisionBlocks() {
         if (this.collisionBlocks == null) {
-            this.collisionBlocks = List.of(getCollisionHelper().getCollisionBlocks());
+            this.collisionBlocks = Arrays.asList(getCollisionHelper().getCollisionBlocks());
         }
         return this.collisionBlocks;
     }

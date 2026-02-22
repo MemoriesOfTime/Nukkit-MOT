@@ -2,15 +2,13 @@ package cn.nukkit.utils;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockBarrier;
-
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Level;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.NukkitMath;
-
 import org.jetbrains.annotations.NotNull;
-import javax.annotation.Nullable;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -300,7 +298,7 @@ public record CollisionHelper(Entity entity) {
             boolean ignoreCollidesCheck,
             Predicate<Block> condition
     ) {
-        if (level == null) return List.of(Block.EMPTY_ARRAY);
+        if (level == null) return Collections.emptyList();
 
         int minX = NukkitMath.floorDouble(boundingBox.getMinX());
         int minY = NukkitMath.floorDouble(boundingBox.getMinY());
@@ -309,11 +307,11 @@ public record CollisionHelper(Entity entity) {
         int maxY = NukkitMath.ceilDouble(boundingBox.getMaxY());
         int maxZ = NukkitMath.ceilDouble(boundingBox.getMaxZ());
 
-        if (minX > maxX || minY > maxY || minZ > maxZ) return List.of(Block.EMPTY_ARRAY);
+        if (minX > maxX || minY > maxY || minZ > maxZ) return Collections.emptyList();
 
         int clampedMinY = Math.max(minY, level.getMinBlockY());
         int clampedMaxY = Math.min(maxY, level.getMaxBlockY());
-        if (clampedMinY > clampedMaxY) return List.of(Block.EMPTY_ARRAY);
+        if (clampedMinY > clampedMaxY) return Collections.emptyList();
 
         if (targetFirst) {
             for (int z = minZ; z <= maxZ; ++z) {
@@ -344,7 +342,7 @@ public record CollisionHelper(Entity entity) {
             return collides;
         }
 
-        return List.of(Block.EMPTY_ARRAY);
+        return Collections.emptyList();
     }
 
     /**
