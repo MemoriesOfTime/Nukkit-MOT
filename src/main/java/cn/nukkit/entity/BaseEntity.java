@@ -413,19 +413,22 @@ public abstract class BaseEntity extends EntityCreature implements EntityAgeable
         double movY = dy;
         double movZ = dz * moveMultiplier;
 
-        List<AxisAlignedBB> collisions = CollisionHelper.getCollisionCubes(
-                this.level,
-                this,
-                this.boundingBox.addCoord(dx, dy, dz),
-                false,
-                false
-        );
+        List<AxisAlignedBB> list = CollisionHelper.getCollisionCubes(this.level, this, this.boundingBox.addCoord(dx, dy, dz), false);
 
-        dx = collisions.stream().reduce(dx, (motion, bb) -> bb.calculateXOffset(this.boundingBox, motion), Double::min);
-        dz = collisions.stream().reduce(dz, (motion, bb) -> bb.calculateZOffset(this.boundingBox, motion), Double::min);
-        dy = collisions.stream().reduce(dy, (motion, bb) -> bb.calculateYOffset(this.boundingBox, motion), Double::min);
+        for (AxisAlignedBB bb : list) {
+            dx = bb.calculateXOffset(this.boundingBox, dx);
+        }
+        this.boundingBox.offset(dx, 0, 0);
 
-        this.boundingBox.offset(dx, dy, dz);
+        for (AxisAlignedBB bb : list) {
+            dz = bb.calculateZOffset(this.boundingBox, dz);
+        }
+        this.boundingBox.offset(0, 0, dz);
+
+        for (AxisAlignedBB bb : list) {
+            dy = bb.calculateYOffset(this.boundingBox, dy);
+        }
+        this.boundingBox.offset(0, dy, 0);
 
         this.setComponents(this.x + dx, this.y + dy, this.z + dz);
         this.checkChunks();

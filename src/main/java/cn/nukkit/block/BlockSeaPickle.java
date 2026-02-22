@@ -145,21 +145,24 @@ public class BlockSeaPickle extends BlockFlowable {
             ThreadLocalRandom random = ThreadLocalRandom.current();
             Level level = this.getLevel();
 
-            blocksAround.stream()
+            List<Block> waterBlocksAboveCoral = blocksAround.stream()
                     .filter(b -> b.getId() == CORAL_BLOCK)
                     .map(Block::up)
                     .filter(up -> up instanceof BlockWater)
                     .filter(up -> up.getDamage() == 0 || up.getDamage() == 8)
-                    .filter(up -> random.nextInt(6) == 0)
-                    .forEach(up -> {
-                        BlockSpreadEvent event = new BlockSpreadEvent(
-                                up, this, new BlockSeaPickle(random.nextInt(3))
-                        );
-                        if (!event.isCancelled()) {
-                            level.setBlock(up, 1, new BlockWater(), true, false);
-                            level.setBlock(up, event.getNewState(), true, true);
-                        }
-                    });
+                    .toList();
+
+            for (Block up : waterBlocksAboveCoral) {
+                if (random.nextInt(6) == 0) {
+                    BlockSpreadEvent event = new BlockSpreadEvent(
+                            up, this, new BlockSeaPickle(random.nextInt(3))
+                    );
+                    if (!event.isCancelled()) {
+                        level.setBlock(up, 1, new BlockWater(), true, false);
+                        level.setBlock(up, event.getNewState(), true, true);
+                    }
+                }
+            }
         }
 
         return true;
