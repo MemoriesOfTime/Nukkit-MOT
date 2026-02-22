@@ -33,6 +33,7 @@ import lombok.Setter;
  */
 @Getter
 public class HopperSearchItemEvent extends Event implements Cancellable {
+
     private static final HandlerList handlers = new HandlerList();
 
     public static HandlerList getHandlers() {

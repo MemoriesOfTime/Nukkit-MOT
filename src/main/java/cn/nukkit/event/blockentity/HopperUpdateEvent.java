@@ -28,7 +28,8 @@ import lombok.Setter;
  * and the modified value will take effect in the current update.
  */
 @Getter
-public class BlockEntityHopperUpdateEvent extends Event implements Cancellable {
+public class HopperUpdateEvent extends Event implements Cancellable {
+
     private static final HandlerList handlers = new HandlerList();
 
     public static HandlerList getHandlers() {
@@ -54,7 +55,7 @@ public class BlockEntityHopperUpdateEvent extends Event implements Cancellable {
     @Setter
     private int transferCooldown;
 
-    public BlockEntityHopperUpdateEvent(BlockEntityHopper blockEntity) {
+    public HopperUpdateEvent(BlockEntityHopper blockEntity) {
         this.blockEntity = blockEntity;
         this.transferCooldown = blockEntity.transferCooldown;
     }

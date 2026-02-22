@@ -4,8 +4,8 @@ import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockComposter;
 import cn.nukkit.block.BlockHopper;
-import cn.nukkit.event.blockentity.BlockEntityHopperUpdateEvent;
 import cn.nukkit.event.blockentity.HopperSearchItemEvent;
+import cn.nukkit.event.blockentity.HopperUpdateEvent;
 import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.*;
 import cn.nukkit.item.Item;
@@ -125,7 +125,7 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             return false;
         }
 
-        BlockEntityHopperUpdateEvent ev = new BlockEntityHopperUpdateEvent(this);
+        HopperUpdateEvent ev = new HopperUpdateEvent(this);
         ev.call();
         if (ev.isCancelled()) {
             return true;
