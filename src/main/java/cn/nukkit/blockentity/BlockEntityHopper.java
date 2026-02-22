@@ -4,6 +4,8 @@ import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockComposter;
 import cn.nukkit.block.BlockHopper;
+import cn.nukkit.event.blockentity.HopperSearchItemEvent;
+import cn.nukkit.event.blockentity.HopperUpdateEvent;
 import cn.nukkit.event.inventory.InventoryMoveItemEvent;
 import cn.nukkit.inventory.*;
 import cn.nukkit.item.Item;
@@ -123,28 +125,41 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             return false;
         }
 
-        this.transferCooldown--;
+        HopperUpdateEvent ev = new HopperUpdateEvent(this);
+        ev.call();
+        if (ev.isCancelled()) {
+            return true;
+        }
+
+        this.transferCooldown = ev.getTransferCooldown() - 1;
 
         if (!this.isOnTransferCooldown()) {
             if (this.level.isBlockPowered(this.getBlock())) {
                 return true;
             }
 
+            HopperSearchItemEvent searchEvent = new HopperSearchItemEvent(this, false, this.pickupArea);
+            searchEvent.call();
+
             boolean changed = false;
 
-            if (!this.inventory.isFull()) {
-                BlockEntity blockEntity = this.level.getBlockEntity(this.up());
-                Block block = null;
-                if (blockEntity instanceof BlockEntityContainer ||
-                        (block = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() + 1, this.getFloorZ(), false)) instanceof BlockComposter) {
-                    changed = this.pullItems(blockEntity, block);
-                } else {
-                    changed = this.pullItemsFromMinecart() || this.pickupItems();
+            if (!searchEvent.isCancelled() && !searchEvent.isCancelPull()) {
+                if (!this.inventory.isFull()) {
+                    BlockEntity blockEntity = this.level.getBlockEntity(this.up());
+                    Block block = null;
+                    if (blockEntity instanceof BlockEntityContainer ||
+                            (block = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() + 1, this.getFloorZ(), false)) instanceof BlockComposter) {
+                        changed = this.pullItems(blockEntity, block);
+                    } else {
+                        changed = this.pullItemsFromMinecart() || this.pickupItems(searchEvent.getPickupArea());
+                    }
                 }
             }
 
-            if (!changed && !this.inventory.isEmpty()) {
-                changed = this.pushItemsIntoMinecart() || this.pushItems();
+            if (!changed && !searchEvent.isCancelled() && !searchEvent.isCancelPush()) {
+                if (!this.inventory.isEmpty()) {
+                    changed = this.pushItemsIntoMinecart() || this.pushItems();
+                }
             }
 
             if (changed) {
