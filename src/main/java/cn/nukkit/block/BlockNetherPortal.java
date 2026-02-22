@@ -7,7 +7,6 @@ import cn.nukkit.level.Position;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Axis;
-import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
@@ -98,11 +97,7 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
 
     @Override
     protected AxisAlignedBB recalculateBoundingBox() {
-        // Fixed 0.3 expansion prevents collision misses at low ticks
-        return new SimpleAxisAlignedBB(
-                this.x - 0.3D, this.y, this.z - 0.3D,
-                this.x + 1.3D, this.y + 1.0D, this.z + 1.3D
-        );
+        return this;
     }
 
     public static boolean trySpawnPortal(Level level, Vector3 pos) {

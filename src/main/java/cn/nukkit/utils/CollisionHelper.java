@@ -43,13 +43,24 @@ public record CollisionHelper(Entity entity) {
 
         for (Block block : blocks) {
             if (block.canPassThrough()) {
-                double shrinkX = (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.25;
-                double shrinkZ = (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.25;
-                if (block.collidesWithBB(boundingBox.shrink(shrinkX, 0, shrinkZ), true)) {
-                    if (count == result.length) {
-                        result = Arrays.copyOf(result, result.length << 1);
+                if (block.hasEntityCollision()) {
+                    // 有实体碰撞的可穿过方块（传送门、火焰等）使用原始碰撞箱
+                    if (block.collidesWithBB(boundingBox, true)) {
+                        if (count == result.length) {
+                            result = Arrays.copyOf(result, result.length << 1);
+                        }
+                        result[count++] = block;
                     }
-                    result[count++] = block;
+                } else {
+                    // 纯装饰性可穿过方块使用收缩碰撞箱
+                    double shrinkX = (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.25;
+                    double shrinkZ = (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.25;
+                    if (block.collidesWithBB(boundingBox.shrink(shrinkX, 0, shrinkZ), true)) {
+                        if (count == result.length) {
+                            result = Arrays.copyOf(result, result.length << 1);
+                        }
+                        result[count++] = block;
+                    }
                 }
             } else if (block.collidesWithBB(boundingBox, true)) {
                 if (count == result.length) {
