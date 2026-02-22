@@ -30,12 +30,22 @@ public class InteractPacket extends DataPacket {
     public void decode() {
         this.action = this.getByte();
         this.target = this.getEntityRuntimeId();
-        if ((protocol >= ProtocolInfo.v1_21_130_28 && this.getBoolean()) ||
-                (protocol < ProtocolInfo.v1_21_130_28 && (this.action == ACTION_MOUSEOVER || (protocol >= ProtocolInfo.v1_13_0 && this.action == ACTION_VEHICLE_EXIT)))) {
+        if (this.hasPositionData()) {
             this.x = this.getFloat();
             this.y = this.getFloat();
             this.z = this.getFloat();
         }
+    }
+
+    private boolean hasPositionData() {
+        if (protocol >= ProtocolInfo.v1_21_130_28) {
+            return this.getBoolean();
+        }
+        if (protocol < ProtocolInfo.v1_2_0) {
+            return false; // v113 (1.1) InteractPacket does not include position data
+        }
+        return this.action == ACTION_MOUSEOVER
+                || (protocol >= ProtocolInfo.v1_13_0 && this.action == ACTION_VEHICLE_EXIT);
     }
 
     @Override
