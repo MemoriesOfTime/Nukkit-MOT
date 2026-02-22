@@ -33,8 +33,15 @@ public record CollisionHelper(Entity entity) {
         if (level == null) return Block.EMPTY_ARRAY;
 
         AxisAlignedBB boundingBox = entity.getBoundingBox();
-        AxisAlignedBB expandedBB = boundingBox.grow(0.5, 0, 0.5);
-        Block[] blocks = this.getBlocksInBoundingBox(expandedBB);
+
+        double motionAbsX = Math.abs(entity.motionX);
+        double motionAbsY = Math.abs(entity.motionY);
+        double motionAbsZ = Math.abs(entity.motionZ);
+        double expandX = Math.max(0.5, motionAbsX + 0.3);
+        double expandY = Math.max(0.5, motionAbsY + 0.3);
+        double expandZ = Math.max(0.5, motionAbsZ + 0.3);
+
+        Block[] blocks = this.getBlocksInBoundingBox(boundingBox.grow(expandX, expandY, expandZ));
 
         if (blocks.length == 0) return Block.EMPTY_ARRAY;
 
@@ -44,18 +51,20 @@ public record CollisionHelper(Entity entity) {
         for (Block block : blocks) {
             if (block.canPassThrough()) {
                 if (block.hasEntityCollision()) {
-                    // 有实体碰撞的可穿过方块（传送门、火焰等）使用原始碰撞箱
-                    if (block.collidesWithBB(boundingBox, true)) {
+                    // Traversable blocks (portals, flames, etc.) with entity collisions are detected using the trajectoryBB extension
+                    AxisAlignedBB trajectoryBB = boundingBox.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3);
+                    if (block.collidesWithBB(trajectoryBB, true)) {
                         if (count == result.length) {
                             result = Arrays.copyOf(result, result.length << 1);
                         }
                         result[count++] = block;
                     }
                 } else {
-                    // 纯装饰性可穿过方块使用收缩碰撞箱
+                    // Purely decorative pass-through block using shrink hitbox
                     double shrinkX = (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.25;
                     double shrinkZ = (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.25;
-                    if (block.collidesWithBB(boundingBox.shrink(shrinkX, 0, shrinkZ), true)) {
+                    AxisAlignedBB shrinkBB = boundingBox.shrink(shrinkX, 0, shrinkZ);
+                    if (block.collidesWithBB(shrinkBB, true)) {
                         if (count == result.length) {
                             result = Arrays.copyOf(result, result.length << 1);
                         }
