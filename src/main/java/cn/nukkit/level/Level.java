@@ -7,6 +7,7 @@ import cn.nukkit.api.NonComputationAtomic;
 import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.BaseEntity;
+import cn.nukkit.utils.CollisionHelper;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
@@ -1242,10 +1243,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public Vector3 adjustPosToNearbyEntity(Vector3 pos) {
         pos.y = this.getHighestBlockAt(pos.getFloorX(), pos.getFloorZ());
-        AxisAlignedBB axisalignedbb = new SimpleAxisAlignedBB(pos.x, pos.y, pos.z, pos.getX(), this.getMaxBlockY(), pos.getZ()).expand(3, 3, 3);
+        AxisAlignedBB boundingBox = new SimpleAxisAlignedBB(pos.x, pos.y, pos.z, pos.getX(), this.getMaxBlockY(), pos.getZ()).expand(3, 3, 3);
         List<Entity> list = new ArrayList<>();
 
-        for (Entity entity : this.getCollidingEntities(axisalignedbb)) {
+        for (Entity entity : CollisionHelper.getCollidingEntities(this, boundingBox)) {
             if (entity.isAlive() && entity.canSeeSky()) {
                 list.add(entity);
             }
@@ -1717,88 +1718,143 @@ public class Level implements ChunkManager, Metadatable {
         return updateQueue.getPendingBlockUpdates(boundingBox);
     }
 
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)}
+     * @see CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)
+     */
+    @Deprecated
     public @NotNull Block[] getCollisionBlocks(AxisAlignedBB bb) {
         return this.getCollisionBlocks(bb, false);
     }
 
-    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB bb, boolean targetFirst) {
-        return getCollisionBlocks(bb, targetFirst, false);
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)}
+     * @see CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)
+     */
+    @Deprecated
+    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB boundingBox, boolean targetFirst) {
+        return CollisionHelper.getCollisionBlocks(
+                this,
+                boundingBox,
+                null,
+                targetFirst,
+                false
+        ).toArray(Block.EMPTY_ARRAY);
     }
 
-    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB bb, boolean targetFirst, boolean ignoreCollidesCheck) {
-        return getCollisionBlocks(bb, targetFirst, ignoreCollidesCheck, block -> block.getId() != 0);
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)}
+     * @see CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)
+     */
+    @Deprecated
+    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB boundingBox, boolean targetFirst, boolean ignoreCollidesCheck) {
+        return CollisionHelper.getCollisionBlocks(
+                this,
+                boundingBox,
+                null,
+                targetFirst,
+                ignoreCollidesCheck,
+                block -> block.getId() != BlockID.AIR
+        ).toArray(Block.EMPTY_ARRAY);
     }
 
-    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB bb, boolean targetFirst, boolean ignoreCollidesCheck, Predicate<Block> condition) {
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = NukkitMath.floorDouble(bb.getMinY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = NukkitMath.ceilDouble(bb.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
-
-        if (targetFirst) {
-            for (int z = minZ; z <= maxZ; ++z) {
-                for (int x = minX; x <= maxX; ++x) {
-                    for (int y = minY; y <= maxY; ++y) {
-                        Block block = this.getBlock(x, y, z, false);
-                        if (block != null && condition.test(block) && (ignoreCollidesCheck || block.collidesWithBB(bb))) {
-                            return new Block[]{block};
-                        }
-                    }
-                }
-            }
-        } else {
-            int capacity = Math.max(0, maxX - minX + 1) * Math.max(0, maxY - minY + 1) * Math.max(0, maxZ - minZ + 1);
-            if (capacity == 0) {
-                return Block.EMPTY_ARRAY;
-            }
-            Block[] collides = new Block[capacity];
-            int count = 0;
-            for (int z = minZ; z <= maxZ; ++z) {
-                for (int x = minX; x <= maxX; ++x) {
-                    for (int y = minY; y <= maxY; ++y) {
-                        Block block = this.getBlock(x, y, z, false);
-                        if (block != null && condition.test(block) && (ignoreCollidesCheck || block.collidesWithBB(bb))) {
-                            collides[count++] = block;
-                        }
-                    }
-                }
-            }
-            return count == capacity ? collides : Arrays.copyOf(collides, count);
-        }
-
-        return Block.EMPTY_ARRAY;
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)}
+     * @see CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)
+     */
+    @Deprecated
+    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB boundingBox, boolean targetFirst, boolean ignoreCollidesCheck, Predicate<Block> condition) {
+        return CollisionHelper.getCollisionBlocks(
+                this,
+                boundingBox,
+                null,
+                targetFirst,
+                ignoreCollidesCheck,
+                condition
+        ).toArray(Block.EMPTY_ARRAY);
     }
 
-    public boolean hasCollisionBlocks(AxisAlignedBB bb) {
-        return this.hasCollisionBlocks(null, bb);
+    /**
+     * @deprecated Use {@link CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)}
+     * @see CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)
+     */
+    @Deprecated
+    public boolean hasCollisionBlocks(AxisAlignedBB boundingBox) {
+        return CollisionHelper.hasCollisionBlocks(
+                this,
+                null,
+                boundingBox
+        );
     }
 
-    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB bb) {
-        return hasCollisionBlocks(entity, bb, false);
+    /**
+     * @deprecated Use {@link CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)}
+     * @see CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)
+     */
+    @Deprecated
+    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB boundingBox) {
+        return CollisionHelper.hasCollisionBlocks(
+                this,
+                entity,
+                boundingBox,
+                false
+        );
     }
 
-    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB bb, boolean checkCanPassThrough) {
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = NukkitMath.floorDouble(bb.getMinY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = NukkitMath.ceilDouble(bb.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
+    /**
+     * @deprecated Use {@link CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)}
+     * @see CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)
+     */
+    @Deprecated
+    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB boundingBox, boolean checkCanPassThrough) {
+        return CollisionHelper.hasCollisionBlocks(
+                this,
+                entity,
+                boundingBox,
+                checkCanPassThrough
+        );
+    }
 
-        for (int z = minZ; z <= maxZ; ++z) {
-            for (int x = minX; x <= maxX; ++x) {
-                for (int y = minY; y <= maxY; ++y) {
-                    Block block = this.getBlock(entity != null ? entity.chunk : null, x, y, z, 0, false);
-                    if ((!checkCanPassThrough || !block.canPassThrough()) && block.collidesWithBB(bb)) {
-                        return true;
-                    }
-                }
-            }
-        }
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB)}
+     * @see CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB)
+     */
+    @Deprecated
+    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB boundingBox) {
+        return CollisionHelper.getCollisionCubes(
+                this,
+                entity,
+                boundingBox
+        ).toArray(AxisAlignedBB.EMPTY_ARRAY);
+    }
 
-        return false;
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB, boolean)}
+     * @see CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB, boolean)
+     */
+    @Deprecated
+    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB boundingBox, boolean entities) {
+        return CollisionHelper.getCollisionCubes(
+                this,
+                entity,
+                boundingBox,
+                entities
+        ).toArray(AxisAlignedBB.EMPTY_ARRAY);
+    }
+
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB, boolean, boolean)}
+     * @see CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB, boolean, boolean)
+     */
+    @Deprecated
+    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB boundingBox, boolean entities, boolean solidEntities) {
+        return CollisionHelper.getCollisionCubes(
+                this,
+                entity,
+                boundingBox,
+                entities,
+                solidEntities
+        ).toArray(AxisAlignedBB.EMPTY_ARRAY);
     }
 
     public boolean isFullBlock(Vector3 pos) {
@@ -1815,56 +1871,22 @@ public class Level implements ChunkManager, Metadatable {
         return bb != null && bb.getAverageEdgeLength() >= 1;
     }
 
-    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB bb) {
-        return this.getCollisionCubes(entity, bb, true);
-    }
-
-    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB bb, boolean entities) {
-        return getCollisionCubes(entity, bb, entities, false);
-    }
-
-    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB bb, boolean entities, boolean solidEntities) {
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = NukkitMath.floorDouble(bb.getMinY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = NukkitMath.ceilDouble(bb.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
-
-        List<AxisAlignedBB> collides = new ArrayList<>();
-
-        for (int z = minZ; z <= maxZ; ++z) {
-            for (int x = minX; x <= maxX; ++x) {
-                for (int y = minY; y <= maxY; ++y) {
-                    Block block = this.getBlock(x, y, z, false);
-                    if (block.getId() == BlockID.BARRIER && entity.canPassThroughBarrier()) {
-                        continue;
-                    }
-                    if (!block.canPassThrough() && block.collidesWithBB(bb)) {
-                        collides.add(block.getBoundingBox());
-                    }
-                }
-            }
-        }
-
-        if (entities || solidEntities) {
-            for (Entity ent : this.getCollidingEntities(bb.grow(0.25f, 0.25f, 0.25f), entity)) {
-                if (solidEntities || !ent.canPassThrough()) {
-                    collides.add(ent.boundingBox.clone());
-                }
-            }
-        }
-
-        return collides.toArray(AxisAlignedBB.EMPTY_ARRAY);
-    }
-
-    public boolean hasCollision(Entity entity, AxisAlignedBB bb, boolean entities) {
-        if (this.hasCollisionBlocks(entity, bb, true)) {
+    public boolean hasCollision(Entity entity, AxisAlignedBB boundingBox, boolean entities) {
+        if (CollisionHelper.hasCollisionBlocks(
+                this,
+                entity,
+                boundingBox,
+                true
+        )) {
             return true;
         }
 
         if (entities) {
-            return this.getCollidingEntities(bb.grow(0.25f, 0.25f, 0.25f), entity).length > 0;
+            return !CollisionHelper.getCollidingEntities(
+                    this,
+                    boundingBox.grow(0.25f, 0.25f, 0.25f),
+                    entity
+            ).isEmpty();
         }
         return false;
     }
@@ -2781,7 +2803,7 @@ public class Level implements ChunkManager, Metadatable {
 
 
         if (!hand.canPassThrough() && hand.getBoundingBox() != null) {
-            Entity[] entities = this.getCollidingEntities(hand.getBoundingBox());
+            List<Entity> entities = CollisionHelper.getCollidingEntities(this, hand.getBoundingBox());
             //int realCount = 0;
             for (Entity e : entities) {
                 if (e == player || e instanceof EntityArrow || e instanceof EntityItem || (e instanceof Player && ((Player) e).isSpectator() || !e.canCollide())) {
@@ -2953,32 +2975,22 @@ public class Level implements ChunkManager, Metadatable {
         return entities.values().toArray(new Entity[0]);
     }
 
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollidingEntities(Level, AxisAlignedBB)}
+     * @see CollisionHelper#getCollidingEntities(Level, AxisAlignedBB)
+     */
+    @Deprecated
     public Entity[] getCollidingEntities(AxisAlignedBB bb) {
         return this.getCollidingEntities(bb, null);
     }
 
-    public Entity[] getCollidingEntities(AxisAlignedBB bb, Entity entity) {
-        List<Entity> nearby = new ArrayList<>();
-
-        if (entity == null || entity.canCollide()) {
-            int minX = NukkitMath.floorDouble((bb.getMinX() - 2) / 16);
-            int maxX = NukkitMath.ceilDouble((bb.getMaxX() + 2) / 16);
-            int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) / 16);
-            int maxZ = NukkitMath.ceilDouble((bb.getMaxZ() + 2) / 16);
-
-            for (int x = minX; x <= maxX; ++x) {
-                for (int z = minZ; z <= maxZ; ++z) {
-                    for (Entity ent : this.getChunkEntities(x, z, false).values()) {
-                        if ((entity == null || (ent != entity && entity.canCollideWith(ent)))
-                                && ent.boundingBox.intersectsWith(bb)) {
-                            nearby.add(ent);
-                        }
-                    }
-                }
-            }
-        }
-
-        return nearby.toArray(new Entity[0]);
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollidingEntities(Level, AxisAlignedBB, Entity)}
+     * @see CollisionHelper#getCollidingEntities(Level, AxisAlignedBB, Entity)
+     */
+    @Deprecated
+    public Entity[] getCollidingEntities(AxisAlignedBB boundingBox, Entity entity) {
+        return CollisionHelper.getCollidingEntities(this, boundingBox, entity).toArray(EMPTY_ENTITY_ARR);
     }
 
     public Entity[] getNearbyEntities(AxisAlignedBB bb) {
