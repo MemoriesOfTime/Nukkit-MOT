@@ -2720,7 +2720,7 @@ public abstract class Entity extends Location implements Metadatable {
      */
     @Deprecated
     public List<Block> getCollisionBlocks() {
-        if (this.collisionBlocks == null) {
+        if (this.collisionBlocks == null || this.positionChanged) {
             this.collisionBlocks = Arrays.asList(getCollisionHelper().getCollisionBlocks());
         }
         return this.collisionBlocks;
