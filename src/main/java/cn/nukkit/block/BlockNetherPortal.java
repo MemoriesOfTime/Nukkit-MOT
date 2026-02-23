@@ -7,7 +7,6 @@ import cn.nukkit.level.Position;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.BlockFace.Axis;
-import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
