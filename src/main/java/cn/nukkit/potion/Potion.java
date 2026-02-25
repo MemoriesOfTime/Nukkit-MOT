@@ -232,15 +232,6 @@ public class Potion implements Cloneable {
                 }
                 break;
             case HARMING:
-                if (!entity.canBeAffected(this.id)) {
-                    break;
-                }
-                if (entity instanceof EntitySmite) {
-                    entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
-                } else {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * 6)));
-                }
-                break;
             case HARMING_II:
                 if (!entity.canBeAffected(this.id)) {
                     break;
@@ -248,8 +239,19 @@ public class Potion implements Cloneable {
                 if (entity instanceof EntitySmite) {
                     entity.heal(new EntityRegainHealthEvent(entity, (float) (health * (double) (4 << (applyEffect.getAmplifier() + 1))), EntityRegainHealthEvent.CAUSE_MAGIC));
                 } else {
-                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * 12)));
+                    entity.attack(new EntityDamageEvent(entity, DamageCause.MAGIC, (float) (health * (6 << applyEffect.getAmplifier()))));
                 }
+                break;
+            case TURTLE_MASTER:
+            case TURTLE_MASTER_LONG:
+            case TURTLE_MASTER_II:
+                applyEffect.setDuration((int) ((splash ? health : 1) * (double) applyEffect.getDuration() + 0.5));
+                entity.addEffect(applyEffect, this.splash ? EntityPotionEffectEvent.Cause.POTION_SPLASH : EntityPotionEffectEvent.Cause.POTION_DRINK);
+                Effect resistance = Effect.getEffect(Effect.DAMAGE_RESISTANCE);
+                resistance.setAmplifier(this.id == TURTLE_MASTER_II ? 3 : 2);
+                int resDuration = 20 * (this.id == TURTLE_MASTER_LONG ? (splash ? 30 : 40) : (splash ? 15 : 20));
+                resistance.setDuration((int) ((splash ? health : 1) * resDuration + 0.5));
+                entity.addEffect(resistance, this.splash ? EntityPotionEffectEvent.Cause.POTION_SPLASH : EntityPotionEffectEvent.Cause.POTION_DRINK);
                 break;
             default:
                 applyEffect.setDuration((int) ((splash ? health : 1) * (double) applyEffect.getDuration() + 0.5));
@@ -334,6 +336,21 @@ public class Potion implements Cloneable {
                 break;
             case WITHER_II:
                 effect = Effect.getEffect(Effect.WITHER);
+                break;
+            case TURTLE_MASTER:
+            case TURTLE_MASTER_LONG:
+                effect = Effect.getEffect(Effect.SLOWNESS);
+                effect.setAmplifier(3); // Slowness IV
+                effect.setDuration(20 * (isSplash ? (potionType == TURTLE_MASTER ? 15 : 30) : (potionType == TURTLE_MASTER ? 20 : 40)));
+                return effect;
+            case TURTLE_MASTER_II:
+                effect = Effect.getEffect(Effect.SLOWNESS);
+                effect.setAmplifier(5); // Slowness VI
+                effect.setDuration(20 * (isSplash ? 15 : 20));
+                return effect;
+            case SLOW_FALLING:
+            case SLOW_FALLING_LONG:
+                effect = Effect.getEffect(Effect.SLOW_FALLING);
                 break;
             case WIND_CHARGED:
                 effect = Effect.getEffect(Effect.WIND_CHARGED);
@@ -435,7 +452,14 @@ public class Potion implements Cloneable {
                 case WEAKNESS -> 67;
                 case WEAKNESS_LONG -> 180;
                 case WITHER_II -> 30;
+                case TURTLE_MASTER -> 15;
+                case TURTLE_MASTER_LONG -> 30;
+                case TURTLE_MASTER_II -> 15;
+                case SLOW_FALLING -> 67;
+                case SLOW_FALLING_LONG -> 180;
+                case SLOWNESS_LONG_II -> 45;
                 case SLOWNESS_IV -> 15;
+                case WIND_CHARGED, WEAVING, OOZING, INFESTED -> 135;
                 default -> 0;
             };
         } else {
@@ -477,7 +501,14 @@ public class Potion implements Cloneable {
                 case WEAKNESS -> 90;
                 case WEAKNESS_LONG -> 240;
                 case WITHER_II -> 30;
+                case TURTLE_MASTER -> 20;
+                case TURTLE_MASTER_LONG -> 40;
+                case TURTLE_MASTER_II -> 20;
+                case SLOW_FALLING -> 90;
+                case SLOW_FALLING_LONG -> 240;
+                case SLOWNESS_LONG_II -> 60;
                 case SLOWNESS_IV -> 20;
+                case WIND_CHARGED, WEAVING, OOZING, INFESTED -> 180;
                 default -> 0;
             };
         }
