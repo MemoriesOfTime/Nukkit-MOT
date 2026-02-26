@@ -7334,6 +7334,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     }
 
     /**
+     * Check if this player is connecting through ViaProxy (Java Edition client)
+     *
+     * @return true if the player is a Java Edition client
+     */
+    public boolean isJavaClient() {
+        return this.loginChainData != null
+                && this.loginChainData.getViaProxyAuthToken() != null
+                && !this.loginChainData.getViaProxyAuthToken().isEmpty();
+    }
+
+    /**
      * Try to pick up an entity
      *
      * @param entity target
