@@ -6193,6 +6193,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.setSneaking(false);
         this.setSwimming(false);
         this.setGliding(false);
+        this.setCrawling(false);
 
         this.extinguish();
         this.setDataProperty(new ShortEntityData(Player.DATA_AIR, 400), false);
