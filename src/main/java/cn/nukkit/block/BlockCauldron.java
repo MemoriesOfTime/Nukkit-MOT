@@ -8,6 +8,7 @@ import cn.nukkit.event.player.PlayerBucketFillEvent;
 import cn.nukkit.item.*;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.Sound;
+import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.particle.SmokeParticle;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.MathHelper;
@@ -15,7 +16,6 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.utils.BlockColor;
-import cn.nukkit.utils.Utils;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -363,7 +363,7 @@ public class BlockCauldron extends BlockSolidMeta implements BlockEntityHolder<B
     public int onUpdate(int type) {
         if (type == Level.BLOCK_UPDATE_RANDOM && level.isRaining() && !this.isFull()) {
             if (freezing < 1) {
-                freezing = Utils.freezingBiomes.contains(level.getBiomeId((int) this.x, (int) this.z)) ? (byte) 2 : (byte) 1;
+                freezing = Biome.getBiome(level.getBiomeId((int) this.x, (int) this.z)).isFreezing() ? (byte) 2 : (byte) 1;
             }
             if (freezing == 1 && ThreadLocalRandom.current().nextInt(20) == 0 && level.canBlockSeeSky(this)) {
                 this.setFillLevel(this.getFillLevel() + 1);

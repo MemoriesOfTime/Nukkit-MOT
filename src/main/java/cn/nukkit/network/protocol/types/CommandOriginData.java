@@ -15,20 +15,25 @@ public final class CommandOriginData {
     public final Origin type;
     public final UUID uuid;
     public final String requestId;
-    private final Long varlong;
+    public final Long playerId;
 
-    public CommandOriginData(Origin type, UUID uuid, String requestId, Long varlong) {
+    public CommandOriginData(Origin type, UUID uuid, String requestId, Long playerId) {
         this.type = type;
         this.uuid = uuid;
         this.requestId = requestId;
-        this.varlong = varlong;
+        this.playerId = playerId;
     }
 
+    @Deprecated
     public OptionalLong getVarLong() {
-        if (varlong == null) {
+        if (playerId == null) {
             return OptionalLong.empty();
         }
-        return OptionalLong.of(varlong);
+        return OptionalLong.of(playerId);
+    }
+
+    public Long getPlayerId() {
+        return playerId;
     }
 
     public enum Origin {

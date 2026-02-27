@@ -135,6 +135,7 @@ public class BlockRespawnAnchor extends BlockMeta {
             case 0 -> 0;
             case 1 -> 3;
             case 2 -> 7;
+            case 3 -> 11;
             default -> 15;
         };
     }

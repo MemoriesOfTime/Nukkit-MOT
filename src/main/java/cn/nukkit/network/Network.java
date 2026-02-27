@@ -469,6 +469,7 @@ public class Network {
                 .registerPacket(ProtocolInfo.ADD_PLAYER_PACKET, AddPlayerPacket.class)
                 .registerPacket(ProtocolInfo.ADVENTURE_SETTINGS_PACKET, AdventureSettingsPacket.class)
                 .registerPacket(ProtocolInfo.ANIMATE_PACKET, AnimatePacket.class)
+                .registerPacket(ProtocolInfo.SETTINGS_COMMAND_PACKET, SettingsCommandPacket.class)
                 .registerPacket(ProtocolInfo.ANVIL_DAMAGE_PACKET, AnvilDamagePacket.class)
                 .registerPacket(ProtocolInfo.AVAILABLE_COMMANDS_PACKET, AvailableCommandsPacket.class)
                 .registerPacket(ProtocolInfo.BATCH_PACKET, BatchPacket.class)
@@ -614,6 +615,8 @@ public class Network {
                 .registerPacket(ProtocolInfo.MOVEMENT_EFFECT_PACKET, MovementEffectPacket.class)
                 .registerPacket(ProtocolInfo.SET_MOVEMENT_AUTHORITY_PACKET, SetMovementAuthorityPacket.class)
                 .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_PRESETS_PACKET, CameraAimAssistPresetsPacket.class)
+                .registerPacket(ProtocolInfo.CLIENT_CAMERA_AIM_ASSIST_PACKET, ClientCameraAimAssistPacket.class)
+                .registerPacket(ProtocolInfo.DEBUG_DRAWER_PACKET, DebugDrawerPacket.class)
 
                 // NetEase
                 .registerPacket(ProtocolInfo.PACKET_CONFIRM_SKIN, ConfirmSkinPacket.class)
@@ -625,6 +628,14 @@ public class Network {
                 .deregisterPacket(ProtocolInfo.PLAYER_INPUT_PACKET)
                 .deregisterPacket(ProtocolInfo.RIDER_JUMP_PACKET)
                 .registerPacket(ProtocolInfo.PLAYER_LOCATIONS_PACKET, PlayerLocationPacket.class)
+                // v924 packets
+                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_SHOW_SCREEN_PACKET, ClientboundDataDrivenUIShowScreenPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_CLOSE_ALL_SCREENS_PACKET, ClientboundDataDrivenUICloseAllScreensPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_DATA_DRIVEN_UI_RELOAD_PACKET, ClientboundDataDrivenUIReloadPacket.class)
+                .registerPacket(ProtocolInfo.CLIENTBOUND_TEXTURE_SHIFT_PACKET, ClientboundTextureShiftPacket.class)
+                .registerPacket(ProtocolInfo.VOXEL_SHAPES_PACKET, VoxelShapesPacket.class)
+                .registerPacket(ProtocolInfo.CAMERA_SPLINE_PACKET, CameraSplinePacket.class)
+                .registerPacket(ProtocolInfo.CAMERA_AIM_ASSIST_ACTOR_PRIORITY_PACKET, CameraAimAssistActorPriorityPacket.class)
                 .build();
     }
 

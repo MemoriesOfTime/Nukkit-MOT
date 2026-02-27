@@ -70,8 +70,10 @@ public class BlockIceFrosted extends BlockTransparentMeta {
                 level.scheduleUpdate(this, Utils.random.nextInt(20, 40));
             }
         } else if (type == Level.BLOCK_UPDATE_NORMAL) {
+            // Like vanilla: don't melt immediately on neighbor update
+            // Instead, schedule a delayed check to allow Frost Walker ice to stabilize
             if (countNeighbors() < 2) {
-                level.setBlock(this, get(WATER), true);
+                level.scheduleUpdate(this, Utils.random.nextInt(20, 40));
             }
         } else if (type == Level.BLOCK_UPDATE_RANDOM) {
             if ((this.getLevel().getBlockLightAt((int) this.x, (int) this.y, (int) this.z) >= 12 || (level.getTime() % Level.TIME_FULL < 13184 || level.getTime() % Level.TIME_FULL > 22800)) && (Utils.random.nextInt(3) == 0 || countNeighbors() < 4)) {
@@ -123,5 +125,10 @@ public class BlockIceFrosted extends BlockTransparentMeta {
             }
         }
         return neighbors;
+    }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
     }
 }

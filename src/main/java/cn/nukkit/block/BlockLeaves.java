@@ -244,4 +244,9 @@ public class BlockLeaves extends BlockTransparentMeta {
             default -> false;
         };
     }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
+    }
 }

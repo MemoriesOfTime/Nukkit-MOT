@@ -34,7 +34,7 @@ public class ItemMace extends StringItemToolBase {
     }
 
     @Override
-    public boolean isSword() {
+    public boolean isMace() {
         return true;
     }
 

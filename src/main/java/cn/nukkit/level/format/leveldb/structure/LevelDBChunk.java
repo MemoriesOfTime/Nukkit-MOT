@@ -67,13 +67,13 @@ public class LevelDBChunk extends BaseChunk {
             }
         }
 
-        this.heightMap = new byte[SUB_CHUNK_2D_SIZE];
+        this.heightMap = new short[SUB_CHUNK_2D_SIZE];
         if (heightmap != null && heightmap.length == SUB_CHUNK_2D_SIZE) {
             for (int i=0; i<heightmap.length; i++) {
-                this.heightMap[i] = (byte) heightmap[i];
+                this.heightMap[i] = (short) heightmap[i];
             }
         } else {
-            Arrays.fill(this.heightMap, (byte) 255);
+            Arrays.fill(this.heightMap, (short) 319);
         }
 
         if (biomes2d != null && biomes2d.length == SUB_CHUNK_2D_SIZE) {
@@ -164,6 +164,25 @@ public class LevelDBChunk extends BaseChunk {
             }
         } else if (this.state.ordinal() >= ChunkState.POPULATED.ordinal()) {
             this.setState(ChunkState.GENERATED);
+        }
+    }
+
+    @Override
+    public boolean isLightPopulated() {
+        return this.state == ChunkState.FINISHED;
+    }
+
+    @Override
+    public void setLightPopulated(boolean value) {
+        if (this.isLightPopulated() == value) {
+            return;
+        }
+        this.setChanged();
+
+        if (value) {
+            this.setState(ChunkState.FINISHED);
+        } else if (this.state == ChunkState.FINISHED) {
+            this.setState(ChunkState.POPULATED);
         }
     }
 
@@ -482,7 +501,7 @@ public class LevelDBChunk extends BaseChunk {
         nbt.putByteArray("Biomes", this.getBiomeIdArray());
 
         int[] heightInts = new int[256];
-        byte[] heightBytes = this.getHeightMapArray();
+        short[] heightBytes = this.getHeightMapArray();
         for (int i = 0; i < heightInts.length; i++) {
             heightInts[i] = heightBytes[i] & 0xFF;
         }
@@ -628,6 +647,14 @@ public class LevelDBChunk extends BaseChunk {
             throw new IllegalArgumentException("Invalid index: " + x + ", " + z );
         }
         return index;
+    }
+
+    @Override
+    protected void setInternalSection(float fY, ChunkSection section) {
+        super.setInternalSection(fY, section);
+        if (section instanceof LevelDBChunkSection) {
+            ((LevelDBChunkSection) section).setParent(this);
+        }
     }
 
     public Lock writeLock() {

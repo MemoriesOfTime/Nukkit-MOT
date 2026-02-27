@@ -270,8 +270,8 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
         }
     }
 
-    protected SmeltingRecipe matchRecipe(int protocol, Item raw) {
-        return this.server.getCraftingManager().matchFurnaceRecipe(protocol, raw);
+    protected SmeltingRecipe matchRecipe(Item raw) {
+        return this.server.getCraftingManager().matchFurnaceRecipe(raw);
     }
 
     protected int getSpeedMultiplier() {
@@ -288,7 +288,7 @@ public class BlockEntityFurnace extends BlockEntitySpawnable implements Inventor
         Item fuel = this.inventory.getFuel();
         Item raw = this.inventory.getSmelting();
         Item product = this.inventory.getResult();
-        SmeltingRecipe smelt = this.matchRecipe(ProtocolInfo.CURRENT_PROTOCOL, raw);
+        SmeltingRecipe smelt = this.matchRecipe(raw);
         boolean canSmelt = (smelt != null && raw.getCount() > 0 && ((smelt.getResult().equals(product, true) && product.getCount() < product.getMaxStackSize()) || product.getId() == Item.AIR));
 
         if (burnTime <= 0 && canSmelt && fuel.getFuelTime() != null && fuel.getCount() > 0) {

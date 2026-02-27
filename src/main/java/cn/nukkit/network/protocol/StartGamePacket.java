@@ -183,7 +183,9 @@ public class StartGamePacket extends DataPacket {
     public String ownerIdentifier = "";
     /**
      * @since v827
+     * @deprecated v897
      */
+    @SuppressWarnings("dep-ann")
     public boolean tickDeathSystemsEnabled;
 
     @Override
@@ -330,7 +332,7 @@ public class StartGamePacket extends DataPacket {
                 if (protocol >= ProtocolInfo.v1_19_20) {
                     this.putByte(this.chatRestrictionLevel);
                     this.putBoolean(this.disablePlayerInteractions);
-                    if (protocol >= ProtocolInfo.v1_21_0) {
+                    if (protocol >= ProtocolInfo.v1_21_0 && protocol < ProtocolInfo.v1_26_0) {
                         this.putString(this.serverId);
                         this.putString(this.worldId);
                         this.putString(this.scenarioId);
@@ -411,10 +413,18 @@ public class StartGamePacket extends DataPacket {
                                 if (protocol >= ProtocolInfo.v1_19_80) {
                                     this.putBoolean(this.blockNetworkIdsHashed);
                                     if (protocol >= ProtocolInfo.v1_20_0_23) {
-                                        if (protocol >= ProtocolInfo.v1_21_100) {
+                                        if (protocol >= ProtocolInfo.v1_21_100 && protocol < ProtocolInfo.v1_21_130_28) {
                                             this.putBoolean(this.tickDeathSystemsEnabled);
                                         }
                                         this.putBoolean(this.networkPermissions.isServerAuthSounds());
+                                        if (protocol >= ProtocolInfo.v1_26_0) {
+                                            // v924: Server telemetry data
+                                            this.putBoolean(false); // containServerJoinInformation
+                                            this.putString(this.serverId); // serverIdentifier
+                                            this.putString(this.scenarioId); // scenarioIdentifier
+                                            this.putString(this.worldId); // worldIdentifier
+                                            this.putString(this.ownerIdentifier); // ownerIdentifier
+                                        }
                                     }
                                 }
                             }

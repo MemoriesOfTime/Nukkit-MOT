@@ -191,4 +191,9 @@ public class BlockShulkerBox extends BlockTransparentMeta {
         }
         return super.getDrops(player, item);
     }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
+    }
 }

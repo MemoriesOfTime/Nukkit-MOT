@@ -133,4 +133,9 @@ public class BlockEndGateway extends BlockSolid implements BlockEntityHolder<Blo
             endGateway.teleportEntity(entity);
         }
     }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
+    }
 }

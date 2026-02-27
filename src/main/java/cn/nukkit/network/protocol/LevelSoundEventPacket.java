@@ -747,8 +747,84 @@ public class LevelSoundEventPacket extends DataPacket {
      * @since v819
      */
     public static final int SOUND_RECORD_LAVA_CHICKEN = 562;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_SADDLE_IN_WATER = 578;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_STONE_SPEAR_ATTACK_HIT = 579;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_IRON_SPEAR_ATTACK_HIT = 580;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_COPPER_SPEAR_ATTACK_HIT = 581;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_GOLDEN_SPEAR_ATTACK_HIT = 582;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_DIAMOND_SPEAR_ATTACK_HIT = 583;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_NETHERITE_SPEAR_ATTACK_HIT = 584;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_STONE_SPEAR_ATTACK_MISS = 585;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_IRON_SPEAR_ATTACK_MISS = 586;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_COPPER_SPEAR_ATTACK_MISS = 587;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_GOLDEN_SPEAR_ATTACK_MISS = 588;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_DIAMOND_SPEAR_ATTACK_MISS = 589;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_NETHERITE_SPEAR_ATTACK_MISS = 590;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_STONE_SPEAR_USE = 591;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_IRON_SPEAR_USE = 592;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_COPPER_SPEAR_USE = 593;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_GOLDEN_SPEAR_USE = 594;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_DIAMOND_SPEAR_USE = 595;
+    /**
+     * @since v924
+     */
+    public static final int SOUND_NETHERITE_SPEAR_USE = 596;
 
-    public static final int SOUND_UNDEFINED = Utils.dynamic(563);
+    public static final int SOUND_UNDEFINED = Utils.dynamic(597);
 
     public int sound;
     public float x;
@@ -781,7 +857,21 @@ public class LevelSoundEventPacket extends DataPacket {
         this.reset();
         this.putUnsignedVarInt(this.sound);
         this.putVector3f(this.x, this.y, this.z);
-        this.putVarInt(this.extraData);
+        if (this.sound == SOUND_NOTE && this.protocol < ProtocolInfo.v1_21_50) {
+            // Pre-1.21.50 instrument ID order differs: swap 5↔6 (flute↔glockenspiel), 7↔8 (guitar↔chime)
+            int instrumentId = this.extraData >> 8;
+            int strength = this.extraData & 0xFF;
+            instrumentId = switch (instrumentId) {
+                case 5 -> 6;
+                case 6 -> 5;
+                case 7 -> 8;
+                case 8 -> 7;
+                default -> instrumentId;
+            };
+            this.putVarInt(instrumentId << 8 | strength);
+        } else {
+            this.putVarInt(this.extraData);
+        }
         this.putString(this.entityIdentifier);
         this.putBoolean(this.isBabyMob);
         this.putBoolean(this.isGlobal);

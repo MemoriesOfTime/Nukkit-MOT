@@ -8,7 +8,6 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.session.RakNetPlayerSession;
 import cn.nukkit.utils.Utils;
-import com.google.common.base.Strings;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -97,7 +96,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
                     }
                 });
 
-        String address = Strings.isNullOrEmpty(this.server.getIp()) ? "0.0.0.0" : this.server.getIp();
+        String address = this.server.getIp().isBlank() ? "0.0.0.0" : this.server.getIp();
 
         this.channel = bootstrap.bind(address, this.server.getPort()).awaitUninterruptibly().channel();
 

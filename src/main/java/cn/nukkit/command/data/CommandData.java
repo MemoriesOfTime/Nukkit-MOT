@@ -1,5 +1,6 @@
 package cn.nukkit.command.data;
 
+import cn.nukkit.network.protocol.types.PermissionLevel;
 import lombok.ToString;
 
 import java.util.ArrayList;
@@ -15,7 +16,7 @@ public class CommandData implements Cloneable {
     public Map<String, CommandOverload> overloads = new HashMap<>();
 
     public int flags;
-    public int permission;
+    public PermissionLevel permission = PermissionLevel.ANY;
 
     public List<ChainedSubCommandData> subcommands = new ArrayList<>();
 

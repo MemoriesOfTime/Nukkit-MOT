@@ -142,4 +142,16 @@ public interface ChunkSection {
     default void setDirty() {
 
     }
+
+    /**
+     * Check if this section may contain light-emitting blocks.
+     * This is a fast check that only looks at the palette, not every block position.
+     * If this returns false, the section definitely has no light sources.
+     * If this returns true, the section may have light sources (needs full scan).
+     *
+     * @return true if light sources may exist, false if definitely none
+     */
+    default boolean maybeHasLightSource() {
+        return true; // Default: assume light sources may exist
+    }
 }

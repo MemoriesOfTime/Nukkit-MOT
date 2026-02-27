@@ -33,6 +33,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * This class contains miscellaneous stuff used in other parts of the program.
@@ -61,8 +62,22 @@ public class Utils {
     public static final IntSet monstersList = new IntOpenHashSet(Arrays.asList(EntityBlaze.NETWORK_ID, EntityCaveSpider.NETWORK_ID, EntityCreeper.NETWORK_ID, EntityDrowned.NETWORK_ID, EntityElderGuardian.NETWORK_ID, EntityEnderman.NETWORK_ID, EntityEndermite.NETWORK_ID, EntityEvoker.NETWORK_ID, EntityGhast.NETWORK_ID, EntityGuardian.NETWORK_ID, EntityHoglin.NETWORK_ID, EntityHusk.NETWORK_ID, EntityPiglinBrute.NETWORK_ID, EntityPillager.NETWORK_ID, EntityRavager.NETWORK_ID, EntityShulker.NETWORK_ID, EntitySilverfish.NETWORK_ID, EntitySkeleton.NETWORK_ID, EntitySlime.NETWORK_ID, EntitySpider.NETWORK_ID, EntityStray.NETWORK_ID, EntityVex.NETWORK_ID, EntityVindicator.NETWORK_ID, EntityWitch.NETWORK_ID, EntityWither.NETWORK_ID, EntityWitherSkeleton.NETWORK_ID, EntityZoglin.NETWORK_ID, EntityZombie.NETWORK_ID, EntityZombiePigman.NETWORK_ID, EntityZombieVillager.NETWORK_ID, EntityZombieVillagerV2.NETWORK_ID));
     /**
      * List of biomes where water can freeze
+     * @deprecated Use {@link cn.nukkit.level.biome.Biome#getBiome(int)} and {@link cn.nukkit.level.biome.Biome#isFreezing()} instead
      */
-    public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(10, 11, 12, 26, 30, 31, 140, 158));
+    @Deprecated
+    public static final IntSet freezingBiomes = new IntOpenHashSet(Arrays.asList(
+            10,  // FROZEN_OCEAN
+            11,  // FROZEN_RIVER
+            12,  // ICE_PLAINS
+            13,  // ICE_MOUNTAINS
+            26,  // COLD_BEACH
+            30,  // COLD_TAIGA
+            31,  // COLD_TAIGA_HILLS
+            46,  // NEW_FROZEN_OCEAN
+            47,  // DEEP_FROZEN_OCEAN
+            140, // ICE_PLAINS_SPIKES
+            158  // COLD_TAIGA_M
+    ));
 
     /**
      * 检查物品或方块是否已在nk中实现
@@ -399,7 +414,7 @@ public class Utils {
         if (min == max) {
             return max;
         }
-        return random.nextInt(max + 1 - min) + min;
+        return ThreadLocalRandom.current().nextInt(max + 1 - min) + min;
     }
 
     /**
@@ -413,7 +428,7 @@ public class Utils {
         if (min == max) {
             return max;
         }
-        return min + random.nextDouble() * (max-min);
+        return min + ThreadLocalRandom.current().nextDouble() * (max-min);
     }
 
     public static float rand(float min, float max) {
@@ -429,7 +444,7 @@ public class Utils {
      * @return random boolean
      */
     public static boolean rand() {
-        return random.nextBoolean();
+        return ThreadLocalRandom.current().nextBoolean();
     }
 
     public static int dynamic(int value) {
@@ -518,6 +533,8 @@ public class Utils {
             case ProtocolInfo.v1_21_110_26, ProtocolInfo.v1_21_110 -> "1.21.110";
             case ProtocolInfo.v1_21_120 -> "1.21.120";
             case ProtocolInfo.v1_21_124 -> "1.21.124";
+            case ProtocolInfo.v1_21_130_28, ProtocolInfo.v1_21_130 -> "1.21.130";
+            case ProtocolInfo.v1_26_0 -> "1.26.0";
             //TODO Multiversion 添加新版本支持时修改这里
             default -> throw new IllegalStateException("Invalid protocol: " + protocol);
         };

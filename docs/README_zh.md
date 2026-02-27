@@ -12,17 +12,17 @@
 ------
 
 ## 项目介绍
-Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 开发的 Minecraft 基岩版（Bedrock Edition）服务端软件的特殊版本。  
-其开发基于 [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition) 的最后一个开源版本。
+Nukkit-MOT 是基于 [Nukkit](https://github.com/CloudburstMC/Nukkit) 的分支项目，具备多版本支持、网易客户端兼容以及良好的插件生态兼容性。
 
-注意：如需更高版本的特性支持，请使用 [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)。
+只想玩新版本？不妨试试 [Lumi](https://github.com/KoshakMineDEV/Lumi) 或 [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 ### Nukkit-MOT 的新特性
-1. 支持 1.2 – 1.21.124 版本（可在配置中设置最低协议版本）
+1. 支持 1.2 – 1.26.0 版本（可在配置中设置最低协议版本）
 2. 支持大多数实体的AI
 3. 支持下界（Nether）和末地（The End）世界
 4. 生成地牢和洞穴
 5. 支持原版命令
+6. 支持网易客户端
 
 ## 如何安装？
 1. 安装 Java 17 或更高版本
@@ -77,6 +77,7 @@ dependencies {
 ## 致谢
 [<img src="https://raw.githubusercontent.com/CloudburstMC/Nukkit/master/.github/images/logo.png" width="18"/>]() [Nukkit](https://github.com/CloudburstMC/Nukkit)  
 [<img src="https://avatars.githubusercontent.com/u/26197131?v=4" width="18"/>]() [NukkitPetteriM1Edition](https://github.com/PetteriM1/NukkitPetteriM1Edition)  
+[<img src="https://avatars.githubusercontent.com/u/20168691?v=4" width="18"/>]() [EaseCation](https://www.easecation.net/) [Nukkit](https://github.com/EaseCation/Nukkit) & [SynapseAPI](https://github.com/EaseCation/SynapseAPI)  
 [<img src="https://docs.powernukkitx.org/img/PNX_LOGO_sm.png" width="18"/>]() [PowerNukkitX](https://github.com/PowerNukkitX/PowerNukkitX)
 
 [<img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" width="120"/>](https://jb.gg/OpenSourceSupport)  

@@ -8,6 +8,8 @@ import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.utils.Config;
+import cn.nukkit.utils.Hash;
+import cn.nukkit.utils.NetEaseConverter;
 import cn.nukkit.utils.Utils;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -34,6 +36,8 @@ public class BlockPalette {
     private final Int2IntMap legacyToRuntimeId = new Int2IntOpenHashMap();
     private final Int2IntMap runtimeIdToLegacy = new Int2IntOpenHashMap();
     private final Int2IntMap stateHashToLegacy = new Int2IntOpenHashMap();
+    private final Int2IntMap legacyToHashId = new Int2IntOpenHashMap();
+    private final Int2IntMap hashIdToLegacy = new Int2IntOpenHashMap();
 
     private final Cache<Integer, Integer> legacyToRuntimeIdCache = CacheBuilder.newBuilder().expireAfterAccess(5, TimeUnit.MINUTES).build();
 
@@ -50,6 +54,8 @@ public class BlockPalette {
 
         legacyToRuntimeId.defaultReturnValue(-1);
         runtimeIdToLegacy.defaultReturnValue(-1);
+        legacyToHashId.defaultReturnValue(-1);
+        hashIdToLegacy.defaultReturnValue(-1);
 
         loadBlockStates(paletteFor(protocol));
         loadBlockStatesExtras();
@@ -58,19 +64,85 @@ public class BlockPalette {
     private ListTag<CompoundTag> paletteFor(int protocol) {
         ListTag<CompoundTag> tag;
         String name = "runtime_block_states_" + protocol + ".dat";
+        boolean useNetEaseConversion = false;
+
         if (gameVersion.isNetEase()) {
-            name = "runtime_block_states_netease_" + protocol + ".dat";
+            String neteaseName = "runtime_block_states_netease_" + protocol + ".dat";
+            InputStream neteaseStream = Server.class.getClassLoader().getResourceAsStream(neteaseName);
+            if (neteaseStream != null) {
+                name = neteaseName;
+                try {
+                    neteaseStream.close();
+                } catch (IOException ignored) {
+                }
+            } else {
+                log.debug("NetEase resource file not found: {}, will convert from standard version", neteaseName);
+                useNetEaseConversion = true;
+            }
         }
+
         try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(name)) {
             if (stream == null) {
                 throw new AssertionError("Unable to locate block state nbt " + protocol);
             }
             //noinspection unchecked
             tag = (ListTag<CompoundTag>) NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
-        } catch (IOException e) {
+
+            if (useNetEaseConversion) {
+                ListTag<CompoundTag> fullPalette = loadFullBlockPalette(protocol);
+                log.info("Using full block_palette_{}.nbt for NetEase conversion ({} blocks)", protocol, fullPalette.size());
+                tag = NetEaseConverter.convertBlockStates(fullPalette, true);
+            }
+        } catch (IOException | NullPointerException e) {
             throw new AssertionError("Unable to load block palette " + protocol, e);
         }
         return tag;
+    }
+
+    /**
+     * Loads the full block palette.
+     * The block_palette contains all block states, while runtime_block_states
+     * only contains a subset of them.
+     *
+     * @param protocol the protocol version
+     * @return the full block palette, or {@code null} if the file does not exist
+     */
+    private ListTag<CompoundTag> loadFullBlockPalette(int protocol) {
+        String paletteName = "BlockPaletteRaw/block_palette_" + protocol + ".nbt";
+        try (InputStream stream = Server.class.getClassLoader().getResourceAsStream(paletteName)) {
+            if (stream == null) {
+                return null;
+            }
+
+            Object tag = NBTIO.readTag(new BufferedInputStream(new GZIPInputStream(stream)), ByteOrder.BIG_ENDIAN, false);
+
+            if (tag instanceof ListTag) {
+                //noinspection unchecked
+                return (ListTag<CompoundTag>) tag;
+            } else if (tag instanceof CompoundTag) {
+                CompoundTag compoundTag = (CompoundTag) tag;
+                if (compoundTag.contains("")) {
+                    //noinspection unchecked
+                    return (ListTag<CompoundTag>) compoundTag.get("");
+                }
+                // 尝试其他可能的 key
+                for (String key : compoundTag.getTags().keySet()) {
+                    Object value = compoundTag.get(key);
+                    if (value instanceof ListTag) {
+                        //noinspection unchecked
+                        return (ListTag<CompoundTag>) value;
+                    }
+                }
+                log.error("Could not find ListTag in CompoundTag for palette: {}", paletteName);
+                return null;
+            } else {
+                log.error("Unexpected tag type for palette {}: {}", paletteName, tag.getClass().getName());
+                return null;
+            }
+        } catch (IOException e) {
+            log.error("Error loading full block palette: {}", paletteName, e);
+            return null;
+        }
     }
 
     private void loadBlockStates(ListTag<CompoundTag> blockStates) {
@@ -148,6 +220,8 @@ public class BlockPalette {
         this.legacyToRuntimeId.clear();
         this.runtimeIdToLegacy.clear();
         this.stateHashToLegacy.clear();
+        this.legacyToHashId.clear();
+        this.hashIdToLegacy.clear();
     }
 
     public void registerState(int blockId, int data, int runtimeId, CompoundTag blockState) {
@@ -158,7 +232,10 @@ public class BlockPalette {
         int legacyId = blockId << Block.DATA_BITS | data;
         this.legacyToRuntimeId.put(legacyId, runtimeId);
         this.runtimeIdToLegacy.putIfAbsent(runtimeId, legacyId);
-        this.stateHashToLegacy.putIfAbsent(blockState.hashCode(), legacyId);
+        int stateHash = Hash.hashBlock(blockState);
+        this.stateHashToLegacy.putIfAbsent(stateHash, legacyId);
+        this.legacyToHashId.putIfAbsent(legacyId, stateHash);
+        this.hashIdToLegacy.putIfAbsent(stateHash, legacyId);
 
         // Hack: Map IDs for item frame up & down states
         if (blockId == BlockID.ITEM_FRAME_BLOCK || blockId == BlockID.GLOW_FRAME) {
@@ -212,8 +289,56 @@ public class BlockPalette {
         return runtimeIdToLegacy.get(runtimeId);
     }
 
-    public int getLegacyFullId(CompoundTag compoundTag) {
-        return stateHashToLegacy.getOrDefault(compoundTag.hashCode(), -1);
+    /**
+     * 从哈希ID获取完整的旧方块ID
+     * Get full legacy block ID from hash ID
+     * <p>
+     * 哈希ID是通过方块状态NBT计算得出的哈希值，用于新版本的方块网络传输
+     * Hash ID is calculated from block state NBT and used for block network transmission in newer versions
+     *
+     * @param hashId 方块状态的哈希ID / hash ID of the block state
+     * @return 完整的旧方块ID (blockId << Block.DATA_BITS | meta)，如果找不到则返回-1 / full legacy block ID, returns -1 if not found
+     */
+    public int getLegacyFullIdFromHashId(int hashId) {
+        return hashIdToLegacy.get(hashId);
+    }
+
+    public int getLegacyFullId(CompoundTag blockState) {
+        return stateHashToLegacy.getOrDefault(Hash.hashBlock(blockState), -1);
+    }
+
+    /**
+     * 获取方块的哈希ID (使用默认meta值0)
+     * Get hash ID of a block (using default meta value 0)
+     *
+     * @param id 方块ID / block ID
+     * @return 方块的哈希ID / hash ID of the block
+     */
+    public int getHashId(int id) {
+        return this.getHashId(id, 0);
+    }
+
+    /**
+     * 获取方块的哈希ID
+     * Get hash ID of a block
+     * <p>
+     * 哈希ID用于新版本协议(1.19.80+)的方块网络传输，基于方块状态NBT的哈希值
+     * Hash ID is used for block network transmission in newer protocols (1.19.80+), based on block state NBT hash
+     *
+     * @param id 方块ID / block ID
+     * @param meta 方块元数据值 / block metadata value
+     * @return 方块的哈希ID，如果找不到则返回INFO_UPDATE方块的哈希ID / hash ID of the block, returns INFO_UPDATE block's hash ID if not found
+     */
+    public int getHashId(int id, int meta) {
+        int legacyId = protocol >= 388 ? ((id << Block.DATA_BITS) | meta) : ((id << 4) | meta);
+        int hashId = legacyToHashId.get(legacyId);
+        if (hashId == -1) {
+            hashId = legacyToHashId.get(id << Block.DATA_BITS);
+            if (hashId == -1) {
+                hashId = legacyToHashId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
+            }
+        }
+        return hashId;
     }
 
 }

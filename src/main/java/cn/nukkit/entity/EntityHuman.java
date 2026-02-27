@@ -325,7 +325,7 @@ public class EntityHuman extends EntityHumanType {
                 throw new IllegalStateException(this.getClass().getSimpleName() + " must have a valid skin set");
             }
 
-            if (this.isPlayer) {
+            if (this instanceof Player) {
                 this.server.updatePlayerListData(
                         new PlayerListPacket.Entry(this.uuid, this.getId(), ((Player) this).getDisplayName(), this.getSkin(), ((Player) this).getLoginChainData().getXUID(), ((Player) this).getLocatorBarColor()),
                         new Player[]{player});
@@ -347,13 +347,14 @@ public class EntityHuman extends EntityHumanType {
             pk.speedY = (float) this.motionY;
             pk.speedZ = (float) this.motionZ;
             pk.yaw = (float) this.yaw;
+            pk.headYaw = (float) this.headYaw;
             pk.pitch = (float) this.pitch;
             pk.item = playerInventory != null ? playerInventory.getItemInHand() : Item.AIR_ITEM;
             pk.metadata = this.dataProperties.clone();
             player.dataPacket(pk);
 
             if (playerInventory != null) {
-                if (this.isPlayer) {
+                if (this instanceof Player) {
                     playerInventory.sendArmorContents(player);
                 } else {
                     playerInventory.sendArmorContentsIfNotAr(player);
@@ -370,7 +371,7 @@ public class EntityHuman extends EntityHumanType {
                 player.dataPacket(pkk);
             }
 
-            if (!this.isPlayer) {
+            if (!(this instanceof Player)) {
                 this.server.removePlayerListData(this.uuid, player);
             }
         }

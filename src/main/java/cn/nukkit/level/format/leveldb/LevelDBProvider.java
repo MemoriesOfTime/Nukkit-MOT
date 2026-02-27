@@ -739,9 +739,18 @@ public class LevelDBProvider implements LevelProvider {
             this.level = null;
             this.executor.shutdown();
             try {
-                this.executor.awaitTermination(1, TimeUnit.DAYS);
+                if (!this.executor.awaitTermination(10, TimeUnit.MINUTES)) {
+                    log.warn("LevelDB executor did not terminate in time, forcing shutdown for: {}", this.getName());
+                    java.util.List<Runnable> droppedTasks = this.executor.shutdownNow();
+                    if (!droppedTasks.isEmpty()) {
+                        log.warn("Dropped {} pending tasks during forced shutdown", droppedTasks.size());
+                    }
+                    if (!this.executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                        log.error("LevelDB executor did not terminate even after forced shutdown for: {}", this.getName());
+                    }
+                }
             } catch (InterruptedException e) {
-                Server.getInstance().getLogger().error("Stopping LevelDB Executor interrupted", e);
+                this.executor.shutdownNow();
             }
 
             try {

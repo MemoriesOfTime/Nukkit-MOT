@@ -128,6 +128,8 @@ public interface FullChunk extends Cloneable {
 
     void populateSkyLight();
 
+    void populateBlockLight();
+
     default public boolean has3dBiomes() {
         return false;
     }
@@ -225,7 +227,7 @@ public interface FullChunk extends Cloneable {
 
     int[] getBiomeColorArray();
 
-    byte[] getHeightMapArray();
+    short[] getHeightMapArray();
 
     byte[] getBlockIdArray(int layer);
 

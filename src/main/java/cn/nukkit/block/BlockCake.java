@@ -121,7 +121,7 @@ public class BlockCake extends BlockTransparentMeta {
         }
         if (player != null && player.canEat(false)) {
             if (getDamage() <= 0x06) setDamage(getDamage() + 1);
-            if (getDamage() >= 0x06) {
+            if (getDamage() > 0x06) {
                 getLevel().setBlock(this, Block.get(BlockID.AIR), true);
             } else {
                 Food.getByRelative(this).eatenBy(player);

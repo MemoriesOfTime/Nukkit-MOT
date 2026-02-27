@@ -288,6 +288,9 @@ public class BiomeDefinitionListPacket extends DataPacket {
         this.putOptionalNull(definitionChunkGen.getSurfaceMaterialAdjustment(),
                 (surfaceMaterialAdjustment) -> this.putSurfaceMaterialAdjustment(surfaceMaterialAdjustment, strings));
         this.putOptionalNull(definitionChunkGen.getSurfaceMaterial(), this::putSurfaceMaterial);
+        if (protocol >= ProtocolInfo.v1_21_110) {
+            this.putBoolean(definitionChunkGen.isHasDefaultOverworldSurface());
+        }
         this.putBoolean(definitionChunkGen.isHasSwampSurface());
         this.putBoolean(definitionChunkGen.isHasFrozenOceanSurface());
         this.putBoolean(definitionChunkGen.isHasTheEndSurface());
@@ -298,6 +301,21 @@ public class BiomeDefinitionListPacket extends DataPacket {
         this.putOptionalNull(definitionChunkGen.getMultinoiseGenRules(), this::putMultinoiseGenRules);
         this.putOptionalNull(definitionChunkGen.getLegacyWorldGenRules(),
                 (legacyWorldGenRules) -> this.putLegacyWorldGenRules(legacyWorldGenRules, strings));
+        if (protocol >= ProtocolInfo.v1_21_120) {
+            this.putOptionalNull(definitionChunkGen.getBiomeReplacementData(), this::putBiomeReplacementData);
+        }
+        if (protocol >= ProtocolInfo.v1_26_0) {
+            this.putOptionalNull(definitionChunkGen.getVillageType(), villageType -> this.putByte((byte) villageType.intValue()));
+        }
+    }
+
+    protected void putBiomeReplacementData(BiomeReplacementData replacementData) {
+        this.putLShort(replacementData.getBiome());
+        this.putLShort(replacementData.getDimension());
+        this.putArray(replacementData.getTargetBiomes(), buf -> this.putLShort(buf));
+        this.putLFloat(replacementData.getAmount());
+        this.putLFloat(replacementData.getNoiseFrequencyScale());
+        this.putLInt(replacementData.getReplacementIndex());
     }
 
     protected void putClimate(BiomeClimateData climate) {

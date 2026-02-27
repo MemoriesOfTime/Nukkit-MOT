@@ -251,4 +251,9 @@ public class BlockChorusFlower extends BlockTransparentMeta {
     public BlockColor getColor() {
         return BlockColor.PURPLE_BLOCK_COLOR;
     }
+
+    @Override
+    public boolean diffusesSkyLight() {
+        return true;
+    }
 }

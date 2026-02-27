@@ -389,6 +389,23 @@ public class StateBlockStorage {
         );
     }
 
+    /**
+     * Check if this storage may contain light-emitting blocks.
+     * This is a fast check that only looks at the palette, not every block position.
+     * If this returns false, the storage definitely has no light sources.
+     * If this returns true, the storage may have light sources (needs full scan).
+     *
+     * @return true if light sources may exist, false if definitely none
+     */
+    public boolean maybeHasLightSource() {
+        for (BlockStateSnapshot state : this.palette) {
+            if (Block.getBlockLight(state.getLegacyId()) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static int elementIndex(int x, int y, int z) {
         int index = (x << 8) | (z << 4) | y;
         if (index < 0 || index >= SUB_CHUNK_SIZE) {

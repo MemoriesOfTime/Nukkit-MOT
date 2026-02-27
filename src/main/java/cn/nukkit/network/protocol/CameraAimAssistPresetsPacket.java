@@ -49,6 +49,16 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
         this.putString(category.getName());
         this.putArray(category.getEntityPriorities(), this::writePriority);
         this.putArray(category.getBlockPriorities(), this::writePriority);
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+            this.putArray(category.getBlockTagPriorities(), this::writePriority);
+        }
+        if (this.protocol >= ProtocolInfo.v1_26_0) {
+            this.putArray(category.getEntityTypeFamiliesPriorities(), this::writePriority);
+        }
+        if (this.protocol >= ProtocolInfo.v1_21_50) {
+            this.putOptionalNull(category.getEntityDefaultPriorities(), this::putLInt);
+            this.putOptionalNull(category.getBlockDefaultPriorities(), this::putLInt);
+        }
     }
 
     private void writePriority(CameraAimAssistPriority priority) {
@@ -58,8 +68,20 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
 
     private void writeCameraAimAssist(CameraAimAssistPresetDefinition preset) {
         this.putString(preset.getIdentifier());
-        this.putString(preset.getCategories()); // todo: multi-version support
-        this.putArray(preset.getExclusionList(), this::putString);
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+            this.putArray(preset.getBlockExclusionList(), this::putString);
+            this.putArray(preset.getEntityExclusionList(), this::putString);
+            this.putArray(preset.getBlockTagExclusionList(), this::putString);
+            if (this.protocol >= ProtocolInfo.v1_26_0) {
+                this.putArray(preset.getEntityTypeFamiliesExclusionList(), this::putString);
+            }
+        } else {
+            if (this.protocol <= ProtocolInfo.v1_21_60) {
+                this.putString(preset.getCategories());
+            }
+            this.putArray(preset.getExclusionList(), this::putString);
+        }
+
         this.putArray(preset.getLiquidTargetingList(), this::putString);
         this.putArray(preset.getItemSettings(), this::writeItemSetting);
         this.putOptional(Objects::nonNull, preset.getDefaultItemSettings(), this::putString);
@@ -85,28 +107,41 @@ public class CameraAimAssistPresetsPacket extends DataPacket {
     public CameraAimAssistCategory readCategory() {
         CameraAimAssistCategory category = new CameraAimAssistCategory();
         category.setName(this.getString());
-        long entityPriorityLength = this.getUnsignedVarInt();
-        for(int i = 0; i < entityPriorityLength; i++) {
-            Map.Entry<String, Integer> entry = readPriority();
-            category.getEntityPriorities().add(new CameraAimAssistPriority(entry.getKey(), entry.getValue()));
+        this.getArray(category.getEntityPriorities(), buf -> readPriority());
+        this.getArray(category.getBlockPriorities(), buf -> readPriority());
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+            this.getArray(category.getBlockTagPriorities(), buf -> readPriority());
         }
-        long blockPriorityLength = this.getUnsignedVarInt();
-        for(int i = 0; i < blockPriorityLength; i++) {
-            Map.Entry<String, Integer> entry = readPriority();
-            category.getBlockPriorities().add(new CameraAimAssistPriority(entry.getKey(), entry.getValue()));
+        if (this.protocol >= ProtocolInfo.v1_26_0) {
+            this.getArray(category.getEntityTypeFamiliesPriorities(), buf -> readPriority());
+        }
+        if (this.protocol >= ProtocolInfo.v1_21_50) {
+            category.setEntityDefaultPriorities(this.getOptional(null, BinaryStream::getLInt));
+            category.setBlockDefaultPriorities(this.getOptional(null, BinaryStream::getLInt));
         }
         return category;
     }
 
-    private Map.Entry<String, Integer> readPriority() {
-        return Map.entry(this.getString(), this.getInt());
+    private CameraAimAssistPriority readPriority() {
+        return new CameraAimAssistPriority(this.getString(), this.getInt());
     }
 
     private CameraAimAssistPresetDefinition readPreset() {
         CameraAimAssistPresetDefinition preset = new CameraAimAssistPresetDefinition();
         preset.setIdentifier(this.getString());
-        preset.setCategories(this.getString());
-        preset.getExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
+        if (this.protocol >= ProtocolInfo.v1_21_130_28) {
+            preset.getBlockExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
+            preset.getEntityExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
+            preset.getBlockTagExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
+            if (this.protocol >= ProtocolInfo.v1_26_0) {
+                preset.getEntityTypeFamiliesExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
+            }
+        } else {
+            if (this.protocol <= ProtocolInfo.v1_21_60) {
+                preset.setCategories(this.getString());
+            }
+            preset.getExclusionList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
+        }
         preset.getLiquidTargetingList().addAll(List.of(this.getArray(String.class, BinaryStream::getString)));
         long itemSettingsLength = this.getUnsignedVarInt();
         for(int i = 0; i < itemSettingsLength; i++) {
