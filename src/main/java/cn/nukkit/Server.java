@@ -534,6 +534,10 @@ public class Server {
      */
     public boolean useWaterdog;
     /**
+     * Username prefix for ViaProxy Java Edition clients (empty to disable)
+     */
+    public String viaProxyUsernamePrefix;
+    /**
      * Using Snappy compression
      */
     public boolean useSnappy;
