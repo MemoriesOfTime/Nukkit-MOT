@@ -95,4 +95,9 @@ public class ItemPotion extends Item {
     public boolean canRelease() {
         return true;
     }
+
+    @Override
+    public int getUseDuration() {
+        return 32;
+    }
 }
