@@ -37,4 +37,7 @@ public class NetworkSettings extends OkaeriConfig {
 
     @Comment("Enable WaterDog proxy mode")
     private boolean useWaterdog = false;
+
+    @Comment("ViaProxy Java Edition player username prefix")
+    private String viaProxyUsernamePrefix = ".";
 }

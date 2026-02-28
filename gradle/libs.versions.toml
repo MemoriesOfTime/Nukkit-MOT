@@ -29,6 +29,7 @@ nukkitx_natives = "1.0.3"
 raknet = "1.0.0.CR3-SNAPSHOT"
 cloudburst_common = "3.0.0.Beta7-SNAPSHOT"
 jackson_dataformat_toml = "2.20.1"
+okaeri_configs = "6.0.0-beta.23"
 
 [libraries]
 raknet = { module = "org.cloudburstmc.netty:netty-transport-raknet", version.ref = "raknet" }

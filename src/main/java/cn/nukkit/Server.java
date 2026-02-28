@@ -86,6 +86,7 @@ import cn.nukkit.scoreboard.manager.ScoreboardManager;
 import cn.nukkit.scoreboard.storage.JSONScoreboardStorage;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.bugreport.ExceptionHandler;
+import cn.nukkit.utils.config.ConfigComments;
 import cn.nukkit.utils.config.ServerConfig;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -123,6 +124,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
@@ -642,9 +644,10 @@ public class Server {
         log.info("Loading server properties...");
         this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ServerProperties());
 
-        // Load server.toml (advanced MOT settings)
+        // Load nukkit-mot.toml (advanced MOT settings)
         log.info("Loading server configuration (TOML)...");
         this.loadServerConfig();
+        this.migrateOldProperties();
 
         if (!this.serverConfig.debugSettings().ansiTitle()) {
             Nukkit.TITLE = false;
@@ -1118,7 +1121,7 @@ public class Server {
         log.info("Reloading server properties...");
         this.properties.reload();
 
-        // Reload server.toml
+        // Reload nukkit-mot.toml
         log.info("Reloading server configuration (TOML)...");
         this.loadServerConfig();
 
@@ -2540,7 +2543,7 @@ public class Server {
      */
     private void loadServerConfig() {
         try {
-            File configFile = new File(this.dataPath, "server.toml");
+            File configFile = new File(this.dataPath, "nukkit-mot.toml");
 
             // If conversion just happened, serverConfig is already set
             if (this.serverConfig == null) {
@@ -2550,7 +2553,7 @@ public class Server {
                     it.saveDefaults();
                     it.load(true);
                 });
-                log.info("Server configuration loaded from server.toml");
+                log.info("Server configuration loaded from nukkit-mot.toml");
             } else {
                 // Reload the converted config from file
                 this.serverConfig = ConfigManager.create(ServerConfig.class, (it) -> {
@@ -2559,8 +2562,12 @@ public class Server {
                     it.load(true);
                 });
             }
+
+            // Apply localized comments based on server language
+            String lang = this.getPropertyString("language", "eng");
+            ConfigComments.apply(this.serverConfig, lang);
         } catch (Exception e) {
-            log.error("Failed to load server.toml, using default configuration", e);
+            log.error("Failed to load nukkit-mot.toml, using default configuration", e);
             if (this.serverConfig == null) {
                 this.serverConfig = new ServerConfig();
             }
@@ -2577,17 +2584,169 @@ public class Server {
     }
 
     /**
-     * Save server configuration to server.toml
+     * Save server configuration to nukkit-mot.toml
      */
     public void saveServerConfig() {
         if (this.serverConfig != null) {
             try {
                 this.serverConfig.save();
-                log.info("Server configuration saved to server.toml");
+                log.info("Server configuration saved to nukkit-mot.toml");
             } catch (Exception e) {
-                log.error("Failed to save server.toml", e);
+                log.error("Failed to save nukkit-mot.toml", e);
             }
         }
+    }
+
+    /**
+     * Migrate old non-standard settings from server.properties to nukkit-mot.toml.
+     * This runs on startup to support upgrading from older versions
+     * that stored all settings in server.properties.
+     */
+    private void migrateOldProperties() {
+        boolean migrated = false;
+
+        // Performance settings
+        migrated |= migrateStringProp("async-workers", serverConfig.performanceSettings()::asyncWorkers);
+        migrated |= migrateBooleanProp("auto-tick-rate", serverConfig.performanceSettings()::autoTickRate);
+        migrated |= migrateIntProp("auto-tick-rate-limit", serverConfig.performanceSettings()::autoTickRateLimit);
+        migrated |= migrateIntProp("base-tick-rate", serverConfig.performanceSettings()::baseTickRate);
+        migrated |= migrateBooleanProp("always-tick-players", serverConfig.performanceSettings()::alwaysTickPlayers);
+        migrated |= migrateBooleanProp("thread-watchdog", serverConfig.performanceSettings()::threadWatchdog);
+        migrated |= migrateIntProp("thread-watchdog-tick", serverConfig.performanceSettings()::threadWatchdogTick);
+        migrated |= migrateBooleanProp("do-level-gc", serverConfig.performanceSettings()::doLevelGc);
+        migrated |= migrateBooleanProp("level-auto-compaction", serverConfig.performanceSettings()::levelAutoCompaction);
+        migrated |= migrateIntProp("level-auto-compaction-ticks", serverConfig.performanceSettings()::levelAutoCompactionTicks);
+        migrated |= migrateIntProp("leveldb-cache-mb", serverConfig.performanceSettings()::leveldbCacheMb);
+        migrated |= migrateBooleanProp("use-native-leveldb", serverConfig.performanceSettings()::useNativeLeveldb);
+        migrated |= migrateBooleanProp("enable-spark", serverConfig.performanceSettings()::enableSpark);
+
+        // Network settings
+        migrated |= migrateIntProp("zlib-provider", serverConfig.networkSettings()::zlibProvider);
+        migrated |= migrateIntProp("compression-level", serverConfig.networkSettings()::compressionLevel);
+        migrated |= migrateIntProp("compression-threshold", serverConfig.networkSettings()::compressionThreshold);
+        migrated |= migrateBooleanProp("use-snappy-compression", serverConfig.networkSettings()::useSnappyCompression);
+        migrated |= migrateIntProp("rak-packet-limit", serverConfig.networkSettings()::rakPacketLimit);
+        migrated |= migrateBooleanProp("enable-rak-send-cookie", serverConfig.networkSettings()::enableRakSendCookie);
+        migrated |= migrateIntProp("timeout-milliseconds", serverConfig.networkSettings()::timeoutMilliseconds);
+        migrated |= migrateBooleanProp("query-plugins", serverConfig.networkSettings()::queryPlugins);
+        migrated |= migrateBooleanProp("use-waterdog", serverConfig.networkSettings()::useWaterdog);
+        migrated |= migrateStringProp("viaproxy-username-prefix", serverConfig.networkSettings()::viaProxyUsernamePrefix);
+
+        // Chunk settings
+        migrated |= migrateIntProp("chunk-sending-per-tick", serverConfig.chunkSettings()::sendingPerTick);
+        migrated |= migrateIntProp("chunk-ticking-per-tick", serverConfig.chunkSettings()::tickingPerTick);
+        migrated |= migrateIntProp("chunk-ticking-radius", serverConfig.chunkSettings()::tickingRadius);
+        migrated |= migrateIntProp("chunk-generation-queue-size", serverConfig.chunkSettings()::generationQueueSize);
+        migrated |= migrateIntProp("chunk-generation-population-queue-size", serverConfig.chunkSettings()::generationPopulationQueueSize);
+        migrated |= migrateBooleanProp("light-updates", serverConfig.chunkSettings()::lightUpdates);
+        migrated |= migrateBooleanProp("clear-chunk-tick-list", serverConfig.chunkSettings()::clearChunkTickList);
+        migrated |= migrateIntProp("spawn-threshold", serverConfig.chunkSettings()::spawnThreshold);
+        migrated |= migrateBooleanProp("cache-chunks", serverConfig.chunkSettings()::cacheChunks);
+        migrated |= migrateBooleanProp("async-chunks", serverConfig.chunkSettings()::asyncChunks);
+
+        // Entity settings
+        migrated |= migrateBooleanProp("spawn-eggs", serverConfig.entitySettings()::spawnEggs);
+        migrated |= migrateBooleanProp("mob-ai", serverConfig.entitySettings()::mobAi);
+        migrated |= migrateBooleanProp("entity-auto-spawn-task", serverConfig.entitySettings()::autoSpawnTask);
+        migrated |= migrateBooleanProp("entity-despawn-task", serverConfig.entitySettings()::despawnTask);
+        migrated |= migrateIntProp("ticks-per-entity-spawns", serverConfig.entitySettings()::ticksPerSpawns);
+        migrated |= migrateIntProp("ticks-per-entity-despawns", serverConfig.entitySettings()::ticksPerDespawns);
+
+        // World settings
+        migrated |= migrateBooleanProp("nether", serverConfig.worldSettings()::nether);
+        migrated |= migrateBooleanProp("end", serverConfig.worldSettings()::end);
+        migrated |= migrateBooleanProp("vanilla-portals", serverConfig.worldSettings()::vanillaPortals);
+        migrated |= migrateIntProp("portal-ticks", serverConfig.worldSettings()::portalTicks);
+        migrated |= migrateStringProp("multi-nether-worlds", serverConfig.worldSettings()::multiNetherWorlds);
+        migrated |= migrateStringProp("anti-xray-worlds", serverConfig.worldSettings()::antiXrayWorlds);
+        migrated |= migrateStringProp("do-not-tick-worlds", serverConfig.worldSettings()::doNotTickWorlds);
+        migrated |= migrateStringProp("worlds-entity-spawning-disabled", serverConfig.worldSettings()::entitySpawningDisabledWorlds);
+        migrated |= migrateBooleanProp("load-all-worlds", serverConfig.worldSettings()::loadAllWorlds);
+        migrated |= migrateStringProp("worlds-level-auto-save-disabled", serverConfig.worldSettings()::autoSaveDisabledWorlds);
+
+        // Player settings
+        migrated |= migrateBooleanProp("save-player-data", serverConfig.playerSettings()::savePlayerData);
+        migrated |= migrateBooleanProp("save-player-data-by-uuid", serverConfig.playerSettings()::savePlayerDataByUuid);
+        migrated |= migrateBooleanProp("persona-skins", serverConfig.playerSettings()::personaSkins);
+        migrated |= migrateIntProp("skin-change-cooldown", serverConfig.playerSettings()::skinChangeCooldown);
+        migrated |= migrateBooleanProp("do-not-limit-skin-geometry", serverConfig.playerSettings()::doNotLimitSkinGeometry);
+        migrated |= migrateBooleanProp("do-not-limit-interactions", serverConfig.playerSettings()::doNotLimitInteractions);
+        migrated |= migrateStringProp("space-name-mode", serverConfig.playerSettings()::spaceNameMode);
+        migrated |= migrateBooleanProp("xp-bottles-on-creative", serverConfig.playerSettings()::xpBottlesOnCreative);
+        migrated |= migrateBooleanProp("stop-in-game", serverConfig.playerSettings()::stopInGame);
+        migrated |= migrateBooleanProp("op-in-game", serverConfig.playerSettings()::opInGame);
+
+        // Debug settings
+        migrated |= migrateIntProp("debug-level", serverConfig.debugSettings()::debugLevel);
+        migrated |= migrateBooleanProp("ansi-title", serverConfig.debugSettings()::ansiTitle);
+        migrated |= migrateBooleanProp("deprecated-verbose", serverConfig.debugSettings()::deprecatedVerbose);
+        migrated |= migrateBooleanProp("call-data-pk-send-event", serverConfig.debugSettings()::callDataPkSendEvent);
+        migrated |= migrateBooleanProp("call-batch-pk-send-event", serverConfig.debugSettings()::callBatchPkSendEvent);
+        migrated |= migrateBooleanProp("call-entity-motion-event", serverConfig.debugSettings()::callEntityMotionEvent);
+        migrated |= migrateBooleanProp("block-listener", serverConfig.debugSettings()::blockListener);
+        migrated |= migrateBooleanProp("automatic-bug-report", serverConfig.debugSettings()::automaticBugReport);
+        migrated |= migrateBooleanProp("update-notifications", serverConfig.debugSettings()::updateNotifications);
+        migrated |= migrateBooleanProp("bstats-metrics", serverConfig.debugSettings()::bstatsMetrics);
+        migrated |= migrateStringProp("hastebin-token", serverConfig.debugSettings()::hastebinToken);
+
+        // Game feature settings
+        migrated |= migrateBooleanProp("achievements", serverConfig.gameFeatureSettings()::achievements);
+        migrated |= migrateBooleanProp("announce-player-achievements", serverConfig.gameFeatureSettings()::announcePlayerAchievements);
+        migrated |= migrateBooleanProp("bed-spawnpoints", serverConfig.gameFeatureSettings()::bedSpawnpoints);
+        migrated |= migrateBooleanProp("explosion-break-blocks", serverConfig.gameFeatureSettings()::explosionBreakBlocks);
+        migrated |= migrateBooleanProp("drop-spawners", serverConfig.gameFeatureSettings()::dropSpawners);
+        migrated |= migrateBooleanProp("anvils-enabled", serverConfig.gameFeatureSettings()::anvilsEnabled);
+        migrated |= migrateBooleanProp("vanilla-bossbars", serverConfig.gameFeatureSettings()::vanillaBossbars);
+        migrated |= migrateBooleanProp("use-client-spectator", serverConfig.gameFeatureSettings()::useClientSpectator);
+        migrated |= migrateBooleanProp("enable-experiment-mode", serverConfig.gameFeatureSettings()::enableExperimentMode);
+        migrated |= migrateIntProp("multiversion-min-protocol", serverConfig.gameFeatureSettings()::multiversionMinProtocol);
+        migrated |= migrateIntProp("multiversion-max-protocol", serverConfig.gameFeatureSettings()::multiversionMaxProtocol);
+        migrated |= migrateBooleanProp("enable-raw-ores", serverConfig.gameFeatureSettings()::enableRawOres);
+        migrated |= migrateBooleanProp("enable-new-paintings", serverConfig.gameFeatureSettings()::enableNewPaintings);
+        migrated |= migrateBooleanProp("enable-new-chicken-eggs-laying", serverConfig.gameFeatureSettings()::enableNewChickenEggsLaying);
+        migrated |= migrateBooleanProp("forced-safety-enchant", serverConfig.gameFeatureSettings()::forcedSafetyEnchant);
+        migrated |= migrateBooleanProp("enable-vibrant-visuals", serverConfig.gameFeatureSettings()::enableVibrantVisuals);
+        migrated |= migrateBooleanProp("enable-raytracing", serverConfig.gameFeatureSettings()::enableRaytracing);
+        migrated |= migrateBooleanProp("temp-ip-ban-failed-xbox-auth", serverConfig.gameFeatureSettings()::tempIpBanFailedXboxAuth);
+        migrated |= migrateBooleanProp("strong-ip-bans", serverConfig.gameFeatureSettings()::strongIpBans);
+        migrated |= migrateBooleanProp("check-op-movement", serverConfig.gameFeatureSettings()::checkOpMovement);
+
+        // NetEase settings
+        migrated |= migrateBooleanProp("netease-client-support", serverConfig.neteaseSettings()::clientSupport);
+        migrated |= migrateBooleanProp("only-allow-netease-client", serverConfig.neteaseSettings()::onlyAllowNeteaseClient);
+
+        if (migrated) {
+            log.info("Migrated advanced settings from server.properties to nukkit-mot.toml");
+            this.properties.save();
+            this.saveServerConfig();
+        }
+    }
+
+    private boolean migrateStringProp(String key, Consumer<String> setter) {
+        if (properties.exists(key)) {
+            setter.accept(getPropertyString(key));
+            properties.remove(key);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean migrateBooleanProp(String key, Consumer<Boolean> setter) {
+        if (properties.exists(key)) {
+            setter.accept(getPropertyBoolean(key));
+            properties.remove(key);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean migrateIntProp(String key, Consumer<Integer> setter) {
+        if (properties.exists(key)) {
+            setter.accept(getPropertyInt(key));
+            properties.remove(key);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -3159,7 +3318,7 @@ public class Server {
     }
 
     /**
-     * Load settings from server.properties (standard MC) and server.toml (advanced MOT)
+     * Load settings from server.properties (standard MC) and nukkit-mot.toml (advanced MOT)
      */
     private void loadSettings() {
         // === Standard MC settings from server.properties ===
@@ -3197,7 +3356,7 @@ public class Server {
         }
         this.serverAuthoritativeBlockBreaking = this.getPropertyBoolean("server-authoritative-block-breaking", true);
 
-        // === Advanced MOT settings from server.toml ===
+        // === Advanced MOT settings from nukkit-mot.toml ===
         ServerConfig config = this.serverConfig;
 
         // Performance
@@ -3219,6 +3378,7 @@ public class Server {
         this.enableRakSendCookie = config.networkSettings().enableRakSendCookie();
         this.queryPlugins = config.networkSettings().queryPlugins();
         this.useWaterdog = config.networkSettings().useWaterdog();
+        this.viaProxyUsernamePrefix = config.networkSettings().viaProxyUsernamePrefix();
 
         // Chunks
         this.chunksPerTick = config.chunkSettings().sendingPerTick();
