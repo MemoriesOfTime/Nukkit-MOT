@@ -531,6 +531,10 @@ public class Server {
      */
     public boolean useWaterdog;
     /**
+     * Username prefix for ViaProxy Java Edition clients (empty to disable)
+     */
+    public String viaProxyUsernamePrefix;
+    /**
      * Using Snappy compression
      */
     public boolean useSnappy;
@@ -3259,6 +3263,7 @@ public class Server {
             log.warn("Encryption is not enabled. For better security, it's recommended to enable it if you don't use a proxy software.");
         }
         this.useWaterdog = this.getPropertyBoolean("use-waterdog", false);
+        this.viaProxyUsernamePrefix = this.getPropertyString("viaproxy-username-prefix", ".");
         this.useSnappy = this.getPropertyBoolean("use-snappy-compression", false);
         this.useClientSpectator = this.getPropertyBoolean("use-client-spectator", true);
         this.networkCompressionThreshold = this.getPropertyInt("compression-threshold", 256);
@@ -3434,6 +3439,7 @@ public class Server {
             put("use-client-spectator", true);
             put("enable-experiment-mode", true);
             put("use-waterdog", false);
+            put("viaproxy-username-prefix", ".");
             put("enable-spark", false);
             put("hastebin-token", "");
 

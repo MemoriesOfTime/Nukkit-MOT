@@ -3345,6 +3345,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.version = loginChainData.getGameVersion();
 
+                // Apply username prefix for ViaProxy Java Edition clients
+                if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isEmpty()) {
+                    this.unverifiedUsername = server.viaProxyUsernamePrefix + this.unverifiedUsername;
+                }
+
                 // Do not set username before the user is authenticated
                 this.username = this.unverifiedUsername;
                 this.unverifiedUsername = null;
@@ -7331,6 +7336,17 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
      */
     public LoginChainData getLoginChainData() {
         return this.loginChainData;
+    }
+
+    /**
+     * Check if this player is connecting through ViaProxy (Java Edition client)
+     *
+     * @return true if the player is a Java Edition client
+     */
+    public boolean isJavaClient() {
+        return this.loginChainData != null
+                && this.loginChainData.getViaProxyAuthToken() != null
+                && !this.loginChainData.getViaProxyAuthToken().isEmpty();
     }
 
     /**
