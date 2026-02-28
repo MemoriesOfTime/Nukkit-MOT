@@ -7,7 +7,6 @@ import cn.nukkit.api.NonComputationAtomic;
 import cn.nukkit.block.*;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.BaseEntity;
-import cn.nukkit.utils.CollisionHelper;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.custom.EntityDefinition;
 import cn.nukkit.entity.custom.EntityManager;
@@ -430,12 +429,12 @@ public class Level implements ChunkManager, Metadatable {
         this.levelCurrentTick = levelProvider.getCurrentTick();
         this.updateQueue = new BlockUpdateScheduler(this, levelCurrentTick);
 
-        this.chunkTickRadius = Math.min(this.server.getViewDistance(), Math.max(1, this.server.getServerConfig().getChunkTickingRadius()));
-        this.chunksPerTicks = this.server.getServerConfig().getChunkTickingPerTick();
-        this.chunkGenerationQueueSize = this.server.getServerConfig().getChunkGenerationQueueSize();
-        this.chunkPopulationQueueSize = this.server.getServerConfig().getChunkGenerationPopulationQueueSize();
+        this.chunkTickRadius = Math.min(this.server.getViewDistance(), Math.max(1, this.server.getServerConfig().chunkSettings().tickingRadius()));
+        this.chunksPerTicks = this.server.getServerConfig().chunkSettings().tickingPerTick();
+        this.chunkGenerationQueueSize = this.server.getServerConfig().chunkSettings().generationQueueSize();
+        this.chunkPopulationQueueSize = this.server.getServerConfig().chunkSettings().generationPopulationQueueSize();
         this.chunkTickList.clear();
-        this.clearChunksOnTick = this.server.getServerConfig().isClearChunkTickList();
+        this.clearChunksOnTick = this.server.getServerConfig().chunkSettings().clearChunkTickList();
         this.temporalVector = new Vector3(0, 0, 0);
         this.tickRate = 1;
 

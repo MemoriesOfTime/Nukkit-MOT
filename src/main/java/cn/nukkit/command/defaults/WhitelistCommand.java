@@ -63,13 +63,13 @@ public class WhitelistCommand extends VanillaCommand {
                     }
                     case "on" -> {
                         sender.getServer().setWhitelisted(true);
-                        sender.getServer().getServerConfig().setWhiteList(true);
+                        sender.getServer().setPropertyBoolean("white-list", true);
                         log.addSuccess("commands.allowlist.enabled").output(true);
                         return 1;
                     }
                     case "off" -> {
                         sender.getServer().setWhitelisted(false);
-                        sender.getServer().getServerConfig().setWhiteList(false);
+                        sender.getServer().setPropertyBoolean("white-list", false);
                         log.addSuccess("commands.allowlist.disabled").output(true);
                         return 1;
                     }
