@@ -46,6 +46,11 @@ public class ItemOminousBottle extends StringItemBase {
     }
 
     @Override
+    public int getUseDuration() {
+        return 32;
+    }
+
+    @Override
     public boolean isSupportedOn(int protocolId) {
         return protocolId >= ProtocolInfo.v1_21_0;
     }

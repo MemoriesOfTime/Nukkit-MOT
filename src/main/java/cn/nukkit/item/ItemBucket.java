@@ -305,6 +305,11 @@ public class ItemBucket extends Item {
         return this.getDamage() == MILK_BUCKET;
     }
 
+    @Override
+    public int getUseDuration() {
+        return this.getDamage() == MILK_BUCKET ? 32 : 0;
+    }
+
     private void checkNether(Player player, Block block, Block target, boolean nether) {
         if (nether) {
             if (!player.isCreative()) {
