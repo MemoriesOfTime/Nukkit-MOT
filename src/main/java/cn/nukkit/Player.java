@@ -3346,7 +3346,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.version = loginChainData.getGameVersion();
 
                 // Apply username prefix for ViaProxy Java Edition clients
-                if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isEmpty()) {
+                if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isBlank()) {
                     this.unverifiedUsername = server.viaProxyUsernamePrefix + this.unverifiedUsername;
                 }
 
