@@ -7,6 +7,7 @@ import lombok.extern.log4j.Log4j2;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Properties;
@@ -57,6 +58,11 @@ public class ConfigComments {
 
     /**
      * Apply comments to fields of an OkaeriConfig.
+     * <p>
+     * Updates both the current declaration instances and the static FieldDeclaration cache.
+     * The cache update is necessary because during TOML save, the configurer resolves
+     * sub-config declarations via ConfigDeclaration.of(Class) which creates new
+     * FieldDeclaration instances from the static cache, bypassing instance-level changes.
      *
      * @param config   the config object
      * @param comments the loaded properties
@@ -67,8 +73,40 @@ public class ConfigComments {
             String key = prefix == null ? field.getName() : prefix + "." + field.getName();
             String comment = comments.getProperty(key);
             if (comment != null) {
-                field.setComment(new String[]{comment});
+                String[] commentArray = new String[]{comment};
+                field.setComment(commentArray);
             }
+        }
+
+        // Also update the static FieldDeclaration cache for sub-configs
+        if (prefix != null) {
+            updateFieldDeclarationCache(config.getClass(), comments, prefix);
+        }
+    }
+
+    /**
+     * Update the static FieldDeclaration.DECLARATION_CACHE so that translated comments
+     * persist when new declarations are created during config save.
+     */
+    @SuppressWarnings("unchecked")
+    private static void updateFieldDeclarationCache(Class<?> configClass, Properties comments, String prefix) {
+        try {
+            Field cacheField = FieldDeclaration.class.getDeclaredField("DECLARATION_CACHE");
+            cacheField.setAccessible(true);
+            Map<?, FieldDeclaration> cache = (Map<?, FieldDeclaration>) cacheField.get(null);
+
+            for (FieldDeclaration cached : cache.values()) {
+                if (cached == null || cached.getField() == null) continue;
+                if (cached.getField().getDeclaringClass() != configClass) continue;
+
+                String key = prefix + "." + cached.getName();
+                String comment = comments.getProperty(key);
+                if (comment != null) {
+                    cached.setComment(new String[]{comment});
+                }
+            }
+        } catch (ReflectiveOperationException e) {
+            log.warn("Failed to update FieldDeclaration cache for {}", configClass.getSimpleName(), e);
         }
     }
 

@@ -18,9 +18,9 @@ import lombok.experimental.Accessors;
 @Getter
 @Accessors(fluent = true)
 @Header("########################################")
-@Header("# Nukkit-MOT Advanced Configuration")
-@Header("# Standard settings are in server.properties")
-@Header("# https://github.com/MemoriesOfTime/Nukkit-MOT")
+@Header("Nukkit-MOT Advanced Configuration")
+@Header("Standard settings are in server.properties")
+@Header("https://github.com/MemoriesOfTime/Nukkit-MOT")
 @Header("########################################")
 public class ServerConfig extends OkaeriConfig {
 

@@ -2566,6 +2566,7 @@ public class Server {
             // Apply localized comments based on server language
             String lang = this.getPropertyString("language", "eng");
             ConfigComments.apply(this.serverConfig, lang);
+            this.serverConfig.save();
         } catch (Exception e) {
             log.error("Failed to load nukkit-mot.toml, using default configuration", e);
             if (this.serverConfig == null) {
