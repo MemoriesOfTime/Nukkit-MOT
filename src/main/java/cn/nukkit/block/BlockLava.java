@@ -9,6 +9,7 @@ import cn.nukkit.event.entity.EntityCombustByBlockEvent;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.GameRule;
 import cn.nukkit.level.Level;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.math.BlockFace;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
@@ -48,6 +49,16 @@ public class BlockLava extends BlockLiquid {
 
     @Override
     public void onEntityCollide(Entity entity) {
+        // Precise collision check to avoid burning entities standing on diagonal blocks
+        // The entity collision system expands bounding boxes for safety checks,
+        // which can cause false positives when lava is placed between diagonal blocks.
+        // Here we verify the entity's actual bounding box intersects with lava.
+        AxisAlignedBB lavaBB = this.getCollisionBoundingBox();
+        AxisAlignedBB entityBB = entity.getBoundingBox();
+        if (lavaBB == null || entityBB == null || !entityBB.intersectsWith(lavaBB)) {
+            return;
+        }
+
         entity.highestPosition -= (entity.highestPosition - entity.y) * 0.5;
 
         EntityCombustByBlockEvent ev = new EntityCombustByBlockEvent(this, entity, 8);
