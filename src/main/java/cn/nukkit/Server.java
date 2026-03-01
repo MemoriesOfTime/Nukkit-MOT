@@ -88,6 +88,7 @@ import cn.nukkit.utils.*;
 import cn.nukkit.utils.bugreport.ExceptionHandler;
 import cn.nukkit.utils.config.ConfigComments;
 import cn.nukkit.utils.config.ServerConfig;
+import cn.nukkit.utils.config.category.WorldEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonParser;
@@ -886,10 +887,18 @@ public class Server {
                         this.loadLevel(fs.getName());
                     }
                 }
-                EnumLevel.initLevels();
             } catch (Exception e) {
                 this.getLogger().error("Unable to load levels", e);
             }
+        }
+
+        // Load custom worlds from config
+        this.loadCustomWorlds();
+
+        try {
+            EnumLevel.initLevels();
+        } catch (Exception e) {
+            this.getLogger().error("Unable to init levels", e);
         }
 
         if (loadPlugins) {
@@ -2334,6 +2343,38 @@ public class Server {
     }
 
     /**
+     * Load or generate worlds defined in the per-world config section.
+     */
+    private void loadCustomWorlds() {
+        Map<String, WorldEntry> worlds = this.serverConfig.worldSettings().worlds();
+        if (worlds == null || worlds.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, WorldEntry> entry : worlds.entrySet()) {
+            String worldName = entry.getKey();
+            if (worldName == null || worldName.trim().isEmpty()) {
+                continue;
+            }
+            if (this.isLevelLoaded(worldName)) {
+                continue;
+            }
+            WorldEntry worldEntry = entry.getValue();
+            if (this.isLevelGenerated(worldName)) {
+                this.loadLevel(worldName);
+            } else {
+                long seed = worldEntry.seed() != 0 ? worldEntry.seed() : System.currentTimeMillis();
+                Class<? extends Generator> generator = Generator.getGenerator(worldEntry.generator());
+                Map<String, Object> options = new HashMap<>();
+                String settings = worldEntry.generatorSettings();
+                if (settings != null && !settings.isEmpty()) {
+                    options.put("preset", settings);
+                }
+                this.generateLevel(worldName, seed, generator, options);
+            }
+        }
+    }
+
+    /**
      * Load a level by name
      *
      * @param name level name
@@ -2567,6 +2608,7 @@ public class Server {
             String lang = this.getPropertyString("language", "eng");
             ConfigComments.apply(this.serverConfig, lang);
             this.serverConfig.save();
+            ConfigComments.formatWorldEntries(configFile);
         } catch (Exception e) {
             log.error("Failed to load nukkit-mot.toml, using default configuration", e);
             if (this.serverConfig == null) {
@@ -2591,6 +2633,7 @@ public class Server {
         if (this.serverConfig != null) {
             try {
                 this.serverConfig.save();
+                ConfigComments.formatWorldEntries(new File(this.dataPath, "nukkit-mot.toml"));
                 log.info("Server configuration saved to nukkit-mot.toml");
             } catch (Exception e) {
                 log.error("Failed to save nukkit-mot.toml", e);
@@ -3409,6 +3452,7 @@ public class Server {
             }
         }
 
+        noTickingWorlds.clear();
         String list = config.worldSettings().doNotTickWorlds();
         if (!list.trim().isEmpty()) {
             StringTokenizer tokenizer = new StringTokenizer(list, ", ");

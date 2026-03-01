@@ -6,6 +6,9 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 @Getter
 @Setter
 @Accessors(fluent = true)
@@ -40,4 +43,13 @@ public class WorldSettings extends OkaeriConfig {
 
     @Comment("Worlds where auto-save is disabled (comma-separated)")
     private String autoSaveDisabledWorlds = "";
+
+    @Comment("Per-world custom settings (generator, seed, generator-settings)")
+    private Map<String, WorldEntry> worlds = defaultWorlds();
+
+    private static Map<String, WorldEntry> defaultWorlds() {
+        Map<String, WorldEntry> map = new LinkedHashMap<>();
+        map.put("world", new WorldEntry());
+        return map;
+    }
 }
