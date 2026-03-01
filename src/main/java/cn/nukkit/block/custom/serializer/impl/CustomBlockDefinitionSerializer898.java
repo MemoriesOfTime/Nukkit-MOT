@@ -7,6 +7,8 @@ import cn.nukkit.nbt.tag.Tag;
 
 /**
  * v898+ (1.21.130): collision_box origin/size -> boxes(min/max)
+ * <p>
+ * Adapted from Lumi project (<a href="https://github.com/KoshakMineDEV/Lumi">Lumi</a>)
  */
 public class CustomBlockDefinitionSerializer898 extends CustomBlockDefinitionSerializer843 {
 

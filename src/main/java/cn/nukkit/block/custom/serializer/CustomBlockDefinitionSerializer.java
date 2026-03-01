@@ -5,6 +5,11 @@ import cn.nukkit.block.custom.serializer.impl.CustomBlockDefinitionSerializer898
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 
+/**
+ * Base class for multi-version protocol serializers of custom block definitions.
+ * <p>
+ * Adapted from Lumi project (<a href="https://github.com/KoshakMineDEV/Lumi">Lumi</a>)
+ */
 public class CustomBlockDefinitionSerializer {
 
     public CompoundTag serialize(CompoundTag nbt) {

@@ -8,6 +8,8 @@ import java.util.Map;
 
 /**
  * v843+ (1.21.110): face_dimming(boolean) -> packed_bools(byte)
+ * <p>
+ * Adapted from Lumi project (<a href="https://github.com/KoshakMineDEV/Lumi">Lumi</a>)
  */
 public class CustomBlockDefinitionSerializer843 extends CustomBlockDefinitionSerializer {
 
