@@ -88,7 +88,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
 import com.google.gson.JsonParser;
-import io.netty.util.internal.PlatformDependent;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.*;
@@ -112,7 +111,6 @@ import java.nio.ByteOrder;
 import java.util.*;
 import java.util.List;
 import java.util.Map.Entry;
-import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -204,7 +202,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
     public Vector3 speed = null;
 
-    private final Queue<Vector3> clientMovements = PlatformDependent.newMpscQueue(4);
     public final HashSet<String> achievements = new HashSet<>();
 
     public int craftingType = CRAFTING_SMALL;
@@ -2075,7 +2072,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         }
     }
 
-    protected void handleMovement(Vector3 clientPos) {
+    protected void handleMovement(Vector3 clientPos, int tickDiff) {
         if (!this.isAlive() || !this.spawned || this.teleportPosition != null || this.isSleeping()) {
             return;
         }
@@ -2123,14 +2120,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             return;
         }
 
-        int maxDist = 9;
-        if (this.riptideTicks > 95 || clientPos.y - this.y < 2 || this.isOnLadder()) { // TODO: Remove ladder/vines check when block collisions are fixed
-            maxDist = 49;
-        }
+        double tickDiffSq = (double) tickDiff * tickDiff;
 
-        if (distanceSquared > maxDist) {
+        if (distanceSquared / tickDiffSq > 225) {
             this.revertClientMotion(this);
-            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared +  " > maxDist=" + maxDist);
+            server.getLogger().debug(username + ": distanceSquared=" + distanceSquared + " > 225 * tickDiffSq=" + (225 * tickDiffSq));
             return;
         }
 
@@ -2157,7 +2151,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         dy += this.ySize * (1 - STEP_CLIP_MULTIPLIER); // FIXME: ySize is always 0
 
         if (this.checkMovement && this.riptideTicks <= 0 && this.riding == null && !this.isGliding() && !this.getAllowFlight()) {
-            double hSpeed = dx * dx + dz * dz;
+            double hSpeed = (dx * dx + dz * dz) / tickDiffSq;
             if (hSpeed > MAXIMUM_SPEED) {
                 PlayerInvalidMoveEvent ev;
                 this.getServer().getPluginManager().callEvent(ev = new PlayerInvalidMoveEvent(this, true));
@@ -2520,8 +2514,9 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 this.spawnToAll();
             }
 
-            while (!this.clientMovements.isEmpty()) {
-                this.handleMovement(this.clientMovements.poll());
+            if (this.newPosition != null) {
+                this.handleMovement(this.newPosition, tickDiff);
+                this.newPosition = null;
             }
 
             if (this.needSendRotation) {
@@ -3521,7 +3516,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                     this.setRotation(movePlayerPacket.yaw, movePlayerPacket.pitch, movePlayerPacket.headYaw);
                     this.newPosition = newPos;
-                    this.clientMovements.offer(newPos);
                     this.forceMovement = null;
                 }
                 break;
@@ -3890,7 +3884,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.setRotation(yaw, pitch, headYaw);
                     if (!ignoreCoordinateMove) {
                         this.newPosition = clientPosition;
-                        this.clientMovements.offer(clientPosition);
                     }
                     this.forceMovement = null;
                 }
@@ -5830,7 +5823,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             this.server.removeOnlinePlayer(this);
             this.loggedIn = false;
         }
-        this.clientMovements.clear();
+        this.newPosition = null;
     }
 
     /**
@@ -6465,7 +6458,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (targets != null) {
             Server.broadcastPacket(targets, pk);
         } else {
-            this.clientMovements.clear();
+            this.newPosition = null;
 
             this.dataPacket(pk);
         }
