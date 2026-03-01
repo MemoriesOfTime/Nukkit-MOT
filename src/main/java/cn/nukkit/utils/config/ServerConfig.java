@@ -8,7 +8,7 @@ import lombok.Getter;
 import lombok.experimental.Accessors;
 
 /**
- * Nukkit-MOT Server Configuration (nukkit-mot.toml)
+ * Nukkit-MOT Server Configuration (nukkit-mot.yml)
  * <p>
  * Contains advanced/MOT-specific settings organized by category.
  * Standard Minecraft settings are in server.properties.

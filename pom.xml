@@ -141,7 +141,7 @@
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>2.0</version>
+            <version>2.5</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -168,7 +168,7 @@
         </dependency>
         <dependency>
             <groupId>eu.okaeri</groupId>
-            <artifactId>okaeri-configs-toml-jackson</artifactId>
+            <artifactId>okaeri-configs-yaml-snakeyaml</artifactId>
             <version>6.0.0-beta.23</version>
             <scope>compile</scope>
         </dependency>

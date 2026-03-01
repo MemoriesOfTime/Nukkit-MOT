@@ -4,22 +4,16 @@ import eu.okaeri.configs.OkaeriConfig;
 import eu.okaeri.configs.schema.FieldDeclaration;
 import lombok.extern.log4j.Log4j2;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Applies localized comments to the TOML configuration based on server language.
+ * Applies localized comments to the YAML configuration based on server language.
  */
 @Log4j2
 public class ConfigComments {
@@ -66,7 +60,7 @@ public class ConfigComments {
      * Apply comments to fields of an OkaeriConfig.
      * <p>
      * Updates both the current declaration instances and the static FieldDeclaration cache.
-     * The cache update is necessary because during TOML save, the configurer resolves
+     * The cache update is necessary because during save, the configurer resolves
      * sub-config declarations via ConfigDeclaration.of(Class) which creates new
      * FieldDeclaration instances from the static cache, bypassing instance-level changes.
      *
@@ -113,82 +107,6 @@ public class ConfigComments {
             }
         } catch (ReflectiveOperationException e) {
             log.warn("Failed to update FieldDeclaration cache for {}", configClass.getSimpleName(), e);
-        }
-    }
-
-    /**
-     * Post-process the TOML file to convert dotted worlds entries
-     * (e.g. {@code worlds.lobby.generator = 'flat'}) into proper TOML table sections
-     * (e.g. {@code [worldSettings.worlds.lobby]}).
-     *
-     * @param tomlFile the nukkit-mot.toml file
-     */
-    public static void formatWorldEntries(File tomlFile) {
-        try {
-            List<String> lines = Files.readAllLines(tomlFile.toPath(), StandardCharsets.UTF_8);
-            List<String> result = new ArrayList<>();
-
-            Pattern dottedKey = Pattern.compile("^worlds\\.(\\S+)\\.(\\S+)\\s*=\\s*(.*)$");
-
-            boolean inWorldSettings = false;
-            boolean firstWorldSeen = false;
-            String currentWorld = null;
-            List<String> pendingComments = new ArrayList<>();
-
-            for (String line : lines) {
-                String trimmed = line.trim();
-
-                // Track section headers
-                if (trimmed.startsWith("[") && !trimmed.startsWith("[[")) {
-                    // Flush any remaining pending comments before a new section
-                    result.addAll(pendingComments);
-                    pendingComments.clear();
-                    inWorldSettings = trimmed.equals("[worldSettings]");
-                    currentWorld = null;
-                    firstWorldSeen = false;
-                    result.add(line);
-                    continue;
-                }
-
-                if (inWorldSettings) {
-                    Matcher m = dottedKey.matcher(trimmed);
-                    if (trimmed.startsWith("#") || trimmed.isEmpty()) {
-                        pendingComments.add(line);
-                        continue;
-                    } else if (m.matches()) {
-                        String worldName = m.group(1);
-                        String field = m.group(2);
-                        String value = m.group(3);
-
-                        if (!worldName.equals(currentWorld)) {
-                            // New world section
-                            if (!firstWorldSeen) {
-                                firstWorldSeen = true;
-                                // First pending comment is the worlds field-level comment
-                                if (!pendingComments.isEmpty()) {
-                                    result.add(pendingComments.remove(0));
-                                }
-                            }
-                            currentWorld = worldName;
-                            result.add("[worldSettings.worlds." + worldName + "]");
-                        }
-                        result.addAll(pendingComments);
-                        pendingComments.clear();
-                        result.add(field + " = " + value);
-                        continue;
-                    }
-                }
-
-                // Non-worlds line or outside worldSettings
-                result.addAll(pendingComments);
-                pendingComments.clear();
-                result.add(line);
-            }
-
-            result.addAll(pendingComments);
-            Files.write(tomlFile.toPath(), result, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            log.warn("Failed to format worlds table sections in TOML", e);
         }
     }
 

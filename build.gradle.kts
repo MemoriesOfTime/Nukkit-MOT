@@ -51,7 +51,7 @@ dependencies {
     }
     api(libs.bundles.snakeyaml)
     api(libs.jackson.dataformat.toml)
-    api(libs.okaeri.configs.toml.jackson)
+    api(libs.okaeri.configs.yaml.snakeyaml)
     api(libs.nimbus.jose.jwt)
     api(libs.asm)
     api(libs.bundles.leveldb)
