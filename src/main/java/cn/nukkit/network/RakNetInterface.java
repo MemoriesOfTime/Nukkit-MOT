@@ -77,7 +77,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .handler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel channel) {
-                        if (server.getPropertyBoolean("enable-query", false)) {
+                        if (server.getPropertyBoolean("enable-query", true)) {
                             channel.pipeline().addLast("query-handler", new SimpleChannelInboundHandler<DatagramPacket>() {
                                 @Override
                                 protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) {

@@ -56,6 +56,10 @@
             <id>repo-lanink-cn</id>
             <url>https://repo.lanink.cn/repository/maven-public/</url>
         </repository>
+        <repository>
+            <id>okaeri-releases</id>
+            <url>https://repo.okaeri.cloud/releases</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -137,7 +141,7 @@
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>2.0</version>
+            <version>2.5</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -161,6 +165,12 @@
                     <artifactId>jackson-core</artifactId>
                 </exclusion>
             </exclusions>-->
+        </dependency>
+        <dependency>
+            <groupId>eu.okaeri</groupId>
+            <artifactId>okaeri-configs-yaml-snakeyaml</artifactId>
+            <version>6.0.0-beta.23</version>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.nimbusds</groupId>
