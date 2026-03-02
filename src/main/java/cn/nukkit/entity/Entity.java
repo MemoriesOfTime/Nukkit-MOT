@@ -2555,7 +2555,16 @@ public abstract class Entity extends Location implements Metadatable {
 
         AxisAlignedBB bb = block.getBoundingBox();
 
-        return bb != null && block.isSolid() && !block.isTransparent() && bb.intersectsWith(this.boundingBox);
+        if (bb == null || !block.isSolid() || block.isTransparent()) {
+            return false;
+        }
+
+        // Check eye position against block BB to avoid false suffocation in non-full blocks like stairs
+        double halfWidth = this.getWidth() * 0.4;
+        return bb.intersectsWith(
+                this.x - halfWidth, y - 0.0001, this.z - halfWidth,
+                this.x + halfWidth, y + 0.0001, this.z + halfWidth
+        );
     }
 
     public boolean isInsideOfFire() {
