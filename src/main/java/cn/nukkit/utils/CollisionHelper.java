@@ -166,10 +166,9 @@ public record CollisionHelper(Entity entity) {
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 for (int y = clampedMinY; y <= clampedMaxY; y++) {
-                    if (level.getBlockIdAt(x, y, z) != targetBlockId) continue;
+                    Block block = level.getBlock(entity.chunk, x, y, z, 0, false);
+                    if (block == null || block.getId() != targetBlockId) continue;
 
-                    int blockData = level.getBlockDataAt(x, y, z);
-                    Block block = Block.get(targetBlockId, blockData, level, x, y, z);
                     if (block.collidesWithBB(boundingBox)) {
                         return true;
                     }
