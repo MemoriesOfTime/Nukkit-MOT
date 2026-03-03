@@ -2,7 +2,6 @@ package cn.nukkit.potion;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityBoss;
 import cn.nukkit.entity.EntityLiving;
@@ -269,15 +268,50 @@ public class Effect implements Cloneable {
         this.color = ((r & 0xff) << 16) + ((g & 0xff) << 8) + (b & 0xff);
     }
 
+    /**
+     * Add this effect to the entity.
+     * Fires {@link EntityEffectUpdateEvent} for backward compatibility, but does NOT fire
+     * {@link cn.nukkit.event.entity.EntityPotionEffectEvent} or update the entity's effects map.
+     * <p>
+     * For full effect lifecycle (including all events and map management),
+     * use {@link Entity#addEffect(Effect)} instead.
+     *
+     * @deprecated Use {@link Entity#addEffect(Effect)} for full event chain support.
+     */
+    @Deprecated
     public void add(Entity entity) {
-        Effect oldEffect = entity.getEffect(getId());
-
-        EntityEffectUpdateEvent event = new EntityEffectUpdateEvent(entity, oldEffect, this);
+        EntityEffectUpdateEvent event = new EntityEffectUpdateEvent(entity, entity.getEffect(this.getId()), this);
         Server.getInstance().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
             return;
         }
+        applyTo(entity);
+    }
 
+    /**
+     * Remove this effect from the entity.
+     * Fires {@link EntityEffectRemoveEvent} for backward compatibility, but does NOT fire
+     * {@link cn.nukkit.event.entity.EntityPotionEffectEvent} or update the entity's effects map.
+     * <p>
+     * For full effect lifecycle (including all events and map management),
+     * use {@link Entity#removeEffect(int)} instead.
+     *
+     * @deprecated Use {@link Entity#removeEffect(int)} for full event chain support.
+     */
+    @Deprecated
+    public void remove(Entity entity) {
+        EntityEffectRemoveEvent event = new EntityEffectRemoveEvent(entity, this);
+        Server.getInstance().getPluginManager().callEvent(event);
+        if (event.isCancelled()) {
+            return;
+        }
+        removeFrom(entity);
+    }
+
+    /**
+     * Apply effect packets and modifiers to the entity (pure logic, no events fired).
+     */
+    public void applyTo(Entity entity) {
         if (entity instanceof EntityLiving entityLiving) {
             if (entity instanceof Player player) {
                 MobEffectPacket pk = new MobEffectPacket();
@@ -286,7 +320,7 @@ public class Effect implements Cloneable {
                 pk.amplifier = this.getAmplifier();
                 pk.particles = this.isVisible();
                 pk.duration = this.getDuration();
-                if (oldEffect != null) {
+                if (entity.getEffect(this.getId()) != null) {
                     pk.eventId = MobEffectPacket.EVENT_MODIFY;
                 } else {
                     pk.eventId = MobEffectPacket.EVENT_ADD;
@@ -296,18 +330,10 @@ public class Effect implements Cloneable {
             }
 
             if (this.id == Effect.SPEED) {
-                /*if (oldEffect != null) {
-                    player.setMovementSpeed(player.getMovementSpeed() / (1 + 0.2f * (oldEffect.amplifier + 1)), false);
-                }
-                player.setMovementSpeed(player.getMovementSpeed() * (1 + 0.2f * (this.amplifier + 1)));*/
                 entityLiving.addMovementSpeedModifier(new EntityMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED, 1 + 0.2f * this.amplifier, EntityMovementSpeedModifier.Operation.MULTIPLY));
             }
 
             if (this.id == Effect.SLOWNESS) {
-                /*if (oldEffect != null) {
-                    player.setMovementSpeed(player.getMovementSpeed() / (1 - 0.15f * (oldEffect.amplifier + 1)), false);
-                }
-                player.setMovementSpeed(player.getMovementSpeed() * (1 - 0.15f * (this.amplifier + 1)));*/
                 entityLiving.addMovementSpeedModifier(new EntityMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SLOWNESS, 1 - 0.15f * this.amplifier, EntityMovementSpeedModifier.Operation.MULTIPLY));
             }
         }
@@ -323,13 +349,10 @@ public class Effect implements Cloneable {
         }
     }
 
-    public void remove(Entity entity) {
-        EntityEffectRemoveEvent event = new EntityEffectRemoveEvent(entity, this);
-        Server.getInstance().getPluginManager().callEvent(event);
-        if (event.isCancelled()) {
-            return;
-        }
-
+    /**
+     * Remove effect packets and modifiers from the entity (pure logic, no events fired).
+     */
+    public void removeFrom(Entity entity) {
         if (entity instanceof EntityLiving entityLiving) {
             if (entityLiving instanceof Player player) {
                 MobEffectPacket pk = new MobEffectPacket();
@@ -338,7 +361,6 @@ public class Effect implements Cloneable {
                 pk.eventId = MobEffectPacket.EVENT_REMOVE;
 
                 player.dataPacket(pk);
-
             }
             if (this.id == Effect.SPEED) {
                 entityLiving.removeMovementSpeedModifier(EntityMovementSpeedModifier.EFFECT_SPEED);

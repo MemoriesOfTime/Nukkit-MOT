@@ -1017,7 +1017,15 @@ public abstract class Entity extends Location implements Metadatable {
 
             this.effects.remove(effectId);
 
-            effect.remove(this);
+            EntityEffectRemoveEvent removeEvent = new EntityEffectRemoveEvent(this, effect);
+            this.server.getPluginManager().callEvent(removeEvent);
+            if (removeEvent.isCancelled()) {
+                this.effects.putIfAbsent(effectId, effect);
+                this.recalculateEffectColor();
+                return;
+            }
+
+            effect.removeFrom(this);
 
             this.recalculateEffectColor();
         }
@@ -1050,9 +1058,9 @@ public abstract class Entity extends Location implements Metadatable {
             return;
         }
 
-        if (cause != null) {
-            Effect oldEffect = this.effects.get(effect.getId());
+        Effect oldEffect = this.effects.get(effect.getId());
 
+        if (cause != null) {
             EntityPotionEffectEvent event = new EntityPotionEffectEvent(
                     this,
                     oldEffect,
@@ -1071,7 +1079,16 @@ public abstract class Entity extends Location implements Metadatable {
             return;
         }
 
-        effect.add(this);
+        // Re-read in case a listener on EntityPotionEffectEvent modified the same effect
+        oldEffect = this.effects.get(effect.getId());
+
+        EntityEffectUpdateEvent updateEvent = new EntityEffectUpdateEvent(this, oldEffect, effect);
+        this.server.getPluginManager().callEvent(updateEvent);
+        if (updateEvent.isCancelled()) {
+            return;
+        }
+
+        effect.applyTo(this);
 
         this.effects.put(effect.getId(), effect);
 
