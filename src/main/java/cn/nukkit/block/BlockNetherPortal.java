@@ -10,6 +10,7 @@ import cn.nukkit.math.BlockFace.Axis;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Faceable;
+import cn.nukkit.Server;
 
 /**
  * Created on 2016/1/5 by xtypr.
@@ -73,6 +74,11 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
             }
         }
         return result;
+    }
+
+    @Override
+    public boolean hasDynamicCollision() {
+        return true;
     }
 
     @Override

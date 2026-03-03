@@ -50,8 +50,8 @@ public record CollisionHelper(Entity entity) {
 
         for (Block block : blocks) {
             if (block.canPassThrough()) {
-                if (block.hasEntityCollision()) {
-                    // Traversable blocks (portals, flames, etc.) with entity collisions are detected using the trajectoryBB extension
+                if (block.hasDynamicCollision()) {
+                    // Dynamic collision of traversable blocks, where x, y, z can change rapidly
                     AxisAlignedBB trajectoryBB = boundingBox.grow(motionAbsX + 0.3, motionAbsY + 0.3, motionAbsZ + 0.3);
                     if (block.collidesWithBB(trajectoryBB, true)) {
                         if (count == result.length) {
@@ -60,7 +60,7 @@ public record CollisionHelper(Entity entity) {
                         result[count++] = block;
                     }
                 } else {
-                    // Purely decorative pass-through block using shrink hitbox
+                    // Simple traversable blocks with shrunk hitboxes to avoid diagonal collisions
                     double shrinkX = (boundingBox.getMaxX() - boundingBox.getMinX()) * 0.25;
                     double shrinkZ = (boundingBox.getMaxZ() - boundingBox.getMinZ()) * 0.25;
                     AxisAlignedBB shrinkBB = boundingBox.shrink(shrinkX, 0, shrinkZ);
@@ -121,8 +121,8 @@ public record CollisionHelper(Entity entity) {
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {
                 for (int y = clampedMinY; y <= clampedMaxY; y++) {
-                    Block block = level.getBlock(x, y, z);
-                    if (block.isAir()) continue;
+                    Block block = level.getBlock(entity.chunk, x, y, z, 0, false);
+                    if (block == null || block.isAir()) continue;
 
                     if (count == result.length) {
                         result = Arrays.copyOf(result, Math.min(result.length * 2, estimatedCount));
