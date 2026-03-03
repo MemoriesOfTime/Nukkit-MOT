@@ -14,7 +14,7 @@ public class BlockNode extends ParamNode<Block> {
     public void fill(String arg) {
         Block block = Item.fromString(arg).getBlockUnsafe();
         if (block == null) {
-            this.error();
+            error("commands.give.block.notFound", arg);
             return;
         }
         this.value = block;

@@ -168,10 +168,27 @@ public interface AxisAlignedBB extends Cloneable {
         return z;
     }
 
+    /**
+     * Checks if this bounding box intersects with the given bounding box.
+     */
     default boolean intersectsWith(AxisAlignedBB bb) {
         if (bb.getMaxY() > this.getMinY() && bb.getMinY() < this.getMaxY()) {
             if (bb.getMaxX() > this.getMinX() && bb.getMinX() < this.getMaxX()) {
                 return bb.getMaxZ() > this.getMinZ() && bb.getMinZ() < this.getMaxZ();
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Checks if this bounding box intersects with the region defined by the given coordinates.
+     * This avoids creating a temporary AxisAlignedBB object.
+     */
+    default boolean intersectsWith(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+        if (maxY > this.getMinY() && minY < this.getMaxY()) {
+            if (maxX > this.getMinX() && minX < this.getMaxX()) {
+                return maxZ > this.getMinZ() && minZ < this.getMaxZ();
             }
         }
 

@@ -80,6 +80,7 @@ dependencies {
     api(libs.block.state.updater)
 
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.bundles.mockito)
     testRuntimeOnly(libs.junit.engine)
 }
 
