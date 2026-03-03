@@ -25,6 +25,7 @@ oshi = "5.8.7"
 annotations = "24.1.0"
 jose4j = "0.9.6"
 junit = "5.10.2"
+mockito = "5.11.0"
 nukkitx_natives = "1.0.3"
 raknet = "1.0.0.CR3-SNAPSHOT"
 cloudburst_common = "3.0.0.Beta7-SNAPSHOT"
@@ -76,6 +77,8 @@ terminal-console = { module = "net.minecrell:terminalconsoleappender", version.r
 
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-junit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
 
 jackson-dataformat-toml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-toml", version.ref = "jackson_dataformat_toml" }
 
@@ -85,6 +88,7 @@ leveldb = [ "leveldb", "leveldb-api", "leveldb-jni" ]
 log4j = [ "log4j-api", "log4j-core", "log4j-slf4j" ]
 terminal = [ "jline-terminal-jni", "jline-reader", "terminal-console" ]
 junit = [ "junit-jupiter", "junit-engine" ]
+mockito = [ "mockito-core", "mockito-junit" ]
 
 [plugins]
 shadow = { id = "com.github.johnrengelman.shadow", version = "8.0.0" }
