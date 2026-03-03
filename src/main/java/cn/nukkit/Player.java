@@ -2696,11 +2696,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             int useDuration = heldItem.getUseDuration();
             if (useDuration > 0 && heldItem.canRelease()) {
                 int ticksUsed = this.server.getTick() - this.startAction;
-                if (ticksUsed > useDuration) {
+                if (ticksUsed >= useDuration) {
                     Vector3 dir = this.getDirectionVector();
                     if (heldItem.onClickAir(this, dir)) {
                         if (this.isSurvival() || this.isAdventure()) {
-                            this.inventory.setItemInHand(heldItem);
+                            if (heldItem.getId() == 0 || this.inventory.getItemInHandFast().getId() == heldItem.getId()) {
+                                this.inventory.setItemInHand(heldItem);
+                            }
                         }
                         this.setUsingItem(false);
                         if (!heldItem.onUse(this, ticksUsed)) {
