@@ -16,7 +16,6 @@ import cn.nukkit.math.BlockFace.Plane;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.UpdateBlockPacket;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -281,6 +280,10 @@ public class ItemBucket extends Item {
     @Override
     public boolean onUse(Player player, int ticksUsed) {
         if (player.isSpectator() || this.getDamage() != MILK_BUCKET) {
+            return false;
+        }
+
+        if (ticksUsed < getUseDuration() - 2) {
             return false;
         }
 
