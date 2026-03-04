@@ -25,12 +25,16 @@ Only interested in newer versions? You might want to try [Lumi](https://github.c
 6. Support for NetEase clients
 
 ## How to install?
-1. Install java 17 or higher
+1. Install java 25 or higher
 2. Download the .jar file from the links below
 3. Write a command to run: `java -jar Nukkit-MOT-SNAPSHOT.jar` (change `Nukkit-MOT-SNAPSHOT.jar` to the name of the file you downloaded)
 
+> **WARNING:**
+> This branch is optimized for performance using the latest Java 25+ and **unstable** when running legacy code for Java 17 and below.  
+> If you encounter issues, please switch to a [master](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster) branch.
+> 
 ## Links
-- __🌐 Download: [Jenkins](https://motci.cn/job/Nukkit-MOT/) / [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Amaster)__
+- __🌐 Download: [GitHub Actions](https://github.com/MemoriesOfTime/Nukkit-MOT/actions/workflows/maven.yml?query=branch%3Afeature/java-25)__
 - __💬 Discuss: [Discord](https://discord.gg/pJjQDQC) / [QQ Group](https://jq.qq.com/?_wv=1027&k=5aIuYMH)__
 - __🔌 Plugins: [Nukkit Forum](https://cloudburstmc.org/resources/categories/nukkit-plugins.1/) / [Nukkit-MOT Forum](https://bbs.nukkit-mot.com/resources/)__
 - __🐞 [Report a Bug](https://github.com/MemoriesOfTime/Nukkit-MOT/issues/new/choose)__
