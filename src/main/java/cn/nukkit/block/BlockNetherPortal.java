@@ -76,6 +76,11 @@ public class BlockNetherPortal extends BlockFlowable implements Faceable {
     }
 
     @Override
+    public boolean hasDynamicCollision() {
+        return true;
+    }
+
+    @Override
     public boolean hasEntityCollision() {
         return true;
     }
