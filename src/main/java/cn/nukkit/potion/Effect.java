@@ -2,7 +2,6 @@ package cn.nukkit.potion;
 
 import cn.nukkit.Player;
 import cn.nukkit.Server;
-import cn.nukkit.entity.Attribute;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityBoss;
 import cn.nukkit.entity.EntityLiving;
@@ -274,9 +273,6 @@ public class Effect implements Cloneable {
 
         EntityEffectUpdateEvent event = new EntityEffectUpdateEvent(entity, oldEffect, this);
         Server.getInstance().getPluginManager().callEvent(event);
-        if (event.isCancelled()) {
-            return;
-        }
 
         if (entity instanceof EntityLiving entityLiving) {
             if (entity instanceof Player player) {
@@ -326,9 +322,6 @@ public class Effect implements Cloneable {
     public void remove(Entity entity) {
         EntityEffectRemoveEvent event = new EntityEffectRemoveEvent(entity, this);
         Server.getInstance().getPluginManager().callEvent(event);
-        if (event.isCancelled()) {
-            return;
-        }
 
         if (entity instanceof EntityLiving entityLiving) {
             if (entityLiving instanceof Player player) {
