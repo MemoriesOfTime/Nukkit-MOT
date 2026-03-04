@@ -990,8 +990,8 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public void removeAllEffects(EntityPotionEffectEvent.Cause cause) {
-        for (Effect effect : this.effects.values()) {
-            this.removeEffect(effect.getId(), cause);
+        for (Integer effectId : this.effects.keySet().toArray(new Integer[0])) {
+            this.removeEffect(effectId, cause);
         }
     }
 
@@ -1908,7 +1908,7 @@ public abstract class Entity extends Location implements Metadatable {
         updatePassengers();
 
         if (!this.effects.isEmpty()) {
-            for (Effect effect : this.effects.values()) {
+            for (Effect effect : this.effects.values().toArray(new Effect[0])) {
                 if (effect.canTick()) {
                     effect.applyEffect(this);
                 }

@@ -1,5 +1,6 @@
 package cn.nukkit.entity.item;
 
+import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.data.IntEntityData;
 import cn.nukkit.entity.projectile.EntityProjectile;
@@ -140,6 +141,9 @@ public class EntityPotion extends EntityProjectile {
 
         Entity[] entities = this.getLevel().getNearbyEntities(this.getBoundingBox().grow(4.125, 2.125, 4.125));
         for (Entity anEntity : entities) {
+            if (anEntity instanceof Player player && player.isSpectator()) {
+                continue;
+            }
             double distance = anEntity.distanceSquared(this);
             if (distance < 16) {
                 double d = anEntity.equals(collidedWith) ? 1 : 1 - Math.sqrt(distance) / 4;
