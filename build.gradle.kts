@@ -15,7 +15,7 @@ version = "MOT-SNAPSHOT"
 
 java {
     toolchain {
-        languageVersion.set(JavaLanguageVersion.of(17))
+        languageVersion.set(JavaLanguageVersion.of(25))
     }
     withSourcesJar()
     withJavadocJar()
@@ -127,6 +127,7 @@ tasks {
 
     shadowJar {
         manifest.attributes["Multi-Release"] = "true"
+        manifest.attributes["Main-Class"] = "cn.nukkit.Nukkit"
 
         transform(Log4j2PluginsCacheFileTransformer())
 
