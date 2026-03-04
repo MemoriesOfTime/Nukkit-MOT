@@ -43,6 +43,11 @@ public class BlockFire extends BlockFlowable {
     }
 
     @Override
+    public boolean hasDynamicCollision() {
+        return true;
+    }
+
+    @Override
     public boolean hasEntityCollision() {
         return true;
     }
