@@ -22,11 +22,27 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v3
+
+      - name: Cache Gradle distributions
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/wrapper/dists
+          key: ${{ runner.os }}-gradle-dists-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-dists-
+
       - name: Build with Gradle
         run: |
-          ./gradlew shadowJar --no-daemon --quiet \
+          export GRADLE_USER_HOME=$HOME/.gradle
+          ./gradlew shadowJar --no-daemon \
             -Dorg.gradle.jvmargs="--enable-native-access=ALL-UNNAMED" \
-            -Dorg.gradle.internal.launcher.welcomeMessageEnabled=false
+            -Dorg.gradle.internal.launcher.welcomeMessageEnabled=false \
+            --console=plain \
+            --no-watch-fs \
+            -Dhttp.socketTimeout=60000 \
+            -Dhttp.connectionTimeout=60000
 
       - uses: actions/upload-artifact@v4
         with:
@@ -43,12 +59,12 @@ jobs:
           CURRENT_TIME=$(date -u +"%Y/%m/%d-%H:%M:%S" -d "+8 hours")
           
           curl -X POST 'https://api.minebbs.com/api/openapi/v1/resources/5934/update' \
-            -H 'Authorization: Bearer ${{ secrets.MINEBBS_API_KEY }}' \
-            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer ${{ secrets.MINEBBS_API_KEY }}" \
+            -H "Content-Type: application/json" \
             -d "{
               \"title\": \"${{ github.ref_name }}-${SHA_SHORT}\",
               \"description\": \"${COMMIT_MSG}\",
               \"new_version\": \"${CURRENT_TIME}\",
               \"file_url\": \"https://motci.cn/job/Nukkit-MOT/\"
             }" \
-            -f -s || true  # -s = silent, -f = fail silently, || true
+            -f -s --max-time 30 || true
