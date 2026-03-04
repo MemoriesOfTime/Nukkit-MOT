@@ -3047,7 +3047,7 @@ public abstract class Entity extends Location implements Metadatable {
             this.blocksAround = null;
             this.collisionBlocks = null;
 
-            this.effects.clear();
+            this.removeAllEffects(EntityPotionEffectEvent.Cause.DEATH);
             this.passengers.clear();
 
             if (this.intProperties != null) {

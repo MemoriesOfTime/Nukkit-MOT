@@ -17,7 +17,7 @@
         <jline.version>3.30.6</jline.version>
         <leveldb-mcpe-java.version>1.1.0</leveldb-mcpe-java.version>
         <leveldb-mcpe-jni.version>0.0.10</leveldb-mcpe-jni.version>
-        <block-state-updater.version>1.21.60-SNAPSHOT</block-state-updater.version>
+        <block-state-updater.version>1.21.60-20250619.144147-3</block-state-updater.version>
     </properties>
 
     <distributionManagement>
@@ -62,7 +62,7 @@
         <dependency>
             <groupId>org.cloudburstmc.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.0.0.CR3-SNAPSHOT</version>
+            <version>1.0.0.CR3-20260303.150721-27</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -80,7 +80,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>common</artifactId>
-            <version>3.0.0.Beta7-SNAPSHOT</version>
+            <version>3.0.0.Beta7-20250812.232642-18</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -298,7 +298,7 @@
         <dependency>
             <groupId>net.daporkchop.lib</groupId>
             <artifactId>natives</artifactId>
-            <version>0.5.8-SNAPSHOT</version>
+            <version>0.5.8-20221202.164554-7</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
