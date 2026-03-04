@@ -2116,6 +2116,17 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
     }
 
     /**
+     * Returns the duration in ticks required to use/consume this item.
+     * Used for server-side auto-completion of consumable items.
+     * Override in subclasses for consumable items (food, potions, etc.).
+     *
+     * @return use duration in ticks, 0 means no auto-completion
+     */
+    public int getUseDuration() {
+        return 0;
+    }
+
+    /**
      * Returns a new item instance with count decreased by amount or air if new count is less or equal to 0
      */
     public final Item decrement(int amount) {

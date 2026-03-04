@@ -2690,6 +2690,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 noShieldTicks = NO_SHIELD_DELAY;
                 hasUpdated = true;
             }
+
+            // Server-side auto-completion for consumable items
+            if (processAutoCompletion()) {
+                hasUpdated = true;
+            }
         } else {
             if (noShieldTicks > 0) {
                 noShieldTicks -= tickDiff;
@@ -2701,6 +2706,32 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             }
         }
         return super.entityBaseTick(tickDiff) || hasUpdated;
+    }
+
+    /**
+     * Processes server-side auto-completion for consumable items.
+     *
+     * @return true if auto-completion was triggered
+     */
+    boolean processAutoCompletion() {
+        Item heldItem = this.inventory.getItemInHand();
+        int useDuration = heldItem.getUseDuration();
+        if (useDuration > 0 && heldItem.canRelease()) {
+            int ticksUsed = this.server.getTick() - this.startAction;
+            if (ticksUsed >= useDuration) {
+                if (this.isSurvival() || this.isAdventure()) {
+                    if (heldItem.getId() == 0 || this.inventory.getItemInHandFast().getId() == heldItem.getId()) {
+                        this.inventory.setItemInHand(heldItem);
+                    }
+                }
+                this.setUsingItem(false);
+                if (!heldItem.onUse(this, ticksUsed)) {
+                    this.inventory.sendContents(this);
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     public void checkInteractNearby() {

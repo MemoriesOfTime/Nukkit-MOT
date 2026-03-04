@@ -69,4 +69,13 @@ public abstract class ItemEdible extends Item {
     public boolean canRelease() {
         return true;
     }
+
+    @Override
+    public int getUseDuration() {
+        Food food = Food.getByRelative(this);
+        if (food != null) {
+            return food.getEatingTickSupplier() == null ? food.getEatingTick() : food.getEatingTickSupplier().getAsInt();
+        }
+        return 10;
+    }
 }
