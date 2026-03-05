@@ -8011,10 +8011,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         UpdateClientInputLocksPacket packet = new UpdateClientInputLocksPacket();
         if (this.lockCameraInput) {
-            packet.lockComponentData = UpdateClientInputLocksPacket.InputLockType.CAMERA;
+            packet.inputLockType = UpdateClientInputLocksPacket.InputLockType.CAMERA;
         }
         if (this.lockMovementInput) {
-            packet.lockComponentData = UpdateClientInputLocksPacket.InputLockType.MOVEMENT;
+            packet.inputLockType = UpdateClientInputLocksPacket.InputLockType.MOVEMENT;
         }
         packet.setServerPosition(this.getLocation().add(0, this.getBaseOffset(), 0).asVector3f());
 
