@@ -1401,7 +1401,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         if (packet instanceof UpdateClientInputLocksPacket updateClientInputLocksPacket) {
             if (packet.protocol < updateClientInputLocksPacket.getInputLockType().getMinimumProtocol().getProtocol()) {
                 Server.getInstance().getLogger().debug("Could not send UpdateClientInputLocksPacket because" + updateClientInputLocksPacket.getInputLockType().name() + " is not valid before " + updateClientInputLocksPacket.getInputLockType().getMinimumProtocol().name() + " while player's version is " + packet.gameVersion.name());
-                return;
+                return false;
             }
         }
 
