@@ -71,7 +71,8 @@ public class UpdateClientInputLocksPacket extends DataPacket {
             for (InputLockType flag : values()) {
                 if (flag.id == id) return flag;
             }
-            throw new IllegalArgumentException("Unknown flag id: " + id);
+            Server.getInstance().getLogger().error("Error in parsing id for inputLockType, caused by: unknown flag id: " + id);
+            return InputLockType.RESET;
         }
 
         public static Set<InputLockType> fromBitSet(int bitset) {
