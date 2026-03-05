@@ -21,7 +21,7 @@ public class UpdateClientInputLocksPacket extends DataPacket {
     @Deprecated
     public static final int FLAG_MOVEMENT = 1 << 2;
 
-    public InputLockType inputLockType;
+    public InputLockType inputLockType = InputLockType.RESET;
     public Vector3f serverPosition;
 
     @Override
