@@ -1398,6 +1398,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         packet.protocol = this.protocol;
         packet.gameVersion = this.gameVersion;
 
+        if (packet instanceof UpdateClientInputLocksPacket updateClientInputLocksPacket) {
+            if (packet.protocol < updateClientInputLocksPacket.getInputLockType().getMinimumProtocol().getProtocol()) {
+                Server.getInstance().getLogger().debug("Could not send UpdateClientInputLocksPacket because" + this.inputLockType.name() + " is not valid before " + this.inputLockType.getMinimumProtocol().name() + " while player's version is " + this.gameVersion.name());
+                return;
+            }
+        }
+
         if (server.callDataPkSendEv) {
             DataPacketSendEvent ev = new DataPacketSendEvent(this, packet);
             this.server.getPluginManager().callEvent(ev);

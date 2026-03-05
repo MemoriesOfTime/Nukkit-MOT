@@ -31,10 +31,6 @@ public class UpdateClientInputLocksPacket extends DataPacket {
 
     @Override
     public void decode() {
-        if (this.protocol < this.inputLockType.minimumProtocol.getProtocol()) {
-            Server.getInstance().getLogger().debug("Could not send UpdateClientInputLocksPacket because" + this.inputLockType.name() + " is not valid before " + this.inputLockType.getMinimumProtocol().name() + " while player's version is " + this.gameVersion.name());
-            return;
-        }
         this.inputLockType = InputLockType.fromId((int) this.getUnsignedVarInt());
         this.serverPosition = this.getVector3f();
     }
