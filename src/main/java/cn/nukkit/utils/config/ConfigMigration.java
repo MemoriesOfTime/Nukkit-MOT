@@ -3,6 +3,7 @@ package cn.nukkit.utils.config;
 import cn.nukkit.utils.Config;
 import lombok.extern.log4j.Log4j2;
 
+import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
@@ -94,7 +95,7 @@ public class ConfigMigration {
         migrated |= migrateInt("skin-change-cooldown", serverConfig.playerSettings()::skinChangeCooldown);
         migrated |= migrateBoolean("do-not-limit-skin-geometry", serverConfig.playerSettings()::doNotLimitSkinGeometry);
         migrated |= migrateBoolean("do-not-limit-interactions", serverConfig.playerSettings()::doNotLimitInteractions);
-        migrated |= migrateString("space-name-mode", serverConfig.playerSettings()::spaceNameMode);
+        migrated |= migrateSpaceNameMode("space-name-mode", serverConfig.playerSettings()::spaceNameMode);
         migrated |= migrateBoolean("xp-bottles-on-creative", serverConfig.playerSettings()::xpBottlesOnCreative);
         migrated |= migrateBoolean("stop-in-game", serverConfig.playerSettings()::stopInGame);
         migrated |= migrateBoolean("op-in-game", serverConfig.playerSettings()::opInGame);
@@ -169,7 +170,27 @@ public class ConfigMigration {
     private boolean migrateInt(String key, Consumer<Integer> setter) {
         if (properties.exists(key)) {
             String value = String.valueOf(properties.get(key)).trim();
-            setter.accept(value.isEmpty() ? 0 : Integer.parseInt(value));
+            try {
+                setter.accept(value.isEmpty() ? 0 : Integer.parseInt(value));
+                properties.remove(key);
+                return true;
+            } catch (NumberFormatException e) {
+                log.warn("Skipped migrating '{}' due to invalid integer value '{}'", key, value);
+                return false;
+            }
+        }
+        return false;
+    }
+
+    private boolean migrateSpaceNameMode(String key, Consumer<String> setter) {
+        if (properties.exists(key)) {
+            String raw = String.valueOf(properties.get(key)).trim();
+            String normalized = switch (raw.toLowerCase(Locale.ROOT)) {
+                case "disabled", "deny" -> "deny";
+                case "replacing", "replace" -> "replace";
+                default -> "ignore";
+            };
+            setter.accept(normalized);
             properties.remove(key);
             return true;
         }

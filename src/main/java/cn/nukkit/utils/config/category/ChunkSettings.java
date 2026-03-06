@@ -27,7 +27,7 @@ public class ChunkSettings extends OkaeriConfig {
     private int generationPopulationQueueSize = 8;
 
     @Comment("Enable dynamic light updates")
-    private boolean lightUpdates = false;
+    private boolean lightUpdates = true;
 
     @Comment("Clear chunk tick list on save")
     private boolean clearChunkTickList = true;

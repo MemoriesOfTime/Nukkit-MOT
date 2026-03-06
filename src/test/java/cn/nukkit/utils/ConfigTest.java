@@ -1,5 +1,7 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.utils.config.ConfigMigration;
+import cn.nukkit.utils.config.ServerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -160,6 +162,48 @@ public class ConfigTest {
         Assertions.assertTrue(reloaded.check());
         Assertions.assertTrue(reloaded.getBoolean("auto-detected"));
         Assertions.assertEquals("toml", reloaded.getString("format"));
+    }
+
+    @Test
+    public void testConfigMigrationSpaceNameModeReplacing() {
+        File propertiesFile = tempDir.resolve("server.properties").toFile();
+        Config properties = new Config(propertiesFile, Config.PROPERTIES);
+        properties.set("space-name-mode", "replacing");
+
+        ServerConfig serverConfig = new ServerConfig();
+        ConfigMigration migration = new ConfigMigration(properties, serverConfig);
+
+        Assertions.assertTrue(migration.migrate());
+        Assertions.assertEquals("replace", serverConfig.playerSettings().spaceNameMode());
+        Assertions.assertFalse(properties.exists("space-name-mode"));
+    }
+
+    @Test
+    public void testConfigMigrationSpaceNameModeDisabled() {
+        File propertiesFile = tempDir.resolve("server-disabled.properties").toFile();
+        Config properties = new Config(propertiesFile, Config.PROPERTIES);
+        properties.set("space-name-mode", "disabled");
+
+        ServerConfig serverConfig = new ServerConfig();
+        ConfigMigration migration = new ConfigMigration(properties, serverConfig);
+
+        Assertions.assertTrue(migration.migrate());
+        Assertions.assertEquals("deny", serverConfig.playerSettings().spaceNameMode());
+        Assertions.assertFalse(properties.exists("space-name-mode"));
+    }
+
+    @Test
+    public void testConfigMigrationInvalidIntegerNotCrash() {
+        File propertiesFile = tempDir.resolve("server-invalid-int.properties").toFile();
+        Config properties = new Config(propertiesFile, Config.PROPERTIES);
+        properties.set("compression-level", "not-a-number");
+
+        ServerConfig serverConfig = new ServerConfig();
+        ConfigMigration migration = new ConfigMigration(properties, serverConfig);
+
+        Assertions.assertDoesNotThrow(migration::migrate);
+        Assertions.assertEquals(5, serverConfig.networkSettings().compressionLevel());
+        Assertions.assertTrue(properties.exists("compression-level"));
     }
 
 }

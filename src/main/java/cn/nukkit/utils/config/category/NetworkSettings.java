@@ -5,6 +5,7 @@ import eu.okaeri.configs.annotation.Comment;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
+import org.cloudburstmc.netty.channel.raknet.RakConstants;
 
 @Getter
 @Setter
@@ -24,7 +25,7 @@ public class NetworkSettings extends OkaeriConfig {
     private boolean useSnappyCompression = false;
 
     @Comment("RakNet packet limit per tick")
-    private int rakPacketLimit = 1000000;
+    private int rakPacketLimit = RakConstants.DEFAULT_PACKET_LIMIT;
 
     @Comment("Enable RakNet cookie validation")
     private boolean enableRakSendCookie = true;
@@ -39,5 +40,5 @@ public class NetworkSettings extends OkaeriConfig {
     private boolean useWaterdog = false;
 
     @Comment("ViaProxy Java Edition player username prefix")
-    private String viaProxyUsernamePrefix = ".";
+    private String viaProxyUsernamePrefix = "";
 }

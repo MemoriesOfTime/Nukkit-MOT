@@ -737,7 +737,7 @@ public class Server {
         if (this.isHardcore && this.difficulty < 3) {
             this.setDifficulty(3);
         } else {
-            this.setDifficulty(this.getPropertyInt("difficulty", 2));
+            this.setDifficulty(getDifficultyFromString(this.getPropertyString("difficulty", "2")));
         }
 
         org.apache.logging.log4j.Level currentLevel = Nukkit.getLogLevel();
@@ -2364,6 +2364,9 @@ public class Server {
                 continue;
             }
             WorldEntry worldEntry = entry.getValue();
+            if (worldEntry == null) {
+                worldEntry = new WorldEntry();
+            }
             if (this.isLevelGenerated(worldName)) {
                 this.loadLevel(worldName);
             } else {
@@ -2699,6 +2702,14 @@ public class Server {
      */
     public Config getProperties() {
         return this.properties;
+    }
+
+    public Object getProperty(String variable) {
+        return this.getProperty(variable, null);
+    }
+
+    public Object getProperty(String variable, Object defaultValue) {
+        return this.properties.exists(variable) ? this.properties.get(variable) : defaultValue;
     }
 
     public String getPropertyString(String key) {
@@ -3304,7 +3315,7 @@ public class Server {
 
         // Performance
         this.networkCompressionLevel = Math.max(Math.min(config.networkSettings().compressionLevel(), 9), 0);
-        this.chunkCompressionLevel = 7;
+        this.chunkCompressionLevel = Math.max(Math.min(this.getPropertyInt("chunk-compression-level", 7), 9), 1);
         this.autoTickRate = config.performanceSettings().autoTickRate();
         this.autoTickRateLimit = config.performanceSettings().autoTickRateLimit();
         this.alwaysTickPlayers = config.performanceSettings().alwaysTickPlayers();
@@ -3511,6 +3522,7 @@ public class Server {
             put("rcon.password", Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13));
             put("rcon.port", 25575);
             put("enable-query", true);
+            put("chunk-compression-level", 7);
 
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);

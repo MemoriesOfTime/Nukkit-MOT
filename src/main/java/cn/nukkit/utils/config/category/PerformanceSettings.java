@@ -45,7 +45,7 @@ public class PerformanceSettings extends OkaeriConfig {
     private int levelAutoCompactionTicks = 36000;
 
     @Comment("LevelDB cache size in MB")
-    private int leveldbCacheMb = 80;
+    private int leveldbCacheMb = 64;
 
     @Comment("Use native LevelDB library")
     private boolean useNativeLeveldb = false;
