@@ -16,7 +16,6 @@ import cn.nukkit.math.BlockFace.Plane;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.network.protocol.UpdateBlockPacket;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -284,6 +283,10 @@ public class ItemBucket extends Item {
             return false;
         }
 
+        if (ticksUsed < getUseDuration() - 2) {
+            return false;
+        }
+
         PlayerItemConsumeEvent consumeEvent = new PlayerItemConsumeEvent(player, this);
 
         player.getServer().getPluginManager().callEvent(consumeEvent);
@@ -303,6 +306,11 @@ public class ItemBucket extends Item {
     @Override
     public boolean canRelease() {
         return this.getDamage() == MILK_BUCKET;
+    }
+
+    @Override
+    public int getUseDuration() {
+        return this.getDamage() == MILK_BUCKET ? 32 : 0;
     }
 
     private void checkNether(Player player, Block block, Block target, boolean nether) {

@@ -70,7 +70,7 @@ public class ItemPotion extends Item {
     @Override
     public boolean onUse(Player player, int ticksUsed) {
         if (player.protocol < 388) return true;
-        if (ticksUsed < 10) return false;
+        if (ticksUsed < getUseDuration() - 2) return false;
         PlayerItemConsumeEvent consumeEvent = new PlayerItemConsumeEvent(player, this);
         player.getServer().getPluginManager().callEvent(consumeEvent);
         if (consumeEvent.isCancelled()) {
@@ -94,5 +94,10 @@ public class ItemPotion extends Item {
     @Override
     public boolean canRelease() {
         return true;
+    }
+
+    @Override
+    public int getUseDuration() {
+        return 32;
     }
 }
