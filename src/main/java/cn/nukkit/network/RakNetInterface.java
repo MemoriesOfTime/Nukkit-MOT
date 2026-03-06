@@ -80,7 +80,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
                     @Override
                     protected void initChannel(Channel channel) {
                         if (server.enableProxyProtocol) {
-                            channel.pipeline().addFirst("proxy-protocol-handler",
+                            channel.parent().pipeline().addFirst("proxy-protocol-handler",
                                     new ProxyProtocolHandler(server.proxyProtocolWhitelist));
                         }
                         if (server.getPropertyBoolean("enable-query", false)) {
