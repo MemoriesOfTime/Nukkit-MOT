@@ -589,6 +589,14 @@ public class Server {
      */
     public boolean enableRakSendCookie;
     /**
+     * Enable Proxy Protocol v2 to get real client IP behind proxies like FRP
+     */
+    public boolean enableProxyProtocol;
+    /**
+     * Whitelist of proxy IPs/CIDRs allowed to send Proxy Protocol headers (e.g. "127.0.0.1", "10.0.0.0/8")
+     */
+    public List<String> proxyProtocolWhitelist;
+    /**
      * Enable forced safety enchantments (up max lvl)
      */
     public boolean forcedSafetyEnchant;
@@ -3289,6 +3297,20 @@ public class Server {
         this.enableNewChickenEggsLaying = this.getPropertyBoolean("enable-new-chicken-eggs-laying", true);
         this.rakPacketLimit = this.getPropertyInt("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
         this.enableRakSendCookie = this.getPropertyBoolean("enable-rak-send-cookie", true);
+        this.enableProxyProtocol = this.getPropertyBoolean("enable-proxy-protocol", false);
+        if (this.enableProxyProtocol) {
+            String whitelist = this.getPropertyString("proxy-protocol-whitelist", "");
+            this.proxyProtocolWhitelist = whitelist.isEmpty() ? new ArrayList<>() :
+                    new ArrayList<>(Arrays.asList(whitelist.split(",")));
+            this.proxyProtocolWhitelist.replaceAll(String::trim);
+            this.proxyProtocolWhitelist.removeIf(String::isEmpty);
+            log.info("Proxy Protocol v2 enabled");
+            if (this.proxyProtocolWhitelist.isEmpty()) {
+                log.warn("Proxy Protocol whitelist is empty - all source IPs will be trusted. Consider setting 'proxy-protocol-whitelist' for security.");
+            }
+        } else {
+            this.proxyProtocolWhitelist = new ArrayList<>();
+        }
         this.forcedSafetyEnchant = this.getPropertyBoolean("forced-safety-enchant", true);
         this.enableVibrantVisuals = this.getPropertyBoolean("enable-vibrant-visuals", true);
         this.enableRaytracing = this.getPropertyBoolean("enable-raytracing", true);
@@ -3378,6 +3400,8 @@ public class Server {
             put("use-snappy-compression", false);
             put("rak-packet-limit", RakConstants.DEFAULT_PACKET_LIMIT);
             put("enable-rak-send-cookie", true);
+            put("enable-proxy-protocol", false);
+            put("proxy-protocol-whitelist", "");
             put("timeout-milliseconds", 25000);
 
             put("auto-tick-rate", true);

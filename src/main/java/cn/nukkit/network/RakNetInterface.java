@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.event.player.PlayerCreationEvent;
 import cn.nukkit.event.server.QueryRegenerateEvent;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.proxy.ProxyProtocolHandler;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.session.RakNetPlayerSession;
 import cn.nukkit.utils.Utils;
@@ -78,6 +79,10 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .handler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel channel) {
+                        if (server.enableProxyProtocol) {
+                            channel.pipeline().addFirst("proxy-protocol-handler",
+                                    new ProxyProtocolHandler(server.proxyProtocolWhitelist));
+                        }
                         if (server.getPropertyBoolean("enable-query", false)) {
                             channel.pipeline().addLast("query-handler", new SimpleChannelInboundHandler<DatagramPacket>() {
                                 @Override

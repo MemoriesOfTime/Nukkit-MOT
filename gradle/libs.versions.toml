@@ -34,6 +34,7 @@ jackson_dataformat_toml = "2.20.1"
 [libraries]
 raknet = { module = "org.cloudburstmc.netty:netty-transport-raknet", version.ref = "raknet" }
 netty-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "netty_epoll" }
+netty-codec-haproxy = { module = "io.netty:netty-codec-haproxy", version.ref = "netty_epoll" }
 nukkitx-natives = { module = "com.nukkitx:natives", version.ref = "nukkitx_natives" }
 cloudburst-common = { module = "org.cloudburstmc.protocol:common", version.ref = "cloudburst_common" }
 fastutil = { module = "it.unimi.dsi:fastutil", version.ref = "fastutil" }
