@@ -1,8 +1,10 @@
-package cn.nukkit.utils.config;
+package cn.nukkit.utils.serverconfig;
 
-import cn.nukkit.utils.config.category.*;
+import cn.nukkit.utils.serverconfig.category.*;
 import eu.okaeri.configs.OkaeriConfig;
-import eu.okaeri.configs.annotation.*;
+import eu.okaeri.configs.annotation.Comment;
+import eu.okaeri.configs.annotation.CustomKey;
+import eu.okaeri.configs.annotation.Header;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
@@ -16,7 +18,6 @@ import lombok.experimental.Accessors;
  */
 @Getter
 @Accessors(fluent = true)
-@Names(strategy = NameStrategy.HYPHEN_CASE, modifier = NameModifier.TO_LOWER_CASE)
 @Header("########################################")
 @Header("Nukkit-MOT Advanced Configuration")
 @Header("Standard settings are in server.properties")
@@ -25,29 +26,38 @@ import lombok.experimental.Accessors;
 public class ServerConfig extends OkaeriConfig {
 
     @Comment({"", "Performance and threading settings"})
+    @CustomKey("performance-settings")
     private PerformanceSettings performanceSettings = new PerformanceSettings();
 
     @Comment({"", "Network and compression settings"})
+    @CustomKey("network-settings")
     private NetworkSettings networkSettings = new NetworkSettings();
 
     @Comment({"", "Chunk loading and ticking settings"})
+    @CustomKey("chunk-settings")
     private ChunkSettings chunkSettings = new ChunkSettings();
 
     @Comment({"", "Entity spawning and AI settings"})
+    @CustomKey("entity-settings")
     private EntitySettings entitySettings = new EntitySettings();
 
     @Comment({"", "World and dimension settings"})
+    @CustomKey("world-settings")
     private WorldSettings worldSettings = new WorldSettings();
 
     @Comment({"", "Player data and interaction settings"})
+    @CustomKey("player-settings")
     private PlayerSettings playerSettings = new PlayerSettings();
 
     @Comment({"", "Debug, logging and metrics settings"})
+    @CustomKey("debug-settings")
     private DebugSettings debugSettings = new DebugSettings();
 
     @Comment({"", "Game feature toggles"})
+    @CustomKey("game-feature-settings")
     private GameFeatureSettings gameFeatureSettings = new GameFeatureSettings();
 
     @Comment({"", "NetEase client support settings"})
+    @CustomKey("netease-settings")
     private NeteaseSettings neteaseSettings = new NeteaseSettings();
 }

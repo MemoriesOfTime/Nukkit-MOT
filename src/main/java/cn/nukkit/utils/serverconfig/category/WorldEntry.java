@@ -1,10 +1,8 @@
-package cn.nukkit.utils.config.category;
+package cn.nukkit.utils.serverconfig.category;
 
 import eu.okaeri.configs.OkaeriConfig;
 import eu.okaeri.configs.annotation.Comment;
-import eu.okaeri.configs.annotation.NameModifier;
-import eu.okaeri.configs.annotation.NameStrategy;
-import eu.okaeri.configs.annotation.Names;
+import eu.okaeri.configs.annotation.CustomKey;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
@@ -12,7 +10,6 @@ import lombok.experimental.Accessors;
 @Getter
 @Setter
 @Accessors(fluent = true)
-@Names(strategy = NameStrategy.HYPHEN_CASE, modifier = NameModifier.TO_LOWER_CASE)
 public class WorldEntry extends OkaeriConfig {
 
     @Comment("World generator type (normal, flat, nether, the_end, void)")
@@ -22,5 +19,6 @@ public class WorldEntry extends OkaeriConfig {
     private long seed = 0;
 
     @Comment("Generator settings (e.g. flat layer definition)")
+    @CustomKey("generator-settings")
     private String generatorSettings = "";
 }

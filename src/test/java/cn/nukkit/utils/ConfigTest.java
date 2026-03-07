@@ -1,7 +1,7 @@
 package cn.nukkit.utils;
 
-import cn.nukkit.utils.config.ConfigMigration;
-import cn.nukkit.utils.config.ServerConfig;
+import cn.nukkit.utils.serverconfig.ConfigMigration;
+import cn.nukkit.utils.serverconfig.ServerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

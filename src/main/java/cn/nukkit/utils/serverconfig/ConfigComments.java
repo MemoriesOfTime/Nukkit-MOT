@@ -1,4 +1,4 @@
-package cn.nukkit.utils.config;
+package cn.nukkit.utils.serverconfig;
 
 import eu.okaeri.configs.OkaeriConfig;
 import eu.okaeri.configs.schema.FieldDeclaration;

@@ -1,4 +1,4 @@
-package cn.nukkit.utils.config;
+package cn.nukkit.utils.serverconfig;
 
 import cn.nukkit.utils.Config;
 import lombok.extern.log4j.Log4j2;
@@ -51,6 +51,7 @@ public class ConfigMigration {
         migrated |= migrateInt("zlib-provider", serverConfig.networkSettings()::zlibProvider);
         migrated |= migrateInt("compression-level", serverConfig.networkSettings()::compressionLevel);
         migrated |= migrateInt("compression-threshold", serverConfig.networkSettings()::compressionThreshold);
+        migrated |= migrateInt("chunk-compression-level", serverConfig.networkSettings()::chunkCompressionLevel);
         migrated |= migrateBoolean("use-snappy-compression", serverConfig.networkSettings()::useSnappyCompression);
         migrated |= migrateInt("rak-packet-limit", serverConfig.networkSettings()::rakPacketLimit);
         migrated |= migrateBoolean("enable-rak-send-cookie", serverConfig.networkSettings()::enableRakSendCookie);

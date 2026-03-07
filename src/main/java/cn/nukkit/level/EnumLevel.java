@@ -3,7 +3,7 @@ package cn.nukkit.level;
 import cn.nukkit.Server;
 import cn.nukkit.level.generator.Generator;
 import cn.nukkit.math.Vector3;
-import cn.nukkit.utils.config.category.WorldEntry;
+import cn.nukkit.utils.serverconfig.category.WorldEntry;
 
 import java.util.HashMap;
 import java.util.List;

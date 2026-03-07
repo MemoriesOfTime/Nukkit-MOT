@@ -86,10 +86,10 @@ import cn.nukkit.scoreboard.manager.ScoreboardManager;
 import cn.nukkit.scoreboard.storage.JSONScoreboardStorage;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.bugreport.ExceptionHandler;
-import cn.nukkit.utils.config.ConfigComments;
-import cn.nukkit.utils.config.ConfigMigration;
-import cn.nukkit.utils.config.ServerConfig;
-import cn.nukkit.utils.config.category.WorldEntry;
+import cn.nukkit.utils.serverconfig.ConfigComments;
+import cn.nukkit.utils.serverconfig.ConfigMigration;
+import cn.nukkit.utils.serverconfig.ServerConfig;
+import cn.nukkit.utils.serverconfig.category.WorldEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.JsonParser;
@@ -3300,7 +3300,7 @@ public class Server {
 
         // Performance
         this.networkCompressionLevel = Math.max(Math.min(config.networkSettings().compressionLevel(), 9), 0);
-        this.chunkCompressionLevel = Math.max(Math.min(this.getPropertyInt("chunk-compression-level", 7), 9), 1);
+        this.chunkCompressionLevel = Math.max(Math.min(config.networkSettings().chunkCompressionLevel(), 9), 1);
         this.autoTickRate = config.performanceSettings().autoTickRate();
         this.autoTickRateLimit = config.performanceSettings().autoTickRateLimit();
         this.alwaysTickPlayers = config.performanceSettings().alwaysTickPlayers();
@@ -3498,7 +3498,6 @@ public class Server {
             put("rcon.password", Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13));
             put("rcon.port", 25575);
             put("enable-query", true);
-            put("chunk-compression-level", 7);
 
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
