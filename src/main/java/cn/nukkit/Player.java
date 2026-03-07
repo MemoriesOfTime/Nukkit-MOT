@@ -1398,6 +1398,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         packet.protocol = this.protocol;
         packet.gameVersion = this.gameVersion;
 
+        if (packet instanceof UpdateClientInputLocksPacket updateClientInputLocksPacket) {
+            if (packet.protocol < updateClientInputLocksPacket.getInputLockType().getMinimumProtocol().getProtocol()) {
+                Server.getInstance().getLogger().debug("Could not send UpdateClientInputLocksPacket because" + updateClientInputLocksPacket.getInputLockType().name() + " is not valid before " + updateClientInputLocksPacket.getInputLockType().getMinimumProtocol().name() + " while player's version is " + packet.gameVersion.name());
+                return false;
+            }
+        }
+
         if (server.callDataPkSendEv) {
             DataPacketSendEvent ev = new DataPacketSendEvent(this, packet);
             this.server.getPluginManager().callEvent(ev);
@@ -8011,10 +8018,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         UpdateClientInputLocksPacket packet = new UpdateClientInputLocksPacket();
         if (this.lockCameraInput) {
-            packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_CAMERA;
+            packet.inputLockType = UpdateClientInputLocksPacket.InputLockType.CAMERA;
         }
         if (this.lockMovementInput) {
-            packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_MOVEMENT;
+            packet.inputLockType = UpdateClientInputLocksPacket.InputLockType.MOVEMENT;
         }
         packet.setServerPosition(this.getLocation().add(0, this.getBaseOffset(), 0).asVector3f());
 
