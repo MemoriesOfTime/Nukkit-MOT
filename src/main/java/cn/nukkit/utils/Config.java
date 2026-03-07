@@ -578,8 +578,8 @@ public class Config {
         for (String line : content.split("\n")) {
             String trimmed = line.trim();
             if (trimmed.startsWith("#")) {
-                if (!sb.isEmpty()) sb.append("\r\n");
-                sb.append(trimmed.substring(1));
+                if (!sb.isEmpty()) sb.append("\n");
+                sb.append(trimmed.substring(1).strip());
             } else if (!trimmed.isEmpty()) {
                 break;
             }
