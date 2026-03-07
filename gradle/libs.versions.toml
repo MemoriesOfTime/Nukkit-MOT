@@ -9,7 +9,7 @@ caffeine = "3.1.8"
 guava = "33.1.0-jre"
 gson = "2.10.1"
 fastutil = "8.5.15"
-snakeyaml = "2.0"
+snakeyaml = "2.5"
 snakeyaml_engine = "2.7"
 nimbus_jose = "10.3.1"
 asm = "9.7"
@@ -30,6 +30,7 @@ nukkitx_natives = "1.0.3"
 raknet = "1.0.0.CR3-20260303.150721-27"
 cloudburst_common = "3.0.0.Beta7-20250812.232642-18"
 jackson_dataformat_toml = "2.20.1"
+okaeri_configs = "6.1.0-beta.1"
 
 [libraries]
 raknet = { module = "org.cloudburstmc.netty:netty-transport-raknet", version.ref = "raknet" }
@@ -82,6 +83,7 @@ mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
 mockito-junit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
 
 jackson-dataformat-toml = { module = "com.fasterxml.jackson.dataformat:jackson-dataformat-toml", version.ref = "jackson_dataformat_toml" }
+okaeri-configs-yaml-snakeyaml = { module = "eu.okaeri:okaeri-configs-yaml-snakeyaml", version.ref = "okaeri_configs" }
 
 [bundles]
 snakeyaml = [ "snakeyaml", "snakeyaml-engine" ]
