@@ -1,13 +1,14 @@
 package cn.nukkit.utils;
 
+import cn.nukkit.utils.serverconfig.ConfigMigration;
+import cn.nukkit.utils.serverconfig.ServerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
+import java.util.*;
 
 public class ConfigTest {
 
@@ -162,4 +163,182 @@ public class ConfigTest {
         Assertions.assertEquals("toml", reloaded.getString("format"));
     }
 
+    @Test
+    public void testConfigMigrationSpaceNameModeReplacing() {
+        File propertiesFile = tempDir.resolve("server.properties").toFile();
+        Config properties = new Config(propertiesFile, Config.PROPERTIES);
+        properties.set("space-name-mode", "replacing");
+
+        ServerConfig serverConfig = new ServerConfig();
+        ConfigMigration migration = new ConfigMigration(properties, serverConfig);
+
+        Assertions.assertTrue(migration.migrate());
+        Assertions.assertEquals("replace", serverConfig.playerSettings().spaceNameMode());
+        Assertions.assertFalse(properties.exists("space-name-mode"));
+    }
+
+    @Test
+    public void testConfigMigrationSpaceNameModeDisabled() {
+        File propertiesFile = tempDir.resolve("server-disabled.properties").toFile();
+        Config properties = new Config(propertiesFile, Config.PROPERTIES);
+        properties.set("space-name-mode", "disabled");
+
+        ServerConfig serverConfig = new ServerConfig();
+        ConfigMigration migration = new ConfigMigration(properties, serverConfig);
+
+        Assertions.assertTrue(migration.migrate());
+        Assertions.assertEquals("deny", serverConfig.playerSettings().spaceNameMode());
+        Assertions.assertFalse(properties.exists("space-name-mode"));
+    }
+
+    @Test
+    public void testConfigMigrationInvalidIntegerNotCrash() {
+        File propertiesFile = tempDir.resolve("server-invalid-int.properties").toFile();
+        Config properties = new Config(propertiesFile, Config.PROPERTIES);
+        properties.set("compression-level", "not-a-number");
+
+        ServerConfig serverConfig = new ServerConfig();
+        ConfigMigration migration = new ConfigMigration(properties, serverConfig);
+
+        Assertions.assertDoesNotThrow(migration::migrate);
+        Assertions.assertEquals(5, serverConfig.networkSettings().compressionLevel());
+        Assertions.assertTrue(properties.exists("compression-level"));
+    }
+
+    @Test
+    public void testServerConfigDefaultValues() {
+        ServerConfig config = new ServerConfig();
+
+        // Performance
+        Assertions.assertEquals("auto", config.performanceSettings().asyncWorkers());
+        Assertions.assertTrue(config.performanceSettings().autoTickRate());
+        Assertions.assertEquals(20, config.performanceSettings().autoTickRateLimit());
+        Assertions.assertEquals(1, config.performanceSettings().baseTickRate());
+        Assertions.assertTrue(config.performanceSettings().threadWatchdog());
+        Assertions.assertEquals(6000, config.performanceSettings().ticksPerAutosave());
+
+        // Network
+        Assertions.assertEquals(2, config.networkSettings().zlibProvider());
+        Assertions.assertEquals(5, config.networkSettings().compressionLevel());
+        Assertions.assertFalse(config.networkSettings().useSnappyCompression());
+        Assertions.assertTrue(config.networkSettings().enableRakSendCookie());
+
+        // Chunk
+        Assertions.assertEquals(4, config.chunkSettings().sendingPerTick());
+        Assertions.assertTrue(config.chunkSettings().lightUpdates());
+        Assertions.assertTrue(config.chunkSettings().asyncChunks());
+
+        // Entity
+        Assertions.assertTrue(config.entitySettings().spawnEggs());
+        Assertions.assertTrue(config.entitySettings().mobAi());
+        Assertions.assertTrue(config.entitySettings().autoSpawnTask());
+        Assertions.assertEquals(200, config.entitySettings().ticksPerSpawns());
+
+        // World
+        Assertions.assertTrue(config.worldSettings().nether());
+        Assertions.assertTrue(config.worldSettings().end());
+        Assertions.assertEquals(80, config.worldSettings().portalTicks());
+        Assertions.assertTrue(config.worldSettings().worlds().isEmpty());
+
+        // Player
+        Assertions.assertTrue(config.playerSettings().savePlayerData());
+        Assertions.assertEquals("ignore", config.playerSettings().spaceNameMode());
+        Assertions.assertEquals(15, config.playerSettings().skinChangeCooldown());
+
+        // Debug
+        Assertions.assertEquals(1, config.debugSettings().debugLevel());
+        Assertions.assertTrue(config.debugSettings().automaticBugReport());
+
+        // Game features
+        Assertions.assertTrue(config.gameFeatureSettings().achievements());
+        Assertions.assertTrue(config.gameFeatureSettings().enableExperimentMode());
+        Assertions.assertEquals(0, config.gameFeatureSettings().multiversionMinProtocol());
+        Assertions.assertEquals(-1, config.gameFeatureSettings().multiversionMaxProtocol());
+
+        // NetEase
+        Assertions.assertFalse(config.neteaseSettings().clientSupport());
+        Assertions.assertFalse(config.neteaseSettings().onlyAllowNeteaseClient());
+    }
+
+    @Test
+    public void testConfigMigrationNoExistingKeys() {
+        File propertiesFile = tempDir.resolve("empty-server.properties").toFile();
+        Config properties = new Config(propertiesFile, Config.PROPERTIES);
+
+        ServerConfig serverConfig = new ServerConfig();
+        ConfigMigration migration = new ConfigMigration(properties, serverConfig);
+
+        Assertions.assertFalse(migration.migrate());
+    }
+
+    @Test
+    public void testParseStringListNullAndEmpty() {
+        // Replicate the parseStringList logic used in Server.java
+        List<String> target = new ArrayList<>();
+
+        // Test null input
+        parseStringListHelper(null, target);
+        Assertions.assertTrue(target.isEmpty());
+
+        // Test empty string
+        parseStringListHelper("", target);
+        Assertions.assertTrue(target.isEmpty());
+
+        // Test whitespace only
+        parseStringListHelper("   ", target);
+        Assertions.assertTrue(target.isEmpty());
+
+        // Test normal comma-separated
+        parseStringListHelper("world1, world2, world3", target);
+        Assertions.assertEquals(3, target.size());
+        Assertions.assertEquals("world1", target.get(0));
+        Assertions.assertEquals("world2", target.get(1));
+        Assertions.assertEquals("world3", target.get(2));
+
+        // Test single value
+        parseStringListHelper("singleWorld", target);
+        Assertions.assertEquals(1, target.size());
+        Assertions.assertEquals("singleWorld", target.get(0));
+    }
+
+    /**
+     * Helper that replicates the parseStringList logic from Server.java for testing.
+     */
+    private static void parseStringListHelper(String input, List<String> target) {
+        target.clear();
+        if (input == null || input.trim().isEmpty()) {
+            return;
+        }
+        StringTokenizer tokenizer = new StringTokenizer(input, ", ");
+        while (tokenizer.hasMoreTokens()) {
+            target.add(tokenizer.nextToken());
+        }
+    }
+
+    @Test
+    public void testSpaceNameModeOldValues() {
+        // Test the spaceNameMode switch logic including old values
+        Assertions.assertEquals(0, resolveSpaceMode("deny"));
+        Assertions.assertEquals(0, resolveSpaceMode("disabled"));
+        Assertions.assertEquals(0, resolveSpaceMode("DENY"));
+        Assertions.assertEquals(0, resolveSpaceMode("Disabled"));
+        Assertions.assertEquals(2, resolveSpaceMode("replace"));
+        Assertions.assertEquals(2, resolveSpaceMode("replacing"));
+        Assertions.assertEquals(2, resolveSpaceMode("REPLACE"));
+        Assertions.assertEquals(2, resolveSpaceMode("Replacing"));
+        Assertions.assertEquals(1, resolveSpaceMode("ignore"));
+        Assertions.assertEquals(1, resolveSpaceMode("anything_else"));
+        Assertions.assertEquals(1, resolveSpaceMode(null));
+    }
+
+    /**
+     * Helper that replicates the spaceNameMode resolution logic from Server.java.
+     */
+    private static int resolveSpaceMode(String mode) {
+        return switch (mode != null ? mode.toLowerCase(Locale.ROOT) : "ignore") {
+            case "deny", "disabled" -> 0;
+            case "replace", "replacing" -> 2;
+            default -> 1;
+        };
+    }
 }
