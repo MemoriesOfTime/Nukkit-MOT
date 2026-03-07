@@ -2625,7 +2625,7 @@ public class Server {
     }
 
     private void logConfigError(Exception e) {
-        // Search the entire exception chain for detailed error info
+        // Search the exception chain for specific error types
         org.yaml.snakeyaml.error.MarkedYAMLException yamlEx = null;
         eu.okaeri.configs.exception.OkaeriConfigException configEx = null;
         for (Throwable t = e; t != null && t != t.getCause(); t = t.getCause()) {
@@ -2637,36 +2637,12 @@ public class Server {
             }
         }
 
-        if (yamlEx != null) {
-            log.error("nukkit-mot.yml has a YAML syntax error:");
-            org.yaml.snakeyaml.error.Mark mark = yamlEx.getProblemMark();
-            if (mark != null) {
-                log.error("  Location: line {}, column {}", mark.getLine() + 1, mark.getColumn() + 1);
-            }
-            if (yamlEx.getProblem() != null) {
-                log.error("  Problem: {}", yamlEx.getProblem());
-            }
-            if (yamlEx.getContext() != null) {
-                log.error("  Context: {}", yamlEx.getContext());
-            }
-        } else if (configEx != null) {
-            log.error("nukkit-mot.yml has a configuration error:");
-            if (configEx.getPath() != null) {
-                log.error("  Field: {}", configEx.getPath());
-            }
-            if (configEx.getExpectedType() != null) {
-                log.error("  Expected type: {}", configEx.getExpectedType());
-            }
-            if (configEx.getActualValue() != null) {
-                log.error("  Actual value: {}", configEx.getActualValue());
-            }
+        if (configEx != null) {
+            log.error("nukkit-mot.yml configuration error:\n{}", configEx.getMessage());
+        } else if (yamlEx != null) {
+            log.error("nukkit-mot.yml YAML syntax error: {}", yamlEx.getMessage());
         } else {
             log.error("Failed to load nukkit-mot.yml: {}", e.getMessage());
-        }
-
-        // If OkaeriConfigException has field info, also print it for YAML errors
-        if (yamlEx != null && configEx != null && configEx.getPath() != null) {
-            log.error("  Field: {}", configEx.getPath());
         }
 
         log.debug("Configuration load exception details:", e);
