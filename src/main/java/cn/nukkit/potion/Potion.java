@@ -249,7 +249,7 @@ public class Potion implements Cloneable {
                 entity.addEffect(applyEffect, this.splash ? EntityPotionEffectEvent.Cause.POTION_SPLASH : EntityPotionEffectEvent.Cause.POTION_DRINK);
                 Effect resistance = Effect.getEffect(Effect.DAMAGE_RESISTANCE);
                 resistance.setAmplifier(this.id == TURTLE_MASTER_II ? 3 : 2);
-                int resDuration = 20 * (this.id == TURTLE_MASTER_LONG ? (splash ? 30 : 40) : (splash ? 15 : 20));
+                int resDuration = 20 * (this.id == TURTLE_MASTER_LONG ? 40 : 20);
                 resistance.setDuration((int) ((splash ? health : 1) * resDuration + 0.5));
                 entity.addEffect(resistance, this.splash ? EntityPotionEffectEvent.Cause.POTION_SPLASH : EntityPotionEffectEvent.Cause.POTION_DRINK);
                 break;
@@ -341,12 +341,12 @@ public class Potion implements Cloneable {
             case TURTLE_MASTER_LONG:
                 effect = Effect.getEffect(Effect.SLOWNESS);
                 effect.setAmplifier(3); // Slowness IV
-                effect.setDuration(20 * (isSplash ? (potionType == TURTLE_MASTER ? 15 : 30) : (potionType == TURTLE_MASTER ? 20 : 40)));
+                effect.setDuration(20 * (potionType == TURTLE_MASTER ? 20 : 40));
                 return effect;
             case TURTLE_MASTER_II:
                 effect = Effect.getEffect(Effect.SLOWNESS);
                 effect.setAmplifier(5); // Slowness VI
-                effect.setDuration(20 * (isSplash ? 15 : 20));
+                effect.setDuration(20 * 20);
                 return effect;
             case SLOW_FALLING:
             case SLOW_FALLING_LONG:
@@ -373,7 +373,12 @@ public class Potion implements Cloneable {
         }
 
         if (!isInstant(potionType)) {
-            effect.setDuration(20 * getApplySeconds(potionType, isSplash));
+            int ticks = 20 * getApplySeconds(potionType, isSplash);
+            // Vanilla BE: Poison II and Regeneration II are 22.5s (450 ticks)
+            if (potionType == POISON_II || potionType == REGENERATION_II) {
+                ticks += 10;
+            }
+            effect.setDuration(ticks);
         }
 
         return effect;
@@ -413,104 +418,54 @@ public class Potion implements Cloneable {
     }
 
     public static int getApplySeconds(int potionType, boolean isSplash) {
-        if (isSplash) {
-            return switch (potionType) {
-                case NO_EFFECTS -> 0;
-                case MUNDANE -> 0;
-                case MUNDANE_II -> 0;
-                case THICK -> 0;
-                case AWKWARD -> 0;
-                case NIGHT_VISION -> 135;
-                case NIGHT_VISION_LONG -> 360;
-                case INVISIBLE -> 135;
-                case INVISIBLE_LONG -> 360;
-                case LEAPING -> 135;
-                case LEAPING_LONG -> 360;
-                case LEAPING_II -> 67;
-                case FIRE_RESISTANCE -> 135;
-                case FIRE_RESISTANCE_LONG -> 360;
-                case SPEED -> 135;
-                case SPEED_LONG -> 360;
-                case SPEED_II -> 67;
-                case SLOWNESS -> 67;
-                case SLOWNESS_LONG -> 180;
-                case WATER_BREATHING -> 135;
-                case WATER_BREATHING_LONG -> 360;
-                case INSTANT_HEALTH -> 0;
-                case INSTANT_HEALTH_II -> 0;
-                case HARMING -> 0;
-                case HARMING_II -> 0;
-                case POISON -> 33;
-                case POISON_LONG -> 90;
-                case POISON_II -> 16;
-                case REGENERATION -> 33;
-                case REGENERATION_LONG -> 90;
-                case REGENERATION_II -> 16;
-                case STRENGTH -> 135;
-                case STRENGTH_LONG -> 360;
-                case STRENGTH_II -> 67;
-                case WEAKNESS -> 67;
-                case WEAKNESS_LONG -> 180;
-                case WITHER_II -> 30;
-                case TURTLE_MASTER -> 15;
-                case TURTLE_MASTER_LONG -> 30;
-                case TURTLE_MASTER_II -> 15;
-                case SLOW_FALLING -> 67;
-                case SLOW_FALLING_LONG -> 180;
-                case SLOWNESS_LONG_II -> 45;
-                case SLOWNESS_IV -> 15;
-                case WIND_CHARGED, WEAVING, OOZING, INFESTED -> 135;
-                default -> 0;
-            };
-        } else {
-            return switch (potionType) {
-                case NO_EFFECTS -> 0;
-                case MUNDANE -> 0;
-                case MUNDANE_II -> 0;
-                case THICK -> 0;
-                case AWKWARD -> 0;
-                case NIGHT_VISION -> 180;
-                case NIGHT_VISION_LONG -> 480;
-                case INVISIBLE -> 180;
-                case INVISIBLE_LONG -> 480;
-                case LEAPING -> 180;
-                case LEAPING_LONG -> 480;
-                case LEAPING_II -> 90;
-                case FIRE_RESISTANCE -> 180;
-                case FIRE_RESISTANCE_LONG -> 480;
-                case SPEED -> 180;
-                case SPEED_LONG -> 480;
-                case SPEED_II -> 90;
-                case SLOWNESS -> 90;
-                case SLOWNESS_LONG -> 240;
-                case WATER_BREATHING -> 180;
-                case WATER_BREATHING_LONG -> 480;
-                case INSTANT_HEALTH -> 0;
-                case INSTANT_HEALTH_II -> 0;
-                case HARMING -> 0;
-                case HARMING_II -> 0;
-                case POISON -> 45;
-                case POISON_LONG -> 120;
-                case POISON_II -> 22;
-                case REGENERATION -> 45;
-                case REGENERATION_LONG -> 120;
-                case REGENERATION_II -> 22;
-                case STRENGTH -> 180;
-                case STRENGTH_LONG -> 480;
-                case STRENGTH_II -> 90;
-                case WEAKNESS -> 90;
-                case WEAKNESS_LONG -> 240;
-                case WITHER_II -> 30;
-                case TURTLE_MASTER -> 20;
-                case TURTLE_MASTER_LONG -> 40;
-                case TURTLE_MASTER_II -> 20;
-                case SLOW_FALLING -> 90;
-                case SLOW_FALLING_LONG -> 240;
-                case SLOWNESS_LONG_II -> 60;
-                case SLOWNESS_IV -> 20;
-                case WIND_CHARGED, WEAVING, OOZING, INFESTED -> 180;
-                default -> 0;
-            };
-        }
+        // Since BE 1.21.0, splash potions have the same base duration as drinkable potions.
+        return switch (potionType) {
+            case NO_EFFECTS -> 0;
+            case MUNDANE -> 0;
+            case MUNDANE_II -> 0;
+            case THICK -> 0;
+            case AWKWARD -> 0;
+            case NIGHT_VISION -> 180;
+            case NIGHT_VISION_LONG -> 480;
+            case INVISIBLE -> 180;
+            case INVISIBLE_LONG -> 480;
+            case LEAPING -> 180;
+            case LEAPING_LONG -> 480;
+            case LEAPING_II -> 90;
+            case FIRE_RESISTANCE -> 180;
+            case FIRE_RESISTANCE_LONG -> 480;
+            case SPEED -> 180;
+            case SPEED_LONG -> 480;
+            case SPEED_II -> 90;
+            case SLOWNESS -> 90;
+            case SLOWNESS_LONG -> 240;
+            case WATER_BREATHING -> 180;
+            case WATER_BREATHING_LONG -> 480;
+            case INSTANT_HEALTH -> 0;
+            case INSTANT_HEALTH_II -> 0;
+            case HARMING -> 0;
+            case HARMING_II -> 0;
+            case POISON -> 45;
+            case POISON_LONG -> 120;
+            case POISON_II -> 22;
+            case REGENERATION -> 45;
+            case REGENERATION_LONG -> 120;
+            case REGENERATION_II -> 22;
+            case STRENGTH -> 180;
+            case STRENGTH_LONG -> 480;
+            case STRENGTH_II -> 90;
+            case WEAKNESS -> 90;
+            case WEAKNESS_LONG -> 240;
+            case WITHER_II -> 40;
+            case TURTLE_MASTER -> 20;
+            case TURTLE_MASTER_LONG -> 40;
+            case TURTLE_MASTER_II -> 20;
+            case SLOW_FALLING -> 90;
+            case SLOW_FALLING_LONG -> 240;
+            case SLOWNESS_LONG_II -> 60;
+            case SLOWNESS_IV -> 20;
+            case WIND_CHARGED, WEAVING, OOZING, INFESTED -> 180;
+            default -> 0;
+        };
     }
 }

@@ -169,6 +169,22 @@ public interface AxisAlignedBB extends Cloneable {
     }
 
     /**
+     * Calculates the squared distance between the surfaces of two bounding boxes.
+     * For each axis, computes the gap between the two boxes (clamped to 0 if overlapping),
+     * then returns the sum of squared gaps.
+     * Returns 0 if the two bounding boxes overlap.
+     *
+     * @param bb the other bounding box
+     * @return the squared distance, or 0 if overlapping
+     */
+    default double distanceToSqr(AxisAlignedBB bb) {
+        double dx = Math.max(Math.max(this.getMinX() - bb.getMaxX(), bb.getMinX() - this.getMaxX()), 0.0);
+        double dy = Math.max(Math.max(this.getMinY() - bb.getMaxY(), bb.getMinY() - this.getMaxY()), 0.0);
+        double dz = Math.max(Math.max(this.getMinZ() - bb.getMaxZ(), bb.getMinZ() - this.getMaxZ()), 0.0);
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    /**
      * Checks if this bounding box intersects with the given bounding box.
      */
     default boolean intersectsWith(AxisAlignedBB bb) {
