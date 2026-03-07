@@ -9,7 +9,9 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Getter
@@ -30,23 +32,23 @@ public class WorldSettings extends OkaeriConfig {
     @Comment("Ticks to wait in portal before teleporting")
     private int portalTicks = 80;
 
-    @Comment("Multiple nether worlds (comma-separated)")
-    private String multiNetherWorlds = "";
+    @Comment("Worlds that should have their own nether dimensions, otherwise using the default nether world")
+    private List<String> multiNetherWorlds = new ArrayList<>();
 
-    @Comment("Worlds where anti-xray is enabled (comma-separated)")
-    private String antiXrayWorlds = "";
+    @Comment("Worlds where the experimental built-in anti-xray is enabled")
+    private List<String> antiXrayWorlds = new ArrayList<>();
 
-    @Comment("Worlds that should not be ticked (comma-separated)")
-    private String doNotTickWorlds = "";
+    @Comment("Worlds where random block ticking is disabled")
+    private List<String> doNotTickWorlds = new ArrayList<>();
 
-    @Comment("Worlds where entity spawning is disabled (comma-separated)")
-    private String entitySpawningDisabledWorlds = "";
+    @Comment("Worlds where entity auto spawning is not allowed")
+    private List<String> entitySpawningDisabledWorlds = new ArrayList<>();
 
     @Comment("Load all worlds on startup")
     private boolean loadAllWorlds = true;
 
-    @Comment("Worlds where auto-save is disabled (comma-separated)")
-    private String autoSaveDisabledWorlds = "";
+    @Comment("Worlds where level auto-save is disabled")
+    private List<String> autoSaveDisabledWorlds = new ArrayList<>();
 
     @Comment("Per-world custom settings (generator, seed, generator-settings)")
     private Map<String, WorldEntry> worlds = new LinkedHashMap<>();

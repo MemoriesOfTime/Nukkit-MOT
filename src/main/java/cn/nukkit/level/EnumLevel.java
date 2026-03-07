@@ -6,8 +6,8 @@ import cn.nukkit.math.Vector3;
 import cn.nukkit.utils.config.category.WorldEntry;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.StringTokenizer;
 
 /**
  * Default dimensions and their Levels
@@ -41,12 +41,10 @@ public enum EnumLevel {
                 server.loadLevel("nether");
             }
             NETHER.level = server.getLevelByName("nether");
-            String list = server.getServerConfig().worldSettings().multiNetherWorlds();
-            if (!list.trim().isEmpty()) {
+            List<String> multiNetherList = server.getServerConfig().worldSettings().multiNetherWorlds();
+            if (!multiNetherList.isEmpty()) {
                 Map<String, WorldEntry> worlds = server.getServerConfig().worldSettings().worlds();
-                StringTokenizer tokenizer = new StringTokenizer(list, ", ");
-                while (tokenizer.hasMoreTokens()) {
-                    String world = tokenizer.nextToken();
+                for (String world : multiNetherList) {
                     Server.multiNetherWorlds.add(world);
                     String nether = world + "-nether";
                     if (server.getLevelByName(nether) == null) {

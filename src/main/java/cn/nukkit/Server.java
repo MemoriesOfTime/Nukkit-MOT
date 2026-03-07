@@ -920,9 +920,11 @@ public class Server {
             this.watchdog.start();
         }
 
-        parseStringList(this.serverConfig.worldSettings().entitySpawningDisabledWorlds(), disabledSpawnWorlds);
+        disabledSpawnWorlds.clear();
+        disabledSpawnWorlds.addAll(this.serverConfig.worldSettings().entitySpawningDisabledWorlds());
 
-        parseStringList(this.serverConfig.worldSettings().autoSaveDisabledWorlds(), nonAutoSaveWorlds);
+        nonAutoSaveWorlds.clear();
+        nonAutoSaveWorlds.addAll(this.serverConfig.worldSettings().autoSaveDisabledWorlds());
 
         if (this.serverConfig.entitySettings().autoSpawnTask()) {
             this.spawnerTask = new SpawnerTask();
@@ -3351,11 +3353,14 @@ public class Server {
         this.endEnabled = config.worldSettings().end();
         this.vanillaPortals = config.worldSettings().vanillaPortals();
         this.portalTicks = config.worldSettings().portalTicks();
-        parseStringList(config.worldSettings().multiNetherWorlds(), multiNetherWorlds);
+        multiNetherWorlds.clear();
+        multiNetherWorlds.addAll(config.worldSettings().multiNetherWorlds());
 
-        parseStringList(config.worldSettings().antiXrayWorlds(), antiXrayWorlds);
+        antiXrayWorlds.clear();
+        antiXrayWorlds.addAll(config.worldSettings().antiXrayWorlds());
 
-        parseStringList(config.worldSettings().doNotTickWorlds(), noTickingWorlds);
+        noTickingWorlds.clear();
+        noTickingWorlds.addAll(config.worldSettings().doNotTickWorlds());
 
         // Player
         this.shouldSavePlayerData = config.playerSettings().savePlayerData();
@@ -3411,20 +3416,6 @@ public class Server {
         this.onlyNetEaseMode = config.neteaseSettings().onlyAllowNeteaseClient();
 
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
-    }
-
-    /**
-     * Parse a comma-separated string into a list, clearing the target list first.
-     */
-    private static void parseStringList(String input, List<String> target) {
-        target.clear();
-        if (input == null || input.trim().isEmpty()) {
-            return;
-        }
-        StringTokenizer tokenizer = new StringTokenizer(input, ", ");
-        while (tokenizer.hasMoreTokens()) {
-            target.add(tokenizer.nextToken());
-        }
     }
 
     /**

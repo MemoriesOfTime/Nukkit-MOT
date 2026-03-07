@@ -3,7 +3,10 @@ package cn.nukkit.utils.config;
 import cn.nukkit.utils.Config;
 import lombok.extern.log4j.Log4j2;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.StringTokenizer;
 import java.util.function.Consumer;
 
 /**
@@ -81,12 +84,12 @@ public class ConfigMigration {
         migrated |= migrateBoolean("end", serverConfig.worldSettings()::end);
         migrated |= migrateBoolean("vanilla-portals", serverConfig.worldSettings()::vanillaPortals);
         migrated |= migrateInt("portal-ticks", serverConfig.worldSettings()::portalTicks);
-        migrated |= migrateString("multi-nether-worlds", serverConfig.worldSettings()::multiNetherWorlds);
-        migrated |= migrateString("anti-xray-worlds", serverConfig.worldSettings()::antiXrayWorlds);
-        migrated |= migrateString("do-not-tick-worlds", serverConfig.worldSettings()::doNotTickWorlds);
-        migrated |= migrateString("worlds-entity-spawning-disabled", serverConfig.worldSettings()::entitySpawningDisabledWorlds);
+        migrated |= migrateStringList("multi-nether-worlds", serverConfig.worldSettings()::multiNetherWorlds);
+        migrated |= migrateStringList("anti-xray-worlds", serverConfig.worldSettings()::antiXrayWorlds);
+        migrated |= migrateStringList("do-not-tick-worlds", serverConfig.worldSettings()::doNotTickWorlds);
+        migrated |= migrateStringList("worlds-entity-spawning-disabled", serverConfig.worldSettings()::entitySpawningDisabledWorlds);
         migrated |= migrateBoolean("load-all-worlds", serverConfig.worldSettings()::loadAllWorlds);
-        migrated |= migrateString("worlds-level-auto-save-disabled", serverConfig.worldSettings()::autoSaveDisabledWorlds);
+        migrated |= migrateStringList("worlds-level-auto-save-disabled", serverConfig.worldSettings()::autoSaveDisabledWorlds);
 
         // Player settings
         migrated |= migrateBoolean("save-player-data", serverConfig.playerSettings()::savePlayerData);
@@ -148,6 +151,23 @@ public class ConfigMigration {
     private boolean migrateString(String key, Consumer<String> setter) {
         if (properties.exists(key)) {
             setter.accept(properties.get(key).toString());
+            properties.remove(key);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean migrateStringList(String key, Consumer<List<String>> setter) {
+        if (properties.exists(key)) {
+            String value = properties.get(key).toString().trim();
+            List<String> list = new ArrayList<>();
+            if (!value.isEmpty()) {
+                StringTokenizer tokenizer = new StringTokenizer(value, ", ");
+                while (tokenizer.hasMoreTokens()) {
+                    list.add(tokenizer.nextToken());
+                }
+            }
+            setter.accept(list);
             properties.remove(key);
             return true;
         }
