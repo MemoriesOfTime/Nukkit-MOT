@@ -2,8 +2,7 @@ package cn.nukkit.utils.config;
 
 import cn.nukkit.utils.config.category.*;
 import eu.okaeri.configs.OkaeriConfig;
-import eu.okaeri.configs.annotation.Comment;
-import eu.okaeri.configs.annotation.Header;
+import eu.okaeri.configs.annotation.*;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
@@ -17,6 +16,7 @@ import lombok.experimental.Accessors;
  */
 @Getter
 @Accessors(fluent = true)
+@Names(strategy = NameStrategy.HYPHEN_CASE, modifier = NameModifier.TO_LOWER_CASE)
 @Header("########################################")
 @Header("Nukkit-MOT Advanced Configuration")
 @Header("Standard settings are in server.properties")

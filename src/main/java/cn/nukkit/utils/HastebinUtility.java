@@ -34,7 +34,7 @@ public class HastebinUtility {
         connection.setRequestMethod("POST");
         String key = Server.getInstance().getServerConfig().debugSettings().hastebinToken();
         if (key == null || key.isBlank()) {
-            log.error("You haven't set a Hastebin token yet! Please create a token on https://www.toptal.com/developers/hastebin/documentation and fill in the obtained key as `hastebin-token` in the `server.properties` file.");
+            log.error("You haven't set a Hastebin token yet! Please create a token on https://www.toptal.com/developers/hastebin/documentation and fill in the obtained key as `hastebin-token` under `debug-settings` in the `nukkit-mot.yml` file.");
         } else {
             connection.setRequestProperty("Authorization", "Bearer " + key.trim());
         }

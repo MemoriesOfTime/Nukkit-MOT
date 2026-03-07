@@ -70,7 +70,9 @@ public class ConfigComments {
      */
     private static void applyFieldComments(OkaeriConfig config, Properties comments, String prefix) {
         for (FieldDeclaration field : config.getDeclaration().getFields()) {
-            String key = prefix == null ? field.getName() : prefix + "." + field.getName();
+            // Use Java field name for property lookup (not the resolved YAML key name)
+            String fieldName = field.getField() != null ? field.getField().getName() : field.getName();
+            String key = prefix == null ? fieldName : prefix + "." + fieldName;
             String comment = comments.getProperty(key);
             if (comment != null) {
                 String[] commentArray = new String[]{comment};
@@ -87,6 +89,10 @@ public class ConfigComments {
     /**
      * Update the static FieldDeclaration.DECLARATION_CACHE so that translated comments
      * persist when new declarations are created during config save.
+     * <p>
+     * WARNING: This method relies on the internal {@code DECLARATION_CACHE} field of
+     * okaeri-configs (6.0.0-beta.23). When upgrading the okaeri-configs library version,
+     * verify that this field still exists and has the same structure.
      */
     @SuppressWarnings("unchecked")
     private static void updateFieldDeclarationCache(Class<?> configClass, Properties comments, String prefix) {
@@ -99,7 +105,7 @@ public class ConfigComments {
                 if (cached == null || cached.getField() == null) continue;
                 if (cached.getField().getDeclaringClass() != configClass) continue;
 
-                String key = prefix + "." + cached.getName();
+                String key = prefix + "." + cached.getField().getName();
                 String comment = comments.getProperty(key);
                 if (comment != null) {
                     cached.setComment(new String[]{comment});

@@ -211,7 +211,7 @@ public class Server {
     private QueryRegenerateEvent queryRegenerateEvent;
     private final UUID serverID;
     private final Config properties;
-    private ServerConfig serverConfig;
+    private volatile ServerConfig serverConfig;
 
     private final Map<InetSocketAddress, Player> players = new HashMap<>();
     final Map<UUID, Player> playerList = new HashMap<>();
@@ -849,6 +849,7 @@ public class Server {
             if (defaultName == null || defaultName.trim().isEmpty()) {
                 this.getLogger().warning("level-name cannot be null, using default");
                 defaultName = "world";
+                this.setPropertyString("level-name", defaultName);
             }
 
             if (!this.loadLevel(defaultName)) {
@@ -919,21 +920,9 @@ public class Server {
             this.watchdog.start();
         }
 
-        String worlds1 = this.serverConfig.worldSettings().entitySpawningDisabledWorlds();
-        if (!worlds1.trim().isEmpty()) {
-            StringTokenizer tokenizer = new StringTokenizer(worlds1, ", ");
-            while (tokenizer.hasMoreTokens()) {
-                disabledSpawnWorlds.add(tokenizer.nextToken());
-            }
-        }
+        parseStringList(this.serverConfig.worldSettings().entitySpawningDisabledWorlds(), disabledSpawnWorlds);
 
-        String worlds2 = this.serverConfig.worldSettings().autoSaveDisabledWorlds();
-        if (!worlds2.trim().isEmpty()) {
-            StringTokenizer tokenizer = new StringTokenizer(worlds2, ", ");
-            while (tokenizer.hasMoreTokens()) {
-                nonAutoSaveWorlds.add(tokenizer.nextToken());
-            }
-        }
+        parseStringList(this.serverConfig.worldSettings().autoSaveDisabledWorlds(), nonAutoSaveWorlds);
 
         if (this.serverConfig.entitySettings().autoSpawnTask()) {
             this.spawnerTask = new SpawnerTask();
@@ -1137,7 +1126,7 @@ public class Server {
 
         // Reload nukkit-mot.yml
         log.info("Reloading server configuration (YAML)...");
-        this.loadServerConfig();
+        this.loadServerConfig(false);
 
         this.maxPlayers = this.getPropertyInt("max-players", 50);
 
@@ -2589,38 +2578,46 @@ public class Server {
 
     /**
      * Load server configuration using OkaeriConfig (YAML format)
+     *
+     * @param firstLoad true on initial startup, false on reload
      */
-    private void loadServerConfig() {
+    private void loadServerConfig(boolean firstLoad) {
         try {
             File configFile = new File(this.dataPath, "nukkit-mot.yml");
-
-            // If conversion just happened, serverConfig is already set
-            if (this.serverConfig == null) {
-                this.serverConfig = ConfigManager.create(ServerConfig.class, (it) -> {
-                    it.withConfigurer(new YamlSnakeYamlConfigurer());
-                    it.withBindFile(configFile);
+            ServerConfig newConfig = ConfigManager.create(ServerConfig.class, (it) -> {
+                it.withConfigurer(new YamlSnakeYamlConfigurer());
+                it.withBindFile(configFile);
+                if (firstLoad) {
                     it.saveDefaults();
-                    it.load(true);
-                });
-                log.info("Server configuration loaded from nukkit-mot.yml");
-            } else {
-                // Reload the converted config from file
-                this.serverConfig = ConfigManager.create(ServerConfig.class, (it) -> {
-                    it.withConfigurer(new YamlSnakeYamlConfigurer());
-                    it.withBindFile(configFile);
-                    it.load(true);
-                });
-            }
+                }
+                it.load(true);
+            });
 
             // Apply localized comments based on server language
             String lang = this.getPropertyString("language", "eng");
-            ConfigComments.apply(this.serverConfig, lang);
-            this.serverConfig.save();
+            ConfigComments.apply(newConfig, lang);
+            newConfig.save();
+
+            this.serverConfig = newConfig;
+            if (firstLoad) {
+                log.info("Server configuration loaded from nukkit-mot.yml");
+            }
         } catch (Exception e) {
             logConfigError(e);
-            log.error("Server cannot start with an invalid configuration. Please fix nukkit-mot.yml and restart.");
-            System.exit(1);
+            if (firstLoad) {
+                log.error("Server cannot start with an invalid configuration. Please fix nukkit-mot.yml and restart.");
+                System.exit(1);
+            } else {
+                log.error("Failed to reload nukkit-mot.yml. Keeping previous configuration.");
+            }
         }
+    }
+
+    /**
+     * Load server configuration (initial startup)
+     */
+    private void loadServerConfig() {
+        this.loadServerConfig(true);
     }
 
     private void logConfigError(Exception e) {
@@ -2687,7 +2684,7 @@ public class Server {
         if (this.serverConfig != null) {
             try {
                 this.serverConfig.save();
-                log.info("Server configuration saved to nukkit-mot.yml");
+                log.debug("Server configuration saved to nukkit-mot.yml");
             } catch (Exception e) {
                 log.error("Failed to save nukkit-mot.yml", e);
             }
@@ -3352,24 +3349,11 @@ public class Server {
         this.endEnabled = config.worldSettings().end();
         this.vanillaPortals = config.worldSettings().vanillaPortals();
         this.portalTicks = config.worldSettings().portalTicks();
+        parseStringList(config.worldSettings().multiNetherWorlds(), multiNetherWorlds);
 
-        antiXrayWorlds.clear();
-        String antiXrayWorldsString = config.worldSettings().antiXrayWorlds();
-        if (!antiXrayWorldsString.trim().isEmpty()) {
-            StringTokenizer tokenizer = new StringTokenizer(antiXrayWorldsString, ", ");
-            while (tokenizer.hasMoreTokens()) {
-                antiXrayWorlds.add(tokenizer.nextToken());
-            }
-        }
+        parseStringList(config.worldSettings().antiXrayWorlds(), antiXrayWorlds);
 
-        noTickingWorlds.clear();
-        String list = config.worldSettings().doNotTickWorlds();
-        if (!list.trim().isEmpty()) {
-            StringTokenizer tokenizer = new StringTokenizer(list, ", ");
-            while (tokenizer.hasMoreTokens()) {
-                noTickingWorlds.add(tokenizer.nextToken());
-            }
-        }
+        parseStringList(config.worldSettings().doNotTickWorlds(), noTickingWorlds);
 
         // Player
         this.shouldSavePlayerData = config.playerSettings().savePlayerData();
@@ -3382,9 +3366,10 @@ public class Server {
         this.stopInGame = config.playerSettings().stopInGame();
         this.opInGame = config.playerSettings().opInGame();
 
-        switch (config.playerSettings().spaceNameMode()) {
-            case "deny" -> this.spaceMode = 0;
-            case "replace" -> this.spaceMode = 2;
+        String spaceNameMode = config.playerSettings().spaceNameMode();
+        switch (spaceNameMode != null ? spaceNameMode.toLowerCase(Locale.ROOT) : "ignore") {
+            case "deny", "disabled" -> this.spaceMode = 0;
+            case "replace", "replacing" -> this.spaceMode = 2;
             default -> this.spaceMode = 1; // ignore
         }
 
@@ -3424,6 +3409,20 @@ public class Server {
         this.onlyNetEaseMode = config.neteaseSettings().onlyAllowNeteaseClient();
 
         this.c_s_spawnThreshold = (int) Math.ceil(Math.sqrt(this.spawnThreshold));
+    }
+
+    /**
+     * Parse a comma-separated string into a list, clearing the target list first.
+     */
+    private static void parseStringList(String input, List<String> target) {
+        target.clear();
+        if (input == null || input.trim().isEmpty()) {
+            return;
+        }
+        StringTokenizer tokenizer = new StringTokenizer(input, ", ");
+        while (tokenizer.hasMoreTokens()) {
+            target.add(tokenizer.nextToken());
+        }
     }
 
     /**

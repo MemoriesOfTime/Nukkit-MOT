@@ -2,6 +2,9 @@ package cn.nukkit.utils.config.category;
 
 import eu.okaeri.configs.OkaeriConfig;
 import eu.okaeri.configs.annotation.Comment;
+import eu.okaeri.configs.annotation.NameModifier;
+import eu.okaeri.configs.annotation.NameStrategy;
+import eu.okaeri.configs.annotation.Names;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
@@ -10,6 +13,7 @@ import org.cloudburstmc.netty.channel.raknet.RakConstants;
 @Getter
 @Setter
 @Accessors(fluent = true)
+@Names(strategy = NameStrategy.HYPHEN_CASE, modifier = NameModifier.TO_LOWER_CASE)
 public class NetworkSettings extends OkaeriConfig {
 
     @Comment("ZLIB compression provider (2 recommended)")
@@ -30,7 +34,7 @@ public class NetworkSettings extends OkaeriConfig {
     @Comment("Enable RakNet cookie validation")
     private boolean enableRakSendCookie = true;
 
-    @Comment("Client timeout in milliseconds")
+    @Comment("Client timeout in milliseconds (reserved, not yet applied)")
     private int timeoutMilliseconds = 25000;
 
     @Comment("Show plugin list in query response")

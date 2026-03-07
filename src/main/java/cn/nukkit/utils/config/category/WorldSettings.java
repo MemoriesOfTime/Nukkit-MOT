@@ -2,6 +2,9 @@ package cn.nukkit.utils.config.category;
 
 import eu.okaeri.configs.OkaeriConfig;
 import eu.okaeri.configs.annotation.Comment;
+import eu.okaeri.configs.annotation.NameModifier;
+import eu.okaeri.configs.annotation.NameStrategy;
+import eu.okaeri.configs.annotation.Names;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.Accessors;
@@ -12,6 +15,7 @@ import java.util.Map;
 @Getter
 @Setter
 @Accessors(fluent = true)
+@Names(strategy = NameStrategy.HYPHEN_CASE, modifier = NameModifier.TO_LOWER_CASE)
 public class WorldSettings extends OkaeriConfig {
 
     @Comment("Enable the Nether dimension")
@@ -45,11 +49,5 @@ public class WorldSettings extends OkaeriConfig {
     private String autoSaveDisabledWorlds = "";
 
     @Comment("Per-world custom settings (generator, seed, generator-settings)")
-    private Map<String, WorldEntry> worlds = defaultWorlds();
-
-    private static Map<String, WorldEntry> defaultWorlds() {
-        Map<String, WorldEntry> map = new LinkedHashMap<>();
-        map.put("world", new WorldEntry());
-        return map;
-    }
+    private Map<String, WorldEntry> worlds = new LinkedHashMap<>();
 }
