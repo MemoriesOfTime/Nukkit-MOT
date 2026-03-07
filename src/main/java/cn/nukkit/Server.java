@@ -711,7 +711,13 @@ public class Server {
 
         if (this.getPropertyBoolean("enable-rcon", false)) {
             try {
-                this.rcon = new RCON(this, this.getPropertyString("rcon.password", "changeme"), (!this.getIp().isEmpty()) ? this.getIp() : "0.0.0.0", this.getPropertyInt("rcon.port", 25575));
+                String randomPassword = Base64.getEncoder().encodeToString(UUID.randomUUID().toString().replace("-", "").getBytes()).substring(3, 13);
+                this.rcon = new RCON(
+                        this,
+                        this.getPropertyString("rcon.password", randomPassword),
+                        (this.getIp().isBlank()) ? "0.0.0.0" : this.getIp(),
+                        this.getPropertyInt("rcon.port", 25575)
+                );
             } catch (IllegalArgumentException e) {
                 log.error(baseLang.translateString(e.getMessage(), e.getCause().getMessage()));
             }
