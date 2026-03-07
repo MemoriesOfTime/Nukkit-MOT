@@ -1,9 +1,12 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.entity.EntityHuman;
 import cn.nukkit.entity.EntityHumanType;
+import cn.nukkit.event.player.PlayerOffhandInventoryChangeEvent;
 import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemBlock;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
@@ -87,6 +90,59 @@ public class PlayerOffhandInventory extends BaseInventory {
     @Override
     public boolean allowedToAdd(Item item) {
         //return OFFHAND_ITEMS.contains(item.getId());
+        return true;
+    }
+
+    @Override
+    public boolean setItem(int index, Item item, boolean send) {
+        if (index < 0 || index >= this.size || !this.allowedToAdd(item)) {
+            return false;
+        } else if (item.getId() == 0 || item.getCount() <= 0) {
+            return this.clear(index, send);
+        }
+
+        EntityHuman holder = this.getHolder();
+        if (holder instanceof Player) {
+            PlayerOffhandInventoryChangeEvent ev = new PlayerOffhandInventoryChangeEvent((Player) holder, this.getItem(index), item);
+            Server.getInstance().getPluginManager().callEvent(ev);
+            if (ev.isCancelled()) {
+                this.sendSlot(index, this.getViewers());
+                return false;
+            }
+            item = ev.getNewItem();
+        }
+
+        Item old = this.getItem(index);
+        this.slots.put(index, item.clone());
+        this.onSlotChange(index, old, send);
+        return true;
+    }
+
+    @Override
+    public boolean clear(int index, boolean send) {
+        Item old = this.slots.get(index);
+        if (old != null && old.getId() != Item.AIR) {
+            Item item = new ItemBlock(cn.nukkit.block.Block.get(cn.nukkit.block.BlockID.AIR), null, 0);
+
+            EntityHuman holder = this.getHolder();
+            if (holder instanceof Player) {
+                PlayerOffhandInventoryChangeEvent ev = new PlayerOffhandInventoryChangeEvent((Player) holder, old, item);
+                Server.getInstance().getPluginManager().callEvent(ev);
+                if (ev.isCancelled()) {
+                    this.sendSlot(index, this.getViewers());
+                    return false;
+                }
+                item = ev.getNewItem();
+                if (item.getId() != Item.AIR) {
+                    this.slots.put(index, item.clone());
+                    this.onSlotChange(index, old, send);
+                    return true;
+                }
+            }
+
+            this.slots.remove(index);
+            this.onSlotChange(index, old, send);
+        }
         return true;
     }
 }
