@@ -3,7 +3,6 @@ package cn.nukkit.network.proxy;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -30,14 +29,16 @@ import java.util.concurrent.TimeUnit;
 @ChannelHandler.Sharable
 public class ProxyProtocolHandler extends ChannelDuplexHandler {
 
+    private static final int MAPPING_TTL_MINUTES = 31;
+
     // proxy address → real client address
     private final Cache<InetSocketAddress, InetSocketAddress> proxyToRealCache = Caffeine.newBuilder()
-            .expireAfterWrite(31, TimeUnit.MINUTES)
+            .expireAfterAccess(MAPPING_TTL_MINUTES, TimeUnit.MINUTES)
             .build();
 
     // real client address → proxy address (reverse mapping for outbound)
     private final Cache<InetSocketAddress, InetSocketAddress> realToProxyCache = Caffeine.newBuilder()
-            .expireAfterWrite(31, TimeUnit.MINUTES)
+            .expireAfterAccess(MAPPING_TTL_MINUTES, TimeUnit.MINUTES)
             .build();
 
     private final long[] whitelistCidrs;
@@ -60,45 +61,35 @@ public class ProxyProtocolHandler extends ChannelDuplexHandler {
         ByteBuf content = packet.content();
 
         try {
-            // Check cache first
             InetSocketAddress cached = proxyToRealCache.getIfPresent(sender);
-            if (cached != null) {
-                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), cached));
-                return;
-            }
-
-            // Log first packet from each new address for debugging
-            log.info("[ProxyProtocol] New sender: {}, readableBytes={}, first bytes: {}",
-                    sender, content.readableBytes(),
-                    content.readableBytes() >= 16 ? ByteBufUtil.hexDump(content, content.readerIndex(), Math.min(32, content.readableBytes())) : ByteBufUtil.hexDump(content));
-
-            // Try to detect PP v2 header
             int version = ProxyProtocolDecoder.findVersion(content);
             if (version == -1) {
-                log.info("[ProxyProtocol] No PP v2 signature detected from {}", sender);
-                // No PP header - pass through as-is (direct connection)
-                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), sender));
+                InetSocketAddress effectiveSender = cached != null ? cached : sender;
+                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
                 return;
             }
 
-            log.info("[ProxyProtocol] PP v2 header detected from {}", sender);
+            if (cached != null) {
+                log.warn("[ProxyProtocol] Unexpected PP v2 header on established session from {}, dropping packet", sender);
+                return;
+            }
 
-            // Whitelist check
             if (whitelistCidrs.length > 0 && !isWhitelisted(sender.getAddress())) {
                 log.warn("[ProxyProtocol] Packet from non-whitelisted address: {}", sender.getAddress().getHostAddress());
                 ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), sender));
                 return;
             }
 
-            // Decode PP v2 header
-            HAProxyMessage message = ProxyProtocolDecoder.decode(content, version);
-            if (message == null || message.sourceAddress() == null) {
-                log.warn("[ProxyProtocol] Failed to decode PP v2 header from {}", sender);
-                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), sender));
-                return;
-            }
-
+            HAProxyMessage message = null;
             try {
+                message = ProxyProtocolDecoder.decode(content, version);
+                if (message == null || message.sourceAddress() == null) {
+                    log.warn("[ProxyProtocol] Failed to decode PP v2 header from {}", sender);
+                    InetSocketAddress effectiveSender = cached != null ? cached : sender;
+                    ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
+                    return;
+                }
+
                 InetSocketAddress realAddress = new InetSocketAddress(
                         InetAddress.getByName(message.sourceAddress()),
                         message.sourcePort()
@@ -106,15 +97,22 @@ public class ProxyProtocolHandler extends ChannelDuplexHandler {
                 proxyToRealCache.put(sender, realAddress);
                 realToProxyCache.put(realAddress, sender);
 
-                log.info("[ProxyProtocol] Mapped proxy {} -> real client {} (remaining bytes: {})",
+                log.debug("[ProxyProtocol] Mapped proxy {} -> real client {} (remaining bytes: {})",
                         sender, realAddress, content.readableBytes());
 
                 ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), realAddress));
             } catch (UnknownHostException e) {
                 log.warn("[ProxyProtocol] Failed to resolve source address: {}", message.sourceAddress(), e);
-                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), sender));
+                InetSocketAddress effectiveSender = cached != null ? cached : sender;
+                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
+            } catch (RuntimeException e) {
+                log.warn("[ProxyProtocol] Exception decoding PP v2 header from {}", sender, e);
+                InetSocketAddress effectiveSender = cached != null ? cached : sender;
+                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
             } finally {
-                message.release();
+                if (message != null) {
+                    message.release();
+                }
             }
         } finally {
             ReferenceCountUtil.release(msg);
@@ -132,12 +130,48 @@ public class ProxyProtocolHandler extends ChannelDuplexHandler {
         // Remap real client address back to proxy address for outbound packets
         InetSocketAddress proxyAddress = realToProxyCache.getIfPresent(recipient);
         if (proxyAddress != null) {
-            log.info("[ProxyProtocol] Outbound remap: {} -> proxy {}", recipient, proxyAddress);
             ctx.write(new DatagramPacket(packet.content().retain(), proxyAddress, packet.sender()), promise);
             ReferenceCountUtil.release(msg);
         } else {
             ctx.write(msg, promise);
         }
+    }
+
+    public void clearMappingByRealAddress(InetSocketAddress realAddress) {
+        if (realAddress == null) {
+            return;
+        }
+
+        InetSocketAddress proxyAddress = realToProxyCache.getIfPresent(realAddress);
+        if (proxyAddress != null) {
+            realToProxyCache.invalidate(realAddress);
+            proxyToRealCache.invalidate(proxyAddress);
+            return;
+        }
+
+        // Fallback for potential address object mismatch (resolved/unresolved variants).
+        realToProxyCache.asMap().entrySet().removeIf(entry -> {
+            if (!sameAddress(entry.getKey(), realAddress)) {
+                return false;
+            }
+            proxyToRealCache.invalidate(entry.getValue());
+            return true;
+        });
+    }
+
+    private static boolean sameAddress(InetSocketAddress first, InetSocketAddress second) {
+        if (first == second) {
+            return true;
+        }
+        if (first == null || second == null || first.getPort() != second.getPort()) {
+            return false;
+        }
+        InetAddress firstAddr = first.getAddress();
+        InetAddress secondAddr = second.getAddress();
+        if (firstAddr != null && secondAddr != null) {
+            return firstAddr.equals(secondAddr);
+        }
+        return first.getHostString().equals(second.getHostString());
     }
 
     private boolean isWhitelisted(InetAddress address) {

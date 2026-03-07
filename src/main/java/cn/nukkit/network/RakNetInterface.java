@@ -49,6 +49,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private Network network;
 
     private final Channel channel;
+    private final ProxyProtocolHandler proxyProtocolHandler;
     private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new HashMap<>();
     private final Queue<RakNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
 
@@ -56,6 +57,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
     public RakNetInterface(Server server) {
         this.server = server;
+        this.proxyProtocolHandler = server.enableProxyProtocol ? new ProxyProtocolHandler(server.proxyProtocolWhitelist) : null;
 
         boolean disableNative = Boolean.parseBoolean(System.getProperty("disableNativeEventLoop"));
 
@@ -79,9 +81,8 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .handler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel channel) {
-                        if (server.enableProxyProtocol) {
-                            channel.parent().pipeline().addFirst("proxy-protocol-handler",
-                                    new ProxyProtocolHandler(server.proxyProtocolWhitelist));
+                        if (proxyProtocolHandler != null) {
+                            channel.parent().pipeline().addFirst("proxy-protocol-handler", proxyProtocolHandler);
                         }
                         if (server.getPropertyBoolean("enable-query", true)) {
                             channel.pipeline().addLast("query-handler", new SimpleChannelInboundHandler<DatagramPacket>() {
@@ -153,6 +154,9 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 } catch (Exception e) {
                     player.getNetworkSession().disconnect("Internal error");
                     log.error("Exception closing player " + player.getName(), e);
+                }
+                if (this.proxyProtocolHandler != null) {
+                    this.proxyProtocolHandler.clearMappingByRealAddress(player.getSocketAddress());
                 }
                 iterator.remove();
             } else {
