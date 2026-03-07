@@ -91,7 +91,7 @@ public class ConfigComments {
      * persist when new declarations are created during config save.
      * <p>
      * WARNING: This method relies on the internal {@code DECLARATION_CACHE} field of
-     * okaeri-configs (6.0.0-beta.23). When upgrading the okaeri-configs library version,
+     * okaeri-configs (6.1.0-beta.1). When upgrading the okaeri-configs library version,
      * verify that this field still exists and has the same structure.
      */
     @SuppressWarnings("unchecked")

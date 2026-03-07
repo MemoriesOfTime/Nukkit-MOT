@@ -2585,8 +2585,10 @@ public class Server {
         try {
             File configFile = new File(this.dataPath, "nukkit-mot.yml");
             ServerConfig newConfig = ConfigManager.create(ServerConfig.class, (it) -> {
-                it.withConfigurer(new YamlSnakeYamlConfigurer());
-                it.withBindFile(configFile);
+                it.configure(opt -> {
+                    opt.configurer(new YamlSnakeYamlConfigurer());
+                    opt.bindFile(configFile);
+                });
                 if (firstLoad) {
                     it.saveDefaults();
                 }
