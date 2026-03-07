@@ -8,6 +8,7 @@ import cn.nukkit.event.potion.PotionCollideEvent;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.level.particle.Particle;
 import cn.nukkit.level.particle.SpellParticle;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.protocol.LevelSoundEventPacket;
@@ -139,12 +140,13 @@ public class EntityPotion extends EntityProjectile {
             return;
         }
 
-        Entity[] entities = this.getLevel().getNearbyEntities(this.getBoundingBox().grow(4.125, 2.125, 4.125));
+        AxisAlignedBB potionBB = this.getBoundingBox();
+        Entity[] entities = this.getLevel().getNearbyEntities(potionBB.grow(4, 2, 4));
         for (Entity anEntity : entities) {
             if (anEntity instanceof Player player && player.isSpectator()) {
                 continue;
             }
-            double distance = anEntity.distanceSquared(this);
+            double distance = potionBB.distanceToSqr(anEntity.getBoundingBox());
             if (distance < 16) {
                 double d = anEntity.equals(collidedWith) ? 1 : 1 - Math.sqrt(distance) / 4;
                 potion.applyPotion(anEntity, d);
