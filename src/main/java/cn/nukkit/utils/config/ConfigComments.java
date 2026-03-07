@@ -75,7 +75,10 @@ public class ConfigComments {
             String key = prefix == null ? fieldName : prefix + "." + fieldName;
             String comment = comments.getProperty(key);
             if (comment != null) {
-                String[] commentArray = new String[]{comment};
+                // Add blank line before top-level category sections for readability
+                String[] commentArray = prefix == null
+                        ? new String[]{"", comment}
+                        : new String[]{comment};
                 field.setComment(commentArray);
             }
         }

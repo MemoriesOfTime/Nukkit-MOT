@@ -24,30 +24,30 @@ import lombok.experimental.Accessors;
 @Header("########################################")
 public class ServerConfig extends OkaeriConfig {
 
-    @Comment("Performance and threading settings")
+    @Comment({"", "Performance and threading settings"})
     private PerformanceSettings performanceSettings = new PerformanceSettings();
 
-    @Comment("Network and compression settings")
+    @Comment({"", "Network and compression settings"})
     private NetworkSettings networkSettings = new NetworkSettings();
 
-    @Comment("Chunk loading and ticking settings")
+    @Comment({"", "Chunk loading and ticking settings"})
     private ChunkSettings chunkSettings = new ChunkSettings();
 
-    @Comment("Entity spawning and AI settings")
+    @Comment({"", "Entity spawning and AI settings"})
     private EntitySettings entitySettings = new EntitySettings();
 
-    @Comment("World and dimension settings")
+    @Comment({"", "World and dimension settings"})
     private WorldSettings worldSettings = new WorldSettings();
 
-    @Comment("Player data and interaction settings")
+    @Comment({"", "Player data and interaction settings"})
     private PlayerSettings playerSettings = new PlayerSettings();
 
-    @Comment("Debug, logging and metrics settings")
+    @Comment({"", "Debug, logging and metrics settings"})
     private DebugSettings debugSettings = new DebugSettings();
 
-    @Comment("Game feature toggles")
+    @Comment({"", "Game feature toggles"})
     private GameFeatureSettings gameFeatureSettings = new GameFeatureSettings();
 
-    @Comment("NetEase client support settings")
+    @Comment({"", "NetEase client support settings"})
     private NeteaseSettings neteaseSettings = new NeteaseSettings();
 }
