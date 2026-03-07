@@ -59,8 +59,6 @@ public class ConfigMigration {
         migrated |= migrateBoolean("query-plugins", serverConfig.networkSettings()::queryPlugins);
         migrated |= migrateBoolean("use-waterdog", serverConfig.networkSettings()::useWaterdog);
         migrated |= migrateString("viaproxy-username-prefix", serverConfig.networkSettings()::viaProxyUsernamePrefix);
-        migrated |= migrateBoolean("enable-proxy-protocol", serverConfig.networkSettings()::enableProxyProtocol);
-        migrated |= migrateStringList("proxy-protocol-whitelist", serverConfig.networkSettings()::proxyProtocolWhitelist);
 
         // Chunk settings
         migrated |= migrateInt("chunk-sending-per-tick", serverConfig.chunkSettings()::sendingPerTick);
