@@ -66,5 +66,5 @@ public class NetworkSettings extends OkaeriConfig {
 
     @Comment("Whitelisted proxy source IP/CIDR entries for Proxy Protocol")
     @CustomKey("proxy-protocol-whitelist")
-    private List<String> proxyProtocolWhitelist = new ArrayList<>();
+    private List<String> proxyProtocolWhitelist = new ArrayList<>(List.of("127.0.0.1/32"));
 }
