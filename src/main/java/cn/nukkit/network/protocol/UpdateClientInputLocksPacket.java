@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.ToString;
 
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.Set;
 
 @Data
@@ -21,7 +22,7 @@ public class UpdateClientInputLocksPacket extends DataPacket {
     @Deprecated
     public static final int FLAG_MOVEMENT = 1 << 2;
 
-    public InputLockType inputLockType = InputLockType.RESET;
+    public Set<InputLockType> inputLockType = new HashSet<>();
     public Vector3f serverPosition;
 
     @Override
@@ -31,14 +32,14 @@ public class UpdateClientInputLocksPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.inputLockType = InputLockType.fromId((int) this.getUnsignedVarInt());
+        this.inputLockType = InputLockType.fromBitSet((int) this.getUnsignedVarInt());
         this.serverPosition = this.getVector3f();
     }
 
     @Override
     public void encode() {
         this.reset();
-        this.putUnsignedVarInt(this.inputLockType.getId());
+        this.putUnsignedVarInt(InputLockType.toBitSet(inputLockType));
         this.putVector3f(this.serverPosition);
     }
 
@@ -58,18 +59,18 @@ public class UpdateClientInputLocksPacket extends DataPacket {
         MOVE_LEFT(2048, GameVersion.V1_21_50),
         MOVE_RIGHT(4096, GameVersion.V1_21_50);
 
-        private final int id;
+        private final int data;
 
         private final GameVersion minimumProtocol;
 
-        InputLockType(int id, GameVersion minimumProtocol) {
-            this.id = id;
+        InputLockType(int data, GameVersion minimumProtocol) {
+            this.data = data;
             this.minimumProtocol = minimumProtocol;
         }
 
         public static InputLockType fromId(int id) {
             for (InputLockType flag : values()) {
-                if (flag.id == id) return flag;
+                if (flag.data == id) return flag;
             }
             Server.getInstance().getLogger().error("Error in parsing id for inputLockType, caused by: unknown flag id: " + id);
             return InputLockType.RESET;
@@ -78,7 +79,7 @@ public class UpdateClientInputLocksPacket extends DataPacket {
         public static Set<InputLockType> fromBitSet(int bitset) {
             EnumSet<InputLockType> set = EnumSet.noneOf(InputLockType.class);
             for (InputLockType flag : values()) {
-                if ((bitset & flag.id) != 0) {
+                if ((bitset & flag.data) != 0) {
                     set.add(flag);
                 }
             }
@@ -88,7 +89,7 @@ public class UpdateClientInputLocksPacket extends DataPacket {
         public static int toBitSet(Set<InputLockType> flags) {
             int bitset = 0;
             for (InputLockType flag : flags) {
-                bitset |= flag.id;
+                bitset |= flag.data;
             }
             return bitset;
         }
