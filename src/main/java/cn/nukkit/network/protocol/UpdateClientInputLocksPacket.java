@@ -11,6 +11,7 @@ import lombok.ToString;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Data
 @EqualsAndHashCode(doNotUseGetters = true, callSuper = false)
@@ -39,7 +40,9 @@ public class UpdateClientInputLocksPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putUnsignedVarInt(InputLockType.toBitSet(inputLockType));
+        this.putUnsignedVarInt(InputLockType.toBitSet(this.inputLockType.stream()
+                .filter(inputLockType1 -> this.protocol >= inputLockType1.getMinimumProtocol().getProtocol())
+                .collect(Collectors.toSet())));
         this.putVector3f(this.serverPosition);
     }
 
