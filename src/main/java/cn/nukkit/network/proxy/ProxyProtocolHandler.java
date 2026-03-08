@@ -41,12 +41,14 @@ public class ProxyProtocolHandler extends ChannelDuplexHandler {
             .expireAfterAccess(MAPPING_TTL_MINUTES, TimeUnit.MINUTES)
             .build();
 
+    private final boolean whitelistConfigured;
     private final long[] whitelistCidrs;
 
     /**
      * @param whitelist list of allowed proxy IPs/CIDRs (e.g. "127.0.0.1", "10.0.0.0/8"). Empty means allow all.
      */
     public ProxyProtocolHandler(List<String> whitelist) {
+        this.whitelistConfigured = whitelist != null && !whitelist.isEmpty();
         this.whitelistCidrs = parseCidrs(whitelist);
     }
 
@@ -74,16 +76,18 @@ public class ProxyProtocolHandler extends ChannelDuplexHandler {
                 return;
             }
 
-            if (whitelistCidrs.length > 0 && !isWhitelisted(sender.getAddress())) {
+            if (whitelistConfigured && !isWhitelisted(sender.getAddress())) {
                 log.warn("[ProxyProtocol] Packet from non-whitelisted address: {}", sender.getAddress().getHostAddress());
                 ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), sender));
                 return;
             }
 
             HAProxyMessage message = null;
+            int initialReaderIndex = content.readerIndex();
             try {
                 message = ProxyProtocolDecoder.decode(content, version);
                 if (message == null || message.sourceAddress() == null) {
+                    content.readerIndex(initialReaderIndex);
                     log.warn("[ProxyProtocol] Failed to decode PP v2 header from {}", sender);
                     InetSocketAddress effectiveSender = cached != null ? cached : sender;
                     ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
@@ -102,10 +106,12 @@ public class ProxyProtocolHandler extends ChannelDuplexHandler {
 
                 ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), realAddress));
             } catch (UnknownHostException e) {
-                log.warn("[ProxyProtocol] Failed to resolve source address: {}", message.sourceAddress(), e);
+                content.readerIndex(initialReaderIndex);
+                log.warn("[ProxyProtocol] Failed to resolve source address: {}", message != null ? message.sourceAddress() : "unknown", e);
                 InetSocketAddress effectiveSender = cached != null ? cached : sender;
                 ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
             } catch (RuntimeException e) {
+                content.readerIndex(initialReaderIndex);
                 log.warn("[ProxyProtocol] Exception decoding PP v2 header from {}", sender, e);
                 InetSocketAddress effectiveSender = cached != null ? cached : sender;
                 ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
@@ -208,6 +214,10 @@ public class ProxyProtocolHandler extends ChannelDuplexHandler {
                         }
                         long network = bytesToLong(bytes);
                         int prefix = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : 32;
+                        if (prefix < 0 || prefix > 32) {
+                            log.warn("Invalid proxy protocol whitelist prefix length: {}", cidr);
+                            return -1;
+                        }
                         return (network << 8) | prefix;
                     } catch (UnknownHostException | NumberFormatException e) {
                         log.warn("Invalid proxy protocol whitelist entry: {}", cidr, e);

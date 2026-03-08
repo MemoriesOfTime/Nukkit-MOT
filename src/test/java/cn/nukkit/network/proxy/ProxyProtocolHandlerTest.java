@@ -99,6 +99,54 @@ public class ProxyProtocolHandlerTest {
         channel.finishAndReleaseAll();
     }
 
+    @Test
+    public void testMalformedProxyHeaderResetsReaderIndexBeforeForwarding() {
+        EmbeddedChannel channel = new EmbeddedChannel(new ProxyProtocolHandler(List.of("127.0.0.1/32")));
+        InetSocketAddress proxyAddress = new InetSocketAddress("127.0.0.1", 63035);
+        InetSocketAddress recipient = new InetSocketAddress("127.0.0.1", 19132);
+
+        ByteBuf buffer = Unpooled.buffer(18);
+        buffer.writeBytes(PP_V2_SIGNATURE);
+        buffer.writeByte(0x00);
+        buffer.writeByte(0x12);
+        buffer.writeShort(0);
+        buffer.writeBytes(new byte[]{0x55, 0x66});
+
+        channel.writeInbound(new DatagramPacket(buffer, recipient, proxyAddress));
+        DatagramPacket forwarded = channel.readInbound();
+        Assertions.assertNotNull(forwarded);
+        Assertions.assertEquals(proxyAddress, forwarded.sender());
+        Assertions.assertEquals(18, forwarded.content().readableBytes());
+        for (byte signatureByte : PP_V2_SIGNATURE) {
+            Assertions.assertEquals(signatureByte & 0xFF, forwarded.content().readUnsignedByte());
+        }
+        Assertions.assertEquals(0x00, forwarded.content().readUnsignedByte());
+        Assertions.assertEquals(0x12, forwarded.content().readUnsignedByte());
+        Assertions.assertEquals(0, forwarded.content().readUnsignedShort());
+        Assertions.assertEquals(0x55, forwarded.content().readUnsignedByte());
+        Assertions.assertEquals(0x66, forwarded.content().readUnsignedByte());
+        forwarded.release();
+
+        channel.finishAndReleaseAll();
+    }
+
+    @Test
+    public void testInvalidWhitelistPrefixFailsClosed() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel(new ProxyProtocolHandler(List.of("127.0.0.1/33")));
+        InetSocketAddress proxyAddress = new InetSocketAddress("127.0.0.1", 63035);
+        InetSocketAddress recipient = new InetSocketAddress("127.0.0.1", 19132);
+        InetAddress realIp = InetAddress.getByName("8.8.8.8");
+        int realPort = randomClientPort();
+
+        channel.writeInbound(createProxyV2Datagram(proxyAddress, recipient, realIp, realPort, new byte[]{0x11}));
+        DatagramPacket forwarded = channel.readInbound();
+        Assertions.assertNotNull(forwarded);
+        Assertions.assertEquals(proxyAddress, forwarded.sender());
+        forwarded.release();
+
+        channel.finishAndReleaseAll();
+    }
+
     private static DatagramPacket createProxyV2Datagram(InetSocketAddress proxyAddress,
                                                         InetSocketAddress recipient,
                                                         InetAddress realSourceIp,
