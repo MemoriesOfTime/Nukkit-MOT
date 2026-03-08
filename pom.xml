@@ -27,7 +27,7 @@
         <guava.version>33.1.0-jre</guava.version>
         <gson.version>2.13.2</gson.version>
         <fastutil.version>8.5.15</fastutil.version>
-        <snakeyaml.version>2.6</snakeyaml.version>
+        <snakeyaml.version>2.5</snakeyaml.version>
         <snakeyaml-engine.version>2.9</snakeyaml-engine.version>
         <nimbus-jose.version>10.8</nimbus-jose.version>
         <asm.version>9.9.1</asm.version>
