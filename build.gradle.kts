@@ -27,11 +27,13 @@ repositories {
     maven("https://repo.opencollab.dev/maven-releases/")
     maven("https://repo.opencollab.dev/maven-snapshots/")
     maven("https://repo.lanink.cn/repository/maven-public/")
+    maven("https://repo.okaeri.cloud/releases")
 }
 
 dependencies {
     api(libs.raknet)
     api(libs.netty.epoll)
+    api(libs.netty.codec.haproxy)
     api(libs.nukkitx.natives)
 
     api(libs.cloudburst.common) {
@@ -50,6 +52,7 @@ dependencies {
     }
     api(libs.bundles.snakeyaml)
     api(libs.jackson.dataformat.toml)
+    api(libs.okaeri.configs.yaml.snakeyaml)
     api(libs.nimbus.jose.jwt)
     api(libs.asm)
     api(libs.bundles.leveldb)

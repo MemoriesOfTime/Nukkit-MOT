@@ -185,7 +185,7 @@ public abstract class EntityLiving extends Entity implements EntityDamageable {
         Vector3 normalizedVector = this.getPosition().subtract(entityPos).normalize();
         boolean blocked = (normalizedVector.x * direction.x) + (normalizedVector.z * direction.z) < 0.0;
         boolean knockBack = !(damager instanceof EntityProjectile);
-        EntityDamageBlockedEvent event = new EntityDamageBlockedEvent(this, source, knockBack, true);
+        EntityDamageBlockedEvent event = new EntityDamageBlockedEvent(this, damager, source, knockBack, true);
         if (!blocked || !source.canBeReducedByArmor() || damager instanceof EntityProjectile && ((EntityProjectile) damager).piercing > 0) {
             event.setCancelled();
         }
