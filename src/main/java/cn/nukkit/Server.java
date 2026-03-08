@@ -595,6 +595,14 @@ public class Server {
      */
     public boolean enableRakSendCookie;
     /**
+     * Enable Proxy Protocol v2 to get real client IP behind proxies like FRP
+     */
+    public boolean enableProxyProtocol;
+    /**
+     * Whitelist of proxy IPs/CIDRs allowed to send Proxy Protocol headers (e.g. "127.0.0.1", "10.0.0.0/8")
+     */
+    public List<String> proxyProtocolWhitelist;
+    /**
      * Enable forced safety enchantments (up max lvl)
      */
     public boolean forcedSafetyEnchant;
@@ -3318,6 +3326,17 @@ public class Server {
         this.queryPlugins = config.networkSettings().queryPlugins();
         this.useWaterdog = config.networkSettings().useWaterdog();
         this.viaProxyUsernamePrefix = config.networkSettings().viaProxyUsernamePrefix();
+        this.enableProxyProtocol = config.networkSettings().enableProxyProtocol();
+        List<String> proxyProtocolWhitelistConfig = config.networkSettings().proxyProtocolWhitelist();
+        this.proxyProtocolWhitelist = proxyProtocolWhitelistConfig == null ? new ArrayList<>() : new ArrayList<>(proxyProtocolWhitelistConfig);
+        this.proxyProtocolWhitelist.replaceAll(String::trim);
+        this.proxyProtocolWhitelist.removeIf(String::isEmpty);
+        if (this.enableProxyProtocol) {
+            log.info("Proxy Protocol v2 enabled");
+            if (this.proxyProtocolWhitelist.isEmpty()) {
+                log.warn("Proxy Protocol whitelist is empty - all source IPs will be trusted. Consider setting 'proxy-protocol-whitelist' for security.");
+            }
+        }
 
         // Chunks
         this.chunksPerTick = config.chunkSettings().sendingPerTick();

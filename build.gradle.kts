@@ -33,6 +33,7 @@ repositories {
 dependencies {
     api(libs.raknet)
     api(libs.netty.epoll)
+    api(libs.netty.codec.haproxy)
     api(libs.nukkitx.natives)
 
     api(libs.cloudburst.common) {

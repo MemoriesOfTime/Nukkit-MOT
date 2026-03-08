@@ -8,6 +8,9 @@ import lombok.Setter;
 import lombok.experimental.Accessors;
 import org.cloudburstmc.netty.channel.raknet.RakConstants;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Getter
 @Setter
 @Accessors(fluent = true)
@@ -56,4 +59,12 @@ public class NetworkSettings extends OkaeriConfig {
     @Comment("ViaProxy Java Edition player username prefix")
     @CustomKey("viaproxy-username-prefix")
     private String viaProxyUsernamePrefix = "";
+
+    @Comment("Enable Proxy Protocol v2 for UDP proxies (e.g. FRP). Whitelisted sources must send a valid PPv2 header; non-whitelisted sources are treated as direct clients")
+    @CustomKey("enable-proxy-protocol")
+    private boolean enableProxyProtocol = false;
+
+    @Comment("Whitelisted proxy source IP/CIDR entries for Proxy Protocol. Use proxy addresses, not player addresses. Headerless or invalid packets from whitelisted sources are dropped")
+    @CustomKey("proxy-protocol-whitelist")
+    private List<String> proxyProtocolWhitelist = new ArrayList<>(List.of("127.0.0.1/32"));
 }
