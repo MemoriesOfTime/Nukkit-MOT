@@ -5,6 +5,7 @@ import cn.nukkit.form.window.FormWindowDialog;
 import cn.nukkit.inventory.Inventory;
 import cn.nukkit.inventory.PlayerUIInventory;
 import cn.nukkit.inventory.transaction.*;
+import cn.nukkit.level.Location;
 import cn.nukkit.level.Position;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.network.SourceInterface;
@@ -192,19 +193,19 @@ public final class PlayerHandle {
         player.randomClientId = randomClientId;
     }
 
-    public Vector3 getForceMovement() {
+    public Location getForceMovement() {
         return player.forceMovement;
     }
 
-    public void setForceMovement(Vector3 forceMovement) {
+    public void setForceMovement(Location forceMovement) {
         player.forceMovement = forceMovement;
     }
 
-    public Vector3 getTeleportPosition() {
+    public Location getTeleportPosition() {
         return player.teleportPosition;
     }
 
-    public void setTeleportPosition(Vector3 teleportPosition) {
+    public void setTeleportPosition(Location teleportPosition) {
         player.teleportPosition = teleportPosition;
     }
 
