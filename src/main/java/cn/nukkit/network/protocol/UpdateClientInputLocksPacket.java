@@ -40,9 +40,7 @@ public class UpdateClientInputLocksPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putUnsignedVarInt(InputLockType.toBitSet(this.inputLockType.stream()
-                .filter(inputLockType1 -> this.protocol >= inputLockType1.getMinimumProtocol().getProtocol())
-                .collect(Collectors.toSet())));
+        this.putUnsignedVarInt(InputLockType.toBitSet(this.protocol, this.inputLockType));
         this.putVector3f(this.serverPosition);
     }
 
@@ -89,9 +87,12 @@ public class UpdateClientInputLocksPacket extends DataPacket {
             return set;
         }
 
-        public static int toBitSet(Set<InputLockType> flags) {
+        public static int toBitSet(int protocol, Set<InputLockType> flags) {
             int bitset = 0;
             for (InputLockType flag : flags) {
+                if (protocol < flag.getMinimumProtocol().getProtocol()) {
+                    continue;
+                }
                 bitset |= flag.data;
             }
             return bitset;
