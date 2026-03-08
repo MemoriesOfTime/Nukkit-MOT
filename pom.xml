@@ -46,6 +46,7 @@
         <raknet.version>1.0.0.CR3-20260303.150721-27</raknet.version>
         <cloudburst-common.version>3.0.0.Beta7-20250812.232642-18</cloudburst-common.version>
         <jackson-dataformat-toml.version>2.20.1</jackson-dataformat-toml.version>
+        <eu.okaeri>6.1.0-beta.1</eu.okaeri>
 
         <!-- Test -->
         <junit.version>6.0.3</junit.version>
@@ -119,13 +120,13 @@
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-transport-native-epoll</artifactId>
-            <version>4.1.101.Final</version>
+            <version>${netty-epoll.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-codec-haproxy</artifactId>
-            <version>4.1.101.Final</version>
+            <version>${netty-epoll.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -210,7 +211,7 @@
         <dependency>
             <groupId>org.yaml</groupId>
             <artifactId>snakeyaml</artifactId>
-            <version>2.5</version>
+            <version>${snakeyaml.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -234,6 +235,12 @@
                     <artifactId>jackson-core</artifactId>
                 </exclusion>
             </exclusions>-->
+        </dependency>
+        <dependency>
+            <groupId>eu.okaeri</groupId>
+            <artifactId>okaeri-configs-yaml-snakeyaml</artifactId>
+            <version>${eu.okaeri.version}</version>
+            <scope>compile</scope>
         </dependency>
 
         <!-- Safety and JWT -->
