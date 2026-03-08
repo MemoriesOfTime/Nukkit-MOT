@@ -66,31 +66,30 @@ public class ProxyProtocolHandler extends ChannelDuplexHandler {
             InetSocketAddress cached = proxyToRealCache.getIfPresent(sender);
             int version = ProxyProtocolDecoder.findVersion(content);
             if (version == -1) {
-                InetSocketAddress effectiveSender = cached != null ? cached : sender;
-                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
+                if (cached != null) {
+                    ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), cached));
+                } else if (!whitelistConfigured || !isWhitelisted(sender.getAddress())) {
+                    ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), sender));
+                } else {
+                    log.warn("[ProxyProtocol] Dropping headerless packet from whitelisted proxy address: {}", sender);
+                }
                 return;
             }
 
-            if (cached != null) {
-                log.warn("[ProxyProtocol] Unexpected PP v2 header on established session from {}, dropping packet", sender);
+            if (version == ProxyProtocolDecoder.INVALID_HEADER) {
+                log.warn("[ProxyProtocol] Dropping invalid or incomplete PP v2 header from {}", sender);
                 return;
             }
-
             if (whitelistConfigured && !isWhitelisted(sender.getAddress())) {
                 log.warn("[ProxyProtocol] Packet from non-whitelisted address: {}", sender.getAddress().getHostAddress());
-                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), sender));
                 return;
             }
 
             HAProxyMessage message = null;
-            int initialReaderIndex = content.readerIndex();
             try {
                 message = ProxyProtocolDecoder.decode(content, version);
                 if (message == null || message.sourceAddress() == null) {
-                    content.readerIndex(initialReaderIndex);
-                    log.warn("[ProxyProtocol] Failed to decode PP v2 header from {}", sender);
-                    InetSocketAddress effectiveSender = cached != null ? cached : sender;
-                    ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
+                    ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), sender));
                     return;
                 }
 
@@ -98,23 +97,24 @@ public class ProxyProtocolHandler extends ChannelDuplexHandler {
                         InetAddress.getByName(message.sourceAddress()),
                         message.sourcePort()
                 );
+                // Clean up stale reverse mapping if real address changed
+                if (cached != null && !sameAddress(cached, realAddress)) {
+                    realToProxyCache.invalidate(cached);
+                    log.debug("[ProxyProtocol] Updated mapping proxy {} -> real client {} (was {})",
+                            sender, realAddress, cached);
+                } else if (cached == null) {
+                    log.debug("[ProxyProtocol] Mapped proxy {} -> real client {} (remaining bytes: {})",
+                            sender, realAddress, content.readableBytes());
+                }
+
                 proxyToRealCache.put(sender, realAddress);
                 realToProxyCache.put(realAddress, sender);
 
-                log.debug("[ProxyProtocol] Mapped proxy {} -> real client {} (remaining bytes: {})",
-                        sender, realAddress, content.readableBytes());
-
                 ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), realAddress));
             } catch (UnknownHostException e) {
-                content.readerIndex(initialReaderIndex);
                 log.warn("[ProxyProtocol] Failed to resolve source address: {}", message != null ? message.sourceAddress() : "unknown", e);
-                InetSocketAddress effectiveSender = cached != null ? cached : sender;
-                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
             } catch (RuntimeException e) {
-                content.readerIndex(initialReaderIndex);
                 log.warn("[ProxyProtocol] Exception decoding PP v2 header from {}", sender, e);
-                InetSocketAddress effectiveSender = cached != null ? cached : sender;
-                ctx.fireChannelRead(new DatagramPacket(content.retain(), packet.recipient(), effectiveSender));
             } finally {
                 if (message != null) {
                     message.release();

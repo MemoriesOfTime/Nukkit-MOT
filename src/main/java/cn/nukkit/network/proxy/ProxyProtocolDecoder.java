@@ -13,6 +13,8 @@ import io.netty.handler.codec.haproxy.HAProxyProxiedProtocol;
  */
 public final class ProxyProtocolDecoder {
 
+    public static final int INVALID_HEADER = 0;
+
     // PP v2 signature: 12 bytes
     private static final int PP_V2_SIGNATURE_LENGTH = 12;
     private static final byte[] PP_V2_SIGNATURE = {
@@ -30,7 +32,7 @@ public final class ProxyProtocolDecoder {
      * @return 2 if PP v2 header detected, -1 otherwise
      */
     public static int findVersion(ByteBuf buf) {
-        if (buf.readableBytes() < PP_V2_MIN_LENGTH) {
+        if (buf.readableBytes() < PP_V2_SIGNATURE_LENGTH) {
             return -1;
         }
         int readerIndex = buf.readerIndex();
@@ -39,6 +41,16 @@ public final class ProxyProtocolDecoder {
                 return -1;
             }
         }
+
+        if (buf.readableBytes() < PP_V2_MIN_LENGTH) {
+            return INVALID_HEADER;
+        }
+
+        int version = (buf.getByte(readerIndex + PP_V2_SIGNATURE_LENGTH) & 0xF0) >> 4;
+        if (version != 0x2) {
+            return INVALID_HEADER;
+        }
+
         return 2;
     }
 
@@ -53,6 +65,10 @@ public final class ProxyProtocolDecoder {
         if (version != 2) {
             return null;
         }
+        if (buf.readableBytes() < PP_V2_MIN_LENGTH) {
+            throw new IllegalArgumentException("Incomplete Proxy Protocol v2 header");
+        }
+
         // Skip signature
         buf.skipBytes(PP_V2_SIGNATURE_LENGTH);
 
@@ -62,6 +78,10 @@ public final class ProxyProtocolDecoder {
         byte famTransport = buf.readByte();
         // Bytes 15-16: address length
         int addrLen = buf.readUnsignedShort();
+
+        if (buf.readableBytes() < addrLen) {
+            throw new IllegalArgumentException("Incomplete Proxy Protocol v2 address block");
+        }
 
         HAProxyProtocolVersion ppVersion = HAProxyProtocolVersion.valueOf(verCmd);
         HAProxyCommand command = HAProxyCommand.valueOf(verCmd);
@@ -81,6 +101,12 @@ public final class ProxyProtocolDecoder {
         switch (proxiedProtocol.addressFamily()) {
             case AF_IPv4 -> {
                 // 4 bytes src, 4 bytes dst, 2 bytes src port, 2 bytes dst port = 12 bytes
+                if ((famTransport & 0x0F) != 0x02) {
+                    throw new IllegalArgumentException("Proxy Protocol v2 UDP handler only accepts DGRAM over IPv4");
+                }
+                if (addrLen < 12) {
+                    throw new IllegalArgumentException("Proxy Protocol v2 IPv4 address block too short");
+                }
                 sourceAddress = readIPv4(buf);
                 destAddress = readIPv4(buf);
                 sourcePort = buf.readUnsignedShort();
@@ -93,6 +119,12 @@ public final class ProxyProtocolDecoder {
             }
             case AF_IPv6 -> {
                 // 16 bytes src, 16 bytes dst, 2 bytes src port, 2 bytes dst port = 36 bytes
+                if ((famTransport & 0x0F) != 0x02) {
+                    throw new IllegalArgumentException("Proxy Protocol v2 UDP handler only accepts DGRAM over IPv6");
+                }
+                if (addrLen < 36) {
+                    throw new IllegalArgumentException("Proxy Protocol v2 IPv6 address block too short");
+                }
                 sourceAddress = readIPv6(buf);
                 destAddress = readIPv6(buf);
                 sourcePort = buf.readUnsignedShort();
@@ -104,8 +136,7 @@ public final class ProxyProtocolDecoder {
                 }
             }
             default -> {
-                buf.skipBytes(addrLen);
-                return new HAProxyMessage(ppVersion, command, proxiedProtocol, null, null, 0, 0);
+                throw new IllegalArgumentException("Unsupported Proxy Protocol v2 address family for UDP handler");
             }
         }
 
