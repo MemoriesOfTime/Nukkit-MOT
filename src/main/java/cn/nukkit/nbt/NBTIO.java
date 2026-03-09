@@ -10,11 +10,17 @@ import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.Tag;
 import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.ThreadCache;
+import org.jspecify.annotations.NonNull;
 
 import java.io.*;
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Collection;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -42,7 +48,7 @@ public class NBTIO {
         if (id == ItemID.STRING_IDENTIFIED_ITEM) {
             tag.putString("Name", item.getNamespaceId(protocol));
         } else {
-            tag.putShort("id", item.getId() & 0xFFFF);
+            tag.putShort("id", id & 0xFFFF);
         }
 
         if (slot != null) {
@@ -67,7 +73,6 @@ public class NBTIO {
         Item item;
 
         if (tag.containsShort("id")) {
-            int id = (short) tag.getShort("id");
             try {
                 item = Item.get((short) tag.getShort("id"), damage, count);
             } catch (Exception e) {
@@ -89,20 +94,26 @@ public class NBTIO {
         }
 
         Tag tagTag = tag.get("tag");
-        if (tagTag instanceof CompoundTag) {
-            item.setNamedTag((CompoundTag) tagTag);
+        if (tagTag instanceof CompoundTag compound) {
+            item.setNamedTag(compound);
         }
 
         return item;
     }
 
     public static CompoundTag read(File file) throws IOException {
-        return read(file, ByteOrder.BIG_ENDIAN);
+        return read(file.toPath(), ByteOrder.BIG_ENDIAN);
     }
 
     public static CompoundTag read(File file, ByteOrder endianness) throws IOException {
-        if (!file.exists()) return null;
-        return read(new FileInputStream(file), endianness);
+        return read(file.toPath(), endianness);
+    }
+
+    public static CompoundTag read(Path path, ByteOrder endianness) throws IOException {
+        if (!Files.exists(path)) return null;
+        try (InputStream inputStream = Files.newInputStream(path, StandardOpenOption.READ)) {
+            return read(inputStream, endianness);
+        }
     }
 
     public static CompoundTag read(InputStream inputStream) throws IOException {
@@ -116,8 +127,8 @@ public class NBTIO {
     public static CompoundTag read(InputStream inputStream, ByteOrder endianness, boolean network) throws IOException {
         try (NBTInputStream stream = new NBTInputStream(inputStream, endianness, network)) {
             Tag tag = Tag.readNamedTag(stream);
-            if (tag instanceof CompoundTag) {
-                return (CompoundTag) tag;
+            if (tag instanceof CompoundTag compound) {
+                return compound;
             }
             throw new IOException("Root tag must be a named compound tag");
         }
@@ -160,7 +171,21 @@ public class NBTIO {
     }
 
     public static CompoundTag readCompressed(byte[] data, ByteOrder endianness) throws IOException {
-        return read(new BufferedInputStream(new GZIPInputStream(new ByteArrayInputStream(data))), endianness, true);
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment nativeSegment = arena.allocate(data.length);
+            nativeSegment.copyFrom(MemorySegment.ofArray(data));
+
+            try (InputStream msStream = new MemorySegmentInputStream(nativeSegment);
+                 GZIPInputStream gzipStream = new GZIPInputStream(msStream);
+                 NBTInputStream nbtStream = new NBTInputStream(gzipStream, endianness, true)) {
+
+                Tag tag = Tag.readNamedTag(nbtStream);
+                if (tag instanceof CompoundTag compound) {
+                    return compound;
+                }
+                throw new IOException("Root tag must be a named compound tag");
+            }
+        }
     }
 
     public static CompoundTag readNetworkCompressed(InputStream inputStream) throws IOException {
@@ -176,7 +201,21 @@ public class NBTIO {
     }
 
     public static CompoundTag readNetworkCompressed(byte[] data, ByteOrder endianness) throws IOException {
-        return read(new BufferedInputStream(new GZIPInputStream(new ByteArrayInputStream(data))), endianness, true);
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment nativeSegment = arena.allocate(data.length);
+            nativeSegment.copyFrom(MemorySegment.ofArray(data));
+
+            try (InputStream msStream = new MemorySegmentInputStream(nativeSegment);
+                 GZIPInputStream gzipStream = new GZIPInputStream(msStream);
+                 NBTInputStream nbtStream = new NBTInputStream(gzipStream, endianness, true)) {
+
+                Tag tag = Tag.readNamedTag(nbtStream);
+                if (tag instanceof CompoundTag compound) {
+                    return compound;
+                }
+                throw new IOException("Root tag must be a named compound tag");
+            }
+        }
     }
 
     public static byte[] write(CompoundTag tag) throws IOException {
@@ -218,11 +257,20 @@ public class NBTIO {
     }
 
     public static void write(CompoundTag tag, File file) throws IOException {
-        write(tag, file, ByteOrder.BIG_ENDIAN);
+        write(tag, file.toPath(), ByteOrder.BIG_ENDIAN);
     }
 
     public static void write(CompoundTag tag, File file, ByteOrder endianness) throws IOException {
-        write(tag, new FileOutputStream(file), endianness);
+        write(tag, file.toPath(), endianness);
+    }
+
+    public static void write(CompoundTag tag, Path path, ByteOrder endianness) throws IOException {
+        try (OutputStream outputStream = Files.newOutputStream(path,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE)) {
+            write(tag, outputStream, endianness);
+        }
     }
 
     public static void write(CompoundTag tag, OutputStream outputStream) throws IOException {
@@ -300,11 +348,53 @@ public class NBTIO {
     }
 
     public static void safeWrite(CompoundTag tag, File file) throws IOException {
-        File tmpFile = new File(file.getAbsolutePath() + "_tmp");
-        if (tmpFile.exists()) {
-            tmpFile.delete();
+        Path path = file.toPath();
+        Path tmpPath = path.resolveSibling(path.getFileName().toString() + "_tmp");
+
+        write(tag, tmpPath.toFile());
+
+        Files.move(tmpPath, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    private static class MemorySegmentInputStream extends InputStream {
+        private final MemorySegment segment;
+        private long offset = 0;
+        private final long size;
+
+        public MemorySegmentInputStream(MemorySegment segment) {
+            this.segment = segment;
+            this.size = segment.byteSize();
         }
-        write(tag, tmpFile);
-        Files.move(tmpFile.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+
+        @Override
+        public int read() {
+            if (offset >= size) return -1;
+            return segment.get(ValueLayout.JAVA_BYTE, offset++) & 0xFF;
+        }
+
+        @Override
+        public int read(byte @NonNull [] b, int off, int len) {
+            if (offset >= size) return -1;
+            long available = size - offset;
+            int toRead = (int) Math.min(len, available);
+
+            // Direct copy from native memory to Java array (Zero-Copy inside JVM)
+            MemorySegment.copy(segment, offset, MemorySegment.ofArray(b), off, toRead);
+            offset += toRead;
+            return toRead;
+        }
+
+        @Override
+        public long skip(long n) {
+            long available = size - offset;
+            long toSkip = Math.min(n, available);
+            offset += toSkip;
+            return toSkip;
+        }
+
+        @Override
+        public int available() {
+            return (int) (size - offset);
+        }
     }
 }
