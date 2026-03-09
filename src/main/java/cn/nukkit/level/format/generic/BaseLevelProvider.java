@@ -37,8 +37,12 @@ import java.util.concurrent.atomic.AtomicReference;
 @Log4j2
 public abstract class BaseLevelProvider implements LevelProvider {
 
-    protected Level level;
+    protected static final String LEVEL_DAT = "level.dat";
+    protected static final String LEVEL_DAT_BAK = "level.dat.bak";
+    protected static final String REGION_DIR = "region";
+    protected static final String DB_DIR = "db";
 
+    protected Level level;
     protected final String path;
     protected final Path pathFastAccess;
 
@@ -65,40 +69,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
             Files.createDirectories(this.pathFastAccess);
         }
 
-        CompoundTag levelData = null;
-        Path levelDatPath = this.pathFastAccess.resolve("level.dat");
-        Path levelDatBakPath = this.pathFastAccess.resolve("level.dat.bak");
-
-        try {
-            if (Files.exists(levelDatPath)) {
-                byte[] data = Files.readAllBytes(levelDatPath);
-                levelData = NBTIO.readCompressed(data, ByteOrder.BIG_ENDIAN);
-            }
-        } catch (Exception e) {
-            log.fatal("Failed to load the level.dat file at {}, attempting to load level.dat.bak instead!", levelDatPath.toAbsolutePath(), e);
-        }
-
-        if (levelData == null) {
-            try {
-                if (Files.exists(levelDatBakPath)) {
-                    byte[] data = Files.readAllBytes(levelDatBakPath);
-                    levelData = NBTIO.readCompressed(data, ByteOrder.BIG_ENDIAN);
-                } else {
-                    log.fatal("The file {} does not exist!", levelDatBakPath.toAbsolutePath());
-                    throw new FileNotFoundException("The file " + levelDatBakPath.toAbsolutePath() + " does not exist!");
-                }
-            } catch (Exception e2) {
-                LevelException ex = new LevelException("Could not load the level.dat and the level.dat.bak files. You might need to restore them from a backup!", e2);
-                if (e2.getCause() != null) ex.addSuppressed(e2.getCause());
-                throw ex;
-            }
-        }
-
-        if (levelData != null && levelData.get("Data") instanceof CompoundTag dataTag) {
-            this.levelData = dataTag;
-        } else {
-            throw new LevelException("Invalid level.dat");
-        }
+        this.levelData = loadLevelData();
 
         if (!this.levelData.contains("generatorName")) {
             this.levelData.putString("generatorName", Generator.getGenerator("DEFAULT").getSimpleName().toLowerCase(Locale.ROOT));
@@ -113,6 +84,42 @@ public abstract class BaseLevelProvider implements LevelProvider {
                 this.levelData.getInt("SpawnY"),
                 this.levelData.getInt("SpawnZ")
         );
+    }
+
+    protected boolean isAnvilWorld() {
+        return Files.exists(pathFastAccess.resolve(REGION_DIR)) || !Files.exists(pathFastAccess.resolve(DB_DIR));
+    }
+
+    private CompoundTag loadLevelData() {
+        CompoundTag data = tryLoadLevelDat(LEVEL_DAT);
+        if (data == null) {
+            data = tryLoadLevelDat(LEVEL_DAT_BAK);
+        }
+
+        if (data == null || !(data.get("Data") instanceof CompoundTag dataTag)) {
+            throw new LevelException("Invalid level.dat");
+        }
+
+        return dataTag;
+    }
+
+    private CompoundTag tryLoadLevelDat(String fileName) {
+        Path filePath = this.pathFastAccess.resolve(fileName);
+        if (!Files.exists(filePath)) return null;
+
+        try {
+            if (isAnvilWorld()) {
+                try (InputStream is = Files.newInputStream(filePath);
+                     BufferedInputStream bis = new BufferedInputStream(is)) {
+                    return NBTIO.readCompressed(bis, ByteOrder.BIG_ENDIAN);
+                }
+            } else {
+                return NBTIO.readCompressed(Files.readAllBytes(filePath), ByteOrder.BIG_ENDIAN);
+            }
+        } catch (Exception e) {
+            log.debug("Failed to load {}: {}", fileName, e.getMessage());
+            return null;
+        }
     }
 
     public abstract BaseFullChunk loadChunk(long index, int chunkX, int chunkZ, boolean create);
@@ -331,8 +338,8 @@ public abstract class BaseLevelProvider implements LevelProvider {
 
     @Override
     public void saveLevelData() {
-        Path levelDatPath = this.pathFastAccess.resolve("level.dat");
-        Path levelDatBakPath = this.pathFastAccess.resolve("level.dat.bak");
+        Path levelDatPath = this.pathFastAccess.resolve(LEVEL_DAT);
+        Path levelDatBakPath = this.pathFastAccess.resolve(LEVEL_DAT_BAK);
 
         if (Files.exists(levelDatPath)) {
             try {
