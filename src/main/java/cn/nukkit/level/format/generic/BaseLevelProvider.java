@@ -63,7 +63,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
         CompoundTag levelData;
         File levelDatFile = new File(getPath(), "level.dat");
         try (FileInputStream fos = new FileInputStream(levelDatFile); BufferedInputStream input = new BufferedInputStream(fos)) {
-            levelData = NBTIO.readCompressed(input, ByteOrder.BIG_ENDIAN);
+            levelData = NBTIO.readCompressed(input.readAllBytes(), ByteOrder.BIG_ENDIAN);
         } catch (Exception e) {
             log.fatal("Failed to load the level.dat file at {}, attempting to load level.dat.bak instead!", levelDatFile.getAbsolutePath(), e);
             try {
@@ -75,7 +75,7 @@ public abstract class BaseLevelProvider implements LevelProvider {
                     throw ex;
                 }
                 try (FileInputStream fos = new FileInputStream(bak); BufferedInputStream input = new BufferedInputStream(fos)) {
-                    levelData = NBTIO.readCompressed(input, ByteOrder.BIG_ENDIAN);
+                    levelData = NBTIO.readCompressed(input.readAllBytes(), ByteOrder.BIG_ENDIAN);
                 } catch (Exception e2) {
                     log.fatal("Failed to load the level.dat.bak file at {}", levelDatFile.getAbsolutePath());
                     e2.addSuppressed(e);
