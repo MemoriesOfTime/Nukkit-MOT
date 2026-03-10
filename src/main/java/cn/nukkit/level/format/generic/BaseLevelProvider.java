@@ -364,7 +364,9 @@ public abstract class BaseLevelProvider implements LevelProvider {
             NBTIO.writeGZIPCompressed(saveData, os);
 
             os.flush();
-            ((FileOutputStream) os).getFD().sync();
+            if (os instanceof FileOutputStream fos) {
+                fos.getFD().sync();
+            }
         } catch (IOException e) {
             try {
                 Files.deleteIfExists(tempPath);
