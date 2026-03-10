@@ -9,10 +9,7 @@ import cn.nukkit.utils.BlockUpdateEntry;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class BlockUpdateScheduler {
@@ -115,6 +112,32 @@ public class BlockUpdateScheduler {
             }
         }
         return false;
+    }
+
+    public void clearChunk(int chunkX, int chunkZ) {
+        int minX = chunkX << 4;
+        int maxX = minX + 16;
+        int minZ = chunkZ << 4;
+        int maxZ = minZ + 16;
+
+        for (Set<BlockUpdateEntry> tickSet : this.queuedUpdates.values()) {
+            if (tickSet != null) {
+                tickSet.removeIf(entry -> {
+                    Vector3 pos = entry.pos;
+                    return pos.getFloorX() >= minX && pos.getFloorX() < maxX &&
+                            pos.getFloorZ() >= minZ && pos.getFloorZ() < maxZ;
+                });
+            }
+        }
+
+        Set<BlockUpdateEntry> updates = this.pendingUpdates;
+        if (updates != null) {
+            updates.removeIf(entry -> {
+                Vector3 pos = entry.pos;
+                return pos.getFloorX() >= minX && pos.getFloorX() < maxX &&
+                        pos.getFloorZ() >= minZ && pos.getFloorZ() < maxZ;
+            });
+        }
     }
 
     public boolean remove(BlockUpdateEntry entry) {
