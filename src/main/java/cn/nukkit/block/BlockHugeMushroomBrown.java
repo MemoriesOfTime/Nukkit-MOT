@@ -49,6 +49,11 @@ public class BlockHugeMushroomBrown extends BlockSolidMeta {
     }
 
     @Override
+    public Item toItem() {
+        return new ItemBlock(Block.get(this.getId(), 14), 14, 1);
+    }
+
+    @Override
     public boolean canSilkTouch() {
         return true;
     }
