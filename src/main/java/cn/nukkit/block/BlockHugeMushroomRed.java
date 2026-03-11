@@ -51,7 +51,7 @@ public class BlockHugeMushroomRed extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        if (this.getDamage() == BigMushroom.STEM) {
+        if (this.getDamage() == BigMushroom.STEM || this.getDamage() == BigMushroom.ALL_STEM) {
             return new ItemBlock(Block.get(BROWN_MUSHROOM_BLOCK, BigMushroom.ALL_STEM), BigMushroom.ALL_STEM, 1);
         }
         return new ItemBlock(Block.get(this.getId(), BigMushroom.ALL_OUTSIDE), BigMushroom.ALL_OUTSIDE, 1);
