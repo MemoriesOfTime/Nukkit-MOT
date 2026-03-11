@@ -4,6 +4,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.item.ItemTool;
 import cn.nukkit.item.enchantment.Enchantment;
+import cn.nukkit.level.generator.object.mushroom.BigMushroom;
 import cn.nukkit.utils.BlockColor;
 import cn.nukkit.utils.Utils;
 
@@ -50,7 +51,10 @@ public class BlockHugeMushroomRed extends BlockSolidMeta {
 
     @Override
     public Item toItem() {
-        return new ItemBlock(Block.get(this.getId(), 14), 14, 1);
+        if (this.getDamage() == BigMushroom.STEM) {
+            return new ItemBlock(Block.get(BROWN_MUSHROOM_BLOCK, BigMushroom.ALL_STEM), BigMushroom.ALL_STEM, 1);
+        }
+        return new ItemBlock(Block.get(this.getId(), BigMushroom.ALL_OUTSIDE), BigMushroom.ALL_OUTSIDE, 1);
     }
 
     @Override
