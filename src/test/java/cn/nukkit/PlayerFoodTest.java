@@ -20,7 +20,7 @@ import static org.mockito.Mockito.*;
  * 覆盖以下核心机制：
  * <ul>
  *     <li>Exhaustion 阈值触发与溢出保留</li>
- *     <li>自然生命恢复条件（食物等级 ≥ 18 或饱和度 > 0）</li>
+ *     <li>自然生命恢复条件（食物等级 ≥ 18）</li>
  *     <li>和平模式下食物系统不重复触发恢复</li>
  * </ul>
  */
@@ -80,7 +80,7 @@ class PlayerFoodTest {
     }
 
     @Test
-    void naturalRegenerationTriggersWhenSaturationIsNonZero() {
+    void naturalRegenerationDoesNotTriggerBelowFoodLevel18EvenWithSaturation() {
         Player player = createPlayer();
         when(player.getHealth()).thenReturn(10f);
         when(player.getMaxHealth()).thenReturn(20);
@@ -88,7 +88,7 @@ class PlayerFoodTest {
 
         food.update(80);
 
-        verify(player).heal(any(EntityRegainHealthEvent.class));
+        verify(player, never()).heal(any(EntityRegainHealthEvent.class));
     }
 
     @Test

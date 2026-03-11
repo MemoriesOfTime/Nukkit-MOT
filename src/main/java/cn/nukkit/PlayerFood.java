@@ -141,7 +141,7 @@ public class PlayerFood {
             // Peaceful mode healing is handled in Player.java
             if (diff == 0) return;
 
-            if (this.foodLevel > 17 || this.foodSaturationLevel > 0) {
+            if (this.foodLevel > 17) {
                 this.foodTickTimer += tickDiff;
                 if (this.foodTickTimer >= 80) {
                     if (this.player.getLevel().getGameRules().getBoolean(GameRule.NATURAL_REGENERATION)
