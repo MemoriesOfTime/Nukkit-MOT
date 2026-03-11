@@ -780,7 +780,7 @@ public class BinaryStream {
 
             if (compoundTag != null && !compoundTag.getAllTags().isEmpty()) {
                 if (compoundTag.contains("Damage")) {
-                    if (stringId != null || id > 255) {
+                    if (stringId != null || id > 255 || protocolId >= ProtocolInfo.v1_19_0_31) {
                         damage = compoundTag.getInt("Damage");
                     }
                     compoundTag.remove("Damage");
