@@ -1,6 +1,7 @@
 package cn.nukkit.level.format;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.level.BlockPalette;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.utils.BinaryStream;
 
@@ -56,6 +57,10 @@ public interface ChunkSection {
 
     boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId, int meta);
 
+    long getBlockChanges();
+
+    void addBlockChange();
+
     int getBlockSkyLight(int x, int y, int z);
 
     void setBlockSkyLight(int x, int y, int z, int level);
@@ -73,11 +78,11 @@ public interface ChunkSection {
     byte[] getDataArray();
 
     byte[] getDataArray(int layer);
-    
+
     default byte[] getDataExtraArray() {
         return getDataExtraArray(0);
     }
-    
+
     byte[] getDataExtraArray(int layer);
 
     default byte[][] getHyperDataArray() {
@@ -96,20 +101,11 @@ public interface ChunkSection {
 
     boolean hasLayer(int layer);
 
-    // for < 1.13 chunk format
-    byte[] getBytes(int protocolId);
-    
     int getMaximumLayer();
 
     CompoundTag toNBT();
 
-    @Deprecated
-    default void writeTo(int protocol, BinaryStream stream) {
-        writeTo(protocol, stream, false);
-    }
-
-    // for >= 1.13 chunk format
-    void writeTo(int protocol, BinaryStream stream, boolean antiXray);
+    void writeTo(int protocol, BinaryStream stream, boolean antiXray, BlockPalette blockPalette);
 
     ChunkSection copy();
 
@@ -127,5 +123,17 @@ public interface ChunkSection {
 
     default void setDirty() {
 
+    }
+
+    /**
+     * Check if this section may contain light-emitting blocks.
+     * This is a fast check that only looks at the palette, not every block position.
+     * If this returns false, the section definitely has no light sources.
+     * If this returns true, the section may have light sources (needs full scan).
+     *
+     * @return true if light sources may exist, false if definitely none
+     */
+    default boolean maybeHasLightSource() {
+        return true; // Default: assume light sources may exist
     }
 }

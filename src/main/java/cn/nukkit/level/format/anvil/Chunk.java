@@ -123,7 +123,7 @@ public class Chunk extends BaseChunk {
         }
 
         int[] heightMap = nbt.getIntArray("HeightMap");
-        this.heightMap = new byte[256];
+        this.heightMap = new short[256];
         if (heightMap.length != 256) {
             Arrays.fill(this.heightMap, (byte) 255);
         } else {
@@ -282,7 +282,7 @@ public class Chunk extends BaseChunk {
 
         nbt.putByteArray("Biomes", this.getBiomeIdArray());
         int[] heightInts = new int[256];
-        byte[] heightBytes = this.getHeightMapArray();
+        short[] heightBytes = this.getHeightMapArray();
         for (int i = 0; i < heightInts.length; i++) {
             heightInts[i] = heightBytes[i] & 0xFF;
         }
@@ -377,7 +377,7 @@ public class Chunk extends BaseChunk {
 
         nbt.putByteArray("Biomes", this.getBiomeIdArray());
         int[] heightInts = new int[256];
-        byte[] heightBytes = this.getHeightMapArray();
+        short[] heightBytes = this.getHeightMapArray();
         for (int i = 0; i < heightInts.length; i++) {
             heightInts[i] = heightBytes[i] & 0xFF;
         }
@@ -501,7 +501,7 @@ public class Chunk extends BaseChunk {
 
             chunk.setPosition(chunkX, chunkZ);
 
-            chunk.heightMap = new byte[256];
+            chunk.heightMap = new short[256];
             chunk.inhabitedTime = 0;
             chunk.terrainGenerated = false;
             chunk.terrainPopulated = false;

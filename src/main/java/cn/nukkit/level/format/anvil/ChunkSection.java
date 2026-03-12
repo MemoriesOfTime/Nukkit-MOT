@@ -1,6 +1,7 @@
 package cn.nukkit.level.format.anvil;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.level.BlockPalette;
 import cn.nukkit.level.format.anvil.util.BlockStorage;
 import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.generic.BaseChunk;
@@ -8,13 +9,11 @@ import cn.nukkit.level.format.generic.EmptyChunkSection;
 import cn.nukkit.nbt.tag.ByteArrayTag;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.*;
 import com.google.common.base.Preconditions;
 import lombok.extern.log4j.Log4j2;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -302,6 +301,16 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
     }
 
     @Override
+    public long getBlockChanges() {
+        return 0;
+    }
+
+    @Override
+    public void addBlockChange() {
+        //do nothing
+    }
+
+    @Override
     public int getBlockSkyLight(int x, int y, int z) {
         if (this.skyLight == null) {
             if (!hasSkyLight) {
@@ -576,43 +585,7 @@ public class ChunkSection implements cn.nukkit.level.format.ChunkSection {
     }
 
     @Override
-    public byte[] getBytes(int protocolId) {
-        //TODO: properly mv support
-        synchronized (storage) {
-            byte[] ids = storage.get(0).getBlockIds();
-            byte[] data = storage.get(0).getBlockData();
-            byte[] merged = new byte[ids.length + data.length];
-            System.arraycopy(ids, 0, merged, 0, ids.length);
-            System.arraycopy(data, 0, merged, ids.length, data.length);
-            if (protocolId < ProtocolInfo.v1_2_0) {
-                ByteBuffer buffer = ByteBuffer.allocate(10240);
-                byte[] skyLight = new byte[2048];
-                byte[] blockLight = new byte[2048];
-                for (int x = 0; x < 16; x++) {
-                    for (int z = 0; z < 16; z++) {
-                        int i = (x << 7) | (z << 3);
-                        for (int y = 0; y < 16; y += 2) {
-                            int b1 = this.getBlockSkyLight(x, y, z);
-                            int b2 = this.getBlockSkyLight(x, y + 1, z);
-                            skyLight[i | (y >> 1)] = (byte) ((b2 << 4) | b1);
-                            b1 = this.getBlockLight(x, y, z);
-                            b2 = this.getBlockLight(x, y + 1, z);
-                            blockLight[i | (y >> 1)] = (byte) ((b2 << 4) | b1);
-                        }
-                    }
-                }
-                return buffer
-                        .put(merged)
-                        .put(skyLight)
-                        .put(blockLight)
-                        .array();
-            }
-            return merged;
-        }
-    }
-
-    @Override
-    public void writeTo(int protocolId, BinaryStream stream, boolean antiXray) {
+    public void writeTo(int protocolId, BinaryStream stream, boolean antiXray, BlockPalette blockPalette) {
         synchronized (storage) {
             stream.putByte((byte) STREAM_STORAGE_VERSION);
             stream.putByte((byte) storage.size());

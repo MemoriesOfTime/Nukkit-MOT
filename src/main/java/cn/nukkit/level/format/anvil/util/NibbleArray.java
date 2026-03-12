@@ -10,7 +10,7 @@ public class NibbleArray implements Cloneable {
     private final byte[] data;
 
     public NibbleArray(int length) {
-        data = new byte[length / 2];
+        data = new byte[(length >> 1)];
     }
 
     public NibbleArray(byte[] array) {
@@ -19,7 +19,7 @@ public class NibbleArray implements Cloneable {
 
     public byte get(int index) {
         Preconditions.checkElementIndex(index, data.length << 1);
-        byte val = data[index / 2];
+        byte val = data[index >> 1];
         if ((index & 1) == 0) {
             return (byte) (val & 0x0f);
         } else {
@@ -34,7 +34,7 @@ public class NibbleArray implements Cloneable {
             throw new IndexOutOfBoundsException();
         }
         value &= 0xf;
-        int half = index / 2;
+        int half = index >> 1;
         byte previous = data[half];
         if ((index & 1) == 0) {
             data[half] = (byte) (previous & 0xf0 | value);

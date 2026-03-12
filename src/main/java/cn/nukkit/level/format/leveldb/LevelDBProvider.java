@@ -28,6 +28,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import lombok.extern.log4j.Log4j2;
 import net.daporkchop.ldbjni.DBProvider;
 import net.daporkchop.ldbjni.LevelDB;
@@ -65,6 +66,8 @@ public class LevelDBProvider implements LevelProvider {
     protected Level level;
 
     protected final String path;
+
+    private int lastGcPosition = 0;
 
     protected CompoundTag levelData;
 
@@ -650,7 +653,7 @@ public class LevelDBProvider implements LevelProvider {
 
     @Override
     public LevelDBChunk getEmptyChunk(int chunkX, int chunkZ) {
-        return LevelDBChunk.getEmptyChunk(chunkX, chunkZ, this);
+        return LevelDBChunk.getEmptyChunk(level, chunkX, chunkZ, this);
     }
 
     public DB getDatabase() {
@@ -669,11 +672,6 @@ public class LevelDBProvider implements LevelProvider {
             this.unloadChunk(chunkX, chunkZ, false);
         }
         this.chunks.put(index, (LevelDBChunk) chunk);
-    }
-
-    @SuppressWarnings("unused")
-    public static LevelDBChunkSection createChunkSection(int chunkY) {
-        return new LevelDBChunkSection(chunkY);
     }
 
     private boolean chunkExists(int chunkX, int chunkZ) {
@@ -867,11 +865,43 @@ public class LevelDBProvider implements LevelProvider {
         rules.writeBedrockNBT(this.levelData);
     }
 
-    private int lastPosition = 0;
-
     @Override
     public void doGarbageCollection() {
-        //leveldb不需要回收regions
+        //Do nothing. LevelDB don't need third-party garbage collection
+    }
+
+    @Override
+    public void doGarbageCollection(long time) {
+        long start = System.currentTimeMillis();
+        int maxIterations = this.chunks.size();
+        if (this.lastGcPosition > maxIterations) {
+            this.lastGcPosition = 0;
+        }
+
+        ObjectIterator<BaseFullChunk> iterator = chunks.values().iterator();
+        if (this.lastGcPosition != 0) {
+            iterator.skip(lastGcPosition);
+        }
+
+        int iterations;
+        for (iterations = 0; iterations < maxIterations; iterations++) {
+            if (!iterator.hasNext()) {
+                iterator = this.chunks.values().iterator();
+            }
+
+            if (!iterator.hasNext()) {
+                break;
+            }
+
+            BaseFullChunk chunk = iterator.next();
+            if (chunk instanceof LevelDBChunk && chunk.isGenerated() && chunk.isPopulated()) {
+                chunk.compress();
+                if (System.currentTimeMillis() - start >= time) {
+                    break;
+                }
+            }
+        }
+        this.lastGcPosition += iterations;
     }
 
     public CompoundTag getLevelData() {

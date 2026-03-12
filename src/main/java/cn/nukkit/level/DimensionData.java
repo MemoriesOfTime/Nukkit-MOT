@@ -11,11 +11,13 @@ public class DimensionData {
     private final int minHeight;
     private final int maxHeight;
     private final int height;
+    private final boolean hasSkyLight;
 
     public DimensionData(int dimensionId, int minHeight, int maxHeight) {
         this.dimensionId = dimensionId;
         this.minHeight = minHeight;
         this.maxHeight = maxHeight;
+        this.hasSkyLight = false;
 
         int height = maxHeight - minHeight;
         if (minHeight <= 0 && maxHeight > 0) {
@@ -34,6 +36,10 @@ public class DimensionData {
 
     public int getMaxSectionY() {
         return this.maxHeight >> 4;
+    }
+
+    public boolean hasSkyLight() {
+        return this.hasSkyLight;
     }
 
     private static class LegacyDimensionData extends DimensionData {

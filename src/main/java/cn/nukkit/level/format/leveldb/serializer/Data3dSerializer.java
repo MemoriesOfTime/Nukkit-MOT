@@ -19,7 +19,7 @@ public class Data3dSerializer {
 
         ByteBuf buffer  = ByteBufAllocator.DEFAULT.ioBuffer();
         try {
-            byte[] heightMap = chunk.getHeightMapArray();
+            short[] heightMap = chunk.getHeightMapArray();
             for (int height : heightMap) {
                 buffer.writeShortLE(height);
             }

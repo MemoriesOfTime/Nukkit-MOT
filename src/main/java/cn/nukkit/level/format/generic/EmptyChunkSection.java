@@ -1,13 +1,12 @@
 package cn.nukkit.level.format.generic;
 
 import cn.nukkit.block.Block;
+import cn.nukkit.level.BlockPalette;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.nbt.tag.CompoundTag;
-import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.ChunkException;
 
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 
 /**
@@ -15,7 +14,7 @@ import java.util.Arrays;
  * Nukkit Project
  */
 public class EmptyChunkSection implements ChunkSection {
-
+    private static final byte[] EMPTY_SECTION = new byte[6145];
     public static final EmptyChunkSection[] EMPTY = new EmptyChunkSection[16];
 
     public static final byte[] EMPTY_ID_ARRAY = new byte[4096];
@@ -100,6 +99,16 @@ public class EmptyChunkSection implements ChunkSection {
     public boolean setBlockAtLayer(int x, int y, int z, int layer, int blockId, int meta) {
         if (blockId != 0) throw new ChunkException("Tried to modify an empty Chunk");
         return false;
+    }
+
+    @Override
+    public long getBlockChanges() {
+        return 0;
+    }
+
+    @Override
+    public void addBlockChange() {
+        //do nothing
     }
 
     @Override
@@ -215,22 +224,8 @@ public class EmptyChunkSection implements ChunkSection {
     }
 
     @Override
-    public byte[] getBytes(int protocolId) {
-        if (protocolId < ProtocolInfo.v1_2_0) {
-            ByteBuffer buffer = ByteBuffer.allocate(10240);
-            byte[] skyLight = new byte[2048];
-            Arrays.fill(skyLight, (byte) 0xff);
-            buffer.position(6144);
-            return buffer
-                    .put(skyLight)
-                    .array();
-        }
-        return new byte[6145];
-    }
-
-    @Override
-    public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
-        stream.put(this.getBytes(protocol));
+    public void writeTo(int protocol, BinaryStream stream, boolean antiXray, BlockPalette blockPalette) {
+        stream.skip(EMPTY_SECTION.length);
     }
 
     @Override

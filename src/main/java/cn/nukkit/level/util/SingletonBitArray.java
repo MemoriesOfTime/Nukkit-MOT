@@ -1,38 +1,21 @@
 package cn.nukkit.level.util;
 
-import com.google.common.base.Preconditions;
-
 public class SingletonBitArray implements BitArray {
 
+    public static final SingletonBitArray INSTANCE = new SingletonBitArray();
     private static final int[] EMPTY_WORDS = new int[0];
 
-    private int value;
-    private final int size;
-
-    SingletonBitArray(int size) {
-        this.size = size;
-    }
-
-    SingletonBitArray(int size, int value) {
-        this.size = size;
-        this.value = value;
+    public SingletonBitArray() {
     }
 
     @Override
-    public void set(int index, int value) {
-        Preconditions.checkElementIndex(index, this.size);
-        this.value = value;
+    public SingletonBitArray copy() {
+        return this;
     }
 
     @Override
     public int get(int index) {
-        Preconditions.checkElementIndex(index, this.size);
-        return this.value;
-    }
-
-    @Override
-    public int size() {
-        return this.size;
+        return 0;
     }
 
     @Override
@@ -46,7 +29,11 @@ public class SingletonBitArray implements BitArray {
     }
 
     @Override
-    public BitArray copy() {
-        return new SingletonBitArray(this.size, this.value);
+    public void set(int index, int value) {
+    }
+
+    @Override
+    public int size() {
+        return 1;
     }
 }

@@ -15,6 +15,8 @@ public enum BitArrayVersion {
      */
     V0(0, 0, V1);
 
+    private static final BitArrayVersion[] VALUES = values();
+
     final byte bits;
     final byte entriesPerWord;
     final int maxEntryValue;
@@ -28,7 +30,7 @@ public enum BitArrayVersion {
     }
 
     public static BitArrayVersion get(int version, boolean read) {
-        for (BitArrayVersion ver : values()) {
+        for (BitArrayVersion ver : VALUES) {
             if ((!read && ver.entriesPerWord <= version) || (read && ver.bits == version)) {
                 return ver;
             }
@@ -37,12 +39,12 @@ public enum BitArrayVersion {
     }
 
     public BitArray createPalette() {
-        return this.createPalette(4096, new int[getWordsForSize(4096)]);
+        return this.createPalette(4096);// chunk section size 16 * 16 * 16
     }
 
     public BitArray createPalette(int size) {
         if (this == V0) {
-            return new SingletonBitArray(size);
+            return SingletonBitArray.INSTANCE;
         }
         return this.createPalette(size, new int[this.getWordsForSize(size)]);
     }
@@ -52,10 +54,6 @@ public enum BitArrayVersion {
     }
 
     public int getWordsForSize(int size) {
-        return this == V0 ? 0 : this.getWordsForSizeInternal(size);
-    }
-
-    private int getWordsForSizeInternal(int size) {
         return (size / entriesPerWord) + (size % entriesPerWord == 0 ? 0 : 1);
     }
 
@@ -68,18 +66,13 @@ public enum BitArrayVersion {
     }
 
     public BitArray createPalette(int size, int[] words) {
-        if (this == V0) {
-            return new SingletonBitArray(size);
-        }
         if (this == V3 || this == V5 || this == V6) {
             // Padded palettes aren't able to use bitwise operations due to their padding.
             return new PaddedBitArray(this, size, words);
+        } else if (this == V0) {
+            return SingletonBitArray.INSTANCE;
         } else {
             return new Pow2BitArray(this, size, words);
         }
-    }
-
-    public boolean isSingleton() {
-        return this == V0 || this == V1;
     }
 }

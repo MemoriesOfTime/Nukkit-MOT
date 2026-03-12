@@ -53,7 +53,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
 
     protected byte[] blockLight;
 
-    protected byte[] heightMap;
+    protected short[] heightMap;
 
     protected List<CompoundTag> NBTtiles;
 
@@ -588,7 +588,7 @@ public abstract class BaseFullChunk implements FullChunk, ChunkManager {
     }
 
     @Override
-    public byte[] getHeightMapArray() {
+    public short[] getHeightMapArray() {
         return this.heightMap;
     }
 

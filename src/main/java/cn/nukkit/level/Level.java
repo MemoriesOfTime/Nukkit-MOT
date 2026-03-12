@@ -334,6 +334,10 @@ public class Level implements ChunkManager, Metadatable {
 
     private Iterator<LongObjectEntry<Long>> lastUsingUnloadingIter;
 
+    @Getter
+    @Setter
+    private AntiXraySystem antiXraySystem;
+
     private final boolean antiXray;
 
     // 用于实现世界监听的回调
@@ -405,6 +409,13 @@ public class Level implements ChunkManager, Metadatable {
 
         this.antiXray = Server.antiXrayWorlds.contains(name);
 
+        if(this.antiXray) {
+            this.antiXraySystem = new AntiXraySystem(this);
+            this.antiXraySystem.setFakeOreDenominator(8);
+            this.antiXraySystem.setPreDeObfuscate(true);
+            this.antiXraySystem.reinitAntiXray();
+        }
+
         if (this.server.asyncChunkSending) {
             this.asyncChuckExecutor = Executors.newSingleThreadExecutor(new ThreadFactoryBuilder().setNameFormat("AsyncChunkThread for " + name).build());
         }
@@ -432,6 +443,10 @@ public class Level implements ChunkManager, Metadatable {
         return (hi & 0xFF) << 16 | lo;
     }
 
+    public static int localBlockHash(double x, double y, double z, Level level) {
+        return localBlockHash(x, y, z, level.getDimensionData());
+    }
+
     public static Vector3 getBlockXYZ(long chunkHash, int blockHash, DimensionData dimensionData) {
         int hi = (byte) (blockHash >>> 16);
         int lo = (short) blockHash;
@@ -439,6 +454,10 @@ public class Level implements ChunkManager, Metadatable {
         int x = (hi & 0xF) + (getHashX(chunkHash) << 4);
         int z = ((hi >> 4) & 0xF) + (getHashZ(chunkHash) << 4);
         return new Vector3(x, y, z);
+    }
+
+    public static Vector3 getBlockXYZ(long chunkHash, int blockHash, Level level) {
+        return getBlockXYZ(chunkHash, blockHash, level.getDimensionData());
     }
 
     public static BlockVector3 blockHash(double x, double y, double z) {
@@ -1041,7 +1060,9 @@ public class Level implements ChunkManager, Metadatable {
 
         this.levelCurrentTick++;
 
-        this.unloadChunks();
+        if (currentTick % 200 == 0) {
+            this.unloadChunks(true);
+        }
 
         this.updateQueue.tick(this.levelCurrentTick);
 

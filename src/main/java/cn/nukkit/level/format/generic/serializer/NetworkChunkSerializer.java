@@ -2,7 +2,9 @@ package cn.nukkit.level.format.generic.serializer;
 
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.blockentity.BlockEntitySpawnable;
+import cn.nukkit.level.BlockPalette;
 import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.ChunkSection;
@@ -63,32 +65,27 @@ public class NetworkChunkSerializer {
             BinaryStream stream = ThreadCache.binaryStream.get().reset();
             NetworkChunkData networkChunkData = new NetworkChunkData(protocolId, subChunkCount, antiXray, dimensionData);
             if (protocolId >= ProtocolInfo.v1_18_30) {
-                serialize1_18_30(stream, chunk, sections, networkChunkData);
+                serialize1_18_30(stream, chunk, sections, networkChunkData, GlobalBlockPalette.getPaletteByProtocol(protocolId));
             } else if (protocolId >= ProtocolInfo.v1_18_0) {
-                serialize1_18_0(stream, chunk, sections, networkChunkData);
+                serialize1_18_0(stream, chunk, sections, networkChunkData, GlobalBlockPalette.getPaletteByProtocol(protocolId));
             } else {
                 subChunkCount = Math.max(1, subChunkCount - chunk.getSectionOffset());
                 networkChunkData.setChunkSections(subChunkCount);
-
-                int maxDimensionSections = dimensionData.getHeight() >> 4;
 
                 if (protocolId < ProtocolInfo.v1_12_0) {
                     stream.putByte((byte) subChunkCount);
                 }
 
+                BlockPalette blockPalette = GlobalBlockPalette.getPaletteByProtocol(protocolId);
+
                 int offset = chunk.getSectionOffset();
                 for (int i = offset; i < subChunkCount + offset; i++) {
-                    if (protocolId < ProtocolInfo.v1_13_0) {
-                        stream.putByte((byte) 0);
-                        stream.put(sections[i].getBytes(protocolId));
-                    } else {
-                        sections[i].writeTo(protocolId, stream, antiXray);
-                    }
+                    sections[i].writeTo(protocolId, stream, antiXray, blockPalette);
                 }
 
                 if (protocolId < ProtocolInfo.v1_12_0) {
-                    for (byte height : chunk.getHeightMapArray()) {
-                        stream.putByte(height);
+                    for (short height : chunk.getHeightMapArray()) {
+                        stream.putByte((byte) height);
                     }
                     stream.put(PAD_256);
                 }
@@ -106,7 +103,7 @@ public class NetworkChunkSerializer {
         }
     }
 
-    private static void serialize1_18_30(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections, NetworkChunkData chunkData) {
+    private static void serialize1_18_30(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections, NetworkChunkData chunkData, BlockPalette blockPalette) {
         DimensionData dimensionData = chunkData.getDimensionData();
         int maxDimensionSections = dimensionData.getHeight() >> 4;
         int subChunkCount = Math.min(maxDimensionSections, chunkData.getChunkSections());
@@ -122,7 +119,7 @@ public class NetworkChunkSerializer {
         }
 
         for (int i = 0; i < subChunkCount; i++) {
-            sections[i].writeTo(chunkData.getProtocol(), stream, chunkData.isAntiXray());
+            sections[i].writeTo(chunkData.getProtocol(), stream, chunkData.isAntiXray(), blockPalette);
         }
 
         stream.put(biomePalettes);
@@ -131,7 +128,7 @@ public class NetworkChunkSerializer {
         chunkData.setChunkSections(writtenSections);
     }
 
-    private static void serialize1_18_0(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections, NetworkChunkData chunkData) {
+    private static void serialize1_18_0(BinaryStream stream, BaseChunk chunk, ChunkSection[] sections, NetworkChunkData chunkData, BlockPalette blockPalette) {
         DimensionData dimensionData = chunkData.getDimensionData();
         int maxDimensionSections = dimensionData.getHeight() >> 4;
         int subChunkCount = Math.min(maxDimensionSections, chunkData.getChunkSections());
@@ -148,7 +145,7 @@ public class NetworkChunkSerializer {
 
         int offset = chunk.getSectionOffset();
         for (int i = offset; i < subChunkCount; i++) {
-            sections[i].writeTo(chunkData.getProtocol(), stream, chunkData.isAntiXray());
+            sections[i].writeTo(chunkData.getProtocol(), stream, chunkData.isAntiXray(), blockPalette);
         }
 
         stream.put(biomePalettes);

@@ -7,6 +7,7 @@ import cn.nukkit.entity.passive.EntityPig;
 import cn.nukkit.entity.passive.EntitySkeletonHorse;
 import cn.nukkit.level.format.FullChunk;
 import cn.nukkit.math.NukkitMath;
+import cn.nukkit.math.SimpleAxisAlignedBB;
 import cn.nukkit.math.Vector2;
 import cn.nukkit.math.Vector3;
 import cn.nukkit.nbt.tag.CompoundTag;
@@ -41,7 +42,10 @@ public abstract class EntityWalking extends BaseEntity {
         if (!(target instanceof EntityCreature) || (!((EntityCreature) target).closed && !this.targetOption((EntityCreature) target, this.distanceSquared(target))) || !((Entity) target).canBeFollowed()) {
             double near = Integer.MAX_VALUE;
 
-            for (Entity entity : this.getLevel().getEntities()) {
+            for (Entity entity : this.getLevel().getCollidingEntities(new SimpleAxisAlignedBB(
+                    this.subtract(16, 16, 16),
+                    this.add(16, 16, 16)
+            ))) {
                 if (entity == this || !(entity instanceof EntityCreature creature) || entity.closed || !this.canTarget(entity)) {
                     continue;
                 }

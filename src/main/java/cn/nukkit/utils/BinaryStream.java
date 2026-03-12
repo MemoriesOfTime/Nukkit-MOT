@@ -153,7 +153,7 @@ public class BinaryStream {
     }
 
     public void put(byte[] bytes) {
-        if (bytes == null) {
+        if (bytes == null || bytes.length == 0) {
             return;
         }
 

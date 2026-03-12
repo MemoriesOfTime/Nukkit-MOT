@@ -15,6 +15,7 @@ import org.checkerframework.checker.nullness.qual.NonNull;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 import static org.cloudburstmc.protocol.common.util.Preconditions.checkArgument;
 import static org.cloudburstmc.protocol.common.util.Preconditions.checkNotNull;
@@ -29,8 +30,8 @@ public class PacketPool {
     private final int protocolVersion;
     @Getter
     private final String minecraftVersion;
-    private final Int2ObjectOpenHashMap<Class<? extends DataPacket>> packets;
-    private final Class<? extends DataPacket>[] packetsById;
+    private final Int2ObjectOpenHashMap<Supplier<DataPacket>> packets;
+    private final Supplier<DataPacket>[] packetsById;
     private final Map<Class<? extends DataPacket>, Integer> packetsByClass;
 
     public static Builder builder() {
@@ -42,10 +43,10 @@ public class PacketPool {
             Server.getInstance().getLogger().debug("Packet exceeds limits, id: " + id);
             return null;
         }
-        Class<? extends DataPacket> clazz = packetsById[id];
-        if (clazz != null) {
+        Supplier<DataPacket> supplier = packetsById[id];
+        if (supplier != null) {
             try {
-                return clazz.getDeclaredConstructor().newInstance();
+                return supplier.get();
             } catch (Exception e) {
                 Server.getInstance().getLogger().logException(e);
             }
@@ -76,19 +77,19 @@ public class PacketPool {
     @SuppressWarnings({"unchecked", "ConstantConditions"})
     @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class Builder {
-        private final Int2ObjectOpenHashMap<Class<? extends DataPacket>> packets = new Int2ObjectOpenHashMap<>(256);
+        private final Int2ObjectOpenHashMap<Supplier<DataPacket>> packets = new Int2ObjectOpenHashMap<>(256);
         private final Map<Class<? extends DataPacket>, Integer> packetsByClass = new IdentityHashMap<>();
         private int protocolVersion = -1;
         private String minecraftVersion = null;
 
-        public <T extends DataPacket> Builder registerPacket(byte id, @NonNull Class<T> packetClass) {
-            return this.registerPacket(ProtocolInfo.toNewProtocolID(id), packetClass);
+        public <T extends DataPacket> Builder registerPacket(byte id, @NonNull Class<? extends  DataPacket> packetClass, @NonNull Supplier<DataPacket> packetBuilder) {
+            return this.registerPacket(ProtocolInfo.toNewProtocolID(id), packetClass, packetBuilder);
         }
 
-        public <T extends DataPacket> Builder registerPacket(@NonNegative int id, @NonNull Class<T> packetClass) {
+        public <T extends DataPacket> Builder registerPacket(@NonNegative int id, @NonNull Class<? extends  DataPacket> packetClass, @NonNull Supplier<DataPacket> packetBuilder) {
             checkArgument(id >= 0, "id " + id + " cannot be negative");
 
-            packets.put(id, packetClass);
+            packets.put(id, packetBuilder);
             packetsByClass.put(packetClass, id);
 
             return this;
@@ -126,9 +127,9 @@ public class PacketPool {
                 }
             }
             checkArgument(largestId > -1, "Must have at least one packet registered");
-            Class<? extends DataPacket>[] packetsById = new Class[largestId + 1];
+            Supplier<DataPacket>[] packetsById = new Supplier[largestId + 1];
 
-            for (Int2ObjectMap.Entry<Class<? extends DataPacket>> entry : packets.int2ObjectEntrySet()) {
+            for (Int2ObjectMap.Entry<Supplier<DataPacket>> entry : packets.int2ObjectEntrySet()) {
                 packetsById[entry.getIntKey()] = entry.getValue();
             }
             return new PacketPool(protocolVersion, minecraftVersion, packets, packetsById, packetsByClass);

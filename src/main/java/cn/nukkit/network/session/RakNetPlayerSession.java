@@ -66,6 +66,8 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
     private final AtomicLong encryptCounter = new AtomicLong();
     private final AtomicLong decryptCounter = new AtomicLong();
 
+    private final List<DataPacket> toBatch = new ObjectArrayList<>();
+
     public RakNetPlayerSession(RakNetInterface server, RakChildChannel channel) {
         this.server = server;
         this.channel = channel;
@@ -225,8 +227,9 @@ public class RakNetPlayerSession extends SimpleChannelInboundHandler<RakMessage>
             return;
         }
 
+        toBatch.clear();
+
         try {
-            List<DataPacket> toBatch = new ObjectArrayList<>();
             DataPacket packet;
             while ((packet = this.outbound.poll()) != null) {
                 if (packet instanceof DisconnectPacket) {

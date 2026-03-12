@@ -2,7 +2,7 @@ package cn.nukkit.level.format.anvil.util;
 
 import cn.nukkit.block.Block;
 import cn.nukkit.level.GlobalBlockPalette;
-import cn.nukkit.level.Level;
+import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
@@ -404,16 +404,10 @@ public class BlockStorage {
     }
 
     public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
-        PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
+        PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol, BitArrayVersion.V2);
 
         for (int i = 0; i < SECTION_SIZE; i++) {
-            int bid = getBlockId(i);
-            int blockData = getBlockData(i);
-            if (antiXray && bid < Block.MAX_BLOCK_ID && Level.xrayableBlocks[bid]) {
-                bid = Block.STONE;
-                blockData = 0;
-            }
-            palettedBlockStorage.setBlock(i, GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, blockData));
+            palettedBlockStorage.setBlock(i, GlobalBlockPalette.getOrCreateRuntimeId(protocol, getBlockId(i), getBlockData(i)));
         }
 
         palettedBlockStorage.writeTo(stream);

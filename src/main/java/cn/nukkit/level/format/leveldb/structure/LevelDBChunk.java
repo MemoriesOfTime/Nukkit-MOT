@@ -4,6 +4,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.blockentity.BlockEntity;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.DimensionData;
+import cn.nukkit.level.Level;
 import cn.nukkit.level.biome.Biome;
 import cn.nukkit.level.format.ChunkSection;
 import cn.nukkit.level.format.LevelProvider;
@@ -42,11 +43,11 @@ public class LevelDBChunk extends BaseChunk {
 
     private final DimensionData dimensionData;
 
-    public LevelDBChunk(@Nullable LevelProvider level, int chunkX, int chunkZ) {
-        this(level, chunkX, chunkZ, new LevelDBChunkSection[0], new int[SUB_CHUNK_2D_SIZE], null, null, null, null, ChunkState.NEW);
+    public LevelDBChunk(Level level, @Nullable LevelProvider provider, int chunkX, int chunkZ) {
+        this(level, provider, chunkX, chunkZ, new LevelDBChunkSection[0], new int[SUB_CHUNK_2D_SIZE], null, null, null, null, ChunkState.NEW);
     }
 
-    public LevelDBChunk(@Nullable LevelProvider provider, int chunkX, int chunkZ, @NotNull ChunkSection[] sections,
+    public LevelDBChunk(Level level, @Nullable LevelProvider provider, int chunkX, int chunkZ, @NotNull ChunkSection[] sections,
                         @Nullable int[] heightmap, @Nullable byte[] biomes2d, @Nullable PalettedBlockStorage[] biomes3d,
                         @Nullable List<CompoundTag> entities, @Nullable List<CompoundTag> blockEntities, @NotNull ChunkState state) {
         this.provider = provider;
@@ -59,7 +60,7 @@ public class LevelDBChunk extends BaseChunk {
         for (int i = minSectionY; i <= maxSectionY; i++) {
             int sectionsY = i + this.dimensionData.getSectionOffset();
             if (sectionsY >= sections.length || sections[sectionsY] == null) {
-                this.sections[sectionsY] = new LevelDBChunkSection(this, i);
+                this.sections[sectionsY] = new LevelDBChunkSection(level, this, i);
             } else {
                 ChunkSection section = sections[sectionsY];
                 ((LevelDBChunkSection) section).setParent(this);
@@ -67,13 +68,13 @@ public class LevelDBChunk extends BaseChunk {
             }
         }
 
-        this.heightMap = new byte[SUB_CHUNK_2D_SIZE];
+        this.heightMap = new short[SUB_CHUNK_2D_SIZE];
         if (heightmap != null && heightmap.length == SUB_CHUNK_2D_SIZE) {
             for (int i=0; i<heightmap.length; i++) {
-                this.heightMap[i] = (byte) heightmap[i];
+                this.heightMap[i] = (short) heightmap[i];
             }
         } else {
-            Arrays.fill(this.heightMap, (byte) 255);
+            Arrays.fill(this.heightMap, (short) 319);
         }
 
         if (biomes2d != null && biomes2d.length == SUB_CHUNK_2D_SIZE) {
@@ -164,6 +165,25 @@ public class LevelDBChunk extends BaseChunk {
             }
         } else if (this.state.ordinal() >= ChunkState.POPULATED.ordinal()) {
             this.setState(ChunkState.GENERATED);
+        }
+    }
+
+    @Override
+    public boolean isLightPopulated() {
+        return this.state == ChunkState.FINISHED;
+    }
+
+    @Override
+    public void setLightPopulated(boolean value) {
+        if (this.isLightPopulated() == value) {
+            return;
+        }
+        this.setChanged();
+
+        if (value) {
+            this.setState(ChunkState.FINISHED);
+        } else if (this.state == ChunkState.FINISHED) {
+            this.setState(ChunkState.POPULATED);
         }
     }
 
@@ -482,7 +502,7 @@ public class LevelDBChunk extends BaseChunk {
         nbt.putByteArray("Biomes", this.getBiomeIdArray());
 
         int[] heightInts = new int[256];
-        byte[] heightBytes = this.getHeightMapArray();
+        short[] heightBytes = this.getHeightMapArray();
         for (int i = 0; i < heightInts.length; i++) {
             heightInts[i] = heightBytes[i] & 0xFF;
         }
@@ -614,12 +634,12 @@ public class LevelDBChunk extends BaseChunk {
     }
 
     @SuppressWarnings("unused")
-    public static LevelDBChunk getEmptyChunk(int chunkX, int chunkZ) {
-        return getEmptyChunk(chunkX, chunkZ, null);
+    public static LevelDBChunk getEmptyChunk(Level level, int chunkX, int chunkZ) {
+        return getEmptyChunk(level, chunkX, chunkZ, null);
     }
 
-    public static LevelDBChunk getEmptyChunk(int chunkX, int chunkZ, LevelProvider provider) {
-        return new LevelDBChunk(provider, chunkX, chunkZ);
+    public static LevelDBChunk getEmptyChunk(Level level, int chunkX, int chunkZ, LevelProvider provider) {
+        return new LevelDBChunk(level, provider, chunkX, chunkZ);
     }
 
     protected static int index2d(int x, int z) {
@@ -628,6 +648,14 @@ public class LevelDBChunk extends BaseChunk {
             throw new IllegalArgumentException("Invalid index: " + x + ", " + z );
         }
         return index;
+    }
+
+    @Override
+    protected void setInternalSection(float fY, ChunkSection section) {
+        super.setInternalSection(fY, section);
+        if (section instanceof LevelDBChunkSection) {
+            ((LevelDBChunkSection) section).setParent(this);
+        }
     }
 
     public Lock writeLock() {

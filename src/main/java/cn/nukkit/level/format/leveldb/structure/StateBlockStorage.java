@@ -3,15 +3,15 @@ package cn.nukkit.level.format.leveldb.structure;
 import cn.nukkit.Nukkit;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
-import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.level.BlockPalette;
 import cn.nukkit.level.Level;
-import cn.nukkit.level.format.anvil.util.BlockStorage;
-import cn.nukkit.level.format.anvil.util.NibbleArray;
 import cn.nukkit.level.format.leveldb.BlockStateMapping;
 import cn.nukkit.level.util.BitArray;
 import cn.nukkit.level.util.BitArrayVersion;
 import cn.nukkit.level.util.PalettedBlockStorage;
+import cn.nukkit.level.util.SingletonBitArray;
 import cn.nukkit.math.BlockVector3;
+import cn.nukkit.math.NukkitRandom;
 import cn.nukkit.utils.BinaryStream;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -24,7 +24,6 @@ import org.cloudburstmc.nbt.NbtMap;
 import org.cloudburstmc.nbt.NbtUtils;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 
 import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
@@ -33,13 +32,10 @@ import static cn.nukkit.level.format.leveldb.LevelDBConstants.SUB_CHUNK_SIZE;
 public class StateBlockStorage {
 
     private static final int SECTION_SIZE = 16 * 16 * 16;
+    private static final BlockStateSnapshot AIR = BlockStateMapping.get().getState(0, 0);
 
     private List<BlockStateSnapshot> palette;
     private BitArray bitArray;
-
-    //用于兼容1.13以下版本
-    private byte[] blockIds;
-    private NibbleArray blockData;
 
     public StateBlockStorage() {
         this(BitArrayVersion.V2);
@@ -48,17 +44,12 @@ public class StateBlockStorage {
     public StateBlockStorage(BitArrayVersion version) {
         this.bitArray = version.createPalette();
         this.palette = new ObjectArrayList<>(16);
-        this.palette.add(BlockStateMapping.get().getState(0, 0));
-
-        this.blockIds = null;
-        this.blockData = null;
+        this.palette.add(AIR);
     }
 
-    protected StateBlockStorage(BitArray bitArray, List<BlockStateSnapshot> palette, byte[] blockIds, NibbleArray blockData) {
+    protected StateBlockStorage(BitArray bitArray, List<BlockStateSnapshot> palette) {
         this.palette = palette;
         this.bitArray = bitArray;
-        this.blockIds = blockIds;
-        this.blockData = blockData;
     }
 
     private static int getPaletteHeader(BitArrayVersion version, boolean runtime) {
@@ -197,10 +188,6 @@ public class StateBlockStorage {
         try {
             int paletteIndex = this.getOrAdd(value);
             this.bitArray.set(index, paletteIndex);
-            if(this.blockIds != null && this.blockData != null) {
-                this.blockIds[index] = (byte) (value.getLegacyId() & 0xff);
-                this.blockData.set(index, (byte) (value.getLegacyData() & 0xf));
-            }
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("Unable to set value: " + value + ", palette: " + palette, e);
         }
@@ -218,26 +205,67 @@ public class StateBlockStorage {
         this.set(elementIndex(pos.x, pos.y, pos.z), BlockStateMapping.get().getBlockStateFromFullId(value));
     }
 
-    public void writeTo(int protocol, BinaryStream stream, boolean antiXray) {
-        PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
+    public void writeTo(Level level, int protocol, BinaryStream stream, boolean antiXray, BlockPalette blockPalette) {
+        PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(BitArrayVersion.V2, protocol);
 
-        for (int i = 0; i < SECTION_SIZE; i++) {
-            int fullId = get(i);
-            int id = fullId >> Block.DATA_BITS;
-            int meta = fullId & Block.DATA_MASK;
-            if (antiXray && id < Block.MAX_BLOCK_ID && Level.xrayableBlocks[id]) {
-                id = Block.STONE;
-                meta = 0;
+        if(this.bitArray.getClass() != SingletonBitArray.class) {
+            if (antiXray) {
+                final NukkitRandom nukkitRandom = new NukkitRandom();
+                var realOreToFakeMap = level.getAntiXraySystem().getRealOreToReplacedBlockIds();
+                var fakeBlockMap = level.getAntiXraySystem().getFakeOreToPutBlockIds();
+                var XAndDenominator = level.getAntiXraySystem().getFakeOreDenominator() - 1;
+
+                for (int i = 0; i < SECTION_SIZE; i++) {
+                    int x = (i >> 8) & 0xF;
+                    int z = (i >> 4) & 0xF;
+                    int y = i & 0xF;
+
+                    final int fullId = get(i);
+                    int id = fullId >> Block.DATA_BITS;
+                    int meta = fullId & Block.DATA_MASK;
+
+                    if (x != 0 && z != 0 && y != 0 && x != 15 && z != 15 && y != 15) {
+                        var tmp = realOreToFakeMap.getOrDefault(id, Integer.MAX_VALUE);
+                        if (tmp != Integer.MAX_VALUE && canBeObfuscated(x, y, z)) {
+                            id = tmp;
+                        } else {
+                            var tmp2 = fakeBlockMap.get(id);
+                            if (tmp2 != null && (nukkitRandom.nextInt() & XAndDenominator) == 0 && canBeObfuscated(x, y, z)) {
+                                id = tmp2.getInt(nukkitRandom.nextRange(0, tmp2.size() - 1));
+                                meta = 0;
+                            }
+                        }
+                    }
+                    palettedBlockStorage.setBlock(i, blockPalette.getRuntimeId(id, meta));
+                }
+            } else {
+                for (int i = 0; i < SECTION_SIZE; i++) {
+                    final int fullId = get(i);
+                    palettedBlockStorage.setBlock(i, blockPalette.getRuntimeId(fullId >> Block.DATA_BITS, fullId & Block.DATA_MASK));
+                }
             }
-            int runtimeId = GlobalBlockPalette.getOrCreateRuntimeId(protocol, id, meta);
-            palettedBlockStorage.setBlock(i, runtimeId);
         }
 
         palettedBlockStorage.writeTo(stream);
     }
 
+    private boolean canBeObfuscated(int x, int y, int z) {
+        return !Block.isBlockTransparentById(get(x + 1, y, z) >> Block.DATA_BITS) &&
+                !Block.isBlockTransparentById(get(x - 1, y, z) >> Block.DATA_BITS) &&
+                !Block.isBlockTransparentById(get(x, y + 1, z) >> Block.DATA_BITS) &&
+                !Block.isBlockTransparentById(get(x, y - 1, z) >> Block.DATA_BITS) &&
+                !Block.isBlockTransparentById(get(x, y, z + 1) >> Block.DATA_BITS) &&
+                !Block.isBlockTransparentById(get(x, y, z - 1) >> Block.DATA_BITS);
+    }
+
     private void grow(BitArrayVersion version) {
         BitArray newBitArray = version.createPalette(SECTION_SIZE);
+
+        if(bitArray.getClass() == SingletonBitArray.class) {
+            bitArray = newBitArray;
+            return;
+        }
+
         for (int i = 0; i < SECTION_SIZE; i++) {
             newBitArray.set(i, this.bitArray.get(i));
         }
@@ -278,24 +306,6 @@ public class StateBlockStorage {
             }
         }
         return true;
-    }
-
-    public byte[] getBlockIds() {
-        if (!this.isEmpty()) {
-            this.computeOldData();
-            return Arrays.copyOf(blockIds, blockIds.length);
-        } else {
-            return new byte[BlockStorage.SECTION_SIZE];
-        }
-    }
-
-    public byte[] getBlockData() {
-        if (!this.isEmpty()) {
-            this.computeOldData();
-            return this.blockData.getData();
-        } else {
-            return new byte[2048];
-        }
     }
 
     /**
@@ -360,26 +370,28 @@ public class StateBlockStorage {
         return true;
     }
 
-    protected void computeOldData() {
-        if (this.blockIds == null || this.blockData == null) {
-            this.blockIds = new byte[SECTION_SIZE];
-            this.blockData = new NibbleArray(BlockStorage.SECTION_SIZE);
-
-            for (int i = 0; i < this.bitArray.size(); i++) {
-                int fullId = this.get(i);
-                this.blockIds[i] = (byte) ((fullId >> Block.DATA_BITS) & 0xff);
-                this.blockData.set(i, (byte) (fullId & 0xf));
-            }
-        }
-    }
-
     public StateBlockStorage copy() {
         return new StateBlockStorage(
                 this.bitArray.copy(),
-                new ObjectArrayList<>(this.palette),
-                this.blockIds != null ? this.blockIds.clone() : null,
-                this.blockData != null ? this.blockData.copy(): null
+                new ObjectArrayList<>(this.palette)
         );
+    }
+
+    /**
+     * Check if this storage may contain light-emitting blocks.
+     * This is a fast check that only looks at the palette, not every block position.
+     * If this returns false, the storage definitely has no light sources.
+     * If this returns true, the storage may have light sources (needs full scan).
+     *
+     * @return true if light sources may exist, false if definitely none
+     */
+    public boolean maybeHasLightSource() {
+        for (BlockStateSnapshot state : this.palette) {
+            if (Block.getBlockLight(state.getLegacyId()) > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static int elementIndex(int x, int y, int z) {
