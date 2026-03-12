@@ -2291,16 +2291,13 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             if (this.riding == null && this.inventory != null) {
                 if (this.isFoodEnabled() && this.getServer().getDifficulty() > 0 && distanceSquared >= 0.05) {
                     double jump = 0;
-                    double swimming = this.isInsideOfWater() ? 0.015 * distanceSquared : 0;
-                    double distance2 = distanceSquared;
-                    if (swimming != 0) {
-                        distance2 = 0;
-                    }
+                    double distance = Math.sqrt(distanceSquared);
+                    double swimming = this.isInsideOfWater() ? 0.01 * distance : 0;
                     if (this.isSprinting()) {
                         if (this.inAirTicks == 3 && swimming == 0) {
                             jump = 0.2;
                         }
-                        this.getFoodData().updateFoodExpLevel(0.1 * distance2 + jump + swimming);
+                        this.getFoodData().updateFoodExpLevel(0.1 * (swimming != 0 ? 0 : distance) + jump + swimming);
                     } else if (this.isSneaking() && this.inAirTicks == 3) {
                         jump = 0.05;
                         this.getFoodData().updateFoodExpLevel(jump);
@@ -8029,10 +8026,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         UpdateClientInputLocksPacket packet = new UpdateClientInputLocksPacket();
         if (this.lockCameraInput) {
-            packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_CAMERA;
+            packet.inputLockType.add(UpdateClientInputLocksPacket.InputLockType.CAMERA);
         }
         if (this.lockMovementInput) {
-            packet.lockComponentData |= UpdateClientInputLocksPacket.FLAG_MOVEMENT;
+            packet.inputLockType.add(UpdateClientInputLocksPacket.InputLockType.MOVEMENT);
         }
         packet.setServerPosition(this.getLocation().add(0, this.getBaseOffset(), 0).asVector3f());
 
