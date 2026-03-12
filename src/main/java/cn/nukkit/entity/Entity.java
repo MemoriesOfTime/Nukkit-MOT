@@ -3500,7 +3500,7 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
-    private PropertySyncData propertySyncData() {
+    protected PropertySyncData propertySyncData() {
         Collection<Integer> intValues = intProperties.values();
         int[] intArray = new int[intValues.size()];
         int i = 0;

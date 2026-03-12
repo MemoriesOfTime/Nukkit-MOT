@@ -17,11 +17,15 @@ import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.AddEntityPacket;
+import cn.nukkit.network.protocol.DataPacket;
+import cn.nukkit.network.protocol.types.EntityLink;
 import cn.nukkit.utils.Utils;
 
 import java.util.ArrayList;
 import java.util.Objects;
 
+import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_PASSENGER;
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
 
 public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHolder, EntityRideable, EntityControllable, EntityMoveable {
@@ -46,11 +50,15 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_CAN_FLY, true);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_WALKER, true);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_TAMED, true);
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_BODY_ROTATION_ALWAYS_FOLLOWS_HEAD, true);
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_COLLIDABLE, true);
 
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_WASD_AIR_CONTROLLED, true);
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_DOES_SERVER_AUTH_ONLY_DISMOUNT, true);
+        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_BODY_ROTATION_ALWAYS_FOLLOWS_HEAD, true);
+
+        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_HAS_COLLISION, true);
+        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_GRAVITY, true);
+        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_COLLIDABLE, true);
+
+        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_WASD_AIR_CONTROLLED, true);
+        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_DOES_SERVER_AUTH_ONLY_DISMOUNT, true);
 
         this.setMoveable(true);
 
@@ -205,5 +213,33 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
     @Override
     public Vector3f getMountedOffset(Entity entity) {
         return new Vector3f(0, 5.22f, 0);
+    }
+
+    @Override
+    protected DataPacket createAddEntityPacket() {
+        AddEntityPacket addEntity = new AddEntityPacket();
+        addEntity.type = 0;
+        addEntity.id = "minecraft:happy_ghast";
+        addEntity.entityUniqueId = this.getId();
+        addEntity.entityRuntimeId = this.getId();
+        addEntity.yaw = (float) this.yaw;
+        addEntity.headYaw = (float) this.yaw;
+        addEntity.pitch = (float) this.pitch;
+        addEntity.x = (float) this.x;
+        addEntity.y = (float) this.y + getBaseOffset();
+        addEntity.z = (float) this.z;
+        addEntity.speedX = (float) this.motionX;
+        addEntity.speedY = (float) this.motionY;
+        addEntity.speedZ = (float) this.motionZ;
+        addEntity.metadata = this.dataProperties.clone();
+
+        addEntity.links = new EntityLink[this.passengers.size()];
+        for (int i = 0; i < addEntity.links.length; i++) {
+            addEntity.links[i] = new EntityLink(this.getId(), this.passengers.get(i).getId(), i == 0 ? EntityLink.TYPE_RIDER : TYPE_PASSENGER, false, false, 0f);
+        }
+
+        addEntity.properties = propertySyncData();
+
+        return addEntity;
     }
 }
