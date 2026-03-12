@@ -1224,6 +1224,7 @@ public class Server {
             this.getLogger().debug("Stopping all tasks...");
             this.scheduler.cancelAllTasks();
             this.scheduler.mainThreadHeartbeat(Integer.MAX_VALUE);
+            this.scheduler.shutdown();
 
             this.getLogger().debug("Closing console...");
             this.consoleThread.interrupt();
