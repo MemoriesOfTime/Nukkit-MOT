@@ -43219,7 +43219,7 @@
         "damage": -1
       },
       "output": {
-        "id": 266
+        "id": "minecraft:copper_ingot"
       },
       "block": "furnace"
     },
