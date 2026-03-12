@@ -3,6 +3,7 @@ package cn.nukkit.network.protocol;
 import cn.nukkit.GameVersion;
 import cn.nukkit.Nukkit;
 import cn.nukkit.Server;
+import cn.nukkit.math.BlockVector3;
 import cn.nukkit.network.Network;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.SnappyCompression;
@@ -137,5 +138,33 @@ public abstract class DataPacket extends BinaryStream implements Cloneable {
             Server.getInstance().getLogger().debug("Warning: encode() not implemented for " + this.getClass().getName());
             Thread.dumpStack();
         }
+    }
+
+    @Override
+    public BlockVector3 getBlockVector3() {
+        if (this.protocol >= ProtocolInfo.v1_26_10) {
+            return this.getSignedBlockPosition();
+        }
+        return super.getBlockVector3();
+    }
+
+    @Override
+    public void putBlockVector3(BlockVector3 v) {
+        if (this.protocol >= ProtocolInfo.v1_26_10) {
+            this.putSignedBlockPosition(v);
+            return;
+        }
+        super.putBlockVector3(v);
+    }
+
+    @Override
+    public void putBlockVector3(int x, int y, int z) {
+        if (this.protocol >= ProtocolInfo.v1_26_10) {
+            this.putVarInt(x);
+            this.putVarInt(y);
+            this.putVarInt(z);
+            return;
+        }
+        super.putBlockVector3(x, y, z);
     }
 }

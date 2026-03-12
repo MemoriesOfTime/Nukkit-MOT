@@ -32,6 +32,13 @@ public class VoxelShapesPacket extends DataPacket {
      */
     public Map<String, Integer> nameMap = new LinkedHashMap<>();
 
+    /**
+     * Number of custom shapes.
+     *
+     * @since v944
+     */
+    public int customShapeCount;
+
     @Override
     @Deprecated
     public byte pid() {
@@ -107,6 +114,10 @@ public class VoxelShapesPacket extends DataPacket {
             int handle = this.getLShort();
             this.nameMap.put(name, handle);
         }
+
+        if (this.protocol >= ProtocolInfo.v1_26_10) {
+            this.customShapeCount = this.getLShort();
+        }
     }
 
     @Override
@@ -154,6 +165,10 @@ public class VoxelShapesPacket extends DataPacket {
         for (Map.Entry<String, Integer> entry : this.nameMap.entrySet()) {
             this.putString(entry.getKey());
             this.putLShort(entry.getValue());
+        }
+
+        if (this.protocol >= ProtocolInfo.v1_26_10) {
+            this.putLShort(this.customShapeCount);
         }
     }
 }
