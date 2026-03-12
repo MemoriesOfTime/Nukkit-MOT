@@ -107,6 +107,7 @@ public class PlayerOffhandInventory extends BaseInventory {
         Server.getInstance().getPluginManager().callEvent(ev);
         if (ev.isCancelled()) {
             this.sendSlot(index, this.getViewers());
+            this.sendSlot(index, (Player) holder);
             return false;
         }
         item = ev.getNewItem();
@@ -116,6 +117,7 @@ public class PlayerOffhandInventory extends BaseInventory {
             Server.getInstance().getPluginManager().callEvent(ev2);
             if (ev2.isCancelled()) {
                 this.sendSlot(index, this.getViewers());
+                this.sendSlot(index, (Player) holder);
                 return false;
             }
             item = ev2.getNewItem();
@@ -138,6 +140,7 @@ public class PlayerOffhandInventory extends BaseInventory {
             Server.getInstance().getPluginManager().callEvent(ev);
             if (ev.isCancelled()) {
                 this.sendSlot(index, this.getViewers());
+                this.sendSlot(index, (Player) holder);
                 return false;
             }
             item = ev.getNewItem();
@@ -147,6 +150,7 @@ public class PlayerOffhandInventory extends BaseInventory {
                 Server.getInstance().getPluginManager().callEvent(ev2);
                 if (ev2.isCancelled()) {
                     this.sendSlot(index, this.getViewers());
+                    this.sendSlot(index, (Player) holder);
                     return false;
                 }
                 item = ev2.getNewItem();
