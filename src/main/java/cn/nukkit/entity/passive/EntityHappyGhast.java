@@ -3,6 +3,7 @@ package cn.nukkit.entity.passive;
 import cn.nukkit.Player;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.entity.EntityControllable;
+import cn.nukkit.entity.EntityMoveable;
 import cn.nukkit.entity.EntityRideable;
 import cn.nukkit.inventory.EntityArmorInventory;
 import cn.nukkit.inventory.Inventory;
@@ -23,7 +24,7 @@ import java.util.Objects;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
 
-public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHolder, EntityRideable, EntityControllable {
+public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHolder, EntityRideable, EntityControllable, EntityMoveable {
 
     public static final int NETWORK_ID = 147;
 
@@ -50,6 +51,8 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
 
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_WASD_AIR_CONTROLLED, true);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_DOES_SERVER_AUTH_ONLY_DISMOUNT, true);
+
+        this.setMoveable(true);
 
         this.setMovementSpeed(0.05f);
         this.armorInventory = new EntityArmorInventory(this);
