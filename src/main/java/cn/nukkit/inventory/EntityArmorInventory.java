@@ -38,6 +38,11 @@ public class EntityArmorInventory extends BaseInventory {
         return "Entity Armor";
     }
 
+    @Override
+    public int getSize() {
+        return 5;
+    }
+
     public Item getHelmet() {
         return this.getItem(SLOT_HEAD);
     }
