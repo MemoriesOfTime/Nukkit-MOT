@@ -47,6 +47,11 @@ public class DebugPasteCommand extends VanillaCommand {
         }
 
         @Override
+        protected boolean isVirtual() {
+            return true;
+        }
+
+        @Override
         public void onRun() {
             try {
                 server.dispatchCommand(sender, "status");
