@@ -282,6 +282,7 @@ public class RecipeRegistry {
     }
 
     public static BatchPacket getPacket(int protocol) {
+        if(protocol > ProtocolInfo.v1_17_0) return null;
         return PACKET;
     }
 
