@@ -493,6 +493,24 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemBootsCopper.class);
             registerNamespacedIdItem(ItemNuggetCopper.class);
 
+            registerNamespacedIdItem(ItemSpawnEggHappyGhast.class);
+            registerNamespacedIdItem(ItemHarnessWhite.class);
+            registerNamespacedIdItem(ItemHarnessLightGray.class);
+            registerNamespacedIdItem(ItemHarnessGray.class);
+            registerNamespacedIdItem(ItemHarnessBlack.class);
+            registerNamespacedIdItem(ItemHarnessBrown.class);
+            registerNamespacedIdItem(ItemHarnessRed.class);
+            registerNamespacedIdItem(ItemHarnessOrange.class);
+            registerNamespacedIdItem(ItemHarnessYellow.class);
+            registerNamespacedIdItem(ItemHarnessLime.class);
+            registerNamespacedIdItem(ItemHarnessGreen.class);
+            registerNamespacedIdItem(ItemHarnessCyan.class);
+            registerNamespacedIdItem(ItemHarnessLightBlue.class);
+            registerNamespacedIdItem(ItemHarnessBlue.class);
+            registerNamespacedIdItem(ItemHarnessPurple.class);
+            registerNamespacedIdItem(ItemHarnessMagenta.class);
+            registerNamespacedIdItem(ItemHarnessPink.class);
+
             // 添加原版物品到NAMESPACED_ID_ITEM
             // Add vanilla items to NAMESPACED_ID_ITEM
             RuntimeItemMapping mapping = RuntimeItems.getMapping(GameVersion.getLastVersion());
