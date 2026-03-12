@@ -3466,6 +3466,13 @@ public abstract class Entity extends Location implements Metadatable {
         return null;
     }
 
+    public final Boolean getBooleanEntityProperty(String identifier) {
+        if (intProperties.containsKey(identifier)) {
+            return intProperties.getOrDefault(identifier, 0) == 1;
+        }
+        return null;
+    }
+
     private void initEntityProperties() {
         if(this.getIdentifier() != null) {
             initEntityProperties(this.getIdentifier().toString());
