@@ -3341,7 +3341,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 try {
-                    // TODO: Why do we read this separately?
                     this.loginChainData = ClientChainData.read(loginPacket);
                 } catch (ClientChainData.TooBigSkinException ex) {
                     this.close("", "disconnectionScreen.invalidSkin");
@@ -3363,13 +3362,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.version = loginChainData.getGameVersion();
 
-                // Apply username prefix for ViaProxy Java Edition clients
+                // Use verified identity data from ClientChainData (signature-validated) as the source of truth
+                String verifiedName = TextFormat.clean(loginChainData.getUsername());
+                if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
+                    verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
+                }
                 if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isBlank()) {
-                    this.unverifiedUsername = server.viaProxyUsernamePrefix + this.unverifiedUsername;
+                    verifiedName = server.viaProxyUsernamePrefix + verifiedName;
                 }
 
-                // Do not set username before the user is authenticated
-                this.username = this.unverifiedUsername;
+                this.username = verifiedName;
                 this.unverifiedUsername = null;
                 this.displayName = this.username;
                 this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
@@ -3377,22 +3379,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
 
-                this.randomClientId = loginPacket.clientId;
+                this.randomClientId = loginChainData.getClientId();
 
-                this.uuid = loginPacket.clientUUID;
+                this.uuid = loginChainData.getClientUUID();
                 this.rawUUID = Binary.writeUUID(this.uuid);
-                this.minecraftId = loginPacket.minecraftId;
+                this.minecraftId = loginChainData.getMinecraftId();
 
                 boolean valid = true;
-                int len = loginPacket.username.length();
+                String rawVerifiedName = loginChainData.getUsername();
+                int len = rawVerifiedName.length();
                 if (((len > 16 || len < 3) && !gameVersion.isNetEase())
-                        || loginPacket.username.trim().isEmpty()) {
+                        || rawVerifiedName.trim().isEmpty()) {
                     valid = false;
                 }
 
                 if (valid && !gameVersion.isNetEase()) {
                     for (int i = 0; i < len; i++) {
-                        char c = loginPacket.username.charAt(i);
+                        char c = rawVerifiedName.charAt(i);
                         if ((c >= 'a' && c <= 'z') ||
                                 (c >= 'A' && c <= 'Z') ||
                                 (c >= '0' && c <= '9') ||
