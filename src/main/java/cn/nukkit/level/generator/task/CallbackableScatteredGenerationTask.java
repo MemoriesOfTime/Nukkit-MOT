@@ -9,7 +9,7 @@ import cn.nukkit.level.generator.populator.overworld.PopulatorScatteredStructure
 import cn.nukkit.level.generator.structure.ScatteredStructurePiece;
 import cn.nukkit.scheduler.AsyncTask;
 
-public class CallbackableScatteredGenerationTask extends AsyncTask {
+public class CallbackableScatteredGenerationTask extends AsyncTask<Void> {
     private final Level world;
     private final PopulatorScatteredStructure structure;
     private final ScatteredStructurePiece piece;

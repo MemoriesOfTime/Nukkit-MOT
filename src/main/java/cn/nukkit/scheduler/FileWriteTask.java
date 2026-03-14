@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets;
  * @author MagicDroidX
  * Nukkit Project
  */
-public class FileWriteTask extends AsyncTask {
+public class FileWriteTask extends AsyncTask<Void> {
 
     private final File file;
     private final InputStream contents;
@@ -44,6 +44,11 @@ public class FileWriteTask extends AsyncTask {
     public FileWriteTask(File file, InputStream contents) {
         this.file = file;
         this.contents = contents;
+    }
+
+    @Override
+    protected boolean isVirtual() {
+        return true;
     }
 
     @Override

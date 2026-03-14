@@ -36,7 +36,7 @@ public class DebugPasteCommand extends VanillaCommand {
         return true;
     }
 
-    private static class DebugPasteTask extends AsyncTask {
+    private static class DebugPasteTask extends AsyncTask<Void> {
 
         private final Server server;
         private final CommandSender sender;
@@ -44,6 +44,11 @@ public class DebugPasteCommand extends VanillaCommand {
         public DebugPasteTask(Server server, CommandSender sender) {
             this.server = server;
             this.sender = sender;
+        }
+
+        @Override
+        protected boolean isVirtual() {
+            return true;
         }
 
         @Override

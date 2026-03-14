@@ -11,7 +11,7 @@ import javax.crypto.SecretKey;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 
-public class PrepareEncryptionTask extends AsyncTask {
+public class PrepareEncryptionTask extends AsyncTask<Void> {
 
     private final Player player;
     @Getter

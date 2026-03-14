@@ -9,13 +9,13 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 /**
  * @author Nukkit Project Team
  */
-public abstract class AsyncTask implements Runnable {
+public abstract class AsyncTask<T> implements Runnable {
 
-    public static final Queue<AsyncTask> FINISHED_LIST = new ConcurrentLinkedQueue<>();
+    public static final Queue<AsyncTask<?>> FINISHED_LIST = new ConcurrentLinkedQueue<>();
 
-    private Object result;
-    private int taskId;
-    private boolean finished = false;
+    private volatile T result;
+    private volatile int taskId;
+    private volatile boolean finished = false;
 
     @Override
     public void run() {
@@ -29,7 +29,7 @@ public abstract class AsyncTask implements Runnable {
         return this.finished;
     }
 
-    public Object getResult() {
+    public T getResult() {
         return this.result;
     }
 
@@ -37,7 +37,7 @@ public abstract class AsyncTask implements Runnable {
         return this.result != null;
     }
 
-    public void setResult(Object result) {
+    public void setResult(T result) {
         this.result = result;
     }
 
@@ -49,10 +49,20 @@ public abstract class AsyncTask implements Runnable {
         return this.taskId;
     }
 
+    /**
+     * Whether this task should run on a virtual thread.
+     * Override and return true for I/O-bound tasks (e.g., file writes, network requests).
+     */
+    protected boolean isVirtual() {
+        return false;
+    }
+
+    @Deprecated
     public Object getFromThreadStore(String identifier) {
         return this.finished ? null : ThreadStore.store.get(identifier);
     }
 
+    @Deprecated
     public void saveToThreadStore(String identifier, Object value) {
         if (!this.finished) {
             if (value == null) {
@@ -76,13 +86,13 @@ public abstract class AsyncTask implements Runnable {
     }
 
     public static void collectTask() {
-        while (!FINISHED_LIST.isEmpty()) {
-            AsyncTask task = FINISHED_LIST.poll();
+        AsyncTask<?> task;
+        while ((task = FINISHED_LIST.poll()) != null) {
             try {
                 task.onCompletion(Server.getInstance());
             } catch (Exception e) {
                 Server.getInstance().getLogger().critical("Exception while async task "
-                        + task.taskId
+                        + task.getTaskId()
                         + " invoking onCompletion", e);
             }
         }

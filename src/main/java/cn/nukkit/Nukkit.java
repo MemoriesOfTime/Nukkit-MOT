@@ -106,6 +106,16 @@ public class Nukkit {
             }
         }
 
+        // Virtual threads are not included in getAllStackTraces(),
+        Server server = Server.getInstance();
+        if (server != null) {
+            Thread consoleThread = server.getConsoleThread();
+            if (consoleThread != null && consoleThread.isAlive()) {
+                log.debug("Stopping console virtual thread...");
+                consoleThread.interrupt();
+            }
+        }
+
         ServerKiller killer = new ServerKiller(10);
         killer.start();
 

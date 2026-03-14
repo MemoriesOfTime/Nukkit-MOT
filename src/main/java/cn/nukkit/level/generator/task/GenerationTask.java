@@ -11,7 +11,7 @@ import cn.nukkit.scheduler.AsyncTask;
  * @author MagicDroidX
  * Nukkit Project
  */
-public class GenerationTask extends AsyncTask {
+public class GenerationTask extends AsyncTask<Void> {
 
     private final Level level;
     public boolean state;
