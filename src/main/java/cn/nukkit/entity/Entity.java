@@ -49,7 +49,6 @@ import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
 import static cn.nukkit.utils.Utils.dynamic;
@@ -2080,7 +2079,11 @@ public abstract class Entity extends Location implements Metadatable {
         pk.yaw = yaw;
         pk.teleport = false;
         pk.onGround = this.onGround;
-        Server.broadcastPacket(hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_7_0).collect(Collectors.toList()), pk);
+        for (Player p : hasSpawned.values()) {
+            if (p.protocol >= ProtocolInfo.v1_7_0) {
+                p.dataPacket(pk);
+            }
+        }
     }
 
     @Override

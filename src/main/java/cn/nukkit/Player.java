@@ -6253,10 +6253,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             newHealth = 0;
         }
 
+        float oldHealth = this.health;
         super.setHealth(newHealth);
 
         // HACK: solve the client-side absorption bug
-        if (this.spawned) {
+        if (this.spawned && this.health != oldHealth) {
             UpdateAttributesPacket pk = new UpdateAttributesPacket();
             pk.entries = new Attribute[]{Attribute.getAttribute(Attribute.MAX_HEALTH).setMaxValue(this.getAbsorption() % 2 != 0 ? this.getMaxHealth() + 1 : this.getMaxHealth()).setValue(this.health > 0 ? (this.health < getMaxHealth() ? this.health : getMaxHealth()) : 0)};
             pk.entityId = this.id;

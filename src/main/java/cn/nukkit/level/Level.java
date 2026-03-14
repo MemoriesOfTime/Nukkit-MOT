@@ -4495,16 +4495,6 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void addEntityMovement(Entity entity, double x, double y, double z, double yaw, double pitch, double headYaw) {
-        MoveEntityAbsolutePacket pk = new MoveEntityAbsolutePacket();
-        pk.eid = entity.getId();
-        pk.x = x;
-        pk.y = y;
-        pk.z = z;
-        pk.yaw = yaw;
-        pk.headYaw = headYaw;
-        pk.pitch = pitch;
-        pk.onGround = entity.onGround;
-
         MoveEntityDeltaPacket pk2 = new MoveEntityDeltaPacket();
         pk2.eid = entity.getId();
         if (entity.lastX != x) {
@@ -4535,8 +4525,20 @@ public class Level implements ChunkManager, Metadatable {
             pk2.flags |= MoveEntityDeltaPacket.FLAG_ON_GROUND;
         }
 
+        MoveEntityAbsolutePacket pk = null; // Lazily created for legacy clients only
         for (Player p : entity.getViewers().values()) {
             if (p.protocol < ProtocolInfo.v1_16_100) {
+                if (pk == null) {
+                    pk = new MoveEntityAbsolutePacket();
+                    pk.eid = entity.getId();
+                    pk.x = x;
+                    pk.y = y;
+                    pk.z = z;
+                    pk.yaw = yaw;
+                    pk.headYaw = headYaw;
+                    pk.pitch = pitch;
+                    pk.onGround = entity.onGround;
+                }
                 p.dataPacket(pk);
             } else {
                 p.dataPacket(pk2);
