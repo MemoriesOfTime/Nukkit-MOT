@@ -64,7 +64,7 @@ public class EntityArmorInventory extends BaseInventory {
     }
 
     public void setHelmet(Item item) {
-        this.setItem(SLOT_CHEST, item);
+        this.setItem(SLOT_HEAD, item);
     }
 
     public void setChestplate(Item item) {
