@@ -8,9 +8,7 @@ import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import cn.nukkit.utils.ChunkException;
 import io.netty.buffer.ByteBuf;
-import it.unimi.dsi.fastutil.ints.Int2IntFunction;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.IntList;
+import it.unimi.dsi.fastutil.ints.*;
 
 public class PalettedBlockStorage {
 
@@ -18,6 +16,7 @@ public class PalettedBlockStorage {
 
     protected IntList palette;
     protected BitArray bitArray;
+    private Int2IntMap paletteIndexLookup;
 
     public static PalettedBlockStorage createFromBlockPalette() {
         return createFromBlockPalette(BitArrayVersion.V2, 0);
@@ -59,11 +58,19 @@ public class PalettedBlockStorage {
         this.bitArray = version.createPalette(SIZE);
         this.palette = new IntArrayList(16);
         this.palette.add(defaultState);
+        this.paletteIndexLookup = new Int2IntOpenHashMap(16);
+        this.paletteIndexLookup.defaultReturnValue(-1);
+        this.paletteIndexLookup.put(defaultState, 0);
     }
 
     protected PalettedBlockStorage(BitArray bitArray, IntList palette) {
         this.palette = palette;
         this.bitArray = bitArray;
+        this.paletteIndexLookup = new Int2IntOpenHashMap(palette.size());
+        this.paletteIndexLookup.defaultReturnValue(-1);
+        for (int i = 0; i < palette.size(); i++) {
+            this.paletteIndexLookup.put(palette.getInt(i), i);
+        }
     }
 
     protected int getPaletteHeader(BitArrayVersion version) {
@@ -113,6 +120,7 @@ public class PalettedBlockStorage {
         BitArrayVersion version  = BitArrayVersion.get(header >> 1, true);
 
         this.palette.clear();
+        this.paletteIndexLookup.clear();
 
         int paletteSize = 1;
         if (version == BitArrayVersion.V0) {
@@ -135,6 +143,7 @@ public class PalettedBlockStorage {
         for (int i = 0; i < paletteSize; i++) {
             int runtimeId = byteBuf.readIntLE();
             this.palette.add(runtimeId);
+            this.paletteIndexLookup.put(runtimeId, i);
             if (runtimeId < 0) {
                 Server.getInstance().getLogger().warning("Invalid runtimeId: " + runtimeId + ", palette: " + palette);
             }
@@ -192,7 +201,7 @@ public class PalettedBlockStorage {
     }
 
     private int idFor(int runtimeId) {
-        int index = this.palette.indexOf(runtimeId);
+        int index = this.paletteIndexLookup.get(runtimeId);
         if (index != -1) {
             return index;
         }
@@ -206,6 +215,7 @@ public class PalettedBlockStorage {
             }
         }
         this.palette.add(runtimeId);
+        this.paletteIndexLookup.put(runtimeId, index);
         return index;
     }
 

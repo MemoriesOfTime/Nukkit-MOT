@@ -285,6 +285,7 @@ public class Level implements ChunkManager, Metadatable {
 
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
+    private final Object2ObjectMap<GameVersion, LongSet> pendingChunkRequests = new Object2ObjectOpenHashMap<>();
 
     private final Cache<Long, Boolean> entityNearbyCacheDirty = Caffeine.newBuilder()
             .maximumSize(512)
@@ -1092,7 +1093,9 @@ public class Level implements ChunkManager, Metadatable {
 
         this.levelCurrentTick++;
 
-        this.unloadChunks();
+        if (this.levelCurrentTick % 10 == 0) {
+            this.unloadChunks();
+        }
 
         this.updateQueue.tick(this.levelCurrentTick);
 
@@ -3818,6 +3821,7 @@ public class Level implements ChunkManager, Metadatable {
 
         this.getChunkSendQueue(player.getGameVersion()).computeIfAbsent(index, k ->
                 new Int2ObjectOpenHashMap<>()).put(player.getLoaderId(), player);
+        this.getPendingChunkRequests(player.getGameVersion()).add(index);
     }
 
     private void sendChunk(int x, int z, long index, DataPacket packet) {
@@ -3843,17 +3847,21 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void processChunkRequest() {
-        // Map shorted by index => requested protocols
         Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = new Long2ObjectOpenHashMap<>();
-        for (GameVersion protocolId : this.chunkSendQueues.keySet()) {
-            for (long index : this.getChunkSendQueue(protocolId).keySet()) {
-                LongSet tasks = this.getChunkSendTasks(protocolId);
-                if (tasks.contains(index)) {
-                    continue;
-                }
-                chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
-                tasks.add(index);
+        for (GameVersion protocolId : this.pendingChunkRequests.keySet()) {
+            LongSet pending = this.getPendingChunkRequests(protocolId);
+            if (pending.isEmpty()) {
+                continue;
             }
+            LongSet tasks = this.getChunkSendTasks(protocolId);
+            ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocolId);
+            for (long index : pending) {
+                if (!tasks.contains(index) && queue.containsKey(index)) {
+                    chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
+                    tasks.add(index);
+                }
+            }
+            pending.clear();
         }
 
         this.chunkRequestInternal(chunkRequests);
@@ -4497,8 +4505,6 @@ public class Level implements ChunkManager, Metadatable {
         pk.pitch = pitch;
         pk.onGround = entity.onGround;
 
-        entity.getViewers().values().stream().filter(p -> p.protocol < ProtocolInfo.v1_16_100).forEach(p -> p.dataPacket(pk));
-
         MoveEntityDeltaPacket pk2 = new MoveEntityDeltaPacket();
         pk2.eid = entity.getId();
         if (entity.lastX != x) {
@@ -4529,7 +4535,13 @@ public class Level implements ChunkManager, Metadatable {
             pk2.flags |= MoveEntityDeltaPacket.FLAG_ON_GROUND;
         }
 
-        entity.getViewers().values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_16_100).forEach(p -> p.dataPacket(pk2));
+        for (Player p : entity.getViewers().values()) {
+            if (p.protocol < ProtocolInfo.v1_16_100) {
+                p.dataPacket(pk);
+            } else {
+                p.dataPacket(pk2);
+            }
+        }
     }
 
     public boolean isRaining() {
@@ -5227,6 +5239,11 @@ public class Level implements ChunkManager, Metadatable {
     private LongSet getChunkSendTasks(GameVersion protocol) {
         GameVersion protocolId = this.getChunkProtocol(protocol);
         return this.chunkSendTasks.computeIfAbsent(protocolId, i -> new LongOpenHashSet());
+    }
+
+    private LongSet getPendingChunkRequests(GameVersion protocol) {
+        GameVersion protocolId = this.getChunkProtocol(protocol);
+        return this.pendingChunkRequests.computeIfAbsent(protocolId, i -> new LongOpenHashSet());
     }
 
     private GameVersion getChunkProtocol(GameVersion version) {
