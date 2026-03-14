@@ -7,7 +7,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public interface EntityMoveable {
 
-    String PROPERTY_STATE = "minecraft:moveable";
+    String PROPERTY_STATE = "minecraft:can_move";
 
     @Nullable
     default Boolean isMoveable() {
