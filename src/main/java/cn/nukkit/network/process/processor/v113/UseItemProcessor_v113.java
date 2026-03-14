@@ -42,7 +42,7 @@ public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacketV113
         Item item = null;
         if (useItemPacket.face >= 0 && useItemPacket.face <= 5) {
             BlockFace face = BlockFace.fromIndex(useItemPacket.face);
-            player.setDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION, false);
+            player.setUsingItem(false);
 
             if (!player.canInteract(blockVector.add(0.5, 0.5, 0.5), player.isCreative() ? 13 : 7)) {
             } else if (player.isCreative()) {
@@ -115,8 +115,7 @@ public class UseItemProcessor_v113 extends DataPacketProcessor<UseItemPacketV113
                 item.onClickAir(player, aimPos);
             }
 
-            player.setDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION, true);
-            playerHandle.setStartAction(player.getServer().getTick());
+            player.setUsingItem(true);
         }
     }
 

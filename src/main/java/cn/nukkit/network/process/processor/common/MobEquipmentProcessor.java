@@ -63,7 +63,7 @@ public class MobEquipmentProcessor extends DataPacketProcessor<MobEquipmentPacke
             ((PlayerInventory) inv).equipItem(pk.hotbarSlot);
         }
 
-        player.setDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION, false);
+        player.setUsingItem(false);
     }
 
     @Override

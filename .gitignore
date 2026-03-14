@@ -42,3 +42,4 @@ dependency-reduced-pom.xml
 *.log
 /logs
 /.gradle/
+/bin/

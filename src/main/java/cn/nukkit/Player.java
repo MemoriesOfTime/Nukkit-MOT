@@ -358,6 +358,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int lastChorusFruitTeleport = 20;
     public long lastSkinChange = -1;
     private double lastRightClickTime = 0.0;
+    private long lastClickAirTime = 0;
     private BlockVector3 lastRightClickPos = null;
     public EntityFishingHook fishing = null;
     public boolean formOpen;
@@ -447,14 +448,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return startAction;
     }
 
+    /**
+     * @deprecated use {@link #setUsingItem(boolean)} instead
+     */
+    @Deprecated(forRemoval = true)
     public void startAction() {
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, true);
-        this.startAction = this.server.getTick();
+        this.setUsingItem(true);
     }
 
+    /**
+     * @deprecated use {@link #setUsingItem(boolean)} instead
+     */
+    @Deprecated(forRemoval = true)
     public void stopAction() {
-        this.setDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION, false);
-        this.startAction = -1;
+        this.setUsingItem(false);
     }
 
     public int getLastEnderPearlThrowingTick() {
@@ -3649,8 +3656,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
+                        this.setUsingItem(false);
                     }
-                    this.setUsingItem(false);
                 }
 
                 if (authPacket.getInputData().contains(AuthInputAction.STOP_SPRINTING)) {
@@ -4801,7 +4808,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     return;
                                 }
 
-                                this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
+                                this.setUsingItem(false);
 
                                 if (!(this.distance(blockVector.asVector3()) > (this.isCreative() ? 13 : 7))) {
                                     // 创造模式或假旁观模式（未启用客户端旁观）：允许触发事件但不消耗物品
@@ -4918,10 +4925,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 // 防止右键点击空气的重复触发
                                 // Prevent duplicate triggers of right-click on air
                                 long currentClickAirTime = System.currentTimeMillis();
-                                if (!server.doNotLimitInteractions && (currentClickAirTime - lastRightClickTime) < 100) {
+                                if (!server.doNotLimitInteractions && (currentClickAirTime - lastClickAirTime) < 100) {
                                     return;
                                 }
-                                lastRightClickTime = currentClickAirTime;
+                                lastClickAirTime = currentClickAirTime;
 
                                 Vector3 directionVector = this.getDirectionVector();
 
@@ -6418,7 +6425,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.level.dropItem(this.add(0, 1.3, 0), item, motion, 40);
 
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
+        this.setUsingItem(false);
         return true;
     }
 
@@ -6440,7 +6447,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         Vector3 motion = this.getDirectionVector().multiply(0.4);
 
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
+        this.setUsingItem(false);
 
         return this.level.dropAndGetItem(this.add(0, 1.3, 0), item, motion, 40);
     }
