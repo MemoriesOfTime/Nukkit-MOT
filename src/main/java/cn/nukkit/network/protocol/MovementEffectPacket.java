@@ -37,6 +37,7 @@ public class MovementEffectPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         this.putUnsignedVarLong(this.targetRuntimeID);
         this.putUnsignedVarInt(this.effectType.getId());
         this.putUnsignedVarInt(this.effectDuration);

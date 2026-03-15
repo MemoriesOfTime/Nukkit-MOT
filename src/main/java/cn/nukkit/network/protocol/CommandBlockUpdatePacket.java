@@ -16,13 +16,13 @@ public class CommandBlockUpdatePacket extends DataPacket {
     public boolean isRedstoneMode;
     public boolean isConditional;
     public long minecartEid;
-    public String command;
-    public String lastOutput;
-    public String name;
+    public String command = "";
+    public String lastOutput = "";
+    public String name = "";
     /**
      * @since v776 1.21.60
      */
-    private String filteredName;
+    public String filteredName = "";
     public boolean shouldTrackOutput;
     public int tickDelay;
     public boolean executingOnFirstTick;
