@@ -4096,6 +4096,10 @@ public class Level implements ChunkManager, Metadatable {
             }
         }
 
+        if (chunk.getProvider() == null) {
+            return false;
+        }
+
         ChunkUnloadEvent ev = new ChunkUnloadEvent(chunk);
         this.server.getPluginManager().callEvent(ev);
         if (ev.isCancelled()) {
