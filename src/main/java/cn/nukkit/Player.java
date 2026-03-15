@@ -3604,6 +3604,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (this.teleportPosition != null) {
+                    if (this.lastTeleportTick != -1
+                            && authPacket.getInputData().contains(AuthInputAction.HANDLE_TELEPORT)) {
+                        this.lastTeleportTick = -1;
+                    }
                     return;
                 }
 
