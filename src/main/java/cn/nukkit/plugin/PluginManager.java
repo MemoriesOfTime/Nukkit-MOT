@@ -44,6 +44,11 @@ public class PluginManager {
 
     protected final Map<String, PluginLoader> fileAssociations = new HashMap<>();
 
+    /**
+     * Cache: Event class -> HandlerList, avoiding repeated reflection lookups.
+     */
+    private final Map<Class<? extends Event>, HandlerList> handlerListCache = new ConcurrentHashMap<>();
+
     public PluginManager(Server server, SimpleCommandMap commandMap) {
         this.server = server;
         this.commandMap = commandMap;
@@ -516,6 +521,7 @@ public class PluginManager {
         this.permissions.clear();
         this.defaultPerms.clear();
         this.defaultPermsOp.clear();
+        this.handlerListCache.clear();
     }
 
     public void callEvent(Event event) {
@@ -599,10 +605,16 @@ public class PluginManager {
     }
 
     private HandlerList getEventListeners(Class<? extends Event> type) throws IllegalAccessException {
+        HandlerList cached = handlerListCache.get(type);
+        if (cached != null) {
+            return cached;
+        }
         try {
             Method method = getRegistrationClass(type).getDeclaredMethod("getHandlers");
             method.setAccessible(true);
-            return (HandlerList) method.invoke(null);
+            HandlerList handlerList = (HandlerList) method.invoke(null);
+            handlerListCache.put(type, handlerList);
+            return handlerList;
         } catch (NullPointerException e) {
             throw new IllegalArgumentException("getHandlers method in " + type.getName() + " was not static!");
         } catch (Exception e) {
