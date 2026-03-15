@@ -1450,6 +1450,9 @@ public class Level implements ChunkManager, Metadatable {
         boolean blockTest = true;
 
         if (!chunkTickList.isEmpty()) {
+            final boolean doRandomTick = this.randomTickingEnabled();
+            final int randomTickSpeed = doRandomTick ? gameRules.getInteger(GameRule.RANDOM_TICK_SPEED) : 0;
+
             ObjectIterator<Long2IntMap.Entry> iter = chunkTickList.long2IntEntrySet().iterator();
             while (iter.hasNext()) {
                 Long2IntMap.Entry entry = iter.next();
@@ -1477,8 +1480,7 @@ public class Level implements ChunkManager, Metadatable {
                     entity.scheduleUpdate();
                 }
 
-                if (this.randomTickingEnabled()) {
-                    final int randomTickSpeed = gameRules.getInteger(GameRule.RANDOM_TICK_SPEED);
+                if (doRandomTick && randomTickSpeed > 0) {
                     if (this.useSections) {
                         for (ChunkSection section : ((Chunk) chunk).getSections()) {
                             if (!(section instanceof EmptyChunkSection)) {
@@ -1489,9 +1491,10 @@ public class Level implements ChunkManager, Metadatable {
                                     int z = n >> 8 & 0xF;
                                     int y = n >> 16 & 0xF;
 
-                                    int blockId = section.getBlockId(x, y, z);
+                                    int fullBlock = section.getFullBlock(x, y, z);
+                                    int blockId = fullBlock >> Block.DATA_BITS;
                                     if (blockId >= 0 && blockId <= Block.MAX_BLOCK_ID && randomTickBlocks[blockId]) {
-                                        Block block = Block.get(blockId, section.getBlockData(x, y, z), this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
+                                        Block block = Block.get(fullBlock, this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
                                         block.onUpdate(BLOCK_UPDATE_RANDOM);
                                     }
                                 }
