@@ -6257,7 +6257,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
             newHealth = 0;
         }
 
-        float oldHealth = this.health;
         super.setHealth(newHealth);
 
         // HACK: solve the client-side absorption bug
