@@ -66,7 +66,7 @@
         <dependency>
             <groupId>org.cloudburstmc.netty</groupId>
             <artifactId>netty-transport-raknet</artifactId>
-            <version>1.0.0.CR3-20260303.150721-27</version>
+            <version>1.0.0.CR3-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -90,7 +90,7 @@
         <dependency>
             <groupId>org.cloudburstmc.protocol</groupId>
             <artifactId>common</artifactId>
-            <version>3.0.0.Beta7-20250812.232642-18</version>
+            <version>3.0.0.Beta12-20260313.231142-8</version>
             <scope>compile</scope>
             <exclusions>
                 <exclusion>
@@ -406,6 +406,30 @@
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
             <version>5.11.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.cloudburstmc.protocol</groupId>
+            <artifactId>bedrock-codec</artifactId>
+            <version>3.0.0.Beta12-20260313.231142-8</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.netty</groupId>
+                    <artifactId>netty-buffer</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.cloudburstmc.math</groupId>
+            <artifactId>immutable</artifactId>
+            <version>2.0-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.allaymc</groupId>
+            <artifactId>protocol-extension</artifactId>
+            <version>0.1.6</version>
             <scope>test</scope>
         </dependency>
         <!-- Test -->

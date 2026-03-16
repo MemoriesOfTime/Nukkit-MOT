@@ -210,6 +210,7 @@ public class BiomeDefinitionListPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override

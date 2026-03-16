@@ -20,7 +20,7 @@ public class DropItemPacketV113 extends DataPacket_v113 {
 
     @Override
     public void encode() {
-
+        this.encodeUnsupported();
     }
 
     @Override

@@ -17,7 +17,7 @@ public class RemoveObjectivePacket extends DataPacket {
 
     @Override
     public void decode() {
-        //only server -> client
+        this.decodeUnsupported();
     }
 
     @Override

@@ -32,7 +32,7 @@ public class MovementEffectPacket extends DataPacket {
 
     @Override
     public void decode() {
-        //packet is client bounded
+        this.decodeUnsupported();
     }
 
     @Override

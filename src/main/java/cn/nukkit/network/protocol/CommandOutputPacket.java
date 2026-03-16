@@ -8,7 +8,6 @@ import lombok.ToString;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Predicate;
 
 @ToString
 public class CommandOutputPacket extends DataPacket {
@@ -27,7 +26,7 @@ public class CommandOutputPacket extends DataPacket {
 
     @Override
     public void decode() {
-        //non
+        this.decodeUnsupported();
     }
 
     @Override
