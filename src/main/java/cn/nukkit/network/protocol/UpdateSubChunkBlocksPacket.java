@@ -36,6 +36,7 @@ public class UpdateSubChunkBlocksPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         putVarInt(chunkX);
         putUnsignedVarInt(chunkY);
         putVarInt(chunkZ);

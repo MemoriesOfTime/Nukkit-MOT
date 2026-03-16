@@ -47,7 +47,7 @@ public class DropItemProcessor_v113 extends DataPacketProcessor<DropItemPacketV1
 
         player.level.dropItem(player.add(0, 1.3, 0), item, motion, 40);
 
-        player.stopAction();
+        player.setUsingItem(false);
     }
 
     @Override

@@ -19,6 +19,7 @@ public class AwardAchievementPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         this.putLInt(achievementId);
     }
 

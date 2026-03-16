@@ -24,6 +24,6 @@ public class SimpleEventPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putShort(this.eventType);
+        this.putLShort(this.eventType);
     }
 }
