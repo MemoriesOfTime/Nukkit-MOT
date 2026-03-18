@@ -18,7 +18,7 @@ public class ModalFormResponsePacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.formId = this.getVarInt();
+        this.formId = (int) this.getUnsignedVarInt();
         if (this.protocol >= ProtocolInfo.v1_19_20) {
             if (this.getBoolean()) {
                 this.data = this.getString();
@@ -33,5 +33,6 @@ public class ModalFormResponsePacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.encodeUnsupported();
     }
 }

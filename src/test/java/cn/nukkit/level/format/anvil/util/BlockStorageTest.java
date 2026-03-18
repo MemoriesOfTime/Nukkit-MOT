@@ -1,20 +1,52 @@
 package cn.nukkit.level.format.anvil.util;
 
+import cn.nukkit.GameVersion;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import cn.nukkit.block.BlockID;
+import cn.nukkit.level.BlockPalette;
+import cn.nukkit.level.GlobalBlockPalette;
+import cn.nukkit.level.util.PalettedBlockStorage;
+import cn.nukkit.utils.BinaryStream;
+import org.junit.jupiter.api.*;
 
+import java.lang.reflect.Field;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 public class BlockStorageTest {
 
+    private static Server originalServer;
     private BlockStorage storage;
+    private boolean originalUseHashedBlockNetworkIds;
+
+    @BeforeAll
+    static void initServer() throws Exception {
+        Field instanceField = Server.class.getDeclaredField("instance");
+        instanceField.setAccessible(true);
+        originalServer = (Server) instanceField.get(null);
+        instanceField.set(null, mock(Server.class));
+    }
+
+    @AfterAll
+    static void restoreServer() throws Exception {
+        Field instanceField = Server.class.getDeclaredField("instance");
+        instanceField.setAccessible(true);
+        instanceField.set(null, originalServer);
+    }
 
     @BeforeEach
     void setup() {
         storage = new BlockStorage();
+        originalUseHashedBlockNetworkIds = GlobalBlockPalette.useHashedBlockNetworkIds();
+        GlobalBlockPalette.setUseHashedBlockNetworkIds(false);
+    }
+
+    @AfterEach
+    void tearDown() {
+        GlobalBlockPalette.setUseHashedBlockNetworkIds(originalUseHashedBlockNetworkIds);
     }
 
     @Test
@@ -150,5 +182,106 @@ public class BlockStorageTest {
         assertEquals(0, storage.getBlockData(1, 1, 1));
         assertEquals(0, storage.getHyperDataA(1, 1, 1));
         assertEquals(0, storage.getHyperDataB(1, 1, 1));
+    }
+
+    @Test
+    void testNibbleArrayUncheckedMatchesCheckedAccess() {
+        NibbleArray nibbleArray = new NibbleArray(16);
+
+        for (int i = 0; i < 16; i++) {
+            nibbleArray.set(i, (byte) (i & 0xf));
+        }
+
+        for (int i = 0; i < 16; i++) {
+            assertEquals(nibbleArray.get(i), nibbleArray.getUnchecked(i));
+        }
+    }
+
+    @Test
+    void testPaletteFullIdLookupsMatchLegacyLookups() {
+        assertPaletteLookupsMatch(GameVersion.V1_16_100, BlockID.AIR, 0);
+        assertPaletteLookupsMatch(GameVersion.V1_16_100, BlockID.PLANKS, 2);
+        assertPaletteLookupsMatch(GameVersion.V1_16_100, BlockID.WOOL, 14);
+
+        assertPaletteLookupsMatch(GameVersion.V1_19_80, BlockID.AIR, 0);
+        assertPaletteLookupsMatch(GameVersion.V1_19_80, BlockID.PLANKS, 2);
+        assertPaletteLookupsMatch(GameVersion.V1_19_80, BlockID.WOOL, 14);
+    }
+
+    @Test
+    void testWriteToUsesRuntimeIdsForModernProtocols() {
+        GameVersion gameVersion = GameVersion.V1_16_100;
+        BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
+
+        storage.setBlock(0, 1, 0, BlockID.PLANKS, 2);
+        storage.setBlock(0, 2, 0, BlockID.WOOL, 14);
+
+        byte[] actual = serialize(storage, gameVersion, false);
+        byte[] expected = serializeExpected(gameVersion, paletted -> {
+            paletted.setBlock(0, 1, 0, palette.getRuntimeId(BlockID.PLANKS, 2));
+            paletted.setBlock(0, 2, 0, palette.getRuntimeId(BlockID.WOOL, 14));
+        });
+
+        assertArrayEquals(expected, actual);
+    }
+
+    @Test
+    void testWriteToUsesHashIdsWhenEnabled() {
+        GameVersion gameVersion = GameVersion.V1_19_80;
+        BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
+        GlobalBlockPalette.setUseHashedBlockNetworkIds(true);
+
+        storage.setBlock(0, 1, 0, BlockID.PLANKS, 2);
+        storage.setBlock(0, 2, 0, BlockID.WOOL, 14);
+
+        byte[] actual = serialize(storage, gameVersion, false);
+        byte[] expected = serializeExpected(gameVersion, paletted -> {
+            paletted.setBlock(0, 1, 0, palette.getHashId(BlockID.PLANKS, 2));
+            paletted.setBlock(0, 2, 0, palette.getHashId(BlockID.WOOL, 14));
+        });
+
+        assertArrayEquals(expected, actual);
+    }
+
+    @Test
+    void testWriteToModernProtocolAppliesAntiXray() {
+        GameVersion gameVersion = GameVersion.V1_16_100;
+        BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
+
+        storage.setBlock(0, 1, 0, BlockID.DIAMOND_ORE, 0);
+
+        byte[] actual = serialize(storage, gameVersion, true);
+        byte[] expected = serializeExpected(gameVersion, paletted ->
+                paletted.setBlock(0, 1, 0, palette.getRuntimeId(BlockID.STONE, 0)));
+
+        assertArrayEquals(expected, actual);
+    }
+
+    private void assertPaletteLookupsMatch(GameVersion gameVersion, int id, int meta) {
+        BlockPalette palette = GlobalBlockPalette.getPaletteByProtocol(gameVersion);
+        int fullId = (id << Block.DATA_BITS) | meta;
+
+        assertEquals(palette.getRuntimeId(id, meta), palette.getRuntimeIdByFullId(fullId));
+        assertEquals(palette.getHashId(id, meta), palette.getHashIdByFullId(fullId));
+    }
+
+    private byte[] serialize(BlockStorage blockStorage, GameVersion gameVersion, boolean antiXray) {
+        BinaryStream stream = new BinaryStream();
+        blockStorage.writeTo(gameVersion, stream, antiXray);
+        return stream.getBuffer();
+    }
+
+    private byte[] serializeExpected(GameVersion gameVersion, StorageConfigurer configurer) {
+        PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(gameVersion);
+        configurer.configure(palettedBlockStorage);
+
+        BinaryStream stream = new BinaryStream();
+        palettedBlockStorage.writeTo(stream);
+        return stream.getBuffer();
+    }
+
+    @FunctionalInterface
+    private interface StorageConfigurer {
+        void configure(PalettedBlockStorage storage);
     }
 }

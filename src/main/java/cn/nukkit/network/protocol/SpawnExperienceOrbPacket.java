@@ -14,13 +14,14 @@ public class SpawnExperienceOrbPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
     public void encode() {
         this.reset();
         this.putVector3f(this.x, this.y, this.z);
-        this.putUnsignedVarInt(this.amount);
+        this.putVarInt(this.amount);
     }
 
     @Override

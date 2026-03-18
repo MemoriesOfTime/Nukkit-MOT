@@ -37,6 +37,7 @@ public class LevelChunkPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
@@ -55,7 +56,7 @@ public class LevelChunkPacket extends DataPacket {
                     this.putUnsignedVarInt(-1);
                 } else {
                     this.putUnsignedVarInt(-2);
-                    this.putUnsignedVarInt(this.subChunkLimit);
+                    this.putLShort(this.subChunkLimit);
                 }
             }else {
                 this.putUnsignedVarInt(this.subChunkCount);

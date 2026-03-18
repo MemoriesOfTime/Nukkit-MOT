@@ -49,6 +49,7 @@ public class ResourcePacksInfoPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override

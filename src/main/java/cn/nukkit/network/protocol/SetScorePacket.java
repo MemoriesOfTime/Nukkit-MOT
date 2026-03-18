@@ -19,7 +19,7 @@ public class SetScorePacket extends DataPacket {
 
     @Override
     public void decode() {
-        //only server -> client
+        this.decodeUnsupported();
     }
 
     @Override

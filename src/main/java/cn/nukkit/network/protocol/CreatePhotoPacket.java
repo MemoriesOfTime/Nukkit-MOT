@@ -13,12 +13,24 @@ public class CreatePhotoPacket extends DataPacket {
         return actorUniqueId;
     }
 
+    public void setActorUniqueId(long actorUniqueId) {
+        this.actorUniqueId = actorUniqueId;
+    }
+
     public String getPhotoItemName() {
         return photoItemName;
     }
 
+    public void setPhotoItemName(String photoItemName) {
+        this.photoItemName = photoItemName;
+    }
+
     public String getPhotoName() {
         return photoName;
+    }
+
+    public void setPhotoName(String photoName) {
+        this.photoName = photoName;
     }
 
     @Override
@@ -35,6 +47,7 @@ public class CreatePhotoPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.reset();
         this.putLLong(this.actorUniqueId);
         this.putString(this.photoName);
         this.putString(this.photoItemName);

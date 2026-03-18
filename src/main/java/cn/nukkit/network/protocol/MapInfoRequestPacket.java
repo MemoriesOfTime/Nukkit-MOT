@@ -44,6 +44,7 @@ public class MapInfoRequestPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.encodeUnsupported();
     }
 
     public static class MapPixel {
