@@ -493,7 +493,6 @@ public class Item implements Cloneable, BlockID, ItemID, ItemNamespaceId, Protoc
             registerNamespacedIdItem(ItemBootsCopper.class);
             registerNamespacedIdItem(ItemNuggetCopper.class);
 
-            registerNamespacedIdItem(ItemSpawnEggHappyGhast.class);
             registerNamespacedIdItem(ItemHarnessWhite.class);
             registerNamespacedIdItem(ItemHarnessLightGray.class);
             registerNamespacedIdItem(ItemHarnessGray.class);
