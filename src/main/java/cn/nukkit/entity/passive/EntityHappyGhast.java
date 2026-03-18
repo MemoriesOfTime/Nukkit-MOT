@@ -17,16 +17,7 @@ import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
-import cn.nukkit.network.protocol.AddEntityPacket;
-import cn.nukkit.network.protocol.DataPacket;
-import cn.nukkit.network.protocol.types.EntityLink;
 import cn.nukkit.utils.Utils;
-
-import java.util.ArrayList;
-import java.util.Objects;
-
-import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_PASSENGER;
-import static cn.nukkit.network.protocol.SetEntityLinkPacket.TYPE_RIDE;
 
 public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHolder, EntityRideable, EntityControllable, EntityMoveable {
 
@@ -108,8 +99,8 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
 
     @Override
     public boolean onInteract(Player player, Item item, Vector3 clickedPos) {
-        if (item.getNamespaceId().equals("minecraft:name_tag") && !player.isAdventure()) {
-            return applyNameTag(player, item);
+        if (super.onInteract(player, item, clickedPos)) {
+            return true;
         }
 
         if (item instanceof ItemHarness harness) {
@@ -120,7 +111,7 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
                 }
                 this.armorInventory.setBody(harnessEquipped);
                 player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
-                this.armorInventory.sendContents(player);
+                this.armorInventory.sendContents(this.getViewers().values());
             }
             return true;
         }
@@ -134,14 +125,15 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
                     this.getLevel().dropItem(clickedPos, body);
                 }
                 this.armorInventory.setBody(Item.AIR_ITEM);
-                this.armorInventory.sendContents(player);
+                this.armorInventory.sendContents(this.getViewers().values());
+                player.getInventory().getItemInHand().setDamage(item.getDamage() + 1);
             }
             return true;
         }
 
         this.mountEntity(player);
 
-        return super.onInteract(player, item, clickedPos);
+        return false;
     }
 
     @Override
@@ -165,81 +157,7 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
     }
 
     @Override
-    public void updatePassengers() {
-        if (this.passengers.isEmpty()) {
-            return;
-        }
-
-        for (Entity passenger : new ArrayList<>(this.passengers)) {
-            if (!passenger.isAlive() || (this.getNetworkId() != EntitySkeletonHorse.NETWORK_ID && this.isInsideOfWater())) {
-                this.dismountEntity(passenger);
-                continue;
-            }
-            this.updatePassengerPosition(passenger);
-        }
-    }
-
-    @Override
-    public boolean mountEntity(Entity entity, byte mode) {
-        Objects.requireNonNull(entity, "The target of the mounting entity can't be null");
-
-        if (entity.riding != null) {
-            this.dismountEntity(entity);
-            this.motionX = 0;
-            this.motionZ = 0;
-            this.stayTime = 20;
-        } else {
-            if (entity instanceof Player && ((Player) entity).isSleeping()) {
-                return false;
-            }
-
-            if (this.isPassenger(entity)) {
-                return false;
-            }
-
-            this.broadcastLinkPacket(entity, TYPE_RIDE);
-
-            entity.riding = this;
-            entity.setDataFlag(DATA_FLAGS, DATA_FLAG_RIDING, true);
-            this.passengers.add(entity);
-
-            entity.setSeatPosition(getMountedOffset(entity));
-            updatePassengerPosition(entity);
-        }
-
-        return true;
-    }
-
-    @Override
     public Vector3f getMountedOffset(Entity entity) {
         return new Vector3f(0, 5.22f, 0);
-    }
-
-    @Override
-    protected DataPacket createAddEntityPacket() {
-        AddEntityPacket addEntity = new AddEntityPacket();
-        addEntity.type = 0;
-        addEntity.id = "minecraft:happy_ghast";
-        addEntity.entityUniqueId = this.getId();
-        addEntity.entityRuntimeId = this.getId();
-        addEntity.yaw = (float) this.yaw;
-        addEntity.headYaw = (float) this.yaw;
-        addEntity.pitch = (float) this.pitch;
-        addEntity.x = (float) this.x;
-        addEntity.y = (float) this.y + getBaseOffset();
-        addEntity.z = (float) this.z;
-        addEntity.speedX = (float) this.motionX;
-        addEntity.speedY = (float) this.motionY;
-        addEntity.speedZ = (float) this.motionZ;
-        addEntity.metadata = this.dataProperties.clone();
-
-        addEntity.links = new EntityLink[this.passengers.size()];
-        for (int i = 0; i < addEntity.links.length; i++) {
-            addEntity.links[i] = new EntityLink(this.getId(), this.passengers.get(i).getId(), i == 0 ? EntityLink.TYPE_RIDER : TYPE_PASSENGER, false, false, 0f);
-        }
-
-        addEntity.properties = propertySyncData();
-
-        return addEntity;
     }
 }
