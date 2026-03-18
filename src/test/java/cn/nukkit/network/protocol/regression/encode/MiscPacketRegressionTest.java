@@ -8,6 +8,7 @@ import cn.nukkit.network.protocol.*;
 import cn.nukkit.network.protocol.regression.AbstractPacketRegressionTest;
 import cn.nukkit.network.protocol.types.MovementEffectType;
 import cn.nukkit.network.protocol.types.ServerAuthMovementMode;
+import cn.nukkit.utils.BinaryStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -441,12 +442,48 @@ public class MiscPacketRegressionTest extends AbstractPacketRegressionTest {
     }
 
     // ==================== EventPacket ====================
-    // EventPacket encode is minimal (only 3 fields) while CB Protocol
-    // expects event-type-specific data. Skipped for now.
+
+    @ParameterizedTest(name = "EventPacket v{0}")
+    @MethodSource("allVersions")
+    void testEventPacket(int protocolVersion) {
+        var nukkitPacket = new EventPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.eid = 123456789L;
+        nukkitPacket.unknown1 = 42;
+        nukkitPacket.unknown2 = (byte) EventPacket.TYPE_BELL_BLOCK_USED;
+        nukkitPacket.encode();
+
+        var stream = new BinaryStream(nukkitPacket.getBuffer());
+        stream.getUnsignedVarInt();
+
+        assertEquals(123456789L, stream.getVarLong());
+        assertEquals(42, stream.getVarInt());
+        assertEquals((byte) EventPacket.TYPE_BELL_BLOCK_USED, stream.getByte());
+        assertEquals(0, stream.readableBytes());
+    }
 
     // ==================== LevelEventGenericPacket ====================
-    // LevelEventGenericPacket uses Nukkit's NBTIO format which differs from
-    // CB Protocol's NbtMap format in deserialization. Skipped for now.
+
+    @ParameterizedTest(name = "LevelEventGenericPacket v{0}")
+    @MethodSource("versionsFrom388")
+    void testLevelEventGenericPacket(int protocolVersion) {
+        var nukkitPacket = new LevelEventGenericPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.eventId = 17;
+        nukkitPacket.tag = new CompoundTag("")
+                .putString("name", "test")
+                .putInt("value", 7);
+        nukkitPacket.encode();
+
+        var stream = new BinaryStream(nukkitPacket.getBuffer());
+        stream.getUnsignedVarInt();
+
+        assertEquals(17, stream.getVarInt());
+        var decodedTag = stream.getTagNetworkLE();
+        assertEquals("test", decodedTag.getString("name"));
+        assertEquals(7, decodedTag.getInt("value"));
+        assertEquals(0, stream.readableBytes());
+    }
 
     // ==================== AddVolumeEntityPacket ====================
 

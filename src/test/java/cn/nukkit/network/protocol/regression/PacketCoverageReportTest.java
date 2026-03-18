@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Generates a coverage report showing which DataPacket subclasses
- * have cross-decode regression tests and which do not.
+ * have encode and decode regression tests.
  * <p>
  * Automatically detects tested packets from {@code @ParameterizedTest} annotations
  * and testable packets from CB Protocol codec registrations. No manual maintenance required.
@@ -73,77 +73,62 @@ public class PacketCoverageReportTest {
             }
         }
 
-        // 3. Auto-detect tested packets from @ParameterizedTest annotations
-        Set<String> testedPackets = scanTestedPacketsFromAnnotations(standardPacketNames);
+        // 3. Auto-detect tested packets from @ParameterizedTest annotations (split by direction)
+        Set<String> encodeTestedPackets = scanTestedPacketsFromAnnotations(
+                standardPacketNames, "cn.nukkit.network.protocol.regression.encode");
+        Set<String> decodeTestedPackets = scanTestedPacketsFromAnnotations(
+                standardPacketNames, "cn.nukkit.network.protocol.regression.decode");
 
-        // 4. Detect encode-not-applicable packets (empty encode or throws exception)
+        // 4. Detect not-applicable packets per direction
         Map<String, Class<?>> classLookup = new HashMap<>();
         for (Class<?> cls : allPacketClasses) {
             classLookup.put(cls.getSimpleName(), cls);
         }
         Set<String> encodeNotApplicable = detectEncodeNotApplicable(testablePackets, classLookup);
+        Set<String> decodeNotApplicable = detectDecodeNotApplicable(testablePackets, classLookup);
 
-        // 5. Classify
-        List<String> tested = new ArrayList<>();
-        List<String> testableUntested = new ArrayList<>();
-        List<String> notTestable = new ArrayList<>();
-        List<String> encodeNA = new ArrayList<>(encodeNotApplicable);
-        Collections.sort(encodeNA);
+        // Packets with encodeUnsupported = pure client-to-server: decode tests are highest priority.
+        // Packets with decodeUnsupported = pure server-to-client: decode tests are not needed.
+        // encodeNotApplicable ∩ testablePackets = client-to-server subset (priority for decode).
+        Set<String> clientToServerPackets = new TreeSet<>(testablePackets);
+        clientToServerPackets.retainAll(encodeNotApplicable);
 
-        // Effective testable = testable minus encode-not-applicable
-        Set<String> effectiveTestable = new TreeSet<>(testablePackets);
-        effectiveTestable.removeAll(encodeNotApplicable);
-
-        for (String name : standardPacketNames) {
-            if (testedPackets.contains(name)) {
-                tested.add(name);
-            } else if (encodeNotApplicable.contains(name)) {
-                // already in encodeNA list
-            } else if (testablePackets.contains(name)) {
-                testableUntested.add(name);
-            } else {
-                notTestable.add(name);
-            }
-        }
-
-        // 6. Build report
-        int total = standardPacketNames.size();
-        int testedCount = tested.size();
-        int effectiveTestableCount = effectiveTestable.size();
-        int rawTestableCount = testablePackets.size();
-        double overallPct = total == 0 ? 0 : (testedCount * 100.0 / total);
-        double testablePct = effectiveTestableCount == 0 ? 0 : (testedCount * 100.0 / effectiveTestableCount);
-
+        // 5. Build report
         StringBuilder sb = new StringBuilder();
         sb.append("\n=== Packet Regression Test Coverage Report ===\n");
-        sb.append(String.format("Overall:  %d / %d (%.1f%%)\n", testedCount, total, overallPct));
-        sb.append(String.format("Testable: %d / %d (%.1f%%)  [packets with CB counterpart and functional encode()]\n",
-                testedCount, effectiveTestableCount, testablePct));
-        sb.append(String.format("  (Raw CB counterpart count: %d, encode-not-applicable: %d)\n",
-                rawTestableCount, encodeNotApplicable.size()));
+        sb.append(String.format("Total standard packets: %d  |  CB counterpart: %d\n",
+                standardPacketNames.size(), testablePackets.size()));
 
-        sb.append(String.format("\nTESTED (%d):\n", testedCount));
-        for (String name : tested) {
-            sb.append("  ").append(name).append('\n');
+        // --- Encode section ---
+        buildDirectionReport(sb, "ENCODE", "NK encode → CB decode",
+                standardPacketNames, testablePackets,
+                encodeTestedPackets, encodeNotApplicable);
+
+        // --- Decode section ---
+        buildDirectionReport(sb, "DECODE", "CB encode → NK decode",
+                standardPacketNames, testablePackets,
+                decodeTestedPackets, decodeNotApplicable);
+
+        // --- Decode priority focus: client-to-server packets ---
+        buildDecodeClientToServerReport(sb, clientToServerPackets, decodeTestedPackets, decodeNotApplicable);
+
+        // --- Combined per-packet matrix ---
+        sb.append("\n--- Per-Packet Status Matrix ---\n");
+        sb.append(String.format("  %-50s  %-10s  %-12s  %-5s  %s\n",
+                "Packet", "Encode", "Decode", "CB?", "Direction"));
+        sb.append(String.format("  %-50s  %-10s  %-12s  %-5s  %s\n",
+                "-".repeat(50), "-".repeat(10), "-".repeat(12), "-----", "---------"));
+
+        for (String name : standardPacketNames) {
+            boolean hasCb = testablePackets.contains(name);
+            String encStatus = getStatus(name, hasCb, encodeTestedPackets, encodeNotApplicable);
+            String decStatus = getStatus(name, hasCb, decodeTestedPackets, decodeNotApplicable);
+            String direction = getDirection(name, encodeNotApplicable, decodeNotApplicable, hasCb);
+            sb.append(String.format("  %-50s  %-10s  %-12s  %-5s  %s\n",
+                    name, encStatus, decStatus, hasCb ? "Y" : "N", direction));
         }
 
-        sb.append(String.format("\nTESTABLE BUT UNTESTED (%d):\n", testableUntested.size()));
-        for (String name : testableUntested) {
-            sb.append("  ").append(name).append('\n');
-        }
-
-        if (!encodeNA.isEmpty()) {
-            sb.append(String.format("\nENCODE NOT APPLICABLE (%d):\n", encodeNA.size()));
-            for (String name : encodeNA) {
-                sb.append("  ").append(name).append('\n');
-            }
-        }
-
-        sb.append(String.format("\nNO CB COUNTERPART (%d):\n", notTestable.size()));
-        for (String name : notTestable) {
-            sb.append("  ").append(name).append('\n');
-        }
-
+        // --- Legacy v113 ---
         if (!legacyV113Packets.isEmpty()) {
             sb.append(String.format("\nLEGACY v113 PACKETS (excluded, %d):\n", legacyV113Packets.size()));
             for (String name : legacyV113Packets) {
@@ -154,6 +139,131 @@ public class PacketCoverageReportTest {
         sb.append("=== End of Report ===\n");
 
         System.out.println(sb);
+    }
+
+    /**
+     * Builds a coverage section for one direction (encode or decode).
+     */
+    private static void buildDirectionReport(StringBuilder sb, String direction, String description,
+                                             Set<String> allPackets, Set<String> testablePackets,
+                                             Set<String> testedPackets, Set<String> notApplicable) {
+        Set<String> effectiveTestable = new TreeSet<>(testablePackets);
+        effectiveTestable.removeAll(notApplicable);
+
+        int testedCount = testedPackets.size();
+        int effectiveTestableCount = effectiveTestable.size();
+        double overallPct = allPackets.isEmpty() ? 0 : (testedCount * 100.0 / allPackets.size());
+        double testablePct = effectiveTestableCount == 0 ? 0 : (testedCount * 100.0 / effectiveTestableCount);
+
+        sb.append(String.format("\n--- %s (%s) ---\n", direction, description));
+        sb.append(String.format("Overall:  %d / %d (%.1f%%)\n", testedCount, allPackets.size(), overallPct));
+        sb.append(String.format("Testable: %d / %d (%.1f%%)  [CB counterpart + functional %s()]\n",
+                testedCount, effectiveTestableCount, testablePct, direction.toLowerCase()));
+        sb.append(String.format("  (CB counterpart: %d, %s-not-applicable: %d)\n",
+                testablePackets.size(), direction.toLowerCase(), notApplicable.size()));
+
+        List<String> tested = new ArrayList<>();
+        List<String> testableUntested = new ArrayList<>();
+        List<String> naList = new ArrayList<>(notApplicable);
+        Collections.sort(naList);
+
+        for (String name : allPackets) {
+            if (testedPackets.contains(name)) {
+                tested.add(name);
+            } else if (effectiveTestable.contains(name)) {
+                testableUntested.add(name);
+            }
+        }
+
+        sb.append(String.format("\n  TESTED (%d):\n", tested.size()));
+        for (String name : tested) {
+            sb.append("    ").append(name).append('\n');
+        }
+
+        sb.append(String.format("\n  TESTABLE BUT UNTESTED (%d):\n", testableUntested.size()));
+        for (String name : testableUntested) {
+            sb.append("    ").append(name).append('\n');
+        }
+
+        if (!naList.isEmpty()) {
+            sb.append(String.format("\n  NOT APPLICABLE (%d):\n", naList.size()));
+            for (String name : naList) {
+                sb.append("    ").append(name).append('\n');
+            }
+        }
+    }
+
+    /**
+     * Builds a focused report on client-to-server decode coverage.
+     * These packets (where encode is N/A) are the highest priority for decode tests.
+     */
+    private static void buildDecodeClientToServerReport(StringBuilder sb,
+                                                        Set<String> clientToServerPackets,
+                                                        Set<String> decodeTestedPackets,
+                                                        Set<String> decodeNotApplicable) {
+        // Among client-to-server packets, those with working decode() are priority
+        Set<String> priorityTestable = new TreeSet<>(clientToServerPackets);
+        priorityTestable.removeAll(decodeNotApplicable);
+
+        List<String> tested = new ArrayList<>();
+        List<String> untested = new ArrayList<>();
+        for (String name : priorityTestable) {
+            if (decodeTestedPackets.contains(name)) {
+                tested.add(name);
+            } else {
+                untested.add(name);
+            }
+        }
+
+        double pct = priorityTestable.isEmpty() ? 0 : (tested.size() * 100.0 / priorityTestable.size());
+        sb.append("\n--- DECODE PRIORITY: Client→Server packets (encode=N/A) ---\n");
+        sb.append(String.format("Coverage: %d / %d (%.1f%%)  [highest priority for decode tests]\n",
+                tested.size(), priorityTestable.size(), pct));
+
+        if (!untested.isEmpty()) {
+            sb.append(String.format("\n  UNTESTED CLIENT→SERVER (%d):\n", untested.size()));
+            for (String name : untested) {
+                sb.append("    ").append(name).append('\n');
+            }
+        }
+    }
+
+    /**
+     * Returns the traffic direction for the per-packet matrix.
+     */
+    private static String getDirection(String name, Set<String> encodeNA, Set<String> decodeNA, boolean hasCb) {
+        if (!hasCb) {
+            return "";
+        }
+        boolean encNA = encodeNA.contains(name);
+        boolean decNA = decodeNA.contains(name);
+        if (encNA && !decNA) {
+            return "C→S";       // client-to-server: encode N/A, decode real
+        }
+        if (!encNA && decNA) {
+            return "S→C";       // server-to-client: decode N/A, encode real
+        }
+        if (encNA) {
+            return "C→S(?)";    // both N/A, unusual
+        }
+        return "BIDIR";         // both implemented
+    }
+
+    /**
+     * Returns a short status string for the per-packet matrix.
+     */
+    private static String getStatus(String name, boolean hasCb,
+                                    Set<String> tested, Set<String> notApplicable) {
+        if (tested.contains(name)) {
+            return "TESTED";
+        }
+        if (notApplicable.contains(name)) {
+            return "N/A";
+        }
+        if (!hasCb) {
+            return "NO_CB";
+        }
+        return "UNTESTED";
     }
 
     /**
@@ -204,12 +314,54 @@ public class PacketCoverageReportTest {
     }
 
     /**
-     * Scans all regression test classes for {@code @ParameterizedTest} annotations
+     * Detects packets whose decode() consumes no data (empty, calls decodeUnsupported(), or throws).
+     * These are typically server-to-client packets that the server never needs to decode.
+     */
+    private static Set<String> detectDecodeNotApplicable(Set<String> testableNames, Map<String, Class<?>> classLookup) {
+        Set<String> result = new HashSet<>();
+        int latestProtocol = ProtocolCodecMapping.getSupportedVersions().stream()
+                .mapToInt(Integer::intValue).max().orElse(898);
+
+        for (String name : testableNames) {
+            Class<?> cls = classLookup.get(name);
+            if (cls == null || Modifier.isAbstract(cls.getModifiers())) {
+                continue;
+            }
+            try {
+                DataPacket packet = (DataPacket) cls.getDeclaredConstructor().newInstance();
+                packet.protocol = latestProtocol;
+                // Provide a buffer with enough dummy data for decode() to read from
+                byte[] dummyBuffer = new byte[1024];
+                packet.setBuffer(dummyBuffer);
+                int offsetBefore = packet.getOffset();
+                try {
+                    packet.decode();
+                } catch (UnsupportedOperationException e) {
+                    result.add(name);
+                    continue;
+                } catch (Exception ignored) {
+                    // decode() crashed on dummy data — it has a real implementation
+                    continue;
+                }
+                int offsetAfter = packet.getOffset();
+                if (offsetAfter == offsetBefore) {
+                    // No bytes consumed — decode is effectively a no-op
+                    result.add(name);
+                }
+            } catch (Exception ignored) {
+                // Can't instantiate or test — skip
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Scans test classes in the specified package for {@code @ParameterizedTest} annotations
      * and extracts tested packet names from their {@code name} attribute.
      */
-    private static Set<String> scanTestedPacketsFromAnnotations(Set<String> knownPacketNames) {
+    private static Set<String> scanTestedPacketsFromAnnotations(Set<String> knownPacketNames, String testPackage) {
         Set<String> tested = new HashSet<>();
-        List<Class<?>> testClasses = scanClassesInPackage("cn.nukkit.network.protocol.regression");
+        List<Class<?>> testClasses = scanClassesInPackage(testPackage);
 
         for (Class<?> testClass : testClasses) {
             if (testClass == PacketCoverageReportTest.class) {

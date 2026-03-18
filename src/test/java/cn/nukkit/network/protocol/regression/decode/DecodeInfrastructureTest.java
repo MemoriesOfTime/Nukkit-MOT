@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class DecodeInfrastructureTest extends AbstractPacketRegressionTest {
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "MovePlayerPacket v{0}")
     @MethodSource("allVersions")
     void movePlayer_normalMode(int protocol) {
         var cbPacket = new org.cloudburstmc.protocol.bedrock.packet.MovePlayerPacket();
@@ -49,7 +49,7 @@ public class DecodeInfrastructureTest extends AbstractPacketRegressionTest {
         }
     }
 
-    @ParameterizedTest
+    @ParameterizedTest(name = "MovePlayerPacket v{0}")
     @MethodSource("allVersions")
     void movePlayer_teleportMode(int protocol) {
         var cbPacket = new org.cloudburstmc.protocol.bedrock.packet.MovePlayerPacket();

@@ -20,7 +20,7 @@ public class RiderJumpPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.jumpStrength = this.getVarInt();
+        this.jumpStrength = (int) this.getUnsignedVarInt();
     }
 
     @Override

@@ -28,6 +28,10 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
         return filteredVersions(407);
     }
 
+    static Stream<Arguments> versionsPre407() {
+        return filteredVersionsRange(291, 407);
+    }
+
     static Stream<Arguments> versionsFrom712() {
         return filteredVersions(712);
     }
@@ -119,6 +123,43 @@ public class InventoryPacketRegressionTest extends AbstractPacketRegressionTest 
                 org.cloudburstmc.protocol.bedrock.packet.ContainerClosePacket.class);
 
         assertEquals(5, cbPacket.getId());
+    }
+
+    @ParameterizedTest(name = "InventoryTransactionPacket v{0} (<407)")
+    @MethodSource("versionsPre407")
+    void testInventoryTransactionPacketPre407(int protocolVersion) {
+        var nukkitPacket = new InventoryTransactionPacket();
+        nukkitPacket.protocol = protocolVersion;
+        nukkitPacket.transactionType = InventoryTransactionPacket.TYPE_RELEASE_ITEM;
+
+        var action = new cn.nukkit.network.protocol.types.NetworkInventoryAction();
+        action.sourceType = cn.nukkit.network.protocol.types.NetworkInventoryAction.SOURCE_CONTAINER;
+        action.windowId = 0;
+        action.inventorySlot = 4;
+        action.oldItem = Item.AIR_ITEM;
+        action.newItem = Item.AIR_ITEM;
+        nukkitPacket.actions = new cn.nukkit.network.protocol.types.NetworkInventoryAction[]{action};
+
+        var releaseItemData = new cn.nukkit.inventory.transaction.data.ReleaseItemData();
+        releaseItemData.actionType = InventoryTransactionPacket.RELEASE_ITEM_ACTION_RELEASE;
+        releaseItemData.hotbarSlot = 2;
+        releaseItemData.itemInHand = Item.AIR_ITEM;
+        releaseItemData.headRot = new cn.nukkit.math.Vector3(1.5f, 64.0f, -2.5f);
+        nukkitPacket.transactionData = releaseItemData;
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.InventoryTransactionPacket.class);
+
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.inventory.transaction.InventoryTransactionType.ITEM_RELEASE,
+                cbPacket.getTransactionType());
+        assertEquals(1, cbPacket.getActions().size());
+        assertEquals(4, cbPacket.getActions().get(0).getSlot());
+        assertEquals(InventoryTransactionPacket.RELEASE_ITEM_ACTION_RELEASE, cbPacket.getActionType());
+        assertEquals(2, cbPacket.getHotbarSlot());
+        assertEquals(1.5f, cbPacket.getHeadPosition().getX(), 0.001f);
+        assertEquals(64.0f, cbPacket.getHeadPosition().getY(), 0.001f);
+        assertEquals(-2.5f, cbPacket.getHeadPosition().getZ(), 0.001f);
     }
 
     // ==================== CreativeContentPacket ====================

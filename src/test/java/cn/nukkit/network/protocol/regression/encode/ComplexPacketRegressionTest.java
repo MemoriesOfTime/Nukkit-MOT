@@ -59,6 +59,10 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         return filteredVersions(ProtocolInfo.v1_21_130_28);
     }
 
+    static Stream<Arguments> versionsFrom924() {
+        return filteredVersions(ProtocolInfo.v1_26_0);
+    }
+
     static Stream<Arguments> versionsPre662() {
         return filteredVersionsRange(291, ProtocolInfo.v1_20_70);
     }
@@ -607,15 +611,79 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(90.0f, cbPreset.getYaw(), 0.001f);
     }
 
-    // ==================== StartGamePacket ====================
-    // Skipped: StartGamePacket has extremely complex version branching with 50+ fields,
-    // block/item palettes, game rules, and experiments. The encoded payload includes
-    // large binary blobs (block palette, item palette) that vary significantly per version.
-    // Cross-decode testing is not practical without exhaustive per-version field alignment.
+    // ==================== CameraAimAssistPresetsPacket ====================
 
-    //@ParameterizedTest(name = "StartGamePacket v{0}")
-    //@MethodSource("allVersions")
-    void _skipped_testStartGamePacket(int protocolVersion) {
+    @ParameterizedTest(name = "CameraAimAssistPresetsPacket v{0} (latest)")
+    @MethodSource("versionsFrom924")
+    void testCameraAimAssistPresetsPacketLatest(int protocolVersion) {
+        var nukkitPacket = new CameraAimAssistPresetsPacket();
+        nukkitPacket.protocol = protocolVersion;
+
+        var categoriesField = readField(nukkitPacket, "categories", java.util.List.class);
+
+        var categoryGroup = new cn.nukkit.network.protocol.types.camera.CameraAimAssistCategories();
+        categoryGroup.setIdentifier("legacy_group");
+
+        var category = new cn.nukkit.network.protocol.types.camera.CameraAimAssistCategory();
+        category.setName("mobs");
+        category.getEntityPriorities().add(new cn.nukkit.network.protocol.types.camera.CameraAimAssistPriority("minecraft:zombie", 10));
+        category.getBlockPriorities().add(new cn.nukkit.network.protocol.types.camera.CameraAimAssistPriority("minecraft:chest", 5));
+        category.getBlockTagPriorities().add(new cn.nukkit.network.protocol.types.camera.CameraAimAssistPriority("minecraft:logs", 4));
+        category.getEntityTypeFamiliesPriorities().add(new cn.nukkit.network.protocol.types.camera.CameraAimAssistPriority("undead", 3));
+        category.setEntityDefaultPriorities(7);
+        category.setBlockDefaultPriorities(8);
+        categoryGroup.getCategories().add(category);
+        categoriesField.add(categoryGroup);
+
+        var presetsField = readField(nukkitPacket, "presets", java.util.List.class);
+        var preset = new cn.nukkit.network.protocol.types.camera.CameraAimAssistPresetDefinition();
+        preset.setIdentifier("default_preset");
+        preset.getBlockExclusionList().add("minecraft:barrel");
+        preset.getEntityExclusionList().add("minecraft:cow");
+        preset.getBlockTagExclusionList().add("leaves");
+        preset.getEntityTypeFamiliesExclusionList().add("aquatic");
+        preset.getLiquidTargetingList().add("water");
+        preset.getItemSettings().add(new cn.nukkit.network.protocol.types.camera.CameraAimAssistItemSettings("minecraft:bow", "mobs"));
+        preset.setDefaultItemSettings("mobs");
+        preset.setHandSettings("hands");
+        presetsField.add(preset);
+
+        nukkitPacket.setOperation(cn.nukkit.network.protocol.types.camera.CameraAimAssistOperation.ADD_TO_EXISTING);
+        nukkitPacket.encode();
+
+        var cbPacket = crossDecode(nukkitPacket,
+                org.cloudburstmc.protocol.bedrock.packet.CameraAimAssistPresetsPacket.class);
+
+        assertEquals(1, cbPacket.getCategoryDefinitions().size());
+        var cbCategory = cbPacket.getCategoryDefinitions().get(0);
+        assertEquals("mobs", cbCategory.getName());
+        assertEquals("minecraft:zombie", cbCategory.getEntityPriorities().get(0).getName());
+        assertEquals("minecraft:chest", cbCategory.getBlockPriorities().get(0).getName());
+        assertEquals("minecraft:logs", cbCategory.getBlockTagPriorities().get(0).getName());
+        assertEquals("undead", cbCategory.getEntityTypeFamiliesPriorities().get(0).getName());
+        assertEquals(7, cbCategory.getEntityDefaultPriorities());
+        assertEquals(8, cbCategory.getBlockDefaultPriorities());
+
+        assertEquals(1, cbPacket.getPresets().size());
+        var cbPreset = cbPacket.getPresets().get(0);
+        assertEquals("default_preset", cbPreset.getIdentifier());
+        assertEquals(java.util.List.of("minecraft:barrel"), cbPreset.getBlockExclusionList());
+        assertEquals(java.util.List.of("minecraft:cow"), cbPreset.getEntityExclusionList());
+        assertEquals(java.util.List.of("leaves"), cbPreset.getBlockTagExclusionList());
+        assertEquals(java.util.List.of("aquatic"), cbPreset.getEntityTypeFamiliesExclusionList());
+        assertEquals(java.util.List.of("water"), cbPreset.getLiquidTargetingList());
+        assertEquals("mobs", cbPreset.getDefaultItemSettings());
+        assertEquals("hands", cbPreset.getHandSettings());
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.camera.CameraAimAssistOperation.ADD_TO_EXISTING, cbPacket.getOperation());
+    }
+
+    // ==================== StartGamePacket ====================
+    // Full cross-version StartGame coverage is still impractical, but the latest protocol
+    // branch can be regression-tested with a constrained payload.
+
+    @ParameterizedTest(name = "StartGamePacket v{0} (latest minimal)")
+    @MethodSource("versionsFrom924")
+    void testStartGamePacketLatest(int protocolVersion) {
         var nukkitPacket = new StartGamePacket();
         nukkitPacket.protocol = protocolVersion;
         nukkitPacket.entityUniqueId = 1;
@@ -635,18 +703,22 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         nukkitPacket.spawnY = 64;
         nukkitPacket.spawnZ = 0;
         nukkitPacket.gameRules = new GameRules();
-        nukkitPacket.levelId = "";
+        nukkitPacket.levelId = "level-1";
         nukkitPacket.worldName = "TestWorld";
         nukkitPacket.premiumWorldTemplateId = "";
-        nukkitPacket.currentTick = 0L;
+        nukkitPacket.currentTick = 123L;
         nukkitPacket.enchantmentSeed = 0;
-        nukkitPacket.multiplayerCorrelationId = "";
+        nukkitPacket.multiplayerCorrelationId = "corr-1";
         nukkitPacket.vanillaVersion = cn.nukkit.utils.Utils.getVersionByProtocol(protocolVersion);
         nukkitPacket.authoritativeMovementMode = AuthoritativeMovementMode.SERVER;
         nukkitPacket.rewindHistorySize = 40;
         nukkitPacket.blockDefinitions = java.util.Collections.emptyList();
         nukkitPacket.playerPropertyData = new CompoundTag("");
         nukkitPacket.networkPermissions = NetworkPermissions.DEFAULT;
+        nukkitPacket.serverId = "server-1";
+        nukkitPacket.worldId = "world-1";
+        nukkitPacket.scenarioId = "scenario-1";
+        nukkitPacket.ownerIdentifier = "owner-1";
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
@@ -655,6 +727,12 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
         assertEquals(1, cbPacket.getUniqueEntityId());
         assertEquals(1, cbPacket.getRuntimeEntityId());
         assertEquals("TestWorld", cbPacket.getLevelName());
+        assertEquals("level-1", cbPacket.getLevelId());
+        assertEquals(123L, cbPacket.getCurrentTick());
+        assertEquals("server-1", cbPacket.getServerId());
+        assertEquals("world-1", cbPacket.getWorldId());
+        assertEquals("scenario-1", cbPacket.getScenarioId());
+        assertEquals("owner-1", cbPacket.getOwnerId());
     }
 
     // ==================== ClientboundMapItemDataPacket ====================
@@ -832,4 +910,15 @@ public class ComplexPacketRegressionTest extends AbstractPacketRegressionTest {
     // Skipped: Nukkit writes hasNetworkIds as a separate boolean for all protocol >= 407,
     // but CB Protocol v407 serializer embeds network ID handling inside readInventoryActions().
     // The encoding formats are incompatible for cross-decode testing.
+
+    @SuppressWarnings("unchecked")
+    private static <T> T readField(Object instance, String fieldName, Class<T> type) {
+        try {
+            var field = instance.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            return (T) field.get(instance);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError("Failed to read field " + fieldName, e);
+        }
+    }
 }

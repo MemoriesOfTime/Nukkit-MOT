@@ -318,10 +318,13 @@ public class VersionedSimplePacketRegressionTest extends AbstractPacketRegressio
         var spline = cbPacket.getSplines().get(0);
         assertEquals("spline1", spline.getName());
         assertEquals(5.0f, spline.getInstruction().getTotalTime(), 0.001f);
-        assertEquals(0, spline.getInstruction().getType().ordinal()); // CATMULL_ROM
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.camera.CameraSplineType.CATMULL_ROM,
+                spline.getInstruction().getType());
         assertEquals(2, spline.getInstruction().getCurve().size());
         assertEquals(1, spline.getInstruction().getProgressKeyFrames().size());
         assertEquals(0.5f, spline.getInstruction().getProgressKeyFrames().get(0).getValue(), 0.001f);
+        assertEquals(org.cloudburstmc.protocol.bedrock.data.camera.CameraEase.LINEAR,
+                spline.getInstruction().getProgressKeyFrames().get(0).getEasingFunc());
         assertEquals(1, spline.getInstruction().getRotationOption().size());
         assertEquals(2.0f, spline.getInstruction().getRotationOption().get(0).getKeyFrameTimes(), 0.001f);
     }
