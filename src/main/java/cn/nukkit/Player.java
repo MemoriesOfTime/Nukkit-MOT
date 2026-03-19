@@ -3621,9 +3621,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 } else if (this.riding instanceof EntityHappyGhast ghast) {
                     double moveVecX = NukkitMath.clamp(authPacket.getMotion().getX(), -1, 1);
                     double moveVecY = NukkitMath.clamp(authPacket.getMotion().getY(), -1, 1);
-                    if (moveVecX != 0 || moveVecY != 0) {
-                        ghast.onPlayerInput(this, moveVecX, moveVecY);
-                    }
+                    ghast.onPlayerInput(this, moveVecX, moveVecY);
                     ignoreCoordinateMove = true;
                 } else if (this.riding instanceof EntityBoat boat) {
                     if (this.protocol >= ProtocolInfo.v1_21_130_28) {

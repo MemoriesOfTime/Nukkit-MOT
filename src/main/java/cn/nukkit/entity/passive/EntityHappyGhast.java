@@ -17,11 +17,22 @@ import cn.nukkit.math.Vector3f;
 import cn.nukkit.nbt.NBTIO;
 import cn.nukkit.nbt.tag.CompoundTag;
 import cn.nukkit.nbt.tag.ListTag;
+import cn.nukkit.network.protocol.SetEntityLinkPacket;
 import cn.nukkit.utils.Utils;
+
+import java.util.Objects;
 
 public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHolder, EntityRideable, EntityControllable, EntityMoveable {
 
     public static final int NETWORK_ID = 147;
+    public static final int MAX_PASSENGERS = 4;
+
+    private static final Vector3f[] SEAT_OFFSETS = {
+            new Vector3f(0, 5.22f, 0.75f),      // 座位0: 驾驶员（前方）
+            new Vector3f(-0.85f, 5.22f, -0.5f),  // 座位1: 左后
+            new Vector3f(0.85f, 5.22f, -0.5f),   // 座位2: 右后
+            new Vector3f(0, 5.22f, -0.75f)       // 座位3: 后方
+    };
 
     private EntityArmorInventory armorInventory;
 
@@ -42,14 +53,13 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_WALKER, true);
         this.setDataFlag(DATA_FLAGS, DATA_FLAG_TAMED, true);
 
-        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_BODY_ROTATION_ALWAYS_FOLLOWS_HEAD, true);
+        this.setGenericFlag(DATA_FLAG_BODY_ROTATION_ALWAYS_FOLLOWS_HEAD, true);
 
-        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_HAS_COLLISION, true);
-        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_GRAVITY, true);
-        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_COLLIDABLE, true);
+        this.setGenericFlag(DATA_FLAG_GRAVITY, true);
+        this.setGenericFlag(DATA_FLAG_COLLIDABLE, true);
 
-        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_WASD_AIR_CONTROLLED, true);
-        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_DOES_SERVER_AUTH_ONLY_DISMOUNT, true);
+        this.setGenericFlag(DATA_FLAG_WASD_AIR_CONTROLLED, true);
+        this.setGenericFlag(DATA_FLAG_DOES_SERVER_AUTH_ONLY_DISMOUNT, true);
 
         this.setMoveable(true);
 
@@ -61,6 +71,7 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
                 this.armorInventory.setItem(armorTag.getByte("Slot"), NBTIO.getItemHelper(armorTag));
             }
         }
+        this.updateHarnessState();
     }
 
     @Override
@@ -103,6 +114,10 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
             return true;
         }
 
+        if (this.isBaby()) {
+            return super.onInteract(player, item, clickedPos);
+        }
+
         if (item instanceof ItemHarness harness) {
             if (this.armorInventory.getBody().isNull()) {
                 Item harnessEquipped = harness.clone();
@@ -110,6 +125,7 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
                     harnessEquipped.setCount(1);
                 }
                 this.armorInventory.setBody(harnessEquipped);
+                this.updateHarnessState();
                 player.getInventory().decreaseCount(player.getInventory().getHeldItemIndex());
                 this.armorInventory.sendContents(this.getViewers().values());
             }
@@ -125,13 +141,16 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
                     this.getLevel().dropItem(clickedPos, body);
                 }
                 this.armorInventory.setBody(Item.AIR_ITEM);
+                this.updateHarnessState();
                 this.armorInventory.sendContents(this.getViewers().values());
                 player.getInventory().getItemInHand().setDamage(item.getDamage() + 1);
             }
             return true;
         }
 
-        this.mountEntity(player);
+        if (this.isHarnessed() && !player.isSneaking()) {
+            this.mountEntity(player);
+        }
 
         return false;
     }
@@ -142,8 +161,57 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
         this.armorInventory.sendContents(player);
     }
 
+    @Override
+    public boolean mountEntity(Entity entity, byte mode) {
+        Objects.requireNonNull(entity, "The target of the mounting entity can't be null");
+
+        if (this.isPassenger(entity) || entity.riding != null && !entity.riding.dismountEntity(entity, false)) {
+            return false;
+        }
+
+        if (entity instanceof Player && ((Player) entity).isSleeping()) {
+            return false;
+        }
+
+        if (this.passengers.size() >= MAX_PASSENGERS) {
+            return false;
+        }
+
+        if (!this.isHarnessed()) {
+            return false;
+        }
+
+        byte linkMode = this.passengers.isEmpty() ? SetEntityLinkPacket.TYPE_RIDE : SetEntityLinkPacket.TYPE_PASSENGER;
+        this.broadcastLinkPacket(entity, linkMode);
+
+        entity.riding = this;
+        entity.setDataFlag(DATA_FLAGS, DATA_FLAG_RIDING, true);
+        this.passengers.add(entity);
+        entity.setSeatPosition(getSeatOffset(this.passengers.size() - 1));
+        this.updatePassengerPosition(entity);
+
+        return true;
+    }
+
+    private Vector3f getSeatOffset(int seatIndex) {
+        if (seatIndex >= 0 && seatIndex < SEAT_OFFSETS.length) {
+            return SEAT_OFFSETS[seatIndex];
+        }
+        return SEAT_OFFSETS[0];
+    }
+
     public Item getHarness() {
         return this.armorInventory.getBody();
+    }
+
+    public boolean isHarnessed() {
+        return !this.armorInventory.getBody().isNull();
+    }
+
+    private void updateHarnessState() {
+        boolean harnessed = this.isHarnessed();
+        this.setDataFlag(DATA_FLAGS, DATA_FLAG_SADDLED, harnessed);
+        this.setMoveable(harnessed);
     }
 
     @Override
@@ -182,6 +250,11 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
     @Override
     public void onPlayerInput(Player player, double strafe, double forward) {
         if (!this.isControllable()) {
+            return;
+        }
+
+        // 只有第一个乘客（驾驶员）能控制方向
+        if (this.passengers.isEmpty() || this.passengers.get(0) != player) {
             return;
         }
 
@@ -242,6 +315,28 @@ public class EntityHappyGhast extends EntityFlyingAnimal implements InventoryHol
         }
 
         this.motionY = up * speed;
+    }
+
+    @Override
+    public boolean dismountEntity(Entity entity, boolean sendLinks) {
+        boolean result = super.dismountEntity(entity, sendLinks);
+        if (result) {
+            reassignPassengerSeats();
+        }
+        return result;
+    }
+
+    /**
+     * 乘客离开后重新分配座位位置和 link 类型，
+     * 确保新的 index 0 乘客获得驾驶员座位和 TYPE_RIDE 权限。
+     */
+    private void reassignPassengerSeats() {
+        for (int i = 0; i < this.passengers.size(); i++) {
+            Entity passenger = this.passengers.get(i);
+            passenger.setSeatPosition(getSeatOffset(i));
+            this.updatePassengerPosition(passenger);
+            broadcastLinkPacket(passenger, i == 0 ? SetEntityLinkPacket.TYPE_RIDE : SetEntityLinkPacket.TYPE_PASSENGER);
+        }
     }
 
     @Override
