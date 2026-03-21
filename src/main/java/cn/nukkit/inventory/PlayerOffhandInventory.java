@@ -10,6 +10,7 @@ import cn.nukkit.item.Item;
 import cn.nukkit.item.ItemBlock;
 import cn.nukkit.network.protocol.InventoryContentPacket;
 import cn.nukkit.network.protocol.InventorySlotPacket;
+import cn.nukkit.network.protocol.LevelSoundEventPacket;
 import cn.nukkit.network.protocol.MobEquipmentPacket;
 import cn.nukkit.network.protocol.types.ContainerIds;
 
@@ -36,13 +37,18 @@ public class PlayerOffhandInventory extends BaseInventory {
             return;
         }
 
+        Item after = this.getItemFast(0);
+        if (!after.isNull() && !after.equalsFast(before) && holder.level != null) {
+            holder.level.addLevelSoundEvent(holder, LevelSoundEventPacket.SOUND_ARMOR_EQUIP_GENERIC);
+        }
+
         this.sendContents(this.getViewers());
         this.sendContents(holder.getViewers().values());
     }
 
     @Override
     public void sendContents(Player... players) {
-        Item item = this.getItem(0);
+        Item item = this.getItemFast(0);
         MobEquipmentPacket pk = this.createMobEquipmentPacket(item);
 
         for (Player player : players) {
@@ -59,7 +65,7 @@ public class PlayerOffhandInventory extends BaseInventory {
 
     @Override
     public void sendSlot(int index, Player... players) {
-        Item item = this.getItem(0);
+        Item item = this.getItemFast(0);
         MobEquipmentPacket pk = this.createMobEquipmentPacket(item);
 
         for (Player player : players) {
@@ -103,7 +109,8 @@ public class PlayerOffhandInventory extends BaseInventory {
         }
 
         EntityHuman holder = this.getHolder();
-        EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent(holder, this.getItem(index), item, index);
+        Item oldItem = this.getItem(index);
+        EntityInventoryChangeEvent ev = new EntityInventoryChangeEvent(holder, oldItem, item, index);
         Server.getInstance().getPluginManager().callEvent(ev);
         if (ev.isCancelled()) {
             this.sendSlot(index, this.getViewers());
@@ -115,7 +122,7 @@ public class PlayerOffhandInventory extends BaseInventory {
         item = ev.getNewItem();
 
         if (holder instanceof Player) {
-            PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, this.getItem(index), item);
+            PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, oldItem, item, index);
             Server.getInstance().getPluginManager().callEvent(ev2);
             if (ev2.isCancelled()) {
                 this.sendSlot(index, this.getViewers());
@@ -125,9 +132,8 @@ public class PlayerOffhandInventory extends BaseInventory {
             item = ev2.getNewItem();
         }
 
-        Item old = this.getItem(index);
         this.slots.put(index, item.clone());
-        this.onSlotChange(index, old, send);
+        this.onSlotChange(index, oldItem, send);
         return true;
     }
 
@@ -150,7 +156,7 @@ public class PlayerOffhandInventory extends BaseInventory {
             item = ev.getNewItem();
 
             if (holder instanceof Player) {
-                PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, old, item);
+                PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, old, item, index);
                 Server.getInstance().getPluginManager().callEvent(ev2);
                 if (ev2.isCancelled()) {
                     this.sendSlot(index, this.getViewers());
@@ -158,14 +164,13 @@ public class PlayerOffhandInventory extends BaseInventory {
                     return false;
                 }
                 item = ev2.getNewItem();
-                if (item.getId() != Item.AIR) {
-                    this.slots.put(index, item.clone());
-                    this.onSlotChange(index, old, send);
-                    return true;
-                }
             }
 
-            this.slots.remove(index);
+            if (item.getId() != Item.AIR) {
+                this.slots.put(index, item.clone());
+            } else {
+                this.slots.remove(index);
+            }
             this.onSlotChange(index, old, send);
         }
         return true;

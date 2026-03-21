@@ -14,11 +14,13 @@ public class PlayerOffhandInventoryChangeEvent extends PlayerEvent implements Ca
 
     private final Item oldItem;
     private Item newItem;
+    private final int slot;
 
-    public PlayerOffhandInventoryChangeEvent(Player player, Item oldItem, Item newItem) {
+    public PlayerOffhandInventoryChangeEvent(Player player, Item oldItem, Item newItem, int slot) {
         this.player = player;
         this.oldItem = oldItem;
         this.newItem = newItem;
+        this.slot = slot;
     }
 
     public Item getOldItem() {
@@ -31,5 +33,9 @@ public class PlayerOffhandInventoryChangeEvent extends PlayerEvent implements Ca
 
     public void setNewItem(Item newItem) {
         this.newItem = newItem;
+    }
+
+    public int getSlot() {
+        return slot;
     }
 }
