@@ -20,9 +20,9 @@ import org.jetbrains.annotations.NotNull;
  */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ModalFormResponseProcessor extends DataPacketProcessor<ModalFormResponsePacket> {
-    
+
     public static final ModalFormResponseProcessor INSTANCE = new ModalFormResponseProcessor();
-    
+
     @Override
     public void handle(@NotNull PlayerHandle playerHandle, @NotNull ModalFormResponsePacket pk) {
         Player player = playerHandle.player;
@@ -58,7 +58,7 @@ public class ModalFormResponseProcessor extends DataPacketProcessor<ModalFormRes
             }
         }
     }
-    
+
     @Override
     public int getPacketId() {
         return ProtocolInfo.toNewProtocolID(ProtocolInfo.MODAL_FORM_RESPONSE_PACKET);
