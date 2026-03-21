@@ -96,6 +96,9 @@ public record CommandLogger(Command command,
      * @return the command logger
      */
     public CommandLogger addError(String key, String... params) {
+        if (TextFormat.getLastColors(key).isEmpty()) {
+            if (Server.getInstance().getLanguage().internalGet(key) != null) key = "%" + key;
+        }
         this.outputContainer.getMessages().add(new CommandOutputMessage(key, params));
         return this;
     }

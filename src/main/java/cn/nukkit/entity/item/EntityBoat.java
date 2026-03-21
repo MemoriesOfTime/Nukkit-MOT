@@ -5,6 +5,7 @@ import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockID;
 import cn.nukkit.block.BlockWater;
 import cn.nukkit.entity.Entity;
+import cn.nukkit.utils.CollisionHelper;
 import cn.nukkit.entity.data.ByteEntityData;
 import cn.nukkit.entity.data.FloatEntityData;
 import cn.nukkit.event.entity.EntityDamageByEntityEvent;
@@ -78,6 +79,7 @@ public class EntityBoat extends EntityVehicle {
         this.dataProperties.putInt(DATA_VARIANT, this.woodID);
         this.dataProperties.putBoolean(DATA_IS_BUOYANT, true);
         this.dataProperties.putString(DATA_BUOYANCY_DATA, "{\"apply_gravity\":true,\"base_buoyancy\":1.0,\"big_wave_probability\":0.02999999932944775,\"big_wave_speed\":10.0,\"drag_down_on_buoyancy_removed\":0.0,\"liquid_blocks\":[\"minecraft:water\",\"minecraft:flowing_water\"],\"simulate_waves\":true}");
+        this.setDataFlag(DATA_FLAGS_EXTENDED, DATA_FLAG_COLLIDABLE, true);
     }
 
     @Override
@@ -191,13 +193,13 @@ public class EntityBoat extends EntityVehicle {
 
         if (this.age % 5 == 0) {
             if (!this.passengers.isEmpty() && this.passengers.get(0) instanceof Player) {
-                Block[] blocks = this.level.getCollisionBlocks(this.getBoundingBox().grow(0.1, 0.3, 0.1));
-                for (Block b : blocks) {
-                    if (b.getId() == Block.LILY_PAD) {
-                        this.level.setBlockAt((int) b.x, (int) b.y, (int) b.z, 0, 0);
-                        this.level.dropItem(b, Item.get(Item.LILY_PAD, 0, 1));
-                    }
-                }
+                CollisionHelper.getCollisionBlocks(this.level, this.getBoundingBox().grow(0.1, 0.3, 0.1))
+                        .stream()
+                        .filter(block -> block.getId() == Block.LILY_PAD)
+                        .forEach(block -> {
+                            this.level.setBlockAt((int) block.x, (int) block.y, (int) block.z, 0, 0);
+                            this.level.dropItem(block, Item.get(Item.LILY_PAD, 0, 1));
+                        });
             }
         }
 

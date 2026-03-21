@@ -31,6 +31,6 @@ public class ItemStackRequestPacket extends DataPacket {
 
     @Override
     public void encode() {
-        //non server bound
+        this.encodeUnsupported();
     }
 }

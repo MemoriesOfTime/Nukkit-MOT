@@ -24,7 +24,7 @@ public class ClientboundDataDrivenUIReloadPacket extends DataPacket {
 
     @Override
     public void decode() {
-        // No data to decode
+        this.decodeUnsupported();
     }
 
     @Override

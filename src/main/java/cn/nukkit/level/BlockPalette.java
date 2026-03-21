@@ -341,4 +341,43 @@ public class BlockPalette {
         return hashId;
     }
 
+    /**
+     * 通过 fullId 直接查询 runtimeId，跳过 id/meta 的拆分与重组
+     * Get runtimeId directly by fullId (blockId << DATA_BITS | meta), skipping id/meta split
+     */
+    public int getRuntimeIdByFullId(int legacyFullId) {
+        int runtimeId = legacyToRuntimeId.get(legacyFullId);
+        if (runtimeId == -1) {
+            int id = legacyFullId >> Block.DATA_BITS;
+            runtimeId = legacyToRuntimeId.get(id << Block.DATA_BITS);
+            if (runtimeId == -1) {
+                Integer cache = legacyToRuntimeIdCache.getIfPresent(legacyFullId);
+                if (cache == null) {
+                    log.info("({}) Missing block runtime id mappings for fullId:{}", gameVersion, legacyFullId);
+                    runtimeId = legacyToRuntimeId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
+                    legacyToRuntimeIdCache.put(legacyFullId, runtimeId);
+                } else {
+                    runtimeId = cache;
+                }
+            }
+        }
+        return runtimeId;
+    }
+
+    /**
+     * 通过 fullId 直接查询 hashId，跳过 id/meta 的拆分与重组
+     * Get hashId directly by fullId (blockId << DATA_BITS | meta), skipping id/meta split
+     */
+    public int getHashIdByFullId(int legacyFullId) {
+        int hashId = legacyToHashId.get(legacyFullId);
+        if (hashId == -1) {
+            int id = legacyFullId >> Block.DATA_BITS;
+            hashId = legacyToHashId.get(id << Block.DATA_BITS);
+            if (hashId == -1) {
+                hashId = legacyToHashId.get(BlockID.INFO_UPDATE << Block.DATA_BITS);
+            }
+        }
+        return hashId;
+    }
+
 }

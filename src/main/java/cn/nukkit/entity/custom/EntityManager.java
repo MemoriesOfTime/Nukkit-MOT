@@ -28,7 +28,7 @@ public class EntityManager {
     }
 
     public EntityManager() {
-        for (Map.Entry<Integer, String> entry : Entity.getEntityRuntimeMapping(ProtocolInfo.CURRENT_PROTOCOL).entrySet()) {
+        for (Map.Entry<Integer, String> entry : Entity.getEntityRuntimeMapping().entrySet()) {
             legacy_ids.put(entry.getValue(), entry.getKey());
         }
     }

@@ -5,7 +5,9 @@ import cn.nukkit.Player;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
 import cn.nukkit.inventory.special.*;
-import cn.nukkit.item.*;
+import cn.nukkit.item.Item;
+import cn.nukkit.item.ItemDurable;
+import cn.nukkit.item.ItemFirework;
 import cn.nukkit.network.protocol.BatchPacket;
 import cn.nukkit.network.protocol.CraftingDataPacket;
 import cn.nukkit.network.protocol.ProtocolInfo;
@@ -484,12 +486,14 @@ public class CraftingManager {
                 }
             }
         }
-        for (SmithingRecipe recipe : this.getSmithingRecipes().values()) {
-            if (recipe.getIngredient().isSupportedOn(protocol)
-                    && recipe.getEquipment().isSupportedOn(protocol)
-                    && recipe.getTemplate().isSupportedOn(protocol)
-                    && recipe.getResult().isSupportedOn(protocol)) {
-                pk.addShapelessRecipe(recipe);
+        if (protocol >= ProtocolInfo.v1_20_0_23) {
+            for (SmithingRecipe recipe : this.getSmithingRecipes().values()) {
+                if (recipe.getIngredient().isSupportedOn(protocol)
+                        && recipe.getEquipment().isSupportedOn(protocol)
+                        && recipe.getTemplate().isSupportedOn(protocol)
+                        && recipe.getResult().isSupportedOn(protocol)) {
+                    pk.addShapelessRecipe(recipe);
+                }
             }
         }
         //TODO Fix 1.10.0 - 1.14.0 client crash

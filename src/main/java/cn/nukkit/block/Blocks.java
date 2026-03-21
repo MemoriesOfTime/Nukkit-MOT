@@ -654,7 +654,7 @@ public class Blocks {
         list[BAMBOO_STAIRS] = BlockStairsBamboo.class; //777
         list[BAMBOO_SLAB] = BlockSlabBamboo.class; //768
         list[BAMBOO_PRESSURE_PLATE] = BlockPressurePlateBamboo.class; //769
-
+        list[BAMBOO_FENCE] = BlockFenceBamboo.class; //769
         list[BAMBOO_FENCE_GATE] = BlockFenceGateBamboo.class; //771
 
         list[BAMBOO_STANDING_SIGN] = BlockBambooSignPost.class; //773

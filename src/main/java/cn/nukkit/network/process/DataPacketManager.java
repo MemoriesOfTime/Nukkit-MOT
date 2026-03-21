@@ -194,6 +194,7 @@ public final class DataPacketManager {
                 CommandStepProcessor_v113.INSTANCE,
                 ContainerSetSlotProcessor_v113.INSTANCE,
                 DropItemProcessor_v113.INSTANCE,
+                InteractProcessor_v113.INSTANCE,
                 RemoveBlockProcessor_v113.INSTANCE,
                 UseItemProcessor_v113.INSTANCE
         );

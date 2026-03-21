@@ -86,7 +86,6 @@ public final class ChainValidationResult {
         String neteaseSid = null;
         String neteasePlatform = null;
         String neteaseClientOsName = null;
-        String neteaseClientOsVersion = null;
         String neteaseEnv = null;
         String neteaseClientEngineVersion = null;
         String neteaseClientPatchVersion = null;

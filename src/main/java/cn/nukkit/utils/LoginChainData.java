@@ -63,6 +63,12 @@ public interface LoginChainData {
     @Nullable
     String getWaterdogIP();
 
+    /**
+     * @return the ViaProxy auth token, or null if the client is not connecting through ViaProxy
+     */
+    @Nullable
+    String getViaProxyAuthToken();
+
     JsonObject getRawData();
 
     String getTitleId();

@@ -5,6 +5,7 @@ import cn.nukkit.Server;
 import cn.nukkit.event.player.PlayerCreationEvent;
 import cn.nukkit.event.server.QueryRegenerateEvent;
 import cn.nukkit.network.protocol.ProtocolInfo;
+import cn.nukkit.network.proxy.ProxyProtocolHandler;
 import cn.nukkit.network.session.NetworkPlayerSession;
 import cn.nukkit.network.session.RakNetPlayerSession;
 import cn.nukkit.utils.Utils;
@@ -24,6 +25,7 @@ import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.raknet.RakChannelFactory;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
 import org.cloudburstmc.netty.channel.raknet.config.RakChannelOption;
+import org.cloudburstmc.netty.channel.raknet.config.RakServerCookieMode;
 import org.cloudburstmc.netty.handler.codec.raknet.server.RakServerRateLimiter;
 
 import java.lang.reflect.Constructor;
@@ -47,6 +49,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
     private Network network;
 
     private final Channel channel;
+    private final ProxyProtocolHandler proxyProtocolHandler;
     private final Map<InetSocketAddress, RakNetPlayerSession> sessions = new HashMap<>();
     private final Queue<RakNetPlayerSession> sessionCreationQueue = PlatformDependent.newMpscQueue();
 
@@ -54,6 +57,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
 
     public RakNetInterface(Server server) {
         this.server = server;
+        this.proxyProtocolHandler = server.enableProxyProtocol ? new ProxyProtocolHandler(server.proxyProtocolWhitelist) : null;
 
         boolean disableNative = Boolean.parseBoolean(System.getProperty("disableNativeEventLoop"));
 
@@ -72,12 +76,15 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .option(RakChannelOption.RAK_GUID, this.serverId)
                 .option(RakChannelOption.RAK_SUPPORTED_PROTOCOLS, new int[]{8, 9, 10, 11})
                 .childOption(RakChannelOption.RAK_ORDERING_CHANNELS, 1)
-                .option(RakChannelOption.RAK_SEND_COOKIE, this.server.enableRakSendCookie)
+                .option(RakChannelOption.RAK_SERVER_COOKIE_MODE, this.server.enableRakSendCookie ? RakServerCookieMode.ACTIVE : RakServerCookieMode.OFF)
                 .option(RakChannelOption.RAK_PACKET_LIMIT, this.server.rakPacketLimit)
                 .handler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel channel) {
-                        if (server.getPropertyBoolean("enable-query", false)) {
+                        if (proxyProtocolHandler != null) {
+                            channel.parent().pipeline().addFirst("proxy-protocol-handler", proxyProtocolHandler);
+                        }
+                        if (server.getPropertyBoolean("enable-query", true)) {
                             channel.pipeline().addLast("query-handler", new SimpleChannelInboundHandler<DatagramPacket>() {
                                 @Override
                                 protected void channelRead0(ChannelHandlerContext ctx, DatagramPacket packet) {
@@ -147,6 +154,9 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 } catch (Exception e) {
                     player.getNetworkSession().disconnect("Internal error");
                     log.error("Exception closing player " + player.getName(), e);
+                }
+                if (this.proxyProtocolHandler != null) {
+                    this.proxyProtocolHandler.clearMappingByRealAddress(player.getSocketAddress());
                 }
                 iterator.remove();
             } else {

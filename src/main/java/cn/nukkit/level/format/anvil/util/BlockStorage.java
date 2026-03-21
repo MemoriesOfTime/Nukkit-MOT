@@ -3,9 +3,11 @@ package cn.nukkit.level.format.anvil.util;
 import cn.nukkit.GameVersion;
 import cn.nukkit.Server;
 import cn.nukkit.block.Block;
+import cn.nukkit.level.BlockPalette;
 import cn.nukkit.level.GlobalBlockPalette;
 import cn.nukkit.level.Level;
 import cn.nukkit.level.util.PalettedBlockStorage;
+import cn.nukkit.network.protocol.ProtocolInfo;
 import cn.nukkit.utils.BinaryStream;
 import com.google.common.base.Preconditions;
 
@@ -59,8 +61,8 @@ public class BlockStorage {
     }
 
     private int getBlockData(int index) {
-        int base = blockData.get(index) & 0xf;
-        int extra = hasBlockDataExtras ? ((blockDataExtra.get(index) & 0xF) << 4) : 0;
+        int base = blockData.getUnchecked(index) & 0xf;
+        int extra = hasBlockDataExtras ? ((blockDataExtra.getUnchecked(index) & 0xF) << 4) : 0;
         int hyperA = hasBlockDataHyperA ? ((blockDataHyperA[index] & 0xff) << 8) : 0;
         int hyperB = hasBlockDataHyperB ? ((blockDataHyperB[index] & 0xffff) << 16) : 0;
         return (base | extra | hyperA | hyperB) & Block.DATA_MASK;
@@ -254,8 +256,8 @@ public class BlockStorage {
         }
         byte block = blockIds[index];
         byte extra = hasBlockIdExtras ? blockIdsExtra[index] : 0;
-        byte data = blockData.get(index);
-        byte dataExtra = hasBlockDataExtras ? blockDataExtra.get(index) : 0;
+        byte data = blockData.getUnchecked(index);
+        byte dataExtra = hasBlockDataExtras ? blockDataExtra.getUnchecked(index) : 0;
         byte hyperA = hasBlockDataHyperA ? blockDataHyperA[index] : 0;
         short hyperB = hasBlockDataHyperB ? blockDataHyperB[index] : 0;
         int fullData = (hyperB << 16 | hyperA << 8 | dataExtra << 4 | data) & Block.DATA_MASK;
@@ -437,14 +439,30 @@ public class BlockStorage {
     public void writeTo(GameVersion protocol, BinaryStream stream, boolean antiXray) {
         PalettedBlockStorage palettedBlockStorage = PalettedBlockStorage.createFromBlockPalette(protocol);
 
-        for (int i = 0; i < SECTION_SIZE; i++) {
-            int bid = getBlockId(i);
-            int blockData = getBlockData(i);
-            if (antiXray && bid < Block.MAX_BLOCK_ID && Level.xrayableBlocks[bid]) {
-                bid = Block.STONE;
-                blockData = 0;
+        if (protocol.getProtocol() >= ProtocolInfo.v1_16_100) {
+            BlockPalette blockPalette = GlobalBlockPalette.getPaletteByProtocol(protocol);
+            boolean useHash = GlobalBlockPalette.shouldUseHashedBlockNetworkIds(protocol);
+            for (int i = 0; i < SECTION_SIZE; i++) {
+                int fullBlock = getFullBlock(i);
+                if (antiXray) {
+                    int bid = fullBlock >> Block.DATA_BITS;
+                    if (bid < Block.MAX_BLOCK_ID && Level.xrayableBlocks[bid]) {
+                        fullBlock = Block.STONE << Block.DATA_BITS;
+                    }
+                }
+                palettedBlockStorage.setBlock(i, useHash ? blockPalette.getHashIdByFullId(fullBlock)
+                                                        : blockPalette.getRuntimeIdByFullId(fullBlock));
             }
-            palettedBlockStorage.setBlock(i, GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, blockData));
+        } else {
+            for (int i = 0; i < SECTION_SIZE; i++) {
+                int bid = getBlockId(i);
+                int blockData = getBlockData(i);
+                if (antiXray && bid < Block.MAX_BLOCK_ID && Level.xrayableBlocks[bid]) {
+                    bid = Block.STONE;
+                    blockData = 0;
+                }
+                palettedBlockStorage.setBlock(i, GlobalBlockPalette.getOrCreateRuntimeId(protocol, bid, blockData));
+            }
         }
 
         palettedBlockStorage.writeTo(stream);

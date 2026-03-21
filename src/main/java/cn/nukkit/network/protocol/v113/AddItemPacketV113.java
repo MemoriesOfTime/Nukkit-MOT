@@ -14,7 +14,7 @@ public class AddItemPacketV113 extends DataPacket_v113 {
 
     @Override
     public void decode() {
-
+        this.decodeUnsupported();
     }
 
     @Override

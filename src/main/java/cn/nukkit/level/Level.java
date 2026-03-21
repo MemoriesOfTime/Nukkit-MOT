@@ -59,7 +59,6 @@ import cn.nukkit.nbt.tag.*;
 import cn.nukkit.network.protocol.*;
 import cn.nukkit.plugin.InternalPlugin;
 import cn.nukkit.plugin.Plugin;
-import cn.nukkit.potion.Effect;
 import cn.nukkit.scheduler.BlockUpdateScheduler;
 import cn.nukkit.utils.*;
 import cn.nukkit.utils.collection.nb.Long2ObjectNonBlockingMap;
@@ -286,6 +285,7 @@ public class Level implements ChunkManager, Metadatable {
 
     private final Object2ObjectMap<GameVersion, ConcurrentMap<Long, Int2ObjectMap<Player>>> chunkSendQueues = new Object2ObjectOpenHashMap<>();
     private final Object2ObjectMap<GameVersion, LongSet> chunkSendTasks = new Object2ObjectOpenHashMap<>();
+    private final Object2ObjectMap<GameVersion, LongSet> pendingChunkRequests = new Object2ObjectOpenHashMap<>();
 
     private final Cache<Long, Boolean> entityNearbyCacheDirty = Caffeine.newBuilder()
             .maximumSize(512)
@@ -430,12 +430,12 @@ public class Level implements ChunkManager, Metadatable {
         this.levelCurrentTick = levelProvider.getCurrentTick();
         this.updateQueue = new BlockUpdateScheduler(this, levelCurrentTick);
 
-        this.chunkTickRadius = Math.min(this.server.getViewDistance(), Math.max(1, this.server.getPropertyInt("chunk-ticking-radius", 4)));
-        this.chunksPerTicks = this.server.getPropertyInt("chunk-ticking-per-tick", 40);
-        this.chunkGenerationQueueSize = this.server.getPropertyInt("chunk-generation-queue-size", 8);
-        this.chunkPopulationQueueSize = this.server.getPropertyInt("chunk-generation-population-queue-size", 8);
+        this.chunkTickRadius = Math.min(this.server.getViewDistance(), Math.max(1, this.server.getServerConfig().chunkSettings().tickingRadius()));
+        this.chunksPerTicks = this.server.getServerConfig().chunkSettings().tickingPerTick();
+        this.chunkGenerationQueueSize = this.server.getServerConfig().chunkSettings().generationQueueSize();
+        this.chunkPopulationQueueSize = this.server.getServerConfig().chunkSettings().generationPopulationQueueSize();
         this.chunkTickList.clear();
-        this.clearChunksOnTick = this.server.getPropertyBoolean("clear-chunk-tick-list", true);
+        this.clearChunksOnTick = this.server.getServerConfig().chunkSettings().clearChunkTickList();
         this.temporalVector = new Vector3(0, 0, 0);
         this.tickRate = 1;
 
@@ -1093,7 +1093,9 @@ public class Level implements ChunkManager, Metadatable {
 
         this.levelCurrentTick++;
 
-        this.unloadChunks();
+        if (this.levelCurrentTick % 10 == 0) {
+            this.unloadChunks();
+        }
 
         this.updateQueue.tick(this.levelCurrentTick);
 
@@ -1243,10 +1245,10 @@ public class Level implements ChunkManager, Metadatable {
 
     public Vector3 adjustPosToNearbyEntity(Vector3 pos) {
         pos.y = this.getHighestBlockAt(pos.getFloorX(), pos.getFloorZ());
-        AxisAlignedBB axisalignedbb = new SimpleAxisAlignedBB(pos.x, pos.y, pos.z, pos.getX(), this.getMaxBlockY(), pos.getZ()).expand(3, 3, 3);
+        AxisAlignedBB boundingBox = new SimpleAxisAlignedBB(pos.x, pos.y, pos.z, pos.getX(), this.getMaxBlockY(), pos.getZ()).expand(3, 3, 3);
         List<Entity> list = new ArrayList<>();
 
-        for (Entity entity : this.getCollidingEntities(axisalignedbb)) {
+        for (Entity entity : CollisionHelper.getCollidingEntities(this, boundingBox)) {
             if (entity.isAlive() && entity.canSeeSky()) {
                 list.add(entity);
             }
@@ -1403,7 +1405,7 @@ public class Level implements ChunkManager, Metadatable {
                     if (b instanceof Block) {
                         updateBlockPacket.blockRuntimeId = GlobalBlockPalette.getOrCreateRuntimeId(target.getGameVersion(), ((Block) b).getId(), ((Block) b).getDamage());
                     } else {
-                        updateBlockPacket.blockRuntimeId = this.getBlockRuntimeId(target.protocol, (int) b.x, (int) b.y, (int) b.z);
+                        updateBlockPacket.blockRuntimeId = this.getBlockRuntimeId(target.getGameVersion(), (int) b.x, (int) b.y, (int) b.z, 0);
                     }
                 } else {
                     Block bl = b instanceof Block ? (Block) b : getBlock((int) b.x, (int) b.y, (int) b.z);
@@ -1448,6 +1450,9 @@ public class Level implements ChunkManager, Metadatable {
         boolean blockTest = true;
 
         if (!chunkTickList.isEmpty()) {
+            final boolean doRandomTick = this.randomTickingEnabled();
+            final int randomTickSpeed = doRandomTick ? gameRules.getInteger(GameRule.RANDOM_TICK_SPEED) : 0;
+
             ObjectIterator<Long2IntMap.Entry> iter = chunkTickList.long2IntEntrySet().iterator();
             while (iter.hasNext()) {
                 Long2IntMap.Entry entry = iter.next();
@@ -1475,8 +1480,7 @@ public class Level implements ChunkManager, Metadatable {
                     entity.scheduleUpdate();
                 }
 
-                if (this.randomTickingEnabled()) {
-                    final int randomTickSpeed = gameRules.getInteger(GameRule.RANDOM_TICK_SPEED);
+                if (doRandomTick && randomTickSpeed > 0) {
                     if (this.useSections) {
                         for (ChunkSection section : ((Chunk) chunk).getSections()) {
                             if (!(section instanceof EmptyChunkSection)) {
@@ -1487,9 +1491,10 @@ public class Level implements ChunkManager, Metadatable {
                                     int z = n >> 8 & 0xF;
                                     int y = n >> 16 & 0xF;
 
-                                    int blockId = section.getBlockId(x, y, z);
+                                    int fullBlock = section.getFullBlock(x, y, z);
+                                    int blockId = fullBlock >> Block.DATA_BITS;
                                     if (blockId >= 0 && blockId <= Block.MAX_BLOCK_ID && randomTickBlocks[blockId]) {
-                                        Block block = Block.get(blockId, section.getBlockData(x, y, z), this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
+                                        Block block = Block.get(fullBlock, this, chunkX * 16 + x, (Y << 4) + y, chunkZ * 16 + z);
                                         block.onUpdate(BLOCK_UPDATE_RANDOM);
                                     }
                                 }
@@ -1718,88 +1723,143 @@ public class Level implements ChunkManager, Metadatable {
         return updateQueue.getPendingBlockUpdates(boundingBox);
     }
 
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)}
+     * @see CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)
+     */
+    @Deprecated
     public @NotNull Block[] getCollisionBlocks(AxisAlignedBB bb) {
         return this.getCollisionBlocks(bb, false);
     }
 
-    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB bb, boolean targetFirst) {
-        return getCollisionBlocks(bb, targetFirst, false);
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)}
+     * @see CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)
+     */
+    @Deprecated
+    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB boundingBox, boolean targetFirst) {
+        return CollisionHelper.getCollisionBlocks(
+                this,
+                boundingBox,
+                null,
+                targetFirst,
+                false
+        ).toArray(Block.EMPTY_ARRAY);
     }
 
-    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB bb, boolean targetFirst, boolean ignoreCollidesCheck) {
-        return getCollisionBlocks(bb, targetFirst, ignoreCollidesCheck, block -> block.getId() != 0);
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)}
+     * @see CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)
+     */
+    @Deprecated
+    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB boundingBox, boolean targetFirst, boolean ignoreCollidesCheck) {
+        return CollisionHelper.getCollisionBlocks(
+                this,
+                boundingBox,
+                null,
+                targetFirst,
+                ignoreCollidesCheck,
+                block -> block.getId() != BlockID.AIR
+        ).toArray(Block.EMPTY_ARRAY);
     }
 
-    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB bb, boolean targetFirst, boolean ignoreCollidesCheck, Predicate<Block> condition) {
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = NukkitMath.floorDouble(bb.getMinY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = NukkitMath.ceilDouble(bb.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
-
-        if (targetFirst) {
-            for (int z = minZ; z <= maxZ; ++z) {
-                for (int x = minX; x <= maxX; ++x) {
-                    for (int y = minY; y <= maxY; ++y) {
-                        Block block = this.getBlock(x, y, z, false);
-                        if (block != null && condition.test(block) && (ignoreCollidesCheck || block.collidesWithBB(bb))) {
-                            return new Block[]{block};
-                        }
-                    }
-                }
-            }
-        } else {
-            int capacity = Math.max(0, maxX - minX + 1) * Math.max(0, maxY - minY + 1) * Math.max(0, maxZ - minZ + 1);
-            if (capacity == 0) {
-                return Block.EMPTY_ARRAY;
-            }
-            Block[] collides = new Block[capacity];
-            int count = 0;
-            for (int z = minZ; z <= maxZ; ++z) {
-                for (int x = minX; x <= maxX; ++x) {
-                    for (int y = minY; y <= maxY; ++y) {
-                        Block block = this.getBlock(x, y, z, false);
-                        if (block != null && condition.test(block) && (ignoreCollidesCheck || block.collidesWithBB(bb))) {
-                            collides[count++] = block;
-                        }
-                    }
-                }
-            }
-            return count == capacity ? collides : Arrays.copyOf(collides, count);
-        }
-
-        return Block.EMPTY_ARRAY;
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)}
+     * @see CollisionHelper#getCollisionBlocks(Level, AxisAlignedBB)
+     */
+    @Deprecated
+    public @NotNull Block[] getCollisionBlocks(AxisAlignedBB boundingBox, boolean targetFirst, boolean ignoreCollidesCheck, Predicate<Block> condition) {
+        return CollisionHelper.getCollisionBlocks(
+                this,
+                boundingBox,
+                null,
+                targetFirst,
+                ignoreCollidesCheck,
+                condition
+        ).toArray(Block.EMPTY_ARRAY);
     }
 
-    public boolean hasCollisionBlocks(AxisAlignedBB bb) {
-        return this.hasCollisionBlocks(null, bb);
+    /**
+     * @deprecated Use {@link CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)}
+     * @see CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)
+     */
+    @Deprecated
+    public boolean hasCollisionBlocks(AxisAlignedBB boundingBox) {
+        return CollisionHelper.hasCollisionBlocks(
+                this,
+                null,
+                boundingBox
+        );
     }
 
-    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB bb) {
-        return hasCollisionBlocks(entity, bb, false);
+    /**
+     * @deprecated Use {@link CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)}
+     * @see CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)
+     */
+    @Deprecated
+    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB boundingBox) {
+        return CollisionHelper.hasCollisionBlocks(
+                this,
+                entity,
+                boundingBox,
+                false
+        );
     }
 
-    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB bb, boolean checkCanPassThrough) {
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = NukkitMath.floorDouble(bb.getMinY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = NukkitMath.ceilDouble(bb.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
+    /**
+     * @deprecated Use {@link CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)}
+     * @see CollisionHelper#hasCollisionBlocks(Level, Entity, AxisAlignedBB, boolean)
+     */
+    @Deprecated
+    public boolean hasCollisionBlocks(Entity entity, AxisAlignedBB boundingBox, boolean checkCanPassThrough) {
+        return CollisionHelper.hasCollisionBlocks(
+                this,
+                entity,
+                boundingBox,
+                checkCanPassThrough
+        );
+    }
 
-        for (int z = minZ; z <= maxZ; ++z) {
-            for (int x = minX; x <= maxX; ++x) {
-                for (int y = minY; y <= maxY; ++y) {
-                    Block block = this.getBlock(entity != null ? entity.chunk : null, x, y, z, 0, false);
-                    if ((!checkCanPassThrough || !block.canPassThrough()) && block.collidesWithBB(bb)) {
-                        return true;
-                    }
-                }
-            }
-        }
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB)}
+     * @see CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB)
+     */
+    @Deprecated
+    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB boundingBox) {
+        return CollisionHelper.getCollisionCubes(
+                this,
+                entity,
+                boundingBox
+        ).toArray(AxisAlignedBB.EMPTY_ARRAY);
+    }
 
-        return false;
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB, boolean)}
+     * @see CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB, boolean)
+     */
+    @Deprecated
+    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB boundingBox, boolean entities) {
+        return CollisionHelper.getCollisionCubes(
+                this,
+                entity,
+                boundingBox,
+                entities
+        ).toArray(AxisAlignedBB.EMPTY_ARRAY);
+    }
+
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB, boolean, boolean)}
+     * @see CollisionHelper#getCollisionCubes(Level, Entity, AxisAlignedBB, boolean, boolean)
+     */
+    @Deprecated
+    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB boundingBox, boolean entities, boolean solidEntities) {
+        return CollisionHelper.getCollisionCubes(
+                this,
+                entity,
+                boundingBox,
+                entities,
+                solidEntities
+        ).toArray(AxisAlignedBB.EMPTY_ARRAY);
     }
 
     public boolean isFullBlock(Vector3 pos) {
@@ -1816,56 +1876,22 @@ public class Level implements ChunkManager, Metadatable {
         return bb != null && bb.getAverageEdgeLength() >= 1;
     }
 
-    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB bb) {
-        return this.getCollisionCubes(entity, bb, true);
-    }
-
-    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB bb, boolean entities) {
-        return getCollisionCubes(entity, bb, entities, false);
-    }
-
-    public AxisAlignedBB[] getCollisionCubes(Entity entity, AxisAlignedBB bb, boolean entities, boolean solidEntities) {
-        int minX = NukkitMath.floorDouble(bb.getMinX());
-        int minY = NukkitMath.floorDouble(bb.getMinY());
-        int minZ = NukkitMath.floorDouble(bb.getMinZ());
-        int maxX = NukkitMath.ceilDouble(bb.getMaxX());
-        int maxY = NukkitMath.ceilDouble(bb.getMaxY());
-        int maxZ = NukkitMath.ceilDouble(bb.getMaxZ());
-
-        List<AxisAlignedBB> collides = new ArrayList<>();
-
-        for (int z = minZ; z <= maxZ; ++z) {
-            for (int x = minX; x <= maxX; ++x) {
-                for (int y = minY; y <= maxY; ++y) {
-                    Block block = this.getBlock(x, y, z, false);
-                    if (block.getId() == BlockID.BARRIER && entity.canPassThroughBarrier()) {
-                        continue;
-                    }
-                    if (!block.canPassThrough() && block.collidesWithBB(bb)) {
-                        collides.add(block.getBoundingBox());
-                    }
-                }
-            }
-        }
-
-        if (entities || solidEntities) {
-            for (Entity ent : this.getCollidingEntities(bb.grow(0.25f, 0.25f, 0.25f), entity)) {
-                if (solidEntities || !ent.canPassThrough()) {
-                    collides.add(ent.boundingBox.clone());
-                }
-            }
-        }
-
-        return collides.toArray(AxisAlignedBB.EMPTY_ARRAY);
-    }
-
-    public boolean hasCollision(Entity entity, AxisAlignedBB bb, boolean entities) {
-        if (this.hasCollisionBlocks(entity, bb, true)) {
+    public boolean hasCollision(Entity entity, AxisAlignedBB boundingBox, boolean entities) {
+        if (CollisionHelper.hasCollisionBlocks(
+                this,
+                entity,
+                boundingBox,
+                true
+        )) {
             return true;
         }
 
         if (entities) {
-            return this.getCollidingEntities(bb.grow(0.25f, 0.25f, 0.25f), entity).length > 0;
+            return !CollisionHelper.getCollidingEntities(
+                    this,
+                    boundingBox.grow(0.25f, 0.25f, 0.25f),
+                    entity
+            ).isEmpty();
         }
         return false;
     }
@@ -2574,21 +2600,9 @@ public class Level implements ChunkManager, Metadatable {
                 breakTime = 0.15;
             }
 
-            if (player.hasEffect(Effect.HASTE)) {
-                breakTime *= 1 - (0.2 * (player.getEffect(Effect.HASTE).getAmplifier() + 1));
+            if (breakTime > 0) {
+                breakTime -= 0.15; // 保留 3 tick（150ms）宽限用于网络延迟补偿
             }
-
-            if (player.hasEffect(Effect.MINING_FATIGUE)) {
-                breakTime *= 1 - (0.3 * (player.getEffect(Effect.MINING_FATIGUE).getAmplifier() + 1));
-            }
-
-            Enchantment eff = item.getEnchantment(Enchantment.ID_EFFICIENCY);
-
-            if (eff != null && eff.getLevel() > 0) {
-                breakTime *= 1 - (0.3 * eff.getLevel());
-            }
-
-            breakTime -= 0.15;
 
             Item[] eventDrops;
             if (isSilkTouch && target.canSilkTouch() || target.isDropOriginal(player)) {
@@ -2596,8 +2610,8 @@ public class Level implements ChunkManager, Metadatable {
             } else {
                 eventDrops = target.getDrops(player, item);
             }
-            //TODO 直接加1000可能会影响其他判断，需要进一步改进
-            boolean fastBreak = (player.lastBreak + breakTime * 1000) > Long.sum(System.currentTimeMillis(), 1000);
+            // lastBreak < 0 表示首次挖掘（初始值 -1），直接放行；否则验证已等待足够时间
+            boolean fastBreak = player.lastBreak >= 0 && (player.lastBreak + breakTime * 1000) > System.currentTimeMillis();
             BlockBreakEvent ev = new BlockBreakEvent(player, target, face, item, eventDrops, player.isCreative(), fastBreak);
 
             if ((player.isSurvival() || player.isAdventure()) && !target.isBreakable(item)) {
@@ -2608,12 +2622,12 @@ public class Level implements ChunkManager, Metadatable {
                 ev.setCancelled();
             }
 
-            player.lastBreak = System.currentTimeMillis();
-
             this.server.getPluginManager().callEvent(ev);
             if (ev.isCancelled()) {
                 return null;
             }
+
+            player.lastBreak = System.currentTimeMillis();
 
             drops = ev.getDrops();
             dropExp = ev.getDropExp();
@@ -2794,7 +2808,7 @@ public class Level implements ChunkManager, Metadatable {
 
 
         if (!hand.canPassThrough() && hand.getBoundingBox() != null) {
-            Entity[] entities = this.getCollidingEntities(hand.getBoundingBox());
+            List<Entity> entities = CollisionHelper.getCollidingEntities(this, hand.getBoundingBox());
             //int realCount = 0;
             for (Entity e : entities) {
                 if (e == player || e instanceof EntityArrow || e instanceof EntityItem || (e instanceof Player && ((Player) e).isSpectator() || !e.canCollide())) {
@@ -2966,32 +2980,22 @@ public class Level implements ChunkManager, Metadatable {
         return entities.values().toArray(new Entity[0]);
     }
 
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollidingEntities(Level, AxisAlignedBB)}
+     * @see CollisionHelper#getCollidingEntities(Level, AxisAlignedBB)
+     */
+    @Deprecated
     public Entity[] getCollidingEntities(AxisAlignedBB bb) {
         return this.getCollidingEntities(bb, null);
     }
 
-    public Entity[] getCollidingEntities(AxisAlignedBB bb, Entity entity) {
-        List<Entity> nearby = new ArrayList<>();
-
-        if (entity == null || entity.canCollide()) {
-            int minX = NukkitMath.floorDouble((bb.getMinX() - 2) / 16);
-            int maxX = NukkitMath.ceilDouble((bb.getMaxX() + 2) / 16);
-            int minZ = NukkitMath.floorDouble((bb.getMinZ() - 2) / 16);
-            int maxZ = NukkitMath.ceilDouble((bb.getMaxZ() + 2) / 16);
-
-            for (int x = minX; x <= maxX; ++x) {
-                for (int z = minZ; z <= maxZ; ++z) {
-                    for (Entity ent : this.getChunkEntities(x, z, false).values()) {
-                        if ((entity == null || (ent != entity && entity.canCollideWith(ent)))
-                                && ent.boundingBox.intersectsWith(bb)) {
-                            nearby.add(ent);
-                        }
-                    }
-                }
-            }
-        }
-
-        return nearby.toArray(new Entity[0]);
+    /**
+     * @deprecated Use {@link CollisionHelper#getCollidingEntities(Level, AxisAlignedBB, Entity)}
+     * @see CollisionHelper#getCollidingEntities(Level, AxisAlignedBB, Entity)
+     */
+    @Deprecated
+    public Entity[] getCollidingEntities(AxisAlignedBB boundingBox, Entity entity) {
+        return CollisionHelper.getCollidingEntities(this, boundingBox, entity).toArray(EMPTY_ENTITY_ARR);
     }
 
     public Entity[] getNearbyEntities(AxisAlignedBB bb) {
@@ -3820,6 +3824,7 @@ public class Level implements ChunkManager, Metadatable {
 
         this.getChunkSendQueue(player.getGameVersion()).computeIfAbsent(index, k ->
                 new Int2ObjectOpenHashMap<>()).put(player.getLoaderId(), player);
+        this.getPendingChunkRequests(player.getGameVersion()).add(index);
     }
 
     private void sendChunk(int x, int z, long index, DataPacket packet) {
@@ -3845,17 +3850,21 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     private void processChunkRequest() {
-        // Map shorted by index => requested protocols
         Long2ObjectMap<ObjectSet<GameVersion>> chunkRequests = new Long2ObjectOpenHashMap<>();
-        for (GameVersion protocolId : this.chunkSendQueues.keySet()) {
-            for (long index : this.getChunkSendQueue(protocolId).keySet()) {
-                LongSet tasks = this.getChunkSendTasks(protocolId);
-                if (tasks.contains(index)) {
-                    continue;
-                }
-                chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
-                tasks.add(index);
+        for (GameVersion protocolId : this.pendingChunkRequests.keySet()) {
+            LongSet pending = this.getPendingChunkRequests(protocolId);
+            if (pending.isEmpty()) {
+                continue;
             }
+            LongSet tasks = this.getChunkSendTasks(protocolId);
+            ConcurrentMap<Long, Int2ObjectMap<Player>> queue = this.getChunkSendQueue(protocolId);
+            for (long index : pending) {
+                if (!tasks.contains(index) && queue.containsKey(index)) {
+                    chunkRequests.computeIfAbsent(index, l -> new ObjectOpenHashSet<>()).add(protocolId);
+                    tasks.add(index);
+                }
+            }
+            pending.clear();
         }
 
         this.chunkRequestInternal(chunkRequests);
@@ -4489,18 +4498,6 @@ public class Level implements ChunkManager, Metadatable {
     }
 
     public void addEntityMovement(Entity entity, double x, double y, double z, double yaw, double pitch, double headYaw) {
-        MoveEntityAbsolutePacket pk = new MoveEntityAbsolutePacket();
-        pk.eid = entity.getId();
-        pk.x = x;
-        pk.y = y;
-        pk.z = z;
-        pk.yaw = yaw;
-        pk.headYaw = headYaw;
-        pk.pitch = pitch;
-        pk.onGround = entity.onGround;
-
-        entity.getViewers().values().stream().filter(p -> p.protocol < ProtocolInfo.v1_16_100).forEach(p -> p.dataPacket(pk));
-
         MoveEntityDeltaPacket pk2 = new MoveEntityDeltaPacket();
         pk2.eid = entity.getId();
         if (entity.lastX != x) {
@@ -4531,7 +4528,25 @@ public class Level implements ChunkManager, Metadatable {
             pk2.flags |= MoveEntityDeltaPacket.FLAG_ON_GROUND;
         }
 
-        entity.getViewers().values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_16_100).forEach(p -> p.dataPacket(pk2));
+        MoveEntityAbsolutePacket pk = null; // Lazily created for legacy clients only
+        for (Player p : entity.getViewers().values()) {
+            if (p.protocol < ProtocolInfo.v1_16_100) {
+                if (pk == null) {
+                    pk = new MoveEntityAbsolutePacket();
+                    pk.eid = entity.getId();
+                    pk.x = x;
+                    pk.y = y;
+                    pk.z = z;
+                    pk.yaw = yaw;
+                    pk.headYaw = headYaw;
+                    pk.pitch = pitch;
+                    pk.onGround = entity.onGround;
+                }
+                p.dataPacket(pk);
+            } else {
+                p.dataPacket(pk2);
+            }
+        }
     }
 
     public boolean isRaining() {
@@ -5229,6 +5244,11 @@ public class Level implements ChunkManager, Metadatable {
     private LongSet getChunkSendTasks(GameVersion protocol) {
         GameVersion protocolId = this.getChunkProtocol(protocol);
         return this.chunkSendTasks.computeIfAbsent(protocolId, i -> new LongOpenHashSet());
+    }
+
+    private LongSet getPendingChunkRequests(GameVersion protocol) {
+        GameVersion protocolId = this.getChunkProtocol(protocol);
+        return this.pendingChunkRequests.computeIfAbsent(protocolId, i -> new LongOpenHashSet());
     }
 
     private GameVersion getChunkProtocol(GameVersion version) {

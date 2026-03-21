@@ -365,30 +365,50 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
 
     public static int getBlockLight(int blockId) {
         if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            return light[0]; // TODO: just temporary
+            return CustomBlockManager.get().getCachedLight(blockId);
         }
         return light[blockId];
     }
 
     public static int getBlockLightFilter(int blockId) {
         if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            return lightFilter[0]; // TODO: just temporary
+            return CustomBlockManager.get().getCachedLightFilter(blockId);
         }
         return lightFilter[blockId];
     }
 
     public static boolean isBlockSolidById(int blockId) {
         if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            return solid[1]; // TODO: just temporary
+            return CustomBlockManager.get().getCachedSolid(blockId);
         }
         return solid[blockId];
     }
 
     public static boolean isBlockTransparentById(int blockId) {
         if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
-            return transparent[1]; // TODO: just temporary
+            return CustomBlockManager.get().getCachedTransparent(blockId);
         }
         return transparent[blockId];
+    }
+
+    public static boolean getBlockDiffusesSkyLight(int blockId) {
+        if (blockId >= CustomBlockManager.LOWEST_CUSTOM_BLOCK_ID) {
+            return CustomBlockManager.get().getCachedDiffusesSkyLight(blockId);
+        }
+        return diffusesSkyLight[blockId];
+    }
+
+    /**
+     * 计算自定义方块的光过滤值（与 lightFilter[] 数组对同类型原版方块的处理保持一致）
+     * Compute light filter value for a custom block, consistent with how lightFilter[] handles equivalent vanilla block types.
+     */
+    public static int computeCustomBlockLightFilter(Block block) {
+        if (block.isTransparent()) {
+            return (block instanceof BlockLiquid || block instanceof BlockIce) ? 2 : 1;
+        } else if (block instanceof BlockSlime) {
+            return 1;
+        }
+        return 15;
     }
 
     public static Block fromFullId(int fullId) {
@@ -555,6 +575,10 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
     }
 
     public boolean canBeActivated() {
+        return false;
+    }
+
+    public boolean hasDynamicCollision() {
         return false;
     }
 
@@ -843,9 +867,9 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
             hasAquaAffinity = Optional.ofNullable(player.getInventory().getHelmet().getEnchantment(Enchantment.ID_WATER_WORKER))
                     .map(Enchantment::getLevel).map(l -> l >= 1).orElse(false);
             hasteEffectLevel = Optional.ofNullable(player.getEffect(Effect.HASTE))
-                    .map(Effect::getAmplifier).orElse(0);
+                    .map(Effect::getAmplifier).orElse(-1) + 1;
             miningFatigueLevel = Optional.ofNullable(player.getEffect(Effect.MINING_FATIGUE))
-                    .map(Effect::getAmplifier).orElse(0);
+                    .map(Effect::getAmplifier).orElse(-1) + 1;
         }
 
 
@@ -862,7 +886,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
                     .map(Enchantment::getLevel).orElse(0);
 
             if (canHarvest && efficiencyLevel > 0) {
-                speedMultiplier += efficiencyLevel ^ 2 + 1;
+                speedMultiplier += efficiencyLevel * efficiencyLevel + 1;
             }
 
             if (hasConduitPower) hasteEffectLevel = Integer.max(hasteEffectLevel, 2);
@@ -873,7 +897,7 @@ public abstract class Block extends Position implements Metadatable, Cloneable, 
         }
 
         if (miningFatigueLevel > 0) {
-            speedMultiplier /= 3 ^ miningFatigueLevel;
+            speedMultiplier *= Math.pow(0.3, miningFatigueLevel);
         }
 
         seconds /= speedMultiplier;

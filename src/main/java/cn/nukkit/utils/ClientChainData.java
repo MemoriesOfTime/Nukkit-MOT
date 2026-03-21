@@ -158,6 +158,12 @@ public final class ClientChainData implements LoginChainData {
     }
 
     @Override
+    @Nullable
+    public String getViaProxyAuthToken() {
+        return viaProxyAuthToken;
+    }
+
+    @Override
     public JsonObject getRawData() {
         return rawData;
     }
@@ -256,6 +262,7 @@ public final class ClientChainData implements LoginChainData {
     private int defaultInputMode;
     private String waterdogIP;
     private String waterdogXUID;
+    private String viaProxyAuthToken;
     private int UIProfile;
     private String capeData;
     private String titleId;
@@ -305,6 +312,7 @@ public final class ClientChainData implements LoginChainData {
         if (skinToken.has("CapeData")) this.capeData = skinToken.get("CapeData").getAsString();
         if (skinToken.has("Waterdog_IP")) this.waterdogIP = skinToken.get("Waterdog_IP").getAsString();
         if (skinToken.has("Waterdog_XUID")) this.waterdogXUID = skinToken.get("Waterdog_XUID").getAsString();
+        if (skinToken.has("ViaProxyAuthToken")) this.viaProxyAuthToken = skinToken.get("ViaProxyAuthToken").getAsString();
 
         if (this.isWaterdog()) {
             xboxAuthed = true;

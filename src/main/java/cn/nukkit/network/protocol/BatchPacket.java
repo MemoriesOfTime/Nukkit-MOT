@@ -22,6 +22,7 @@ public class BatchPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.encodeUnsupported();
     }
 
     public void trim() {

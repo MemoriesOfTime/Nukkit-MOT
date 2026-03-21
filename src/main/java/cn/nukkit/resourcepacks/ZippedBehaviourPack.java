@@ -51,4 +51,9 @@ public class ZippedBehaviourPack extends ZippedResourcePack {
     public boolean isBehaviourPack() {
         return this.isBehaviourPack;
     }
+
+    @Override
+    public boolean isAddonPack() {
+        return this.isBehaviourPack;
+    }
 }

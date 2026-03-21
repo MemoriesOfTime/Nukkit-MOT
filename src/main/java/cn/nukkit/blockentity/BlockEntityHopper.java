@@ -4,8 +4,13 @@ import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockComposter;
 import cn.nukkit.block.BlockHopper;
+import cn.nukkit.event.blockentity.HopperSearchItemEvent;
+import cn.nukkit.event.blockentity.HopperUpdateEvent;
 import cn.nukkit.event.inventory.InventoryMoveItemEvent;
-import cn.nukkit.inventory.*;
+import cn.nukkit.inventory.FurnaceInventory;
+import cn.nukkit.inventory.HopperInventory;
+import cn.nukkit.inventory.Inventory;
+import cn.nukkit.inventory.InventoryHolder;
 import cn.nukkit.item.Item;
 import cn.nukkit.level.Position;
 import cn.nukkit.level.format.FullChunk;
@@ -123,28 +128,41 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             return false;
         }
 
-        this.transferCooldown--;
+        HopperUpdateEvent ev = new HopperUpdateEvent(this);
+        ev.call();
+        if (ev.isCancelled()) {
+            return true;
+        }
+
+        this.transferCooldown = ev.getTransferCooldown() - 1;
 
         if (!this.isOnTransferCooldown()) {
             if (this.level.isBlockPowered(this.getBlock())) {
                 return true;
             }
 
+            HopperSearchItemEvent searchEvent = new HopperSearchItemEvent(this, false, this.pickupArea);
+            searchEvent.call();
+
             boolean changed = false;
 
-            if (!this.inventory.isFull()) {
-                BlockEntity blockEntity = this.level.getBlockEntity(this.up());
-                Block block = null;
-                if (blockEntity instanceof BlockEntityContainer ||
-                        (block = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() + 1, this.getFloorZ(), false)) instanceof BlockComposter) {
-                    changed = this.pullItems(blockEntity, block);
-                } else {
-                    changed = this.pullItemsFromMinecart() || this.pickupItems();
+            if (!searchEvent.isCancelled() && !searchEvent.isCancelPull()) {
+                if (!this.inventory.isFull()) {
+                    BlockEntity blockEntity = this.level.getBlockEntity(this.up());
+                    Block block = null;
+                    if (blockEntity instanceof BlockEntityContainer ||
+                            (block = this.level.getBlock(this.chunk, this.getFloorX(), this.getFloorY() + 1, this.getFloorZ(), false)) instanceof BlockComposter) {
+                        changed = this.pullItems(blockEntity, block);
+                    } else {
+                        changed = this.pullItemsFromMinecart() || this.pickupItems(searchEvent.getPickupArea());
+                    }
                 }
             }
 
-            if (!changed && !this.inventory.isEmpty()) {
-                changed = this.pushItemsIntoMinecart() || this.pushItems();
+            if (!changed && !searchEvent.isCancelled() && !searchEvent.isCancelPush()) {
+                if (!this.inventory.isEmpty()) {
+                    changed = this.pushItemsIntoMinecart() || this.pushItems();
+                }
             }
 
             if (changed) {
@@ -307,7 +325,7 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                                 item.count--;
                                 pushedItem = true;
                             }
-                        } else if (smelting.getId() == itemToAdd.getId() && smelting.getDamage() == itemToAdd.getDamage() && smelting.count < smelting.getMaxStackSize()) {
+                        } else if (smelting.equals(itemToAdd, true, false) && smelting.count < smelting.getMaxStackSize()) {
                             InventoryMoveItemEvent event = new InventoryMoveItemEvent(inv, targetInv, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
                             this.server.getPluginManager().callEvent(event);
                             if (!event.isCancelled()) {
@@ -317,7 +335,7 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                                 pushedItem = true;
                             }
                         }
-                    } else if (Fuel.duration.containsKey(itemToAdd.getId())) {
+                    } else if (itemToAdd.getFuelTime() != null) {
                         Item fuel = targetInv.getFuel();
                         if (fuel.isNull()) {
                             InventoryMoveItemEvent event = new InventoryMoveItemEvent(inv, targetInv, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
@@ -327,7 +345,7 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
                                 item.count--;
                                 pushedItem = true;
                             }
-                        } else if (fuel.getId() == itemToAdd.getId() && fuel.getDamage() == itemToAdd.getDamage() && fuel.count < fuel.getMaxStackSize()) {
+                        } else if (fuel.equals(itemToAdd, true, false) && fuel.count < fuel.getMaxStackSize()) {
                             InventoryMoveItemEvent event = new InventoryMoveItemEvent(inv, targetInv, this, itemToAdd, InventoryMoveItemEvent.Action.SLOT_CHANGE);
                             this.server.getPluginManager().callEvent(event);
                             if (!event.isCancelled()) {

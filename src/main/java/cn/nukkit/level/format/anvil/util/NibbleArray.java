@@ -19,7 +19,20 @@ public class NibbleArray implements Cloneable {
 
     public byte get(int index) {
         Preconditions.checkElementIndex(index, data.length << 1);
-        byte val = data[index / 2];
+        byte val = data[index >> 1];
+        if ((index & 1) == 0) {
+            return (byte) (val & 0x0f);
+        } else {
+            return (byte) ((val & 0xf0) >>> 4);
+        }
+    }
+
+    /**
+     * 无边界检查的快速读取，调用方需确保 index 合法
+     * Fast get without bounds check, caller must ensure index is valid
+     */
+    public byte getUnchecked(int index) {
+        byte val = data[index >> 1];
         if ((index & 1) == 0) {
             return (byte) (val & 0x0f);
         } else {
