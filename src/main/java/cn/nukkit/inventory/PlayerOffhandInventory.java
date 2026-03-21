@@ -122,7 +122,7 @@ public class PlayerOffhandInventory extends BaseInventory {
         item = ev.getNewItem();
 
         if (holder instanceof Player) {
-            PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, oldItem, item, index);
+            PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, oldItem, item);
             Server.getInstance().getPluginManager().callEvent(ev2);
             if (ev2.isCancelled()) {
                 this.sendSlot(index, this.getViewers());
@@ -156,7 +156,7 @@ public class PlayerOffhandInventory extends BaseInventory {
             item = ev.getNewItem();
 
             if (holder instanceof Player) {
-                PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, old, item, index);
+                PlayerOffhandInventoryChangeEvent ev2 = new PlayerOffhandInventoryChangeEvent((Player) holder, old, item);
                 Server.getInstance().getPluginManager().callEvent(ev2);
                 if (ev2.isCancelled()) {
                     this.sendSlot(index, this.getViewers());
