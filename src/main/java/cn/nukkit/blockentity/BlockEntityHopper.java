@@ -128,6 +128,11 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             return false;
         }
 
+        // Sleep when redstone-locked
+        if (this.level.isBlockPowered(this.getBlock())) {
+            return false;
+        }
+
         HopperUpdateEvent ev = new HopperUpdateEvent(this);
         ev.call();
         if (ev.isCancelled()) {
@@ -137,10 +142,6 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
         this.transferCooldown = ev.getTransferCooldown() - 1;
 
         if (!this.isOnTransferCooldown()) {
-            if (this.level.isBlockPowered(this.getBlock())) {
-                return true;
-            }
-
             HopperSearchItemEvent searchEvent = new HopperSearchItemEvent(this, false, this.pickupArea);
             searchEvent.call();
 
@@ -168,6 +169,9 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             if (changed) {
                 this.setTransferCooldown(8);
                 this.setDirty();
+            } else {
+                // No transfer occurred, reduce update frequency
+                this.setTransferCooldown(8);
             }
         }
 

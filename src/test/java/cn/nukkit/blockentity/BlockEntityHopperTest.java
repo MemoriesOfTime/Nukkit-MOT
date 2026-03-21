@@ -502,7 +502,7 @@ public class BlockEntityHopperTest {
         }
 
         @Test
-        @DisplayName("E2: redstone powered skips transfer")
+        @DisplayName("E2: redstone powered sleeps (returns false)")
         void poweredSkipsTransfer() {
             HopperTestContext ctx = createHopper();
             ctx.hopper.transferCooldown = 1; // Will become 0 after decrement
@@ -515,7 +515,7 @@ public class BlockEntityHopperTest {
 
             boolean result = ctx.hopper.onUpdate();
 
-            assertTrue(result); // Returns true but does NOT transfer
+            assertFalse(result); // Returns false to sleep when powered
             assertEquals(5, ctx.hopper.getInventory().getItem(0).getCount());
         }
 

@@ -73,6 +73,8 @@ public abstract class BlockEntity extends Position {
 
     public boolean movable;
 
+    public volatile boolean scheduledForBlockEntityUpdate = false;
+
     public boolean closed = false;
     public CompoundTag namedTag;
     protected Server server;
