@@ -1680,12 +1680,20 @@ public class BinaryStream {
         return this.offset < 0 || this.offset >= this.buffer.length;
     }
 
-    @SneakyThrows(IOException.class)
     public CompoundTag getTag() {
+        return getTag(ByteOrder.BIG_ENDIAN, false);
+    }
+
+    public CompoundTag getTagNetworkLE() {
+        return getTag(ByteOrder.LITTLE_ENDIAN, true);
+    }
+
+    @SneakyThrows(IOException.class)
+    public CompoundTag getTag(ByteOrder endianness, boolean network) {
         ByteArrayInputStream is = new ByteArrayInputStream(buffer, offset, buffer.length);
         int initial = is.available();
         try {
-            return NBTIO.read(is);
+            return NBTIO.read(is, endianness, network);
         } finally {
             offset += initial - is.available();
         }

@@ -82,6 +82,12 @@ dependencies {
 
     api(libs.block.state.updater)
 
+    testImplementation(libs.cloudburst.bedrock.codec) {
+        exclude("io.netty", "netty-buffer")
+    }
+    testImplementation("org.cloudburstmc.math:immutable:2.0-SNAPSHOT")
+    testImplementation("org.allaymc:protocol-extension:0.1.7-SNAPSHOT")
+
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.bundles.mockito)
     testRuntimeOnly(libs.junit.engine)

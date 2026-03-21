@@ -6,6 +6,9 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+/**
+ * @since v630 (1.20.50)
+ */
 @EqualsAndHashCode(doNotUseGetters = true, callSuper = false)
 @ToString(doNotUseGetters = true)
 public class ToggleCrafterSlotRequestPacket extends DataPacket {
@@ -32,7 +35,7 @@ public class ToggleCrafterSlotRequestPacket extends DataPacket {
 
     @Override
     public void decode() {
-        this.blockPosition = this.getVector3f();
+        this.blockPosition = new Vector3f(this.getLInt(), this.getLInt(), this.getLInt());
         this.slot = (byte) this.getByte();
         this.disabled = this.getBoolean();
     }
@@ -40,7 +43,9 @@ public class ToggleCrafterSlotRequestPacket extends DataPacket {
     @Override
     public void encode() {
         this.reset();
-        this.putVector3f(this.blockPosition);
+        this.putLInt((int) this.blockPosition.x);
+        this.putLInt((int) this.blockPosition.y);
+        this.putLInt((int) this.blockPosition.z);
         this.putByte(this.slot);
         this.putBoolean(this.disabled);
     }

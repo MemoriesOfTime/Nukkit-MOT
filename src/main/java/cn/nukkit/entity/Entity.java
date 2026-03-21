@@ -49,7 +49,6 @@ import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
 
 import static cn.nukkit.network.protocol.SetEntityLinkPacket.*;
 import static cn.nukkit.utils.Utils.dynamic;
@@ -403,21 +402,13 @@ public abstract class Entity extends Location implements Metadatable {
     private static final Map<String, Class<? extends Entity>> knownEntities = new HashMap<>();
     private static final Map<String, String> shortNames = new HashMap<>();
 
-    private static final Map<Integer, String> entityRuntimeMappingOld = new HashMap<>();
-    private static final Map<Integer, String> entityRuntimeMapping407 = new HashMap<>();
-    private static final Map<Integer, String> entityRuntimeMapping440 = new HashMap<>();
-    private static final Map<Integer, String> entityRuntimeMapping527 = new HashMap<>();
-    private static final Map<Integer, String> entityRuntimeMapping589 = new HashMap<>();
+    private static final Map<Integer, String> entityRuntimeMapping = new HashMap<>();
 
     private static final Map<Integer, CompoundTag> entityIdentifiersMap = new HashMap<>();
     private static final Map<Integer, byte[]> entityIdentifiersCache = new HashMap<>();
 
     static {
-        AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMappingOld, ProtocolInfo.v1_2_0);
-        AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMapping407, ProtocolInfo.v1_16_0);
-        AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMapping440, ProtocolInfo.v1_17_0);
-        AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMapping527, ProtocolInfo.v1_19_0);
-        AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMapping589, ProtocolInfo.v1_20_0);
+        AddEntityPacket.setupLegacyIdentifiers(entityRuntimeMapping);
 
         initEntityIdentifiers(ProtocolInfo.v1_2_0, Base64.getDecoder().decode(AvailableEntityIdentifiersPacket.NBT313));
         initEntityIdentifiers(ProtocolInfo.v1_10_0, Base64.getDecoder().decode(AvailableEntityIdentifiersPacket.NBT340));
@@ -1234,24 +1225,12 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public static Map<Integer, String> getEntityRuntimeMapping() {
-        return getEntityRuntimeMapping(ProtocolInfo.CURRENT_PROTOCOL);
+        return entityRuntimeMapping;
     }
 
+    @Deprecated(forRemoval = true)
     public static Map<Integer, String> getEntityRuntimeMapping(int protocolId) {
-        return Collections.unmodifiableMap(getEntityRuntimeMappingInternal(protocolId));
-    }
-
-    protected static Map<Integer, String> getEntityRuntimeMappingInternal(int protocolId) {
-        if (protocolId >= ProtocolInfo.v1_20_0_23) {
-            return entityRuntimeMapping589;
-        } else if (protocolId >= ProtocolInfo.v1_19_0_29) {
-            return entityRuntimeMapping527;
-        } else if (protocolId >= ProtocolInfo.v1_17_0) {
-            return entityRuntimeMapping440;
-        } else if (protocolId >= ProtocolInfo.v1_16_0) {
-            return entityRuntimeMapping407;
-        }
-        return entityRuntimeMappingOld;
+        return entityRuntimeMapping;
     }
 
     private static void initEntityIdentifiers(int protocolId, byte[] bytes) {
@@ -1282,7 +1261,7 @@ public abstract class Entity extends Location implements Metadatable {
     }
 
     public static void registerEntityIdentifier(String identifier, int entityId, CompoundTag nbtEntry, int protocolId) {
-        Map<Integer, String> runtimeMapping = getEntityRuntimeMappingInternal(protocolId);
+        Map<Integer, String> runtimeMapping = getEntityRuntimeMapping();
         runtimeMapping.put(entityId, identifier);
 
         int protocol = correctEntityIdentifiersProtocol(protocolId);
@@ -2080,7 +2059,11 @@ public abstract class Entity extends Location implements Metadatable {
         pk.yaw = yaw;
         pk.teleport = false;
         pk.onGround = this.onGround;
-        Server.broadcastPacket(hasSpawned.values().stream().filter(p -> p.protocol >= ProtocolInfo.v1_7_0).collect(Collectors.toList()), pk);
+        for (Player p : hasSpawned.values()) {
+            if (p.protocol >= ProtocolInfo.v1_7_0) {
+                p.dataPacket(pk);
+            }
+        }
     }
 
     @Override
@@ -3466,6 +3449,13 @@ public abstract class Entity extends Location implements Metadatable {
         return null;
     }
 
+    public final Boolean getBooleanEntityProperty(String identifier) {
+        if (intProperties.containsKey(identifier)) {
+            return intProperties.getOrDefault(identifier, 0) == 1;
+        }
+        return null;
+    }
+
     private void initEntityProperties() {
         if(this.getIdentifier() != null) {
             initEntityProperties(this.getIdentifier().toString());
@@ -3493,7 +3483,7 @@ public abstract class Entity extends Location implements Metadatable {
         }
     }
 
-    private PropertySyncData propertySyncData() {
+    protected PropertySyncData propertySyncData() {
         Collection<Integer> intValues = intProperties.values();
         int[] intArray = new int[intValues.size()];
         int i = 0;

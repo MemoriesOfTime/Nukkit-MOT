@@ -49,6 +49,7 @@ public class CraftingEventPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.encodeUnsupported();
     }
 
     @Override

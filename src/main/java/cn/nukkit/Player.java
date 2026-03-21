@@ -17,6 +17,7 @@ import cn.nukkit.entity.data.property.EntityProperty;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
+import cn.nukkit.entity.passive.EntityHappyGhast;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
@@ -358,6 +359,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
     private int lastChorusFruitTeleport = 20;
     public long lastSkinChange = -1;
     private double lastRightClickTime = 0.0;
+    private long lastClickAirTime = 0;
     private BlockVector3 lastRightClickPos = null;
     public EntityFishingHook fishing = null;
     public boolean formOpen;
@@ -447,14 +449,20 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         return startAction;
     }
 
+    /**
+     * @deprecated use {@link #setUsingItem(boolean)} instead
+     */
+    @Deprecated(forRemoval = true)
     public void startAction() {
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, true);
-        this.startAction = this.server.getTick();
+        this.setUsingItem(true);
     }
 
+    /**
+     * @deprecated use {@link #setUsingItem(boolean)} instead
+     */
+    @Deprecated(forRemoval = true)
     public void stopAction() {
-        this.setDataFlag(Player.DATA_FLAGS, Player.DATA_FLAG_ACTION, false);
-        this.startAction = -1;
+        this.setUsingItem(false);
     }
 
     public int getLastEnderPearlThrowingTick() {
@@ -2556,14 +2564,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 } else {
                     this.lastInAirTick = server.getTick();
 
-                    if (this.checkMovement && !this.isGliding() && !server.getAllowFlight() && this.inAirTicks > 20 && !this.getAllowFlight() && !this.isSleeping() && !this.isImmobile() && !this.isSwimming() && this.riding == null && !this.hasEffect(Effect.LEVITATION) && !this.hasEffect(Effect.SLOW_FALLING)) {
+                    if (this.checkMovement && !this.isGliding() && !server.getAllowFlight() && this.inAirTicks > 20 && !this.getAllowFlight() && !this.isSleeping() && !this.isImmobile() && !this.isSwimming() && this.riding == null && !this.hasEffect(Effect.LEVITATION) && !this.hasEffect(Effect.SLOW_FALLING) && this.speed.y != 0) {
                         double expectedVelocity = (-this.getGravity()) / ((double) this.getDrag()) - ((-this.getGravity()) / ((double) this.getDrag())) * FastMath.exp(-((double) this.getDrag()) * ((double) (this.inAirTicks - this.startAirTicks)));
-                        double diff = (this.speed.y - expectedVelocity) * (this.speed.y - expectedVelocity);
+                        // speed.y: positive=down (from-to), expectedVelocity: negative=down (physics)
+                        // Their sum cancels to ~0 during normal falling
+                        double diff = Math.abs(this.speed.y + expectedVelocity);
 
                         if (this.isOnLadder()) {
                             this.resetFallDistance();
                         } else {
-                            if (diff > 2 && expectedVelocity < this.speed.y && this.speed.y != 0) {
+                            if (diff > 1 && expectedVelocity < 0) {
                                 if (this.inAirTicks < 150) {
                                     PlayerInvalidMoveEvent ev = new PlayerInvalidMoveEvent(this, true);
                                     this.getServer().getPluginManager().callEvent(ev);
@@ -3339,7 +3349,6 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 try {
-                    // TODO: Why do we read this separately?
                     this.loginChainData = ClientChainData.read(loginPacket);
                 } catch (ClientChainData.TooBigSkinException ex) {
                     this.close("", "disconnectionScreen.invalidSkin");
@@ -3361,13 +3370,16 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.version = loginChainData.getGameVersion();
 
-                // Apply username prefix for ViaProxy Java Edition clients
+                // Use verified identity data from ClientChainData (signature-validated) as the source of truth
+                String verifiedName = TextFormat.clean(loginChainData.getUsername());
+                if (this.server.spaceMode == 2 && protocol >= ProtocolInfo.v1_16_0) {
+                    verifiedName = verifiedName != null ? verifiedName.replace(" ", "_") : null;
+                }
                 if (this.isJavaClient() && !server.viaProxyUsernamePrefix.isBlank()) {
-                    this.unverifiedUsername = server.viaProxyUsernamePrefix + this.unverifiedUsername;
+                    verifiedName = server.viaProxyUsernamePrefix + verifiedName;
                 }
 
-                // Do not set username before the user is authenticated
-                this.username = this.unverifiedUsername;
+                this.username = verifiedName;
                 this.unverifiedUsername = null;
                 this.displayName = this.username;
                 this.iusername = Optional.ofNullable(this.username).map(s -> s.toLowerCase(Locale.ROOT)).orElse(null);
@@ -3375,22 +3387,23 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
                 this.server.getLogger().debug("Name: " + this.username + " Protocol: " + this.protocol + " Version: " + this.version);
 
-                this.randomClientId = loginPacket.clientId;
+                this.randomClientId = loginChainData.getClientId();
 
-                this.uuid = loginPacket.clientUUID;
+                this.uuid = loginChainData.getClientUUID();
                 this.rawUUID = Binary.writeUUID(this.uuid);
-                this.minecraftId = loginPacket.minecraftId;
+                this.minecraftId = loginChainData.getMinecraftId();
 
                 boolean valid = true;
-                int len = loginPacket.username.length();
+                String rawVerifiedName = loginChainData.getUsername();
+                int len = rawVerifiedName.length();
                 if (((len > 16 || len < 3) && !gameVersion.isNetEase())
-                        || loginPacket.username.trim().isEmpty()) {
+                        || rawVerifiedName.trim().isEmpty()) {
                     valid = false;
                 }
 
                 if (valid && !gameVersion.isNetEase()) {
                     for (int i = 0; i < len; i++) {
-                        char c = loginPacket.username.charAt(i);
+                        char c = rawVerifiedName.charAt(i);
                         if ((c >= 'a' && c <= 'z') ||
                                 (c >= 'A' && c <= 'Z') ||
                                 (c >= '0' && c <= '9') ||
@@ -3592,6 +3605,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                 }
 
                 if (this.teleportPosition != null) {
+                    if (this.lastTeleportTick != -1
+                            && authPacket.getInputData().contains(AuthInputAction.HANDLE_TELEPORT)) {
+                        this.lastTeleportTick = -1;
+                    }
                     return;
                 }
 
@@ -3601,6 +3618,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (inputY >= -1.001 && inputY <= 1.001) {
                         ((EntityMinecartAbstract) riding).setCurrentSpeed(inputY);
                     }
+                } else if (this.riding instanceof EntityHappyGhast ghast) {
+                    double moveVecX = NukkitMath.clamp(authPacket.getMotion().getX(), -1, 1);
+                    double moveVecY = NukkitMath.clamp(authPacket.getMotion().getY(), -1, 1);
+                    ghast.onPlayerInput(this, moveVecX, moveVecY);
+                    ignoreCoordinateMove = true;
                 } else if (this.riding instanceof EntityBoat boat) {
                     if (this.protocol >= ProtocolInfo.v1_21_130_28) {
                         double moveVecX = authPacket.getMotion().getX();
@@ -3644,8 +3666,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         this.needSendData = true;
                     } else {
                         this.setSprinting(true);
+                        this.setUsingItem(false);
                     }
-                    this.setUsingItem(false);
                 }
 
                 if (authPacket.getInputData().contains(AuthInputAction.STOP_SPRINTING)) {
@@ -4796,7 +4818,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                     return;
                                 }
 
-                                this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
+                                this.setUsingItem(false);
 
                                 if (!(this.distance(blockVector.asVector3()) > (this.isCreative() ? 13 : 7))) {
                                     // 创造模式或假旁观模式（未启用客户端旁观）：允许触发事件但不消耗物品
@@ -4913,10 +4935,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 // 防止右键点击空气的重复触发
                                 // Prevent duplicate triggers of right-click on air
                                 long currentClickAirTime = System.currentTimeMillis();
-                                if (!server.doNotLimitInteractions && (currentClickAirTime - lastRightClickTime) < 100) {
+                                if (!server.doNotLimitInteractions && (currentClickAirTime - lastClickAirTime) < 100) {
                                     return;
                                 }
-                                lastRightClickTime = currentClickAirTime;
+                                lastClickAirTime = currentClickAirTime;
 
                                 Vector3 directionVector = this.getDirectionVector();
 
@@ -6413,7 +6435,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         this.level.dropItem(this.add(0, 1.3, 0), item, motion, 40);
 
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
+        this.setUsingItem(false);
         return true;
     }
 
@@ -6435,7 +6457,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
 
         Vector3 motion = this.getDirectionVector().multiply(0.4);
 
-        this.setDataFlag(DATA_FLAGS, DATA_FLAG_ACTION, false);
+        this.setUsingItem(false);
 
         return this.level.dropAndGetItem(this.add(0, 1.3, 0), item, motion, 40);
     }

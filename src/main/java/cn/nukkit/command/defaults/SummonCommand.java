@@ -10,7 +10,6 @@ import cn.nukkit.command.utils.CommandLogger;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.level.Position;
 import cn.nukkit.network.protocol.AddEntityPacket;
-import cn.nukkit.network.protocol.ProtocolInfo;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,7 +26,7 @@ public class SummonCommand extends VanillaCommand {
         List<String> entity_key = new ArrayList<>();
         Map<Integer, String> entity_ids = new HashMap<>();
 
-        AddEntityPacket.setupLegacyIdentifiers(entity_ids, ProtocolInfo.CURRENT_PROTOCOL);
+        AddEntityPacket.setupLegacyIdentifiers(entity_ids);
         for (String key : entity_ids.values()) {
             entity_key.add(key);
             entity_key.add(key.substring(10));

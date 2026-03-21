@@ -29,9 +29,10 @@ public class ChangeDimensionPacket extends DataPacket {
     @Override
     public void decode() {
         this.dimension = this.getVarInt();
-        this.x = this.getVector3f().x;
-        this.y = this.getVector3f().y;
-        this.z = this.getVector3f().z;
+        var pos = this.getVector3f();
+        this.x = pos.x;
+        this.y = pos.y;
+        this.z = pos.z;
         this.respawn = this.getBoolean();
         if (protocol >= ProtocolInfo.v1_21_20) {
             this.loadingScreenId = this.getOptional(null, BinaryStream::getLInt);

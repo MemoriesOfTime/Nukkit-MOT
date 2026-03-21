@@ -26,7 +26,7 @@ public class PlayerEnchantOptionsPacket extends DataPacket {
             throw new RuntimeException("EnchantOptions too big: " + size);
         }
         for (int i = 0; i < size; i++) {
-            int minLevel = this.getVarInt();
+            int minLevel = (int) this.getUnsignedVarInt();
             int slot = this.getInt();
 
             int eSize = (int) this.getUnsignedVarInt();
@@ -70,7 +70,7 @@ public class PlayerEnchantOptionsPacket extends DataPacket {
         this.reset();
         this.putUnsignedVarInt(this.options.size());
         for (EnchantOptionData option : this.options) {
-            this.putVarInt(option.getMinLevel());
+            this.putUnsignedVarInt(option.getMinLevel());
             this.putInt(option.getPrimarySlot());
             this.putUnsignedVarInt(option.getEnchants0().size());
             for (EnchantData data : option.getEnchants0()) {

@@ -20,10 +20,11 @@ public class DimensionDataPacket extends DataPacket {
 
     @Override
     public void decode() {
+        this.decodeUnsupported();
     }
 
     @Override
     public void encode() {
-
+        this.encodeUnsupported();
     }
 }
