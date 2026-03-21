@@ -128,7 +128,7 @@ public class BlockUpdateScheduler {
     @Deprecated
     @SuppressWarnings("SuspiciousMethodCalls")
     public boolean remove(Vector3 pos) {
-        globalIndex.remove(pos);
+        globalIndex.removeIf(e -> e.pos.equals(pos));
         for (Set<BlockUpdateEntry> tickUpdateSet : queuedUpdates.values()) {
             if (tickUpdateSet.remove(pos)) {
                 return true;

@@ -1130,10 +1130,10 @@ public class Level implements ChunkManager, Metadatable {
         while (updateBlockEntities.hasNext()) {
             BlockEntity be = updateBlockEntities.next();
             if (!be.isValid()) {
-                be.scheduledForBlockEntityUpdate = false;
+                be.scheduledForBlockEntityUpdate.set(false);
                 updateBlockEntities.remove();
             } else if (!be.onUpdate()) {
-                be.scheduledForBlockEntityUpdate = false;
+                be.scheduledForBlockEntityUpdate.set(false);
                 updateBlockEntities.remove();
             }
         }
@@ -3977,8 +3977,7 @@ public class Level implements ChunkManager, Metadatable {
     public void scheduleBlockEntityUpdate(BlockEntity entity) {
         Preconditions.checkNotNull(entity, "entity");
         Preconditions.checkArgument(entity.getLevel() == this, "BlockEntity is not in this level");
-        if (!entity.scheduledForBlockEntityUpdate) {
-            entity.scheduledForBlockEntityUpdate = true;
+        if (entity.scheduledForBlockEntityUpdate.compareAndSet(false, true)) {
             updateBlockEntities.add(entity);
         }
     }
@@ -3990,7 +3989,7 @@ public class Level implements ChunkManager, Metadatable {
         entity.close();
 
         blockEntities.remove(entity.getId());
-        entity.scheduledForBlockEntityUpdate = false;
+        entity.scheduledForBlockEntityUpdate.set(false);
         updateBlockEntities.remove(entity);
     }
 
