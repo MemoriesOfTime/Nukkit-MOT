@@ -40,9 +40,9 @@ public class NetworkSettings extends OkaeriConfig {
     @CustomKey("rak-packet-limit")
     private int rakPacketLimit = RakConstants.DEFAULT_PACKET_LIMIT;
 
-    @Comment("Enable RakNet cookie validation")
-    @CustomKey("enable-rak-send-cookie")
-    private boolean enableRakSendCookie = true;
+    @Comment("RakNet cookie mode (active, offloaded, offloaded_psk, off, invalid)")
+    @CustomKey("rak-cookie-mode")
+    private String rakCookieMode = "active";
 
     @Comment("Client timeout in milliseconds (reserved, not yet applied)")
     @CustomKey("timeout-milliseconds")
