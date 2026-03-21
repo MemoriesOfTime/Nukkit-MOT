@@ -28,7 +28,7 @@ junit = "6.0.3"
 mockito = "5.11.0"
 nukkitx_natives = "1.0.3"
 raknet = "1.0.0.CR3-20260303.150721-27"
-cloudburst_common = "3.0.0.Beta7-20250812.232642-18"
+cloudburst_common = "3.0.0.Beta12-20260313.231142-8"
 jackson_dataformat_toml = "2.20.1"
 okaeri_configs = "6.1.0-beta.1"
 
@@ -38,6 +38,7 @@ netty-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = 
 netty-codec-haproxy = { module = "io.netty:netty-codec-haproxy", version.ref = "netty_epoll" }
 nukkitx-natives = { module = "com.nukkitx:natives", version.ref = "nukkitx_natives" }
 cloudburst-common = { module = "org.cloudburstmc.protocol:common", version.ref = "cloudburst_common" }
+cloudburst-bedrock-codec = { module = "org.cloudburstmc.protocol:bedrock-codec", version.ref = "cloudburst_common" }
 fastutil = { module = "it.unimi.dsi:fastutil", version.ref = "fastutil" }
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }

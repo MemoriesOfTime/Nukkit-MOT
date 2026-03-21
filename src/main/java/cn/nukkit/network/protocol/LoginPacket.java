@@ -73,6 +73,7 @@ public class LoginPacket extends DataPacket {
 
     @Override
     public void encode() {
+        this.encodeUnsupported();
     }
 
     public int getProtocol() {

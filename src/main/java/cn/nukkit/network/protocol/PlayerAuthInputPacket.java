@@ -160,6 +160,6 @@ public class PlayerAuthInputPacket extends DataPacket {
 
     @Override
     public void encode() {
-        // Noop
+        this.encodeUnsupported();
     }
 }

@@ -51,26 +51,19 @@ public class VoxelShapesPacket extends DataPacket {
         for (int i = 0; i < shapeCount; i++) {
             SerializableVoxelShape shape = new SerializableVoxelShape();
 
-            // Read cells array
-            int cellCount = (int) this.getUnsignedVarInt();
-            List<SerializableVoxelShape.SerializableCells> cells = new ArrayList<>(cellCount);
+            // Read single cells definition
+            short xSize = (short) this.getByte();
+            short ySize = (short) this.getByte();
+            short zSize = (short) this.getByte();
 
-            for (int j = 0; j < cellCount; j++) {
-                short xSize = (short) this.getByte();
-                short ySize = (short) this.getByte();
-                short zSize = (short) this.getByte();
-
-                // Read storage array
-                int storageCount = (int) this.getUnsignedVarInt();
-                List<Short> storage = new ArrayList<>(storageCount);
-                for (int k = 0; k < storageCount; k++) {
-                    storage.add((short) this.getByte());
-                }
-
-                cells.add(new SerializableVoxelShape.SerializableCells(xSize, ySize, zSize, storage));
+            // Read storage array
+            int storageCount = (int) this.getUnsignedVarInt();
+            List<Short> storage = new ArrayList<>(storageCount);
+            for (int k = 0; k < storageCount; k++) {
+                storage.add((short) this.getByte());
             }
 
-            shape.setCells(cells);
+            shape.setCells(new SerializableVoxelShape.SerializableCells(xSize, ySize, zSize, storage));
 
             // Read X coordinates
             int xCount = (int) this.getUnsignedVarInt();
@@ -116,18 +109,16 @@ public class VoxelShapesPacket extends DataPacket {
         // Write shapes array
         this.putUnsignedVarInt(this.shapes.size());
         for (SerializableVoxelShape shape : this.shapes) {
-            // Write cells array
-            this.putUnsignedVarInt(shape.getCells().size());
-            for (SerializableVoxelShape.SerializableCells cell : shape.getCells()) {
-                this.putByte((byte) cell.getXSize());
-                this.putByte((byte) cell.getYSize());
-                this.putByte((byte) cell.getZSize());
+            // Write single cells definition
+            SerializableVoxelShape.SerializableCells cell = shape.getCells();
+            this.putByte((byte) cell.getXSize());
+            this.putByte((byte) cell.getYSize());
+            this.putByte((byte) cell.getZSize());
 
-                // Write storage array
-                this.putUnsignedVarInt(cell.getStorage().size());
-                for (Short value : cell.getStorage()) {
-                    this.putByte(value.byteValue());
-                }
+            // Write storage array
+            this.putUnsignedVarInt(cell.getStorage().size());
+            for (Short value : cell.getStorage()) {
+                this.putByte(value.byteValue());
             }
 
             // Write X coordinates

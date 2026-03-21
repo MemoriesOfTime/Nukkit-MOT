@@ -104,6 +104,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import lombok.extern.log4j.Log4j2;
+import org.cloudburstmc.netty.channel.raknet.config.RakServerCookieMode;
 import org.iq80.leveldb.CompressionType;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
@@ -591,9 +592,9 @@ public class Server {
      */
     public boolean holdWorldSave;
     /**
-     * Enable RakNet cookies for additional security
+     * RakNet cookie mode
      */
-    public boolean enableRakSendCookie;
+    public RakServerCookieMode rakCookieMode;
     /**
      * Enable Proxy Protocol v2 to get real client IP behind proxies like FRP
      */
@@ -2605,6 +2606,7 @@ public class Server {
     private void loadServerConfig(boolean firstLoad) {
         try {
             File configFile = new File(this.dataPath, "nukkit-mot.yml");
+            ConfigMigration.migrateYamlKeys(configFile);
             ServerConfig newConfig = ConfigManager.create(ServerConfig.class, (it) -> {
                 it.configure(opt -> {
                     opt.configurer(new YamlSnakeYamlConfigurer());
@@ -3334,7 +3336,7 @@ public class Server {
         this.networkCompressionThreshold = config.networkSettings().compressionThreshold();
         this.useSnappy = config.networkSettings().useSnappyCompression();
         this.rakPacketLimit = config.networkSettings().rakPacketLimit();
-        this.enableRakSendCookie = config.networkSettings().enableRakSendCookie();
+        this.rakCookieMode = parseRakCookieMode(config.networkSettings().rakCookieMode());
         this.queryPlugins = config.networkSettings().queryPlugins();
         this.useWaterdog = config.networkSettings().useWaterdog();
         this.viaProxyUsernamePrefix = config.networkSettings().viaProxyUsernamePrefix();
@@ -3525,6 +3527,21 @@ public class Server {
 
             put("server-authoritative-movement", "server-auth");
             put("server-authoritative-block-breaking", true);
+        }
+    }
+
+    private static RakServerCookieMode parseRakCookieMode(String value) {
+        try {
+            return RakServerCookieMode.valueOf(value.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            // Backward compatibility: treat "true" as ACTIVE and "false" as OFF
+            if ("true".equalsIgnoreCase(value)) {
+                return RakServerCookieMode.ACTIVE;
+            } else if ("false".equalsIgnoreCase(value)) {
+                return RakServerCookieMode.OFF;
+            }
+            log.warn("Unknown rak-cookie-mode '{}', defaulting to ACTIVE", value);
+            return RakServerCookieMode.ACTIVE;
         }
     }
 }

@@ -10,9 +10,21 @@ public class PhotoTransferPacket extends DataPacket {
     public String photoData;
     //photos are stored in a sibling directory to the game's folder (screenshots/(some UUID)/bookID/example.png)
     public String bookId;
+    /**
+     * @since v465
+     */
     public int type;
+    /**
+     * @since v465
+     */
     public int sourceType;
+    /**
+     * @since v465
+     */
     public long ownerActorUniqueId;
+    /**
+     * @since v465
+     */
     public String newPhotoName;
 
     @Override
@@ -25,20 +37,25 @@ public class PhotoTransferPacket extends DataPacket {
         this.photoName = this.getString();
         this.photoData = this.getString();
         this.bookId = this.getString();
-        this.type = this.getByte();
-        this.sourceType = this.getByte();
-        this.ownerActorUniqueId = this.getLLong();
-        this.newPhotoName = this.getString();
+        if (this.protocol >= ProtocolInfo.v1_17_30) {
+            this.type = this.getByte();
+            this.sourceType = this.getByte();
+            this.ownerActorUniqueId = this.getLLong();
+            this.newPhotoName = this.getString();
+        }
     }
 
     @Override
     public void encode() {
+        this.reset();
         this.putString(photoName);
         this.putString(photoData);
         this.putString(bookId);
-        this.putByte((byte) type);
-        this.putByte((byte) sourceType);
-        this.putLLong(this.ownerActorUniqueId);
-        this.putString(newPhotoName);
+        if (this.protocol >= ProtocolInfo.v1_17_30) {
+            this.putByte((byte) type);
+            this.putByte((byte) sourceType);
+            this.putLLong(this.ownerActorUniqueId);
+            this.putString(newPhotoName);
+        }
     }
 }

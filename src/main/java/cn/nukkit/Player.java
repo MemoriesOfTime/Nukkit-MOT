@@ -17,6 +17,7 @@ import cn.nukkit.entity.data.property.EntityProperty;
 import cn.nukkit.entity.item.*;
 import cn.nukkit.entity.mob.EntityWalkingMob;
 import cn.nukkit.entity.mob.EntityWolf;
+import cn.nukkit.entity.passive.EntityHappyGhast;
 import cn.nukkit.entity.passive.EntityVillager;
 import cn.nukkit.entity.projectile.EntityArrow;
 import cn.nukkit.entity.projectile.EntityProjectile;
@@ -3617,6 +3618,11 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     if (inputY >= -1.001 && inputY <= 1.001) {
                         ((EntityMinecartAbstract) riding).setCurrentSpeed(inputY);
                     }
+                } else if (this.riding instanceof EntityHappyGhast ghast) {
+                    double moveVecX = NukkitMath.clamp(authPacket.getMotion().getX(), -1, 1);
+                    double moveVecY = NukkitMath.clamp(authPacket.getMotion().getY(), -1, 1);
+                    ghast.onPlayerInput(this, moveVecX, moveVecY);
+                    ignoreCoordinateMove = true;
                 } else if (this.riding instanceof EntityBoat boat) {
                     if (this.protocol >= ProtocolInfo.v1_21_130_28) {
                         double moveVecX = authPacket.getMotion().getX();

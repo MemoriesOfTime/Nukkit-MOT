@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * Represents a serializable voxel shape structure for client-server synchronization.
- * Contains multiple cells with their dimensional data and coordinate arrays.
+ * Contains a single cells definition with dimensional data and coordinate arrays.
  *
  * @since v924
  */
@@ -19,10 +19,10 @@ import java.util.List;
 public class SerializableVoxelShape {
 
     /**
-     * List of cells that make up this voxel shape.
-     * Each cell contains dimensional information and storage data.
+     * Cells definition for this voxel shape.
+     * Contains dimensional information and storage data.
      */
-    private List<SerializableCells> cells = new ArrayList<>();
+    private SerializableCells cells;
 
     /**
      * X-axis coordinate boundaries for all cells.

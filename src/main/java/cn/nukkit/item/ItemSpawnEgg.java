@@ -56,7 +56,7 @@ public class ItemSpawnEgg extends Item {
         }
 
         if (!Server.getInstance().spawnEggsEnabled) {
-            player.sendMessage("\u00A7cSpawn eggs are disabled on this server");
+            player.sendMessage("§cSpawn eggs are disabled on this server");
             return false;
         }
 
@@ -156,6 +156,7 @@ public class ItemSpawnEgg extends Item {
             case 142 -> protocolId >= ProtocolInfo.v1_20_80;
             case 140, 144 -> protocolId >= ProtocolInfo.v1_21_0;
             case 141, 143, 145, 146 -> protocolId >= ProtocolInfo.v1_21_50;
+            case 147 -> protocolId >= ProtocolInfo.v1_21_90;
             default -> true;
         };
     }

@@ -25,7 +25,6 @@ import lombok.extern.log4j.Log4j2;
 import org.cloudburstmc.netty.channel.raknet.RakChannelFactory;
 import org.cloudburstmc.netty.channel.raknet.RakChildChannel;
 import org.cloudburstmc.netty.channel.raknet.config.RakChannelOption;
-import org.cloudburstmc.netty.channel.raknet.config.RakServerCookieMode;
 import org.cloudburstmc.netty.handler.codec.raknet.server.RakServerRateLimiter;
 
 import java.lang.reflect.Constructor;
@@ -76,7 +75,7 @@ public class RakNetInterface implements AdvancedSourceInterface {
                 .option(RakChannelOption.RAK_GUID, this.serverId)
                 .option(RakChannelOption.RAK_SUPPORTED_PROTOCOLS, new int[]{8, 9, 10, 11})
                 .childOption(RakChannelOption.RAK_ORDERING_CHANNELS, 1)
-                .option(RakChannelOption.RAK_SERVER_COOKIE_MODE, this.server.enableRakSendCookie ? RakServerCookieMode.ACTIVE : RakServerCookieMode.OFF)
+                .option(RakChannelOption.RAK_SERVER_COOKIE_MODE, this.server.rakCookieMode)
                 .option(RakChannelOption.RAK_PACKET_LIMIT, this.server.rakPacketLimit)
                 .handler(new ChannelInitializer<>() {
                     @Override
