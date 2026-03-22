@@ -156,15 +156,14 @@ public class SimplePacketRegressionTest extends AbstractPacketRegressionTest {
     void testModalFormRequestPacket(int protocolVersion) {
         var nukkitPacket = new cn.nukkit.network.protocol.ModalFormRequestPacket();
         nukkitPacket.protocol = protocolVersion;
-        // formId=0 avoids zigzag vs unsigned VarInt encoding difference
-        nukkitPacket.formId = 0;
+        nukkitPacket.formId = 42;
         nukkitPacket.data = "{}";
         nukkitPacket.encode();
 
         var cbPacket = crossDecode(nukkitPacket,
                 org.cloudburstmc.protocol.bedrock.packet.ModalFormRequestPacket.class);
 
-        assertEquals(0, cbPacket.getFormId());
+        assertEquals(42, cbPacket.getFormId());
         assertEquals("{}", cbPacket.getFormData());
     }
 
