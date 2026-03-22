@@ -128,15 +128,15 @@ public class BlockEntityHopper extends BlockEntitySpawnableContainer implements 
             return false;
         }
 
-        // Sleep when redstone-locked
-        if (this.level.isBlockPowered(this.getBlock())) {
-            return false;
-        }
-
         HopperUpdateEvent ev = new HopperUpdateEvent(this);
         ev.call();
         if (ev.isCancelled()) {
             return true;
+        }
+
+        // Sleep when redstone-locked
+        if (this.level.isBlockPowered(this.getBlock())) {
+            return false;
         }
 
         this.transferCooldown = ev.getTransferCooldown() - 1;
