@@ -535,6 +535,71 @@ public class BlockEntityHopperTest {
             // Items should not have been transferred
             assertEquals(5, ctx.hopper.getInventory().getItem(0).getCount());
         }
+
+        @Test
+        @DisplayName("E4: idle hopper with container above sleeps (returns false)")
+        void idleHopperWithContainerAboveSleeps() {
+            HopperTestContext ctx = createHopper();
+            ctx.hopper.transferCooldown = 0;
+
+            // Empty hopper, empty chest above
+            BlockEntityChest chest = createMockChest();
+            when(ctx.level.getBlockEntity(any(Vector3.class))).thenReturn(chest);
+
+            boolean result = ctx.hopper.onUpdate();
+
+            // No items to transfer, container above → should sleep
+            assertFalse(result);
+        }
+
+        @Test
+        @DisplayName("E5: idle hopper without container above polls for ground items")
+        void idleHopperWithoutContainerAbovePolls() {
+            HopperTestContext ctx = createHopper();
+            ctx.hopper.transferCooldown = 0;
+
+            // Not powered
+            lenient().when(ctx.level.getBlock(any(Vector3.class))).thenReturn(Block.get(Block.HOPPER_BLOCK));
+            when(ctx.level.isBlockPowered(any())).thenReturn(false);
+            // No block entity above, no composter, no entities
+            when(ctx.level.getBlockEntity(any(Vector3.class))).thenReturn(null);
+            lenient().when(ctx.level.getBlock(any(FullChunk.class), anyInt(), anyInt(), anyInt(), anyBoolean()))
+                    .thenReturn(Block.get(Block.AIR));
+            when(ctx.level.getCollidingEntities(any())).thenReturn(new cn.nukkit.entity.Entity[0]);
+
+            boolean result = ctx.hopper.onUpdate();
+
+            // No container above, not full → should stay awake polling for ground items
+            assertTrue(result);
+            assertEquals(8, ctx.hopper.transferCooldown);
+        }
+
+        @Test
+        @DisplayName("E6: full hopper without container above sleeps")
+        void fullHopperWithoutContainerAboveSleeps() {
+            HopperTestContext ctx = createHopper();
+            ctx.hopper.transferCooldown = 0;
+
+            // Fill hopper
+            for (int i = 0; i < ctx.hopper.getInventory().getSize(); i++) {
+                ctx.hopper.getInventory().setItem(i, Item.get(ItemID.IRON_INGOT, 0, 64));
+            }
+
+            // Not powered
+            lenient().when(ctx.level.getBlock(any(Vector3.class))).thenReturn(Block.get(Block.HOPPER_BLOCK));
+            when(ctx.level.isBlockPowered(any())).thenReturn(false);
+            // No block entity above, no composter
+            when(ctx.level.getBlockEntity(any(Vector3.class))).thenReturn(null);
+            lenient().when(ctx.level.getBlock(any(FullChunk.class), anyInt(), anyInt(), anyInt(), anyBoolean()))
+                    .thenReturn(Block.get(Block.AIR));
+            // No push target
+            when(ctx.level.getBlockDataAt(anyInt(), anyInt(), anyInt())).thenReturn(0);
+
+            boolean result = ctx.hopper.onUpdate();
+
+            // Full, no container above, can't push → should sleep
+            assertFalse(result);
+        }
     }
 
     // ===== F. Boundary — Edge cases =====

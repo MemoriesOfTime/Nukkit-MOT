@@ -1,6 +1,8 @@
 package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
+import cn.nukkit.blockentity.BlockEntity;
+import cn.nukkit.blockentity.BlockEntityHopper;
 import cn.nukkit.entity.Entity;
 import cn.nukkit.item.Item;
 import cn.nukkit.math.NukkitMath;
@@ -67,6 +69,16 @@ public abstract class ContainerInventory extends BaseInventory {
         }
 
         super.onClose(who);
+    }
+
+    @Override
+    public void onSlotChange(int index, Item before, boolean send) {
+        super.onSlotChange(index, before, send);
+        // Notify adjacent sleeping hoppers about inventory change
+        InventoryHolder holder = this.getHolder();
+        if (holder instanceof BlockEntity be && !be.closed && be.getLevel() != null) {
+            BlockEntityHopper.wakeupHoppersAround(be.getLevel(), be.getFloorX(), be.getFloorY(), be.getFloorZ());
+        }
     }
 
     public static int calculateRedstone(Inventory inv) {
