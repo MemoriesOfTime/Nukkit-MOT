@@ -21,15 +21,18 @@ public class FireworkRecipe extends MultiRecipe {
             int powder = 0;
             for (Item input : inputs) {
                 if (input.getId() == ItemID.GUNPOWDER) {
-                    powder += 1;
+                    powder++;
                 } else if (input.getId() == ItemID.PAPER) {
                     hasPaper = true;
+                } else if (input.getId() != ItemID.FIREWORKSCHARGE) {
+                    // Only paper, gunpowder and firework stars are allowed
+                    return false;
                 }
             }
             if (!hasPaper) {
                 return false;
             }
-            if (powder != outputItem.getCount()) {
+            if (powder < 1 || powder > 3) {
                 return false;
             }
             return true;
