@@ -284,7 +284,7 @@ public class CraftingManager {
                 }
                 int aux = (int) ingredient.getOrDefault("auxValue", 0);
                 if (aux == 32767) {
-                    aux = legacyEntry.isHasDamage() ? legacyEntry.getDamage() : -1;
+                    aux = -1;
                 } else if (aux == 0) {
                     aux = legacyEntry.getDamage();
                 }
@@ -319,7 +319,8 @@ public class CraftingManager {
             return;
         }
 
-        Map shapedOutput = (Map) ((List) recipe.get("output")).get(0);
+        List<Map> outputList = (List<Map>) recipe.get("output");
+        Map shapedOutput = outputList.get(0);
         RuntimeItemMapping.LegacyEntry shapedOutputEntry = itemMapping.fromRuntime((int) shapedOutput.get("legacyId"));
         top:
         if (shapedOutputEntry != null && shapedOutputEntry.getLegacyId() != 0) {
@@ -330,6 +331,21 @@ public class CraftingManager {
             String nbt = (String) shapedOutput.get("nbt_b64");
             byte[] nbtBytes = nbt != null ? Base64.getDecoder().decode(nbt) : new byte[0];
             Item outputItem = Item.get(shapedOutputEntry.getLegacyId(), outputDamage, (Integer) shapedOutput.getOrDefault("count", 1), nbtBytes);
+
+            List<Item> extraOutputs = new ArrayList<>();
+            for (int i = 1; i < outputList.size(); i++) {
+                Map extraOutput = outputList.get(i);
+                RuntimeItemMapping.LegacyEntry extraEntry = itemMapping.fromRuntime((int) extraOutput.get("legacyId"));
+                if (extraEntry != null && extraEntry.getLegacyId() != 0) {
+                    int extraDamage = (int) extraOutput.getOrDefault("damage", 0);
+                    if (extraDamage == 0) {
+                        extraDamage = extraEntry.getDamage();
+                    }
+                    String extraNbt = (String) extraOutput.get("nbt_b64");
+                    byte[] extraNbtBytes = extraNbt != null ? Base64.getDecoder().decode(extraNbt) : new byte[0];
+                    extraOutputs.add(Item.get(extraEntry.getLegacyId(), extraDamage, (Integer) extraOutput.getOrDefault("count", 1), extraNbtBytes));
+                }
+            }
             String[] shape = ((List<String>) recipe.get("shape")).toArray(new String[0]);
             Map<Character, Item> ingredients = new CharObjectHashMap<>();
             Map<String, Map<String, Object>> input = (Map) recipe.get("input");
@@ -383,7 +399,7 @@ public class CraftingManager {
                     }
                     int aux = (int) ingredientEntry.getValue().getOrDefault("auxValue", 0);
                     if (aux == 32767) {
-                        aux = legacyEntry.isHasDamage() ? legacyEntry.getDamage() : -1;
+                        aux = -1;
                     } else if (aux == 0) {
                         aux = legacyEntry.getDamage();
                     }
@@ -393,7 +409,7 @@ public class CraftingManager {
             }
 
             int priority = (int) recipe.getOrDefault("priority", 0);
-            this.registerRecipe(new ShapedRecipe((String) recipe.get("id"), priority, outputItem, shape, ingredients, Collections.emptyList()));
+            this.registerRecipe(new ShapedRecipe((String) recipe.get("id"), priority, outputItem, shape, ingredients, extraOutputs));
         } else {
             log.trace("Unknown shaped output: {}", recipe);
         }
@@ -412,8 +428,24 @@ public class CraftingManager {
         RuntimeItemMapping.LegacyEntry furnaceOutputEntry = itemMapping.fromIdentifier((String) output.get("id"));
 
         if (furnaceInputEntry != null && furnaceOutputEntry != null && furnaceInputEntry.getLegacyId() != 0 && furnaceOutputEntry.getLegacyId() != 0) {
-            Item inputItem = Item.get(furnaceInputEntry.getLegacyId(), furnaceInputEntry.getDamage(), (Integer) input.getOrDefault("count", 1));
-            Item outputItem = Item.get(furnaceOutputEntry.getLegacyId(), furnaceOutputEntry.getDamage(), (Integer) output.getOrDefault("count", 1));
+            int inputDamage;
+            if (input.containsKey("damage")) {
+                inputDamage = ((Number) input.get("damage")).intValue();
+                if (inputDamage == 32767) {
+                    inputDamage = -1;
+                }
+            } else {
+                inputDamage = furnaceInputEntry.getDamage();
+            }
+            int outputDamage;
+            if (output.containsKey("damage")) {
+                int rawOutputDamage = ((Number) output.get("damage")).intValue();
+                outputDamage = (rawOutputDamage == 32767 || rawOutputDamage == -1) ? furnaceOutputEntry.getDamage() : rawOutputDamage;
+            } else {
+                outputDamage = furnaceOutputEntry.getDamage();
+            }
+            Item inputItem = Item.get(furnaceInputEntry.getLegacyId(), inputDamage, (Integer) input.getOrDefault("count", 1));
+            Item outputItem = Item.get(furnaceOutputEntry.getLegacyId(), outputDamage, (Integer) output.getOrDefault("count", 1));
 
             switch (smeltingBlock) {
                 case "furnace": {
@@ -505,7 +537,7 @@ public class CraftingManager {
                     }
                     int aux = (int) ingredient.getOrDefault("auxValue", 0);
                     if (aux == 32767) {
-                        aux = legacyEntry.isHasDamage() ? legacyEntry.getDamage() : -1;
+                        aux = -1;
                     } else if (aux == 0) {
                         aux = legacyEntry.getDamage();
                     }
@@ -591,7 +623,7 @@ public class CraftingManager {
                     }
                     int aux = (int) ingredientEntry.getValue().getOrDefault("auxValue", 0);
                     if (aux == 32767) {
-                        aux = legacyEntry.isHasDamage() ? legacyEntry.getDamage() : -1;
+                        aux = -1;
                     } else if (aux == 0) {
                         aux = legacyEntry.getDamage();
                     }
