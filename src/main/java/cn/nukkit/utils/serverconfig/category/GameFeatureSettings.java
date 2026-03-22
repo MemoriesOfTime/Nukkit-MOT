@@ -93,6 +93,6 @@ public class GameFeatureSettings extends OkaeriConfig {
 
     @Comment("Enable clearing invalid items from item frames")
     @CustomKey("clear-invalid-item-frame")
-    private boolean clearInvalidItemFrame = true;
+    private boolean clearInvalidItemFrame = false;
 
 }
