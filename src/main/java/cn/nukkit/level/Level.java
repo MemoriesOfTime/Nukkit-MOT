@@ -3979,6 +3979,7 @@ public class Level implements ChunkManager, Metadatable {
         Preconditions.checkArgument(entity.getLevel() == this, "BlockEntity is not in this level");
         if (!entity.scheduledForBlockEntityUpdate) {
             entity.scheduledForBlockEntityUpdate = true;
+            entity.setDirty();
             updateBlockEntities.add(entity);
         }
     }

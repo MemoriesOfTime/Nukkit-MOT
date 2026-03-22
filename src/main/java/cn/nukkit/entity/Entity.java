@@ -3060,6 +3060,9 @@ public abstract class Entity extends Location implements Metadatable {
         }
 
         this.dataProperties.put(data);
+        if (this.chunk != null && !(this instanceof Player)) {
+            this.chunk.setChanged();
+        }
         if (send) {
             EntityMetadata metadata = new EntityMetadata();
             metadata.put(this.dataProperties.get(data.getId()));

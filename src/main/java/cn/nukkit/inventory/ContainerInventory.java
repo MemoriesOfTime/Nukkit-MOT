@@ -77,7 +77,10 @@ public abstract class ContainerInventory extends BaseInventory {
         // Notify adjacent sleeping hoppers about inventory change
         InventoryHolder holder = this.getHolder();
         if (holder instanceof BlockEntity be && !be.closed && be.getLevel() != null) {
+            be.setDirty();
             BlockEntityHopper.wakeupHoppersAround(be.getLevel(), be.getFloorX(), be.getFloorY(), be.getFloorZ());
+        } else if (holder instanceof Entity entity && entity.chunk != null) {
+            entity.chunk.setChanged();
         }
     }
 
