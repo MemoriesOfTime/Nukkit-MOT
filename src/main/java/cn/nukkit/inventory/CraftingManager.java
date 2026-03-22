@@ -88,6 +88,7 @@ public class CraftingManager {
     public final Map<Integer, ContainerRecipe> containerRecipes = new Int2ObjectOpenHashMap<>();
     public final Map<Integer, CampfireRecipe> campfireRecipes = new Int2ObjectOpenHashMap<>();
     private final Map<UUID, SmithingRecipe> smithingRecipes = new Object2ObjectOpenHashMap<>();
+    private final List<StonecutterRecipe> stonecutterRecipes = new ArrayList<>();
 
     private final Object2DoubleOpenHashMap<Recipe> recipeXpMap = new Object2DoubleOpenHashMap<>();
 
@@ -135,7 +136,11 @@ public class CraftingManager {
             try {
                 switch (Utils.toInt(recipe.get("type"))) {
                     case 0: // shapeless
-                        loadShapelessRecipe(itemMapping, recipe);
+                        if ("stonecutter".equals(recipe.get("block"))) {
+                            loadStonecutterRecipe(itemMapping, recipe);
+                        } else {
+                            loadShapelessRecipe(itemMapping, recipe);
+                        }
                         break;
                     case 1: // shaped
                         loadShapedRecipe(itemMapping, recipe);
@@ -244,7 +249,7 @@ public class CraftingManager {
         }
 
         this.rebuildPacket();
-        MainLogger.getLogger().debug("Loaded " + this.recipes.size() + " recipes");
+        MainLogger.getLogger().debug("Loaded " + this.recipes.size() + " recipes, " + this.stonecutterRecipes.size() + " stonecutter recipes");
     }
 
     @SuppressWarnings("unchecked")
@@ -311,6 +316,60 @@ public class CraftingManager {
         } else {
             log.trace("Unknown shapeless output: {}", recipe);
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadStonecutterRecipe(RuntimeItemMapping itemMapping, Map recipe) {
+        Map outputMap = (Map) ((List) recipe.get("output")).get(0);
+        RuntimeItemMapping.LegacyEntry outputEntry = itemMapping.fromRuntime((int) outputMap.get("legacyId"));
+        if (outputEntry == null || outputEntry.getLegacyId() == 0) {
+            log.trace("Unknown stonecutter output: {}", recipe);
+            return;
+        }
+
+        int outputDamage = (int) outputMap.getOrDefault("damage", 0);
+        if (outputDamage == 0) {
+            outputDamage = outputEntry.getDamage();
+        }
+        String nbt = (String) outputMap.get("nbt_b64");
+        byte[] nbtBytes = nbt != null ? Base64.getDecoder().decode(nbt) : new byte[0];
+        Item outputItem = Item.get(outputEntry.getLegacyId(), outputDamage, (Integer) outputMap.getOrDefault("count", 1), nbtBytes);
+
+        List<Map> input = (List<Map>) recipe.get("input");
+        if (input.isEmpty()) {
+            return;
+        }
+        Map<String, Object> ingredientMap = input.get(0);
+        if (!"default".equals(ingredientMap.get("type"))) {
+            log.trace("Unknown stonecutter ingredient type: {}", recipe);
+            return;
+        }
+        RuntimeItemMapping.LegacyEntry inputEntry = itemMapping.fromRuntime((int) ingredientMap.get("itemId"));
+        if (inputEntry == null || inputEntry.getLegacyId() == 0) {
+            log.trace("Unknown stonecutter input: {}", recipe);
+            return;
+        }
+        int inputAux = (int) ingredientMap.getOrDefault("auxValue", 0);
+        int count = (Integer) ingredientMap.getOrDefault("count", 1);
+        Item inputItem;
+        if (inputAux == 32767) {
+            if (inputEntry.isHasDamage()) {
+                // 运行时物品映射到带 damage 的 legacy ID（如花岗岩→stone:1），使用具体 damage 值
+                inputItem = Item.get(inputEntry.getLegacyId(), inputEntry.getDamage(), count);
+            } else {
+                // 真正的通配符：meta 传 null 使 hasMeta=false，编码时 damage=Short.MAX_VALUE(32767)，客户端按 runtimeId 过滤
+                inputItem = Item.get(inputEntry.getLegacyId(), null, count);
+            }
+        } else {
+            if (inputAux == 0) {
+                inputAux = inputEntry.getDamage();
+            }
+            inputItem = Item.get(inputEntry.getLegacyId(), inputAux, count);
+        }
+
+        String recipeId = (String) recipe.get("id");
+        int priority = (int) recipe.getOrDefault("priority", 0);
+        this.registerStonecutterRecipe(new StonecutterRecipe(recipeId, priority, outputItem, inputItem));
     }
 
     @SuppressWarnings("unchecked")
@@ -702,6 +761,11 @@ public class CraftingManager {
                 }
             }
         }
+        for (StonecutterRecipe recipe : this.getStonecutterRecipes()) {
+            if (recipe.getIngredient().isSupportedOn(protocol) && recipe.getResult().isSupportedOn(protocol)) {
+                pk.addStonecutterRecipe(recipe);
+            }
+        }
         //TODO Fix 1.10.0 - 1.14.0 client crash
         if (protocol < ProtocolInfo.v1_10_0 || protocol > ProtocolInfo.v1_13_0) {
             for (FurnaceRecipe recipe : this.getFurnaceRecipes().values()) {
@@ -1041,6 +1105,10 @@ public class CraftingManager {
         return smithingRecipes;
     }
 
+    public List<StonecutterRecipe> getStonecutterRecipes() {
+        return stonecutterRecipes;
+    }
+
     @Deprecated
     public Map<UUID, SmithingRecipe> getSmithingRecipes(int protocol) {
         return this.getSmithingRecipes();
@@ -1254,6 +1322,11 @@ public class CraftingManager {
         this.smithingRecipes.put(multiItemHash, recipe);
     }
 
+    public void registerStonecutterRecipe(StonecutterRecipe recipe) {
+        recipe.setId(UUID.randomUUID());
+        this.stonecutterRecipes.add(recipe);
+    }
+
     @Deprecated
     public void registerSmithingRecipe(int protocol, SmithingRecipe recipe) {
         this.registerSmithingRecipe(recipe);
@@ -1376,6 +1449,23 @@ public class CraftingManager {
             }
         }
 
+        return null;
+    }
+
+    @Nullable
+    public StonecutterRecipe matchStonecutterRecipe(Item input, Item output) {
+        if (input == null || output == null) return null;
+        for (StonecutterRecipe recipe : this.stonecutterRecipes) {
+            boolean ingredientMatch = recipe.getIngredient().equals(input, recipe.getIngredient().hasMeta(), false);
+            boolean resultMatch = recipe.getResult().equals(output, recipe.getResult().hasMeta(), false);
+            if (ingredientMatch && resultMatch) {
+                return recipe;
+            }
+            // 仅输入匹配但输出不匹配时，打印第一个供调试
+            if (ingredientMatch && !resultMatch) {
+                log.debug("Stonecutter ingredient matched but result mismatched: recipe.result={}, output={}", recipe.getResult(), output);
+            }
+        }
         return null;
     }
 

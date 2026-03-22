@@ -38,7 +38,11 @@ public class CraftingTransaction extends InventoryTransaction {
         super(source, actions, false);
 
         this.craftingType = source.craftingType;
-        this.gridSize = (source.getCraftingGrid() instanceof BigCraftingGrid) ? 3 : 2;
+        if (source.craftingType == Player.STONECUTTER_WINDOW_ID) {
+            this.gridSize = 1;
+        } else {
+            this.gridSize = (source.getCraftingGrid() instanceof BigCraftingGrid) ? 3 : 2;
+        }
         this.inputs = new ArrayList<>();
         this.secondaryOutputs = new ArrayList<>();
 
@@ -46,7 +50,7 @@ public class CraftingTransaction extends InventoryTransaction {
     }
 
     public void setInput(Item item) {
-        if (inputs.size() < gridSize * gridSize) {
+        if (inputs.size() < gridSize * gridSize || this.craftingType == Player.STONECUTTER_WINDOW_ID) {
             for (Item existingInput : this.inputs) {
                 if (existingInput.equals(item, item.hasMeta(), item.hasCompoundTag())) {
                     existingInput.setCount(existingInput.getCount() + item.getCount());
@@ -64,7 +68,7 @@ public class CraftingTransaction extends InventoryTransaction {
     }
 
     public void setExtraOutput(Item item) {
-        if (secondaryOutputs.size() < gridSize * gridSize) {
+        if (secondaryOutputs.size() < gridSize * gridSize || this.craftingType == Player.STONECUTTER_WINDOW_ID) {
             secondaryOutputs.add(item.clone());
         } else {
             throw new RuntimeException("Output list is full can't add " + item);
@@ -98,26 +102,8 @@ public class CraftingTransaction extends InventoryTransaction {
 
     @Override
     public boolean canExecute() {
-        /*CraftingManager craftingManager = source.getServer().getCraftingManager();
-        Inventory inventory;
-        if (craftingType == Player.CRAFTING_SMITHING) {
-            inventory = source.getWindowById(Player.SMITHING_WINDOW_ID);
-            if (inventory instanceof SmithingInventory smithingInventory) {
-                addInventory(inventory);
-                SmithingRecipe smithingRecipe = smithingInventory.matchRecipe();
-                if (smithingRecipe != null && this.primaryOutput.equals(smithingRecipe.getFinalResult(smithingInventory.getEquipment(), smithingInventory.getTemplate()), true, true)) {
-                    setTransactionRecipe(smithingRecipe);
-                }
-            }
-        } else {
-            MultiRecipe multiRecipe = craftingManager.getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
-            if (multiRecipe != null) {
-                setTransactionRecipe(multiRecipe.toRecipe(this.getPrimaryOutput(), this.getInputList()));
-            } else {
-                setTransactionRecipe(craftingManager.matchRecipe(source.protocol, inputs, this.primaryOutput, this.secondaryOutputs));
-            }
-        }*/
-        Recipe recipe = source.getServer().getCraftingManager().matchRecipe(this.inputs, this.primaryOutput, this.secondaryOutputs);
+        Recipe recipe;
+        recipe = source.getServer().getCraftingManager().matchRecipe(this.inputs, this.primaryOutput, this.secondaryOutputs);
         if (recipe == null) {
             MultiRecipe multiRecipe = source.getServer().getCraftingManager().getMultiRecipe(this.source, this.getPrimaryOutput(), this.getInputList());
             if (multiRecipe != null) {
