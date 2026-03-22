@@ -116,10 +116,10 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
         CompoundTag itemOriginal = namedTag.getCompound("Item");
 
         CompoundTag tag = new CompoundTag()
-                .putString("id", BlockEntity.ITEM_FRAME)
-                .putInt("x", (int) this.x)
-                .putInt("y", (int) this.y)
-                .putInt("z", (int) this.z);
+            .putString("id", BlockEntity.ITEM_FRAME)
+            .putInt("x", (int) this.x)
+            .putInt("y", (int) this.y)
+            .putInt("z", (int) this.z);
 
         int itemId = itemOriginal.getShort("id");
         String itemName = itemOriginal.getString("Name");
@@ -140,8 +140,13 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
                                 throw new Exception("Empty namespaceId");
                             }
                         } catch (Exception e) {
-                            namespaceId = "minecraft:unknown";
-                            Server.getInstance().getLogger().error("Failed to get namespaceId of " + itemId + ":" + damage, e);
+                            Server.getInstance().getLogger().error(String.format(
+                                "Failed to get namespaceId for item %d:%d", itemId, damage), e);
+                            if (Server.getInstance().getServerConfig().gameFeatureSettings().clearInvalidItemFrame()) {
+                                // 清除无效物品
+                                this.setItem(new ItemBlock(Block.get(BlockID.AIR)), false);
+                            }
+                            return tag;
                         }
                     }
                     item.putString("Name", namespaceId);
@@ -159,7 +164,7 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
             }
 
             tag.putCompound("Item", item)
-                    .putByte("ItemRotation", this.getItemRotation());
+                .putByte("ItemRotation", this.getItemRotation());
         }
         return tag;
     }

@@ -90,4 +90,9 @@ public class GameFeatureSettings extends OkaeriConfig {
     @Comment("Check operator movement for cheating")
     @CustomKey("check-op-movement")
     private boolean checkOpMovement = false;
+
+    @Comment("Enable clearing invalid items from item frames")
+    @CustomKey("clear-invalid-item-frame")
+    private boolean clearInvalidItemFrame = true;
+
 }
