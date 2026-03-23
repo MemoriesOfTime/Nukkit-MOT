@@ -4710,6 +4710,14 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 if (!players.isEmpty()) {
                                     level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_GRINDSTONE_USE);
                                 }
+                                int exp = this.grindstoneTransaction.getExperienceDropped();
+                                if (exp > 0) {
+                                    Inventory grindstoneInv = this.getWindowById(Player.GRINDSTONE_WINDOW_ID);
+                                    if (grindstoneInv instanceof GrindstoneInventory gInv) {
+                                        Position grindstonePos = gInv.getHolder();
+                                        level.dropExpOrb(grindstonePos.add(0.5, 0.5, 0.5), exp);
+                                    }
+                                }
                             }
                             this.grindstoneTransaction = null;
                         }

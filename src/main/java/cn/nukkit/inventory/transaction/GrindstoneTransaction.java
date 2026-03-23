@@ -22,6 +22,8 @@ public class GrindstoneTransaction extends InventoryTransaction {
     private Item ingredientItem;
     @Getter
     private Item outputItem;
+    @Getter
+    private int experienceDropped;
     private final List<Item> outputItemCheck = new ArrayList<>();
 
     public GrindstoneTransaction(Player source, List<InventoryAction> actions) {
@@ -92,7 +94,8 @@ public class GrindstoneTransaction extends InventoryTransaction {
         }
 
         GrindstoneInventory inventory = (GrindstoneInventory) getSource().getWindowById(Player.GRINDSTONE_WINDOW_ID);
-        GrindItemEvent event = new GrindItemEvent(inventory, this.equipmentItem, this.outputItem, this.ingredientItem, this.source);
+        int experience = inventory.calculateExperience();
+        GrindItemEvent event = new GrindItemEvent(inventory, this.equipmentItem, this.outputItem, this.ingredientItem, experience, this.source);
         this.source.getServer().getPluginManager().callEvent(event);
         if (event.isCancelled()) {
             this.sendInventories();
@@ -108,6 +111,7 @@ public class GrindstoneTransaction extends InventoryTransaction {
             }
         }
 
+        this.experienceDropped = event.getExperienceDropped();
         return true;
     }
 

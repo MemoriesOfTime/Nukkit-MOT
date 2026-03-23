@@ -521,6 +521,10 @@ public abstract class Enchantment implements Cloneable {
         return false;
     }
 
+    public boolean isCurse() {
+        return false;
+    }
+
     @Override
     protected Enchantment clone() {
         try {
