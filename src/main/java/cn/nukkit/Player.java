@@ -4642,6 +4642,10 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                                 level.addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BLOCK_STONECUTTER_USE);
                             }
                             this.stonecutterTransaction = null;
+                        } else if (this.stonecutterTransaction.getActionList().size() >= 4) {
+                            // 切石机操作最多 4 个 action，超过说明数据已损坏
+                            this.setNeedSendInventory(true);
+                            this.stonecutterTransaction = null;
                         }
                         return;
                     }
