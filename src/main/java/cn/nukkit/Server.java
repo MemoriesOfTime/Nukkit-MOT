@@ -265,6 +265,7 @@ public class Server {
     private Level defaultLevel;
     private final Thread currentThread;
     private Watchdog watchdog;
+    private NukkitMetrics nukkitMetrics;
     private final DB nameLookup;
     private PlayerDataSerializer playerDataSerializer;
     private SpawnerTask spawnerTask;
@@ -952,7 +953,7 @@ public class Server {
         }
 
         if (this.serverConfig.debugSettings().bstatsMetrics()) {
-            new NukkitMetrics(this);
+            this.nukkitMetrics = new NukkitMetrics(this);
         }
 
         // 触发一次，加载JwtConsumerHolder
@@ -1246,6 +1247,11 @@ public class Server {
             if (nameLookup != null) {
                 this.getLogger().debug("Closing name lookup DB...");
                 nameLookup.close();
+            }
+
+            if (this.nukkitMetrics != null) {
+                this.getLogger().debug("Stopping metrics...");
+                this.nukkitMetrics.shutdown();
             }
 
             if (this.watchdog != null) {

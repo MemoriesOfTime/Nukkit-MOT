@@ -94,3 +94,15 @@ YourKit is the creator of <a href="https://www.yourkit.com/java/profiler/">YourK
 <a href="https://www.yourkit.com/dotnet-profiler/">YourKit .NET Profiler</a>,
 and <a href="https://www.yourkit.com/youmonitor/">YourKit YouMonitor</a>.
 
+## Star 历史
+
+如果你喜欢这个项目，请帮我们点个 Star ⭐
+
+<a href="https://www.star-history.com/?repos=MemoriesOfTime%2FNukkit-MOT&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=MemoriesOfTime/Nukkit-MOT&type=date&legend=top-left" />
+ </picture>
+</a>
+

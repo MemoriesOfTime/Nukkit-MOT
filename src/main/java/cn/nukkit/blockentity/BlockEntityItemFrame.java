@@ -137,11 +137,11 @@ public class BlockEntityItemFrame extends BlockEntitySpawnable {
                         try {
                             namespaceId = RuntimeItems.getMapping(protocol).toRuntime(itemId, damage).getIdentifier();
                             if (namespaceId == null || namespaceId.isBlank()) {
-                                throw new Exception("Empty namespaceId");
+                                namespaceId = "minecraft:unknown";
                             }
                         } catch (Exception e) {
                             namespaceId = "minecraft:unknown";
-                            Server.getInstance().getLogger().error("Failed to get namespaceId of " + itemId + ":" + damage, e);
+                            Server.getInstance().getLogger().debug("ItemFrame at (" + (int) this.x + ", " + (int) this.y + ", " + (int) this.z + ") failed to get namespaceId of " + itemId + ":" + damage + ": " + e.getMessage());
                         }
                     }
                     item.putString("Name", namespaceId);

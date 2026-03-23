@@ -340,7 +340,17 @@ public class BlockRedstoneWire extends BlockFlowable {
         if (block.getId() == Block.REDSTONE_WIRE) {
             return 0;
         }
-        return block.isNormalBlock() ? getStrongPower(pos.getSide(face), face) : block.getWeakPower(face);
+        if (block.isNormalBlock()) {
+            int power = 0;
+            for (BlockFace side : BlockFace.values()) {
+                power = Math.max(power, getStrongPower(pos.getSide(side), side));
+                if (power >= 15) {
+                    return power;
+                }
+            }
+            return power;
+        }
+        return block.getWeakPower(face);
     }
 
     private int getStrongPower(Vector3 pos, BlockFace direction) {
