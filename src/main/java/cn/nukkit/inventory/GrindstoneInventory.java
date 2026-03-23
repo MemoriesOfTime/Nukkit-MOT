@@ -193,4 +193,21 @@ public class GrindstoneInventory extends FakeBlockUIComponent {
         super.onOpen(who);
         who.craftingType = Player.GRINDSTONE_WINDOW_ID;
     }
+
+    @Override
+    public void onClose(Player who) {
+        super.onClose(who);
+        who.craftingType = Player.CRAFTING_SMALL;
+
+        Item[] drops = who.getInventory().addItem(this.getItem(EQUIPMENT), this.getItem(INGREDIENT));
+        for (Item drop : drops) {
+            if (!who.dropItem(drop)) {
+                this.getHolder().getLevel().dropItem(this.getHolder().add(0.5, 0.5, 0.5), drop);
+            }
+        }
+
+        this.clear(EQUIPMENT);
+        this.clear(INGREDIENT);
+        who.resetCraftingGridType();
+    }
 }

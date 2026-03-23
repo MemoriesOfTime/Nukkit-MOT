@@ -40,8 +40,6 @@ public class StonecutterTransaction extends InventoryTransaction {
     public void addAction(InventoryAction action) {
         super.addAction(action);
         if (action instanceof StonecutterItemAction sta) {
-            Server.getInstance().getLogger().warning("StonecutterTransaction.addAction: type=" + sta.getType()
-                    + ", sourceItem=" + action.getSourceItem() + ", targetItem=" + action.getTargetItem());
             switch (sta.getType()) {
                 case NetworkInventoryAction.SOURCE_TYPE_CRAFTING_USE_INGREDIENT:
                     this.inputItem = action.getTargetItem();
@@ -56,18 +54,15 @@ public class StonecutterTransaction extends InventoryTransaction {
     @Override
     public boolean canExecute() {
         if (!super.canExecute()) {
-            source.getServer().getLogger().warning("StonecutterTransaction: super.canExecute() failed");
             return false;
         }
 
         Inventory inventory = getSource().getWindowById(Player.STONECUTTER_WINDOW_ID);
         if (!(inventory instanceof StonecutterInventory stonecutterInventory)) {
-            source.getServer().getLogger().warning("StonecutterTransaction: no stonecutter inventory open");
             return false;
         }
 
         if (this.outputItem == null || this.outputItem.isNull() || this.inputItem == null || this.inputItem.isNull()) {
-            source.getServer().getLogger().warning("StonecutterTransaction: inputItem=" + this.inputItem + ", outputItem=" + this.outputItem);
             return false;
         }
 
@@ -81,13 +76,11 @@ public class StonecutterTransaction extends InventoryTransaction {
 
         // 验证客户端声称的输入与库存中实际物品一致
         if (!inputItem.equals(stonecutterInventory.getInput(), true, true)) {
-            source.getServer().getLogger().warning("StonecutterTransaction: input mismatch, claimed=" + inputItem + ", actual=" + stonecutterInventory.getInput());
             return false;
         }
 
         StonecutterRecipe recipe = Server.getInstance().getCraftingManager().matchStonecutterRecipe(this.inputItem, this.outputItem);
         if (recipe == null) {
-            source.getServer().getLogger().warning("StonecutterTransaction: no matching recipe for input=" + this.inputItem + ", output=" + this.outputItem);
             return false;
         }
 
