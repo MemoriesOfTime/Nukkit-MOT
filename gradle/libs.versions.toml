@@ -25,7 +25,11 @@ oshi = "6.6.5"
 annotations = "26.0.2"
 jose4j = "0.9.6"
 junit = "6.0.3"
-mockito = "5.11.0"
+
+mockito = "5.17.0"
+bytebuddy = "1.17.5"
+objenesis = "3.4"
+
 nukkitx_natives = "1.0.3"
 raknet = "1.0.0.CR3-20260317.160234-28"
 cloudburst_common = "3.0.0.Beta12-20260313.231142-8"
@@ -47,6 +51,10 @@ fastutil = { module = "it.unimi.dsi:fastutil", version.ref = "fastutil" }
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "caffeine" }
+
+bytebuddy = { module = "net.bytebuddy:byte-buddy", version.ref = "bytebuddy" }
+bytebuddy-agent = { module = "net.bytebuddy:byte-buddy-agent", version.ref = "bytebuddy" }
+objenesis = { module = "org.objenesis:objenesis", version.ref = "objenesis" }
 
 snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "snakeyaml" }
 snakeyaml-engine = { module = "org.snakeyaml:snakeyaml-engine", version.ref = "snakeyaml_engine" }
@@ -96,7 +104,7 @@ leveldb = [ "leveldb", "leveldb-api", "leveldb-jni" ]
 log4j = [ "log4j-api", "log4j-core", "log4j-slf4j" ]
 terminal = [ "jline-terminal-jni", "jline-reader", "terminal-console" ]
 junit = [ "junit-jupiter", "junit-engine" ]
-mockito = [ "mockito-core", "mockito-junit" ]
+mockito = [ "mockito-core", "mockito-junit", "bytebuddy", "bytebuddy-agent", "objenesis" ]
 
 [plugins]
 shadow = { id = "com.gradleup.shadow", version = "9.0.0-beta4" }

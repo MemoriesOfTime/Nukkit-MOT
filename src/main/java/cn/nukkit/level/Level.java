@@ -4155,7 +4155,6 @@ public class Level implements ChunkManager, Metadatable {
                 }
             }
 
-            this.updateQueue.clearChunk(x, z);
             this.unloadQueue.remove(hash);
 
             this.nearbyEntitiesCache.invalidateAll();

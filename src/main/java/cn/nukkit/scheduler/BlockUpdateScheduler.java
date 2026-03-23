@@ -114,32 +114,6 @@ public class BlockUpdateScheduler {
         return false;
     }
 
-    public void clearChunk(int chunkX, int chunkZ) {
-        int minX = chunkX << 4;
-        int maxX = minX + 16;
-        int minZ = chunkZ << 4;
-        int maxZ = minZ + 16;
-
-        for (Set<BlockUpdateEntry> tickSet : this.queuedUpdates.values()) {
-            if (tickSet != null) {
-                tickSet.removeIf(entry -> {
-                    Vector3 pos = entry.pos;
-                    return pos.getFloorX() >= minX && pos.getFloorX() < maxX &&
-                            pos.getFloorZ() >= minZ && pos.getFloorZ() < maxZ;
-                });
-            }
-        }
-
-        Set<BlockUpdateEntry> updates = this.pendingUpdates;
-        if (updates != null) {
-            updates.removeIf(entry -> {
-                Vector3 pos = entry.pos;
-                return pos.getFloorX() >= minX && pos.getFloorX() < maxX &&
-                        pos.getFloorZ() >= minZ && pos.getFloorZ() < maxZ;
-            });
-        }
-    }
-
     public boolean remove(BlockUpdateEntry entry) {
         for (Map.Entry<Long, Set<BlockUpdateEntry>> tickUpdateSet : queuedUpdates.entrySet()) {
             if (tickUpdateSet.getValue().remove(entry)) {
