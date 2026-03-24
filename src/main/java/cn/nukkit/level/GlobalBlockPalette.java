@@ -89,6 +89,7 @@ public class GlobalBlockPalette {
     private static BlockPalette blockPalette818;
     private static BlockPalette blockPalette827;
     private static BlockPalette blockPalette844;
+    private static BlockPalette blockPalette944;
 
     private static BlockPalette blockPalette_netease_630;
     private static BlockPalette blockPalette_netease_686;
@@ -323,7 +324,21 @@ public class GlobalBlockPalette {
             return getPaletteByProtocolNetEase(protocol);
         }
 
-        if (protocol >= ProtocolInfo.v1_21_110_26) {
+        if (protocol >= ProtocolInfo.v1_26_10) {
+            if (blockPalette944 == null) {
+                try {
+                    blockPalette944 = new BlockPalette(GameVersion.V1_26_10);
+                } catch (AssertionError e) {
+                    // Fallback to v844 if v944 resource not available yet
+                    log.warn("Block palette for v944 not found, falling back to v844");
+                    if (blockPalette844 == null) {
+                        blockPalette844 = new BlockPalette(GameVersion.V1_21_110);
+                    }
+                    blockPalette944 = blockPalette844;
+                }
+            }
+            return blockPalette944;
+        } else if (protocol >= ProtocolInfo.v1_21_110_26) {
             if (blockPalette844 == null) {
                 blockPalette844 = new BlockPalette(GameVersion.V1_21_110);
             }

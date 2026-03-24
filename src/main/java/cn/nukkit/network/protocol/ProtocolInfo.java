@@ -432,6 +432,30 @@ public interface ProtocolInfo {
      * @since v924
      */
     int CAMERA_AIM_ASSIST_ACTOR_PRIORITY_PACKET = 339;
+    /**
+     * @since v944
+     */
+    int RESOURCE_PACKS_READY_FOR_VALIDATION_PACKET = 340;
+    /**
+     * @since v944
+     */
+    int LOCATOR_BAR_PACKET = 341;
+    /**
+     * @since v944
+     */
+    int PARTY_CHANGED_PACKET = 342;
+    /**
+     * @since v944
+     */
+    int SERVERBOUND_DATA_DRIVEN_SCREEN_CLOSED_PACKET = 343;
+    /**
+     * @since v944
+     */
+    int SYNC_WORLD_CLOCKS_PACKET = 344;
+    /**
+     * @since v944
+     */
+    int CLIENTBOUND_ATTRIBUTE_LAYER_SYNC_PACKET = 345;
 
     @OnlyNetEase
     int PACKET_CONFIRM_SKIN = 0xe4;

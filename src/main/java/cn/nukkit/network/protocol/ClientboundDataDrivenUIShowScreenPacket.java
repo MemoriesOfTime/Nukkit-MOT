@@ -15,6 +15,14 @@ public class ClientboundDataDrivenUIShowScreenPacket extends DataPacket {
      * The ID of the screen to show.
      */
     public String screenId;
+    /**
+     * @since v944
+     */
+    public int formId;
+    /**
+     * @since v944
+     */
+    public Integer dataInstanceId;
 
     @Override
     @Deprecated
@@ -30,11 +38,27 @@ public class ClientboundDataDrivenUIShowScreenPacket extends DataPacket {
     @Override
     public void decode() {
         this.screenId = this.getString();
+        if (this.protocol >= ProtocolInfo.v1_26_10) {
+            this.formId = this.getLInt();
+            boolean hasDataInstanceId = this.getBoolean();
+            if (hasDataInstanceId) {
+                this.dataInstanceId = this.getLInt();
+            }
+        }
     }
 
     @Override
     public void encode() {
         this.reset();
         this.putString(this.screenId);
+        if (this.protocol >= ProtocolInfo.v1_26_10) {
+            this.putLInt(this.formId);
+            if (this.dataInstanceId != null) {
+                this.putBoolean(true);
+                this.putLInt(this.dataInstanceId);
+            } else {
+                this.putBoolean(false);
+            }
+        }
     }
 }
