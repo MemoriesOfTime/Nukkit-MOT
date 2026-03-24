@@ -164,6 +164,7 @@ public class InventoryTransaction {
 
             if (!action.isValid(this.source)) {
                 invalid = true;
+                Server.getInstance().getLogger().debug("matchItems: action.isValid() failed for " + action);
                 return false;
             }
 
@@ -195,6 +196,10 @@ public class InventoryTransaction {
 
         if (clientAuthTrim) {
             needItems.removeIf(item -> TRIM_PATTERN.matcher(item.getNamespaceId()).matches() && item.getDamage() == 0 && item.getCount() <= 1);
+        }
+
+        if (!haveItems.isEmpty() || !needItems.isEmpty()) {
+            Server.getInstance().getLogger().debug("matchItems failed: unmatched haveItems=" + haveItems + ", needItems=" + needItems);
         }
 
         return haveItems.isEmpty() && needItems.isEmpty();

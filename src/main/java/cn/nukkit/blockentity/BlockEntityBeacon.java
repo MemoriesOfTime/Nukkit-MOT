@@ -70,6 +70,12 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
 
     private long currentTick = 0;
 
+    // Cache for expensive calculations (recalculated every 2 update cycles = 160 ticks = 8 seconds)
+    private static final int CACHE_RECALC_INTERVAL = 2;
+    private int cacheCounter = 0;
+    private int cachedPowerLevel = -1; // -1 = uninitialized
+    private boolean cachedSkyAccess = false;
+
     @Override
     public boolean onUpdate() {
         //Only apply effects every 4 secs
@@ -78,11 +84,20 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
         }
 
         int oldPowerLevel = this.getPowerLevel();
+
+        // Recalculate expensive checks periodically, use cached values otherwise
+        if (cachedPowerLevel < 0 || cacheCounter >= CACHE_RECALC_INTERVAL) {
+            cacheCounter = 0;
+            cachedPowerLevel = calculatePowerLevel();
+            cachedSkyAccess = hasSkyAccess();
+        }
+        cacheCounter++;
+
         //Get the power level based on the pyramid
-        setPowerLevel(calculatePowerLevel());
+        setPowerLevel(cachedPowerLevel);
 
         //Skip beacons that do not have a pyramid or sky access
-        if (this.getPowerLevel() < 1 || !hasSkyAccess()) {
+        if (this.getPowerLevel() < 1 || !cachedSkyAccess) {
             if (oldPowerLevel > 0) {
                 this.getLevel().addLevelSoundEvent(this, LevelSoundEventPacket.SOUND_BEACON_DEACTIVATE);
             }
@@ -234,6 +249,9 @@ public class BlockEntityBeacon extends BlockEntitySpawnable {
         if (!nbt.getString("id").equals(BlockEntity.BEACON)) {
             return false;
         }
+
+        // Invalidate cache on player interaction
+        this.cacheCounter = CACHE_RECALC_INTERVAL;
 
         Inventory inv = player.getWindowById(Player.BEACON_WINDOW_ID);
         if (inv instanceof BeaconInventory beaconInventory) {

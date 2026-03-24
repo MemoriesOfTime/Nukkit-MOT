@@ -468,11 +468,25 @@ public class LevelDBProvider implements LevelProvider {
     public boolean unloadChunk(int chunkX, int chunkZ, boolean safe) {
         long index = Level.chunkHash(chunkX, chunkZ);
         BaseFullChunk chunk = this.chunks.get(index);
-        if (chunk == null || !chunk.unload(false, safe)) {
+        if (chunk == null) {
             return false;
         }
-        // TODO: this.lastChunk.set(null);
-        this.chunks.remove(index); // TODO: Do this after saveChunkFuture to prevent loading of old copy
+
+        if (chunk instanceof LevelDBChunk levelDBChunk) {
+            // Wait for any pending async save to complete before closing entities
+            levelDBChunk.writeLock().lock();
+            levelDBChunk.writeLock().unlock();
+            // If still dirty (async save failed or hasn't run), retry synchronously
+            // while entities/block entities are still alive
+            if (levelDBChunk.hasChanged()) {
+                this.saveChunkSync(chunkX, chunkZ, levelDBChunk);
+            }
+        }
+        if (!chunk.unload(false, safe)) {
+            return false;
+        }
+        this.chunks.remove(index, chunk);
+
         return true;
     }
 
@@ -501,10 +515,9 @@ public class LevelDBProvider implements LevelProvider {
             return CompletableFuture.completedFuture(null);
         }
 
-        chunk.setChanged(false);
-
+        long changeSnapshot = chunk.getChanges();
         WriteBatch batch = this.save0(chunkX, chunkZ, chunk);
-        return CompletableFuture.runAsync(() -> this.saveChunkCallback(batch, chunk), this.executor);
+        return CompletableFuture.runAsync(() -> this.saveChunkCallback(batch, chunk, changeSnapshot), this.executor);
     }
 
     public void saveChunkSync(int chunkX, int chunkZ, FullChunk fullChunk) {
@@ -519,10 +532,9 @@ public class LevelDBProvider implements LevelProvider {
             return;
         }
 
-        chunk.setChanged(false);
-
+        long changeSnapshot = chunk.getChanges();
         WriteBatch batch = this.save0(chunkX, chunkZ, chunk);
-        this.saveChunkCallback(batch, chunk);
+        this.saveChunkCallback(batch, chunk, changeSnapshot);
     }
 
     private WriteBatch save0(int chunkX, int chunkZ, LevelDBChunk chunk) {
@@ -604,10 +616,11 @@ public class LevelDBProvider implements LevelProvider {
         return writeBatch;
     }
 
-    private void saveChunkCallback(WriteBatch batch, LevelDBChunk chunk) {
+    private void saveChunkCallback(WriteBatch batch, LevelDBChunk chunk, long changeSnapshot) {
         chunk.writeLock().lock();
         try {
             this.db.write(batch);
+            chunk.clearChangesIfUnmodified(changeSnapshot);
         } catch (Exception e) {
             log.error("Exception in saveChunkCallback for {}", this.getName(), e);
         } finally {
@@ -624,7 +637,6 @@ public class LevelDBProvider implements LevelProvider {
     public void saveChunks() {
         for (BaseFullChunk chunk : this.chunks.values()) {
             if (chunk.hasChanged()) {
-                chunk.setChanged(false);
                 this.saveChunk(chunk.getX(), chunk.getZ(), chunk);
             }
         }
@@ -639,15 +651,19 @@ public class LevelDBProvider implements LevelProvider {
         Iterator<BaseFullChunk> iterator = this.chunks.values().iterator();
         while (iterator.hasNext()) {
             LevelDBChunk chunk = (LevelDBChunk) iterator.next();
-            if (chunk.unload(level.isSaveOnUnloadEnabled(), false)) {
-                if (wait) {
-                    if (!chunk.writeLock().tryLock()) {
-                        chunk.writeLock().lock();
-                    }
-                    chunk.writeLock().unlock();
+            if (wait) {
+                // Wait for any pending async save before closing entities
+                if (!chunk.writeLock().tryLock()) {
+                    chunk.writeLock().lock();
                 }
-                iterator.remove();
+                chunk.writeLock().unlock();
+                // If async save failed, retry synchronously while chunk is still alive
+                if (chunk.hasChanged()) {
+                    this.saveChunkSync(chunk.getX(), chunk.getZ(), chunk);
+                }
             }
+            chunk.unload(level.isSaveOnUnloadEnabled(), false);
+            iterator.remove();
         }
     }
 
